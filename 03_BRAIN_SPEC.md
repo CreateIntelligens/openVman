@@ -1,0 +1,311 @@
+
+# 03_BRAIN_SPEC.md
+## 大腦與記憶層實作指南 (Brain & Memory Implementation Spec)
+
+### 1. 核心定位與設計哲學 (Core Philosophy)
+本層級負責虛擬人的「靈魂、記憶與技能」。
+採用基於檔案系統 (File-system as truth) 與 **LanceDB 向量資料庫**的混合檢索架構。與 `01_BACKEND_SPEC.md` 完全解耦：本層只負責接收文字輸入、檢索記憶、產出 LLM 串流字串，**不處理**任何 WebSocket 或語音合成邏輯。
+
+* **為什麼選 LanceDB**：LanceDB 是嵌入式向量資料庫（Embedded），無需獨立部署服務端，直接運行在應用行程內。比傳統 RAG 方案（如 ChromaDB、Pinecone）更輕量、更低延遲，且原生支援 Lance 格式的高效列存儲，適合本地部署場景。
+* **為什麼選 bge-m3**：BAAI/bge-m3 是目前最強的開源多語言 Embedding 模型，原生支援中文、英文、日文等 100+ 語言，且支援 Dense + Sparse + ColBERT 三種檢索模式，在 MTEB 排行榜上表現優異。本地部署無需依賴外部 API，保障資料隱私。
+
+### 2. 技術選型 (Tech Stack)
+
+| 組件 | 選型 | 說明 |
+|------|------|------|
+| 向量資料庫 | **LanceDB** (嵌入式) | 無服務端、低延遲、原生 Python/JS SDK |
+| Embedding 模型 | **BAAI/bge-m3** (本地) | 多語言、Dense+Sparse 混合檢索 |
+| LLM | OpenAI / Claude / vLLM | 依 `BRAIN_LLM_PROVIDER` 環境變數切換 |
+| 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
+| 知識庫格式 | Markdown 檔案系統 | 人類可讀、Git 可追蹤 |
+
+#### 2.1 bge-m3 部署方式
+
+```python
+# 安裝依賴
+# pip install FlagEmbedding lancedb
+
+from FlagEmbedding import BGEM3FlagModel
+
+# 載入模型（首次會自動下載 ~2.2GB）
+model = BGEM3FlagModel('BAAI/bge-m3', use_fp16=True)
+
+# 生成向量 (Dense Embedding, 1024 維)
+embeddings = model.encode([
+    "這套架構採用三層解耦設計",
+    "虛擬人的記憶系統基於 LanceDB"
+])['dense_vecs']
+
+# embeddings.shape = (2, 1024)
+```
+
+* **硬體需求**：GPU 推薦 (VRAM ≥ 4GB)，CPU 可用但速度較慢（約 50ms/句 vs GPU 5ms/句）。
+* **維度**：1024 維 (Dense)，相較 OpenAI text-embedding-3-small 的 1536 維更緊湊。
+* **fp16 模式**：啟用半精度以節省 VRAM，精度損失可忽略。
+
+#### 2.2 LanceDB 初始化
+
+```python
+import lancedb
+
+# 嵌入式模式：直接指向本地目錄（無需啟動服務）
+db = lancedb.connect("~/.openclaw/lancedb")
+
+# 建立記憶表（若不存在則自動建立）
+if "memories" not in db.table_names():
+    db.create_table("memories", data=[{
+        "text": "初始化記錄",
+        "vector": model.encode(["初始化記錄"])['dense_vecs'][0].tolist(),
+        "source": "system",
+        "date": "2026-03-11",
+        "metadata": "{}"
+    }])
+
+memories_table = db.open_table("memories")
+```
+
+### 3. 知識庫目錄結構 (Knowledge Base Structure)
+系統啟動時，必須載入以下 `.openclaw/workspace/` 目錄結構作為核心 System Prompt 與檢索來源：
+```text
+~/.openclaw/
+├── workspace/
+│   ├── SOUL.md            # 絕對核心：人格設定、語氣限制、核心價值觀
+│   ├── AGENTS.md          # 任務分派：若需調用外部系統，定義工作流程
+│   ├── TOOLS.md           # 工具描述：定義可用的 CRM API / 電商 API Schema
+│   ├── MEMORY.md          # 長期核心記憶 (重要人物、絕對不變的事實)
+│   ├── memory/            # 每日對話日誌
+│   │   └── YYYY-MM-DD.md  # 每日結束後自動歸檔的歷史對話
+│   └── .learnings/        # 自我進化區
+│       ├── LEARNINGS.md   # 從對話中總結出的新知識與偏好
+│       └── ERRORS.md      # 曾經犯過的錯誤與修正紀錄
+└── lancedb/               # LanceDB 嵌入式資料庫目錄
+    ├── memories.lance/     # 記憶向量表
+    └── knowledge.lance/    # 知識庫向量表（從 Markdown 索引而來）
+```
+
+### 4. 知識索引管線 (Knowledge Indexing Pipeline)
+
+系統啟動時（或知識庫檔案有變動時），必須將 Markdown 知識庫索引到 LanceDB 中：
+
+```
+┌──────────────┐     Chunking      ┌──────────────┐    bge-m3     ┌──────────────┐
+│  Markdown    │───────────────────►│  文字片段     │──────────────►│  LanceDB     │
+│  檔案系統     │   (按段落/標題切分)  │  (Chunks)    │  Embedding   │  knowledge   │
+│  workspace/  │                    │  ~200-500字/段│              │  .lance      │
+└──────────────┘                    └──────────────┘              └──────────────┘
+```
+
+**Chunking 策略**：
+* 以 Markdown 標題 (`##`, `###`) 為自然分界點切分。
+* 每個 Chunk 控制在 200-500 字之間，過長則在段落邊界再切。
+* 每個 Chunk 攜帶 metadata：`{ source_file, heading, date, chunk_index }`。
+
+### 5. 記憶檢索與注入機制 (Memory & Retrieval Pipeline)
+
+當收到使用者的輸入 (`user_input`) 時，必須經過以下管線才能組裝出最終的 LLM Prompt：
+
+```
+user_input
+    │
+    ├──► ① 短期會話記憶 (Redis / Memory)
+    │       提取該 Session 最近 10-20 輪對話
+    │
+    ├──► ② LanceDB 語意檢索 (Semantic Search)
+    │       user_input → bge-m3 → 向量化
+    │       → LanceDB memories 表 Top-K 檢索
+    │       → LanceDB knowledge 表 Top-K 檢索
+    │       → 合併 + Re-rank (依分數排序)
+    │
+    └──► ③ Prompt 組裝 (Assembly)
+            ┌──────────────────────────────┐
+            │ [System]                      │
+            │   SOUL.md + MEMORY.md         │
+            ├──────────────────────────────┤
+            │ [Context]                     │
+            │   LanceDB Top-K 記憶片段       │
+            ├──────────────────────────────┤
+            │ [Tools]                       │
+            │   TOOLS.md Function Schema    │
+            ├──────────────────────────────┤
+            │ [History]                     │
+            │   短期會話記憶 (最近 N 輪)      │
+            ├──────────────────────────────┤
+            │ [User]                        │
+            │   當前 user_input             │
+            └──────────────────────────────┘
+```
+
+**LanceDB 檢索範例**：
+```python
+async def retrieve_context(user_input: str, top_k: int = 5):
+    # 1. 向量化使用者輸入
+    query_vec = model.encode([user_input])['dense_vecs'][0].tolist()
+    
+    # 2. 檢索記憶表 (歷史對話)
+    memory_results = memories_table.search(query_vec).limit(top_k).to_list()
+    
+    # 3. 檢索知識表 (Markdown 知識庫)
+    knowledge_results = knowledge_table.search(query_vec).limit(top_k).to_list()
+    
+    # 4. 合併並按相似度分數排序
+    all_results = memory_results + knowledge_results
+    all_results.sort(key=lambda x: x['_distance'])  # 距離越小越相關
+    
+    return all_results[:top_k]
+```
+
+### 6. Token 預算管理 (Token Budget)
+
+為防止 Prompt 超出 LLM 的 Context Window，必須嚴格控制各區塊的 Token 分配：
+
+```
+Total Context Budget = 8192 tokens（依實際 LLM 模型調整）
+┌────────────────────────────────────────────────┐
+│  System (SOUL.md)            ≤ 1500 tokens     │
+│  Memory (MEMORY.md 長期)      ≤ 1000 tokens     │
+│  RAG Context (LanceDB Top-K) ≤ 2000 tokens     │
+│  History (短期對話)            ≤ 2500 tokens     │
+│  User Input                  ≤  500 tokens     │
+│  ─────────────────────────────────────────     │
+│  Reserved (留給 LLM 回答)     ≥  692 tokens     │
+└────────────────────────────────────────────────┘
+```
+
+**溢出處理策略**：
+1. 先壓縮 History（移除最早的對話輪次）。
+2. 再減少 RAG Context（只保留最相關的 Top-3）。
+3. 最後對 System Prompt 做摘要壓縮（不建議，最後手段）。
+
+### 7. 工具調用與擴充 (Tool Calling / Plugins)
+
+虛擬人必須具備與現實世界互動的能力（如查訂單、建立客訴）。
+
+* 大腦層必須支援 LLM 的 Native Function Calling 特性。
+* 當 LLM 決定調用工具時，暫停文字串流輸出，透過定義好的 RESTful API (如 CRM API) 獲取結果後，將結果作為 `tool_message` 再次餵給 LLM 繼續生成。
+
+```python
+# 概念範例：Tool Calling 流程
+async def handle_tool_call(tool_name: str, arguments: dict):
+    if tool_name == "query_order":
+        result = await crm_api.get_order(arguments["order_id"])
+    elif tool_name == "create_ticket":
+        result = await crm_api.create_ticket(arguments)
+    else:
+        result = {"error": f"Unknown tool: {tool_name}"}
+    
+    return result  # 將結果餵回 LLM 繼續生成
+```
+
+### 8. 睡眠與反思機制 (Sleep & Reflection)
+
+為了避免記憶無限膨脹，系統必須實作非同步的「記憶整理」排程 (Cron Job)：
+
+* **觸發時機**：當 Session 閒置超過一定時間，或每日深夜。
+* **執行動作**：
+  1. 呼叫 LLM 總結當日的短期對話內容。
+  2. 將總結寫入 `memory/YYYY-MM-DD.md`。
+  3. 將該 Markdown 進行 Chunking → bge-m3 Embedding → 存入 LanceDB `memories` 表。
+  4. 識別對話中學到的新知識，更新至 `.learnings/LEARNINGS.md`。
+  5. 檢測並清理 LanceDB 中重複度過高的向量記錄（去重）。
+
+```
+每日反思流程 (Nightly Reflection)
+┌─────────────┐    LLM 摘要    ┌──────────────┐   寫檔    ┌──────────────┐
+│ 當日對話紀錄  │──────────────►│  對話總結      │─────────►│ memory/      │
+│ (短期記憶)   │               │  + 新知識      │          │ YYYY-MM-DD.md│
+└─────────────┘               └──────┬───────┘          └──────┬───────┘
+                                     │                         │
+                           更新 LEARNINGS.md             Chunk + Embed
+                                                              │
+                                                    ┌─────────▼────────┐
+                                                    │  LanceDB         │
+                                                    │  memories.lance  │
+                                                    └──────────────────┘
+```
+
+### 9. 多角色切換 (Multi-Persona)
+
+系統應支援透過 `client_init` 帶入 `persona_id` 來切換不同虛擬人角色：
+
+* 每個 Persona 擁有獨立的 `SOUL.md`，存放在 `workspace/personas/{persona_id}/SOUL.md`。
+* `MEMORY.md`、`memory/`、`.learnings/` 可以共享（全域知識）或獨立（角色專屬記憶），依業務需求設定。
+* LanceDB 檢索時，可透過 metadata 中的 `persona_id` 欄位進行過濾。
+
+### 10. 安全防護 (Guardrails)
+
+**10.1 輸入過濾 (Input Sanitization)**
+* 偵測 Prompt Injection 攻擊：使用規則引擎或專用分類模型攔截惡意指令。
+* 長度限制：單輪 `user_input` 最大 500 字，超出截斷並提示使用者。
+
+**10.2 輸出過濾 (Output Filtering)**
+* 敏感內容攔截：可串接內容安全分類器（如 Azure Content Safety）。
+* 角色一致性檢查：確保 LLM 輸出不脫離 `SOUL.md` 定義的人格範圍。
+
+**10.3 對話限制**
+* 單 Session 最大對話輪次：100 輪（超出後提示使用者重新開始）。
+* 單 Session 最大存活時間：30 分鐘（可透過環境變數調整）。
+
+### 11. 環境變數 (Configuration)
+
+```env
+# === 大腦層設定 ===
+BRAIN_PORT=8100
+BRAIN_LLM_PROVIDER=openai       # openai | azure | claude | vllm
+BRAIN_LLM_API_KEY=sk-***
+BRAIN_LLM_MODEL=gpt-4o
+
+# === Embedding 設定 ===
+EMBEDDING_MODEL=BAAI/bge-m3     # 本地 Embedding 模型
+EMBEDDING_USE_FP16=true
+EMBEDDING_DEVICE=cuda            # cuda | cpu
+LANCEDB_PATH=~/.openclaw/lancedb
+
+# === 記憶設定 ===
+SHORT_TERM_MEMORY_ROUNDS=20     # 短期記憶保留輪次
+RAG_TOP_K=5                     # 向量檢索 Top-K
+MAX_SESSION_ROUNDS=100          # 單 Session 最大輪次
+MAX_SESSION_TTL_MINUTES=30      # Session 最大存活時間
+
+# === 安全設定 ===
+MAX_INPUT_LENGTH=500            # 單輪輸入最大字數
+ENABLE_CONTENT_FILTER=true      # 是否啟用內容安全過濾
+```
+
+### 12. 與 Backend 層的介面約定 (Interface with Backend Layer)
+
+大腦層暴露出一個核心異步生成函數供 `01_BACKEND_SPEC` 調用：
+
+```python
+# 核心介面 (Python)
+async def generate_response_stream(
+    client_id: str,
+    user_input: str,
+    persona_id: str = "default"
+) -> AsyncIterator[str]:
+    """
+    完整流程：
+    1. 從短期記憶提取對話歷史
+    2. 將 user_input 透過 bge-m3 向量化
+    3. 在 LanceDB 中執行 Top-K 語意檢索
+    4. 根據 Token Budget 組裝完整 Prompt
+    5. 呼叫 LLM (stream=True)
+    6. 逐 Token yield 回傳給後端
+       → 後端負責標點截斷 + TTS
+    7. (若觸發 Tool Calling) 暫停 yield → 執行工具 → 繼續生成
+    """
+    pass
+```
+
+**HTTP 介面（供後端通過 HTTP 呼叫時使用）**：
+```
+POST /api/generate
+Content-Type: application/json
+
+{
+  "client_id": "kiosk_01",
+  "user_input": "請問我的訂單狀態",
+  "persona_id": "customer_service"
+}
+
+回應：Server-Sent Events (SSE) 或 Streaming JSON
+```
