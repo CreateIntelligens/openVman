@@ -3,18 +3,24 @@ import {
   validateClientEvent,
   validateServerEvent,
 } from "./validators";
+import type {
+  ClientInterruptEvent,
+  ServerErrorEvent,
+} from "../../../../contracts/generated/typescript/protocol-contracts";
 
 const contract = loadProtocolContract();
-const clientEvent = validateClientEvent({
+const clientPayload: ClientInterruptEvent = {
   event: "client_interrupt",
   timestamp: 1710123465,
-});
-const serverEvent = validateServerEvent({
+};
+const serverPayload: ServerErrorEvent = {
   event: "server_error",
   error_code: "INTERNAL_ERROR",
   message: "smoke",
   timestamp: 1710123480,
-});
+};
+const clientEvent = validateClientEvent(clientPayload);
+const serverEvent = validateServerEvent(serverPayload);
 
 console.log(
   JSON.stringify({

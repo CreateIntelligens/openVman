@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import json
+import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 DEFAULT_PROTOCOL_VERSION = "1.0.0"
+
+
+def _ensure_generated_contracts_import_path() -> None:
+    generated_python_root = _resolve_generated_python_root()
+    if str(generated_python_root) not in sys.path:
+        sys.path.insert(0, str(generated_python_root))
+
+
 _VERSION_DIRECTORIES = {
     "1.0.0": "v1",
 }
-_SEMVER_PATTERN = r"^\d+\.\d+\.\d+$"
-ProtocolDirection = Literal["client_to_server", "server_to_client"]
 
 
 class ProtocolValidationError(ValueError):
@@ -32,73 +39,6 @@ class ProtocolValidationError(ValueError):
         self.event = event
         self.details = details or []
         super().__init__(message)
-
-
-class ProtocolBaseModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class ClientInitEvent(ProtocolBaseModel):
-    event: Literal["client_init"]
-    client_id: str = Field(min_length=1, max_length=128)
-    protocol_version: str = Field(pattern=_SEMVER_PATTERN)
-    auth_token: str = Field(min_length=1)
-    capabilities: dict[str, str] = Field(default_factory=dict)
-    timestamp: int = Field(ge=0)
-
-
-class UserSpeakEvent(ProtocolBaseModel):
-    event: Literal["user_speak"]
-    text: str = Field(min_length=1)
-    timestamp: int = Field(ge=0)
-
-
-class ClientInterruptEvent(ProtocolBaseModel):
-    event: Literal["client_interrupt"]
-    timestamp: int = Field(ge=0)
-
-
-class VisemeFrame(ProtocolBaseModel):
-    time: float = Field(ge=0)
-    value: Literal["closed", "A", "E", "I", "O", "U"]
-
-
-class ServerStreamChunkEvent(ProtocolBaseModel):
-    event: Literal["server_stream_chunk"]
-    chunk_id: str = Field(min_length=1)
-    text: str = Field(min_length=1)
-    audio_base64: str = Field(min_length=1)
-    visemes: list[VisemeFrame]
-    emotion: str | None = Field(default=None, min_length=1)
-    is_final: bool
-
-
-class ServerErrorEvent(ProtocolBaseModel):
-    event: Literal["server_error"]
-    error_code: Literal[
-        "TTS_TIMEOUT",
-        "LLM_OVERLOAD",
-        "BRAIN_UNAVAILABLE",
-        "AUTH_FAILED",
-        "SESSION_EXPIRED",
-        "INTERNAL_ERROR",
-    ]
-    message: str = Field(min_length=1)
-    retry_after_ms: int | None = Field(default=None, ge=0)
-    timestamp: int = Field(ge=0)
-
-
-ClientEvent = Annotated[
-    ClientInitEvent | UserSpeakEvent | ClientInterruptEvent,
-    Field(discriminator="event"),
-]
-ServerEvent = Annotated[
-    ServerStreamChunkEvent | ServerErrorEvent,
-    Field(discriminator="event"),
-]
-
-_CLIENT_EVENT_ADAPTER = TypeAdapter(ClientEvent)
-_SERVER_EVENT_ADAPTER = TypeAdapter(ServerEvent)
 
 
 def load_protocol_contract(version: str = DEFAULT_PROTOCOL_VERSION) -> dict[str, Any]:
@@ -119,7 +59,7 @@ def validate_client_event(
         payload,
         version=version,
         allowed_direction="client_to_server",
-        adapter=_CLIENT_EVENT_ADAPTER,
+        adapter=CLIENT_EVENT_ADAPTER,
     )
 
 
@@ -131,7 +71,7 @@ def validate_server_event(
         payload,
         version=version,
         allowed_direction="server_to_client",
-        adapter=_SERVER_EVENT_ADAPTER,
+        adapter=SERVER_EVENT_ADAPTER,
     )
 
 
@@ -208,19 +148,27 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 @lru_cache(maxsize=1)
-def _resolve_protocol_root() -> Path:
+def _resolve_contracts_root() -> Path:
     resolved_path = Path(__file__).resolve()
-    candidates = [Path("/contracts/schemas")]
+    candidates = [Path("/contracts")]
     project_root = _resolve_project_root(resolved_path)
     if project_root is not None:
-        candidates.append(project_root / "contracts" / "schemas")
+        candidates.append(project_root / "contracts")
 
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
+    contracts_root = _first_existing_path(candidates)
+    if contracts_root is not None:
+        return contracts_root
     raise ProtocolValidationError(
-        "Protocol schema directory not found",
+        "Contracts directory not found",
         version=DEFAULT_PROTOCOL_VERSION,
+    )
+
+
+@lru_cache(maxsize=1)
+def _resolve_protocol_root() -> Path:
+    return _require_existing_path(
+        _resolve_contracts_root() / "schemas",
+        message="Protocol schema directory not found",
     )
 
 
@@ -228,3 +176,40 @@ def _resolve_project_root(resolved_path: Path) -> Path | None:
     if len(resolved_path.parents) < 4:
         return None
     return resolved_path.parents[3]
+
+
+def _resolve_generated_python_root() -> Path:
+    generated_python_root = _resolve_contracts_root() / "generated" / "python"
+    if generated_python_root.exists():
+        return generated_python_root
+    raise ModuleNotFoundError(f"Generated protocol contracts not found: {generated_python_root}")
+
+
+def _first_existing_path(candidates: list[Path]) -> Path | None:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _require_existing_path(path: Path, *, message: str) -> Path:
+    if path.exists():
+        return path
+    raise ProtocolValidationError(
+        message,
+        version=DEFAULT_PROTOCOL_VERSION,
+    )
+
+
+_ensure_generated_contracts_import_path()
+
+from openvman_contracts.protocol_contracts import (  # noqa: E402
+    CLIENT_EVENT_ADAPTER,
+    SERVER_EVENT_ADAPTER,
+    ClientInitEvent,
+    ClientInterruptEvent,
+    ProtocolDirection,
+    ServerErrorEvent,
+    ServerStreamChunkEvent,
+    UserSpeakEvent,
+)

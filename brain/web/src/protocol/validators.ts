@@ -4,22 +4,22 @@ import userSpeakSchemaJson from "../../../../contracts/schemas/v1/user_speak.sch
 import clientInterruptSchemaJson from "../../../../contracts/schemas/v1/client_interrupt.schema.json";
 import serverStreamChunkSchemaJson from "../../../../contracts/schemas/v1/server_stream_chunk.schema.json";
 import serverErrorSchemaJson from "../../../../contracts/schemas/v1/server_error.schema.json";
+import type {
+  ClientEvent,
+  ClientInitEvent,
+  ClientInterruptEvent,
+  ContractManifest,
+  ProtocolDirection,
+  ProtocolEventName,
+  ServerErrorEvent,
+  ServerEvent,
+  ServerStreamChunkEvent,
+  UserSpeakEvent,
+  VisemeFrame,
+} from "../../../../contracts/generated/typescript/protocol-contracts";
 
 type JsonValue = boolean | number | string | null | JsonObject | JsonValue[];
 type JsonObject = { [key: string]: JsonValue };
-type ProtocolDirection = "client_to_server" | "server_to_client";
-
-interface ContractEventEntry {
-  direction: ProtocolDirection;
-  schema: string;
-}
-
-interface ContractManifest {
-  protocol: string;
-  version: string;
-  schema_dialect: string;
-  events: Record<string, ContractEventEntry>;
-}
 
 interface EventSchema {
   title: string;
@@ -34,68 +34,16 @@ const schemaRegistry = {
   client_interrupt: clientInterruptSchemaJson as EventSchema,
   server_stream_chunk: serverStreamChunkSchemaJson as EventSchema,
   server_error: serverErrorSchemaJson as EventSchema,
-} satisfies Record<string, EventSchema>;
+} satisfies Record<ProtocolEventName, EventSchema>;
 const clientInitSchema = schemaRegistry.client_init;
 const userSpeakSchema = schemaRegistry.user_speak;
 const clientInterruptSchema = schemaRegistry.client_interrupt;
 const serverStreamChunkSchema = schemaRegistry.server_stream_chunk;
 const serverErrorSchema = schemaRegistry.server_error;
-const allowedServerErrorCodes = readEnum(serverErrorSchema, "error_code");
-const allowedVisemeValues = readEnum(serverStreamChunkSchema, "visemes", "value");
+const allowedServerErrorCodes = readEnum(serverErrorSchema, "error_code") as ServerErrorEvent["error_code"][];
+const allowedVisemeValues = readEnum(serverStreamChunkSchema, "visemes", "value") as VisemeFrame["value"][];
 
 export const DEFAULT_PROTOCOL_VERSION = manifest.version;
-
-export interface ClientInitEvent {
-  event: "client_init";
-  client_id: string;
-  protocol_version: string;
-  auth_token: string;
-  capabilities?: Record<string, string>;
-  timestamp: number;
-}
-
-export interface UserSpeakEvent {
-  event: "user_speak";
-  text: string;
-  timestamp: number;
-}
-
-export interface ClientInterruptEvent {
-  event: "client_interrupt";
-  timestamp: number;
-}
-
-export interface VisemeFrame {
-  time: number;
-  value: "closed" | "A" | "E" | "I" | "O" | "U";
-}
-
-export interface ServerStreamChunkEvent {
-  event: "server_stream_chunk";
-  chunk_id: string;
-  text: string;
-  audio_base64: string;
-  visemes: VisemeFrame[];
-  emotion?: string;
-  is_final: boolean;
-}
-
-export interface ServerErrorEvent {
-  event: "server_error";
-  error_code:
-    | "TTS_TIMEOUT"
-    | "LLM_OVERLOAD"
-    | "BRAIN_UNAVAILABLE"
-    | "AUTH_FAILED"
-    | "SESSION_EXPIRED"
-    | "INTERNAL_ERROR";
-  message: string;
-  retry_after_ms?: number;
-  timestamp: number;
-}
-
-export type ClientEvent = ClientInitEvent | UserSpeakEvent | ClientInterruptEvent;
-export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent;
 
 export class ProtocolValidationError extends Error {
   version: string;
@@ -132,7 +80,7 @@ function validateEvent(
 ): ClientEvent | ServerEvent {
   assertSupportedVersion(version);
   const record = expectRecord(payload, version);
-  const eventName = expectNonEmptyString(record.event, version, "event");
+  const eventName = expectEventName(record.event, version);
   const eventConfig = manifest.events[eventName];
 
   if (!eventConfig || eventConfig.direction !== direction) {
@@ -208,19 +156,17 @@ function validateServerStreamChunk(record: Record<string, unknown>, version: str
 
 function validateServerError(record: Record<string, unknown>, version: string): ServerErrorEvent {
   assertShape(record, serverErrorSchema, version, "server_error");
-  const errorCode = expectNonEmptyString(record.error_code, version, "error_code", "server_error");
-  if (!allowedServerErrorCodes.includes(errorCode)) {
-    throwInvalidField(
-      version,
-      "server_error",
-      "error_code",
-      `must be one of ${allowedServerErrorCodes.join(", ")}`,
-    );
-  }
+  const errorCode = expectEnumValue(
+    record.error_code,
+    allowedServerErrorCodes,
+    version,
+    "server_error",
+    "error_code",
+  );
 
   return {
     event: "server_error",
-    error_code: errorCode as ServerErrorEvent["error_code"],
+    error_code: errorCode,
     message: expectNonEmptyString(record.message, version, "message", "server_error"),
     retry_after_ms: expectOptionalNonNegativeInteger(
       record.retry_after_ms,
@@ -301,10 +247,7 @@ function expectOptionalStringMap(
   eventName: string,
   fieldName: string,
 ) {
-  if (value === undefined) {
-    return {};
-  }
-  return expectStringMap(value, version, eventName, fieldName);
+  return expectOptional(value, () => expectStringMap(value, version, eventName, fieldName)) ?? {};
 }
 
 function expectVisemeFrames(value: unknown, version: string): VisemeFrame[] {
@@ -314,19 +257,18 @@ function expectVisemeFrames(value: unknown, version: string): VisemeFrame[] {
 
   return value.map((item, index) => {
     const record = expectRecord(item, version);
-    const frameValue = expectNonEmptyString(record.value, version, `visemes.${index}.value`, "server_stream_chunk");
-    if (!allowedVisemeValues.includes(frameValue)) {
-      throwInvalidField(
-        version,
-        "server_stream_chunk",
-        `visemes.${index}.value`,
-        `must be one of ${allowedVisemeValues.join(", ")}`,
-      );
-    }
+    const valueFieldName = `visemes.${index}.value`;
+    const frameValue = expectEnumValue(
+      record.value,
+      allowedVisemeValues,
+      version,
+      "server_stream_chunk",
+      valueFieldName,
+    );
 
     return {
       time: expectNonNegativeNumber(record.time, version, "server_stream_chunk", `visemes.${index}.time`),
-      value: frameValue as VisemeFrame["value"],
+      value: frameValue,
     };
   });
 }
@@ -356,16 +298,25 @@ function expectNonEmptyString(
   return value.trim();
 }
 
+function expectEventName(value: unknown, version: string): ProtocolEventName {
+  const eventName = expectNonEmptyString(value, version, "event");
+  if (eventName in manifest.events) {
+    return eventName as ProtocolEventName;
+  }
+  throw new ProtocolValidationError(
+    `Unsupported protocol event \`${eventName}\``,
+    version,
+    eventName,
+  );
+}
+
 function expectOptionalNonEmptyString(
   value: unknown,
   version: string,
   fieldName: string,
   eventName: string,
 ) {
-  if (value === undefined) {
-    return undefined;
-  }
-  return expectNonEmptyString(value, version, fieldName, eventName);
+  return expectOptional(value, () => expectNonEmptyString(value, version, fieldName, eventName));
 }
 
 function expectNonNegativeInteger(
@@ -386,10 +337,7 @@ function expectOptionalNonNegativeInteger(
   eventName: string,
   fieldName: string,
 ) {
-  if (value === undefined) {
-    return undefined;
-  }
-  return expectNonNegativeInteger(value, version, eventName, fieldName);
+  return expectOptional(value, () => expectNonNegativeInteger(value, version, eventName, fieldName));
 }
 
 function expectNonNegativeNumber(
@@ -434,6 +382,27 @@ function readEnum(schema: EventSchema, propertyName: string, nestedProperty?: st
 
 function filterStringEnum(values: JsonValue[] | undefined) {
   return values?.filter((item): item is string => typeof item === "string") ?? [];
+}
+
+function expectOptional<T>(value: unknown, readValue: () => T): T | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return readValue();
+}
+
+function expectEnumValue<T extends string>(
+  value: unknown,
+  allowedValues: readonly T[],
+  version: string,
+  eventName: string,
+  fieldName: string,
+): T {
+  const text = expectNonEmptyString(value, version, fieldName, eventName);
+  if (allowedValues.includes(text as T)) {
+    return text as T;
+  }
+  throwInvalidField(version, eventName, fieldName, `must be one of ${allowedValues.join(", ")}`);
 }
 
 function throwInvalidField(

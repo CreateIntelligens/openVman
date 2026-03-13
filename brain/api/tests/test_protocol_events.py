@@ -9,7 +9,11 @@ import pytest
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
+GENERATED_PYTHON_ROOT = Path(__file__).resolve().parents[3] / "contracts" / "generated" / "python"
+if str(GENERATED_PYTHON_ROOT) not in sys.path:
+    sys.path.insert(0, str(GENERATED_PYTHON_ROOT))
 PROTOCOL_EVENTS_MODULE = "protocol.protocol_events"
+GENERATED_PROTOCOL_MODULE = "openvman_contracts.protocol_contracts"
 
 
 def _import(module_name: str):
@@ -18,6 +22,16 @@ def _import(module_name: str):
 
 def _protocol_events():
     return _import(PROTOCOL_EVENTS_MODULE)
+
+
+def _generated_protocol_contracts():
+    return _import(GENERATED_PROTOCOL_MODULE)
+
+
+def test_generated_python_contracts_module_is_available():
+    generated_contracts = _generated_protocol_contracts()
+
+    assert generated_contracts.DEFAULT_PROTOCOL_VERSION == "1.0.0"
 
 
 def test_load_protocol_contract_exposes_versioned_machine_readable_schemas():
@@ -58,6 +72,7 @@ def test_validate_client_event_accepts_valid_client_init_payload():
     assert event.client_id == "device_001"
     assert event.protocol_version == "1.0.0"
     assert event.capabilities["asr"] == "webkitSpeechRecognition"
+    assert type(event).__module__ == GENERATED_PROTOCOL_MODULE
 
 
 def test_validate_server_event_accepts_valid_stream_chunk_payload():
