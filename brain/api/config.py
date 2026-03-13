@@ -1,0 +1,132 @@
+"""大腦層集中設定 — 從 .env 讀取所有環境變數"""
+
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+API_INTERNAL_PORT = 8100
+
+
+class BrainSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parent.parent / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # === 環境 ===
+    env: str = "dev"  # dev | prod
+
+    # === LLM 設定 ===
+    brain_llm_provider: str = "gemini"
+    brain_llm_api_key: str = ""
+    brain_llm_api_keys: str = ""
+    brain_llm_model: str = "gemini-2.0-flash"
+    brain_llm_fallback_model: str = ""
+    brain_llm_base_url: str = ""
+    brain_llm_temperature: float = 0.3
+    brain_llm_key_cooldown_seconds: int = 60
+    prompt_system_char_budget: int = 6000
+    prompt_context_char_budget: int = 2800
+    prompt_history_char_budget: int = 2200
+    prompt_history_summary_char_budget: int = 900
+
+    # === Embedding 設定 ===
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_use_fp16: bool = True
+    embedding_device: str = "cuda"
+    lancedb_path: str = "~/.openclaw/lancedb"
+    knowledge_index_state_path: str = "/data/knowledge_index_state.json"
+
+    # === 記憶設定 ===
+    short_term_memory_rounds: int = 20
+    rag_top_k: int = 5
+    max_session_rounds: int = 100
+    max_session_ttl_minutes: int = 30
+    session_db_path: str = "/data/sessions.db"
+    memory_maintenance_interval_seconds: int = 300
+
+    # === Agent 設定 ===
+    agent_loop_max_rounds: int = 6
+    tool_document_char_limit: int = 4000
+
+    # === 安全設定 ===
+    max_input_length: int = 500
+    enable_content_filter: bool = True
+    request_rate_limit_per_minute: int = 90
+    block_prompt_injection: bool = True
+    allowed_channels: str = "web,api,kiosk,admin,system"
+
+    @property
+    def is_dev(self) -> bool:
+        return self.env == "dev"
+
+    @property
+    def lancedb_resolved_path(self) -> str:
+        """展開 ~ 為完整路徑"""
+        return str(Path(self.lancedb_path).expanduser())
+
+    @property
+    def session_db_resolved_path(self) -> str:
+        """展開 session db 路徑。"""
+        return str(Path(self.session_db_path).expanduser())
+
+    @property
+    def knowledge_index_state_resolved_path(self) -> str:
+        """展開知識索引狀態檔路徑。"""
+        return str(Path(self.knowledge_index_state_path).expanduser())
+
+    @property
+    def resolved_llm_api_keys(self) -> list[str]:
+        """Combine the legacy single key and the new key-pool env into one list."""
+        candidates = []
+        if self.brain_llm_api_keys.strip():
+            candidates.extend(
+                key.strip()
+                for key in self.brain_llm_api_keys.split(",")
+                if key.strip()
+            )
+        if self.brain_llm_api_key.strip():
+            candidates.append(self.brain_llm_api_key.strip())
+
+        unique_keys: list[str] = []
+        for key in candidates:
+            if key not in unique_keys:
+                unique_keys.append(key)
+        return unique_keys
+
+    @property
+    def resolved_llm_models(self) -> list[str]:
+        """Return the primary and fallback models without duplicates."""
+        models = [self.brain_llm_model.strip()]
+        fallback = self.brain_llm_fallback_model.strip()
+        if fallback and fallback not in models:
+            models.append(fallback)
+        return [model for model in models if model]
+
+    @property
+    def resolved_llm_base_url(self) -> str:
+        """Provide a sane default for Gemini's OpenAI-compatible endpoint."""
+        if self.brain_llm_base_url:
+            return self.brain_llm_base_url
+        if self.brain_llm_provider == "gemini":
+            return "https://generativelanguage.googleapis.com/v1beta/openai/"
+        return ""
+
+    @property
+    def resolved_allowed_channels(self) -> list[str]:
+        return [
+            channel.strip()
+            for channel in self.allowed_channels.split(",")
+            if channel.strip()
+        ]
+
+
+_settings: BrainSettings | None = None
+
+
+def get_settings() -> BrainSettings:
+    """Singleton 取得設定實例"""
+    global _settings
+    if _settings is None:
+        _settings = BrainSettings()
+    return _settings
