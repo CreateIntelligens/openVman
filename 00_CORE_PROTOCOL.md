@@ -9,11 +9,11 @@
   * **參考規格**：詳見 `02_FRONTEND_SPEC.md`。
 
 * **2. 後端通訊與發聲層 (Backend / Nervous System)**：
-  * **職責**：神經網路與發聲器官。負責 WebSocket 連線與 Session 管理。它會向「大腦層」請求文字串流，並負責將文字轉為語音 (TTS)、提取唇形時間軸 (Viseme Extraction)，最後打包推播給前端。**絕對不處理影像，也不處理 RAG 或 LLM 記憶。**
+  * **職責**：神經網路與發聲器官。負責 WebSocket 連線與 Session 管理，並包含一個輕量的訊息處理層 (message handling layer)，用來做事件正規化、排程、ACK、中斷與回傳封裝。它會向「大腦層」請求文字串流，並負責將文字轉為語音 (TTS)、提取唇形時間軸 (Viseme Extraction)，最後打包推播給前端。**絕對不處理影像，也不在此層維護 RAG 知識庫。**
   * **參考規格**：詳見 `01_BACKEND_SPEC.md`。
 
 * **3. 大腦認知層 (Brain / Cognitive Core)**：
-  * **職責**：靈魂與記憶。基於 OpenClaw 概念，整合 LanceDB 與 Markdown 檔案系統。負責接收後端傳來的純文字，進行 RAG 檢索、Prompt 組裝、Tool Calling，並以異步 Generator 的形式，將生成的文字串流 (Text Stream) 交還給通訊層。
+  * **職責**：靈魂與記憶。參考 OpenClaw 的大腦設計，除 LanceDB + Markdown 檔案系統外，還必須具備訊息處理層與 Key Fallback 機制。大腦負責接收後端傳來的純文字或結構化訊息，進行 RAG 檢索、Prompt 組裝、Tool Calling、Provider/Model 路由，並以異步 Generator 的形式，將生成的文字串流 (Text Stream) 交還給通訊層。
   * **參考規格**：詳見 `03_BRAIN_SPEC.md`。
 
 ### 2. 通訊協定 (Communication Layer)

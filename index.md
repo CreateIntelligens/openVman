@@ -11,7 +11,7 @@
 | 編號 | 文件 | 職責 | 狀態 |
 |------|------|------|------|
 | 00 | [00_CORE_PROTOCOL.md](./00_CORE_PROTOCOL.md) | 通訊協定 · WebSocket JSON · Viseme Map · 狀態機 · 錯誤事件 · 心跳 · 版本管理 | ✅ 已完成 |
-| 01 | [01_BACKEND_SPEC.md](./01_BACKEND_SPEC.md) | 後端 (神經)：Session · Chunking · TTS · 中斷 · 配置 · 健檢 · 指標 · 關機 · 日誌 | ✅ 已完成 |
+| 01 | [01_BACKEND_SPEC.md](./01_BACKEND_SPEC.md) | 後端 (神經)：Session · 訊息處理層 · Chunking · zh-TW TTS · Key Fallback · 中斷 · 配置 · 健檢 · 指標 · 關機 · 日誌 | ✅ 已完成 |
 | 02 | [02_FRONTEND_SPEC.md](./02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
 | 03 | [03_BRAIN_SPEC.md](./03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
 
@@ -45,7 +45,7 @@
   │  │  (底層背景)     │  │   ◄── server_error    │  └────────────────┘  │
   │  ├────────────────┤  │   ◄── ping / pong ──►  │  ┌────────────────┐  │
   │  │ <canvas>       │  │                        │  │ TTS Engine     │  │
-  │  │  嘴型 Sprite   │  │                        │  │ Azure/EdgeTTS  │  │
+  │  │  嘴型 Sprite   │  │                        │  │ IndexTTS2 zh-TW│  │
   │  │  (即時覆蓋)     │  │                        │  │ + Viseme 提取  │  │
   │  ├────────────────┤  │                        │  └────────────────┘  │
   │  │ Web Audio API  │  │                        │  ┌────────────────┐  │
@@ -183,9 +183,9 @@
 | 文件 | 章節數 | 涵蓋範圍 |
 |------|--------|----------|
 | `00_CORE_PROTOCOL` | 6 章 | 三層架構總覽 · WebSocket 協定 · Viseme Map · 狀態機 · **錯誤事件 (6 種錯誤碼)** · **Ping/Pong 心跳** · **Init Ack** · **協定版本管理 (SemVer)** · **連線認證** |
-| `01_BACKEND_SPEC` | 12 章 | Session 管理 · LLM Chunking · TTS/Viseme · 中斷處理 · **環境變數配置** · **健康檢查 /health** · **Prometheus 效能指標 (6 項)** · **優雅關機 SIGTERM** · **結構化 JSON 日誌** |
+| `01_BACKEND_SPEC` | 14 章 | Session 管理 · **訊息處理層** · LLM Chunking · **zh-TW TTS/Viseme** · **Provider / Key Fallback** · 中斷處理 · **環境變數配置** · **健康檢查 /health** · **Prometheus 效能指標 (6 項)** · **優雅關機 SIGTERM** · **結構化 JSON 日誌** |
 | `02_FRONTEND_SPEC` | 11 章 | DOM 結構 · Audio Queue · Golden Sync Loop · Canvas Sprite · ASR · 狀態機 · **素材 Manifest (含定位座標)** · **RWD 響應式 (4 種場景)** · **指數退避斷線重連** · **server_error 前端行為表** |
-| `03_BRAIN_SPEC` | 12 章 | **LanceDB 嵌入式向量 DB** · **bge-m3 本地 Embedding (1024 維)** · 知識庫結構 · 知識索引管線 (Chunk→Embed→Lance) · RAG 檢索 · **Token 預算管理** · Tool Calling · 反思機制 · **多角色切換 (persona_id)** · **安全防護 (Guardrails)** · 環境變數 · HTTP/SSE 介面 |
+| `03_BRAIN_SPEC` | 14 章 | **LanceDB 嵌入式向量 DB** · **bge-m3 本地 Embedding (1024 維)** · 知識庫結構 · 知識索引管線 (Chunk→Embed→Lance) · RAG 檢索 · **Message Handling Layer** · **Key / Model Fallback** · **Token 預算管理** · Tool Calling · 反思機制 · **多角色切換 (persona_id)** · **安全防護 (Guardrails)** · 環境變數 · HTTP/SSE 介面 |
 
 ---
 
@@ -196,7 +196,8 @@
 | 前端 | `AudioContext.currentTime` | 唯一對嘴時鐘源，嚴禁 setTimeout |
 | 前端 | `<video>` + `<canvas>` 雙層疊加 | 2.5D 擬真切片渲染 |
 | 後端 | 標點符號截斷 (Punctuation Chunking) | LLM 串流 → 短句 → TTS，最小化延遲 |
-| 後端 | Azure TTS / Edge-TTS + Viseme 提取 | 音頻 + 唇形時間軸同步產出 |
+| 後端 | IndexTTS2-style zh-TW + Viseme 提取 | 以台灣口音為預設，支援品牌聲線與客製化發音 |
+| 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
 | 大腦 | **LanceDB** (嵌入式向量 DB) | 無服務端、低延遲、本地部署 |
 | 大腦 | **BAAI/bge-m3** (本地 Embedding) | 1024 維、多語言、Dense+Sparse 混合檢索 |
 | 大腦 | Markdown 檔案系統 | 人類可讀、Git 可追蹤的知識庫 |
@@ -208,7 +209,7 @@
 
 | 文件 | 預計內容 |
 |------|----------|
-| `04_DEPLOYMENT.md` | Docker Compose 編排 · K8s Deployment YAML · 環境分離 (dev/staging/prod) · CI/CD 流程 (GitHub Actions) · GPU 節點配置 (bge-m3) |
+| `04_DEPLOYMENT.md` | Docker Compose 編排 · K8s Deployment YAML · 環境分離 (dev/staging/prod) · CI/CD 流程 (GitHub Actions) · GPU 節點配置 (bge-m3) · API Key 池與 Secret 管理 |
 | `05_SECURITY.md` | WebSocket JWT 認證流程 · API Key 管理 · Kiosk 設備白名單 · TLS/WSS 設定 · Prompt Injection 防護細節 |
 | `06_ASSET_PIPELINE.md` | 從照片/影片生成 idle.mp4 的 SOP · 6 張嘴型 Sprite 的製作方法 · manifest.json 的校準流程 · 素材品質檢查清單 |
 | `07_MONITORING.md` | Grafana Dashboard 設計 · 告警規則 (Alertmanager) · SLA 定義 (可用性 99.9%) · 日誌查詢範例 (ELK/Loki) |
