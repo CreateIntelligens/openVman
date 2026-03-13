@@ -4,45 +4,50 @@ import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager, suppress
-from time import perf_counter
+from time import perf_counter, time
 from typing import AsyncIterator
 from uuid import uuid4
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from sse_starlette.sse import EventSourceResponse
 
-from agent_loop import stream_agent_reply
-from chat_service import (
+from config import API_INTERNAL_PORT, get_settings
+from core.agent_loop import stream_agent_reply
+from core.chat_service import (
     GenerationContext,
     execute_generation,
     finalize_generation,
     prepare_generation,
     record_generation_failure,
 )
-from config import API_INTERNAL_PORT, get_settings
-from db import ensure_tables, get_db
-from embedder import encode_text, get_embedder
-from guardrails import enforce_guardrails
-from indexer import rebuild_knowledge_index
-from knowledge_admin import (
+from infra.db import ensure_tables, get_db
+from knowledge.indexer import rebuild_knowledge_index
+from knowledge.knowledge_admin import (
     list_workspace_documents,
     move_workspace_document,
     read_workspace_document,
     save_uploaded_document,
     save_workspace_document,
 )
-from message_envelope import build_message_envelope
-from memory import add_memory as store_memory, get_or_create_session, list_session_messages
-from memory_governance import maybe_run_memory_maintenance
-from observability import get_metrics_store, log_event, log_exception
-from personas import (
+from knowledge.workspace import ensure_workspace_scaffold
+from memory.embedder import encode_text, get_embedder
+from memory.memory import add_memory as store_memory, get_or_create_session, list_session_messages
+from memory.memory_governance import maybe_run_memory_maintenance
+from memory.retrieval import search_records
+from personas.personas import (
     clone_persona_scaffold,
     create_persona_scaffold,
     delete_persona_scaffold,
     list_personas,
 )
-from retrieval import search_records
-from workspace import ensure_workspace_scaffold
+from protocol.message_envelope import build_message_envelope
+from protocol.protocol_events import (
+    ProtocolValidationError,
+    validate_client_event,
+    validate_server_event,
+)
+from safety.guardrails import enforce_guardrails
+from safety.observability import get_metrics_store, log_event, log_exception
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brain")
@@ -231,6 +236,35 @@ async def clone_persona(request: Request):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.post("/api/protocol/validate")
+async def protocol_validate(request: Request):
+    """Validate a protocol event payload against the versioned contract."""
+    body = await request.json()
+    direction = str(body.get("direction", "")).strip()
+    payload = body.get("payload")
+    version = str(body.get("version", "1.0.0")).strip()
+
+    if not direction or direction not in {"client_to_server", "server_to_client"}:
+        raise HTTPException(status_code=400, detail="direction 須為 client_to_server 或 server_to_client")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="payload 須為 JSON object")
+
+    try:
+        if direction == "client_to_server":
+            event = validate_client_event(payload, version)
+        else:
+            event = validate_server_event(payload, version)
+        return {"valid": True, "event": event.event, "version": version}
+    except ProtocolValidationError as exc:
+        return {
+            "valid": False,
+            "event": exc.event,
+            "version": exc.version,
+            "error": str(exc),
+            "details": exc.details,
+        }
+
+
 @app.post("/api/embed")
 async def embed(request: Request):
     """測試用：向量化文字"""
@@ -354,7 +388,8 @@ async def generate(request: Request):
             trace_id=getattr(request.state, "trace_id", ""),
         )
         record_generation_failure("generate", "llm_failure", str(exc))
-        raise HTTPException(status_code=502, detail="LLM 生成失敗") from exc
+        error_payload = _build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
+        raise HTTPException(status_code=502, detail=error_payload) from exc
 
 
 @app.post("/api/generate/stream")
@@ -490,6 +525,29 @@ def _sse_event(event: str, payload: dict[str, object]) -> dict[str, str]:
     }
 
 
+def _build_protocol_error(
+    error_code: str,
+    message: str,
+    *,
+    retry_after_ms: int | None = None,
+) -> dict[str, object]:
+    """Build and validate a server_error protocol event."""
+    payload: dict[str, object] = {
+        "event": "server_error",
+        "error_code": error_code,
+        "message": message,
+        "timestamp": int(time()),
+    }
+    if retry_after_ms is not None:
+        payload["retry_after_ms"] = retry_after_ms
+    try:
+        validate_server_event(payload)
+    except ProtocolValidationError:
+        payload["error_code"] = "INTERNAL_ERROR"
+        validate_server_event(payload)
+    return payload
+
+
 async def read_generation_request(request: Request):
     body = await request.json()
     return build_message_envelope(request, body, content_key="message")
@@ -533,11 +591,11 @@ async def stream_generation_events(context: GenerationContext) -> AsyncIterator[
         raise
     except ValueError as exc:
         record_generation_failure("stream_generate", "validation", str(exc))
-        yield _sse_event("error", {"trace_id": context.trace_id, "message": str(exc)})
+        yield _sse_event("error", _build_protocol_error("BRAIN_UNAVAILABLE", str(exc)))
     except Exception as exc:  # pragma: no cover - external provider failures
         log_exception("stream_generate_error", exc, trace_id=context.trace_id)
         record_generation_failure("stream_generate", "llm_failure", str(exc))
-        yield _sse_event("error", {"trace_id": context.trace_id, "message": "LLM 串流生成失敗"})
+        yield _sse_event("error", _build_protocol_error("LLM_OVERLOAD", "LLM 串流生成失敗", retry_after_ms=3000))
 
 
 if __name__ == "__main__":

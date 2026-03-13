@@ -7,10 +7,10 @@ from datetime import date, datetime
 from typing import Any
 from uuid import uuid4
 
-from db import get_memories_table
-from personas import normalize_persona_id
-from session_store import SessionState, SessionStore
-from workspace import ensure_workspace_scaffold
+from infra.db import get_memories_table
+from knowledge.workspace import ensure_workspace_scaffold
+from memory.session_store import SessionState, SessionStore
+from personas.personas import normalize_persona_id
 
 _session_store: SessionStore | None = None
 

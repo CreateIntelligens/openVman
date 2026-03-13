@@ -9,7 +9,7 @@ from time import monotonic
 from typing import Any
 
 from config import get_settings
-from message_envelope import RequestContext
+from protocol.message_envelope import RequestContext
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 _PROMPT_INJECTION_RULES = {

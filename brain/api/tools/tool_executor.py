@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from tool_registry import format_tool_result, get_tool_registry
+from tools.tool_registry import format_tool_result, get_tool_registry
 
 
 def execute_tool_call(tool_name: str, raw_arguments: str | dict[str, Any]) -> str:

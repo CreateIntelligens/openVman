@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 import re
+from datetime import datetime
 from pathlib import Path
 
-from workspace import CORE_DOCUMENTS, ensure_workspace_scaffold
+from knowledge.workspace import CORE_DOCUMENTS, ensure_workspace_scaffold
 
 _LEARNING_PATTERNS = (
     (re.compile(r"(簡短|簡潔|精簡|直接)"), "使用者偏好簡潔、直接的回答。"),

@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import workspace
+from knowledge import workspace
 
 PERSONA_CORE_FILENAMES = {
     "SOUL.md",

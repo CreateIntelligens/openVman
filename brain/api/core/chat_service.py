@@ -5,21 +5,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from agent_loop import AgentLoopResult, run_agent_loop
 from config import get_settings
-from embedder import encode_text
-from guardrails import enforce_guardrails
-from learnings import capture_learnings_from_message, record_error_event
-from message_envelope import MessageEnvelope, serialize_context
-from memory_governance import maybe_run_memory_maintenance
-from memory import (
+from core.agent_loop import AgentLoopResult, run_agent_loop
+from core.prompt_builder import build_chat_messages
+from infra.learnings import capture_learnings_from_message, record_error_event
+from memory.embedder import encode_text
+from memory.memory import (
     append_session_message,
     archive_session_turn,
     get_or_create_session,
     list_session_messages,
 )
-from prompt_builder import build_chat_messages
-from retrieval import search_records
+from memory.memory_governance import maybe_run_memory_maintenance
+from memory.retrieval import search_records
+from protocol.message_envelope import MessageEnvelope, serialize_context
+from safety.guardrails import enforce_guardrails
 
 
 @dataclass(slots=True)

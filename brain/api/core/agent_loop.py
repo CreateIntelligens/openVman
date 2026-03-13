@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
 from config import get_settings
-from llm_client import LLMReply, LLMToolCall, generate_chat_turn
-from tool_executor import execute_tool_call
-from tool_registry import bind_tool_persona, get_tool_registry
+from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn
+from tools.tool_executor import execute_tool_call
+from tools.tool_registry import bind_tool_persona, get_tool_registry
 
 
 @dataclass(slots=True)

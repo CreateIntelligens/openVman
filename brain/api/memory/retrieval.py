@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from db import get_knowledge_table, get_memories_table
-from personas import normalize_persona_id
+from infra.db import get_knowledge_table, get_memories_table
+from personas.personas import normalize_persona_id
 
 
 def get_search_table(table_name: str):

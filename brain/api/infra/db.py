@@ -7,7 +7,7 @@ from typing import Any
 import lancedb
 
 from config import get_settings
-from embedder import encode_text
+from memory.embedder import encode_text
 
 _db: lancedb.DBConnection | None = None
 _tables_ready = False

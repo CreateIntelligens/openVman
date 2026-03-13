@@ -6,16 +6,15 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
 from threading import Lock
 from time import monotonic
 from typing import Any
 
 from config import get_settings
-from db import get_db, get_memories_table
-from embedder import get_embedder
-from personas import normalize_persona_id
-from workspace import CORE_DOCUMENTS, WORKSPACE_ROOT, ensure_workspace_scaffold
+from infra.db import get_db, get_memories_table
+from knowledge.workspace import CORE_DOCUMENTS, WORKSPACE_ROOT, ensure_workspace_scaffold
+from memory.embedder import get_embedder
+from personas.personas import normalize_persona_id
 
 _maintenance_lock = Lock()
 _last_maintenance_at = 0.0

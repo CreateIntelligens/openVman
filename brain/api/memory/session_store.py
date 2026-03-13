@@ -9,7 +9,7 @@ from pathlib import Path
 from threading import Lock
 
 from config import get_settings
-from personas import normalize_persona_id
+from personas.personas import normalize_persona_id
 
 
 @dataclass(slots=True)

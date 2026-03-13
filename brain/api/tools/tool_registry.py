@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from config import get_settings
-from embedder import encode_text
-from retrieval import search_records
-from workspace import WORKSPACE_ROOT, resolve_workspace_document
+from knowledge.workspace import WORKSPACE_ROOT, resolve_workspace_document
+from memory.embedder import encode_text
+from memory.retrieval import search_records
 
 ToolHandler = Callable[[dict[str, Any]], Any]
 _active_persona_id: ContextVar[str] = ContextVar("brain_active_persona_id", default="default")
@@ -93,10 +93,6 @@ def _get_document(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _format_tool_result(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False)
-
-
 _registry: ToolRegistry | None = None
 
 
@@ -156,7 +152,7 @@ def get_tool_registry() -> ToolRegistry:
 
 
 def format_tool_result(payload: dict[str, Any]) -> str:
-    return _format_tool_result(payload)
+    return json.dumps(payload, ensure_ascii=False)
 
 
 @contextmanager

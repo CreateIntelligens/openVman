@@ -9,7 +9,7 @@ from typing import Any
 from openai import AsyncOpenAI, OpenAI
 
 from config import get_settings
-from provider_router import LLMRoute, get_provider_router
+from core.provider_router import LLMRoute, get_provider_router
 
 
 def _require_api_key() -> None:

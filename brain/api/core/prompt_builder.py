@@ -5,13 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from config import get_settings
-from reflection import (
+from infra.reflection import (
     compress_text,
     select_recent_messages,
     summarize_message_history,
     summarize_supporting_context,
 )
-from workspace import load_core_workspace_context
+from knowledge.workspace import load_core_workspace_context
 
 
 def build_chat_messages(

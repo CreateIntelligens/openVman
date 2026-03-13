@@ -9,7 +9,7 @@ from time import monotonic
 from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
 
 from config import get_settings
-from learnings import record_error_event
+from infra.learnings import record_error_event
 
 
 @dataclass(frozen=True, slots=True)

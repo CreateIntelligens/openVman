@@ -105,15 +105,10 @@ def load_protocol_contract(version: str = DEFAULT_PROTOCOL_VERSION) -> dict[str,
     directory = _resolve_version_directory(version)
     manifest_path = _resolve_protocol_root() / directory / "manifest.json"
     manifest = _read_json(manifest_path)
-    contract = dict(manifest)
-    contract["events"] = {
-        event_name: {
-            **event_config,
-            "schema": _read_json(manifest_path.parent / event_config["schema"]),
-        }
-        for event_name, event_config in manifest["events"].items()
+    return {
+        **manifest,
+        "events": _load_contract_events(manifest_path, manifest["events"]),
     }
-    return contract
 
 
 def validate_client_event(
@@ -183,6 +178,19 @@ def _format_validation_errors(exc: ValidationError) -> list[str]:
     ]
 
 
+def _load_contract_events(
+    manifest_path: Path,
+    event_configs: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    return {
+        event_name: {
+            **event_config,
+            "schema": _read_json(manifest_path.parent / event_config["schema"]),
+        }
+        for event_name, event_config in event_configs.items()
+    }
+
+
 def _resolve_version_directory(version: str) -> str:
     directory = _VERSION_DIRECTORIES.get(version)
     if directory:
@@ -217,6 +225,6 @@ def _resolve_protocol_root() -> Path:
 
 
 def _resolve_project_root(resolved_path: Path) -> Path | None:
-    if len(resolved_path.parents) < 3:
+    if len(resolved_path.parents) < 4:
         return None
-    return resolved_path.parents[2]
+    return resolved_path.parents[3]

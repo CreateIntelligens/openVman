@@ -18,15 +18,15 @@ def _import(module_name: str):
 
 
 def _stub_db_module(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_db = types.ModuleType("db")
+    fake_db = types.ModuleType("infra.db")
     fake_db.get_memories_table = lambda: None
     fake_db.get_knowledge_table = lambda: None
     fake_db.get_db = lambda: None
-    monkeypatch.setitem(sys.modules, "db", fake_db)
+    monkeypatch.setitem(sys.modules, "infra.db", fake_db)
 
 
 def _configure_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    workspace = _import("workspace")
+    workspace = _import("knowledge.workspace")
     root = tmp_path / "workspace"
     core_documents = {
         "soul": root / "SOUL.md",
@@ -61,7 +61,7 @@ def test_load_core_workspace_context_overrides_soul_and_inherits_global_docs(
     persona_dir.mkdir(parents=True, exist_ok=True)
     (persona_dir / "SOUL.md").write_text("doctor soul", encoding="utf-8")
 
-    workspace = _import("workspace")
+    workspace = _import("knowledge.workspace")
     context = workspace.load_core_workspace_context("doctor")
 
     assert context["soul"] == "doctor soul"
@@ -79,12 +79,12 @@ def test_is_indexable_document_skips_persona_core_docs(
     persona_soul.parent.mkdir(parents=True, exist_ok=True)
     persona_soul.write_text("doctor soul", encoding="utf-8")
 
-    workspace = _import("workspace")
+    workspace = _import("knowledge.workspace")
     assert workspace.is_indexable_document(persona_soul) is False
 
 
 def test_session_store_rejects_persona_mismatch(tmp_path: Path):
-    session_store = _import("session_store")
+    session_store = _import("memory.session_store")
     store = session_store.SessionStore(str(tmp_path / "sessions.db"))
 
     session = store.get_or_create_session("same-session", "default")
@@ -102,8 +102,8 @@ def test_archive_session_turn_writes_into_persona_subdirectory(
 ):
     root = _configure_workspace(monkeypatch, tmp_path)
     _stub_db_module(monkeypatch)
-    sys.modules.pop("memory", None)
-    memory = _import("memory")
+    sys.modules.pop("memory.memory", None)
+    memory = _import("memory.memory")
 
     memory.archive_session_turn(
         session_id="persona-session",
@@ -119,8 +119,8 @@ def test_archive_session_turn_writes_into_persona_subdirectory(
 
 def test_search_records_returns_matching_persona_and_global_records(monkeypatch: pytest.MonkeyPatch):
     _stub_db_module(monkeypatch)
-    sys.modules.pop("retrieval", None)
-    retrieval = _import("retrieval")
+    sys.modules.pop("memory.retrieval", None)
+    retrieval = _import("memory.retrieval")
 
     records = [
         {
@@ -169,7 +169,7 @@ def test_list_personas_includes_default_and_custom_personas(
     (root / "personas" / "doctor").mkdir(parents=True, exist_ok=True)
     (root / "personas" / "doctor" / "SOUL.md").write_text("doctor soul", encoding="utf-8")
 
-    personas = _import("personas")
+    personas = _import("personas.personas")
     result = personas.list_personas()
     persona_ids = [item["persona_id"] for item in result]
 
@@ -182,7 +182,7 @@ def test_create_persona_scaffold_creates_core_files_and_rejects_duplicates(
     tmp_path: Path,
 ):
     root = _configure_workspace(monkeypatch, tmp_path)
-    personas = _import("personas")
+    personas = _import("personas.personas")
 
     created = personas.create_persona_scaffold("doctor", "醫師助理")
 
@@ -205,7 +205,7 @@ def test_delete_persona_scaffold_removes_custom_persona_only(
     tmp_path: Path,
 ):
     root = _configure_workspace(monkeypatch, tmp_path)
-    personas = _import("personas")
+    personas = _import("personas.personas")
     personas.create_persona_scaffold("doctor", "醫師助理")
 
     deleted = personas.delete_persona_scaffold("doctor")
@@ -223,7 +223,7 @@ def test_clone_persona_scaffold_copies_core_docs_from_source(
     tmp_path: Path,
 ):
     root = _configure_workspace(monkeypatch, tmp_path)
-    personas = _import("personas")
+    personas = _import("personas.personas")
     personas.create_persona_scaffold("doctor", "醫師助理")
     (root / "personas" / "doctor" / "SOUL.md").write_text("doctor soul custom", encoding="utf-8")
 
@@ -244,9 +244,9 @@ def test_save_uploaded_document_can_target_persona_knowledge_directory(
     tmp_path: Path,
 ):
     _configure_workspace(monkeypatch, tmp_path)
-    personas = _import("personas")
+    personas = _import("personas.personas")
     personas.create_persona_scaffold("doctor", "醫師助理")
-    knowledge_admin = _import("knowledge_admin")
+    knowledge_admin = _import("knowledge.knowledge_admin")
 
     document = knowledge_admin.save_uploaded_document(
         "faq.md",

@@ -7,7 +7,7 @@ agent context once the orchestration layer is added.
 
 from __future__ import annotations
 
-from workspace import load_core_workspace_context
+from knowledge.workspace import load_core_workspace_context
 
 
 def load_agents_description() -> str:

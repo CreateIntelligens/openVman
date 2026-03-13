@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from config import get_settings
-from db import get_db, get_knowledge_table
-from embedder import get_embedder
-from personas import extract_persona_id_from_relative_path
-from workspace import ensure_workspace_scaffold, iter_indexable_documents
+from infra.db import get_db, get_knowledge_table
+from knowledge.workspace import ensure_workspace_scaffold, iter_indexable_documents
+from memory.embedder import get_embedder
+from personas.personas import extract_persona_id_from_relative_path
 
 _IMAGE_MARKDOWN_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _QUESTION_RE = re.compile(r"^Q\s*\d*\s*[：: ]?\s*(.+)$", re.IGNORECASE)

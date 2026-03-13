@@ -6,14 +6,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from workspace import (
+from knowledge.workspace import (
     CORE_DOCUMENTS,
     ensure_workspace_scaffold,
     is_indexable_document,
     iter_workspace_documents,
     resolve_workspace_document,
 )
-from personas import is_persona_core_relative_path
+from personas.personas import is_persona_core_relative_path
 
 
 def list_workspace_documents() -> list[dict[str, Any]]:

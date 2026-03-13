@@ -9,14 +9,19 @@ import pytest
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
+PROTOCOL_EVENTS_MODULE = "protocol.protocol_events"
 
 
 def _import(module_name: str):
     return importlib.import_module(module_name)
 
 
+def _protocol_events():
+    return _import(PROTOCOL_EVENTS_MODULE)
+
+
 def test_load_protocol_contract_exposes_versioned_machine_readable_schemas():
-    protocol_events = _import("protocol_events")
+    protocol_events = _protocol_events()
 
     contract = protocol_events.load_protocol_contract()
 
@@ -33,7 +38,7 @@ def test_load_protocol_contract_exposes_versioned_machine_readable_schemas():
 
 
 def test_validate_client_event_accepts_valid_client_init_payload():
-    protocol_events = _import("protocol_events")
+    protocol_events = _protocol_events()
 
     event = protocol_events.validate_client_event(
         {
@@ -56,7 +61,7 @@ def test_validate_client_event_accepts_valid_client_init_payload():
 
 
 def test_validate_server_event_accepts_valid_stream_chunk_payload():
-    protocol_events = _import("protocol_events")
+    protocol_events = _protocol_events()
 
     event = protocol_events.validate_server_event(
         {
@@ -79,7 +84,7 @@ def test_validate_server_event_accepts_valid_stream_chunk_payload():
 
 
 def test_validate_client_event_rejects_missing_required_field():
-    protocol_events = _import("protocol_events")
+    protocol_events = _protocol_events()
 
     with pytest.raises(protocol_events.ProtocolValidationError) as exc_info:
         protocol_events.validate_client_event(
@@ -95,7 +100,7 @@ def test_validate_client_event_rejects_missing_required_field():
 
 
 def test_validate_server_event_rejects_unknown_error_code():
-    protocol_events = _import("protocol_events")
+    protocol_events = _protocol_events()
 
     with pytest.raises(protocol_events.ProtocolValidationError) as exc_info:
         protocol_events.validate_server_event(
@@ -111,7 +116,7 @@ def test_validate_server_event_rejects_unknown_error_code():
 
 
 def test_validate_client_event_rejects_extra_fields_consistently():
-    protocol_events = _import("protocol_events")
+    protocol_events = _protocol_events()
 
     with pytest.raises(protocol_events.ProtocolValidationError) as exc_info:
         protocol_events.validate_client_event(
@@ -126,7 +131,7 @@ def test_validate_client_event_rejects_extra_fields_consistently():
 
 
 def test_load_protocol_contract_rejects_unknown_version():
-    protocol_events = _import("protocol_events")
+    protocol_events = _protocol_events()
 
     with pytest.raises(protocol_events.ProtocolValidationError) as exc_info:
         protocol_events.load_protocol_contract("9.9.9")

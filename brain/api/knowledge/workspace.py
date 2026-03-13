@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-WORKSPACE_ROOT = Path(__file__).resolve().parent.parent / "data" / "workspace"
+WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "workspace"
 ALLOWED_DOCUMENT_SUFFIXES = {".md", ".txt", ".csv"}
 CORE_DOCUMENTS = {
     "soul": WORKSPACE_ROOT / "SOUL.md",
@@ -124,7 +124,7 @@ def resolve_workspace_document(relative_path: str) -> Path:
 
 def load_core_workspace_context(persona_id: str = "default") -> dict[str, str]:
     """Load the core markdown files used to steer chat generation."""
-    from personas import resolve_core_document_paths
+    from personas.personas import resolve_core_document_paths
 
     ensure_workspace_scaffold()
     document_paths = resolve_core_document_paths(persona_id)
@@ -160,6 +160,6 @@ def iter_indexable_documents() -> list[Path]:
 
 
 def _is_persona_core_document(relative_path: str) -> bool:
-    from personas import is_persona_core_relative_path
+    from personas.personas import is_persona_core_relative_path
 
     return is_persona_core_relative_path(relative_path)
