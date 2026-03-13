@@ -1,0 +1,29 @@
+# 環境變數（含 API Key，絕對不進 git）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+
+# LanceDB 資料庫（runtime 資料）
+.openclaw/
+
+# Brain data
+brain/data/lancedb/
+brain/data/workspace/.learnings/
+brain/data/workspace/memory/*
+!brain/data/workspace/memory/.gitkeep
+brain/data/workspace/scratch/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
