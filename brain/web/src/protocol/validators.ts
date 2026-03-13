@@ -130,10 +130,10 @@ function validateEvent(
   version: string,
   direction: ProtocolDirection,
 ): ClientEvent | ServerEvent {
-  const contract = loadProtocolContract(version);
+  assertSupportedVersion(version);
   const record = expectRecord(payload, version);
   const eventName = expectNonEmptyString(record.event, version, "event");
-  const eventConfig = contract.events[eventName];
+  const eventConfig = manifest.events[eventName];
 
   if (!eventConfig || eventConfig.direction !== direction) {
     throw new ProtocolValidationError(
@@ -426,12 +426,14 @@ function readEnum(schema: EventSchema, propertyName: string, nestedProperty?: st
     const itemRecord = property.items as JsonObject | undefined;
     const nestedProperties = itemRecord?.properties as JsonObject | undefined;
     const nestedSchema = nestedProperties?.[nestedProperty] as JsonObject | undefined;
-    const enumValues = nestedSchema?.enum as JsonValue[] | undefined;
-    return enumValues?.filter((item): item is string => typeof item === "string") ?? [];
+    return filterStringEnum(nestedSchema?.enum as JsonValue[] | undefined);
   }
 
-  const enumValues = property.enum as JsonValue[] | undefined;
-  return enumValues?.filter((item): item is string => typeof item === "string") ?? [];
+  return filterStringEnum(property.enum as JsonValue[] | undefined);
+}
+
+function filterStringEnum(values: JsonValue[] | undefined) {
+  return values?.filter((item): item is string => typeof item === "string") ?? [];
 }
 
 function throwInvalidField(
