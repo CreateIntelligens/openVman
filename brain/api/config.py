@@ -49,6 +49,11 @@ class BrainSettings(BaseSettings):
     agent_loop_max_rounds: int = 6
     tool_document_char_limit: int = 4000
 
+    # === 備用 Provider Keys ===
+    gemini_api_key: str = ""
+    groq_api_key: str = ""
+    openai_api_key: str = ""
+
     # === 安全設定 ===
     max_input_length: int = 500
     enable_content_filter: bool = True
@@ -105,12 +110,14 @@ class BrainSettings(BaseSettings):
 
     @property
     def resolved_llm_base_url(self) -> str:
-        """Provide a sane default for Gemini's OpenAI-compatible endpoint."""
+        """Provide a sane default base URL per provider."""
         if self.brain_llm_base_url:
             return self.brain_llm_base_url
-        if self.brain_llm_provider == "gemini":
-            return "https://generativelanguage.googleapis.com/v1beta/openai/"
-        return ""
+        defaults = {
+            "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "groq": "https://api.groq.com/openai/v1",
+        }
+        return defaults.get(self.brain_llm_provider, "")
 
     @property
     def resolved_allowed_channels(self) -> list[str]:
