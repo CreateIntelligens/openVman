@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openvman://protocol/v1/server_stream_chunk",
+  "title": "Server Stream Chunk Event",
+  "type": "object",
+  "additionalProperties": false,
+  "x-direction": "server_to_client",
+  "x-contract-version": "1.0.0",
+  "properties": {
+    "event": {
+      "const": "server_stream_chunk"
+    },
+    "chunk_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audio_base64": {
+      "type": "string",
+      "minLength": 1
+    },
+    "visemes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "value": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "A",
+              "E",
+              "I",
+              "O",
+              "U"
+            ]
+          }
+        },
+        "required": [
+          "time",
+          "value"
+        ]
+      }
+    },
+    "emotion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "is_final": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "event",
+    "chunk_id",
+    "text",
+    "audio_base64",
+    "visemes",
+    "is_final"
+  ]
+}
