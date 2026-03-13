@@ -6,12 +6,13 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from threading import Lock
 from time import monotonic
 from typing import Any
 
 from config import get_settings
-from infra.db import get_db, get_memories_table
+from infra.db import get_db, get_memories_table, normalize_vector, parse_record_metadata
 from knowledge.workspace import CORE_DOCUMENTS, WORKSPACE_ROOT, ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from personas.personas import normalize_persona_id
@@ -62,7 +63,7 @@ def run_memory_maintenance() -> dict[str, Any]:
         curated_records = [
             {
                 "text": "系統初始化記錄",
-                "vector": _to_vector(get_embedder().encode(["系統初始化記錄"])[0]),
+                "vector": normalize_vector(get_embedder().encode(["系統初始化記錄"])[0]),
                 "source": "system",
                 "date": date.today().isoformat(),
                 "metadata": json.dumps({"placeholder": True}, ensure_ascii=False),
@@ -151,16 +152,19 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
     current_assistant: list[str] = []
     section: str | None = None
 
+    def _flush_turn() -> None:
+        if current_user or current_assistant:
+            turns.append(
+                {
+                    "user": " ".join(current_user),
+                    "assistant": " ".join(current_assistant),
+                }
+            )
+
     for raw_line in content.splitlines():
         line = raw_line.strip()
         if line.startswith("## "):
-            if current_user or current_assistant:
-                turns.append(
-                    {
-                        "user": " ".join(current_user).strip(),
-                        "assistant": " ".join(current_assistant).strip(),
-                    }
-                )
+            _flush_turn()
             current_user = []
             current_assistant = []
             section = None
@@ -178,13 +182,7 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
         else:
             current_assistant.append(line)
 
-    if current_user or current_assistant:
-        turns.append(
-            {
-                "user": " ".join(current_user).strip(),
-                "assistant": " ".join(current_assistant).strip(),
-            }
-        )
+    _flush_turn()
     return [turn for turn in turns if turn["user"] or turn["assistant"]]
 
 
@@ -213,7 +211,7 @@ def _build_summary_records(summaries: list[DailyMemorySummary]) -> list[dict[str
         records.append(
             {
                 "text": summary.summary_text,
-                "vector": _to_vector(vector),
+                "vector": normalize_vector(vector),
                 "source": "memory_summary",
                 "date": summary.day,
                 "metadata": json.dumps(
@@ -252,42 +250,25 @@ def _dedupe_memory_records(records: list[dict[str, Any]]) -> list[dict[str, Any]
 
 
 def _normalize_memory_text(text: str) -> str:
-    return " ".join(text.split()).strip()
+    return " ".join(text.split())
 
 
 def _is_placeholder_record(record: dict[str, Any]) -> bool:
-    metadata = _parse_metadata(record)
+    metadata = parse_record_metadata(record)
     return bool(metadata.get("placeholder"))
 
 
 def _memory_kind(record: dict[str, Any]) -> str:
-    metadata = _parse_metadata(record)
+    metadata = parse_record_metadata(record)
     return str(metadata.get("kind", "")).strip()
 
 
 def _memory_persona_id(record: dict[str, Any]) -> str:
-    metadata = _parse_metadata(record)
+    metadata = parse_record_metadata(record)
     raw = str(metadata.get("persona_id", "")).strip()
     if not raw:
         return "global"
     return normalize_persona_id(raw)
-
-
-def _parse_metadata(record: dict[str, Any]) -> dict[str, Any]:
-    raw = record.get("metadata", "{}")
-    if isinstance(raw, dict):
-        return raw
-    try:
-        parsed = json.loads(str(raw))
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _to_vector(vector: Any) -> list[float]:
-    if hasattr(vector, "tolist"):
-        return list(vector.tolist())
-    return list(vector)
 
 
 def _persona_id_from_memory_path(path: Path, memory_dir: Path) -> str:

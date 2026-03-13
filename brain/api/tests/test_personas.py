@@ -17,11 +17,30 @@ def _import(module_name: str):
     return importlib.import_module(module_name)
 
 
+def _parse_record_metadata(record: dict) -> dict:
+    raw = record.get("metadata", "{}")
+    if isinstance(raw, dict):
+        return raw
+    try:
+        parsed = json.loads(str(raw))
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _normalize_vector(vector) -> list[float]:
+    if hasattr(vector, "tolist"):
+        return list(vector.tolist())
+    return list(vector)
+
+
 def _stub_db_module(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_db = types.ModuleType("infra.db")
     fake_db.get_memories_table = lambda: None
     fake_db.get_knowledge_table = lambda: None
     fake_db.get_db = lambda: None
+    fake_db.parse_record_metadata = _parse_record_metadata
+    fake_db.normalize_vector = _normalize_vector
     monkeypatch.setitem(sys.modules, "infra.db", fake_db)
 
 

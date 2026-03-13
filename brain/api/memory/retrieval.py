@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-from infra.db import get_knowledge_table, get_memories_table
+from infra.db import get_knowledge_table, get_memories_table, parse_record_metadata
 from personas.personas import normalize_persona_id
 
 
@@ -24,9 +23,9 @@ def search_records(
 ) -> list[dict[str, Any]]:
     """執行檢索並回傳符合 persona 的結果。"""
     normalized_persona = normalize_persona_id(persona_id)
-    limit = max(int(top_k), 1)
+    limit = max(top_k, 1)
     raw_records = _search_to_records(
-        get_search_table(table_name).search(query_vector).limit(max(limit * 4, limit))
+        get_search_table(table_name).search(query_vector).limit(limit * 4)
     )
     filtered: list[dict[str, Any]] = []
 
@@ -49,25 +48,12 @@ def _search_to_records(search_result: Any) -> list[dict[str, Any]]:
 
 
 def _matches_persona(record: dict[str, Any], persona_id: str) -> bool:
-    metadata = _parse_metadata(record)
+    metadata = parse_record_metadata(record)
     record_persona = str(metadata.get("persona_id", "")).strip()
     if not record_persona or record_persona == "global":
         return True
     return normalize_persona_id(record_persona) == persona_id
 
 
-def _parse_metadata(record: dict[str, Any]) -> dict[str, Any]:
-    raw = record.get("metadata", "{}")
-    if isinstance(raw, dict):
-        return raw
-    try:
-        parsed = json.loads(str(raw))
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
 def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
-    cleaned_record = dict(record)
-    cleaned_record.pop("vector", None)
-    return cleaned_record
+    return {key: value for key, value in record.items() if key != "vector"}

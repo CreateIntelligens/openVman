@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
 
 from config import get_settings
 from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn

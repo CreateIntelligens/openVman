@@ -1,5 +1,8 @@
 """LanceDB 連線初始化與資料表存取。"""
 
+from __future__ import annotations
+
+import json
 from datetime import date
 from threading import Lock
 from typing import Any
@@ -77,3 +80,22 @@ def get_memories_table() -> lancedb.table.Table:
 def get_knowledge_table() -> lancedb.table.Table:
     """取得 knowledge 表"""
     return get_table("knowledge")
+
+
+def parse_record_metadata(record: dict[str, Any]) -> dict[str, Any]:
+    """Parse the JSON metadata field from a LanceDB record."""
+    raw = record.get("metadata", "{}")
+    if isinstance(raw, dict):
+        return raw
+    try:
+        parsed = json.loads(str(raw))
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def normalize_vector(vector: Any) -> list[float]:
+    """Ensure a vector is a plain list[float], handling numpy arrays."""
+    if hasattr(vector, "tolist"):
+        return vector.tolist()
+    return list(vector)

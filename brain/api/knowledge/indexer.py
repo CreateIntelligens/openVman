@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from config import get_settings
-from infra.db import get_db, get_knowledge_table
+from infra.db import get_db, get_knowledge_table, normalize_vector, parse_record_metadata
 from knowledge.workspace import ensure_workspace_scaffold, iter_indexable_documents
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
@@ -41,7 +41,7 @@ def rebuild_knowledge_index() -> dict[str, Any]:
     existing_records = _load_existing_knowledge_records()
     reusable_records = _collect_reusable_records(existing_records, current_fingerprints)
     reusable_paths = {
-        str(_parse_metadata(record).get("path", "")).strip()
+        str(parse_record_metadata(record).get("path", "")).strip()
         for record in reusable_records
     }
     changed_paths = [
@@ -112,6 +112,25 @@ def _extract_markdown_qa_chunks(
     answer_lines: list[str] = []
     chunk_index = 0
 
+    def _flush_qa() -> None:
+        nonlocal chunk_index
+        if question and answer_lines:
+            chunks.append(
+                ChunkSpec(
+                    text=_format_qa_chunk(title, question, answer_lines),
+                    metadata={
+                        "path": relative_path,
+                        "title": title,
+                        "kind": "qa_markdown",
+                        "question": question,
+                        "persona_id": persona_id,
+                        "fingerprint": fingerprint,
+                        "chunk_id": f"{relative_path}::{chunk_index}",
+                    },
+                )
+            )
+            chunk_index += 1
+
     for raw_line in content.splitlines():
         line = raw_line.strip()
         if not line:
@@ -119,22 +138,7 @@ def _extract_markdown_qa_chunks(
 
         question_match = _QUESTION_RE.match(line)
         if question_match:
-            if question and answer_lines:
-                chunks.append(
-                    ChunkSpec(
-                        text=_format_qa_chunk(title, question, answer_lines),
-                        metadata={
-                            "path": relative_path,
-                            "title": title,
-                            "kind": "qa_markdown",
-                            "question": question,
-                            "persona_id": persona_id,
-                            "fingerprint": fingerprint,
-                            "chunk_id": f"{relative_path}::{chunk_index}",
-                        },
-                    )
-                )
-                chunk_index += 1
+            _flush_qa()
             question = question_match.group(1).strip()
             answer_lines = []
             continue
@@ -147,22 +151,7 @@ def _extract_markdown_qa_chunks(
         if question:
             answer_lines.append(line)
 
-    if question and answer_lines:
-        chunks.append(
-            ChunkSpec(
-                text=_format_qa_chunk(title, question, answer_lines),
-                metadata={
-                    "path": relative_path,
-                    "title": title,
-                    "kind": "qa_markdown",
-                    "question": question,
-                    "persona_id": persona_id,
-                    "fingerprint": fingerprint,
-                    "chunk_id": f"{relative_path}::{chunk_index}",
-                },
-            )
-        )
-
+    _flush_qa()
     return chunks
 
 
@@ -182,9 +171,9 @@ def _chunk_freeform_text(
     current_length = 0
     chunk_index = 0
 
-    for segment in segments:
-        additional = len(segment) + (2 if buffer else 0)
-        if buffer and current_length + additional > 700:
+    def _flush_buffer() -> None:
+        nonlocal chunk_index
+        if buffer:
             chunk_text = "\n\n".join(buffer)
             chunks.append(
                 ChunkSpec(
@@ -200,6 +189,11 @@ def _chunk_freeform_text(
                 )
             )
             chunk_index += 1
+
+    for segment in segments:
+        additional = len(segment) + (2 if buffer else 0)
+        if buffer and current_length + additional > 700:
+            _flush_buffer()
             buffer = [segment]
             current_length = len(segment)
             continue
@@ -207,22 +201,7 @@ def _chunk_freeform_text(
         buffer.append(segment)
         current_length += additional
 
-    if buffer:
-        chunk_text = "\n\n".join(buffer)
-        chunks.append(
-            ChunkSpec(
-                text=f"主題：{title}\n內容：{chunk_text}",
-                metadata={
-                    "path": relative_path,
-                    "title": title,
-                    "kind": "freeform_markdown",
-                    "persona_id": persona_id,
-                    "fingerprint": fingerprint,
-                    "chunk_id": f"{relative_path}::{chunk_index}",
-                },
-            )
-        )
-
+    _flush_buffer()
     return chunks
 
 
@@ -274,7 +253,7 @@ def _build_knowledge_records(chunk_specs: list[ChunkSpec]) -> list[dict[str, Any
         records.append(
             {
                 "text": chunk.text,
-                "vector": _to_vector(vector),
+                "vector": normalize_vector(vector),
                 "source": "workspace",
                 "date": date.today().isoformat(),
                 "metadata": json.dumps(chunk.metadata, ensure_ascii=False),
@@ -288,7 +267,7 @@ def _build_placeholder_records() -> list[dict[str, Any]]:
     return [
         {
             "text": "知識庫目前沒有內容。",
-            "vector": _to_vector(get_embedder().encode(["知識庫目前沒有內容。"])[0]),
+            "vector": normalize_vector(get_embedder().encode(["知識庫目前沒有內容。"])[0]),
             "source": "system",
             "date": date.today().isoformat(),
             "metadata": json.dumps({"placeholder": True}, ensure_ascii=False),
@@ -301,10 +280,7 @@ def _normalize_text(content: str) -> str:
     for raw_line in content.splitlines():
         line = _IMAGE_MARKDOWN_RE.sub("", raw_line).strip()
         line = _HEADING_RE.sub("", line)
-        if line:
-            lines.append(line)
-        else:
-            lines.append("")
+        lines.append(line)
     return "\n".join(lines).strip()
 
 
@@ -321,12 +297,6 @@ def _pick_first(row: dict[str, Any], *keys: str) -> str:
             if text:
                 return text
     return ""
-
-
-def _to_vector(vector: Any) -> list[float]:
-    if hasattr(vector, "tolist"):
-        return list(vector.tolist())
-    return list(vector)
 
 
 def _fingerprint_document(path: Path) -> str:
@@ -346,7 +316,7 @@ def _collect_reusable_records(
 ) -> list[dict[str, Any]]:
     reusable: list[dict[str, Any]] = []
     for record in records:
-        metadata = _parse_metadata(record)
+        metadata = parse_record_metadata(record)
         if metadata.get("placeholder"):
             continue
         path = str(metadata.get("path", "")).strip()
@@ -357,15 +327,6 @@ def _collect_reusable_records(
             continue
         reusable.append(record)
     return reusable
-
-
-def _parse_metadata(record: dict[str, Any]) -> dict[str, Any]:
-    raw = record.get("metadata", "{}")
-    try:
-        parsed = json.loads(str(raw))
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
 
 
 def _load_index_state() -> dict[str, Any]:
