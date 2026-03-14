@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -38,7 +37,7 @@ class ToolRegistry:
         return self._tools[name]
 
     def list_tools(self) -> list[Tool]:
-        return [self._tools[name] for name in sorted(self._tools)]
+        return sorted(self._tools.values(), key=lambda t: t.name)
 
     def build_openai_tools(self) -> list[dict[str, Any]]:
         return [
@@ -71,12 +70,11 @@ def _search_tool(table_name: str, query: str, top_k: int) -> dict[str, Any]:
     }
 
 
-def _search_knowledge(args: dict[str, Any]) -> dict[str, Any]:
-    return _search_tool("knowledge", str(args.get("query", "")), int(args.get("top_k", 3)))
-
-
-def _search_memory(args: dict[str, Any]) -> dict[str, Any]:
-    return _search_tool("memories", str(args.get("query", "")), int(args.get("top_k", 3)))
+def _make_search_handler(table_name: str) -> ToolHandler:
+    """Create a search handler bound to a specific vector table."""
+    def handler(args: dict[str, Any]) -> dict[str, Any]:
+        return _search_tool(table_name, str(args.get("query", "")), int(args.get("top_k", 3)))
+    return handler
 
 
 def _get_document(args: dict[str, Any]) -> dict[str, Any]:
@@ -129,7 +127,7 @@ def get_tool_registry() -> ToolRegistry:
                     },
                     "required": ["query"],
                 },
-                handler=_search_knowledge,
+                handler=_make_search_handler("knowledge"),
             )
         )
         registry.register(
@@ -144,15 +142,11 @@ def get_tool_registry() -> ToolRegistry:
                     },
                     "required": ["query"],
                 },
-                handler=_search_memory,
+                handler=_make_search_handler("memories"),
             )
         )
         _registry = registry
     return _registry
-
-
-def format_tool_result(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False)
 
 
 @contextmanager
