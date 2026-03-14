@@ -4,9 +4,9 @@ export const PROTOCOL_NAME = "openvman-core";
 export const DEFAULT_PROTOCOL_VERSION = "1.0.0";
 
 export type ProtocolDirection = "client_to_server" | "server_to_client";
-export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "server_stream_chunk" | "server_error";
+export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "server_stream_chunk" | "server_error" | "server_init_ack";
 export type ClientEventName = "client_init" | "user_speak" | "client_interrupt";
-export type ServerEventName = "server_stream_chunk" | "server_error";
+export type ServerEventName = "server_stream_chunk" | "server_error" | "server_init_ack";
 
 export interface ContractEventEntry {
   direction: ProtocolDirection;
@@ -63,6 +63,15 @@ export interface ServerErrorEvent {
   timestamp: number;
 }
 
+export interface ServerInitAckEvent {
+  event: "server_init_ack";
+  session_id: string;
+  server_version: string;
+  status: "ok" | "version_mismatch";
+  message?: string;
+  timestamp: number;
+}
+
 export type ClientEvent = ClientInitEvent | UserSpeakEvent | ClientInterruptEvent;
-export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent;
+export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent;
 export type ProtocolEvent = ClientEvent | ServerEvent;

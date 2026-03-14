@@ -22,6 +22,10 @@
     "server_error": {
       "direction": "server_to_client",
       "schema": "server_error.schema.json"
+    },
+    "server_init_ack": {
+      "direction": "server_to_client",
+      "schema": "server_init_ack.schema.json"
     }
   }
 }

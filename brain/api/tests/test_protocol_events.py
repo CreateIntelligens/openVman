@@ -152,3 +152,124 @@ def test_load_protocol_contract_rejects_unknown_version():
         protocol_events.load_protocol_contract("9.9.9")
 
     assert "Unsupported protocol contract version" in str(exc_info.value)
+
+
+# --- handshake tests ---
+
+
+def _client_init_payload(**overrides):
+    return {
+        "event": "client_init",
+        "client_id": "device_handshake",
+        "protocol_version": "1.0.0",
+        "auth_token": "token-abc",
+        "timestamp": 1710200000,
+        **overrides,
+    }
+
+
+def _server_init_ack_payload(**overrides):
+    return {
+        "event": "server_init_ack",
+        "session_id": "sess_001",
+        "server_version": "1.0.0",
+        "status": "ok",
+        "timestamp": 1710200000,
+        **overrides,
+    }
+
+
+@pytest.mark.parametrize(
+    ("client_version", "server_version", "expected"),
+    [
+        ("1.0.0", "1.2.3", True),
+        ("1.9.0", "1.0.0", True),
+        ("2.0.0", "2.5.1", True),
+        ("1.0.0", "2.0.0", False),
+        ("2.0.0", "1.0.0", False),
+        ("0.9.0", "1.0.0", False),
+    ],
+)
+def test_check_version_compatible_uses_major_version(client_version, server_version, expected):
+    protocol_events = _protocol_events()
+
+    assert protocol_events.check_version_compatible(client_version, server_version) is expected
+
+
+def test_perform_handshake_returns_ok_when_versions_compatible():
+    protocol_events = _protocol_events()
+
+    ack = protocol_events.perform_handshake(_client_init_payload())
+
+    assert ack["event"] == "server_init_ack"
+    assert ack["status"] == "ok"
+    assert ack["server_version"] == "1.0.0"
+    assert len(ack["session_id"]) > 0
+    assert ack["timestamp"] >= 0
+
+
+def test_perform_handshake_returns_version_mismatch_when_incompatible():
+    protocol_events = _protocol_events()
+
+    ack = protocol_events.perform_handshake(
+        _client_init_payload(
+            client_id="device_old",
+            protocol_version="2.0.0",
+            auth_token="token-xyz",
+        )
+    )
+
+    assert ack["event"] == "server_init_ack"
+    assert ack["status"] == "version_mismatch"
+    assert "message" in ack
+    assert "2.0.0" in ack["message"]
+    assert "1.0.0" in ack["message"]
+
+
+def test_perform_handshake_rejects_invalid_client_payload():
+    protocol_events = _protocol_events()
+    payload = _client_init_payload(client_id="device_bad")
+    payload.pop("auth_token")
+
+    with pytest.raises(protocol_events.ProtocolValidationError):
+        protocol_events.perform_handshake(payload)
+
+
+def test_validate_server_event_accepts_valid_server_init_ack():
+    protocol_events = _protocol_events()
+
+    event = protocol_events.validate_server_event(_server_init_ack_payload())
+
+    assert event.event == "server_init_ack"
+    assert event.session_id == "sess_001"
+    assert event.status == "ok"
+    assert event.message is None
+
+
+def test_validate_server_event_accepts_server_init_ack_with_message():
+    protocol_events = _protocol_events()
+
+    event = protocol_events.validate_server_event(
+        _server_init_ack_payload(
+            session_id="sess_002",
+            status="version_mismatch",
+            message="Client 2.0.0 incompatible with server 1.0.0",
+        )
+    )
+
+    assert event.status == "version_mismatch"
+    assert event.message == "Client 2.0.0 incompatible with server 1.0.0"
+
+
+def test_validate_server_event_rejects_server_init_ack_with_invalid_status():
+    protocol_events = _protocol_events()
+
+    with pytest.raises(protocol_events.ProtocolValidationError) as exc_info:
+        protocol_events.validate_server_event(
+            _server_init_ack_payload(
+                session_id="sess_003",
+                status="unknown_status",
+            )
+        )
+
+    assert "status" in str(exc_info.value)

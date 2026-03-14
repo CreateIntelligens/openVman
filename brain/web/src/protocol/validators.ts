@@ -4,6 +4,7 @@ import userSpeakSchemaJson from "../../../../contracts/schemas/v1/user_speak.sch
 import clientInterruptSchemaJson from "../../../../contracts/schemas/v1/client_interrupt.schema.json";
 import serverStreamChunkSchemaJson from "../../../../contracts/schemas/v1/server_stream_chunk.schema.json";
 import serverErrorSchemaJson from "../../../../contracts/schemas/v1/server_error.schema.json";
+import serverInitAckSchemaJson from "../../../../contracts/schemas/v1/server_init_ack.schema.json";
 import type {
   ClientEvent,
   ClientInitEvent,
@@ -13,6 +14,7 @@ import type {
   ProtocolEventName,
   ServerErrorEvent,
   ServerEvent,
+  ServerInitAckEvent,
   ServerStreamChunkEvent,
   UserSpeakEvent,
   VisemeFrame,
@@ -34,14 +36,17 @@ const schemaRegistry = {
   client_interrupt: clientInterruptSchemaJson as EventSchema,
   server_stream_chunk: serverStreamChunkSchemaJson as EventSchema,
   server_error: serverErrorSchemaJson as EventSchema,
+  server_init_ack: serverInitAckSchemaJson as EventSchema,
 } satisfies Record<ProtocolEventName, EventSchema>;
 const clientInitSchema = schemaRegistry.client_init;
 const userSpeakSchema = schemaRegistry.user_speak;
 const clientInterruptSchema = schemaRegistry.client_interrupt;
 const serverStreamChunkSchema = schemaRegistry.server_stream_chunk;
 const serverErrorSchema = schemaRegistry.server_error;
+const serverInitAckSchema = schemaRegistry.server_init_ack;
 const allowedServerErrorCodes = readEnum(serverErrorSchema, "error_code") as ServerErrorEvent["error_code"][];
 const allowedVisemeValues = readEnum(serverStreamChunkSchema, "visemes", "value") as VisemeFrame["value"][];
+const allowedInitAckStatuses = readEnum(serverInitAckSchema, "status") as ServerInitAckEvent["status"][];
 
 export const DEFAULT_PROTOCOL_VERSION = manifest.version;
 
@@ -102,6 +107,8 @@ function validateEvent(
       return validateServerStreamChunk(record, version);
     case "server_error":
       return validateServerError(record, version);
+    case "server_init_ack":
+      return validateServerInitAck(record, version);
     default:
       throw new ProtocolValidationError(
         `Unsupported protocol event \`${eventName}\``,
@@ -176,6 +183,35 @@ function validateServerError(record: Record<string, unknown>, version: string): 
     ),
     timestamp: expectNonNegativeInteger(record.timestamp, version, "server_error", "timestamp"),
   };
+}
+
+function validateServerInitAck(record: Record<string, unknown>, version: string): ServerInitAckEvent {
+  const eventName = "server_init_ack";
+  assertShape(record, serverInitAckSchema, version, eventName);
+  const status = expectEnumValue(
+    record.status,
+    allowedInitAckStatuses,
+    version,
+    eventName,
+    "status",
+  );
+
+  return {
+    event: eventName,
+    session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
+    server_version: expectSemver(record.server_version, version, eventName, "server_version"),
+    status,
+    message: expectOptionalNonEmptyString(record.message, version, "message", eventName),
+    timestamp: expectNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
+  };
+}
+
+export function checkVersionCompatible(clientVersion: string, serverVersion: string): boolean {
+  return getMajorVersion(clientVersion) === getMajorVersion(serverVersion);
+}
+
+function getMajorVersion(version: string): string {
+  return version.split(".")[0] ?? "";
 }
 
 function buildContractEvents() {

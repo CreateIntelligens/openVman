@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import sys
+import time
+import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -66,12 +68,60 @@ def validate_client_event(
 def validate_server_event(
     payload: dict[str, Any],
     version: str = DEFAULT_PROTOCOL_VERSION,
-) -> ServerStreamChunkEvent | ServerErrorEvent:
+) -> ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent:
     return _validate_event_payload(
         payload,
         version=version,
         allowed_direction="server_to_client",
         adapter=SERVER_EVENT_ADAPTER,
+    )
+
+
+def check_version_compatible(client_version: str, server_version: str) -> bool:
+    """Return True if MAJOR versions match (semver §6)."""
+    return client_version.split(".")[0] == server_version.split(".")[0]
+
+
+def perform_handshake(
+    client_payload: dict[str, Any],
+    version: str = DEFAULT_PROTOCOL_VERSION,
+) -> dict[str, Any]:
+    """Validate a client_init payload and return a server_init_ack dict."""
+    client_event = validate_client_event(client_payload, version)
+    client_version = client_event.protocol_version
+
+    if check_version_compatible(client_version, version):
+        return _build_server_init_ack(server_version=version, status="ok")
+
+    return _build_server_init_ack(
+        server_version=version,
+        status="version_mismatch",
+        message=_build_version_mismatch_message(client_version, version),
+    )
+
+
+def _build_server_init_ack(
+    *,
+    server_version: str,
+    status: str,
+    message: str | None = None,
+) -> dict[str, Any]:
+    base = {
+        "event": "server_init_ack",
+        "session_id": uuid.uuid4().hex,
+        "server_version": server_version,
+        "status": status,
+        "timestamp": int(time.time()),
+    }
+    if message is None:
+        return base
+    return {**base, "message": message}
+
+
+def _build_version_mismatch_message(client_version: str, server_version: str) -> str:
+    return (
+        f"Client version {client_version} is incompatible with "
+        f"server version {server_version}: MAJOR version mismatch"
     )
 
 
@@ -210,6 +260,7 @@ from openvman_contracts.protocol_contracts import (  # noqa: E402
     ClientInterruptEvent,
     ProtocolDirection,
     ServerErrorEvent,
+    ServerInitAckEvent,
     ServerStreamChunkEvent,
     UserSpeakEvent,
 )

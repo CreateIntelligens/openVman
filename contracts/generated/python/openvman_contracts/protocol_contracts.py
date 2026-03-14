@@ -51,8 +51,16 @@ class ServerErrorEvent(GeneratedProtocolModel):
     retry_after_ms: int | None = Field(default=None, ge=0)
     timestamp: int = Field(ge=0)
 
+class ServerInitAckEvent(GeneratedProtocolModel):
+    event: Literal['server_init_ack']
+    session_id: str = Field(min_length=1)
+    server_version: str = Field(pattern='^\\d+\\.\\d+\\.\\d+$')
+    status: Literal['ok', 'version_mismatch']
+    message: str | None = Field(default=None)
+    timestamp: int = Field(ge=0)
+
 ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent, Field(discriminator='event')]
-ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent, Field(discriminator='event')]
+ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent, Field(discriminator='event')]
 ProtocolEvent = ClientEvent | ServerEvent
 
 CLIENT_EVENT_ADAPTER = TypeAdapter(ClientEvent)
@@ -71,6 +79,7 @@ __all__ = [
     "SERVER_EVENT_ADAPTER",
     "ServerErrorEvent",
     "ServerEvent",
+    "ServerInitAckEvent",
     "ServerStreamChunkEvent",
     "UserSpeakEvent",
     "VisemeFrame",
