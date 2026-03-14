@@ -7,6 +7,8 @@ from typing import Any
 
 from config import get_settings
 from core.agent_loop import AgentLoopResult, run_agent_loop
+from core.llm_client import generate_chat_reply
+from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
 from infra.learnings import capture_learnings_from_message, record_error_event
 from memory.embedder import encode_text
@@ -18,8 +20,8 @@ from memory.memory import (
 )
 from memory.memory_governance import maybe_run_memory_maintenance
 from memory.retrieval import search_records
-from protocol.message_envelope import MessageEnvelope, serialize_context
-from safety.guardrails import enforce_guardrails
+from protocol.message_envelope import MessageEnvelope, normalize_to_brain_message, serialize_context
+from safety.guardrails import enforce_guardrails, enforce_session_limits
 
 
 @dataclass(slots=True)
@@ -27,6 +29,7 @@ class GenerationContext:
     trace_id: str
     persona_id: str
     session_id: str
+    route: RouteDecision
     user_message: str
     request_context: dict[str, Any]
     prompt_messages: list[dict[str, str]]
@@ -45,27 +48,20 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     if len(cleaned_message) > cfg.max_input_length:
         raise ValueError(f"message 不可超過 {cfg.max_input_length} 字")
     enforce_guardrails("generate", cleaned_message, envelope.context)
+    enforce_session_limits(envelope.context.session_id, persona_id)
 
+    route = route_message(normalize_to_brain_message(envelope))
     session = get_or_create_session(envelope.context.session_id, persona_id)
     prior_messages = list_session_messages(session.session_id, persona_id)
     append_session_message(session.session_id, persona_id, "user", cleaned_message)
 
-    query_vector = encode_text(cleaned_message)
-    knowledge_results = search_records(
-        "knowledge",
-        query_vector,
-        cfg.rag_top_k,
-        persona_id=persona_id,
+    knowledge_results, memory_results = _retrieve_rag_context(
+        route, cleaned_message, persona_id, cfg,
     )
-    memory_results = search_records(
-        "memories",
-        query_vector,
-        min(3, cfg.rag_top_k),
-        persona_id=persona_id,
-    )
+    request_ctx = serialize_context(envelope.context)
     prompt_messages = build_chat_messages(
         user_message=cleaned_message,
-        request_context=serialize_context(envelope.context),
+        request_context=request_ctx,
         session_messages=prior_messages,
         knowledge_results=knowledge_results,
         memory_results=memory_results,
@@ -75,12 +71,32 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         trace_id=envelope.context.trace_id,
         persona_id=persona_id,
         session_id=session.session_id,
+        route=route,
         user_message=cleaned_message,
-        request_context=serialize_context(envelope.context),
+        request_context=request_ctx,
         prompt_messages=prompt_messages,
         knowledge_results=knowledge_results,
         memory_results=memory_results,
     )
+
+
+def _retrieve_rag_context(
+    route: RouteDecision,
+    message: str,
+    persona_id: str,
+    cfg: Any,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Fetch knowledge and memory results when RAG is enabled for this route."""
+    if route.skip_rag:
+        return [], []
+    query_vector = encode_text(message)
+    knowledge = search_records(
+        "knowledge", query_vector, cfg.rag_top_k, persona_id=persona_id,
+    )
+    memory = search_records(
+        "memories", query_vector, min(3, cfg.rag_top_k), persona_id=persona_id,
+    )
+    return knowledge, memory
 
 
 def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any]:
@@ -115,6 +131,11 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
 
 def execute_generation(context: GenerationContext) -> AgentLoopResult:
     """Run the configured agent loop on top of prepared prompt messages."""
+    if context.route.skip_tools:
+        return AgentLoopResult(
+            reply=generate_chat_reply(context.prompt_messages),
+            tool_steps=[],
+        )
     return run_agent_loop(context.prompt_messages, persona_id=context.persona_id)
 
 

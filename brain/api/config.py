@@ -26,9 +26,16 @@ class BrainSettings(BaseSettings):
     brain_llm_temperature: float = 0.3
     brain_llm_key_cooldown_seconds: int = 60
     prompt_system_char_budget: int = 6000
+    prompt_total_char_budget: int = 12000
     prompt_context_char_budget: int = 2800
     prompt_history_char_budget: int = 2200
     prompt_history_summary_char_budget: int = 900
+    prompt_soul_char_budget: int = 1800
+    prompt_memory_char_budget: int = 1200
+    prompt_agents_char_budget: int = 1000
+    prompt_tools_char_budget: int = 1000
+    prompt_learnings_char_budget: int = 900
+    prompt_errors_char_budget: int = 700
 
     # === Embedding 設定 ===
     embedding_model: str = "BAAI/bge-m3"

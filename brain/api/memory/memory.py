@@ -83,6 +83,14 @@ def list_session_messages(
     return [dict(message) for message in messages]
 
 
+def get_session_updated_at(
+    session_id: str,
+    persona_id: str | None = None,
+) -> str | None:
+    """Return the session updated_at timestamp without mutating session state."""
+    return get_session_store().get_session_updated_at(session_id, persona_id)
+
+
 def archive_session_turn(
     session_id: str,
     user_message: str,

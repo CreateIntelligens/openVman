@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from config import get_settings
+from core.pipeline import enforce_context_budget
 from infra.reflection import (
     compress_text,
     select_recent_messages,
@@ -29,12 +30,12 @@ def build_chat_messages(
         block
         for block in [
             "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。",
-            _format_workspace_block("SOUL", workspace["soul"], 1800),
-            _format_workspace_block("MEMORY", workspace["memory"], 1200),
-            _format_workspace_block("AGENTS", workspace["agents"], 1000),
-            _format_workspace_block("TOOLS", workspace["tools"], 1000),
-            _format_workspace_block("LEARNINGS", workspace["learnings"], 900),
-            _format_workspace_block("ERRORS", workspace["errors"], 700),
+            _format_workspace_block("SOUL", workspace["soul"], cfg.prompt_soul_char_budget),
+            _format_workspace_block("MEMORY", workspace["memory"], cfg.prompt_memory_char_budget),
+            _format_workspace_block("AGENTS", workspace["agents"], cfg.prompt_agents_char_budget),
+            _format_workspace_block("TOOLS", workspace["tools"], cfg.prompt_tools_char_budget),
+            _format_workspace_block("LEARNINGS", workspace["learnings"], cfg.prompt_learnings_char_budget),
+            _format_workspace_block("ERRORS", workspace["errors"], cfg.prompt_errors_char_budget),
             _format_request_context(request_context),
             summarize_supporting_context(
                 knowledge_results,
@@ -56,7 +57,10 @@ def build_chat_messages(
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(select_recent_messages(session_messages))
     messages.append({"role": "user", "content": user_message})
-    return messages
+    return enforce_context_budget(
+        messages,
+        total_char_budget=cfg.prompt_total_char_budget,
+    )
 
 
 def _format_workspace_block(label: str, content: str, max_chars: int) -> str:

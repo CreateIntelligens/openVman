@@ -134,6 +134,29 @@ class SessionStore:
                     for row in rows
                 ]
 
+    def get_session_updated_at(
+        self,
+        session_id: str,
+        persona_id: str | None = None,
+    ) -> str | None:
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT persona_id, updated_at
+                    FROM sessions
+                    WHERE session_id = ?
+                    """,
+                    (session_id,),
+                ).fetchone()
+                if row is None:
+                    return None
+                if persona_id is not None:
+                    existing_persona = normalize_persona_id(str(row[0] or "default"))
+                    if existing_persona != normalize_persona_id(persona_id):
+                        raise ValueError("session_id 已綁定其他 persona")
+                return str(row[1] or "")
+
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.execute(
