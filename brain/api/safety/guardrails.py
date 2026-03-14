@@ -9,7 +9,7 @@ from time import monotonic
 from typing import Any
 
 from config import get_settings
-from protocol.message_envelope import RequestContext
+from protocol.message_envelope import ALLOWED_ROLES, RequestContext
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 _PROMPT_INJECTION_RULES = {
@@ -40,7 +40,7 @@ def validate_request_context(context: RequestContext) -> None:
         raise ValueError(f"channel 不允許：{context.channel}")
     if not _IDENTIFIER_RE.match(context.persona_id):
         raise ValueError("persona_id 格式不合法")
-    if context.message_type not in {"user", "tool", "control"}:
+    if context.message_type not in ALLOWED_ROLES:
         raise ValueError("message_type 不合法")
     if context.session_id and not _IDENTIFIER_RE.match(context.session_id):
         raise ValueError("session_id 格式不合法")

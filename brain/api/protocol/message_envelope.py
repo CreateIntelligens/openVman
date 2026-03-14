@@ -21,10 +21,27 @@ class RequestContext:
     metadata: dict[str, Any]
 
 
+ALLOWED_ROLES = frozenset({"system", "user", "assistant", "tool", "control"})
+
+
 @dataclass(slots=True)
 class MessageEnvelope:
     content: str
     context: RequestContext
+
+
+@dataclass(slots=True)
+class BrainMessage:
+    """Normalized internal message passed through all brain pipeline stages."""
+
+    role: str
+    content: str
+    trace_id: str
+    session_id: str | None
+    persona_id: str
+    locale: str
+    channel: str
+    metadata: dict[str, Any]
 
 
 def build_message_envelope(
@@ -66,6 +83,40 @@ def serialize_context(context: RequestContext) -> dict[str, Any]:
     return asdict(context)
 
 
+def normalize_to_brain_message(envelope: MessageEnvelope) -> BrainMessage:
+    """Convert a MessageEnvelope into a BrainMessage for pipeline consumption."""
+    ctx = envelope.context
+    return BrainMessage(
+        role=ctx.message_type,
+        content=envelope.content,
+        trace_id=ctx.trace_id,
+        session_id=ctx.session_id,
+        persona_id=ctx.persona_id,
+        locale=ctx.locale,
+        channel=ctx.channel,
+        metadata=dict(ctx.metadata),
+    )
+
+
+def create_brain_message(
+    role: str,
+    content: str,
+    *,
+    context: RequestContext,
+) -> BrainMessage:
+    """Create a BrainMessage for internal stages (system prompt, assistant reply, etc.)."""
+    return BrainMessage(
+        role=role,
+        content=content,
+        trace_id=context.trace_id,
+        session_id=context.session_id,
+        persona_id=context.persona_id,
+        locale=context.locale,
+        channel=context.channel,
+        metadata=dict(context.metadata),
+    )
+
+
 def _resolve_trace_id(
     request: Request,
     body: dict[str, Any],
@@ -91,5 +142,5 @@ def _merge_metadata(*values: object) -> dict[str, Any]:
 
 def _read_text(payload: dict[str, Any], key: str, fallback: object = "") -> str:
     if key in payload:
-        return str(payload.get(key, "")).strip()
+        return str(payload[key]).strip()
     return str(fallback).strip()
