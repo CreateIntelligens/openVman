@@ -235,6 +235,21 @@ def test_perform_handshake_rejects_invalid_client_payload():
         protocol_events.perform_handshake(payload)
 
 
+def test_perform_handshake_rejects_non_client_init_event():
+    protocol_events = _protocol_events()
+
+    with pytest.raises(protocol_events.ProtocolValidationError) as exc_info:
+        protocol_events.perform_handshake(
+            {
+                "event": "client_interrupt",
+                "timestamp": 1710200000,
+            }
+        )
+
+    assert "client_init" in str(exc_info.value)
+    assert "client_interrupt" in str(exc_info.value)
+
+
 def test_validate_server_event_accepts_valid_server_init_ack():
     protocol_events = _protocol_events()
 

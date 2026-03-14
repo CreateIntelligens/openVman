@@ -88,6 +88,12 @@ def perform_handshake(
 ) -> dict[str, Any]:
     """Validate a client_init payload and return a server_init_ack dict."""
     client_event = validate_client_event(client_payload, version)
+    if not isinstance(client_event, ClientInitEvent):
+        raise ProtocolValidationError(
+            f"Handshake requires `client_init`, got `{client_event.event}`",
+            version=version,
+            event=client_event.event,
+        )
     client_version = client_event.protocol_version
 
     if check_version_compatible(client_version, version):
