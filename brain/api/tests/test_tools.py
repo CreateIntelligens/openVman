@@ -1,35 +1,11 @@
 from __future__ import annotations
 
-import importlib
 import json
-import sys
-import types
-from pathlib import Path
 
 import pytest
 
-API_ROOT = Path(__file__).resolve().parents[1]
-if str(API_ROOT) not in sys.path:
-    sys.path.insert(0, str(API_ROOT))
-
+from conftest import load_tool_modules
 from safety.observability import MetricsStore
-
-
-def _load_tool_modules(monkeypatch: pytest.MonkeyPatch):
-    fake_embedder = types.ModuleType("memory.embedder")
-    fake_embedder.encode_text = lambda text: [0.1]
-
-    fake_retrieval = types.ModuleType("memory.retrieval")
-    fake_retrieval.search_records = lambda *args, **kwargs: []
-
-    monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder)
-    monkeypatch.setitem(sys.modules, "memory.retrieval", fake_retrieval)
-    sys.modules.pop("tools.tool_executor", None)
-    sys.modules.pop("tools.tool_registry", None)
-
-    tool_registry = importlib.import_module("tools.tool_registry")
-    tool_executor = importlib.import_module("tools.tool_executor")
-    return tool_registry, tool_executor
 
 
 def _make_tool(tool_registry, *, name: str = "test_tool", handler=None, parameters=None):
@@ -45,7 +21,7 @@ def _decode_result(result_json: str) -> dict[str, object]:
 
 
 def test_registry_register_and_get(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, _ = _load_tool_modules(monkeypatch)
+    tool_registry, _ = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     tool = _make_tool(tool_registry)
 
@@ -55,7 +31,7 @@ def test_registry_register_and_get(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_registry_get_unknown_tool(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, _ = _load_tool_modules(monkeypatch)
+    tool_registry, _ = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
 
     with pytest.raises(ValueError, match="未知工具"):
@@ -63,7 +39,7 @@ def test_registry_get_unknown_tool(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_registry_list_tools_sorted(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, _ = _load_tool_modules(monkeypatch)
+    tool_registry, _ = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     registry.register(_make_tool(tool_registry, name="z"))
     registry.register(_make_tool(tool_registry, name="a"))
@@ -74,7 +50,7 @@ def test_registry_list_tools_sorted(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_registry_build_openai_tools_format(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, _ = _load_tool_modules(monkeypatch)
+    tool_registry, _ = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     registry.register(_make_tool(tool_registry, name="t", parameters={"p": 1}))
 
@@ -93,7 +69,7 @@ def test_registry_build_openai_tools_format(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_validate_tool_arguments_accepts_valid_args(monkeypatch: pytest.MonkeyPatch):
-    _, tool_executor = _load_tool_modules(monkeypatch)
+    _, tool_executor = load_tool_modules(monkeypatch)
     schema = {
         "type": "object",
         "properties": {
@@ -107,7 +83,7 @@ def test_validate_tool_arguments_accepts_valid_args(monkeypatch: pytest.MonkeyPa
 
 
 def test_validate_tool_arguments_reports_missing_required(monkeypatch: pytest.MonkeyPatch):
-    _, tool_executor = _load_tool_modules(monkeypatch)
+    _, tool_executor = load_tool_modules(monkeypatch)
     schema = {
         "type": "object",
         "properties": {"query": {"type": "string"}},
@@ -120,7 +96,7 @@ def test_validate_tool_arguments_reports_missing_required(monkeypatch: pytest.Mo
 
 
 def test_validate_tool_arguments_reports_wrong_type(monkeypatch: pytest.MonkeyPatch):
-    _, tool_executor = _load_tool_modules(monkeypatch)
+    _, tool_executor = load_tool_modules(monkeypatch)
     schema = {
         "type": "object",
         "properties": {
@@ -136,7 +112,7 @@ def test_validate_tool_arguments_reports_wrong_type(monkeypatch: pytest.MonkeyPa
 
 
 def test_execute_tool_call_returns_ok_result(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, tool_executor = _load_tool_modules(monkeypatch)
+    tool_registry, tool_executor = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     registry.register(
         _make_tool(
@@ -174,7 +150,7 @@ def test_execute_tool_call_returns_ok_result(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_execute_tool_call_unknown_tool_returns_error(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, tool_executor = _load_tool_modules(monkeypatch)
+    tool_registry, tool_executor = load_tool_modules(monkeypatch)
     metrics = MetricsStore()
     events: list[tuple[str, dict[str, object]]] = []
 
@@ -197,7 +173,7 @@ def test_execute_tool_call_unknown_tool_returns_error(monkeypatch: pytest.Monkey
 
 
 def test_execute_tool_call_invalid_json_returns_error(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, tool_executor = _load_tool_modules(monkeypatch)
+    tool_registry, tool_executor = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     registry.register(_make_tool(tool_registry, name="test"))
 
@@ -210,7 +186,7 @@ def test_execute_tool_call_invalid_json_returns_error(monkeypatch: pytest.Monkey
 
 
 def test_execute_tool_call_missing_required_param_returns_error(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, tool_executor = _load_tool_modules(monkeypatch)
+    tool_registry, tool_executor = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     registry.register(
         _make_tool(
@@ -233,7 +209,7 @@ def test_execute_tool_call_missing_required_param_returns_error(monkeypatch: pyt
 
 
 def test_execute_tool_call_wrong_type_param_returns_error(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, tool_executor = _load_tool_modules(monkeypatch)
+    tool_registry, tool_executor = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     registry.register(
         _make_tool(
@@ -255,7 +231,7 @@ def test_execute_tool_call_wrong_type_param_returns_error(monkeypatch: pytest.Mo
 
 
 def test_execute_tool_call_handler_exception_returns_error(monkeypatch: pytest.MonkeyPatch):
-    tool_registry, tool_executor = _load_tool_modules(monkeypatch)
+    tool_registry, tool_executor = load_tool_modules(monkeypatch)
     registry = tool_registry.ToolRegistry()
     metrics = MetricsStore()
     exceptions: list[tuple[str, Exception, dict[str, object]]] = []
@@ -283,7 +259,7 @@ def test_execute_tool_call_handler_exception_returns_error(monkeypatch: pytest.M
 
 
 def test_tool_result_ok_serialize(monkeypatch: pytest.MonkeyPatch):
-    _, tool_executor = _load_tool_modules(monkeypatch)
+    _, tool_executor = load_tool_modules(monkeypatch)
 
     result = json.loads(tool_executor.ToolResult.ok("tool_a", {"k": "v"}).serialize())
 
@@ -296,7 +272,7 @@ def test_tool_result_ok_serialize(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_tool_result_fail_serialize(monkeypatch: pytest.MonkeyPatch):
-    _, tool_executor = _load_tool_modules(monkeypatch)
+    _, tool_executor = load_tool_modules(monkeypatch)
 
     result = json.loads(tool_executor.ToolResult.fail("tool_a", "failed").serialize())
 

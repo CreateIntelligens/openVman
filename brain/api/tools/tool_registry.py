@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from config import get_settings
 from knowledge.workspace import WORKSPACE_ROOT, resolve_workspace_document
 from memory.embedder import encode_text
 from memory.retrieval import search_records
+from tools.mock_data import FAQ_ENTRIES, ORDER_RECORDS
 
 ToolHandler = Callable[[dict[str, Any]], Any]
 _active_persona_id: ContextVar[str] = ContextVar("brain_active_persona_id", default="default")
@@ -91,6 +93,30 @@ def _get_document(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _query_faq(args: dict[str, Any]) -> dict[str, Any]:
+    """Keyword-match against FAQ entries."""
+    query = str(args.get("query", "")).strip()
+    if not query:
+        raise ValueError("query 不可為空")
+    matches = [
+        dict(entry)
+        for entry in FAQ_ENTRIES
+        if any(kw in query for kw in entry["keywords"].split(","))
+    ]
+    return {"query": query, "results": matches, "total": len(matches)}
+
+
+def _query_order(args: dict[str, Any]) -> dict[str, Any]:
+    """Exact lookup by order_id."""
+    order_id = str(args.get("order_id", "")).strip()
+    if not order_id:
+        raise ValueError("order_id 不可為空")
+    record = ORDER_RECORDS.get(order_id)
+    if record is None:
+        return {"order_id": order_id, "found": False, "order": None}
+    return {"order_id": order_id, "found": True, "order": deepcopy(record)}
+
+
 _registry: ToolRegistry | None = None
 
 
@@ -143,6 +169,40 @@ def get_tool_registry() -> ToolRegistry:
                     "required": ["query"],
                 },
                 handler=_make_search_handler("memories"),
+            )
+        )
+        registry.register(
+            Tool(
+                name="query_faq",
+                description="用關鍵字查詢常見問題 (FAQ)，回傳匹配的問答項目。",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "使用者的問題關鍵字，例如「退貨」、「運費」",
+                        },
+                    },
+                    "required": ["query"],
+                },
+                handler=_query_faq,
+            )
+        )
+        registry.register(
+            Tool(
+                name="query_order",
+                description="用訂單編號查詢訂單詳情，回傳訂單狀態、商品與金額。",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "order_id": {
+                            "type": "string",
+                            "description": "訂單編號，例如 ORD-20260301-001",
+                        },
+                    },
+                    "required": ["order_id"],
+                },
+                handler=_query_order,
             )
         )
         _registry = registry
