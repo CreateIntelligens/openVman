@@ -33,7 +33,7 @@ class LLMReply:
     model: str
 
 
-def generate_chat_reply(messages: list[dict[str, str]]) -> str:
+def generate_chat_reply(messages: list[dict[str, Any]]) -> str:
     """Generate a chat reply using the configured provider."""
     return generate_chat_turn(messages).content.strip()
 
@@ -64,7 +64,7 @@ def generate_chat_turn(
     )
 
 
-async def stream_chat_reply(messages: list[dict[str, str]]) -> AsyncIterator[str]:
+async def stream_chat_reply(messages: list[dict[str, Any]]) -> AsyncIterator[str]:
     """Stream a chat reply token-by-token from the configured provider."""
     stream = await _create_async_stream(messages)
 

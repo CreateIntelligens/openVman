@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
 from config import get_settings
-from core.agent_loop import AgentLoopResult, run_agent_loop
-from core.llm_client import generate_chat_reply
+from core.agent_loop import AgentLoopResult, prepare_agent_reply, run_agent_loop
+from core.llm_client import generate_chat_reply, stream_chat_reply
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
+from core.sse_events import (
+    ContextEvent,
+    DoneEvent,
+    SessionEvent,
+    SSEEvent,
+    TokenEvent,
+    ToolEvent,
+)
 from infra.learnings import capture_learnings_from_message, record_error_event
 from memory.embedder import encode_text
 from memory.memory import (
@@ -137,6 +147,57 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             tool_steps=[],
         )
     return run_agent_loop(context.prompt_messages, persona_id=context.persona_id)
+
+
+def _tool_event_from_step(trace_id: str, step: dict[str, Any]) -> ToolEvent:
+    return ToolEvent(
+        trace_id=trace_id,
+        tool_call_id=step.get("tool_call_id", ""),
+        name=step.get("name", ""),
+        arguments=step.get("arguments", ""),
+        result=step.get("result", ""),
+    )
+
+
+async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEvent]:
+    """Stream a chat generation from prepared prompt context."""
+    yield SessionEvent(session_id=context.session_id, trace_id=context.trace_id)
+    yield ContextEvent(
+        trace_id=context.trace_id,
+        knowledge_count=len(context.knowledge_results),
+        memory_count=len(context.memory_results),
+        request_context=context.request_context,
+    )
+
+    reply_parts: list[str] = []
+    tool_steps: list[dict[str, Any]] = []
+    stream_messages: list[dict[str, Any]] = context.prompt_messages
+
+    if not context.route.skip_tools:
+        prepared = await asyncio.to_thread(
+            prepare_agent_reply,
+            context.prompt_messages,
+            context.persona_id,
+        )
+        stream_messages = prepared.messages
+        tool_steps = prepared.tool_steps
+        for step in tool_steps:
+            yield _tool_event_from_step(context.trace_id, step)
+
+    async for token in stream_chat_reply(stream_messages):
+        reply_parts.append(token)
+        yield TokenEvent(trace_id=context.trace_id, token=token)
+
+    full_reply = "".join(reply_parts)
+    finalize_generation(context, full_reply)
+    yield DoneEvent(
+        trace_id=context.trace_id,
+        session_id=context.session_id,
+        reply=full_reply,
+        knowledge_results=context.knowledge_results,
+        memory_results=context.memory_results,
+        tool_steps=tool_steps,
+    )
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:

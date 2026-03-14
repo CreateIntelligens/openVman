@@ -84,9 +84,19 @@ def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
                 and self.tool_steps == other.tool_steps
             )
 
+    class PreparedAgentReply:
+        def __init__(self, messages: list[dict], tool_steps: list[dict]):
+            self.messages = messages
+            self.tool_steps = tool_steps
+
     fake_agent_loop.AgentLoopResult = AgentLoopResult
+    fake_agent_loop.PreparedAgentReply = PreparedAgentReply
     fake_agent_loop.run_agent_loop = lambda messages, persona_id="default": AgentLoopResult(
         reply="tool reply",
+        tool_steps=[],
+    )
+    fake_agent_loop.prepare_agent_reply = lambda messages, persona_id="default": PreparedAgentReply(
+        messages=list(messages),
         tool_steps=[],
     )
 

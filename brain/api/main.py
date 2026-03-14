@@ -1,10 +1,9 @@
 """大腦層 FastAPI 入口"""
 
 import asyncio
-import json
 import logging
 from contextlib import asynccontextmanager, suppress
-from time import perf_counter, time
+from time import perf_counter
 from typing import AsyncIterator
 from uuid import uuid4
 
@@ -12,13 +11,19 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from sse_starlette.sse import EventSourceResponse
 
 from config import API_INTERNAL_PORT, get_settings
-from core.agent_loop import stream_agent_reply
 from core.chat_service import (
     GenerationContext,
     execute_generation,
     finalize_generation,
     prepare_generation,
     record_generation_failure,
+    stream_generation,
+)
+from core.sse_events import (
+    build_exception_protocol_error,
+    build_protocol_error,
+    sse_error_to_dict,
+    sse_event_to_dict,
 )
 from infra.db import ensure_tables, get_db
 from knowledge.indexer import rebuild_knowledge_index
@@ -41,11 +46,7 @@ from personas.personas import (
     list_personas,
 )
 from protocol.message_envelope import build_message_envelope
-from protocol.protocol_events import (
-    ProtocolValidationError,
-    validate_client_event,
-    validate_server_event,
-)
+from protocol.protocol_events import ProtocolValidationError, validate_client_event, validate_server_event
 from safety.guardrails import enforce_guardrails
 from safety.observability import get_metrics_store, log_event, log_exception
 
@@ -380,7 +381,8 @@ async def generate(request: Request):
     except ValueError as exc:
         get_metrics_store().increment("guardrail_blocks_total", action="generate")
         record_generation_failure("generate", "validation", str(exc))
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        error_payload = build_exception_protocol_error(exc)
+        raise HTTPException(status_code=400, detail=error_payload) from exc
     except Exception as exc:  # pragma: no cover - external provider failures
         log_exception(
             "generate_error",
@@ -388,7 +390,7 @@ async def generate(request: Request):
             trace_id=getattr(request.state, "trace_id", ""),
         )
         record_generation_failure("generate", "llm_failure", str(exc))
-        error_payload = _build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
+        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
         raise HTTPException(status_code=502, detail=error_payload) from exc
 
 
@@ -402,9 +404,10 @@ async def generate_stream(request: Request):
     except ValueError as exc:
         get_metrics_store().increment("guardrail_blocks_total", action="stream_generate")
         record_generation_failure("stream_generate", "validation", str(exc))
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        error_payload = build_exception_protocol_error(exc)
+        raise HTTPException(status_code=400, detail=error_payload) from exc
 
-    return EventSourceResponse(stream_generation_events(context))
+    return EventSourceResponse(_stream_generation_events(context))
 
 
 @app.get("/api/chat/history")
@@ -518,84 +521,44 @@ async def maintain_memory():
         raise HTTPException(status_code=500, detail="記憶整理失敗") from exc
 
 
-def _sse_event(event: str, payload: dict[str, object]) -> dict[str, str]:
-    return {
-        "event": event,
-        "data": json.dumps(payload, ensure_ascii=False),
-    }
-
-
-def _build_protocol_error(
-    error_code: str,
-    message: str,
-    *,
-    retry_after_ms: int | None = None,
-) -> dict[str, object]:
-    """Build and validate a server_error protocol event."""
-    payload: dict[str, object] = {
-        "event": "server_error",
-        "error_code": error_code,
-        "message": message,
-        "timestamp": int(time()),
-    }
-    if retry_after_ms is not None:
-        payload["retry_after_ms"] = retry_after_ms
-    try:
-        validate_server_event(payload)
-    except ProtocolValidationError:
-        payload["error_code"] = "INTERNAL_ERROR"
-        validate_server_event(payload)
-    return payload
-
-
 async def read_generation_request(request: Request):
     body = await request.json()
     return build_message_envelope(request, body, content_key="message")
 
 
-async def stream_generation_events(context: GenerationContext) -> AsyncIterator[dict[str, str]]:
-    reply_parts: list[str] = []
-    tool_steps: list[dict[str, object]] = []
-
+async def _stream_generation_events(context: GenerationContext) -> AsyncIterator[dict[str, str]]:
+    """Yield SSE events from the chat service generator."""
     try:
-        yield _sse_event("session", {"session_id": context.session_id, "trace_id": context.trace_id})
-        yield _sse_event(
-            "context",
-            {
-                "trace_id": context.trace_id,
-                "knowledge_count": len(context.knowledge_results),
-                "memory_count": len(context.memory_results),
-                "request_context": context.request_context,
-            },
-        )
-        result = await asyncio.to_thread(execute_generation, context)
-        tool_steps = result.tool_steps
-        for tool_step in tool_steps:
-            get_metrics_store().increment("tool_calls_total", tool_name=str(tool_step.get("name", "")))
-            yield _sse_event("tool", tool_step)
-        async for token in stream_agent_reply(result.reply):
-            reply_parts.append(token)
-            yield _sse_event("token", {"token": token})
+        tool_count = 0
+        async for event in stream_generation(context):
+            if event.event == "tool":
+                tool_count += 1
+                get_metrics_store().increment("tool_calls_total", tool_name=event.name)
 
-        payload = finalize_generation(context, "".join(reply_parts))
-        payload["tool_steps"] = tool_steps
+            yield sse_event_to_dict(event)
+
         log_event(
             "stream_generate_complete",
             trace_id=context.trace_id,
             session_id=context.session_id,
-            tool_steps=len(tool_steps),
+            tool_steps=tool_count,
         )
-        yield _sse_event("done", payload)
     except asyncio.CancelledError:
         record_generation_failure("stream_generate", "cancelled", context.user_message[:120])
         raise
     except ValueError as exc:
         record_generation_failure("stream_generate", "validation", str(exc))
-        yield _sse_event("error", _build_protocol_error("BRAIN_UNAVAILABLE", str(exc)))
+        yield sse_error_to_dict(
+            build_exception_protocol_error(exc),
+            context.trace_id,
+        )
     except Exception as exc:  # pragma: no cover - external provider failures
         log_exception("stream_generate_error", exc, trace_id=context.trace_id)
         record_generation_failure("stream_generate", "llm_failure", str(exc))
-        yield _sse_event("error", _build_protocol_error("LLM_OVERLOAD", "LLM 串流生成失敗", retry_after_ms=3000))
+        yield sse_error_to_dict(
+            build_protocol_error("LLM_OVERLOAD", "LLM 串流生成失敗", retry_after_ms=3000),
+            context.trace_id,
+        )
 
 
 if __name__ == "__main__":
