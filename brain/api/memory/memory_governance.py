@@ -16,6 +16,7 @@ from infra.db import get_db, get_memories_table, normalize_vector, parse_record_
 from knowledge.workspace import CORE_DOCUMENTS, WORKSPACE_ROOT, ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from personas.personas import normalize_persona_id
+from safety.observability import log_event
 
 _maintenance_lock = Lock()
 _last_maintenance_at = 0.0
@@ -51,13 +52,13 @@ def run_memory_maintenance() -> dict[str, Any]:
     _write_summary_document(summaries)
 
     existing_records = get_memories_table().to_arrow().to_pylist()
-    curated_records = _dedupe_memory_records(existing_records)
-    curated_records = [
+    deduped = _dedupe_memory_records(existing_records)
+    non_summary = [
         record
-        for record in curated_records
+        for record in deduped
         if _memory_kind(record) != "daily_summary"
     ]
-    curated_records.extend(_build_summary_records(summaries))
+    curated_records = non_summary + _build_summary_records(summaries)
 
     if not curated_records:
         curated_records = [
@@ -76,6 +77,130 @@ def run_memory_maintenance() -> dict[str, Any]:
         "summary_days": len(summaries),
         "memory_records": len(curated_records),
     }
+
+
+_SUMMARY_SECTION_HEADER = "# 記憶摘要"
+
+
+def write_summary_and_reindex(
+    *,
+    persona_id: str,
+    day: str,
+    summary_text: str,
+    source_turns: int = 0,
+    session_id: str = "",
+) -> dict[str, Any]:
+    """Write a summary block to the daily memory file and trigger reindex.
+
+    Returns a status dict with writeback and reindex results.
+    Skips writeback if the same fingerprint already exists for (persona_id, day).
+    """
+    ensure_workspace_scaffold()
+    fingerprint = hashlib.sha256(summary_text.encode("utf-8")).hexdigest()
+    normalized_persona = normalize_persona_id(persona_id)
+
+    daily_path = _resolve_daily_file(normalized_persona, day)
+
+    # Duplicate check: scan existing summary section for same fingerprint
+    if _daily_file_has_fingerprint(daily_path, fingerprint):
+        log_event(
+            "memory_writeback_skipped",
+            persona_id=normalized_persona,
+            day=day,
+            reason="duplicate_fingerprint",
+        )
+        return {"status": "skipped", "reason": "duplicate_fingerprint"}
+
+    # Append summary block
+    block = _format_summary_block(
+        persona_id=normalized_persona,
+        day=day,
+        fingerprint=fingerprint,
+        summary_text=summary_text,
+        source_turns=source_turns,
+        session_id=session_id,
+    )
+    _append_summary_block(daily_path, block)
+
+    log_event(
+        "memory_writeback_completed",
+        persona_id=normalized_persona,
+        day=day,
+        fingerprint=fingerprint[:12],
+    )
+
+    # Trigger reindex
+    reindex_result = run_memory_maintenance()
+    return {
+        "status": "ok",
+        "writeback": "appended",
+        "fingerprint": fingerprint[:12],
+        "reindex": reindex_result,
+    }
+
+
+def _resolve_daily_file(persona_id: str, day: str) -> Path:
+    """Resolve the path to a daily memory file."""
+    memory_dir = WORKSPACE_ROOT / "memory" / persona_id
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    return memory_dir / f"{day}.md"
+
+
+def _daily_file_has_fingerprint(path: Path, fingerprint: str) -> bool:
+    """Check if a daily file already contains a summary with the given fingerprint."""
+    if not path.exists():
+        return False
+    content = path.read_text(encoding="utf-8-sig")
+    return f"fingerprint: {fingerprint[:12]}" in content
+
+
+def _format_summary_block(
+    *,
+    persona_id: str,
+    day: str,
+    fingerprint: str,
+    summary_text: str,
+    source_turns: int,
+    session_id: str,
+) -> str:
+    """Format a stable summary block for appending to the daily file."""
+    from datetime import datetime
+
+    ts = datetime.now().isoformat(timespec="seconds")
+    lines = [
+        f"## {ts} | session {session_id}",
+        "",
+        f"- persona_id: {persona_id}",
+        f"- fingerprint: {fingerprint[:12]}",
+        f"- source_turns: {source_turns}",
+        "",
+        "### Summary",
+        summary_text,
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _append_summary_block(path: Path, block: str) -> None:
+    """Append a summary block to the daily file under the summary section."""
+    if not path.exists():
+        path.write_text(
+            f"# {path.stem} 對話日誌\n\n"
+            f"{_SUMMARY_SECTION_HEADER}\n\n"
+            f"{block}\n",
+            encoding="utf-8",
+        )
+        return
+
+    content = path.read_text(encoding="utf-8-sig")
+    if _SUMMARY_SECTION_HEADER in content:
+        # Append after existing summary section
+        content = content.rstrip() + "\n\n" + block + "\n"
+    else:
+        # Add summary section at end
+        content = content.rstrip() + "\n\n" + _SUMMARY_SECTION_HEADER + "\n\n" + block + "\n"
+
+    path.write_text(content, encoding="utf-8")
 
 
 def _build_daily_summaries() -> list[DailyMemorySummary]:

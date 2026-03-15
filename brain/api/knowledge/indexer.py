@@ -20,7 +20,6 @@ from personas.personas import extract_persona_id_from_relative_path
 _IMAGE_MARKDOWN_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _QUESTION_RE = re.compile(r"^Q\s*\d*\s*[：: ]?\s*(.+)$", re.IGNORECASE)
 _ANSWER_RE = re.compile(r"^A\s*[：: ]?\s*(.+)$", re.IGNORECASE)
-_HEADING_RE = re.compile(r"^#{1,6}\s*")
 
 
 @dataclass(slots=True)
@@ -81,14 +80,16 @@ def rebuild_knowledge_index() -> dict[str, Any]:
 
 def _extract_text_chunks(path: Path) -> list[ChunkSpec]:
     content = path.read_text(encoding="utf-8-sig")
-    normalized = _normalize_text(content)
+    cleaned = _clean_text(content)
     title = path.stem
     relative_path = path.relative_to(ensure_workspace_scaffold()).as_posix()
     fingerprint = _fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
 
+    # Strip headings for QA detection (QA docs don't use heading structure)
+    stripped = re.sub(r"^#{1,6}\s*", "", cleaned, flags=re.MULTILINE)
     qa_chunks = _extract_markdown_qa_chunks(
-        normalized,
+        stripped,
         title,
         relative_path,
         fingerprint,
@@ -97,7 +98,7 @@ def _extract_text_chunks(path: Path) -> list[ChunkSpec]:
     if qa_chunks:
         return qa_chunks
 
-    return _chunk_freeform_text(normalized, title, relative_path, fingerprint, persona_id)
+    return _chunk_by_headings(cleaned, title, relative_path, fingerprint, persona_id)
 
 
 def _extract_markdown_qa_chunks(
@@ -115,17 +116,21 @@ def _extract_markdown_qa_chunks(
     def _flush_qa() -> None:
         nonlocal chunk_index
         if question and answer_lines:
+            text = _format_qa_chunk(title, question, answer_lines)
             chunks.append(
                 ChunkSpec(
-                    text=_format_qa_chunk(title, question, answer_lines),
+                    text=text,
                     metadata={
                         "path": relative_path,
                         "title": title,
+                        "heading_path": [],
+                        "chunk_index": chunk_index,
                         "kind": "qa_markdown",
                         "question": question,
                         "persona_id": persona_id,
                         "fingerprint": fingerprint,
                         "chunk_id": f"{relative_path}::{chunk_index}",
+                        "char_count": len(text),
                     },
                 )
             )
@@ -155,44 +160,134 @@ def _extract_markdown_qa_chunks(
     return chunks
 
 
-def _chunk_freeform_text(
+_HEADING_LEVEL_RE = re.compile(r"^(#{1,6})\s+(.+)$")
+
+_CHUNK_CHAR_LIMIT = 700
+
+
+@dataclass(slots=True, frozen=True)
+class _HeadingBlock:
+    """A contiguous block of paragraphs under one heading."""
+
+    heading_path: tuple[str, ...]
+    paragraphs: tuple[str, ...]
+
+
+def _parse_heading_blocks(content: str) -> list[_HeadingBlock]:
+    """Split markdown into heading-delimited blocks preserving heading hierarchy."""
+    heading_stack: list[tuple[int, str]] = []
+    blocks: list[_HeadingBlock] = []
+    current_paragraphs: list[str] = []
+
+    def _flush() -> None:
+        path = tuple(h for _, h in heading_stack)
+        text_paragraphs = [p for p in current_paragraphs if p.strip()]
+        if text_paragraphs:
+            blocks.append(
+                _HeadingBlock(
+                    heading_path=path,
+                    paragraphs=tuple(text_paragraphs),
+                )
+            )
+
+    for raw_line in content.split("\n"):
+        match = _HEADING_LEVEL_RE.match(raw_line.strip())
+        if match:
+            _flush()
+            current_paragraphs = []
+            level = len(match.group(1))
+            heading_text = match.group(2).strip()
+            # Pop headings at same or deeper level
+            while heading_stack and heading_stack[-1][0] >= level:
+                heading_stack.pop()
+            heading_stack.append((level, heading_text))
+        else:
+            current_paragraphs.append(raw_line)
+
+    _flush()
+    return blocks
+
+
+def _chunk_by_headings(
     content: str,
     title: str,
     relative_path: str,
     fingerprint: str,
     persona_id: str,
 ) -> list[ChunkSpec]:
-    segments = [segment.strip() for segment in content.split("\n\n") if segment.strip()]
+    blocks = _parse_heading_blocks(content)
+    if not blocks:
+        # No headings found — fall back to plain paragraph splitting
+        return _chunk_paragraphs(
+            content, title, relative_path, fingerprint, persona_id, heading_path=()
+        )
+
+    chunks: list[ChunkSpec] = []
+    for block in blocks:
+        block_chunks = _chunk_paragraphs(
+            "\n\n".join(block.paragraphs),
+            title,
+            relative_path,
+            fingerprint,
+            persona_id,
+            heading_path=block.heading_path,
+            chunk_index_start=len(chunks),
+        )
+        chunks.extend(block_chunks)
+    return chunks
+
+
+def _chunk_paragraphs(
+    content: str,
+    title: str,
+    relative_path: str,
+    fingerprint: str,
+    persona_id: str,
+    *,
+    heading_path: tuple[str, ...] = (),
+    chunk_index_start: int = 0,
+) -> list[ChunkSpec]:
+    segments = [s.strip() for s in content.split("\n\n") if s.strip()]
     if not segments:
         return []
 
     chunks: list[ChunkSpec] = []
     buffer: list[str] = []
     current_length = 0
-    chunk_index = 0
+    chunk_index = chunk_index_start
+
+    heading_label = " > ".join(heading_path) if heading_path else ""
 
     def _flush_buffer() -> None:
         nonlocal chunk_index
-        if buffer:
-            chunk_text = "\n\n".join(buffer)
-            chunks.append(
-                ChunkSpec(
-                    text=f"主題：{title}\n內容：{chunk_text}",
-                    metadata={
-                        "path": relative_path,
-                        "title": title,
-                        "kind": "freeform_markdown",
-                        "persona_id": persona_id,
-                        "fingerprint": fingerprint,
-                        "chunk_id": f"{relative_path}::{chunk_index}",
-                    },
-                )
+        if not buffer:
+            return
+        chunk_text = "\n\n".join(buffer)
+        prefix = f"主題：{title}"
+        if heading_label:
+            prefix += f"\n章節：{heading_label}"
+        full_text = f"{prefix}\n內容：{chunk_text}"
+        chunks.append(
+            ChunkSpec(
+                text=full_text,
+                metadata={
+                    "path": relative_path,
+                    "title": title,
+                    "heading_path": list(heading_path),
+                    "chunk_index": chunk_index,
+                    "kind": "freeform_markdown",
+                    "persona_id": persona_id,
+                    "fingerprint": fingerprint,
+                    "chunk_id": f"{relative_path}::{chunk_index}",
+                    "char_count": len(full_text),
+                },
             )
-            chunk_index += 1
+        )
+        chunk_index += 1
 
     for segment in segments:
         additional = len(segment) + (2 if buffer else 0)
-        if buffer and current_length + additional > 700:
+        if buffer and current_length + additional > _CHUNK_CHAR_LIMIT:
             _flush_buffer()
             buffer = [segment]
             current_length = len(segment)
@@ -220,12 +315,15 @@ def _extract_csv_chunks(path: Path) -> list[ChunkSpec]:
             if not question and not answer:
                 continue
 
+            text = _format_qa_chunk(title, question or "未命名問題", [answer or ""])
             chunks.append(
                 ChunkSpec(
-                    text=_format_qa_chunk(title, question or "未命名問題", [answer or ""]),
+                    text=text,
                     metadata={
                         "path": relative_path,
                         "title": title,
+                        "heading_path": [],
+                        "chunk_index": row_number,
                         "kind": "qa_csv",
                         "question": question,
                         "persona_id": persona_id,
@@ -234,6 +332,7 @@ def _extract_csv_chunks(path: Path) -> list[ChunkSpec]:
                         "image": _pick_first(row, "img", "image"),
                         "fingerprint": fingerprint,
                         "chunk_id": f"{relative_path}::{row_number}",
+                        "char_count": len(text),
                     },
                 )
             )
@@ -275,13 +374,11 @@ def _build_placeholder_records() -> list[dict[str, Any]]:
     ]
 
 
-def _normalize_text(content: str) -> str:
-    lines: list[str] = []
-    for raw_line in content.splitlines():
-        line = _IMAGE_MARKDOWN_RE.sub("", raw_line).strip()
-        line = _HEADING_RE.sub("", line)
-        lines.append(line)
-    return "\n".join(lines).strip()
+def _clean_text(content: str) -> str:
+    """Remove image markdown but preserve headings for heading-aware chunking."""
+    return "\n".join(
+        _IMAGE_MARKDOWN_RE.sub("", line) for line in content.splitlines()
+    ).strip()
 
 
 def _format_qa_chunk(title: str, question: str, answer_lines: list[str]) -> str:

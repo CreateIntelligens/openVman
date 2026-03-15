@@ -5,10 +5,11 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from config import get_settings
-from core.agent_loop import AgentLoopResult, prepare_agent_reply, run_agent_loop
+from core.agent_loop import AgentLoopResult, ToolPhaseError, prepare_agent_reply, run_agent_loop
 from core.llm_client import generate_chat_reply, stream_chat_reply
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
@@ -18,20 +19,21 @@ from core.sse_events import (
     SessionEvent,
     SSEEvent,
     TokenEvent,
+    ToolErrorEvent,
     ToolEvent,
 )
 from infra.learnings import capture_learnings_from_message, record_error_event
-from memory.embedder import encode_text
+from core.retrieval_service import retrieve_context
 from memory.memory import (
     append_session_message,
     archive_session_turn,
     get_or_create_session,
     list_session_messages,
 )
-from memory.memory_governance import maybe_run_memory_maintenance
-from memory.retrieval import search_records
+from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
 from protocol.message_envelope import MessageEnvelope, normalize_to_brain_message, serialize_context
 from safety.guardrails import enforce_guardrails, enforce_session_limits
+from tools.tool_executor import parse_tool_result
 
 
 @dataclass(slots=True)
@@ -45,6 +47,7 @@ class GenerationContext:
     prompt_messages: list[dict[str, str]]
     knowledge_results: list[dict[str, Any]]
     memory_results: list[dict[str, Any]]
+    retrieval_diagnostics: dict[str, Any]
 
 
 def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
@@ -65,8 +68,8 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     prior_messages = list_session_messages(session.session_id, persona_id)
     append_session_message(session.session_id, persona_id, "user", cleaned_message)
 
-    knowledge_results, memory_results = _retrieve_rag_context(
-        route, cleaned_message, persona_id, cfg,
+    knowledge_results, memory_results, retrieval_diagnostics = _retrieve_rag_context(
+        route, cleaned_message, persona_id,
     )
     request_ctx = serialize_context(envelope.context)
     prompt_messages = build_chat_messages(
@@ -87,6 +90,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         prompt_messages=prompt_messages,
         knowledge_results=knowledge_results,
         memory_results=memory_results,
+        retrieval_diagnostics=retrieval_diagnostics,
     )
 
 
@@ -94,19 +98,12 @@ def _retrieve_rag_context(
     route: RouteDecision,
     message: str,
     persona_id: str,
-    cfg: Any,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Fetch knowledge and memory results when RAG is enabled for this route."""
     if route.skip_rag:
-        return [], []
-    query_vector = encode_text(message)
-    knowledge = search_records(
-        "knowledge", query_vector, cfg.rag_top_k, persona_id=persona_id,
-    )
-    memory = search_records(
-        "memories", query_vector, min(3, cfg.rag_top_k), persona_id=persona_id,
-    )
-    return knowledge, memory
+        return [], [], {}
+    bundle = retrieve_context(query=message, persona_id=persona_id)
+    return bundle.knowledge_results, bundle.memory_results, bundle.diagnostics
 
 
 def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any]:
@@ -125,6 +122,14 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
     learnings_added = capture_learnings_from_message(context.user_message)
     maintenance = maybe_run_memory_maintenance()
 
+    writeback = write_summary_and_reindex(
+        persona_id=context.persona_id,
+        day=date.today().isoformat(),
+        summary_text=f"User: {context.user_message[:200]}\nAssistant: {cleaned_reply[:200]}",
+        source_turns=1,
+        session_id=context.session_id,
+    )
+
     return {
         "status": "ok",
         "trace_id": context.trace_id,
@@ -133,10 +138,68 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         "reply": cleaned_reply,
         "knowledge_results": context.knowledge_results,
         "memory_results": context.memory_results,
+        "retrieval_diagnostics": context.retrieval_diagnostics,
         "history": list_session_messages(context.session_id, context.persona_id),
         "learnings_added": learnings_added,
         "memory_maintenance": maintenance,
+        "memory_writeback": writeback,
     }
+
+
+_TOOL_FALLBACK_HINT = (
+    "[系統提示] 工具流程部分失敗。請優先使用已成功取得的工具資訊回答使用者，"
+    "若資訊不足，請誠實說明限制並提供安全的下一步建議。"
+)
+
+
+def _inject_tool_fallback_hint(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return a new message list with a system hint inserted before the last user message.
+
+    The original list is NOT mutated.
+    """
+    result = list(messages)
+    insert_idx = len(result)
+    for i in range(len(result) - 1, -1, -1):
+        if result[i].get("role") == "user":
+            insert_idx = i
+            break
+    result.insert(insert_idx, {"role": "system", "content": _TOOL_FALLBACK_HINT})
+    return result
+
+
+def _fallback_messages_for_tool_phase_error(
+    context: GenerationContext,
+    exc: ToolPhaseError,
+) -> list[dict[str, Any]]:
+    partial_messages = exc.partial_messages or context.prompt_messages
+    return _inject_tool_fallback_hint(partial_messages)
+
+
+def _tool_error_status_from_steps(tool_steps: list[dict[str, Any]]) -> str:
+    if not tool_steps:
+        return "phase_error"
+    parsed = parse_tool_result(tool_steps[-1].get("result", ""))
+    if parsed is None:
+        return "phase_error"
+    if "逾時" in parsed.error:
+        return "timeout"
+    if parsed.status == "error":
+        return "error"
+    return "phase_error"
+
+
+def _tool_error_event_from_phase_error(trace_id: str, exc: ToolPhaseError) -> ToolErrorEvent:
+    last_step = exc.partial_steps[-1] if exc.partial_steps else {}
+    return ToolErrorEvent(
+        trace_id=trace_id,
+        error=str(exc),
+        partial_steps_count=len(exc.partial_steps),
+        tool_call_id=last_step.get("tool_call_id", ""),
+        name=last_step.get("name", ""),
+        status=_tool_error_status_from_steps(exc.partial_steps),
+    )
 
 
 def execute_generation(context: GenerationContext) -> AgentLoopResult:
@@ -146,7 +209,12 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             reply=generate_chat_reply(context.prompt_messages),
             tool_steps=[],
         )
-    return run_agent_loop(context.prompt_messages, persona_id=context.persona_id)
+    try:
+        return run_agent_loop(context.prompt_messages, persona_id=context.persona_id)
+    except ToolPhaseError as exc:
+        fallback_messages = _fallback_messages_for_tool_phase_error(context, exc)
+        reply = generate_chat_reply(fallback_messages)
+        return AgentLoopResult(reply=reply, tool_steps=exc.partial_steps)
 
 
 def _tool_event_from_step(trace_id: str, step: dict[str, Any]) -> ToolEvent:
@@ -174,15 +242,22 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
     stream_messages: list[dict[str, Any]] = context.prompt_messages
 
     if not context.route.skip_tools:
-        prepared = await asyncio.to_thread(
-            prepare_agent_reply,
-            context.prompt_messages,
-            context.persona_id,
-        )
-        stream_messages = prepared.messages
-        tool_steps = prepared.tool_steps
-        for step in tool_steps:
-            yield _tool_event_from_step(context.trace_id, step)
+        try:
+            prepared = await asyncio.to_thread(
+                prepare_agent_reply,
+                context.prompt_messages,
+                context.persona_id,
+            )
+            stream_messages = prepared.messages
+            tool_steps = prepared.tool_steps
+            for step in tool_steps:
+                yield _tool_event_from_step(context.trace_id, step)
+        except ToolPhaseError as exc:
+            tool_steps = exc.partial_steps
+            for step in tool_steps:
+                yield _tool_event_from_step(context.trace_id, step)
+            yield _tool_error_event_from_phase_error(context.trace_id, exc)
+            stream_messages = _fallback_messages_for_tool_phase_error(context, exc)
 
     async for token in stream_chat_reply(stream_messages):
         reply_parts.append(token)
