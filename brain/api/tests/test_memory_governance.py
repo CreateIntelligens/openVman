@@ -68,6 +68,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     # Stub config
     fake_cfg = MagicMock()
     fake_cfg.memory_maintenance_interval_seconds = 0
+    fake_cfg.memory_merge_similarity_threshold = 0.92
     fake_config_mod = types.ModuleType("config")
     fake_config_mod.get_settings = lambda: fake_cfg
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)
@@ -77,6 +78,18 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_obs = types.ModuleType("safety.observability")
     fake_obs.log_event = lambda event, **kw: logged_events.append({"event": event, **kw})
     monkeypatch.setitem(sys.modules, "safety.observability", fake_obs)
+
+    # Stub importance (used by _build_summary_records)
+    fake_importance_mod = types.ModuleType("memory.importance")
+
+    class FakeImportanceResult:
+        score = 0.1
+        level = "low"
+        signals = ()
+
+    fake_importance_mod.score_importance = lambda text: FakeImportanceResult()
+    fake_importance_mod.ImportanceResult = FakeImportanceResult
+    monkeypatch.setitem(sys.modules, "memory.importance", fake_importance_mod)
 
     # Force reimport
     sys.modules.pop("memory.memory_governance", None)
@@ -201,3 +214,107 @@ class TestDailySummaryWriteback:
         assert "fingerprint:" in content
         assert "source_turns: 5" in content
         assert "### Summary" in content
+
+
+class TestSemanticDedup:
+    def test_identical_vectors_are_merged(self, monkeypatch, tmp_path):
+        """Records with identical vectors should be merged (newer wins)."""
+        gov, _, _ = _stub_deps(monkeypatch, tmp_path)
+
+        vec = [1.0] * 128
+        records = [
+            {
+                "text": "older",
+                "vector": vec,
+                "date": "2026-03-10",
+                "metadata": json.dumps({"persona_id": "default"}),
+            },
+            {
+                "text": "newer",
+                "vector": vec,
+                "date": "2026-03-15",
+                "metadata": json.dumps({"persona_id": "default"}),
+            },
+        ]
+        result = gov._semantic_dedupe_records(records)
+        assert len(result) == 1
+        assert result[0]["text"] == "newer"
+
+    def test_different_vectors_are_kept(self, monkeypatch, tmp_path):
+        """Records with very different vectors should both be kept."""
+        gov, _, _ = _stub_deps(monkeypatch, tmp_path)
+
+        vec_a = [1.0, 0.0] + [0.0] * 126
+        vec_b = [0.0, 1.0] + [0.0] * 126
+        records = [
+            {
+                "text": "topic A",
+                "vector": vec_a,
+                "date": "2026-03-10",
+                "metadata": json.dumps({"persona_id": "default"}),
+            },
+            {
+                "text": "topic B",
+                "vector": vec_b,
+                "date": "2026-03-15",
+                "metadata": json.dumps({"persona_id": "default"}),
+            },
+        ]
+        result = gov._semantic_dedupe_records(records)
+        assert len(result) == 2
+
+    def test_different_personas_not_merged(self, monkeypatch, tmp_path):
+        """Records from different personas should not be merged even if identical vectors."""
+        gov, _, _ = _stub_deps(monkeypatch, tmp_path)
+
+        vec = [1.0] * 128
+        records = [
+            {
+                "text": "same content",
+                "vector": vec,
+                "date": "2026-03-10",
+                "metadata": json.dumps({"persona_id": "alice"}),
+            },
+            {
+                "text": "same content",
+                "vector": vec,
+                "date": "2026-03-15",
+                "metadata": json.dumps({"persona_id": "bob"}),
+            },
+        ]
+        result = gov._semantic_dedupe_records(records)
+        assert len(result) == 2
+
+    def test_records_without_vectors_are_preserved(self, monkeypatch, tmp_path):
+        """Records without vector field should not be dropped."""
+        gov, _, _ = _stub_deps(monkeypatch, tmp_path)
+
+        records = [
+            {"text": "no vector", "date": "2026-03-10", "metadata": "{}"},
+            {"text": "also no vector", "date": "2026-03-15", "metadata": "{}"},
+        ]
+        result = gov._semantic_dedupe_records(records)
+        assert len(result) == 2
+
+    def test_merge_logs_event(self, monkeypatch, tmp_path):
+        """Semantic dedup should log an event when merges occur."""
+        gov, _, events = _stub_deps(monkeypatch, tmp_path)
+
+        vec = [1.0] * 128
+        records = [
+            {
+                "text": "dup A",
+                "vector": vec,
+                "date": "2026-03-10",
+                "metadata": json.dumps({"persona_id": "default"}),
+            },
+            {
+                "text": "dup B",
+                "vector": vec,
+                "date": "2026-03-15",
+                "metadata": json.dumps({"persona_id": "default"}),
+            },
+        ]
+        gov._semantic_dedupe_records(records)
+        event_types = [e["event"] for e in events]
+        assert "memory_semantic_dedup" in event_types

@@ -34,7 +34,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, *, knowledge=None, memories=None
     knowledge_data = knowledge or []
     memory_data = memories or []
 
-    def mock_search_records(table_name, query_vector, top_k, persona_id="default"):
+    def mock_search_records(table_name, query_vector, top_k, persona_id="default", *, query_text=""):
         if table_name == "knowledge":
             return knowledge_data[:top_k]
         return memory_data[:top_k]
@@ -59,6 +59,8 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, *, knowledge=None, memories=None
     fake_cfg.rag_memory_top_k = 2
     fake_cfg.rag_rerank_candidate_multiplier = 4
     fake_cfg.rag_memory_distance_bonus = 0.02
+    fake_cfg.memory_decay_rate_per_day = 0.005
+    fake_cfg.memory_importance_weight = 0.03
     fake_config_mod = types.ModuleType("config")
     fake_config_mod.get_settings = lambda: fake_cfg
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)
@@ -171,3 +173,77 @@ class TestRetrievalService:
         bundle = service.retrieve_context(query="test")
         with pytest.raises(AttributeError):
             bundle.knowledge_results = []
+
+    def test_decay_penalizes_old_records(self, monkeypatch):
+        """Older memory records should rank lower due to time decay."""
+        from datetime import date, timedelta
+
+        today = date.today()
+        old_date = (today - timedelta(days=60)).isoformat()
+        recent_date = (today - timedelta(days=1)).isoformat()
+
+        service, _, _ = _stub_deps(monkeypatch)
+
+        # Both have the same raw distance
+        candidates = [
+            {"text": "old", "_distance": 0.3, "date": old_date, "metadata": "{}"},
+            {"text": "recent", "_distance": 0.3, "date": recent_date, "metadata": "{}"},
+        ]
+        reranked = service._rerank_by_distance(
+            candidates, decay_rate_per_day=0.005,
+        )
+        # Recent record should rank first (lower effective distance)
+        assert reranked[0]["text"] == "recent"
+
+    def test_decay_zero_has_no_effect(self, monkeypatch):
+        """With decay_rate=0, old and new records rank the same by distance."""
+        from datetime import date, timedelta
+
+        today = date.today()
+        old_date = (today - timedelta(days=100)).isoformat()
+
+        service, _, _ = _stub_deps(monkeypatch)
+
+        candidates = [
+            {"text": "old", "_distance": 0.2, "date": old_date, "metadata": "{}"},
+            {"text": "new", "_distance": 0.3, "date": today.isoformat(), "metadata": "{}"},
+        ]
+        reranked = service._rerank_by_distance(candidates, decay_rate_per_day=0.0)
+        # Without decay, lower raw distance still wins
+        assert reranked[0]["text"] == "old"
+
+    def test_missing_date_no_decay_penalty(self, monkeypatch):
+        """Records without a date field should not be penalized by decay."""
+        service, _, _ = _stub_deps(monkeypatch)
+
+        candidates = [
+            {"text": "no_date", "_distance": 0.3, "metadata": "{}"},
+            {"text": "with_date", "_distance": 0.3, "date": "2020-01-01", "metadata": "{}"},
+        ]
+        reranked = service._rerank_by_distance(
+            candidates, decay_rate_per_day=0.01,
+        )
+        # no_date gets 0 days penalty, with_date gets huge penalty
+        assert reranked[0]["text"] == "no_date"
+
+    def test_importance_boosts_high_importance_records(self, monkeypatch):
+        """Records with higher importance should rank better."""
+        service, _, _ = _stub_deps(monkeypatch)
+
+        candidates = [
+            {
+                "text": "low_importance",
+                "_distance": 0.3,
+                "metadata": json.dumps({"importance": 0.1}),
+            },
+            {
+                "text": "high_importance",
+                "_distance": 0.3,
+                "metadata": json.dumps({"importance": 0.9}),
+            },
+        ]
+        reranked = service._rerank_by_distance(
+            candidates, importance_weight=0.1,
+        )
+        # high importance => lower effective distance => ranked first
+        assert reranked[0]["text"] == "high_importance"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -11,12 +12,17 @@ from threading import Lock
 from time import monotonic
 from typing import Any
 
+import numpy as np
+
 from config import get_settings
 from infra.db import get_db, get_memories_table, normalize_vector, parse_record_metadata
 from knowledge.workspace import CORE_DOCUMENTS, WORKSPACE_ROOT, ensure_workspace_scaffold
 from memory.embedder import get_embedder
+from memory.importance import score_importance
 from personas.personas import normalize_persona_id
 from safety.observability import log_event
+
+logger = logging.getLogger(__name__)
 
 _maintenance_lock = Lock()
 _last_maintenance_at = 0.0
@@ -53,6 +59,7 @@ def run_memory_maintenance() -> dict[str, Any]:
 
     existing_records = get_memories_table().to_arrow().to_pylist()
     deduped = _dedupe_memory_records(existing_records)
+    deduped = _semantic_dedupe_records(deduped)
     non_summary = [
         record
         for record in deduped
@@ -333,6 +340,7 @@ def _build_summary_records(summaries: list[DailyMemorySummary]) -> list[dict[str
     vectors = get_embedder().encode([summary.summary_text for summary in summaries])
     records: list[dict[str, Any]] = []
     for summary, vector in zip(summaries, vectors):
+        importance = score_importance(summary.summary_text)
         records.append(
             {
                 "text": summary.summary_text,
@@ -345,6 +353,8 @@ def _build_summary_records(summaries: list[DailyMemorySummary]) -> list[dict[str
                         "persona_id": summary.persona_id,
                         "day": summary.day,
                         "fingerprint": summary.fingerprint,
+                        "importance": importance.score,
+                        "importance_level": importance.level,
                     },
                     ensure_ascii=False,
                 ),
@@ -401,3 +411,108 @@ def _persona_id_from_memory_path(path: Path, memory_dir: Path) -> str:
     if len(relative.parts) == 1:
         return "default"
     return normalize_persona_id(relative.parts[0])
+
+
+# ---------------------------------------------------------------------------
+# Semantic dedup / merge
+# ---------------------------------------------------------------------------
+
+
+def _semantic_dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove near-duplicate memory records using cosine similarity.
+
+    Groups records by persona, then compares pairs within each group.
+    When similarity >= threshold, the newer record is kept (merged).
+    """
+    cfg = get_settings()
+    threshold = cfg.memory_merge_similarity_threshold
+
+    # Group by persona
+    groups: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+    for idx, record in enumerate(records):
+        persona = _memory_persona_id(record)
+        groups.setdefault(persona, []).append((idx, record))
+
+    drop_indices: set[int] = set()
+    merge_count = 0
+
+    for group in groups.values():
+        vectors_with_idx = [
+            (idx, vec)
+            for idx, record in group
+            if (vec := record.get("vector")) is not None
+        ]
+        merged = _find_merge_drops(vectors_with_idx, records, threshold, drop_indices)
+        drop_indices.update(merged)
+        merge_count += len(merged)
+
+    if merge_count > 0:
+        logger.info("semantic dedup: merged %d pairs (threshold=%.2f)", merge_count, threshold)
+        log_event("memory_semantic_dedup", merged_pairs=merge_count, threshold=threshold)
+
+    return [r for idx, r in enumerate(records) if idx not in drop_indices]
+
+
+def _find_merge_drops(
+    vectors_with_idx: list[tuple[int, Any]],
+    records: list[dict[str, Any]],
+    threshold: float,
+    already_dropped: set[int],
+) -> set[int]:
+    """Compare all pairs in a persona group and return indices to drop."""
+    drops: set[int] = set()
+    if len(vectors_with_idx) < 2:
+        return drops
+
+    for i in range(len(vectors_with_idx)):
+        idx_a, vec_a = vectors_with_idx[i]
+        if idx_a in already_dropped or idx_a in drops:
+            continue
+        for j in range(i + 1, len(vectors_with_idx)):
+            idx_b, vec_b = vectors_with_idx[j]
+            if idx_b in already_dropped or idx_b in drops:
+                continue
+            if _cosine_similarity(vec_a, vec_b) >= threshold:
+                older_idx, _ = _merge_memory_pair(
+                    idx_a, records[idx_a], idx_b, records[idx_b],
+                )
+                drops.add(older_idx)
+
+    return drops
+
+
+def _cosine_similarity(vec_a: Any, vec_b: Any) -> float:
+    """Compute cosine similarity between two vectors."""
+    a = np.asarray(vec_a, dtype=np.float32)
+    b = np.asarray(vec_b, dtype=np.float32)
+    dot = np.dot(a, b)
+    norm_a = np.linalg.norm(a)
+    norm_b = np.linalg.norm(b)
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return float(dot / (norm_a * norm_b))
+
+
+def _merge_memory_pair(
+    idx_a: int,
+    record_a: dict[str, Any],
+    idx_b: int,
+    record_b: dict[str, Any],
+) -> tuple[int, int]:
+    """Decide which record to drop when merging a near-duplicate pair.
+
+    Returns (older_idx, newer_idx). The newer record (by date, then index) wins.
+    """
+    date_a = str(record_a.get("date", ""))
+    date_b = str(record_b.get("date", ""))
+
+    if date_a < date_b:
+        return idx_a, idx_b
+    if date_b < date_a:
+        return idx_b, idx_a
+    # Same date — higher index is newer
+    if idx_a < idx_b:
+        return idx_a, idx_b
+    return idx_b, idx_a
+
+

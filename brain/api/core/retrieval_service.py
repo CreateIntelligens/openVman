@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, timedelta
 from typing import Any
 
 from config import get_settings
@@ -36,21 +37,31 @@ def retrieve_context(
     memory_top_k = cfg.rag_memory_top_k
     candidate_multiplier = cfg.rag_rerank_candidate_multiplier
     distance_bonus = cfg.rag_memory_distance_bonus
+    decay_rate = cfg.memory_decay_rate_per_day
+    importance_weight = cfg.memory_importance_weight
 
     # Encode query
     query_vector = get_embedder().encode([query])[0]
 
     # Fetch candidates (wider than final top-k for reranking)
+    # Pass query text to enable hybrid search (vector + FTS)
     knowledge_candidates = _safe_search(
-        "knowledge", query_vector, knowledge_top_k * candidate_multiplier, persona_id
+        "knowledge", query_vector, knowledge_top_k * candidate_multiplier, persona_id,
+        query_text=query,
     )
     memory_candidates = _safe_search(
-        "memories", query_vector, memory_top_k * candidate_multiplier, persona_id
+        "memories", query_vector, memory_top_k * candidate_multiplier, persona_id,
+        query_text=query,
     )
 
-    # Rerank: sort by distance with memory bonus
+    # Rerank: sort by distance with memory bonus, decay, and importance
     reranked_knowledge = _rerank_by_distance(knowledge_candidates)
-    reranked_memory = _rerank_by_distance(memory_candidates, distance_bonus=distance_bonus)
+    reranked_memory = _rerank_by_distance(
+        memory_candidates,
+        distance_bonus=distance_bonus,
+        decay_rate_per_day=decay_rate,
+        importance_weight=importance_weight,
+    )
 
     # Trim to final top-k
     final_knowledge = reranked_knowledge[:knowledge_top_k]
@@ -79,10 +90,14 @@ def _safe_search(
     query_vector: list[float],
     top_k: int,
     persona_id: str,
+    *,
+    query_text: str = "",
 ) -> list[dict[str, Any]]:
     """Search with error handling — return empty on failure."""
     try:
-        return search_records(table_name, query_vector, top_k, persona_id)
+        return search_records(
+            table_name, query_vector, top_k, persona_id, query_text=query_text,
+        )
     except Exception:
         return []
 
@@ -91,16 +106,59 @@ def _rerank_by_distance(
     candidates: list[dict[str, Any]],
     *,
     distance_bonus: float = 0.0,
+    decay_rate_per_day: float = 0.0,
+    importance_weight: float = 0.0,
 ) -> list[dict[str, Any]]:
-    """Sort candidates by _distance (ascending), applying an optional bonus.
+    """Sort candidates by effective distance (ascending).
 
-    A negative bonus makes candidates appear closer (lower distance = better).
+    effective_distance = raw_distance - bonus
+                       + (days_old * decay_rate)
+                       - (importance * importance_weight)
+
+    A positive bonus (lower distance) makes candidates rank higher.
+    Decay penalizes older records; importance rewards higher-scored records.
     """
+    today = date.today()
+
     def sort_key(record: dict[str, Any]) -> float:
         raw_distance = float(record.get("_distance", 999.0))
-        return raw_distance - distance_bonus
+        effective = raw_distance - distance_bonus
+
+        # Time decay: older records get penalized
+        if decay_rate_per_day > 0:
+            days_old = _days_since(record, today)
+            effective += days_old * decay_rate_per_day
+
+        # Importance bonus: higher importance records rank better
+        if importance_weight > 0:
+            importance = _record_importance(record)
+            effective -= importance * importance_weight
+
+        return effective
 
     return sorted(candidates, key=sort_key)
+
+
+def _days_since(record: dict[str, Any], today: date) -> float:
+    """Return the number of days between the record's date and today."""
+    raw_date = str(record.get("date", ""))
+    if not raw_date:
+        return 0.0
+    try:
+        record_date = date.fromisoformat(raw_date)
+        delta = today - record_date
+        return max(delta.days, 0)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _record_importance(record: dict[str, Any]) -> float:
+    """Extract importance score from record metadata."""
+    meta = parse_record_metadata(record)
+    try:
+        return float(meta.get("importance", 0.0))
+    except (ValueError, TypeError):
+        return 0.0
 
 
 def _build_diagnostics(
