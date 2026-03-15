@@ -44,6 +44,17 @@ class TokenEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolErrorEvent:
+    trace_id: str
+    error: str
+    partial_steps_count: int
+    tool_call_id: str = ""
+    name: str = ""
+    status: str = "phase_error"
+    event: str = "tool_error"
+
+
+@dataclass(frozen=True, slots=True)
 class DoneEvent:
     trace_id: str
     session_id: str
@@ -54,7 +65,7 @@ class DoneEvent:
     event: str = "done"
 
 
-SSEEvent = SessionEvent | ContextEvent | ToolEvent | TokenEvent | DoneEvent
+SSEEvent = SessionEvent | ContextEvent | ToolEvent | ToolErrorEvent | TokenEvent | DoneEvent
 
 
 def _encode_sse_data(payload: dict[str, Any]) -> str:

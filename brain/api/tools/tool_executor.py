@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from queue import Empty, Queue
+from threading import Thread
 from time import perf_counter
 from typing import Any, Callable
 
+from config import get_settings
 from safety.observability import get_metrics_store, log_event, log_exception
 from tools.tool_registry import get_tool_registry
 
@@ -31,6 +34,10 @@ class ToolResult:
     def serialize(self) -> str:
         """Serialize to JSON string for the agent loop."""
         return json.dumps(asdict(self), ensure_ascii=False)
+
+
+class ToolCallTimeoutError(Exception):
+    """Raised when a tool handler does not finish within the configured timeout."""
 
 
 def execute_tool_call(tool_name: str, raw_arguments: str | dict[str, Any]) -> str:
@@ -66,8 +73,12 @@ def execute_tool_call(tool_name: str, raw_arguments: str | dict[str, Any]) -> st
             reason="schema_validation",
         )
 
+    timeout = get_settings().tool_call_timeout_seconds
     try:
-        result = tool.handler(arguments)
+        result = _run_tool_handler_with_timeout(tool.handler, arguments, timeout)
+    except ToolCallTimeoutError:
+        log_event("tool_timeout", tool_name=tool_name, timeout_seconds=timeout)
+        return _finalize(tool_name, "timeout", start, ToolResult.fail(tool_name, f"工具執行逾時（{timeout}s）"))
     except Exception as exc:
         log_exception("tool_execution_error", exc, tool_name=tool_name)
         return _finalize(tool_name, "error", start, ToolResult.fail(tool_name, f"工具執行失敗：{exc}"))
@@ -97,6 +108,29 @@ def validate_tool_arguments(
     return errors
 
 
+def parse_tool_result(result_json: str) -> ToolResult | None:
+    """Parse a serialized ToolResult payload if it matches the expected shape."""
+    try:
+        payload = json.loads(result_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    status = payload.get("status")
+    if status not in {"ok", "error"}:
+        return None
+    data = payload.get("data", {})
+    error = payload.get("error", "")
+    if not isinstance(data, dict) or not isinstance(error, str):
+        return None
+    return ToolResult(
+        status=status,
+        tool_name=str(payload.get("tool_name", "")),
+        data=data,
+        error=error,
+    )
+
+
 _SCHEMA_TYPE_CHECKS: dict[str, Callable[[Any], bool]] = {
     "string": lambda v: isinstance(v, str),
     "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
@@ -116,6 +150,31 @@ def _coerce_tool_data(result: Any) -> dict[str, Any]:
     if isinstance(result, dict):
         return result
     return {"text": str(result)}
+
+
+def _run_tool_handler_with_timeout(
+    handler: Callable[[dict[str, Any]], Any],
+    arguments: dict[str, Any],
+    timeout: int,
+) -> Any:
+    queue: Queue[tuple[str, Any]] = Queue(maxsize=1)
+
+    def runner() -> None:
+        try:
+            queue.put(("result", handler(arguments)))
+        except Exception as exc:  # pragma: no cover - exercised via queue consumer
+            queue.put(("error", exc))
+
+    thread = Thread(target=runner, daemon=True, name="brain-tool-call")
+    thread.start()
+    try:
+        outcome, payload = queue.get(timeout=timeout)
+    except Empty as exc:
+        raise ToolCallTimeoutError from exc
+
+    if outcome == "error":
+        raise payload
+    return payload
 
 
 def _record_tool_outcome(tool_name: str, status: str, start: float) -> float:

@@ -11,6 +11,24 @@ from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_persona, get_tool_registry
 
 
+class ToolPhaseError(Exception):
+    """Raised when the tool phase fails (e.g. max rounds exceeded).
+
+    Carries the partial tool steps completed before the error so that
+    callers can still use them for fallback generation.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        partial_steps: list[dict[str, Any]],
+        partial_messages: list[dict[str, Any]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.partial_steps = partial_steps
+        self.partial_messages = partial_messages or []
+
+
 @dataclass(slots=True)
 class AgentLoopResult:
     reply: str
@@ -30,7 +48,11 @@ def run_agent_loop(
     """Run a bounded think -> tool -> observe loop until the model returns text."""
     working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id)
     if final_turn is None:
-        raise ValueError("工具調用超出最大輪次")
+        raise ToolPhaseError(
+            "工具調用超出最大輪次",
+            partial_steps=tool_steps,
+            partial_messages=working_messages,
+        )
     reply = final_turn.content.strip()
     if not reply:
         raise ValueError("LLM 沒有回傳內容")
@@ -46,7 +68,13 @@ def prepare_agent_reply(
     Unlike run_agent_loop, this does NOT make the final text completion.
     The caller is expected to stream the final reply via stream_chat_reply().
     """
-    working_messages, tool_steps, _ = _run_tool_phase(messages, persona_id)
+    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id)
+    if final_turn is None:
+        raise ToolPhaseError(
+            "工具調用超出最大輪次",
+            partial_steps=tool_steps,
+            partial_messages=working_messages,
+        )
     return PreparedAgentReply(messages=working_messages, tool_steps=tool_steps)
 
 
