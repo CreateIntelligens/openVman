@@ -81,3 +81,101 @@ def _metric_key(name: str, labels: dict[str, object]) -> str:
         return name
     serialized = ",".join(f"{key}={labels[key]}" for key in sorted(labels))
     return f"{name}|{serialized}"
+
+
+# ---------------------------------------------------------------------------
+# Routing metrics helpers (TASK-24)
+# ---------------------------------------------------------------------------
+
+def record_route_attempt(
+    *,
+    trace_id: str,
+    provider: str,
+    model: str,
+    hop_index: int,
+    result: str,
+    latency_ms: float,
+    reason: str = "",
+    chain_length: int = 0,
+) -> None:
+    """Record a routing attempt with metrics and structured log."""
+    store = get_metrics_store()
+    store.increment("llm_route_attempts_total", provider=provider, model=model, result=result)
+    store.observe("llm_route_latency_ms", latency_ms, provider=provider, model=model, result=result)
+
+    if result == "failure" and reason:
+        store.increment("llm_provider_failures_total", provider=provider, model=model, reason=reason)
+
+    log_event(
+        "llm_route_attempt",
+        trace_id=trace_id,
+        provider=provider,
+        model=model,
+        hop_index=hop_index,
+        result=result,
+        reason=reason,
+        latency_ms=round(latency_ms, 2),
+        chain_length=chain_length,
+    )
+
+
+def record_fallback_hop(
+    *,
+    trace_id: str,
+    from_provider: str,
+    from_model: str,
+    to_provider: str,
+    to_model: str,
+    reason: str,
+    hop_index: int,
+) -> None:
+    """Record a fallback hop between providers/models."""
+    store = get_metrics_store()
+    store.increment(
+        "llm_fallback_hops_total",
+        from_provider=from_provider,
+        from_model=from_model,
+        to_provider=to_provider,
+        to_model=to_model,
+        reason=reason,
+    )
+    log_event(
+        "llm_fallback_hop",
+        trace_id=trace_id,
+        from_provider=from_provider,
+        from_model=from_model,
+        to_provider=to_provider,
+        to_model=to_model,
+        reason=reason,
+        hop_index=hop_index,
+    )
+
+
+def record_chain_exhausted(*, trace_id: str, final_reason: str, hops: int) -> None:
+    """Record that the entire fallback chain was exhausted."""
+    store = get_metrics_store()
+    store.increment("llm_chain_exhausted_total", final_reason=final_reason)
+    log_event(
+        "llm_chain_exhausted",
+        trace_id=trace_id,
+        final_reason=final_reason,
+        total_hops=hops,
+    )
+
+
+def record_circuit_state_change(
+    *, provider: str, old_state: str, new_state: str
+) -> None:
+    """Record a circuit-breaker state transition."""
+    store = get_metrics_store()
+    store.increment(
+        "llm_circuit_breaker_state_changes_total",
+        provider=provider,
+        state=new_state,
+    )
+    log_event(
+        f"llm_circuit_{new_state}",
+        provider=provider,
+        old_state=old_state,
+        new_state=new_state,
+    )
