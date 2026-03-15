@@ -72,6 +72,16 @@ def get_table(table_name: str) -> lancedb.table.Table:
     return get_db().open_table(table_name)
 
 
+def ensure_fts_index(table_name: str) -> None:
+    """Create a full-text search index on the text column if not already present."""
+    table = get_table(table_name)
+    try:
+        table.create_fts_index("text", replace=True)
+    except Exception:
+        # FTS index may already exist or not be supported in this version
+        pass
+
+
 def get_memories_table() -> lancedb.table.Table:
     """取得 memories 表"""
     return get_table("memories")

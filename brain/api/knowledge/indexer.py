@@ -12,8 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from config import get_settings
-from infra.db import get_db, get_knowledge_table, normalize_vector, parse_record_metadata
-from knowledge.workspace import ensure_workspace_scaffold, iter_indexable_documents
+import math
+
+from infra.db import ensure_fts_index, get_db, get_knowledge_table, normalize_vector, parse_record_metadata
+from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold, iter_indexable_documents
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
 
@@ -65,6 +67,7 @@ def rebuild_knowledge_index() -> dict[str, Any]:
     if not records:
         records = _build_placeholder_records()
     get_db().create_table("knowledge", data=records, mode="overwrite")
+    ensure_fts_index("knowledge")
     _save_index_state(current_fingerprints)
 
     return {
@@ -80,11 +83,16 @@ def rebuild_knowledge_index() -> dict[str, Any]:
 
 def _extract_text_chunks(path: Path) -> list[ChunkSpec]:
     content = path.read_text(encoding="utf-8-sig")
-    cleaned = _clean_text(content)
     title = path.stem
     relative_path = path.relative_to(ensure_workspace_scaffold()).as_posix()
     fingerprint = _fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
+
+    # Code files: skip heading parsing, chunk by line groups with overlap
+    if path.suffix.lower() in _CODE_EXTENSIONS:
+        return _chunk_code_file(content, title, relative_path, fingerprint, persona_id)
+
+    cleaned = _clean_text(content)
 
     # Strip headings for QA detection (QA docs don't use heading structure)
     stripped = re.sub(r"^#{1,6}\s*", "", cleaned, flags=re.MULTILINE)
@@ -162,7 +170,99 @@ def _extract_markdown_qa_chunks(
 
 _HEADING_LEVEL_RE = re.compile(r"^(#{1,6})\s+(.+)$")
 
-_CHUNK_CHAR_LIMIT = 700
+def _chunk_settings() -> tuple[int, int]:
+    """Return (char_limit, overlap_chars) from config."""
+    cfg = get_settings()
+    overlap_chars = int(cfg.chunk_char_limit * cfg.chunk_overlap_ratio)
+    return cfg.chunk_char_limit, overlap_chars
+
+
+_CODE_EXTENSIONS = ALLOWED_CODE_SUFFIXES
+
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？\n])")
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Compute cosine similarity between two vectors."""
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(x * x for x in b))
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _split_into_sentences(text: str) -> list[str]:
+    """Split text into sentences using Chinese/English punctuation boundaries."""
+    parts = _SENTENCE_SPLIT_RE.split(text)
+    return [s.strip() for s in parts if s.strip()]
+
+
+def _semantic_split_sentences(sentences: list[str], threshold: float) -> list[list[str]]:
+    """Group sentences into semantic chunks by embedding similarity.
+
+    Adjacent sentences with cosine similarity >= *threshold* stay together.
+    When similarity drops below threshold, a new group starts.
+    """
+    if len(sentences) <= 1:
+        return [sentences] if sentences else []
+
+    embedder = get_embedder()
+    vectors = embedder.encode(sentences)
+
+    groups: list[list[str]] = [[sentences[0]]]
+    for i in range(1, len(sentences)):
+        sim = _cosine_similarity(vectors[i - 1], vectors[i])
+        if sim >= threshold:
+            groups[-1].append(sentences[i])
+        else:
+            groups.append([sentences[i]])
+    return groups
+
+
+def _semantic_chunk_text(content: str, char_limit: int) -> list[str]:
+    """Split content into semantically coherent segments respecting char_limit.
+
+    1. Split into sentences
+    2. Group by semantic similarity
+    3. Merge small groups / split large groups to stay within char_limit
+    """
+    cfg = get_settings()
+    sentences = _split_into_sentences(content)
+    if not sentences:
+        return []
+
+    groups = _semantic_split_sentences(sentences, cfg.chunk_semantic_threshold)
+
+    # Merge/split groups to respect char_limit
+    segments: list[str] = []
+    buffer: list[str] = []
+    buffer_len = 0
+
+    for group in groups:
+        group_text = "".join(group)
+        # If single group exceeds limit, flush buffer first, then add group as-is
+        # (it will be further split by _split_oversized_segment later)
+        if len(group_text) > char_limit:
+            if buffer:
+                segments.append("".join(buffer))
+                buffer = []
+                buffer_len = 0
+            segments.append(group_text)
+            continue
+
+        if buffer_len + len(group_text) > char_limit:
+            segments.append("".join(buffer))
+            buffer = list(group)
+            buffer_len = len(group_text)
+        else:
+            buffer.extend(group)
+            buffer_len += len(group_text)
+
+    if buffer:
+        segments.append("".join(buffer))
+
+    return segments
 
 
 @dataclass(slots=True, frozen=True)
@@ -208,6 +308,149 @@ def _parse_heading_blocks(content: str) -> list[_HeadingBlock]:
     return blocks
 
 
+def _extract_python_ast_blocks(content: str) -> list[str]:
+    """Extract top-level functions and classes from Python source using AST.
+
+    Returns a list of source code blocks.  If AST parsing fails, returns an
+    empty list so the caller can fall back to blank-line splitting.
+    """
+    import ast
+    import textwrap
+
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return []
+
+    lines = content.splitlines(keepends=True)
+    blocks: list[str] = []
+    covered: set[int] = set()
+
+    for node in ast.iter_child_nodes(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        start = node.lineno - 1  # 0-indexed
+        end = node.end_lineno or (start + 1)
+        block = "".join(lines[start:end]).rstrip()
+        if block:
+            blocks.append(block)
+            covered.update(range(start, end))
+
+    # Collect non-covered top-level lines (imports, constants, etc.)
+    top_lines: list[str] = []
+    for i, line in enumerate(lines):
+        if i not in covered:
+            top_lines.append(line)
+
+    top_block = "".join(top_lines).strip()
+    if top_block:
+        blocks.insert(0, top_block)
+
+    return blocks
+
+
+def _chunk_code_file(
+    content: str,
+    title: str,
+    relative_path: str,
+    fingerprint: str,
+    persona_id: str,
+) -> list[ChunkSpec]:
+    """Chunk a code file using AST (Python) or blank-line boundaries (others).
+
+    Python files are split by top-level functions and classes via AST.
+    Other code files fall back to blank-line splitting.
+    Oversized blocks are further split to stay within char_limit.
+    """
+    suffix = Path(relative_path).suffix.lower()
+    char_limit, overlap_chars = _chunk_settings()
+
+    # Try AST splitting for Python files
+    if suffix == ".py":
+        ast_blocks = _extract_python_ast_blocks(content)
+        if ast_blocks:
+            return _assemble_code_chunks(
+                ast_blocks, title, relative_path, fingerprint, persona_id, char_limit
+            )
+
+    # Fallback: blank-line splitting with overlap
+    return _chunk_paragraphs(
+        content,
+        title,
+        relative_path,
+        fingerprint,
+        persona_id,
+        heading_path=(),
+        chunk_index_start=0,
+        is_code=True,
+    )
+
+
+def _assemble_code_chunks(
+    blocks: list[str],
+    title: str,
+    relative_path: str,
+    fingerprint: str,
+    persona_id: str,
+    char_limit: int,
+) -> list[ChunkSpec]:
+    """Assemble AST blocks into ChunkSpecs, merging small blocks and splitting large ones."""
+    chunks: list[ChunkSpec] = []
+    buffer: list[str] = []
+    buffer_len = 0
+    chunk_index = 0
+
+    def _flush() -> None:
+        nonlocal chunk_index
+        if not buffer:
+            return
+        chunk_text = "\n\n".join(buffer)
+        full_text = f"檔案：{relative_path}\n{chunk_text}"
+        chunks.append(
+            ChunkSpec(
+                text=full_text,
+                metadata={
+                    "path": relative_path,
+                    "title": title,
+                    "heading_path": [],
+                    "chunk_index": chunk_index,
+                    "kind": "code",
+                    "persona_id": persona_id,
+                    "fingerprint": fingerprint,
+                    "chunk_id": f"{relative_path}::{chunk_index}",
+                    "char_count": len(full_text),
+                },
+            )
+        )
+        chunk_index += 1
+
+    for block in blocks:
+        # If a single block exceeds limit, flush buffer first, then split the block
+        if len(block) > char_limit:
+            _flush()
+            buffer = []
+            buffer_len = 0
+            sub_pieces = _split_oversized_segment(block, char_limit)
+            for piece in sub_pieces:
+                buffer = [piece]
+                buffer_len = len(piece)
+                _flush()
+                buffer = []
+                buffer_len = 0
+            continue
+
+        if buffer and buffer_len + len(block) + 2 > char_limit:
+            _flush()
+            buffer = [block]
+            buffer_len = len(block)
+        else:
+            buffer.append(block)
+            buffer_len += len(block) + (2 if len(buffer) > 1 else 0)
+
+    _flush()
+    return chunks
+
+
 def _chunk_by_headings(
     content: str,
     title: str,
@@ -237,6 +480,43 @@ def _chunk_by_headings(
     return chunks
 
 
+def _split_oversized_segment(segment: str, char_limit: int) -> list[str]:
+    """Split a single segment that exceeds char_limit into smaller pieces.
+
+    Tries to split on sentence boundaries (。！？\n) first, falls back to
+    hard character splits at *char_limit* intervals.
+    """
+    if len(segment) <= char_limit:
+        return [segment]
+
+    pieces: list[str] = []
+    sentence_re = re.compile(r"(?<=[。！？\n])")
+    sentences = [s for s in sentence_re.split(segment) if s.strip()]
+
+    buf: list[str] = []
+    buf_len = 0
+    for sentence in sentences:
+        if buf and buf_len + len(sentence) > char_limit:
+            pieces.append("".join(buf))
+            buf = [sentence]
+            buf_len = len(sentence)
+        else:
+            buf.append(sentence)
+            buf_len += len(sentence)
+    if buf:
+        pieces.append("".join(buf))
+
+    # If sentence splitting still left oversized pieces, hard-split them
+    final: list[str] = []
+    for piece in pieces:
+        while len(piece) > char_limit:
+            final.append(piece[:char_limit])
+            piece = piece[char_limit:]
+        if piece.strip():
+            final.append(piece)
+    return final
+
+
 def _chunk_paragraphs(
     content: str,
     title: str,
@@ -246,8 +526,26 @@ def _chunk_paragraphs(
     *,
     heading_path: tuple[str, ...] = (),
     chunk_index_start: int = 0,
+    is_code: bool = False,
 ) -> list[ChunkSpec]:
-    segments = [s.strip() for s in content.split("\n\n") if s.strip()]
+    char_limit, overlap_chars = _chunk_settings()
+    kind = "code" if is_code else "freeform_markdown"
+
+    if is_code:
+        # Code files: split by blank lines (natural function/class boundaries)
+        raw_segments = [s.strip() for s in content.split("\n\n") if s.strip()]
+        segments: list[str] = []
+        for seg in raw_segments:
+            segments.extend(_split_oversized_segment(seg, char_limit))
+    else:
+        # Markdown/text: use semantic chunking for coherent segments
+        segments = _semantic_chunk_text(content, char_limit)
+        # Further split any oversized semantic segments
+        final_segments: list[str] = []
+        for seg in segments:
+            final_segments.extend(_split_oversized_segment(seg, char_limit))
+        segments = final_segments
+
     if not segments:
         return []
 
@@ -258,39 +556,59 @@ def _chunk_paragraphs(
 
     heading_label = " > ".join(heading_path) if heading_path else ""
 
-    def _flush_buffer() -> None:
+    def _make_chunk(chunk_text: str) -> ChunkSpec:
+        if is_code:
+            full_text = f"檔案：{relative_path}\n{chunk_text}"
+        else:
+            prefix = f"主題：{title}"
+            if heading_label:
+                prefix += f"\n章節：{heading_label}"
+            full_text = f"{prefix}\n內容：{chunk_text}"
+        return ChunkSpec(
+            text=full_text,
+            metadata={
+                "path": relative_path,
+                "title": title,
+                "heading_path": list(heading_path),
+                "chunk_index": chunk_index,
+                "kind": kind,
+                "persona_id": persona_id,
+                "fingerprint": fingerprint,
+                "chunk_id": f"{relative_path}::{chunk_index}",
+                "char_count": len(full_text),
+            },
+        )
+
+    def _flush_buffer() -> list[str]:
+        """Flush buffer into a chunk and return overlap segments for next chunk."""
         nonlocal chunk_index
         if not buffer:
-            return
+            return []
         chunk_text = "\n\n".join(buffer)
-        prefix = f"主題：{title}"
-        if heading_label:
-            prefix += f"\n章節：{heading_label}"
-        full_text = f"{prefix}\n內容：{chunk_text}"
-        chunks.append(
-            ChunkSpec(
-                text=full_text,
-                metadata={
-                    "path": relative_path,
-                    "title": title,
-                    "heading_path": list(heading_path),
-                    "chunk_index": chunk_index,
-                    "kind": "freeform_markdown",
-                    "persona_id": persona_id,
-                    "fingerprint": fingerprint,
-                    "chunk_id": f"{relative_path}::{chunk_index}",
-                    "char_count": len(full_text),
-                },
-            )
-        )
+        chunks.append(_make_chunk(chunk_text))
         chunk_index += 1
+
+        if overlap_chars <= 0:
+            return []
+
+        # Collect trailing segments that fit within overlap_chars.
+        # Always include at least the last segment for continuity.
+        overlap_segs: list[str] = []
+        overlap_len = 0
+        for seg in reversed(buffer):
+            candidate = len(seg) + (2 if overlap_segs else 0)
+            if overlap_segs and overlap_len + candidate > overlap_chars:
+                break
+            overlap_segs.insert(0, seg)
+            overlap_len += candidate
+        return overlap_segs
 
     for segment in segments:
         additional = len(segment) + (2 if buffer else 0)
-        if buffer and current_length + additional > _CHUNK_CHAR_LIMIT:
-            _flush_buffer()
-            buffer = [segment]
-            current_length = len(segment)
+        if buffer and current_length + additional > char_limit:
+            overlap_segs = _flush_buffer()
+            buffer = overlap_segs + [segment]
+            current_length = sum(len(s) for s in buffer) + 2 * max(len(buffer) - 1, 0)
             continue
 
         buffer.append(segment)

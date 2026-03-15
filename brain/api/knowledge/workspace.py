@@ -6,6 +6,13 @@ from pathlib import Path
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "workspace"
 ALLOWED_DOCUMENT_SUFFIXES = {".md", ".txt", ".csv"}
+ALLOWED_CODE_SUFFIXES = {
+    ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs",
+    ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".swift",
+    ".kt", ".sh", ".bash", ".zsh", ".sql", ".yaml", ".yml",
+    ".toml", ".ini", ".cfg", ".vue", ".svelte",
+}
+ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
 CORE_DOCUMENTS = {
     "soul": WORKSPACE_ROOT / "SOUL.md",
     "agents": WORKSPACE_ROOT / "AGENTS.md",
@@ -155,8 +162,14 @@ def iter_workspace_documents() -> list[Path]:
 
 
 def iter_indexable_documents() -> list[Path]:
-    """Return workspace documents that should feed the knowledge index."""
-    return [path for path in iter_workspace_documents() if is_indexable_document(path)]
+    """Return workspace documents (including code files) for the knowledge index."""
+    root = ensure_workspace_scaffold()
+    all_files = sorted(
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.lower() in ALLOWED_INDEX_SUFFIXES
+    )
+    return [path for path in all_files if is_indexable_document(path)]
 
 
 def _is_persona_core_document(relative_path: str) -> bool:

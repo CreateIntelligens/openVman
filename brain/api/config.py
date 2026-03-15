@@ -46,6 +46,9 @@ class BrainSettings(BaseSettings):
     embedding_device: str = "cuda"
     lancedb_path: str = "~/.openclaw/lancedb"
     knowledge_index_state_path: str = "/data/knowledge_index_state.json"
+    chunk_char_limit: int = 500
+    chunk_overlap_ratio: float = 0.15
+    chunk_semantic_threshold: float = 0.65
 
     # === 記憶設定 ===
     short_term_memory_rounds: int = 20
@@ -58,6 +61,9 @@ class BrainSettings(BaseSettings):
     max_session_ttl_minutes: int = 30
     session_db_path: str = "/data/sessions.db"
     memory_maintenance_interval_seconds: int = 300
+    memory_decay_rate_per_day: float = 0.005
+    memory_merge_similarity_threshold: float = 0.92
+    memory_importance_weight: float = 0.03
 
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6

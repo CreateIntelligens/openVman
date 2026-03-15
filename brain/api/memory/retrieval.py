@@ -1,11 +1,14 @@
-"""語意檢索與結果整理。"""
+"""語意檢索與結果整理 — 支援 vector-only 與 hybrid (vector + FTS) 搜索。"""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from infra.db import get_knowledge_table, get_memories_table, parse_record_metadata
 from personas.personas import normalize_persona_id
+
+logger = logging.getLogger(__name__)
 
 
 def get_search_table(table_name: str):
@@ -20,15 +23,21 @@ def search_records(
     query_vector: list[float],
     top_k: int,
     persona_id: str = "default",
+    *,
+    query_text: str = "",
 ) -> list[dict[str, Any]]:
-    """執行檢索並回傳符合 persona 的結果。"""
+    """Execute search and return persona-filtered results.
+
+    When *query_text* is provided, attempts hybrid search (vector + FTS).
+    Falls back to vector-only search if hybrid is not available.
+    """
     normalized_persona = normalize_persona_id(persona_id)
     limit = max(top_k, 1)
-    raw_records = _search_to_records(
-        get_search_table(table_name).search(query_vector).limit(limit * 4)
-    )
-    filtered: list[dict[str, Any]] = []
+    table = get_search_table(table_name)
 
+    raw_records = _hybrid_search(table, query_vector, query_text, limit * 4)
+
+    filtered: list[dict[str, Any]] = []
     for record in raw_records:
         if not _matches_persona(record, normalized_persona):
             continue
@@ -37,6 +46,35 @@ def search_records(
             break
 
     return filtered
+
+
+def _hybrid_search(
+    table: Any,
+    query_vector: list[float],
+    query_text: str,
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Try hybrid search (vector + FTS), fall back to vector-only."""
+    if query_text:
+        try:
+            result = (
+                table.search(
+                    query_text,
+                    query_type="hybrid",
+                    vector_column_name="vector",
+                    fts_columns="text",
+                )
+                .vector(query_vector)
+                .limit(limit)
+            )
+            records = _search_to_records(result)
+            if records:
+                return records
+        except Exception as exc:
+            logger.debug("hybrid search unavailable, falling back to vector: %s", exc)
+
+    # Vector-only fallback
+    return _search_to_records(table.search(query_vector).limit(limit))
 
 
 def _search_to_records(search_result: Any) -> list[dict[str, Any]]:

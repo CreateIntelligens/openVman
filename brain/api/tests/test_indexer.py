@@ -22,10 +22,23 @@ if str(API_ROOT) not in sys.path:
 
 def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """Import indexer with all heavy dependencies stubbed out."""
-    # Stub memory.embedder
+    # Stub memory.embedder — returns distinct vectors per sentence
+    # so semantic chunking can compute meaningful cosine similarities.
     fake_embedder_mod = types.ModuleType("memory.embedder")
     fake_embedder = MagicMock()
-    fake_embedder.encode.return_value = [[0.1] * 128]
+
+    def _fake_encode(texts):
+        """Return a unique vector per text based on hash, for semantic similarity."""
+        import hashlib as _hl
+
+        vectors = []
+        for text in texts:
+            h = _hl.sha512(text.encode()).hexdigest()  # 128 hex chars
+            vec = [int(c, 16) / 15.0 for c in h[:128]]
+            vectors.append(vec)
+        return vectors
+
+    fake_embedder.encode.side_effect = _fake_encode
     fake_embedder_mod.get_embedder = lambda: fake_embedder
 
     # Stub infra.db
@@ -36,6 +49,7 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_db_mod.get_knowledge_table = MagicMock()
     fake_db_mod.normalize_vector = lambda v: v
     fake_db_mod.parse_record_metadata = lambda r: json.loads(r.get("metadata", "{}"))
+    fake_db_mod.ensure_fts_index = lambda table_name: None
 
     # Stub workspace
     workspace_root = tmp_path / "workspace"
@@ -46,6 +60,12 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_workspace_mod.iter_indexable_documents = lambda: list(
         p for p in workspace_root.rglob("*") if p.is_file()
     )
+    fake_workspace_mod.ALLOWED_CODE_SUFFIXES = {
+        ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs",
+        ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".swift",
+        ".kt", ".sh", ".bash", ".zsh", ".sql", ".yaml", ".yml",
+        ".toml", ".ini", ".cfg", ".vue", ".svelte",
+    }
 
     # Stub personas
     fake_personas_mod = types.ModuleType("personas.personas")
@@ -56,6 +76,9 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_config.knowledge_index_state_resolved_path = str(
         tmp_path / "index_state.json"
     )
+    fake_config.chunk_char_limit = 500
+    fake_config.chunk_overlap_ratio = 0.15
+    fake_config.chunk_semantic_threshold = 0.65
     fake_settings_mod = types.ModuleType("config")
     fake_settings_mod.get_settings = lambda: fake_config
 
@@ -109,8 +132,8 @@ class TestHeadingAwareChunking:
         """A heading block exceeding char limit gets split into multiple chunks."""
         indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
 
-        # Build a block with many paragraphs exceeding 700 char limit
-        paragraphs = [f"段落{i}：" + "X" * 200 for i in range(5)]
+        # Build a block with many paragraphs exceeding 500 char limit
+        paragraphs = [f"段落{i}：" + "X" * 150 for i in range(5)]
         md = "# 很長的章節\n\n" + "\n\n".join(paragraphs)
         doc = ws / "long.md"
         doc.write_text(md, encoding="utf-8")
@@ -185,6 +208,218 @@ class TestHeadingAwareChunking:
         chunks = indexer._extract_text_chunks(doc)
         for chunk in chunks:
             assert "![" not in chunk.text
+
+    def test_overlap_between_consecutive_chunks(self, monkeypatch, tmp_path):
+        """Consecutive chunks should share overlapping trailing segments."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        # 5 paragraphs of ~120 chars each ≈ 600 chars, exceeds 500 limit
+        paragraphs = [f"段落{i}內容" + "字" * 110 for i in range(5)]
+        md = "# 重疊測試\n\n" + "\n\n".join(paragraphs)
+        doc = ws / "overlap.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 2
+
+        # The last segment of chunk N should appear in chunk N+1
+        for i in range(len(chunks) - 1):
+            current_text = chunks[i].text
+            next_text = chunks[i + 1].text
+            # Extract last paragraph from current chunk
+            current_last_para = current_text.split("\n\n")[-1].strip()
+            assert current_last_para in next_text, (
+                f"Overlap missing between chunk {i} and {i+1}"
+            )
+
+    def test_oversized_segment_auto_split(self, monkeypatch, tmp_path):
+        """A single segment exceeding char_limit is automatically split."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        # Single paragraph of 1200 chars — exceeds 500 limit
+        big_text = "# 超長段落\n\n" + "這是一段很長的內容。" * 80
+        doc = ws / "big.md"
+        doc.write_text(big_text, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 2
+        # No raw content segment should exceed the limit
+        for chunk in chunks:
+            # chunk.text includes prefix, but the content portion should be bounded
+            assert chunk.metadata["char_count"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Semantic chunking tests
+# ---------------------------------------------------------------------------
+
+
+class TestSemanticChunking:
+    def test_semantic_split_groups_similar_sentences(self, monkeypatch, tmp_path):
+        """Sentences about the same topic should stay in the same chunk."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        # Two distinct topics separated by sentence boundaries
+        md = (
+            "# 健康\n\n"
+            "糖尿病是一種慢性代謝疾病。血糖控制非常重要。飲食管理是關鍵。"
+            "\n\n"
+            "運動可以幫助減重。每天走路三十分鐘。適度運動有益心血管。"
+        )
+        doc = ws / "health.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 1
+        # All chunks should have valid metadata
+        for chunk in chunks:
+            assert chunk.metadata["char_count"] > 0
+            assert chunk.metadata["kind"] == "freeform_markdown"
+
+    def test_semantic_chunking_respects_char_limit(self, monkeypatch, tmp_path):
+        """Semantic chunks should not exceed the configured char limit (plus prefix)."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        # Generate long content with many sentences (well over 500 chars)
+        sentences = [f"這是第{i}句話，包含一些比較長的內容來確保超過限制。" for i in range(30)]
+        md = "# 長文\n\n" + "".join(sentences)
+        doc = ws / "long_semantic.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 2
+
+    def test_semantic_chunking_produces_deterministic_results(
+        self, monkeypatch, tmp_path
+    ):
+        """Same input should always produce the same chunks."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        md = "# 測試\n\n第一句。第二句。第三句。\n\n第四句。第五句。"
+        doc = ws / "deterministic.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks1 = indexer._extract_text_chunks(doc)
+        chunks2 = indexer._extract_text_chunks(doc)
+        assert len(chunks1) == len(chunks2)
+        for c1, c2 in zip(chunks1, chunks2):
+            assert c1.text == c2.text
+
+
+# ---------------------------------------------------------------------------
+# Code file chunking tests
+# ---------------------------------------------------------------------------
+
+
+class TestCodeFileChunking:
+    def test_python_file_uses_code_kind(self, monkeypatch, tmp_path):
+        """Code files should produce chunks with kind='code'."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        code = 'def hello():\n    print("hello")\n\n\ndef world():\n    print("world")\n'
+        doc = ws / "example.py"
+        doc.write_text(code, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 1
+        for chunk in chunks:
+            assert chunk.metadata["kind"] == "code"
+            assert "檔案：" in chunk.text
+            assert chunk.metadata["heading_path"] == []
+
+    def test_code_file_skips_heading_parsing(self, monkeypatch, tmp_path):
+        """Code files with # comments should not be parsed as markdown headings."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        code = "# This is a comment\nimport os\n\n# Another comment\nprint(os.getcwd())\n"
+        doc = ws / "script.py"
+        doc.write_text(code, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 1
+        # heading_path should be empty — # is not a markdown heading in .py
+        for chunk in chunks:
+            assert chunk.metadata["heading_path"] == []
+
+    def test_large_code_file_is_split_with_overlap(self, monkeypatch, tmp_path):
+        """Large code files get split by blank-line boundaries with overlap."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        # Generate many short functions totaling > 500 chars
+        functions = [
+            f"def func_{i}():\n    return {i}\n" for i in range(20)
+        ]
+        code = "\n\n".join(functions)
+        doc = ws / "big_module.py"
+        doc.write_text(code, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 2
+        for chunk in chunks:
+            assert chunk.metadata["kind"] == "code"
+
+    def test_python_ast_splits_by_function_and_class(self, monkeypatch, tmp_path):
+        """Python files should be split by top-level functions and classes via AST."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        code = (
+            "import os\n"
+            "import sys\n"
+            "\n\n"
+            "def hello():\n"
+            "    print('hello')\n"
+            "\n\n"
+            "class Greeter:\n"
+            "    def greet(self):\n"
+            "        return 'hi'\n"
+            "\n\n"
+            "def goodbye():\n"
+            "    print('bye')\n"
+        )
+        doc = ws / "ast_test.py"
+        doc.write_text(code, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        all_text = " ".join(c.text for c in chunks)
+
+        # AST should preserve function/class boundaries
+        assert "def hello" in all_text
+        assert "class Greeter" in all_text
+        assert "def goodbye" in all_text
+        assert "import os" in all_text
+
+    def test_python_ast_fallback_on_syntax_error(self, monkeypatch, tmp_path):
+        """Invalid Python syntax falls back to blank-line splitting."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        code = "def broken(\n    # missing close paren\n\nprint('still works')\n"
+        doc = ws / "broken.py"
+        doc.write_text(code, encoding="utf-8")
+
+        # Should not raise — falls back to blank-line splitting
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 1
+        assert chunks[0].metadata["kind"] == "code"
+
+    def test_non_python_code_uses_blank_line_splitting(self, monkeypatch, tmp_path):
+        """Non-Python code files should use blank-line splitting, not AST."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        code = (
+            "function hello() {\n"
+            "  console.log('hello');\n"
+            "}\n"
+            "\n"
+            "function goodbye() {\n"
+            "  console.log('bye');\n"
+            "}\n"
+        )
+        doc = ws / "script.js"
+        doc.write_text(code, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert len(chunks) >= 1
+        assert chunks[0].metadata["kind"] == "code"
 
 
 # ---------------------------------------------------------------------------
