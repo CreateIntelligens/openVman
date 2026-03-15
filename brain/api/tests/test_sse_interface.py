@@ -29,29 +29,17 @@ from core.sse_events import (
 from protocol.protocol_events import validate_server_event
 
 
+def _make_fake_agent_loop() -> types.ModuleType:
+    from conftest import make_fake_agent_loop
+
+    return make_fake_agent_loop()
+
+
 def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
-    fake_agent_loop = types.ModuleType("core.agent_loop")
+    from conftest import stub_chat_service_deps
 
-    class AgentLoopResult:
-        def __init__(self, reply: str, tool_steps: list[dict]):
-            self.reply = reply
-            self.tool_steps = tool_steps
-
-    class PreparedAgentReply:
-        def __init__(self, messages: list[dict], tool_steps: list[dict]):
-            self.messages = messages
-            self.tool_steps = tool_steps
-
-    fake_agent_loop.AgentLoopResult = AgentLoopResult
-    fake_agent_loop.PreparedAgentReply = PreparedAgentReply
-    fake_agent_loop.run_agent_loop = lambda messages, persona_id="default": AgentLoopResult(
-        reply="sync reply",
-        tool_steps=[],
-    )
-    fake_agent_loop.prepare_agent_reply = lambda messages, persona_id="default": PreparedAgentReply(
-        messages=list(messages),
-        tool_steps=[],
-    )
+    stub_chat_service_deps(monkeypatch)
+    monkeypatch.setitem(sys.modules, "core.agent_loop", _make_fake_agent_loop())
 
     fake_llm_client = types.ModuleType("core.llm_client")
     fake_llm_client.generate_chat_reply = lambda messages: "sync reply"
@@ -61,37 +49,8 @@ def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
             yield token
 
     fake_llm_client.stream_chat_reply = _stream_chat_reply
-
-    fake_embedder = types.ModuleType("memory.embedder")
-    fake_embedder.encode_text = lambda text: [0.1]
-
-    fake_retrieval = types.ModuleType("memory.retrieval")
-    fake_retrieval.search_records = lambda *args, **kwargs: []
-
-    fake_memory = types.ModuleType("memory.memory")
-    fake_memory.append_session_message = lambda session_id, persona_id, role, content: None
-    fake_memory.archive_session_turn = lambda session_id, user_message, assistant_message, persona_id="default": None
-    fake_memory.get_or_create_session = lambda session_id=None, persona_id="default": type(
-        "Session",
-        (),
-        {"session_id": session_id or "sess_new"},
-    )()
-    fake_memory.list_session_messages = lambda session_id, persona_id=None: []
-
-    fake_learnings = types.ModuleType("infra.learnings")
-    fake_learnings.capture_learnings_from_message = lambda user_message: []
-    fake_learnings.record_error_event = lambda area, summary, detail="": None
-
-    fake_governance = types.ModuleType("memory.memory_governance")
-    fake_governance.maybe_run_memory_maintenance = lambda: {"status": "skipped"}
-
-    monkeypatch.setitem(sys.modules, "core.agent_loop", fake_agent_loop)
     monkeypatch.setitem(sys.modules, "core.llm_client", fake_llm_client)
-    monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder)
-    monkeypatch.setitem(sys.modules, "memory.retrieval", fake_retrieval)
-    monkeypatch.setitem(sys.modules, "memory.memory", fake_memory)
-    monkeypatch.setitem(sys.modules, "infra.learnings", fake_learnings)
-    monkeypatch.setitem(sys.modules, "memory.memory_governance", fake_governance)
+
     sys.modules.pop("core.chat_service", None)
     return importlib.import_module("core.chat_service")
 
@@ -101,6 +60,7 @@ def _stub_finalize_dependencies(monkeypatch: pytest.MonkeyPatch, chat_service) -
     monkeypatch.setattr(chat_service, "archive_session_turn", lambda *args, **kwargs: None)
     monkeypatch.setattr(chat_service, "capture_learnings_from_message", lambda message: [])
     monkeypatch.setattr(chat_service, "maybe_run_memory_maintenance", lambda: {})
+    monkeypatch.setattr(chat_service, "write_summary_and_reindex", lambda **kw: {"status": "skipped"})
     monkeypatch.setattr(chat_service, "list_session_messages", lambda session_id, persona_id: [])
 
 
@@ -123,6 +83,7 @@ def _make_generation_context(
         prompt_messages=prompt_messages,
         knowledge_results=[],
         memory_results=[],
+        retrieval_diagnostics={},
     )
 
 
