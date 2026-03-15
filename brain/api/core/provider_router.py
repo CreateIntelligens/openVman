@@ -1,14 +1,11 @@
-"""Provider routing with API-key rotation and model fallback."""
+"""Provider routing with key-pool integration and failure classification."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from threading import Lock
-from time import monotonic
-
-from openai import APIConnectionError, APIStatusError, APITimeoutError, RateLimitError
 
 from config import get_settings
+from core.key_pool import KeyPoolManager, classify_failure
 from infra.learnings import record_error_event
 
 
@@ -20,20 +17,45 @@ class LLMRoute:
 
 
 class ProviderRouter:
-    """Track key cooldowns and generate ordered route attempts."""
+    """Route LLM requests through the key pool with failure classification."""
 
     def __init__(self) -> None:
-        self._lock = Lock()
-        self._next_key_index = 0
-        self._cooldowns: dict[str, float] = {}
+        self._pool: KeyPoolManager | None = None
+
+    def _ensure_pool(self) -> KeyPoolManager:
+        if self._pool is None:
+            cfg = get_settings()
+            self._pool = KeyPoolManager(
+                cfg.resolved_llm_api_keys,
+                short_cooldown=cfg.brain_llm_key_cooldown_seconds,
+                long_cooldown=cfg.brain_llm_key_long_cooldown_seconds,
+            )
+        return self._pool
+
+    @property
+    def pool(self) -> KeyPoolManager:
+        """Expose the key pool for diagnostics."""
+        return self._ensure_pool()
 
     def iter_routes(self) -> list[LLMRoute]:
         cfg = get_settings()
+        pool = self._ensure_pool()
         keys = cfg.resolved_llm_api_keys
         if not keys:
             return []
 
-        ordered_keys = self._ordered_keys(keys)
+        # Build ordered key list: selected key first, then remaining healthy keys
+        selected = pool.select_key()
+        if selected is None:
+            return []
+
+        ordered_keys = [selected]
+        for key in keys:
+            if key != selected:
+                state = pool.get_state(key)
+                if state is not None and not state.disabled:
+                    ordered_keys.append(key)
+
         return [
             LLMRoute(api_key=api_key, model=model, base_url=cfg.resolved_llm_base_url)
             for model in cfg.resolved_llm_models
@@ -41,44 +63,17 @@ class ProviderRouter:
         ]
 
     def mark_success(self, api_key: str) -> None:
-        with self._lock:
-            self._cooldowns.pop(api_key, None)
+        self._ensure_pool().mark_success(api_key)
 
     def mark_failure(self, api_key: str, model: str, exc: Exception) -> None:
-        cfg = get_settings()
-        with self._lock:
-            if self._should_cooldown(exc):
-                self._cooldowns[api_key] = monotonic() + cfg.brain_llm_key_cooldown_seconds
+        reason = classify_failure(exc)
+        self._ensure_pool().mark_failure(api_key, reason)
 
         record_error_event(
             area="provider_router",
-            summary=f"{model} route failed",
+            summary=f"{model} route failed ({reason})",
             detail=f"{type(exc).__name__}: {exc}",
         )
-
-    def _ordered_keys(self, keys: list[str]) -> list[str]:
-        available_keys = self._available_keys(keys)
-        if not available_keys:
-            available_keys = list(keys)
-
-        with self._lock:
-            start = self._next_key_index % len(available_keys)
-            ordered = available_keys[start:] + available_keys[:start]
-            self._next_key_index = (start + 1) % len(available_keys)
-            return ordered
-
-    def _available_keys(self, keys: list[str]) -> list[str]:
-        now = monotonic()
-        with self._lock:
-            return [key for key in keys if self._cooldowns.get(key, 0.0) <= now]
-
-    @staticmethod
-    def _should_cooldown(exc: Exception) -> bool:
-        if isinstance(exc, (RateLimitError, APIConnectionError, APITimeoutError)):
-            return True
-        if isinstance(exc, APIStatusError):
-            return exc.status_code in {401, 403, 429, 500, 502, 503, 504}
-        return False
 
 
 _router: ProviderRouter | None = None

@@ -25,6 +25,9 @@ class BrainSettings(BaseSettings):
     brain_llm_base_url: str = ""
     brain_llm_temperature: float = 0.3
     brain_llm_key_cooldown_seconds: int = 60
+    brain_llm_key_long_cooldown_seconds: int = 300
+    brain_llm_fallback_chain: str = ""
+    brain_llm_max_fallback_hops: int = 4
     prompt_system_char_budget: int = 6000
     prompt_total_char_budget: int = 12000
     prompt_context_char_budget: int = 2800
@@ -47,6 +50,10 @@ class BrainSettings(BaseSettings):
     # === 記憶設定 ===
     short_term_memory_rounds: int = 20
     rag_top_k: int = 5
+    rag_knowledge_top_k: int = 5
+    rag_memory_top_k: int = 3
+    rag_rerank_candidate_multiplier: int = 4
+    rag_memory_distance_bonus: float = 0.02
     max_session_rounds: int = 100
     max_session_ttl_minutes: int = 30
     session_db_path: str = "/data/sessions.db"
@@ -54,6 +61,7 @@ class BrainSettings(BaseSettings):
 
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6
+    tool_call_timeout_seconds: int = 10
     tool_document_char_limit: int = 4000
 
     # === 備用 Provider Keys ===
@@ -100,11 +108,7 @@ class BrainSettings(BaseSettings):
         if self.brain_llm_api_key.strip():
             candidates.append(self.brain_llm_api_key.strip())
 
-        unique_keys: list[str] = []
-        for key in candidates:
-            if key not in unique_keys:
-                unique_keys.append(key)
-        return unique_keys
+        return list(dict.fromkeys(candidates))
 
     @property
     def resolved_llm_models(self) -> list[str]:
@@ -116,15 +120,56 @@ class BrainSettings(BaseSettings):
         return [model for model in models if model]
 
     @property
+    def resolved_fallback_chain(self) -> list[tuple[str, str]]:
+        """Parse BRAIN_LLM_FALLBACK_CHAIN into (provider, model) pairs.
+
+        Format: ``provider:model,provider:model,...``
+        Falls back to the primary provider/model if not configured.
+        """
+        if not self.brain_llm_fallback_chain.strip():
+            return [
+                (self.brain_llm_provider, model)
+                for model in self.resolved_llm_models
+            ]
+        pairs: list[tuple[str, str]] = []
+        for raw_entry in self.brain_llm_fallback_chain.split(","):
+            stripped = raw_entry.strip()
+            if ":" not in stripped:
+                continue
+            provider, model = stripped.split(":", 1)
+            if provider.strip() and model.strip():
+                pairs.append((provider.strip(), model.strip()))
+        return pairs if pairs else [(self.brain_llm_provider, self.brain_llm_model)]
+
+    _BASE_URL_DEFAULTS: dict[str, str] = {
+        "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "groq": "https://api.groq.com/openai/v1",
+    }
+
+    @property
     def resolved_llm_base_url(self) -> str:
         """Provide a sane default base URL per provider."""
         if self.brain_llm_base_url:
             return self.brain_llm_base_url
-        defaults = {
-            "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
-            "groq": "https://api.groq.com/openai/v1",
+        return self._BASE_URL_DEFAULTS.get(self.brain_llm_provider, "")
+
+    def resolve_base_url_for_provider(self, provider: str) -> str:
+        """Return the base URL for a given provider name."""
+        if self.brain_llm_base_url and provider == self.brain_llm_provider:
+            return self.brain_llm_base_url
+        return self._BASE_URL_DEFAULTS.get(provider, "")
+
+    def resolve_api_key_for_provider(self, provider: str) -> str:
+        """Return the first API key available for a given provider."""
+        if provider == self.brain_llm_provider:
+            keys = self.resolved_llm_api_keys
+            return keys[0] if keys else ""
+        key_map = {
+            "gemini": self.gemini_api_key,
+            "groq": self.groq_api_key,
+            "openai": self.openai_api_key,
         }
-        return defaults.get(self.brain_llm_provider, "")
+        return key_map.get(provider, "")
 
     @property
     def resolved_allowed_channels(self) -> list[str]:
