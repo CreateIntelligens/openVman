@@ -198,7 +198,7 @@ def _create_sync_completion(
             response = client.chat.completions.create(
                 model=hop.model,
                 messages=messages,
-                temperature=cfg.brain_llm_temperature,
+                temperature=cfg.llm_temperature,
                 **_build_create_kwargs(tools),
             )
             router.mark_success(hop.api_key)
@@ -229,7 +229,7 @@ def _try_routes_sync(routes, messages, tools, cfg, router):
             response = client.chat.completions.create(
                 model=route.model,
                 messages=messages,
-                temperature=cfg.brain_llm_temperature,
+                temperature=cfg.llm_temperature,
                 **_build_create_kwargs(tools),
             )
             router.mark_success(route.api_key)
@@ -276,7 +276,7 @@ async def _create_async_stream(
             stream = await client.chat.completions.create(
                 model=hop.model,
                 messages=messages,
-                temperature=cfg.brain_llm_temperature,
+                temperature=cfg.llm_temperature,
                 stream=True,
             )
             router.mark_success(hop.api_key)
@@ -305,7 +305,7 @@ async def _try_routes_async(routes, messages, cfg, router):
             stream = await client.chat.completions.create(
                 model=route.model,
                 messages=messages,
-                temperature=cfg.brain_llm_temperature,
+                temperature=cfg.llm_temperature,
                 stream=True,
             )
             router.mark_success(route.api_key)

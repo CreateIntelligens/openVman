@@ -42,17 +42,17 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch):
 
 def _stub_config(monkeypatch, *, chain="", gemini_key="gk", groq_key="grk"):
     fake_cfg = MagicMock()
-    fake_cfg.brain_llm_provider = "gemini"
-    fake_cfg.brain_llm_model = "gemini-2.0-flash"
-    fake_cfg.brain_llm_fallback_model = ""
-    fake_cfg.brain_llm_api_key = gemini_key
-    fake_cfg.brain_llm_api_keys = ""
-    fake_cfg.brain_llm_base_url = ""
-    fake_cfg.brain_llm_temperature = 0.3
-    fake_cfg.brain_llm_fallback_chain = chain
-    fake_cfg.brain_llm_max_fallback_hops = 4
-    fake_cfg.brain_llm_key_cooldown_seconds = 60
-    fake_cfg.brain_llm_key_long_cooldown_seconds = 300
+    fake_cfg.llm_provider = "gemini"
+    fake_cfg.llm_model = "gemini-2.0-flash"
+    fake_cfg.llm_fallback_model = ""
+    fake_cfg.llm_api_key = gemini_key
+    fake_cfg.llm_api_keys = ""
+    fake_cfg.llm_base_url = ""
+    fake_cfg.llm_temperature = 0.3
+    fake_cfg.llm_fallback_chain = chain
+    fake_cfg.llm_max_fallback_hops = 4
+    fake_cfg.llm_key_cooldown_seconds = 60
+    fake_cfg.llm_key_long_cooldown_seconds = 300
     fake_cfg.gemini_api_key = gemini_key
     fake_cfg.groq_api_key = groq_key
     fake_cfg.openai_api_key = ""
