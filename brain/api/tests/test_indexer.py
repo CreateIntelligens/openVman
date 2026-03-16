@@ -45,21 +45,22 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_db_mod = types.ModuleType("infra.db")
     fake_db = MagicMock()
     fake_db.table_names.return_value = []
-    fake_db_mod.get_db = lambda: fake_db
-    fake_db_mod.get_knowledge_table = MagicMock()
+    fake_db_mod.get_db = lambda project_id="default": fake_db
+    fake_db_mod.get_knowledge_table = lambda project_id="default": MagicMock()
     fake_db_mod.normalize_vector = lambda v: v
     fake_db_mod.parse_record_metadata = lambda r: json.loads(r.get("metadata", "{}"))
-    fake_db_mod.ensure_fts_index = lambda table_name: None
+    fake_db_mod.ensure_fts_index = lambda table_name, project_id="default": None
 
     # Stub workspace
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(exist_ok=True)
 
     fake_workspace_mod = types.ModuleType("knowledge.workspace")
-    fake_workspace_mod.ensure_workspace_scaffold = lambda: workspace_root
-    fake_workspace_mod.iter_indexable_documents = lambda: list(
+    fake_workspace_mod.ensure_workspace_scaffold = lambda project_id="default": workspace_root
+    fake_workspace_mod.iter_indexable_documents = lambda project_id="default": list(
         p for p in workspace_root.rglob("*") if p.is_file()
     )
+    fake_workspace_mod.get_workspace_root = lambda project_id="default": workspace_root
     fake_workspace_mod.ALLOWED_CODE_SUFFIXES = {
         ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs",
         ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".swift",
@@ -82,8 +83,23 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_settings_mod = types.ModuleType("config")
     fake_settings_mod.get_settings = lambda: fake_config
 
+    # Stub infra.project_context
+    fake_project_context_mod = types.ModuleType("infra.project_context")
+
+    class FakeProjectContext:
+        def __init__(self, project_id):
+            self.project_id = project_id
+            self.project_root = tmp_path / "projects" / project_id
+            self.workspace_root = workspace_root
+            self.lancedb_path = self.project_root / "lancedb"
+            self.session_db_path = self.project_root / "sessions.db"
+            self.index_state_path = tmp_path / "index_state.json"
+
+    fake_project_context_mod.resolve_project_context = lambda pid="default": FakeProjectContext(pid)
+
     monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder_mod)
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
+    monkeypatch.setitem(sys.modules, "infra.project_context", fake_project_context_mod)
     monkeypatch.setitem(sys.modules, "knowledge.workspace", fake_workspace_mod)
     monkeypatch.setitem(sys.modules, "personas.personas", fake_personas_mod)
     monkeypatch.setitem(sys.modules, "config", fake_settings_mod)
@@ -545,7 +561,7 @@ class TestReindexCLI:
 
         # Stub the indexer import inside the CLI module
         fake_indexer = types.ModuleType("knowledge.indexer")
-        fake_indexer.rebuild_knowledge_index = lambda: mock_result
+        fake_indexer.rebuild_knowledge_index = lambda project_id="default": mock_result
         monkeypatch.setitem(sys.modules, "knowledge.indexer", fake_indexer)
 
         cli = importlib.import_module("scripts.reindex_knowledge")

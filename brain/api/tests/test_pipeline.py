@@ -30,6 +30,7 @@ def _make_brain_message(*, role: str = "user", content: str = "你好") -> Brain
         trace_id="trace_test",
         session_id="sess_test",
         persona_id="default",
+        project_id="default",
         locale="zh-TW",
         channel="web",
         metadata={},
@@ -48,6 +49,7 @@ def _make_request_context(
         channel="web",
         locale="zh-TW",
         persona_id="default",
+        project_id="default",
         client_ip="127.0.0.1",
         metadata={},
     )
@@ -191,7 +193,7 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
     )
     monkeypatch.setattr(
         "core.prompt_builder.load_core_workspace_context",
-        lambda persona_id: {
+        lambda persona_id, project_id="default": {
             "soul": "S" * 500,
             "memory": "",
             "agents": "",
@@ -295,22 +297,22 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         chat_service,
         "get_or_create_session",
-        lambda session_id, persona_id: type("Session", (), {"session_id": session_id or "sess_new"})(),
+        lambda session_id, persona_id, project_id="default": type("Session", (), {"session_id": session_id or "sess_new"})(),
     )
     monkeypatch.setattr(
         chat_service,
         "list_session_messages",
-        lambda session_id, persona_id: [],
+        lambda session_id, persona_id, project_id="default": [],
     )
     monkeypatch.setattr(
         chat_service,
         "append_session_message",
-        lambda session_id, persona_id, role, content: None,
+        lambda session_id, persona_id, role, content, project_id="default": None,
     )
     monkeypatch.setattr(
         chat_service,
         "retrieve_context",
-        lambda **kwargs: (_ for _ in ()).throw(AssertionError("retrieve_context should be skipped")),
+        lambda query="", persona_id="default", project_id="default": (_ for _ in ()).throw(AssertionError("retrieve_context should be skipped")),
     )
     monkeypatch.setattr(
         chat_service,

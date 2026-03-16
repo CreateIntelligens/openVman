@@ -179,6 +179,7 @@ def test_create_brain_message_for_system_role():
         channel="web",
         locale="zh-TW",
         persona_id="default",
+        project_id="default",
         client_ip="127.0.0.1",
         metadata={},
     )
@@ -199,6 +200,7 @@ def test_create_brain_message_for_assistant_role():
         channel="web",
         locale="zh-TW",
         persona_id="doctor",
+        project_id="default",
         client_ip="127.0.0.1",
         metadata={"source": "llm"},
     )
@@ -219,6 +221,7 @@ def test_brain_message_metadata_is_defensive_copy():
         channel="web",
         locale="zh-TW",
         persona_id="default",
+        project_id="default",
         client_ip="127.0.0.1",
         metadata=original_metadata,
     )

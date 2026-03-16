@@ -63,11 +63,11 @@ def make_fake_agent_loop() -> types.ModuleType:
     fake.AgentLoopResult = AgentLoopResult
     fake.PreparedAgentReply = PreparedAgentReply
     fake.ToolPhaseError = ToolPhaseError
-    fake.run_agent_loop = lambda messages, persona_id="default": AgentLoopResult(
+    fake.run_agent_loop = lambda messages, persona_id="default", project_id="default": AgentLoopResult(
         reply="tool reply",
         tool_steps=[],
     )
-    fake.prepare_agent_reply = lambda messages, persona_id="default": PreparedAgentReply(
+    fake.prepare_agent_reply = lambda messages, persona_id="default", project_id="default": PreparedAgentReply(
         messages=list(messages),
         tool_steps=[],
     )
@@ -91,6 +91,10 @@ def _empty_bundle(**_kwargs: Any) -> FakeRetrievalBundle:
     return FakeRetrievalBundle(knowledge_results=[], memory_results=[], diagnostics={})
 
 
+def _empty_bundle_with_project(*, query: str = "", persona_id: str = "default", project_id: str = "default") -> FakeRetrievalBundle:
+    return FakeRetrievalBundle(knowledge_results=[], memory_results=[], diagnostics={})
+
+
 # ---------------------------------------------------------------------------
 # Common module stubs shared across chat_service-related tests
 # ---------------------------------------------------------------------------
@@ -108,26 +112,26 @@ def stub_chat_service_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_embedder.encode_text = lambda text: [0.1]
 
     fake_retrieval = types.ModuleType("memory.retrieval")
-    fake_retrieval.search_records = lambda *args, **kwargs: []
+    fake_retrieval.search_records = lambda *args, project_id="default", **kwargs: []
 
     fake_memory = types.ModuleType("memory.memory")
-    fake_memory.append_session_message = lambda session_id, persona_id, role, content: None
+    fake_memory.append_session_message = lambda session_id, persona_id, role, content, project_id="default": None
     fake_memory.archive_session_turn = (
-        lambda session_id, user_message, assistant_message, persona_id="default": None
+        lambda session_id, user_message, assistant_message, persona_id="default", project_id="default": None
     )
     fake_memory.get_or_create_session = (
-        lambda session_id=None, persona_id="default": MagicMock(
+        lambda session_id=None, persona_id="default", project_id="default": MagicMock(
             session_id=session_id or "sess_new",
         )
     )
-    fake_memory.list_session_messages = lambda session_id, persona_id=None: []
+    fake_memory.list_session_messages = lambda session_id, persona_id=None, project_id="default": []
 
     fake_learnings = types.ModuleType("infra.learnings")
-    fake_learnings.capture_learnings_from_message = lambda user_message: []
-    fake_learnings.record_error_event = lambda area, summary, detail="": None
+    fake_learnings.capture_learnings_from_message = lambda user_message, project_id="default": []
+    fake_learnings.record_error_event = lambda area, summary, detail="", project_id="default": None
 
     fake_governance = types.ModuleType("memory.memory_governance")
-    fake_governance.maybe_run_memory_maintenance = lambda: {"status": "skipped"}
+    fake_governance.maybe_run_memory_maintenance = lambda force=False, project_id="default": {"status": "skipped"}
     fake_governance.write_summary_and_reindex = lambda **kwargs: {"status": "skipped"}
 
     fake_infra_db = types.ModuleType("infra.db")
@@ -135,7 +139,7 @@ def stub_chat_service_deps(monkeypatch: pytest.MonkeyPatch) -> None:
 
     fake_retrieval_svc = types.ModuleType("core.retrieval_service")
     fake_retrieval_svc.RetrievalBundle = FakeRetrievalBundle
-    fake_retrieval_svc.retrieve_context = _empty_bundle
+    fake_retrieval_svc.retrieve_context = _empty_bundle_with_project
 
     monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder)
     monkeypatch.setitem(sys.modules, "memory.retrieval", fake_retrieval)
@@ -161,7 +165,7 @@ def load_tool_modules(monkeypatch: pytest.MonkeyPatch):
     fake_embedder.encode_text = lambda text: [0.1]
 
     fake_retrieval = types.ModuleType("memory.retrieval")
-    fake_retrieval.search_records = lambda *args, **kwargs: []
+    fake_retrieval.search_records = lambda *args, project_id="default", **kwargs: []
 
     monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder)
     monkeypatch.setitem(sys.modules, "memory.retrieval", fake_retrieval)

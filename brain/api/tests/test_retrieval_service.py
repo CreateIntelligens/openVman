@@ -34,7 +34,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, *, knowledge=None, memories=None
     knowledge_data = knowledge or []
     memory_data = memories or []
 
-    def mock_search_records(table_name, query_vector, top_k, persona_id="default", *, query_text=""):
+    def mock_search_records(table_name, query_vector, top_k, persona_id="default", *, query_text="", project_id="default"):
         if table_name == "knowledge":
             return knowledge_data[:top_k]
         return memory_data[:top_k]

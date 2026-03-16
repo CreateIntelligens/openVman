@@ -58,10 +58,10 @@ def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
 def _stub_finalize_dependencies(monkeypatch: pytest.MonkeyPatch, chat_service) -> None:
     monkeypatch.setattr(chat_service, "append_session_message", lambda *args, **kwargs: None)
     monkeypatch.setattr(chat_service, "archive_session_turn", lambda *args, **kwargs: None)
-    monkeypatch.setattr(chat_service, "capture_learnings_from_message", lambda message: [])
-    monkeypatch.setattr(chat_service, "maybe_run_memory_maintenance", lambda: {})
+    monkeypatch.setattr(chat_service, "capture_learnings_from_message", lambda message, project_id="default": [])
+    monkeypatch.setattr(chat_service, "maybe_run_memory_maintenance", lambda project_id="default": {})
     monkeypatch.setattr(chat_service, "write_summary_and_reindex", lambda **kw: {"status": "skipped"})
-    monkeypatch.setattr(chat_service, "list_session_messages", lambda session_id, persona_id: [])
+    monkeypatch.setattr(chat_service, "list_session_messages", lambda session_id, persona_id, project_id="default": [])
 
 
 def _make_generation_context(
@@ -76,6 +76,7 @@ def _make_generation_context(
     return chat_service.GenerationContext(
         trace_id=trace_id,
         persona_id="default",
+        project_id="default",
         session_id=session_id,
         route=route,
         user_message=user_message,
@@ -241,7 +242,7 @@ async def test_stream_generation_with_tools_uses_native_stream_after_tool_phase(
     monkeypatch.setattr(
         chat_service,
         "prepare_agent_reply",
-        lambda messages, persona_id="default": prepared_reply_cls(
+        lambda messages, persona_id="default", project_id="default": prepared_reply_cls(
             messages=[
                 *messages,
                 {

@@ -36,9 +36,9 @@ def _normalize_vector(vector) -> list[float]:
 
 def _stub_db_module(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_db = types.ModuleType("infra.db")
-    fake_db.get_memories_table = lambda: None
-    fake_db.get_knowledge_table = lambda: None
-    fake_db.get_db = lambda: None
+    fake_db.get_memories_table = lambda project_id="default": None
+    fake_db.get_knowledge_table = lambda project_id="default": None
+    fake_db.get_db = lambda project_id="default": None
     fake_db.parse_record_metadata = _parse_record_metadata
     fake_db.normalize_vector = _normalize_vector
     monkeypatch.setitem(sys.modules, "infra.db", fake_db)
@@ -58,6 +58,8 @@ def _configure_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pat
     }
     monkeypatch.setattr(workspace, "WORKSPACE_ROOT", root)
     monkeypatch.setattr(workspace, "CORE_DOCUMENTS", core_documents)
+    monkeypatch.setattr(workspace, "get_workspace_root", lambda project_id="default": root)
+    monkeypatch.setattr(workspace, "get_core_documents", lambda project_id="default": core_documents)
     root.mkdir(parents=True, exist_ok=True)
     (root / ".learnings").mkdir(parents=True, exist_ok=True)
     (root / "memory").mkdir(parents=True, exist_ok=True)
@@ -173,7 +175,7 @@ def test_search_records_returns_matching_persona_and_global_records(monkeypatch:
         def search(self, _query_vector):
             return FakeSearch(records)
 
-    monkeypatch.setattr(retrieval, "get_search_table", lambda _table_name: FakeTable())
+    monkeypatch.setattr(retrieval, "get_search_table", lambda _table_name, project_id="default": FakeTable())
 
     result = retrieval.search_records("knowledge", [0.1], 2, persona_id="doctor")
 

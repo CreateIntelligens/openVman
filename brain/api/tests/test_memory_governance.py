@@ -44,19 +44,22 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_table = MagicMock()
     fake_table.to_arrow.return_value.to_pylist.return_value = []
     fake_db.create_table = MagicMock()
-    fake_db_mod.get_db = lambda: fake_db
-    fake_db_mod.get_memories_table = lambda: fake_table
-    fake_db_mod.get_knowledge_table = MagicMock()
+    fake_db_mod.get_db = lambda project_id="default": fake_db
+    fake_db_mod.get_memories_table = lambda project_id="default": fake_table
+    fake_db_mod.get_knowledge_table = lambda project_id="default": MagicMock()
     fake_db_mod.normalize_vector = lambda v: v
     fake_db_mod.parse_record_metadata = lambda r: json.loads(r.get("metadata", "{}"))
+    fake_db_mod.ensure_fts_index = lambda table_name, project_id="default": None
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
 
     # Stub workspace
     fake_workspace_mod = types.ModuleType("knowledge.workspace")
-    fake_workspace_mod.ensure_workspace_scaffold = lambda: workspace_root
+    fake_workspace_mod.ensure_workspace_scaffold = lambda project_id="default": workspace_root
     fake_workspace_mod.WORKSPACE_ROOT = workspace_root
     fake_workspace_mod.CORE_DOCUMENTS = {"memory_summaries": summaries_path}
-    fake_workspace_mod.iter_indexable_documents = lambda: []
+    fake_workspace_mod.get_workspace_root = lambda project_id="default": workspace_root
+    fake_workspace_mod.get_core_documents = lambda project_id="default": {"memory_summaries": summaries_path}
+    fake_workspace_mod.iter_indexable_documents = lambda project_id="default": []
     monkeypatch.setitem(sys.modules, "knowledge.workspace", fake_workspace_mod)
 
     # Stub personas
@@ -94,7 +97,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     # Force reimport
     sys.modules.pop("memory.memory_governance", None)
     gov = importlib.import_module("memory.memory_governance")
-    gov._last_maintenance_at = 0.0
+    gov._last_maintenance_at = {}
 
     return gov, workspace_root, logged_events
 
