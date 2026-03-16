@@ -123,6 +123,57 @@ def archive_session_turn(
         handle.write(f"### Assistant\n{assistant_message.strip()}\n\n")
 
 
+def list_memories(
+    project_id: str = "default",
+    page: int = 1,
+    page_size: int = 20,
+) -> dict[str, Any]:
+    """List memories with pagination, excluding vectors."""
+    table = get_memories_table(project_id)
+    df = table.to_pandas()
+    if "vector" in df.columns:
+        df = df.drop(columns=["vector"])
+    df = df.sort_values(by="date", ascending=False).reset_index(drop=True)
+    total = len(df)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_df = df.iloc[start:end]
+    records = page_df.to_dict(orient="records")
+    return {
+        "memories": records,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def delete_memory(
+    project_id: str = "default",
+    text: str = "",
+) -> bool:
+    """Delete a memory record by exact text match."""
+    table = get_memories_table(project_id)
+    escaped = text.replace("'", "''")
+    table.delete(f"text = '{escaped}'")
+    return True
+
+
+def list_sessions_for_project(
+    project_id: str = "default",
+    persona_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """List all chat sessions for a project."""
+    return get_session_store(project_id).list_sessions(persona_id)
+
+
+def delete_session_for_project(
+    project_id: str = "default",
+    session_id: str = "",
+) -> bool:
+    """Delete a chat session for a project."""
+    return get_session_store(project_id).delete_session(session_id)
+
+
 def get_session_store(project_id: str = "default") -> SessionStore:
     ctx = resolve_project_context(project_id)
     return get_project_session_store(ctx)

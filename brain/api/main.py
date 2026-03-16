@@ -42,7 +42,15 @@ from knowledge.knowledge_admin import (
 )
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import encode_text, get_embedder
-from memory.memory import add_memory as store_memory, get_or_create_session, list_session_messages
+from memory.memory import (
+    add_memory as store_memory,
+    delete_memory as remove_memory,
+    delete_session_for_project,
+    get_or_create_session,
+    list_memories as query_memories,
+    list_session_messages,
+    list_sessions_for_project,
+)
 from memory.memory_governance import maybe_run_memory_maintenance
 from memory.retrieval import search_records
 from personas.personas import (
@@ -487,6 +495,54 @@ async def get_chat_history(session_id: str, persona_id: str = "default", project
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Memory Browse & Session Management
+# ---------------------------------------------------------------------------
+
+@app.get("/api/memories")
+async def list_memories(project_id: str = "default", page: int = 1, page_size: int = 20):
+    try:
+        return query_memories(project_id=project_id, page=page, page_size=page_size)
+    except Exception as exc:
+        log_exception("list_memories_error", exc)
+        raise HTTPException(status_code=500, detail="無法讀取記憶列表") from exc
+
+
+@app.delete("/api/memories")
+async def delete_memory(request: Request):
+    body = await request.json()
+    project_id = get_request_text(body, "project_id") or "default"
+    text = get_request_text(body, "text")
+    if not text:
+        raise HTTPException(status_code=400, detail="text 不可為空")
+    try:
+        remove_memory(project_id=project_id, text=text)
+        log_event("memory_deleted", project_id=project_id)
+        return {"status": "ok"}
+    except Exception as exc:
+        log_exception("delete_memory_error", exc)
+        raise HTTPException(status_code=500, detail="刪除記憶失敗") from exc
+
+
+@app.get("/api/sessions")
+async def list_sessions(project_id: str = "default", persona_id: str | None = None):
+    try:
+        sessions = list_sessions_for_project(project_id=project_id, persona_id=persona_id)
+        return {"sessions": sessions, "session_count": len(sessions)}
+    except Exception as exc:
+        log_exception("list_sessions_error", exc)
+        raise HTTPException(status_code=500, detail="無法讀取 session 列表") from exc
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str, project_id: str = "default"):
+    deleted = delete_session_for_project(project_id=project_id, session_id=session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session 不存在")
+    log_event("session_deleted", session_id=session_id, project_id=project_id)
+    return {"status": "ok", "session_id": session_id}
 
 
 # ---------------------------------------------------------------------------
