@@ -56,8 +56,6 @@ def _configure_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pat
         "errors": root / ".learnings" / "ERRORS.md",
         "memory_summaries": root / ".learnings" / "MEMORY_SUMMARIES.md",
     }
-    monkeypatch.setattr(workspace, "WORKSPACE_ROOT", root)
-    monkeypatch.setattr(workspace, "CORE_DOCUMENTS", core_documents)
     monkeypatch.setattr(workspace, "get_workspace_root", lambda project_id="default": root)
     monkeypatch.setattr(workspace, "get_core_documents", lambda project_id="default": core_documents)
     root.mkdir(parents=True, exist_ok=True)

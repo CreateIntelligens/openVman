@@ -96,6 +96,22 @@ def _empty_bundle_with_project(*, query: str = "", persona_id: str = "default", 
 
 
 # ---------------------------------------------------------------------------
+# Shared fake module factories
+# ---------------------------------------------------------------------------
+
+def _make_fake_embedder() -> types.ModuleType:
+    mod = types.ModuleType("memory.embedder")
+    mod.encode_text = lambda text: [0.1]
+    return mod
+
+
+def _make_fake_retrieval() -> types.ModuleType:
+    mod = types.ModuleType("memory.retrieval")
+    mod.search_records = lambda *args, project_id="default", **kwargs: []
+    return mod
+
+
+# ---------------------------------------------------------------------------
 # Common module stubs shared across chat_service-related tests
 # ---------------------------------------------------------------------------
 
@@ -108,12 +124,6 @@ def stub_chat_service_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     Does NOT stub core.agent_loop or core.llm_client — callers that need
     those should add their own stubs after calling this function.
     """
-    fake_embedder = types.ModuleType("memory.embedder")
-    fake_embedder.encode_text = lambda text: [0.1]
-
-    fake_retrieval = types.ModuleType("memory.retrieval")
-    fake_retrieval.search_records = lambda *args, project_id="default", **kwargs: []
-
     fake_memory = types.ModuleType("memory.memory")
     fake_memory.append_session_message = lambda session_id, persona_id, role, content, project_id="default": None
     fake_memory.archive_session_turn = (
@@ -143,8 +153,8 @@ def stub_chat_service_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_retrieval_svc.RetrievalBundle = FakeRetrievalBundle
     fake_retrieval_svc.retrieve_context = _empty_bundle_with_project
 
-    monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder)
-    monkeypatch.setitem(sys.modules, "memory.retrieval", fake_retrieval)
+    monkeypatch.setitem(sys.modules, "memory.embedder", _make_fake_embedder())
+    monkeypatch.setitem(sys.modules, "memory.retrieval", _make_fake_retrieval())
     monkeypatch.setitem(sys.modules, "memory.memory", fake_memory)
     monkeypatch.setitem(sys.modules, "infra.learnings", fake_learnings)
     monkeypatch.setitem(sys.modules, "memory.memory_governance", fake_governance)
@@ -163,14 +173,8 @@ def load_tool_modules(monkeypatch: pytest.MonkeyPatch):
     can import ``tools.tool_registry`` / ``tools.tool_executor`` without
     a running vector store.  Returns ``(tool_registry, tool_executor)``.
     """
-    fake_embedder = types.ModuleType("memory.embedder")
-    fake_embedder.encode_text = lambda text: [0.1]
-
-    fake_retrieval = types.ModuleType("memory.retrieval")
-    fake_retrieval.search_records = lambda *args, project_id="default", **kwargs: []
-
-    monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder)
-    monkeypatch.setitem(sys.modules, "memory.retrieval", fake_retrieval)
+    monkeypatch.setitem(sys.modules, "memory.embedder", _make_fake_embedder())
+    monkeypatch.setitem(sys.modules, "memory.retrieval", _make_fake_retrieval())
 
     for mod in _MOCK_TOOL_MODULES:
         sys.modules.pop(mod, None)

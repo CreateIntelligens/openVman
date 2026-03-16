@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import sys
-import types
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -67,23 +66,13 @@ def _make_envelope(
     )
 
 
-def _import(module_name: str):
-    return importlib.import_module(module_name)
-
-
-def _make_fake_agent_loop() -> types.ModuleType:
-    from conftest import make_fake_agent_loop
-
-    return make_fake_agent_loop()
-
-
 def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
-    from conftest import stub_chat_service_deps
+    from conftest import make_fake_agent_loop, stub_chat_service_deps
 
     stub_chat_service_deps(monkeypatch)
-    monkeypatch.setitem(sys.modules, "core.agent_loop", _make_fake_agent_loop())
+    monkeypatch.setitem(sys.modules, "core.agent_loop", make_fake_agent_loop())
     sys.modules.pop("core.chat_service", None)
-    return _import("core.chat_service")
+    return importlib.import_module("core.chat_service")
 
 
 # --- route tests ---

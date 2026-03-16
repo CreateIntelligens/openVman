@@ -6,11 +6,6 @@ from pathlib import Path
 
 from infra.project_context import resolve_project_context
 
-# ---------------------------------------------------------------------------
-# Backward-compatible module-level constants (always point to "default" project)
-# ---------------------------------------------------------------------------
-
-WORKSPACE_ROOT = resolve_project_context("default").workspace_root
 ALLOWED_DOCUMENT_SUFFIXES = {".md", ".txt", ".csv"}
 ALLOWED_CODE_SUFFIXES = {
     ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs",
@@ -19,15 +14,6 @@ ALLOWED_CODE_SUFFIXES = {
     ".toml", ".ini", ".cfg", ".vue", ".svelte",
 }
 ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
-CORE_DOCUMENTS = {
-    "soul": WORKSPACE_ROOT / "SOUL.md",
-    "agents": WORKSPACE_ROOT / "AGENTS.md",
-    "tools": WORKSPACE_ROOT / "TOOLS.md",
-    "memory": WORKSPACE_ROOT / "MEMORY.md",
-    "learnings": WORKSPACE_ROOT / ".learnings" / "LEARNINGS.md",
-    "errors": WORKSPACE_ROOT / ".learnings" / "ERRORS.md",
-    "memory_summaries": WORKSPACE_ROOT / ".learnings" / "MEMORY_SUMMARIES.md",
-}
 RESERVED_INDEX_PATHS = {
     "SOUL.md",
     "AGENTS.md",

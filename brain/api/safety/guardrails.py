@@ -94,7 +94,9 @@ def enforce_session_limits(session_id: str | None, persona_id: str, project_id: 
 
 
 def _get_session_updated_at(session_id: str, persona_id: str, project_id: str = "default") -> str | None:
-    return _get_session_store(project_id).get_session_updated_at(session_id, persona_id)
+    from memory.memory import get_session_updated_at
+
+    return get_session_updated_at(session_id, persona_id, project_id)
 
 
 def _session_ttl_exceeded(updated_at: str, ttl_minutes: int) -> bool:
@@ -103,14 +105,10 @@ def _session_ttl_exceeded(updated_at: str, ttl_minutes: int) -> bool:
 
 
 def _count_session_rounds(session_id: str, persona_id: str, project_id: str = "default") -> int:
-    messages = _get_session_store(project_id).list_messages(session_id, persona_id)
+    from memory.memory import list_session_messages
+
+    messages = list_session_messages(session_id, persona_id, project_id)
     return sum(1 for m in messages if m.get("role") == "user")
-
-
-def _get_session_store(project_id: str = "default"):
-    from memory.memory import get_session_store
-
-    return get_session_store(project_id)
 
 
 def _enforce_rate_limit(action: str, context: RequestContext) -> None:
