@@ -9,10 +9,12 @@ import {
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
 import ConfirmModal from "../components/ConfirmModal";
+import { useProject } from "../context/ProjectContext";
 
 type Tab = "browse" | "add";
 
 export default function Memory() {
+  const { projectId } = useProject();
   const [activeTab, setActiveTab] = useState<Tab>("browse");
 
   // Browse state
@@ -58,7 +60,8 @@ export default function Memory() {
 
   useEffect(() => {
     loadMemories(1);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   const handlePageChange = (nextPage: number) => {
     if (nextPage < 1 || nextPage > totalPages) return;
@@ -375,9 +378,12 @@ export default function Memory() {
   );
 }
 
+function parseMetadataJson(raw: string): Record<string, string> {
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+
 function MemoryMetaBadges({ metadata }: { metadata: string }) {
-  let meta: Record<string, string> = {};
-  try { meta = JSON.parse(metadata); } catch { /* ignore malformed JSON */ }
+  const meta = parseMetadataJson(metadata);
   return (
     <>
       {meta.persona_id && meta.persona_id !== "default" && (
@@ -386,9 +392,16 @@ function MemoryMetaBadges({ metadata }: { metadata: string }) {
           {meta.persona_id}
         </span>
       )}
-      <span className="truncate max-w-[200px]" title={metadata}>
-        {metadata}
-      </span>
+      {meta.source_type && (
+        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+          {meta.source_type}
+        </span>
+      )}
+      {meta.turn && (
+        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+          turn {meta.turn}
+        </span>
+      )}
     </>
   );
 }

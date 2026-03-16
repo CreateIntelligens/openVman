@@ -12,6 +12,7 @@ import {
   streamGenerate,
 } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
+import MarkdownPreview from "../components/MarkdownPreview";
 
 const emptySources: { knowledge: RetrievalResult[]; memory: RetrievalResult[] } = {
   knowledge: [],
@@ -25,9 +26,9 @@ const defaultPersona: PersonaSummary = {
   is_default: true,
 };
 const starterPrompts = [
-  "幫我介紹糖尿病常見症狀",
-  "如果要查詢客戶預約流程，你會怎麼處理？",
-  "把目前 brain 的 workspace 架構講給我聽",
+  "你好，請介紹一下你的功能",
+  "幫我查詢目前的知識庫內容",
+  "說明你能處理哪些類型的問題",
 ] as const;
 
 export default function Chat() {
@@ -51,7 +52,7 @@ export default function Chat() {
     ? `streaming · ${activePersona.persona_id}`
     : `${messages.length} messages · ${activePersona.persona_id}`;
 
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionSummary | null>(null);
@@ -107,7 +108,7 @@ export default function Chat() {
     setLoadingSessions(true);
     fetchSessions(selectedPersonaId !== "default" ? selectedPersonaId : undefined)
       .then((res) => setSessions(res.sessions ?? []))
-      .catch(() => {})
+      .catch((e) => setError(String(e)))
       .finally(() => setLoadingSessions(false));
   };
 
@@ -225,18 +226,14 @@ export default function Chat() {
               loadSessions();
             }
           },
-          onContext: (payload) => {
-            setLastContext({ knowledge: payload.knowledge_count, memory: payload.memory_count });
+          onContext: ({ knowledge_count, memory_count }) => {
+            setLastContext({ knowledge: knowledge_count, memory: memory_count });
           },
-          onToken: (payload) => {
-            setMessages((current) => appendStreamingToken(current, payload.token));
+          onToken: ({ token }) => {
+            setMessages((current) => appendStreamingToken(current, token));
           },
-          onDone: (payload) => {
-            applyGenerationResult(payload);
-          },
-          onError: (payload) => {
-            setError(payload.message);
-          },
+          onDone: applyGenerationResult,
+          onError: ({ message }) => setError(message),
         },
         controller.signal,
       );
@@ -358,6 +355,9 @@ export default function Chat() {
                         {s.last_message_preview}
                       </p>
                     )}
+                    {s.updated_at && (
+                      <p className="text-[10px] text-slate-600">{formatRelativeTime(s.updated_at)}</p>
+                    )}
                   </div>
                 );
               })}
@@ -423,7 +423,7 @@ export default function Chat() {
             {messages.map((message, index) => (
               <article
                 key={`${message.role}-${index}-${message.created_at ?? ""}`}
-                className={`max-w-[85%] lg:max-w-[75%] rounded-2xl px-5 py-4 shadow-sm ${message.role === "user"
+                className={`max-w-[85%] lg:max-w-[75%] rounded-2xl px-5 py-4 shadow-sm group/msg ${message.role === "user"
                   ? "ml-auto bg-primary text-white rounded-tr-sm"
                   : "bg-slate-900/80 text-slate-200 border border-slate-800/80 rounded-tl-sm backdrop-blur-sm"
                   }`}
@@ -432,8 +432,23 @@ export default function Chat() {
                   }`}>
                   <span>{message.role === "user" ? "You" : "Brain"}</span>
                   {message.created_at && <span>{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
+                  {message.role === "assistant" && message.content && (
+                    <button
+                      onClick={() => navigator.clipboard.writeText(message.content)}
+                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity ml-auto text-slate-500 hover:text-white"
+                      title="Copy"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                    </button>
+                  )}
                 </div>
-                <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{message.content}</p>
+                {message.role === "assistant" ? (
+                  <div className="text-[15px] leading-relaxed relative z-10">
+                    <MarkdownPreview content={message.content} />
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{message.content}</p>
+                )}
               </article>
             ))}
             <div ref={chatEndRef} />
@@ -453,15 +468,20 @@ export default function Chat() {
                 <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
+                  onInput={(event) => {
+                    const el = event.currentTarget;
+                    el.style.height = "auto";
+                    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
                       submit();
                     }
                   }}
-                  rows={3}
+                  rows={1}
                   placeholder="Message Brain..."
-                  className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none min-h-[100px]"
+                  className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
                 />
 
                 <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
@@ -615,31 +635,22 @@ function addPendingExchange(messages: ChatMessage[], userMessage: string, create
 }
 
 function appendStreamingToken(messages: ChatMessage[], token: string) {
-  const nextMessages = [...messages];
-  const lastMessage = nextMessages[nextMessages.length - 1];
+  const lastMessage = messages[messages.length - 1];
   if (!lastMessage || lastMessage.role !== "assistant") {
-    nextMessages.push({
-      role: "assistant",
-      content: token,
-      created_at: new Date().toISOString(),
-    });
-    return nextMessages;
+    return [...messages, { role: "assistant", content: token, created_at: new Date().toISOString() }];
   }
-
-  nextMessages[nextMessages.length - 1] = {
-    ...lastMessage,
-    content: `${lastMessage.content}${token}`,
-  };
-  return nextMessages;
+  return [
+    ...messages.slice(0, -1),
+    { ...lastMessage, content: lastMessage.content + token },
+  ];
 }
 
 function removeEmptyAssistantDraft(messages: ChatMessage[]) {
-  const nextMessages = [...messages];
-  const lastMessage = nextMessages[nextMessages.length - 1];
+  const lastMessage = messages[messages.length - 1];
   if (lastMessage?.role === "assistant" && !lastMessage.content.trim()) {
-    nextMessages.pop();
+    return messages.slice(0, -1);
   }
-  return nextMessages;
+  return messages;
 }
 
 function parseMetadata(raw?: string) {
@@ -667,4 +678,15 @@ function resolvePersonaId(personas: PersonaSummary[], preferredPersonaId: string
   return personas.some((persona) => persona.persona_id === preferredPersonaId)
     ? preferredPersonaId
     : "default";
+}
+
+function formatRelativeTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "剛剛";
+  if (minutes < 60) return `${minutes} 分鐘前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小時前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 天前`;
 }

@@ -34,6 +34,7 @@ from infra.project_admin import (
 )
 from knowledge.indexer import rebuild_knowledge_index
 from knowledge.knowledge_admin import (
+    delete_workspace_document,
     list_workspace_documents,
     move_workspace_document,
     read_workspace_document,
@@ -581,6 +582,17 @@ async def put_knowledge_document(request: Request):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"status": "ok", "document": document}
+
+
+@app.delete("/api/admin/knowledge/document")
+async def delete_knowledge_document(path: str, project_id: str = "default"):
+    try:
+        delete_workspace_document(path, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="找不到指定文件") from exc
+    return {"status": "ok"}
 
 
 @app.post("/api/admin/knowledge/move")

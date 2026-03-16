@@ -313,6 +313,13 @@ export function saveKnowledgeDocument(path: string, content: string) {
   );
 }
 
+export async function deleteKnowledgeDocument(path: string) {
+  const res = await fetch(projectUrl("/admin/knowledge/document", { path }), {
+    method: "DELETE",
+  });
+  return parseJson<{ status: string }>(res);
+}
+
 export function moveKnowledgeDocument(sourcePath: string, targetPath: string) {
   return post<{ status: string; document: KnowledgeDocumentSummary }>(
     "/admin/knowledge/move",
@@ -415,13 +422,12 @@ export async function streamGenerate(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+  let done = false;
+  while (!done) {
+    const result = await reader.read();
+    done = result.done;
+    buffer += decoder.decode(result.value ?? new Uint8Array(), { stream: !done });
     buffer = processSseBuffer(buffer, handlers);
-    if (done) {
-      break;
-    }
   }
 }
 
@@ -480,25 +486,14 @@ function parseSsePayload(payload: string) {
 }
 
 function dispatchSseEvent(eventName: string, payload: unknown, handlers: GenerateStreamHandlers) {
-  switch (eventName) {
-    case "session":
-      handlers.onSession?.(payload as { session_id: string });
-      return;
-    case "context":
-      handlers.onContext?.(payload as GenerateContextEvent);
-      return;
-    case "token":
-      handlers.onToken?.(payload as { token: string });
-      return;
-    case "done":
-      handlers.onDone?.(payload as GenerateDoneEvent);
-      return;
-    case "error":
-      handlers.onError?.(payload as { message: string });
-      return;
-    default:
-      return;
-  }
+  const handlerMap: Record<string, ((p: never) => void) | undefined> = {
+    session: handlers.onSession,
+    context: handlers.onContext,
+    token: handlers.onToken,
+    done: handlers.onDone,
+    error: handlers.onError,
+  };
+  handlerMap[eventName]?.(payload as never);
 }
 
 function getApiErrorMessage(payload: ApiErrorPayload, status: number) {

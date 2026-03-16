@@ -8,22 +8,38 @@ interface EmbedResult {
   vectors: number[][];
 }
 
+const PREVIEW_LIMIT = 100;
+
 export default function Embed() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState<EmbedResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const submit = () => {
     const texts = input.split("\n").map((s) => s.trim()).filter(Boolean);
     if (!texts.length) return;
     setError("");
     setLoading(true);
+    setShowAll(false);
     postEmbed<EmbedResult>(texts)
       .then((r) => setResult(r))
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   };
+
+  const copyJson = () => {
+    if (!result) return;
+    navigator.clipboard.writeText(JSON.stringify(result.vectors, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const allValues = result?.vectors.flat() ?? [];
+  const displayValues = showAll ? allValues : allValues.slice(0, PREVIEW_LIMIT);
+  const hasMore = allValues.length > PREVIEW_LIMIT;
 
   return (
     <>
@@ -70,6 +86,15 @@ export default function Embed() {
             <div className="bg-primary/5 rounded-xl border border-primary/20 overflow-hidden">
               <div className="px-6 py-4 border-b border-primary/20 bg-primary/10 flex items-center justify-between">
                 <h3 className="text-sm font-bold">Result Preview</h3>
+                <button
+                  onClick={copyJson}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-primary/30 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {copied ? "check" : "content_copy"}
+                  </span>
+                  {copied ? "Copied!" : "Copy JSON"}
+                </button>
               </div>
               {/* Stats */}
               <div className="grid grid-cols-2 divide-x divide-primary/20 border-b border-primary/20">
@@ -86,10 +111,10 @@ export default function Embed() {
               <div className="p-6">
                 <p className="text-xs font-bold uppercase tracking-wider mb-4">
                   <span className="material-symbols-outlined text-primary text-sm align-middle mr-1">list</span>
-                  Vector Components (preview)
+                  Vector Components ({showAll ? allValues.length : `${displayValues.length} of ${allValues.length}`})
                 </p>
                 <div className="grid grid-cols-5 sm:grid-cols-8 gap-2">
-                  {result.vectors.flat().map((v, i) => (
+                  {displayValues.map((v, i) => (
                     <div
                       key={i}
                       className="bg-background-dark p-2 rounded text-[10px] font-mono text-center border border-primary/10"
@@ -98,6 +123,14 @@ export default function Embed() {
                     </div>
                   ))}
                 </div>
+                {hasMore && !showAll && (
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className="mt-4 px-4 py-2 rounded-lg border border-slate-700 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-500 transition-colors"
+                  >
+                    Show all {allValues.length} components
+                  </button>
+                )}
               </div>
             </div>
           )}

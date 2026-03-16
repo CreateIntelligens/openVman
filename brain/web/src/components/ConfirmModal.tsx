@@ -52,7 +52,7 @@ export default function ConfirmModal({
         className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl outline-none"
       >
         <h3 className="text-lg font-bold text-white">{title}</h3>
-        <p className="mt-3 text-sm leading-7 text-slate-400">{message}</p>
+        <p className="mt-3 text-sm leading-7 text-slate-400 whitespace-pre-wrap">{message}</p>
         <div className="mt-6 flex items-center justify-end gap-3">
           <button
             onClick={onCancel}

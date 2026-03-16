@@ -16,8 +16,22 @@ interface FileTreeProps {
        searchQuery?: string;
 }
 
+function sortNodes(nodes: FileNode[]): FileNode[] {
+       return nodes.sort((a, b) => {
+              if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+              return a.name.localeCompare(b.name);
+       });
+}
+
+const ICON_MAP: Record<string, { icon: string; color: string }> = {
+       ".md": { icon: "markdown", color: "text-sky-400" },
+       ".csv": { icon: "table_chart", color: "text-emerald-400" },
+       ".txt": { icon: "description", color: "text-slate-400" },
+};
+const DEFAULT_ICON = { icon: "draft", color: "text-slate-500" };
+
 export default function FileTree({ documents, selectedPath, onSelect, searchQuery = "" }: FileTreeProps) {
-       const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["core"]));
+       const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
        const toggleFolder = (path: string) => {
               setExpandedFolders(prev => {
@@ -91,13 +105,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                      // Force expand matching folders during search
                      const isExpanded = searchQuery ? true : expandedFolders.has(node.path);
 
-                     // Sort: Folders first, then files. Alphabetically.
-                     const children = Object.values(node.children).sort((a, b) => {
-                            if (a.isDirectory !== b.isDirectory) {
-                                   return a.isDirectory ? -1 : 1;
-                            }
-                            return a.name.localeCompare(b.name);
-                     });
+                     const children = sortNodes(Object.values(node.children));
 
                      return (
                             <div key={node.path} className="w-full">
@@ -125,12 +133,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
               const isSelected = selectedPath === node.path;
               const doc = node.document;
 
-              let icon = "draft";
-              let iconColor = "text-slate-500";
-
-              if (doc?.extension === ".md") { icon = "markdown"; iconColor = "text-sky-400"; }
-              else if (doc?.extension === ".csv") { icon = "table_chart"; iconColor = "text-emerald-400"; }
-              else if (doc?.extension === ".txt") { icon = "description"; iconColor = "text-slate-400"; }
+              const { icon, color: iconColor } = (doc?.extension && ICON_MAP[doc.extension]) || DEFAULT_ICON;
 
               return (
                      <button
@@ -166,10 +169,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
               );
        };
 
-       const rootChildren = Object.values(tree.children).sort((a, b) => {
-              if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
-              return a.name.localeCompare(b.name);
-       });
+       const rootChildren = sortNodes(Object.values(tree.children));
 
        if (documents.length === 0) {
               return <div className="text-sm text-slate-500 p-4">No documents found.</div>;

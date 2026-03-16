@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { fetchHealth, fetchMetrics, MetricsSnapshot } from "../api";
 import StatusAlert from "../components/StatusAlert";
 
@@ -12,27 +12,49 @@ interface HealthData {
   llm_model: string;
 }
 
+const REFRESH_INTERVAL = 30;
+
 export default function Health() {
   const [data, setData] = useState<HealthData | null>(null);
   const [metrics, setMetrics] = useState<MetricsSnapshot | null>(null);
-  const [error, setError] = useState("");
+  const [healthError, setHealthError] = useState("");
+  const [metricsError, setMetricsError] = useState("");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(REFRESH_INTERVAL);
 
-  const load = () => {
-    setError("");
+  const load = useCallback(() => {
     setLoading(true);
-    Promise.all([fetchHealth<HealthData>(), fetchMetrics()])
-      .then(([healthData, metricsData]) => {
-        setData(healthData);
-        setMetrics(metricsData);
-        setLastChecked(new Date());
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  };
+    Promise.all([
+      fetchHealth<HealthData>()
+        .then((healthData) => { setData(healthData); setHealthError(""); })
+        .catch((e) => setHealthError(String(e))),
+      fetchMetrics()
+        .then((metricsData) => { setMetrics(metricsData); setMetricsError(""); })
+        .catch((e) => setMetricsError(String(e))),
+    ]).finally(() => {
+      setLastChecked(new Date());
+      setLoading(false);
+      setCountdown(REFRESH_INTERVAL);
+    });
+  }, []);
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          load();
+          return REFRESH_INTERVAL;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const isOk = data?.status === "ok";
 
@@ -44,18 +66,22 @@ export default function Health() {
           <h2 className="text-2xl font-bold">System Health</h2>
           <p className="text-sm text-slate-400">Real-time status of your brain infrastructure</p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-bold transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
-        >
-          <span className="material-symbols-outlined text-sm">refresh</span>
-          <span>{loading ? "Loading..." : "Refresh"}</span>
-        </button>
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-slate-500">auto-refresh in {countdown}s</span>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-bold transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-sm">refresh</span>
+            <span>{loading ? "Loading..." : "Refresh"}</span>
+          </button>
+        </div>
       </header>
 
       <div className="p-8 space-y-6">
-        {error && <StatusAlert type="error" message={error} />}
+        {healthError && <StatusAlert type="error" message={`Health: ${healthError}`} />}
+        {metricsError && <StatusAlert type="error" message={`Metrics: ${metricsError}`} />}
 
         {/* Status Card */}
         <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6 flex items-center justify-between">
@@ -66,13 +92,18 @@ export default function Health() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500" />
                 </>
+              ) : data ? (
+                <>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+                </>
               ) : (
                 <span className="relative inline-flex rounded-full h-4 w-4 bg-slate-500" />
               )}
             </div>
             <div>
               <p className="text-sm font-medium text-slate-400">System Status</p>
-              <h3 className={`text-2xl font-bold uppercase tracking-wider ${isOk ? "text-emerald-400" : "text-slate-400"}`}>
+              <h3 className={`text-2xl font-bold uppercase tracking-wider ${isOk ? "text-emerald-400" : data ? "text-red-400" : "text-slate-400"}`}>
                 {data ? data.status : "—"}
               </h3>
             </div>
@@ -94,21 +125,25 @@ export default function Health() {
                 label="Database Tables"
                 value={data.tables.length.toString()}
                 detail={data.tables.join(", ")}
+                status="ok"
               />
               <InfoCard
                 icon="folder"
                 label="Workspace Docs"
                 value={data.workspace_documents.toString()}
+                status="ok"
               />
               <InfoCard
                 icon="chat"
                 label="Chat"
                 value={data.chat_enabled ? "Enabled" : "Disabled"}
+                status={data.chat_enabled ? "ok" : "warn"}
               />
               <InfoCard
                 icon="view_in_ar"
                 label="Embedding Model"
                 value={data.embedding_model}
+                status={data.embedding_model ? "ok" : "error"}
               />
             </div>
 
@@ -117,11 +152,13 @@ export default function Health() {
                 icon="cloud"
                 label="LLM Provider"
                 value={data.llm_provider}
+                status={data.llm_provider ? "ok" : "error"}
               />
               <InfoCard
                 icon="smart_toy"
                 label="LLM Model"
                 value={data.llm_model}
+                status={data.llm_model ? "ok" : "error"}
               />
             </div>
           </>
@@ -186,18 +223,25 @@ export default function Health() {
   );
 }
 
-function InfoCard({ icon, label, value, detail }: {
+function InfoCard({ icon, label, value, detail, status = "ok" }: {
   icon: string;
   label: string;
   value: string;
   detail?: string;
+  status?: "ok" | "warn" | "error";
 }) {
+  const badgeConfig = {
+    ok: { text: "Active", classes: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
+    warn: { text: "Warning", classes: "bg-amber-500/10 text-amber-500 border-amber-500/20" },
+    error: { text: "Error", classes: "bg-red-500/10 text-red-500 border-red-500/20" },
+  }[status];
+
   return (
     <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6 transition-transform hover:scale-[1.02]">
       <div className="flex justify-between items-start mb-4">
         <span className="material-symbols-outlined text-primary text-3xl">{icon}</span>
-        <span className="px-2 py-1 text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded uppercase tracking-widest">
-          Active
+        <span className={`px-2 py-1 text-[10px] font-bold border rounded uppercase tracking-widest ${badgeConfig.classes}`}>
+          {badgeConfig.text}
         </span>
       </div>
       <h4 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">{label}</h4>

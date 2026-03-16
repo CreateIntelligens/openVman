@@ -47,7 +47,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
        useEffect(() => {
               refreshProjects();
               // eslint-disable-next-line react-hooks/exhaustive-deps
-       }, [projectId]);
+       }, []);
 
        return (
               <ProjectContext.Provider

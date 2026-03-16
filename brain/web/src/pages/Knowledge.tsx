@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import Markdown from "react-markdown";
 import {
+  deleteKnowledgeDocument,
   fetchKnowledgeDocument,
   fetchKnowledgeDocuments,
   KnowledgeDocumentSummary,
@@ -11,6 +11,8 @@ import {
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
 import FileTree from "../components/FileTree";
+import MarkdownPreview from "../components/MarkdownPreview";
+import ConfirmModal from "../components/ConfirmModal";
 import { useProject } from "../context/ProjectContext";
 
 type EditorMode = "edit" | "preview" | "split";
@@ -41,7 +43,11 @@ export default function Knowledge() {
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
-  const hasUnsavedChanges = draftPath !== loadedPath || draftContent !== loadedContent;
+  const [deleteTarget, setDeleteTarget] = useState("");
+
+  const hasUnsavedChanges = loadedPath === ""
+    ? draftContent !== ""
+    : draftPath !== loadedPath || draftContent !== loadedContent;
 
   const loadDocuments = async (preferredPath?: string) => {
     setLoadingList(true);
@@ -169,6 +175,20 @@ export default function Knowledge() {
     await uploadFiles(Array.from(e.target.files ?? []));
     if (uploadInputRef.current) {
       uploadInputRef.current.value = "";
+    }
+  };
+
+  const confirmDeleteDocument = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteKnowledgeDocument(deleteTarget);
+      setStatus({ type: "success", message: `已刪除 ${deleteTarget}` });
+      setDeleteTarget("");
+      resetDraft(emptyDraft.path, emptyDraft.content);
+      await loadDocuments();
+    } catch (error) {
+      setStatus({ type: "error", message: String(error) });
+      setDeleteTarget("");
     }
   };
 
@@ -306,7 +326,17 @@ export default function Knowledge() {
               />
             </div>
 
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
+              {selectedPath && (
+                <button
+                  onClick={() => setDeleteTarget(selectedPath)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/10 transition-colors"
+                  title="Delete Document"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  Delete
+                </button>
+              )}
               <div className="flex rounded-md border border-slate-700 overflow-hidden bg-slate-900">
                 {(["edit", "split", "preview"] as EditorMode[]).map((mode) => (
                   <button
@@ -384,40 +414,17 @@ export default function Knowledge() {
           </div>
         </div>
       </main>
-    </div>
-  );
-}
 
-function MarkdownPreview({ content }: { content: string }) {
-  return (
-    <Markdown
-      components={{
-        h1: ({ children }) => <h1 className="text-2xl font-bold text-white mb-4 mt-6 first:mt-0">{children}</h1>,
-        h2: ({ children }) => <h2 className="text-xl font-bold text-white mb-3 mt-5 border-b border-slate-800 pb-2">{children}</h2>,
-        h3: ({ children }) => <h3 className="text-lg font-semibold text-white mb-2 mt-4">{children}</h3>,
-        p: ({ children }) => <p className="text-sm leading-7 text-slate-300 mb-4">{children}</p>,
-        ul: ({ children }) => <ul className="list-disc list-inside text-sm text-slate-300 mb-4 space-y-1.5 pl-2">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-slate-300 mb-4 space-y-1.5 pl-2">{children}</ol>,
-        li: ({ children }) => <li className="text-sm text-slate-300">{children}</li>,
-        code: ({ children, className }) => {
-          const isBlock = className?.includes("language-");
-          if (isBlock) {
-            return <code className="block rounded-lg bg-slate-950 p-4 text-sm text-primary/80 font-mono overflow-x-auto mb-4 border border-slate-800">{children}</code>;
-          }
-          return <code className="rounded bg-slate-800 px-1.5 py-0.5 text-sm text-primary/80 font-mono">{children}</code>;
-        },
-        pre: ({ children }) => <pre className="mb-4">{children}</pre>,
-        blockquote: ({ children }) => <blockquote className="border-l-4 border-primary/40 pl-4 italic text-slate-400 mb-4 bg-primary/5 py-2 pr-4 rounded-r-lg">{children}</blockquote>,
-        a: ({ children, href }) => <a href={href} className="text-primary hover:text-primary/80 underline decoration-primary/30 underline-offset-2 transition-colors" target="_blank" rel="noopener noreferrer">{children}</a>,
-        hr: () => <hr className="border-slate-800 my-6" />,
-        strong: ({ children }) => <strong className="font-bold text-slate-200">{children}</strong>,
-        table: ({ children }) => <div className="overflow-x-auto mb-4"><table className="w-full text-sm text-slate-300 border-collapse">{children}</table></div>,
-        th: ({ children }) => <th className="border border-slate-700 px-4 py-2.5 text-left font-semibold text-slate-200 bg-slate-800/50">{children}</th>,
-        td: ({ children }) => <td className="border border-slate-700 px-4 py-2 bg-slate-900/20">{children}</td>,
-      }}
-    >
-      {content}
-    </Markdown>
+      <ConfirmModal
+        open={deleteTarget !== ""}
+        title="Delete Document"
+        message={`確定要刪除「${deleteTarget}」嗎？\n\n此操作無法復原。`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={confirmDeleteDocument}
+        onCancel={() => setDeleteTarget("")}
+      />
+    </div>
   );
 }
 
