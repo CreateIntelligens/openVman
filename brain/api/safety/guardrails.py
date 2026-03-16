@@ -80,21 +80,21 @@ def _enforce_prompt_injection_rules(action: str, text: str) -> None:
         raise ValueError(f"偵測到疑似 prompt injection：{', '.join(matched_rules)}")
 
 
-def enforce_session_limits(session_id: str | None, persona_id: str) -> None:
+def enforce_session_limits(session_id: str | None, persona_id: str, project_id: str = "default") -> None:
     """Raise if the session has exceeded the configured round limit."""
     if session_id is None:
         return
     cfg = get_settings()
-    updated_at = _get_session_updated_at(session_id, persona_id)
+    updated_at = _get_session_updated_at(session_id, persona_id, project_id)
     if updated_at is not None and _session_ttl_exceeded(updated_at, cfg.max_session_ttl_minutes):
         raise ValueError(f"session 已超過 TTL {cfg.max_session_ttl_minutes} 分鐘")
-    round_count = _count_session_rounds(session_id, persona_id)
+    round_count = _count_session_rounds(session_id, persona_id, project_id)
     if round_count >= cfg.max_session_rounds:
         raise ValueError(f"session 已達 {cfg.max_session_rounds} 輪上限")
 
 
-def _get_session_updated_at(session_id: str, persona_id: str) -> str | None:
-    return _get_session_store().get_session_updated_at(session_id, persona_id)
+def _get_session_updated_at(session_id: str, persona_id: str, project_id: str = "default") -> str | None:
+    return _get_session_store(project_id).get_session_updated_at(session_id, persona_id)
 
 
 def _session_ttl_exceeded(updated_at: str, ttl_minutes: int) -> bool:
@@ -102,15 +102,15 @@ def _session_ttl_exceeded(updated_at: str, ttl_minutes: int) -> bool:
     return datetime.fromisoformat(updated_at) < deadline
 
 
-def _count_session_rounds(session_id: str, persona_id: str) -> int:
-    messages = _get_session_store().list_messages(session_id, persona_id)
+def _count_session_rounds(session_id: str, persona_id: str, project_id: str = "default") -> int:
+    messages = _get_session_store(project_id).list_messages(session_id, persona_id)
     return sum(1 for m in messages if m.get("role") == "user")
 
 
-def _get_session_store():
-    from memory.session_store import SessionStore
+def _get_session_store(project_id: str = "default"):
+    from memory.memory import get_session_store
 
-    return SessionStore()
+    return get_session_store(project_id)
 
 
 def _enforce_rate_limit(action: str, context: RequestContext) -> None:

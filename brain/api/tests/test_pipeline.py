@@ -231,11 +231,11 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
 def test_enforce_session_round_limit_raises_when_exceeded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "safety.guardrails._get_session_updated_at",
-        lambda session_id, persona_id: None,
+        lambda session_id, persona_id, project_id="default": None,
     )
     monkeypatch.setattr(
         "safety.guardrails._count_session_rounds",
-        lambda session_id, persona_id: 100,
+        lambda session_id, persona_id, project_id="default": 100,
     )
 
     with pytest.raises(ValueError, match="輪上限"):
@@ -245,11 +245,11 @@ def test_enforce_session_round_limit_raises_when_exceeded(monkeypatch: pytest.Mo
 def test_enforce_session_round_within_limit_does_not_raise(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "safety.guardrails._get_session_updated_at",
-        lambda session_id, persona_id: None,
+        lambda session_id, persona_id, project_id="default": None,
     )
     monkeypatch.setattr(
         "safety.guardrails._count_session_rounds",
-        lambda session_id, persona_id: 5,
+        lambda session_id, persona_id, project_id="default": 5,
     )
 
     # should not raise
@@ -260,11 +260,11 @@ def test_enforce_session_limits_rejects_expired_session(monkeypatch: pytest.Monk
     expired_at = (datetime.now() - timedelta(minutes=45)).isoformat(timespec="seconds")
     monkeypatch.setattr(
         "safety.guardrails._count_session_rounds",
-        lambda session_id, persona_id: 0,
+        lambda session_id, persona_id, project_id="default": 0,
     )
     monkeypatch.setattr(
         "safety.guardrails._get_session_updated_at",
-        lambda session_id, persona_id: expired_at,
+        lambda session_id, persona_id, project_id="default": expired_at,
         raising=False,
     )
 
@@ -285,7 +285,7 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         chat_service,
         "enforce_session_limits",
-        lambda session_id, persona_id: None,
+        lambda session_id, persona_id, project_id="default": None,
     )
     monkeypatch.setattr(
         chat_service,

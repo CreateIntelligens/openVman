@@ -65,7 +65,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     if len(cleaned_message) > cfg.max_input_length:
         raise ValueError(f"message 不可超過 {cfg.max_input_length} 字")
     enforce_guardrails("generate", cleaned_message, envelope.context)
-    enforce_session_limits(envelope.context.session_id, persona_id)
+    enforce_session_limits(envelope.context.session_id, persona_id, project_id)
 
     route = route_message(normalize_to_brain_message(envelope))
     session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
