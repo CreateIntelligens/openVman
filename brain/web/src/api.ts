@@ -228,6 +228,73 @@ export interface GenerateStreamHandlers {
   onError?: (payload: { message: string }) => void;
 }
 
+// ---------------------------------------------------------------------------
+// Memory Browse
+// ---------------------------------------------------------------------------
+
+export interface MemoryRecord {
+  text: string;
+  source: string;
+  date: string;
+  metadata?: string;
+}
+
+export interface MemoriesListResponse {
+  memories: MemoryRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export async function fetchMemories(page = 1, pageSize = 20) {
+  const res = await fetch(projectUrl("/memories", { page: String(page), page_size: String(pageSize) }));
+  return parseJson<MemoriesListResponse>(res);
+}
+
+export function deleteMemory(text: string) {
+  return jsonRequest<{ status: string }>(
+    "DELETE",
+    "/memories",
+    { project_id: activeProjectId, text },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Session Management
+// ---------------------------------------------------------------------------
+
+export interface SessionSummary {
+  session_id: string;
+  persona_id: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_preview: string;
+}
+
+export interface SessionsListResponse {
+  sessions: SessionSummary[];
+  session_count: number;
+}
+
+export async function fetchSessions(personaId?: string) {
+  const params: Record<string, string> = {};
+  if (personaId) params.persona_id = personaId;
+  const res = await fetch(projectUrl("/sessions", params));
+  return parseJson<SessionsListResponse>(res);
+}
+
+export async function deleteSession(sessionId: string) {
+  const res = await fetch(projectUrl(`/sessions/${encodeURIComponent(sessionId)}`), {
+    method: "DELETE",
+  });
+  return parseJson<{ status: string; session_id: string }>(res);
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge
+// ---------------------------------------------------------------------------
+
 export async function fetchKnowledgeDocuments() {
   const res = await fetch(projectUrl("/admin/knowledge/documents"));
   return parseJson<KnowledgeDocumentsResponse>(res);
