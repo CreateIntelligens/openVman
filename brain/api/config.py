@@ -175,15 +175,23 @@ class BrainSettings(BaseSettings):
 
     def resolve_api_key_for_provider(self, provider: str) -> str:
         """Return the first API key available for a given provider."""
-        if provider == self.llm_provider:
-            keys = self.resolved_llm_api_keys
-            return keys[0] if keys else ""
+        # Check provider-specific env vars first (avoids recursion with resolved_llm_api_keys)
         key_map = {
             "gemini": self.gemini_api_key,
             "groq": self.groq_api_key,
             "openai": self.openai_api_key,
         }
-        return key_map.get(provider, "")
+        provider_key = key_map.get(provider, "")
+        if provider_key:
+            return provider_key
+        # For the active provider, fall back to generic llm_api_key(s) without
+        # going through resolved_llm_api_keys to avoid infinite recursion.
+        if provider == self.llm_provider:
+            if self.llm_api_keys.strip():
+                return next((k.strip() for k in self.llm_api_keys.split(",") if k.strip()), "")
+            if self.llm_api_key.strip():
+                return self.llm_api_key.strip()
+        return ""
 
     @property
     def resolved_allowed_channels(self) -> list[str]:
