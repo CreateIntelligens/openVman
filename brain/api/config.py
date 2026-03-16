@@ -17,17 +17,17 @@ class BrainSettings(BaseSettings):
     env: str = "dev"  # dev | prod
 
     # === LLM 設定 ===
-    brain_llm_provider: str = "gemini"
-    brain_llm_api_key: str = ""
-    brain_llm_api_keys: str = ""
-    brain_llm_model: str = "gemini-2.0-flash"
-    brain_llm_fallback_model: str = ""
-    brain_llm_base_url: str = ""
-    brain_llm_temperature: float = 0.3
-    brain_llm_key_cooldown_seconds: int = 60
-    brain_llm_key_long_cooldown_seconds: int = 300
-    brain_llm_fallback_chain: str = ""
-    brain_llm_max_fallback_hops: int = 4
+    llm_provider: str = "gemini"
+    llm_api_key: str = ""
+    llm_api_keys: str = ""
+    llm_model: str = "gemini-2.0-flash"
+    llm_fallback_model: str = ""
+    llm_base_url: str = ""
+    llm_temperature: float = 0.3
+    llm_key_cooldown_seconds: int = 60
+    llm_key_long_cooldown_seconds: int = 300
+    llm_fallback_chain: str = ""
+    llm_max_fallback_hops: int = 4
     prompt_system_char_budget: int = 6000
     prompt_total_char_budget: int = 12000
     prompt_context_char_budget: int = 2800
@@ -103,49 +103,57 @@ class BrainSettings(BaseSettings):
 
     @property
     def resolved_llm_api_keys(self) -> list[str]:
-        """Combine the legacy single key and the new key-pool env into one list."""
+        """Combine the legacy single key and the new key-pool env into one list.
+        If both are empty, fall back to the provider-specific key.
+        """
         candidates = []
-        if self.brain_llm_api_keys.strip():
+        if self.llm_api_keys.strip():
             candidates.extend(
                 key.strip()
-                for key in self.brain_llm_api_keys.split(",")
+                for key in self.llm_api_keys.split(",")
                 if key.strip()
             )
-        if self.brain_llm_api_key.strip():
-            candidates.append(self.brain_llm_api_key.strip())
+        if self.llm_api_key.strip():
+            candidates.append(self.llm_api_key.strip())
+
+        # If still empty, try to resolve from the specific provider's key
+        if not candidates:
+            specific_key = self.resolve_api_key_for_provider(self.llm_provider)
+            if specific_key:
+                candidates.append(specific_key)
 
         return list(dict.fromkeys(candidates))
 
     @property
     def resolved_llm_models(self) -> list[str]:
         """Return the primary and fallback models without duplicates."""
-        models = [self.brain_llm_model.strip()]
-        fallback = self.brain_llm_fallback_model.strip()
+        models = [self.llm_model.strip()]
+        fallback = self.llm_fallback_model.strip()
         if fallback and fallback not in models:
             models.append(fallback)
         return [model for model in models if model]
 
     @property
     def resolved_fallback_chain(self) -> list[tuple[str, str]]:
-        """Parse BRAIN_LLM_FALLBACK_CHAIN into (provider, model) pairs.
+        """Parse LLM_FALLBACK_CHAIN into (provider, model) pairs.
 
         Format: ``provider:model,provider:model,...``
         Falls back to the primary provider/model if not configured.
         """
-        if not self.brain_llm_fallback_chain.strip():
+        if not self.llm_fallback_chain.strip():
             return [
-                (self.brain_llm_provider, model)
+                (self.llm_provider, model)
                 for model in self.resolved_llm_models
             ]
         pairs: list[tuple[str, str]] = []
-        for raw_entry in self.brain_llm_fallback_chain.split(","):
+        for raw_entry in self.llm_fallback_chain.split(","):
             stripped = raw_entry.strip()
             if ":" not in stripped:
                 continue
             provider, model = stripped.split(":", 1)
             if provider.strip() and model.strip():
                 pairs.append((provider.strip(), model.strip()))
-        return pairs if pairs else [(self.brain_llm_provider, self.brain_llm_model)]
+        return pairs if pairs else [(self.llm_provider, self.llm_model)]
 
     _BASE_URL_DEFAULTS: dict[str, str] = {
         "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -155,19 +163,19 @@ class BrainSettings(BaseSettings):
     @property
     def resolved_llm_base_url(self) -> str:
         """Provide a sane default base URL per provider."""
-        if self.brain_llm_base_url:
-            return self.brain_llm_base_url
-        return self._BASE_URL_DEFAULTS.get(self.brain_llm_provider, "")
+        if self.llm_base_url:
+            return self.llm_base_url
+        return self._BASE_URL_DEFAULTS.get(self.llm_provider, "")
 
     def resolve_base_url_for_provider(self, provider: str) -> str:
         """Return the base URL for a given provider name."""
-        if self.brain_llm_base_url and provider == self.brain_llm_provider:
-            return self.brain_llm_base_url
+        if self.llm_base_url and provider == self.llm_provider:
+            return self.llm_base_url
         return self._BASE_URL_DEFAULTS.get(provider, "")
 
     def resolve_api_key_for_provider(self, provider: str) -> str:
         """Return the first API key available for a given provider."""
-        if provider == self.brain_llm_provider:
+        if provider == self.llm_provider:
             keys = self.resolved_llm_api_keys
             return keys[0] if keys else ""
         key_map = {

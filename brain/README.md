@@ -385,18 +385,18 @@ user input
 
 目前設計是：
 
-- 對外入口只用一個 `BRAIN_PORT`
+- 對外入口只用一個 `PORT`
 - API 容器內部 port 固定 `8100`
 - nginx public port 預設 `8787`
 
 ### Port 邏輯
 
 - `.env`
-  - `BRAIN_PORT=8787`
+  - `PORT=8787`
 - `nginx`
   - listen `8787`
 - `docker-compose`
-  - host `${BRAIN_PORT}:8787`
+  - host `${PORT}:8787`
 - `api`
   - internal `8100`
 - `nginx upstream`
@@ -415,7 +415,7 @@ user input
 
 ```env
 ENV=dev
-BRAIN_PORT=8787
+PORT=8787
 
 BRAIN_LLM_PROVIDER=gemini
 BRAIN_LLM_API_KEY=

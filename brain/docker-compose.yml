@@ -33,7 +33,7 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "${BRAIN_PORT:-8787}:8787"
+      - "${PORT:-8787}:8787"
     volumes:
       - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
     environment:
