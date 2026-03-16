@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openvman://protocol/v1/client_init",
+  "title": "Client Init Event",
+  "type": "object",
+  "additionalProperties": false,
+  "x-direction": "client_to_server",
+  "x-contract-version": "1.0.0",
+  "properties": {
+    "event": {
+      "const": "client_init"
+    },
+    "client_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "protocol_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "auth_token": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capabilities": {
+      "type": "object",
+      "default": {},
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "event",
+    "client_id",
+    "protocol_version",
+    "auth_token",
+    "timestamp"
+  ]
+}
