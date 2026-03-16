@@ -3,6 +3,7 @@ import {
   ChatMessage,
   fetchChatHistory,
   fetchPersonas,
+  getActiveProjectId,
   PersonaSummary,
   RetrievalResult,
   streamGenerate,
@@ -51,10 +52,6 @@ export default function Chat() {
     window.localStorage.setItem(getSessionStorageKey(personaId), nextSessionId);
   };
 
-  const updateLastContext = (knowledge: number, memory: number) => {
-    setLastContext({ knowledge, memory });
-  };
-
   const resetViewState = () => {
     setInput("");
     setSessionId("");
@@ -74,11 +71,8 @@ export default function Chat() {
   }) => {
     setMessages(payload.history);
     persistSessionId(payload.session_id);
-    updateLastContext(payload.knowledge_results.length, payload.memory_results.length);
-    setLastSources({
-      knowledge: payload.knowledge_results,
-      memory: payload.memory_results,
-    });
+    setLastContext({ knowledge: payload.knowledge_results.length, memory: payload.memory_results.length });
+    setLastSources({ knowledge: payload.knowledge_results, memory: payload.memory_results });
     setLastLearned(payload.learnings_added);
   };
 
@@ -106,13 +100,7 @@ export default function Chat() {
       return;
     }
 
-    setInput("");
-    setSessionId("");
-    setMessages([]);
-    setLastContext({ knowledge: 0, memory: 0 });
-    setLastLearned([]);
-    setLastSources(emptySources);
-    setError("");
+    resetViewState();
     const storedSessionId = window.localStorage.getItem(getSessionStorageKey(selectedPersonaId));
     if (!storedSessionId) {
       return;
@@ -159,7 +147,7 @@ export default function Chat() {
             persistSessionId(payload.session_id);
           },
           onContext: (payload) => {
-            updateLastContext(payload.knowledge_count, payload.memory_count);
+            setLastContext({ knowledge: payload.knowledge_count, memory: payload.memory_count });
           },
           onToken: (payload) => {
             setMessages((current) => appendStreamingToken(current, payload.token));
@@ -549,7 +537,7 @@ function parseMetadata(raw?: string) {
 }
 
 function getSessionStorageKey(personaId: string) {
-  return `brain-chat-session-id:${personaId}`;
+  return `brain-chat-session-id:${getActiveProjectId()}:${personaId}`;
 }
 
 function resolvePersonaId(personas: PersonaSummary[], preferredPersonaId: string) {

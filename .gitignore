@@ -24,6 +24,7 @@ brain/data/workspace/.learnings/
 brain/data/workspace/memory/*
 !brain/data/workspace/memory/.gitkeep
 brain/data/workspace/scratch/
+brain/data/projects/
 
 # Node
 node_modules/

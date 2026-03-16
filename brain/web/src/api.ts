@@ -1,6 +1,18 @@
 const BASE = "/api";
 type ApiErrorPayload = { detail?: string; error?: string };
 
+// ---------------------------------------------------------------------------
+// Active Project
+// ---------------------------------------------------------------------------
+
+let activeProjectId = "default";
+export const getActiveProjectId = () => activeProjectId;
+export const setActiveProjectId = (id: string) => { activeProjectId = id; };
+
+// ---------------------------------------------------------------------------
+// Shared HTTP helpers
+// ---------------------------------------------------------------------------
+
 async function parseJson<T>(res: Response): Promise<T> {
   const payload = await res.json();
   if (!res.ok) {
@@ -9,7 +21,7 @@ async function parseJson<T>(res: Response): Promise<T> {
   return payload as T;
 }
 
-async function jsonRequest<T = Record<string, unknown>>(
+async function jsonRequest<T>(
   method: string,
   path: string,
   body: Record<string, unknown>,
@@ -22,15 +34,62 @@ async function jsonRequest<T = Record<string, unknown>>(
   return parseJson<T>(res);
 }
 
-async function post<T = Record<string, unknown>>(
+async function post<T>(
   path: string,
   body: Record<string, unknown>,
 ): Promise<T> {
   return jsonRequest<T>("POST", path, body);
 }
 
+/** Build a relative URL with project_id (and optional extra params) as query string. */
+function projectUrl(path: string, params: Record<string, string> = {}): string {
+  const qs = new URLSearchParams({ project_id: activeProjectId, ...params });
+  return `${BASE}${path}?${qs}`;
+}
+
+// ---------------------------------------------------------------------------
+// Project CRUD
+// ---------------------------------------------------------------------------
+
+export interface ProjectSummary {
+  project_id: string;
+  label: string;
+  document_count: number;
+  persona_count: number;
+}
+
+export interface ProjectsResponse {
+  projects: ProjectSummary[];
+  project_count: number;
+}
+
+export async function fetchProjects() {
+  const res = await fetch(`${BASE}/admin/projects`);
+  return parseJson<ProjectsResponse>(res);
+}
+
+export async function fetchProjectInfo(projectId: string) {
+  const res = await fetch(`${BASE}/admin/projects/${encodeURIComponent(projectId)}`);
+  return parseJson<ProjectSummary>(res);
+}
+
+export function createProject(projectId: string, label: string) {
+  return post<{ status: string; project_id: string }>("/admin/projects", {
+    project_id: projectId,
+    label,
+  });
+}
+
+export function deleteProject(projectId: string) {
+  return jsonRequest<{ status: string; project_id: string }>(
+    "DELETE",
+    "/admin/projects",
+    { project_id: projectId },
+  );
+}
+
 export async function fetchHealth<T = Record<string, unknown>>() {
-  const res = await fetch(`${BASE}/health`);
+  const res = await fetch(projectUrl("/health"));
   return parseJson<T>(res);
 }
 
@@ -39,15 +98,15 @@ export function postEmbed<T = Record<string, unknown>>(texts: string[]) {
 }
 
 export function postSearch<T = Record<string, unknown>>(query: string, table = "knowledge", topK = 5) {
-  return post<T>("/search", { query, table, top_k: topK });
+  return post<T>("/search", { query, table, top_k: topK, project_id: activeProjectId });
 }
 
-export function postAddMemory<T = Record<string, unknown>>(
+export function postAddMemory(
   text: string,
   source = "user",
   metadata: Record<string, unknown> = {},
 ) {
-  return post<T>("/add_memory", { text, source, metadata });
+  return post<Record<string, unknown>>("/add_memory", { text, source, metadata, project_id: activeProjectId });
 }
 
 export interface PersonaSummary {
@@ -147,14 +206,12 @@ export interface GenerateStreamHandlers {
 }
 
 export async function fetchKnowledgeDocuments() {
-  const res = await fetch(`${BASE}/admin/knowledge/documents`);
+  const res = await fetch(projectUrl("/admin/knowledge/documents"));
   return parseJson<KnowledgeDocumentsResponse>(res);
 }
 
 export async function fetchKnowledgeDocument(path: string) {
-  const url = new URL(`${BASE}/admin/knowledge/document`, window.location.origin);
-  url.searchParams.set("path", path);
-  const res = await fetch(url.pathname + url.search);
+  const res = await fetch(projectUrl("/admin/knowledge/document", { path }));
   return parseJson<KnowledgeDocument>(res);
 }
 
@@ -162,14 +219,14 @@ export function saveKnowledgeDocument(path: string, content: string) {
   return jsonRequest<{ status: string; document: KnowledgeDocumentSummary }>(
     "PUT",
     "/admin/knowledge/document",
-    { path, content },
+    { path, content, project_id: activeProjectId },
   );
 }
 
 export function moveKnowledgeDocument(sourcePath: string, targetPath: string) {
   return post<{ status: string; document: KnowledgeDocumentSummary }>(
     "/admin/knowledge/move",
-    { source_path: sourcePath, target_path: targetPath },
+    { source_path: sourcePath, target_path: targetPath, project_id: activeProjectId },
   );
 }
 
@@ -177,6 +234,7 @@ export async function uploadKnowledgeDocuments(files: File[], targetDir = "") {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
   formData.append("target_dir", targetDir);
+  formData.append("project_id", activeProjectId);
 
   const res = await fetch(`${BASE}/admin/knowledge/upload`, {
     method: "POST",
@@ -186,13 +244,14 @@ export async function uploadKnowledgeDocuments(files: File[], targetDir = "") {
   return parseJson<KnowledgeUploadResponse>(res);
 }
 
-export async function reindexKnowledge() {
-  const res = await fetch(`${BASE}/admin/knowledge/reindex`, { method: "POST" });
-  return parseJson<KnowledgeReindexResponse>(res);
+export function reindexKnowledge() {
+  return post<KnowledgeReindexResponse>("/admin/knowledge/reindex", {
+    project_id: activeProjectId,
+  });
 }
 
 export async function fetchPersonas() {
-  const res = await fetch(`${BASE}/personas`);
+  const res = await fetch(projectUrl("/personas"));
   return parseJson<PersonasResponse>(res);
 }
 
@@ -200,6 +259,7 @@ export function createPersona(personaId: string, label: string) {
   return post<PersonaCreateResponse>("/admin/personas", {
     persona_id: personaId,
     label,
+    project_id: activeProjectId,
   });
 }
 
@@ -207,7 +267,7 @@ export function deletePersona(personaId: string) {
   return jsonRequest<{ status: string; persona_id: string }>(
     "DELETE",
     "/admin/personas",
-    { persona_id: personaId },
+    { persona_id: personaId, project_id: activeProjectId },
   );
 }
 
@@ -215,6 +275,7 @@ export function clonePersona(sourcePersonaId: string, targetPersonaId: string) {
   return post<PersonaCloneResponse>("/admin/personas/clone", {
     source_persona_id: sourcePersonaId,
     target_persona_id: targetPersonaId,
+    project_id: activeProjectId,
   });
 }
 
@@ -223,6 +284,7 @@ export function postGenerate(message: string, personaId = "default", sessionId?:
     message,
     persona_id: personaId,
     session_id: sessionId,
+    project_id: activeProjectId,
   });
 }
 
@@ -236,7 +298,7 @@ export async function streamGenerate(
   const res = await fetch(`${BASE}/generate/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, persona_id: personaId, session_id: sessionId }),
+    body: JSON.stringify({ message, persona_id: personaId, session_id: sessionId, project_id: activeProjectId }),
     signal,
   });
 
@@ -263,10 +325,7 @@ export async function streamGenerate(
 }
 
 export async function fetchChatHistory(sessionId: string, personaId = "default") {
-  const url = new URL(`${BASE}/chat/history`, window.location.origin);
-  url.searchParams.set("session_id", sessionId);
-  url.searchParams.set("persona_id", personaId);
-  const res = await fetch(url.pathname + url.search);
+  const res = await fetch(projectUrl("/chat/history", { session_id: sessionId, persona_id: personaId }));
   return parseJson<{ session_id: string; persona_id: string; history: ChatMessage[] }>(res);
 }
 
