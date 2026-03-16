@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { postAddMemory } from "../api";
+import { postAddMemory, runMemoryMaintenance, MemoryMaintenanceResponse } from "../api";
 import StatusAlert from "../components/StatusAlert";
 
 export default function Memory() {
@@ -7,6 +7,8 @@ export default function Memory() {
   const [source, setSource] = useState("user");
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [maintaining, setMaintaining] = useState(false);
+  const [maintenanceResult, setMaintenanceResult] = useState<MemoryMaintenanceResponse | null>(null);
 
   const submit = () => {
     if (!text.trim()) return;
@@ -24,6 +26,19 @@ export default function Memory() {
       })
       .catch((e) => setStatus({ type: "error", message: String(e) }))
       .finally(() => setLoading(false));
+  };
+
+  const handleMaintenance = () => {
+    setMaintaining(true);
+    setMaintenanceResult(null);
+    setStatus(null);
+    runMemoryMaintenance()
+      .then((result) => {
+        setMaintenanceResult(result);
+        setStatus({ type: "success", message: `Memory maintenance completed (${result.status})` });
+      })
+      .catch((e) => setStatus({ type: "error", message: String(e) }))
+      .finally(() => setMaintaining(false));
   };
 
   return (
@@ -105,6 +120,34 @@ export default function Memory() {
 
           {/* Info Column */}
           <div className="space-y-6">
+            {/* Maintenance */}
+            <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+              <h3 className="text-white font-bold mb-2 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">build</span>
+                Memory Maintenance
+              </h3>
+              <p className="text-sm text-slate-400 mb-4">
+                執行記憶衰減、語意去重、重要性評分。正常情況會自動排程執行，也可以手動觸發。
+              </p>
+              <button
+                onClick={handleMaintenance}
+                disabled={maintaining}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold hover:bg-amber-500/20 transition-all disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-sm">memory</span>
+                {maintaining ? "Running..." : "Run Maintenance"}
+              </button>
+              {maintenanceResult && (
+                <div className="mt-4 space-y-2 text-sm">
+                  <StatRow label="Records before" value={maintenanceResult.records_before} />
+                  <StatRow label="Records after" value={maintenanceResult.records_after} />
+                  <StatRow label="Deduped" value={maintenanceResult.deduped || undefined} highlight />
+                  <StatRow label="Summaries written" value={maintenanceResult.summaries_written} />
+                </div>
+              )}
+            </div>
+
+            {/* Guidelines */}
             <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
               <h3 className="text-white font-bold mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">info</span>
@@ -129,5 +172,15 @@ export default function Memory() {
         </div>
       </div>
     </>
+  );
+}
+
+function StatRow({ label, value, highlight }: { label: string; value?: number | null; highlight?: boolean }) {
+  if (value == null) return null;
+  return (
+    <div className="flex justify-between text-slate-400">
+      <span>{label}</span>
+      <span className={`font-mono ${highlight ? "text-emerald-400" : "text-white"}`}>{value}</span>
+    </div>
   );
 }

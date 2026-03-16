@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchHealth } from "../api";
+import { fetchHealth, fetchMetrics, MetricsSnapshot } from "../api";
 import StatusAlert from "../components/StatusAlert";
 
 interface HealthData {
@@ -14,6 +14,7 @@ interface HealthData {
 
 export default function Health() {
   const [data, setData] = useState<HealthData | null>(null);
+  const [metrics, setMetrics] = useState<MetricsSnapshot | null>(null);
   const [error, setError] = useState("");
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,9 +22,10 @@ export default function Health() {
   const load = () => {
     setError("");
     setLoading(true);
-    fetchHealth<HealthData>()
-      .then((d) => {
-        setData(d);
+    Promise.all([fetchHealth<HealthData>(), fetchMetrics()])
+      .then(([healthData, metricsData]) => {
+        setData(healthData);
+        setMetrics(metricsData);
         setLastChecked(new Date());
       })
       .catch((e) => setError(String(e)))
@@ -85,43 +87,98 @@ export default function Health() {
 
         {/* Infrastructure Grid */}
         {data && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <InfoCard
-              icon="database"
-              label="Database Tables"
-              value={data.tables.length.toString()}
-              detail={data.tables.join(", ")}
-            />
-            <InfoCard
-              icon="folder"
-              label="Workspace Docs"
-              value={data.workspace_documents.toString()}
-            />
-            <InfoCard
-              icon="chat"
-              label="Chat"
-              value={data.chat_enabled ? "Enabled" : "Disabled"}
-            />
-            <InfoCard
-              icon="view_in_ar"
-              label="Embedding Model"
-              value={data.embedding_model}
-            />
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <InfoCard
+                icon="database"
+                label="Database Tables"
+                value={data.tables.length.toString()}
+                detail={data.tables.join(", ")}
+              />
+              <InfoCard
+                icon="folder"
+                label="Workspace Docs"
+                value={data.workspace_documents.toString()}
+              />
+              <InfoCard
+                icon="chat"
+                label="Chat"
+                value={data.chat_enabled ? "Enabled" : "Disabled"}
+              />
+              <InfoCard
+                icon="view_in_ar"
+                label="Embedding Model"
+                value={data.embedding_model}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InfoCard
+                icon="cloud"
+                label="LLM Provider"
+                value={data.llm_provider}
+              />
+              <InfoCard
+                icon="smart_toy"
+                label="LLM Model"
+                value={data.llm_model}
+              />
+            </div>
+          </>
         )}
 
-        {data && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InfoCard
-              icon="cloud"
-              label="LLM Provider"
-              value={data.llm_provider}
-            />
-            <InfoCard
-              icon="smart_toy"
-              label="LLM Model"
-              value={data.llm_model}
-            />
+        {/* Metrics */}
+        {metrics && (metrics.counter_count > 0 || metrics.timing_count > 0) && (
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1">
+              Runtime Metrics
+            </h3>
+
+            {metrics.counter_count > 0 && (
+              <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Counters</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {Object.entries(metrics.counters)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between gap-3 rounded-lg bg-slate-950/50 border border-slate-800 px-4 py-3">
+                        <span className="text-xs text-slate-400 truncate" title={key}>{key}</span>
+                        <span className="text-sm font-bold font-mono text-white shrink-0">{value}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {metrics.timing_count > 0 && (
+              <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Timings</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs uppercase tracking-widest text-slate-500">
+                        <th className="pb-3 pr-4">Name</th>
+                        <th className="pb-3 pr-4 text-right">Count</th>
+                        <th className="pb-3 pr-4 text-right">Avg (ms)</th>
+                        <th className="pb-3 text-right">Max (ms)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {Object.entries(metrics.timings)
+                        .sort(([, a], [, b]) => b.count - a.count)
+                        .map(([key, bucket]) => (
+                          <tr key={key} className="text-slate-300">
+                            <td className="py-2 pr-4 text-xs text-slate-400 truncate max-w-[240px]" title={key}>{key}</td>
+                            <td className="py-2 pr-4 text-right font-mono">{bucket.count}</td>
+                            <td className="py-2 pr-4 text-right font-mono">{bucket.avg_ms.toFixed(1)}</td>
+                            <td className="py-2 text-right font-mono">{bucket.max_ms.toFixed(1)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
