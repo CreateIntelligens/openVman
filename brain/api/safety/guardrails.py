@@ -116,7 +116,7 @@ def _get_session_store(project_id: str = "default"):
 def _enforce_rate_limit(action: str, context: RequestContext) -> None:
     cfg = get_settings()
     limit = max(1, cfg.request_rate_limit_per_minute)
-    key = f"{action}:{context.client_ip or 'unknown'}:{context.channel}"
+    key = f"{action}:{context.project_id}:{context.client_ip or 'unknown'}:{context.channel}"
     now = monotonic()
     window_start = now - 60
 
