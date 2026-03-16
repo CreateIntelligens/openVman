@@ -24,7 +24,10 @@ def build_chat_messages(
 ) -> list[dict[str, str]]:
     """Build the system and conversation messages for the LLM call."""
     cfg = get_settings()
-    workspace = load_core_workspace_context(str(request_context.get("persona_id", "default")))
+    workspace = load_core_workspace_context(
+        str(request_context.get("persona_id", "default")),
+        project_id=str(request_context.get("project_id", "default")),
+    )
     history_summary = summarize_message_history(session_messages)
     system_prompt = "\n\n".join(
         block

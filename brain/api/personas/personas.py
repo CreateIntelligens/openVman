@@ -16,6 +16,12 @@ PERSONA_CORE_FILENAMES = {
     "MEMORY.md",
 }
 PERSONA_CORE_KEYS = {"soul", "agents", "tools", "memory"}
+PERSONA_CORE_KEYS_TO_FILES = {
+    "soul": "SOUL.md",
+    "agents": "AGENTS.md",
+    "tools": "TOOLS.md",
+    "memory": "MEMORY.md",
+}
 _PERSONA_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
@@ -26,33 +32,31 @@ def normalize_persona_id(persona_id: str | None) -> str:
     return text
 
 
-def get_persona_directory(persona_id: str | None) -> Path:
+def get_persona_directory(persona_id: str | None, project_id: str = "default") -> Path:
     normalized = normalize_persona_id(persona_id)
-    return workspace.WORKSPACE_ROOT / "personas" / normalized
+    ws = workspace.get_workspace_root(project_id)
+    return ws / "personas" / normalized
 
 
-def resolve_core_document_paths(persona_id: str | None = None) -> dict[str, Path]:
+def resolve_core_document_paths(persona_id: str | None = None, project_id: str = "default") -> dict[str, Path]:
     normalized = normalize_persona_id(persona_id)
-    resolved = dict(workspace.CORE_DOCUMENTS)
+    resolved = dict(workspace.get_core_documents(project_id))
     if normalized == "default":
         return resolved
 
-    overrides = {
-        "soul": get_persona_directory(normalized) / "SOUL.md",
-        "agents": get_persona_directory(normalized) / "AGENTS.md",
-        "tools": get_persona_directory(normalized) / "TOOLS.md",
-        "memory": get_persona_directory(normalized) / "MEMORY.md",
-    }
-    for key, path in overrides.items():
-        if path.exists():
-            resolved[key] = path
+    persona_dir = get_persona_directory(normalized, project_id)
+    for key, filename in PERSONA_CORE_KEYS_TO_FILES.items():
+        override = persona_dir / filename
+        if override.exists():
+            resolved[key] = override
     return resolved
 
 
-def list_personas() -> list[dict[str, Any]]:
-    workspace.ensure_workspace_scaffold()
-    personas = [_build_default_persona_summary()]
-    personas_root = workspace.WORKSPACE_ROOT / "personas"
+def list_personas(project_id: str = "default") -> list[dict[str, Any]]:
+    workspace.ensure_workspace_scaffold(project_id)
+    ws = workspace.get_workspace_root(project_id)
+    personas = [_build_default_persona_summary(project_id)]
+    personas_root = ws / "personas"
     personas_root.mkdir(parents=True, exist_ok=True)
 
     for path in sorted(personas_root.iterdir()):
@@ -62,16 +66,16 @@ def list_personas() -> list[dict[str, Any]]:
         if not soul_path.exists():
             continue
         persona_id = normalize_persona_id(path.name)
-        personas.append(_build_persona_summary(persona_id, soul_path, is_default=False))
+        personas.append(_build_persona_summary(persona_id, soul_path, is_default=False, project_id=project_id))
     return personas
 
 
-def create_persona_scaffold(persona_id: str, label: str = "") -> dict[str, Any]:
+def create_persona_scaffold(persona_id: str, label: str = "", project_id: str = "default") -> dict[str, Any]:
     normalized = normalize_persona_id(_require_text(persona_id, "persona_id"))
     if normalized == "default":
         raise ValueError("default persona 已存在，無法重建")
 
-    persona_dir = get_persona_directory(normalized)
+    persona_dir = get_persona_directory(normalized, project_id)
     soul_path = persona_dir / "SOUL.md"
     if soul_path.exists():
         raise ValueError("persona 已存在")
@@ -82,23 +86,24 @@ def create_persona_scaffold(persona_id: str, label: str = "") -> dict[str, Any]:
     for filename, content in files.items():
         (persona_dir / filename).write_text(content, encoding="utf-8")
 
-    persona = _get_persona_summary(normalized)
+    ws = workspace.get_workspace_root(project_id)
+    persona = _build_persona_summary(normalized, persona_dir / "SOUL.md", is_default=False, project_id=project_id)
     return {
         "status": "ok",
         "persona": persona,
         "files": [
-            (persona_dir / filename).relative_to(workspace.WORKSPACE_ROOT).as_posix()
+            (persona_dir / filename).relative_to(ws).as_posix()
             for filename in files
         ],
     }
 
 
-def delete_persona_scaffold(persona_id: str) -> dict[str, Any]:
+def delete_persona_scaffold(persona_id: str, project_id: str = "default") -> dict[str, Any]:
     normalized = normalize_persona_id(_require_text(persona_id, "persona_id"))
     if normalized == "default":
         raise ValueError("default persona 不可刪除")
 
-    persona_dir = get_persona_directory(normalized)
+    persona_dir = get_persona_directory(normalized, project_id)
     if not persona_dir.exists():
         raise ValueError("persona 不存在")
 
@@ -112,16 +117,18 @@ def delete_persona_scaffold(persona_id: str) -> dict[str, Any]:
 def clone_persona_scaffold(
     source_persona_id: str,
     target_persona_id: str,
+    project_id: str = "default",
 ) -> dict[str, Any]:
-    source_paths = resolve_core_document_paths(source_persona_id)
+    source_paths = resolve_core_document_paths(source_persona_id, project_id)
     target_id = normalize_persona_id(_require_text(target_persona_id, "target_persona_id"))
     if target_id == "default":
         raise ValueError("不可覆蓋 default persona")
 
-    target_dir = get_persona_directory(target_id)
+    target_dir = get_persona_directory(target_id, project_id)
     if target_dir.exists():
         raise ValueError("target persona 已存在")
 
+    ws = workspace.get_workspace_root(project_id)
     target_dir.mkdir(parents=True, exist_ok=True)
     copied_files: list[str] = []
     for key, source_path in source_paths.items():
@@ -129,9 +136,9 @@ def clone_persona_scaffold(
             continue
         target_path = target_dir / source_path.name
         shutil.copyfile(source_path, target_path)
-        copied_files.append(target_path.relative_to(workspace.WORKSPACE_ROOT).as_posix())
+        copied_files.append(target_path.relative_to(ws).as_posix())
 
-    persona = _get_persona_summary(target_id)
+    persona = _build_persona_summary(target_id, target_dir / "SOUL.md", is_default=False, project_id=project_id)
     return {
         "status": "ok",
         "persona": persona,
@@ -156,9 +163,10 @@ def is_persona_core_relative_path(relative_path: str) -> bool:
     )
 
 
-def _build_default_persona_summary() -> dict[str, Any]:
-    soul_path = workspace.CORE_DOCUMENTS["soul"]
-    return _build_persona_summary("default", soul_path, is_default=True)
+def _build_default_persona_summary(project_id: str = "default") -> dict[str, Any]:
+    core_docs = workspace.get_core_documents(project_id)
+    soul_path = core_docs["soul"]
+    return _build_persona_summary("default", soul_path, is_default=True, project_id=project_id)
 
 
 def _require_text(value: str | None, field_name: str) -> str:
@@ -168,21 +176,18 @@ def _require_text(value: str | None, field_name: str) -> str:
     return text
 
 
-def _get_persona_summary(persona_id: str) -> dict[str, Any]:
-    normalized = normalize_persona_id(persona_id)
-    return next(item for item in list_personas() if item["persona_id"] == normalized)
-
-
 def _build_persona_summary(
     persona_id: str,
     soul_path: Path,
     *,
     is_default: bool,
+    project_id: str = "default",
 ) -> dict[str, Any]:
+    ws = workspace.get_workspace_root(project_id)
     return {
         "persona_id": persona_id,
         "label": _extract_heading_or_name(soul_path, persona_id),
-        "path": soul_path.relative_to(workspace.WORKSPACE_ROOT).as_posix(),
+        "path": soul_path.relative_to(ws).as_posix(),
         "preview": _read_preview(soul_path),
         "is_default": is_default,
     }

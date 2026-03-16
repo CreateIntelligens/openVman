@@ -8,11 +8,10 @@ from typing import Any
 from uuid import uuid4
 
 from infra.db import get_memories_table
+from infra.project_context import get_project_session_store, resolve_project_context
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.session_store import SessionState, SessionStore
 from personas.personas import normalize_persona_id
-
-_session_store: SessionStore | None = None
 
 
 def build_memory_record(
@@ -42,6 +41,7 @@ def add_memory(
     source: str = "user",
     metadata: dict[str, Any] | None = None,
     persona_id: str = "default",
+    project_id: str = "default",
 ) -> dict[str, Any]:
     """寫入一筆記憶並回傳實際寫入內容。"""
     record = build_memory_record(
@@ -51,17 +51,18 @@ def add_memory(
         metadata=metadata,
         persona_id=persona_id,
     )
-    get_memories_table().add([record])
+    get_memories_table(project_id).add([record])
     return record
 
 
 def get_or_create_session(
     session_id: str | None = None,
     persona_id: str = "default",
+    project_id: str = "default",
 ) -> SessionState:
     """Return an existing chat session or create a new one."""
     session_key = (session_id or "").strip() or str(uuid4())
-    return get_session_store().get_or_create_session(session_key, persona_id)
+    return get_session_store(project_id).get_or_create_session(session_key, persona_id)
 
 
 def append_session_message(
@@ -69,26 +70,29 @@ def append_session_message(
     persona_id: str,
     role: str,
     content: str,
+    project_id: str = "default",
 ) -> SessionState:
     """Append a message to the session and enforce max rounds."""
-    return get_session_store().append_message(session_id, persona_id, role, content)
+    return get_session_store(project_id).append_message(session_id, persona_id, role, content)
 
 
 def list_session_messages(
     session_id: str,
     persona_id: str | None = None,
+    project_id: str = "default",
 ) -> list[dict[str, str]]:
     """Return serialized session messages for APIs and prompt building."""
-    messages = get_session_store().list_messages(session_id, persona_id)
+    messages = get_session_store(project_id).list_messages(session_id, persona_id)
     return [dict(message) for message in messages]
 
 
 def get_session_updated_at(
     session_id: str,
     persona_id: str | None = None,
+    project_id: str = "default",
 ) -> str | None:
     """Return the session updated_at timestamp without mutating session state."""
-    return get_session_store().get_session_updated_at(session_id, persona_id)
+    return get_session_store(project_id).get_session_updated_at(session_id, persona_id)
 
 
 def archive_session_turn(
@@ -96,9 +100,10 @@ def archive_session_turn(
     user_message: str,
     assistant_message: str,
     persona_id: str = "default",
+    project_id: str = "default",
 ) -> None:
     """Append the latest conversation turn into the daily markdown log."""
-    root = ensure_workspace_scaffold()
+    root = ensure_workspace_scaffold(project_id)
     persona_key = normalize_persona_id(persona_id)
     log_dir = root / "memory"
     if persona_key != "default":
@@ -118,8 +123,6 @@ def archive_session_turn(
         handle.write(f"### Assistant\n{assistant_message.strip()}\n\n")
 
 
-def get_session_store() -> SessionStore:
-    global _session_store
-    if _session_store is None:
-        _session_store = SessionStore()
-    return _session_store
+def get_session_store(project_id: str = "default") -> SessionStore:
+    ctx = resolve_project_context(project_id)
+    return get_project_session_store(ctx)

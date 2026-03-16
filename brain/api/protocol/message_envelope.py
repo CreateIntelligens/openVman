@@ -17,6 +17,7 @@ class RequestContext:
     channel: str
     locale: str
     persona_id: str
+    project_id: str
     client_ip: str
     metadata: dict[str, Any]
 
@@ -39,6 +40,7 @@ class BrainMessage:
     trace_id: str
     session_id: str | None
     persona_id: str
+    project_id: str
     locale: str
     channel: str
     metadata: dict[str, Any]
@@ -73,6 +75,10 @@ def build_message_envelope(
         persona_id=_read_text(body, "persona_id")
         or _read_text(message_payload, "persona_id")
         or "default",
+        project_id=_read_text(body, "project_id")
+        or _read_text(message_payload, "project_id")
+        or _read_text(dict(request.headers), "x-brain-project")
+        or "default",
         client_ip=request.client.host if request.client else "",
         metadata=_merge_metadata(body.get("metadata"), message_payload.get("metadata")),
     )
@@ -92,6 +98,7 @@ def normalize_to_brain_message(envelope: MessageEnvelope) -> BrainMessage:
         trace_id=ctx.trace_id,
         session_id=ctx.session_id,
         persona_id=ctx.persona_id,
+        project_id=ctx.project_id,
         locale=ctx.locale,
         channel=ctx.channel,
         metadata=dict(ctx.metadata),
@@ -111,6 +118,7 @@ def create_brain_message(
         trace_id=context.trace_id,
         session_id=context.session_id,
         persona_id=context.persona_id,
+        project_id=context.project_id,
         locale=context.locale,
         channel=context.channel,
         metadata=dict(context.metadata),

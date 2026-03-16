@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent / "data" / "workspace"
+from infra.project_context import resolve_project_context
+
+# ---------------------------------------------------------------------------
+# Backward-compatible module-level constants (always point to "default" project)
+# ---------------------------------------------------------------------------
+
+WORKSPACE_ROOT = resolve_project_context("default").workspace_root
 ALLOWED_DOCUMENT_SUFFIXES = {".md", ".txt", ".csv"}
 ALLOWED_CODE_SUFFIXES = {
     ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs",
@@ -92,26 +98,50 @@ WORKSPACE_TEMPLATES = {
 }
 
 
-def ensure_workspace_scaffold() -> Path:
+# ---------------------------------------------------------------------------
+# Project-aware helpers
+# ---------------------------------------------------------------------------
+
+def get_workspace_root(project_id: str = "default") -> Path:
+    """Return the workspace root for a given project."""
+    return resolve_project_context(project_id).workspace_root
+
+
+def get_core_documents(project_id: str = "default") -> dict[str, Path]:
+    """Return the core document map for a given project."""
+    ws = get_workspace_root(project_id)
+    return {
+        "soul": ws / "SOUL.md",
+        "agents": ws / "AGENTS.md",
+        "tools": ws / "TOOLS.md",
+        "memory": ws / "MEMORY.md",
+        "learnings": ws / ".learnings" / "LEARNINGS.md",
+        "errors": ws / ".learnings" / "ERRORS.md",
+        "memory_summaries": ws / ".learnings" / "MEMORY_SUMMARIES.md",
+    }
+
+
+def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     """Ensure the workspace root, core docs, and support directories exist."""
-    WORKSPACE_ROOT.mkdir(parents=True, exist_ok=True)
-    (WORKSPACE_ROOT / "memory").mkdir(parents=True, exist_ok=True)
-    (WORKSPACE_ROOT / ".learnings").mkdir(parents=True, exist_ok=True)
-    (WORKSPACE_ROOT / "personas").mkdir(parents=True, exist_ok=True)
+    ws = get_workspace_root(project_id)
+    ws.mkdir(parents=True, exist_ok=True)
+    (ws / "memory").mkdir(parents=True, exist_ok=True)
+    (ws / ".learnings").mkdir(parents=True, exist_ok=True)
+    (ws / "personas").mkdir(parents=True, exist_ok=True)
 
     for relative_path, template in WORKSPACE_TEMPLATES.items():
-        path = WORKSPACE_ROOT / relative_path
+        path = ws / relative_path
         if path.exists():
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(template, encoding="utf-8")
 
-    return WORKSPACE_ROOT
+    return ws
 
 
-def resolve_workspace_document(relative_path: str) -> Path:
+def resolve_workspace_document(relative_path: str, project_id: str = "default") -> Path:
     """Resolve a relative document path safely within the workspace."""
-    root = ensure_workspace_scaffold().resolve()
+    root = ensure_workspace_scaffold(project_id).resolve()
     cleaned = relative_path.strip()
     relative = Path(cleaned)
 
@@ -129,21 +159,21 @@ def resolve_workspace_document(relative_path: str) -> Path:
     return resolved
 
 
-def load_core_workspace_context(persona_id: str = "default") -> dict[str, str]:
+def load_core_workspace_context(persona_id: str = "default", project_id: str = "default") -> dict[str, str]:
     """Load the core markdown files used to steer chat generation."""
     from personas.personas import resolve_core_document_paths
 
-    ensure_workspace_scaffold()
-    document_paths = resolve_core_document_paths(persona_id)
+    ensure_workspace_scaffold(project_id)
+    document_paths = resolve_core_document_paths(persona_id, project_id=project_id)
     return {
         key: path.read_text(encoding="utf-8-sig").strip()
         for key, path in document_paths.items()
     }
 
 
-def is_indexable_document(path: Path) -> bool:
+def is_indexable_document(path: Path, project_id: str = "default") -> bool:
     """Return whether a workspace file should be embedded into knowledge."""
-    relative = path.relative_to(ensure_workspace_scaffold()).as_posix()
+    relative = path.relative_to(ensure_workspace_scaffold(project_id)).as_posix()
     if relative in RESERVED_INDEX_PATHS:
         return False
     if _is_persona_core_document(relative):
@@ -151,9 +181,9 @@ def is_indexable_document(path: Path) -> bool:
     return not any(relative.startswith(prefix) for prefix in EXCLUDED_INDEX_PREFIXES)
 
 
-def iter_workspace_documents() -> list[Path]:
+def iter_workspace_documents(project_id: str = "default") -> list[Path]:
     """Return all text-like documents stored in the workspace."""
-    root = ensure_workspace_scaffold()
+    root = ensure_workspace_scaffold(project_id)
     return sorted(
         path
         for path in root.rglob("*")
@@ -161,15 +191,15 @@ def iter_workspace_documents() -> list[Path]:
     )
 
 
-def iter_indexable_documents() -> list[Path]:
+def iter_indexable_documents(project_id: str = "default") -> list[Path]:
     """Return workspace documents (including code files) for the knowledge index."""
-    root = ensure_workspace_scaffold()
+    root = ensure_workspace_scaffold(project_id)
     all_files = sorted(
         path
         for path in root.rglob("*")
         if path.is_file() and path.suffix.lower() in ALLOWED_INDEX_SUFFIXES
     )
-    return [path for path in all_files if is_indexable_document(path)]
+    return [path for path in all_files if is_indexable_document(path, project_id)]
 
 
 def _is_persona_core_document(relative_path: str) -> bool:

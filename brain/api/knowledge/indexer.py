@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -12,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from config import get_settings
-import math
 
 from infra.db import ensure_fts_index, get_db, get_knowledge_table, normalize_vector, parse_record_metadata
+from infra.project_context import resolve_project_context
 from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold, iter_indexable_documents
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
@@ -30,45 +31,43 @@ class ChunkSpec:
     metadata: dict[str, Any]
 
 
-def rebuild_knowledge_index() -> dict[str, Any]:
+def rebuild_knowledge_index(project_id: str = "default") -> dict[str, Any]:
     """Incrementally rebuild the knowledge table from indexable workspace documents."""
-    workspace_root = ensure_workspace_scaffold()
-    documents = iter_indexable_documents()
+    workspace_root = ensure_workspace_scaffold(project_id)
+    documents = iter_indexable_documents(project_id)
     current_fingerprints = {
         path.relative_to(workspace_root).as_posix(): _fingerprint_document(path)
         for path in documents
     }
-    state = _load_index_state()
-    existing_records = _load_existing_knowledge_records()
+    state = _load_index_state(project_id)
+    existing_records = _load_existing_knowledge_records(project_id)
     reusable_records = _collect_reusable_records(existing_records, current_fingerprints)
     reusable_paths = {
         str(parse_record_metadata(record).get("path", "")).strip()
         for record in reusable_records
     }
+    previous_docs = state.get("documents", {})
     changed_paths = [
         path
         for path in documents
-        if (
-            state.get("documents", {}).get(path.relative_to(workspace_root).as_posix())
-            != current_fingerprints[path.relative_to(workspace_root).as_posix()]
-            or path.relative_to(workspace_root).as_posix() not in reusable_paths
-        )
+        for rel in [path.relative_to(workspace_root).as_posix()]
+        if previous_docs.get(rel) != current_fingerprints[rel] or rel not in reusable_paths
     ]
     removed_paths = sorted(set(state.get("documents", {})) - set(current_fingerprints))
 
     chunk_specs: list[ChunkSpec] = []
     for path in changed_paths:
         if path.suffix.lower() == ".csv":
-            chunk_specs.extend(_extract_csv_chunks(path))
+            chunk_specs.extend(_extract_csv_chunks(path, workspace_root))
             continue
-        chunk_specs.extend(_extract_text_chunks(path))
+        chunk_specs.extend(_extract_text_chunks(path, workspace_root))
 
     records = reusable_records + _build_knowledge_records(chunk_specs)
     if not records:
         records = _build_placeholder_records()
-    get_db().create_table("knowledge", data=records, mode="overwrite")
-    ensure_fts_index("knowledge")
-    _save_index_state(current_fingerprints)
+    get_db(project_id).create_table("knowledge", data=records, mode="overwrite")
+    ensure_fts_index("knowledge", project_id)
+    _save_index_state(current_fingerprints, project_id)
 
     return {
         "status": "ok",
@@ -81,10 +80,11 @@ def rebuild_knowledge_index() -> dict[str, Any]:
     }
 
 
-def _extract_text_chunks(path: Path) -> list[ChunkSpec]:
+def _extract_text_chunks(path: Path, workspace_root: Path | None = None) -> list[ChunkSpec]:
     content = path.read_text(encoding="utf-8-sig")
     title = path.stem
-    relative_path = path.relative_to(ensure_workspace_scaffold()).as_posix()
+    ws = workspace_root or ensure_workspace_scaffold()
+    relative_path = path.relative_to(ws).as_posix()
     fingerprint = _fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
 
@@ -618,9 +618,10 @@ def _chunk_paragraphs(
     return chunks
 
 
-def _extract_csv_chunks(path: Path) -> list[ChunkSpec]:
+def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[ChunkSpec]:
     chunks: list[ChunkSpec] = []
-    relative_path = path.relative_to(ensure_workspace_scaffold()).as_posix()
+    ws = workspace_root or ensure_workspace_scaffold()
+    relative_path = path.relative_to(ws).as_posix()
     title = path.stem
     fingerprint = _fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
@@ -718,11 +719,11 @@ def _fingerprint_document(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _load_existing_knowledge_records() -> list[dict[str, Any]]:
-    db = get_db()
+def _load_existing_knowledge_records(project_id: str = "default") -> list[dict[str, Any]]:
+    db = get_db(project_id)
     if "knowledge" not in db.table_names():
         return []
-    return get_knowledge_table().to_arrow().to_pylist()
+    return get_knowledge_table(project_id).to_arrow().to_pylist()
 
 
 def _collect_reusable_records(
@@ -744,9 +745,9 @@ def _collect_reusable_records(
     return reusable
 
 
-def _load_index_state() -> dict[str, Any]:
-    cfg = get_settings()
-    path = Path(cfg.knowledge_index_state_resolved_path)
+def _load_index_state(project_id: str = "default") -> dict[str, Any]:
+    ctx = resolve_project_context(project_id)
+    path = ctx.index_state_path
     if not path.exists():
         return {}
     try:
@@ -756,9 +757,9 @@ def _load_index_state() -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _save_index_state(documents: dict[str, str]) -> None:
-    cfg = get_settings()
-    path = Path(cfg.knowledge_index_state_resolved_path)
+def _save_index_state(documents: dict[str, str], project_id: str = "default") -> None:
+    ctx = resolve_project_context(project_id)
+    path = ctx.index_state_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(

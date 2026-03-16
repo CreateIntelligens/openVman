@@ -9,13 +9,14 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from config import get_settings
-from knowledge.workspace import WORKSPACE_ROOT, resolve_workspace_document
+from knowledge.workspace import get_workspace_root, resolve_workspace_document
 from memory.embedder import encode_text
 from memory.retrieval import search_records
 from tools.mock_data import FAQ_ENTRIES, ORDER_RECORDS
 
 ToolHandler = Callable[[dict[str, Any]], Any]
 _active_persona_id: ContextVar[str] = ContextVar("brain_active_persona_id", default="default")
+_active_project_id: ContextVar[str] = ContextVar("brain_active_project_id", default="default")
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +65,7 @@ def _search_tool(table_name: str, query: str, top_k: int) -> dict[str, Any]:
         query_vector=encode_text(query.strip()),
         top_k=max(1, min(int(top_k), 8)),
         persona_id=_active_persona_id.get(),
+        project_id=_active_project_id.get(),
     )
     return {
         "table": table_name,
@@ -81,12 +83,14 @@ def _make_search_handler(table_name: str) -> ToolHandler:
 
 def _get_document(args: dict[str, Any]) -> dict[str, Any]:
     cfg = get_settings()
-    path = resolve_workspace_document(str(args.get("path", "")).strip())
+    project_id = _active_project_id.get()
+    ws = get_workspace_root(project_id)
+    path = resolve_workspace_document(str(args.get("path", "")).strip(), project_id)
     content = path.read_text(encoding="utf-8-sig")
     limit = max(200, cfg.tool_document_char_limit)
     truncated = content[:limit]
     return {
-        "path": path.relative_to(WORKSPACE_ROOT).as_posix(),
+        "path": path.relative_to(ws).as_posix(),
         "content": truncated,
         "truncated": len(content) > len(truncated),
         "size": len(content),
@@ -210,9 +214,12 @@ def get_tool_registry() -> ToolRegistry:
 
 
 @contextmanager
-def bind_tool_persona(persona_id: str):
-    token = _active_persona_id.set(persona_id or "default")
+def bind_tool_context(persona_id: str, project_id: str = "default"):
+    """Bind both persona and project context for tool execution."""
+    persona_token = _active_persona_id.set(persona_id or "default")
+    project_token = _active_project_id.set(project_id or "default")
     try:
         yield
     finally:
-        _active_persona_id.reset(token)
+        _active_persona_id.reset(persona_token)
+        _active_project_id.reset(project_token)

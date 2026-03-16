@@ -2,9 +2,9 @@
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from time import perf_counter
-from typing import AsyncIterator
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -26,6 +26,12 @@ from core.sse_events import (
     sse_event_to_dict,
 )
 from infra.db import ensure_tables, get_db
+from infra.project_admin import (
+    create_project,
+    delete_project,
+    get_project_info,
+    list_projects,
+)
 from knowledge.indexer import rebuild_knowledge_index
 from knowledge.knowledge_admin import (
     list_workspace_documents,
@@ -59,16 +65,17 @@ def get_request_text(body: dict[str, object], key: str, default: str = "") -> st
     return str(body.get(key, default)).strip()
 
 
-def build_health_payload() -> dict[str, object]:
+def build_health_payload(project_id: str = "default") -> dict[str, object]:
     """組裝 health response。"""
     cfg = get_settings()
-    db = get_db()
+    db = get_db(project_id)
     metrics = get_metrics_store().snapshot()
     return {
         "status": "ok",
+        "project_id": project_id,
         "tables": db.table_names(),
-        "workspace_documents": len(list_workspace_documents()),
-        "personas": len(list_personas()),
+        "workspace_documents": len(list_workspace_documents(project_id)),
+        "personas": len(list_personas(project_id)),
         "chat_enabled": True,
         "embedding_model": cfg.embedding_model,
         "llm_provider": cfg.brain_llm_provider,
@@ -83,10 +90,10 @@ def build_health_payload() -> dict[str, object]:
 async def warmup_resources() -> None:
     """背景預熱重資源，避免第一個請求承擔初始化成本。"""
     logger.info("背景預熱開始...")
-    ensure_workspace_scaffold()
+    ensure_workspace_scaffold("default")
     await asyncio.to_thread(get_embedder)
-    await asyncio.to_thread(ensure_tables)
-    await asyncio.to_thread(maybe_run_memory_maintenance, True)
+    await asyncio.to_thread(ensure_tables, "default")
+    await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
     logger.info("背景預熱完成")
 
 
@@ -104,8 +111,13 @@ async def cancel_task(task: asyncio.Task[None] | None) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """啟動時先讓服務可用，再背景預熱重資源。"""
     logger.info("初始化 LanceDB 連線...")
-    ensure_workspace_scaffold()
-    get_db()
+    ensure_workspace_scaffold("default")
+    get_db("default")
+
+    # Run data migration if needed
+    from scripts.migrate_to_projects import run_migration
+    await asyncio.to_thread(run_migration)
+
     app.state.warmup_task = asyncio.create_task(warmup_resources())
     logger.info("大腦層就緒")
     yield
@@ -179,9 +191,13 @@ async def metrics_middleware(request: Request, call_next):
     return response
 
 
+# ---------------------------------------------------------------------------
+# Health & Metrics
+# ---------------------------------------------------------------------------
+
 @app.get("/api/health")
-async def health():
-    return build_health_payload()
+async def health(project_id: str = "default"):
+    return build_health_payload(project_id)
 
 
 @app.get("/api/metrics")
@@ -189,9 +205,56 @@ async def metrics():
     return get_metrics_store().snapshot()
 
 
+# ---------------------------------------------------------------------------
+# Project Admin
+# ---------------------------------------------------------------------------
+
+@app.get("/api/admin/projects")
+async def admin_list_projects():
+    projects = list_projects()
+    return {"projects": projects, "project_count": len(projects)}
+
+
+@app.post("/api/admin/projects")
+async def admin_create_project(request: Request):
+    body = await request.json()
+    project_id = get_request_text(body, "project_id")
+    label = get_request_text(body, "label")
+    try:
+        result = create_project(project_id, label)
+        log_event("project_created", project_id=project_id)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/admin/projects")
+async def admin_delete_project(request: Request):
+    body = await request.json()
+    project_id = get_request_text(body, "project_id")
+    try:
+        result = delete_project(project_id)
+        log_event("project_deleted", project_id=project_id)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/admin/projects/{project_id}")
+async def admin_get_project(project_id: str):
+    try:
+        return get_project_info(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Personas
+# ---------------------------------------------------------------------------
+
 @app.get("/api/personas")
-async def personas():
-    items = list_personas()
+async def personas(project_id: str = "default"):
+    items = list_personas(project_id)
     return {"personas": items, "persona_count": len(items)}
 
 
@@ -200,9 +263,10 @@ async def create_persona(request: Request):
     body = await request.json()
     persona_id = get_request_text(body, "persona_id")
     label = get_request_text(body, "label")
+    project_id = get_request_text(body, "project_id") or "default"
     try:
-        result = create_persona_scaffold(persona_id, label)
-        log_event("persona_created", persona_id=persona_id)
+        result = create_persona_scaffold(persona_id, label, project_id)
+        log_event("persona_created", persona_id=persona_id, project_id=project_id)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -212,9 +276,10 @@ async def create_persona(request: Request):
 async def delete_persona(request: Request):
     body = await request.json()
     persona_id = get_request_text(body, "persona_id")
+    project_id = get_request_text(body, "project_id") or "default"
     try:
-        result = delete_persona_scaffold(persona_id)
-        log_event("persona_deleted", persona_id=persona_id)
+        result = delete_persona_scaffold(persona_id, project_id)
+        log_event("persona_deleted", persona_id=persona_id, project_id=project_id)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -225,17 +290,23 @@ async def clone_persona(request: Request):
     body = await request.json()
     source_persona_id = get_request_text(body, "source_persona_id")
     target_persona_id = get_request_text(body, "target_persona_id")
+    project_id = get_request_text(body, "project_id") or "default"
     try:
-        result = clone_persona_scaffold(source_persona_id, target_persona_id)
+        result = clone_persona_scaffold(source_persona_id, target_persona_id, project_id)
         log_event(
             "persona_cloned",
             source_persona_id=source_persona_id,
             target_persona_id=target_persona_id,
+            project_id=project_id,
         )
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+
+# ---------------------------------------------------------------------------
+# Protocol Validation
+# ---------------------------------------------------------------------------
 
 @app.post("/api/protocol/validate")
 async def protocol_validate(request: Request):
@@ -266,6 +337,10 @@ async def protocol_validate(request: Request):
         }
 
 
+# ---------------------------------------------------------------------------
+# Embedding
+# ---------------------------------------------------------------------------
+
 @app.post("/api/embed")
 async def embed(request: Request):
     """測試用：向量化文字"""
@@ -282,6 +357,10 @@ async def embed(request: Request):
     }
 
 
+# ---------------------------------------------------------------------------
+# Search & Memory
+# ---------------------------------------------------------------------------
+
 @app.post("/api/search")
 async def search(request: Request):
     """測試用：在 LanceDB 中語意搜尋"""
@@ -290,6 +369,7 @@ async def search(request: Request):
     query = envelope.content
     table_name = body.get("table", "memories")
     top_k = body.get("top_k", 5)
+    project_id = envelope.context.project_id
 
     if not query:
         raise HTTPException(status_code=400, detail="query 不可為空")
@@ -307,6 +387,7 @@ async def search(request: Request):
         query_vector=query_vec,
         top_k=top_k,
         persona_id=envelope.context.persona_id,
+        project_id=project_id,
     )
     log_event(
         "search_complete",
@@ -314,6 +395,7 @@ async def search(request: Request):
         table=table_name,
         top_k=top_k,
         result_count=len(results),
+        project_id=project_id,
     )
 
     return {
@@ -331,6 +413,7 @@ async def add_memory(request: Request):
     envelope = build_message_envelope(request, body, content_key="text")
     text = envelope.content
     source = body.get("source", "user")
+    project_id = envelope.context.project_id
 
     if not text:
         raise HTTPException(status_code=400, detail="text 不可為空")
@@ -347,11 +430,13 @@ async def add_memory(request: Request):
         source=source,
         metadata=body.get("metadata", {}),
         persona_id=envelope.context.persona_id,
+        project_id=project_id,
     )
     log_event(
         "memory_added",
         trace_id=envelope.context.trace_id,
         source=source,
+        project_id=project_id,
     )
 
     return {
@@ -360,6 +445,10 @@ async def add_memory(request: Request):
         "text": text,
     }
 
+
+# ---------------------------------------------------------------------------
+# Chat Generation
+# ---------------------------------------------------------------------------
 
 @app.post("/api/generate")
 async def generate(request: Request):
@@ -376,6 +465,7 @@ async def generate(request: Request):
             trace_id=context.trace_id,
             session_id=context.session_id,
             tool_steps=len(result.tool_steps),
+            project_id=context.project_id,
         )
         return response
     except ValueError as exc:
@@ -411,21 +501,25 @@ async def generate_stream(request: Request):
 
 
 @app.get("/api/chat/history")
-async def get_chat_history(session_id: str, persona_id: str = "default"):
+async def get_chat_history(session_id: str, persona_id: str = "default", project_id: str = "default"):
     try:
-        session = get_or_create_session(session_id, persona_id)
+        session = get_or_create_session(session_id, persona_id, project_id=project_id)
         return {
             "session_id": session.session_id,
             "persona_id": session.persona_id,
-            "history": list_session_messages(session.session_id, session.persona_id),
+            "history": list_session_messages(session.session_id, session.persona_id, project_id=project_id),
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+# ---------------------------------------------------------------------------
+# Knowledge Admin
+# ---------------------------------------------------------------------------
+
 @app.get("/api/admin/knowledge/documents")
-async def list_knowledge_documents():
-    documents = list_workspace_documents()
+async def list_knowledge_documents(project_id: str = "default"):
+    documents = list_workspace_documents(project_id)
     return {
         "documents": documents,
         "document_count": len(documents),
@@ -433,9 +527,9 @@ async def list_knowledge_documents():
 
 
 @app.get("/api/admin/knowledge/document")
-async def get_knowledge_document(path: str):
+async def get_knowledge_document(path: str, project_id: str = "default"):
     try:
-        return read_workspace_document(path)
+        return read_workspace_document(path, project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
@@ -447,9 +541,10 @@ async def put_knowledge_document(request: Request):
     body = await request.json()
     path = get_request_text(body, "path")
     content = str(body.get("content", ""))
+    project_id = get_request_text(body, "project_id") or "default"
 
     try:
-        document = save_workspace_document(path, content)
+        document = save_workspace_document(path, content, project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -461,9 +556,10 @@ async def post_move_knowledge_document(request: Request):
     body = await request.json()
     source_path = get_request_text(body, "source_path")
     target_path = get_request_text(body, "target_path")
+    project_id = get_request_text(body, "project_id") or "default"
 
     try:
-        document = move_workspace_document(source_path, target_path)
+        document = move_workspace_document(source_path, target_path, project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
@@ -476,6 +572,7 @@ async def post_move_knowledge_document(request: Request):
 async def upload_knowledge_documents(
     files: list[UploadFile] = File(...),
     target_dir: str = Form(""),
+    project_id: str = Form("default"),
 ):
     uploaded: list[dict[str, object]] = []
     try:
@@ -485,6 +582,7 @@ async def upload_knowledge_documents(
                     upload.filename or "",
                     await upload.read(),
                     target_dir,
+                    project_id,
                 )
             )
     except UnicodeDecodeError as exc:
@@ -496,10 +594,12 @@ async def upload_knowledge_documents(
 
 
 @app.post("/api/admin/knowledge/reindex")
-async def reindex_knowledge():
+async def reindex_knowledge(request: Request):
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    project_id = get_request_text(body, "project_id") or "default"
     try:
-        result = await asyncio.to_thread(rebuild_knowledge_index)
-        log_event("knowledge_reindex", **result)
+        result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
+        log_event("knowledge_reindex", project_id=project_id, **result)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -510,16 +610,22 @@ async def reindex_knowledge():
 
 
 @app.post("/api/admin/memory/maintain")
-async def maintain_memory():
+async def maintain_memory(request: Request):
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    project_id = get_request_text(body, "project_id") or "default"
     try:
-        result = await asyncio.to_thread(maybe_run_memory_maintenance, True)
-        log_event("memory_maintenance", **result)
+        result = await asyncio.to_thread(maybe_run_memory_maintenance, True, project_id)
+        log_event("memory_maintenance", project_id=project_id, **result)
         return result
     except Exception as exc:  # pragma: no cover - maintenance failures
         log_exception("memory_maintenance_error", exc)
         record_generation_failure("memory_maintain", "maintenance_failure", str(exc))
         raise HTTPException(status_code=500, detail="記憶整理失敗") from exc
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 async def read_generation_request(request: Request):
     body = await request.json()
@@ -542,6 +648,7 @@ async def _stream_generation_events(context: GenerationContext) -> AsyncIterator
             trace_id=context.trace_id,
             session_id=context.session_id,
             tool_steps=tool_count,
+            project_id=context.project_id,
         )
     except asyncio.CancelledError:
         record_generation_failure("stream_generate", "cancelled", context.user_message[:120])

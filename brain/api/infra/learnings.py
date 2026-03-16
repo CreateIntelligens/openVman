@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from knowledge.workspace import CORE_DOCUMENTS, ensure_workspace_scaffold
+from knowledge.workspace import get_core_documents, ensure_workspace_scaffold
 
 _LEARNING_PATTERNS = (
     (re.compile(r"(簡短|簡潔|精簡|直接)"), "使用者偏好簡潔、直接的回答。"),
@@ -17,9 +17,9 @@ _LEARNING_PATTERNS = (
 )
 
 
-def capture_learnings_from_message(user_message: str) -> list[str]:
+def capture_learnings_from_message(user_message: str, project_id: str = "default") -> list[str]:
     """Append stable user preferences into LEARNINGS.md if they are new."""
-    ensure_workspace_scaffold()
+    ensure_workspace_scaffold(project_id)
     normalized = " ".join(user_message.strip().split())
     if not normalized:
         return []
@@ -32,7 +32,8 @@ def capture_learnings_from_message(user_message: str) -> list[str]:
     if not candidates:
         return []
 
-    path = CORE_DOCUMENTS["learnings"]
+    core_docs = get_core_documents(project_id)
+    path = core_docs["learnings"]
     existing = path.read_text(encoding="utf-8-sig")
     appended: list[str] = []
 
@@ -46,10 +47,11 @@ def capture_learnings_from_message(user_message: str) -> list[str]:
     return appended
 
 
-def record_error_event(area: str, summary: str, detail: str = "") -> None:
+def record_error_event(area: str, summary: str, detail: str = "", project_id: str = "default") -> None:
     """Append a timestamped error line into ERRORS.md."""
-    ensure_workspace_scaffold()
-    path = CORE_DOCUMENTS["errors"]
+    ensure_workspace_scaffold(project_id)
+    core_docs = get_core_documents(project_id)
+    path = core_docs["errors"]
     timestamp = datetime.now().isoformat(timespec="seconds")
     line = f"- [{timestamp}] {area}: {summary}"
     if detail.strip():

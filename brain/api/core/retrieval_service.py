@@ -26,6 +26,7 @@ def retrieve_context(
     *,
     query: str,
     persona_id: str = "default",
+    project_id: str = "default",
 ) -> RetrievalBundle:
     """Retrieve and rerank context from knowledge and memory tables.
 
@@ -47,11 +48,11 @@ def retrieve_context(
     # Pass query text to enable hybrid search (vector + FTS)
     knowledge_candidates = _safe_search(
         "knowledge", query_vector, knowledge_top_k * candidate_multiplier, persona_id,
-        query_text=query,
+        query_text=query, project_id=project_id,
     )
     memory_candidates = _safe_search(
         "memories", query_vector, memory_top_k * candidate_multiplier, persona_id,
-        query_text=query,
+        query_text=query, project_id=project_id,
     )
 
     # Rerank: sort by distance with memory bonus, decay, and importance
@@ -92,11 +93,13 @@ def _safe_search(
     persona_id: str,
     *,
     query_text: str = "",
+    project_id: str = "default",
 ) -> list[dict[str, Any]]:
     """Search with error handling — return empty on failure."""
     try:
         return search_records(
-            table_name, query_vector, top_k, persona_id, query_text=query_text,
+            table_name, query_vector, top_k, persona_id,
+            query_text=query_text, project_id=project_id,
         )
     except Exception:
         return []

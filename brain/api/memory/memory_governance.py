@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
 from time import monotonic
@@ -16,7 +16,7 @@ import numpy as np
 
 from config import get_settings
 from infra.db import get_db, get_memories_table, normalize_vector, parse_record_metadata
-from knowledge.workspace import CORE_DOCUMENTS, WORKSPACE_ROOT, ensure_workspace_scaffold
+from knowledge.workspace import get_core_documents, get_workspace_root, ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from memory.importance import score_importance
 from personas.personas import normalize_persona_id
@@ -25,7 +25,7 @@ from safety.observability import log_event
 logger = logging.getLogger(__name__)
 
 _maintenance_lock = Lock()
-_last_maintenance_at = 0.0
+_last_maintenance_at: dict[str, float] = {}
 
 
 @dataclass(slots=True)
@@ -37,27 +37,27 @@ class DailyMemorySummary:
     markdown: str
 
 
-def maybe_run_memory_maintenance(force: bool = False) -> dict[str, Any]:
+def maybe_run_memory_maintenance(force: bool = False, project_id: str = "default") -> dict[str, Any]:
     """Run maintenance on a throttle to avoid heavy work every turn."""
-    global _last_maintenance_at
     cfg = get_settings()
     now = monotonic()
 
     with _maintenance_lock:
-        if not force and now - _last_maintenance_at < cfg.memory_maintenance_interval_seconds:
+        last = _last_maintenance_at.get(project_id, 0.0)
+        if not force and now - last < cfg.memory_maintenance_interval_seconds:
             return {"status": "skipped", "reason": "throttled"}
-        result = run_memory_maintenance()
-        _last_maintenance_at = monotonic()
+        result = run_memory_maintenance(project_id)
+        _last_maintenance_at[project_id] = monotonic()
         return result
 
 
-def run_memory_maintenance() -> dict[str, Any]:
+def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
     """Summarize archived logs and rewrite the memories table without duplicates."""
-    ensure_workspace_scaffold()
-    summaries = _build_daily_summaries()
-    _write_summary_document(summaries)
+    ensure_workspace_scaffold(project_id)
+    summaries = _build_daily_summaries(project_id)
+    _write_summary_document(summaries, project_id)
 
-    existing_records = get_memories_table().to_arrow().to_pylist()
+    existing_records = get_memories_table(project_id).to_arrow().to_pylist()
     deduped = _dedupe_memory_records(existing_records)
     deduped = _semantic_dedupe_records(deduped)
     non_summary = [
@@ -78,7 +78,7 @@ def run_memory_maintenance() -> dict[str, Any]:
             }
         ]
 
-    get_db().create_table("memories", data=curated_records, mode="overwrite")
+    get_db(project_id).create_table("memories", data=curated_records, mode="overwrite")
     return {
         "status": "ok",
         "summary_days": len(summaries),
@@ -96,17 +96,18 @@ def write_summary_and_reindex(
     summary_text: str,
     source_turns: int = 0,
     session_id: str = "",
+    project_id: str = "default",
 ) -> dict[str, Any]:
     """Write a summary block to the daily memory file and trigger reindex.
 
     Returns a status dict with writeback and reindex results.
     Skips writeback if the same fingerprint already exists for (persona_id, day).
     """
-    ensure_workspace_scaffold()
+    ensure_workspace_scaffold(project_id)
     fingerprint = hashlib.sha256(summary_text.encode("utf-8")).hexdigest()
     normalized_persona = normalize_persona_id(persona_id)
 
-    daily_path = _resolve_daily_file(normalized_persona, day)
+    daily_path = _resolve_daily_file(normalized_persona, day, project_id)
 
     # Duplicate check: scan existing summary section for same fingerprint
     if _daily_file_has_fingerprint(daily_path, fingerprint):
@@ -137,7 +138,7 @@ def write_summary_and_reindex(
     )
 
     # Trigger reindex
-    reindex_result = run_memory_maintenance()
+    reindex_result = run_memory_maintenance(project_id)
     return {
         "status": "ok",
         "writeback": "appended",
@@ -146,9 +147,10 @@ def write_summary_and_reindex(
     }
 
 
-def _resolve_daily_file(persona_id: str, day: str) -> Path:
+def _resolve_daily_file(persona_id: str, day: str, project_id: str = "default") -> Path:
     """Resolve the path to a daily memory file."""
-    memory_dir = WORKSPACE_ROOT / "memory" / persona_id
+    ws = get_workspace_root(project_id)
+    memory_dir = ws / "memory" / persona_id
     memory_dir.mkdir(parents=True, exist_ok=True)
     return memory_dir / f"{day}.md"
 
@@ -171,8 +173,6 @@ def _format_summary_block(
     session_id: str,
 ) -> str:
     """Format a stable summary block for appending to the daily file."""
-    from datetime import datetime
-
     ts = datetime.now().isoformat(timespec="seconds")
     lines = [
         f"## {ts} | session {session_id}",
@@ -210,9 +210,10 @@ def _append_summary_block(path: Path, block: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _build_daily_summaries() -> list[DailyMemorySummary]:
+def _build_daily_summaries(project_id: str = "default") -> list[DailyMemorySummary]:
     summaries: list[DailyMemorySummary] = []
-    memory_dir = WORKSPACE_ROOT / "memory"
+    ws = get_workspace_root(project_id)
+    memory_dir = ws / "memory"
     for path in sorted(memory_dir.rglob("*.md")):
         if path.stem == "_summaries":
             continue
@@ -266,8 +267,9 @@ def _build_daily_summaries() -> list[DailyMemorySummary]:
     return summaries
 
 
-def _write_summary_document(summaries: list[DailyMemorySummary]) -> None:
-    path = CORE_DOCUMENTS["memory_summaries"]
+def _write_summary_document(summaries: list[DailyMemorySummary], project_id: str = "default") -> None:
+    core_docs = get_core_documents(project_id)
+    path = core_docs["memory_summaries"]
     lines = ["# 記憶摘要 (MEMORY_SUMMARIES)", ""]
     if not summaries:
         lines.append("- 尚未有可整理的每日對話。")
@@ -419,15 +421,10 @@ def _persona_id_from_memory_path(path: Path, memory_dir: Path) -> str:
 
 
 def _semantic_dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove near-duplicate memory records using cosine similarity.
-
-    Groups records by persona, then compares pairs within each group.
-    When similarity >= threshold, the newer record is kept (merged).
-    """
+    """Remove near-duplicate memory records using cosine similarity."""
     cfg = get_settings()
     threshold = cfg.memory_merge_similarity_threshold
 
-    # Group by persona
     groups: dict[str, list[tuple[int, dict[str, Any]]]] = {}
     for idx, record in enumerate(records):
         persona = _memory_persona_id(record)
@@ -482,7 +479,6 @@ def _find_merge_drops(
 
 
 def _cosine_similarity(vec_a: Any, vec_b: Any) -> float:
-    """Compute cosine similarity between two vectors."""
     a = np.asarray(vec_a, dtype=np.float32)
     b = np.asarray(vec_b, dtype=np.float32)
     dot = np.dot(a, b)
@@ -499,10 +495,6 @@ def _merge_memory_pair(
     idx_b: int,
     record_b: dict[str, Any],
 ) -> tuple[int, int]:
-    """Decide which record to drop when merging a near-duplicate pair.
-
-    Returns (older_idx, newer_idx). The newer record (by date, then index) wins.
-    """
     date_a = str(record_a.get("date", ""))
     date_b = str(record_b.get("date", ""))
 
@@ -510,9 +502,6 @@ def _merge_memory_pair(
         return idx_a, idx_b
     if date_b < date_a:
         return idx_b, idx_a
-    # Same date — higher index is newer
     if idx_a < idx_b:
         return idx_a, idx_b
     return idx_b, idx_a
-
-

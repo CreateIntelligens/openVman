@@ -40,6 +40,7 @@ from tools.tool_executor import parse_tool_result
 class GenerationContext:
     trace_id: str
     persona_id: str
+    project_id: str
     session_id: str
     route: RouteDecision
     user_message: str
@@ -55,6 +56,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     cleaned_message = envelope.content.strip()
     cfg = get_settings()
     persona_id = envelope.context.persona_id
+    project_id = envelope.context.project_id
 
     if not cleaned_message:
         raise ValueError("message 不可為空")
@@ -64,12 +66,12 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     enforce_session_limits(envelope.context.session_id, persona_id)
 
     route = route_message(normalize_to_brain_message(envelope))
-    session = get_or_create_session(envelope.context.session_id, persona_id)
-    prior_messages = list_session_messages(session.session_id, persona_id)
-    append_session_message(session.session_id, persona_id, "user", cleaned_message)
+    session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
+    prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
+    append_session_message(session.session_id, persona_id, "user", cleaned_message, project_id=project_id)
 
     knowledge_results, memory_results, retrieval_diagnostics = _retrieve_rag_context(
-        route, cleaned_message, persona_id,
+        route, cleaned_message, persona_id, project_id=project_id,
     )
     request_ctx = serialize_context(envelope.context)
     prompt_messages = build_chat_messages(
@@ -83,6 +85,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     return GenerationContext(
         trace_id=envelope.context.trace_id,
         persona_id=persona_id,
+        project_id=project_id,
         session_id=session.session_id,
         route=route,
         user_message=cleaned_message,
@@ -98,11 +101,13 @@ def _retrieve_rag_context(
     route: RouteDecision,
     message: str,
     persona_id: str,
+    *,
+    project_id: str = "default",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     """Fetch knowledge and memory results when RAG is enabled for this route."""
     if route.skip_rag:
         return [], [], {}
-    bundle = retrieve_context(query=message, persona_id=persona_id)
+    bundle = retrieve_context(query=message, persona_id=persona_id, project_id=project_id)
     return bundle.knowledge_results, bundle.memory_results, bundle.diagnostics
 
 
@@ -112,15 +117,16 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
     if not cleaned_reply:
         raise ValueError("LLM 沒有回傳內容")
 
-    append_session_message(context.session_id, context.persona_id, "assistant", cleaned_reply)
+    append_session_message(context.session_id, context.persona_id, "assistant", cleaned_reply, project_id=context.project_id)
     archive_session_turn(
         context.session_id,
         context.user_message,
         cleaned_reply,
         context.persona_id,
+        project_id=context.project_id,
     )
-    learnings_added = capture_learnings_from_message(context.user_message)
-    maintenance = maybe_run_memory_maintenance()
+    learnings_added = capture_learnings_from_message(context.user_message, project_id=context.project_id)
+    maintenance = maybe_run_memory_maintenance(project_id=context.project_id)
 
     writeback = write_summary_and_reindex(
         persona_id=context.persona_id,
@@ -128,6 +134,7 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         summary_text=f"User: {context.user_message[:200]}\nAssistant: {cleaned_reply[:200]}",
         source_turns=1,
         session_id=context.session_id,
+        project_id=context.project_id,
     )
 
     return {
@@ -139,7 +146,7 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         "knowledge_results": context.knowledge_results,
         "memory_results": context.memory_results,
         "retrieval_diagnostics": context.retrieval_diagnostics,
-        "history": list_session_messages(context.session_id, context.persona_id),
+        "history": list_session_messages(context.session_id, context.persona_id, project_id=context.project_id),
         "learnings_added": learnings_added,
         "memory_maintenance": maintenance,
         "memory_writeback": writeback,
@@ -210,7 +217,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             tool_steps=[],
         )
     try:
-        return run_agent_loop(context.prompt_messages, persona_id=context.persona_id)
+        return run_agent_loop(context.prompt_messages, persona_id=context.persona_id, project_id=context.project_id)
     except ToolPhaseError as exc:
         fallback_messages = _fallback_messages_for_tool_phase_error(context, exc)
         reply = generate_chat_reply(fallback_messages)
@@ -247,6 +254,7 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
                 prepare_agent_reply,
                 context.prompt_messages,
                 context.persona_id,
+                context.project_id,
             )
             stream_messages = prepared.messages
             tool_steps = prepared.tool_steps

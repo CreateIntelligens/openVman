@@ -9,11 +9,10 @@ from typing import Any
 
 import lancedb
 
-from config import get_settings
+from infra.project_context import get_project_db, resolve_project_context
 from memory.embedder import encode_text
 
-_db: lancedb.DBConnection | None = None
-_tables_ready = False
+_tables_ready: set[str] = set()
 _tables_lock = Lock()
 
 TABLE_SEED_TEXTS = {
@@ -22,29 +21,23 @@ TABLE_SEED_TEXTS = {
 }
 
 
-def get_db() -> lancedb.DBConnection:
-    """Singleton 取得 LanceDB 連線。"""
-    global _db
-    if _db is not None:
-        return _db
-
-    cfg = get_settings()
-    _db = lancedb.connect(cfg.lancedb_resolved_path)
-    return _db
+def get_db(project_id: str = "default") -> lancedb.DBConnection:
+    """取得指定專案的 LanceDB 連線。"""
+    ctx = resolve_project_context(project_id)
+    return get_project_db(ctx)
 
 
-def ensure_tables() -> None:
+def ensure_tables(project_id: str = "default") -> None:
     """確保所需資料表存在，不存在則以初始資料建立。"""
-    global _tables_ready
-    if _tables_ready:
+    if project_id in _tables_ready:
         return
 
     with _tables_lock:
-        if _tables_ready:
+        if project_id in _tables_ready:
             return
 
-        _create_missing_tables(get_db())
-        _tables_ready = True
+        _create_missing_tables(get_db(project_id))
+        _tables_ready.add(project_id)
 
 
 def _create_missing_tables(db: lancedb.DBConnection) -> None:
@@ -66,15 +59,15 @@ def _build_seed_record(text: str) -> dict[str, Any]:
     }
 
 
-def get_table(table_name: str) -> lancedb.table.Table:
+def get_table(table_name: str, project_id: str = "default") -> lancedb.table.Table:
     """依表名開啟 LanceDB 資料表。"""
-    ensure_tables()
-    return get_db().open_table(table_name)
+    ensure_tables(project_id)
+    return get_db(project_id).open_table(table_name)
 
 
-def ensure_fts_index(table_name: str) -> None:
+def ensure_fts_index(table_name: str, project_id: str = "default") -> None:
     """Create a full-text search index on the text column if not already present."""
-    table = get_table(table_name)
+    table = get_table(table_name, project_id)
     try:
         table.create_fts_index("text", replace=True)
     except Exception:
@@ -82,14 +75,14 @@ def ensure_fts_index(table_name: str) -> None:
         pass
 
 
-def get_memories_table() -> lancedb.table.Table:
+def get_memories_table(project_id: str = "default") -> lancedb.table.Table:
     """取得 memories 表"""
-    return get_table("memories")
+    return get_table("memories", project_id)
 
 
-def get_knowledge_table() -> lancedb.table.Table:
+def get_knowledge_table(project_id: str = "default") -> lancedb.table.Table:
     """取得 knowledge 表"""
-    return get_table("knowledge")
+    return get_table("knowledge", project_id)
 
 
 def parse_record_metadata(record: dict[str, Any]) -> dict[str, Any]:

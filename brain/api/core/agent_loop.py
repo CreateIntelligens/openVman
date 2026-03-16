@@ -8,7 +8,7 @@ from typing import Any
 from config import get_settings
 from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn
 from tools.tool_executor import execute_tool_call
-from tools.tool_registry import bind_tool_persona, get_tool_registry
+from tools.tool_registry import bind_tool_context, get_tool_registry
 
 
 class ToolPhaseError(Exception):
@@ -44,9 +44,10 @@ class PreparedAgentReply:
 def run_agent_loop(
     messages: list[dict[str, Any]],
     persona_id: str = "default",
+    project_id: str = "default",
 ) -> AgentLoopResult:
     """Run a bounded think -> tool -> observe loop until the model returns text."""
-    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id)
+    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id)
     if final_turn is None:
         raise ToolPhaseError(
             "工具調用超出最大輪次",
@@ -62,13 +63,14 @@ def run_agent_loop(
 def prepare_agent_reply(
     messages: list[dict[str, Any]],
     persona_id: str = "default",
+    project_id: str = "default",
 ) -> PreparedAgentReply:
     """Run only the tool turns, returning messages ready for a final streaming call.
 
     Unlike run_agent_loop, this does NOT make the final text completion.
     The caller is expected to stream the final reply via stream_chat_reply().
     """
-    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id)
+    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id)
     if final_turn is None:
         raise ToolPhaseError(
             "工具調用超出最大輪次",
@@ -81,6 +83,7 @@ def prepare_agent_reply(
 def _run_tool_phase(
     messages: list[dict[str, Any]],
     persona_id: str,
+    project_id: str = "default",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
     """Execute tool call rounds until the LLM returns a text turn or rounds are exhausted.
 
@@ -92,7 +95,7 @@ def _run_tool_phase(
     tool_steps: list[dict[str, Any]] = []
     tools = get_tool_registry().build_openai_tools()
 
-    with bind_tool_persona(persona_id):
+    with bind_tool_context(persona_id, project_id):
         for _ in range(max(1, cfg.agent_loop_max_rounds)):
             turn = generate_chat_turn(working_messages, tools=tools)
             if turn.tool_calls:

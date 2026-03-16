@@ -20,8 +20,9 @@ if str(_API_ROOT) not in sys.path:
 def main() -> None:
     from knowledge.indexer import rebuild_knowledge_index
 
+    project_id = sys.argv[1] if len(sys.argv) > 1 else "default"
     try:
-        result = rebuild_knowledge_index()
+        result = rebuild_knowledge_index(project_id=project_id)
     except Exception as exc:
         print(f"[reindex] 索引失敗: {exc}", file=sys.stderr)
         sys.exit(1)

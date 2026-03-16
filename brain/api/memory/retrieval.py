@@ -11,11 +11,11 @@ from personas.personas import normalize_persona_id
 logger = logging.getLogger(__name__)
 
 
-def get_search_table(table_name: str):
+def get_search_table(table_name: str, project_id: str = "default"):
     """根據請求表名回傳對應資料表，維持既有預設行為。"""
     if table_name == "memories":
-        return get_memories_table()
-    return get_knowledge_table()
+        return get_memories_table(project_id)
+    return get_knowledge_table(project_id)
 
 
 def search_records(
@@ -25,6 +25,7 @@ def search_records(
     persona_id: str = "default",
     *,
     query_text: str = "",
+    project_id: str = "default",
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
 
@@ -33,7 +34,7 @@ def search_records(
     """
     normalized_persona = normalize_persona_id(persona_id)
     limit = max(top_k, 1)
-    table = get_search_table(table_name)
+    table = get_search_table(table_name, project_id)
 
     raw_records = _hybrid_search(table, query_vector, query_text, limit * 4)
 
