@@ -105,9 +105,7 @@ def archive_session_turn(
     """Append the latest conversation turn into the daily markdown log."""
     root = ensure_workspace_scaffold(project_id)
     persona_key = normalize_persona_id(persona_id)
-    log_dir = root / "memory"
-    if persona_key != "default":
-        log_dir = log_dir / persona_key
+    log_dir = root / "memory" / persona_key
     log_dir.mkdir(parents=True, exist_ok=True)
 
     today = date.today().isoformat()
