@@ -70,8 +70,8 @@ class TestFallbackMetrics:
 
     def test_failure_records_provider_failure_counter(self):
         svc = TTSRouterService(_make_config())
-        svc._aws.synthesize = MagicMock(side_effect=RuntimeError("aws down"))  # type: ignore[method-assign]
-        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(side_effect=RuntimeError("gcp down"))  # type: ignore[method-assign]
+        svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
         svc.synthesize(SynthesizeRequest(text="hello"))
         snap = get_metrics_snapshot()
@@ -81,8 +81,8 @@ class TestFallbackMetrics:
 
     def test_fallback_hop_is_recorded(self):
         svc = TTSRouterService(_make_config())
-        svc._aws.synthesize = MagicMock(side_effect=RuntimeError("aws fail"))  # type: ignore[method-assign]
-        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(side_effect=RuntimeError("gcp fail"))  # type: ignore[method-assign]
+        svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
         svc.synthesize(SynthesizeRequest(text="hello"))
         snap = get_metrics_snapshot()
@@ -91,8 +91,8 @@ class TestFallbackMetrics:
         assert len(hop_keys) >= 1
         # Verify from/to targets
         hop_key = hop_keys[0]
-        assert "aws-polly" in hop_key
         assert "gcp-tts" in hop_key
+        assert "aws-polly" in hop_key
 
     def test_chain_exhausted_is_recorded(self):
         svc = TTSRouterService(_make_config())
@@ -108,7 +108,7 @@ class TestFallbackMetrics:
 
     def test_latency_is_recorded(self):
         svc = TTSRouterService(_make_config())
-        svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
         svc.synthesize(SynthesizeRequest(text="hello"))
         snap = get_metrics_snapshot()
@@ -119,17 +119,17 @@ class TestFallbackMetrics:
 
     def test_provider_request_counter(self):
         svc = TTSRouterService(_make_config())
-        svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
         svc.synthesize(SynthesizeRequest(text="hello"))
         snap = get_metrics_snapshot()
 
-        req_keys = [k for k in snap["counters"] if "tts_provider_requests_total" in k and "aws" in k]
+        req_keys = [k for k in snap["counters"] if "tts_provider_requests_total" in k and "gcp" in k]
         assert len(req_keys) >= 1
 
     def test_events_contain_route_attempt(self):
         svc = TTSRouterService(_make_config())
-        svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
         svc.synthesize(SynthesizeRequest(text="hello"))
         snap = get_metrics_snapshot()
@@ -138,14 +138,14 @@ class TestFallbackMetrics:
         assert len(route_events) >= 1
         evt = route_events[0]
         assert evt["kind"] == "provider"
-        assert evt["target"] == "aws-polly"
+        assert evt["target"] == "gcp-tts"
         assert evt["result"] == "success"
         assert "latency_ms" in evt
 
     def test_fallback_hop_event_contains_from_to(self):
         svc = TTSRouterService(_make_config())
-        svc._aws.synthesize = MagicMock(side_effect=RuntimeError("aws fail"))  # type: ignore[method-assign]
-        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(side_effect=RuntimeError("gcp fail"))  # type: ignore[method-assign]
+        svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
         svc.synthesize(SynthesizeRequest(text="hello"))
         snap = get_metrics_snapshot()
@@ -153,8 +153,8 @@ class TestFallbackMetrics:
         hop_events = [e for e in snap["events"] if e["event"] == "tts_fallback_hop"]
         assert len(hop_events) >= 1
         evt = hop_events[0]
-        assert evt["from_target"] == "aws-polly"
-        assert evt["to_target"] == "gcp-tts"
+        assert evt["from_target"] == "gcp-tts"
+        assert evt["to_target"] == "aws-polly"
 
     def test_chain_exhausted_event(self):
         svc = TTSRouterService(_make_config())
@@ -181,5 +181,5 @@ class TestFallbackMetrics:
         snap = get_metrics_snapshot()
         attempt_events = [e for e in snap["events"] if e["event"] == "tts_route_attempt"]
         assert len(attempt_events) == 2
-        assert attempt_events[0]["target"] == "aws-polly"
-        assert attempt_events[1]["target"] == "gcp-tts"
+        assert attempt_events[0]["target"] == "gcp-tts"
+        assert attempt_events[1]["target"] == "aws-polly"

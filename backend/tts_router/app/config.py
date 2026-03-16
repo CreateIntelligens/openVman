@@ -11,9 +11,13 @@ from functools import lru_cache
 class TTSRouterConfig:
     """Immutable TTS router settings loaded from environment."""
 
-    # --- Self-hosted nodes ---
+    # --- Self-hosted nodes (Edge-TTS) ---
     tts_primary_node: str = ""
     tts_secondary_node: str = ""
+
+    # --- Index TTS ---
+    tts_index_url: str = ""
+    tts_index_character: str = "hayley"
 
     # --- AWS Polly ---
     tts_aws_enabled: bool = False
@@ -53,6 +57,8 @@ def get_tts_config() -> TTSRouterConfig:
     return TTSRouterConfig(
         tts_primary_node=os.environ.get("TTS_PRIMARY_NODE", ""),
         tts_secondary_node=os.environ.get("TTS_SECONDARY_NODE", ""),
+        tts_index_url=os.environ.get("TTS_INDEX_URL", ""),
+        tts_index_character=os.environ.get("TTS_INDEX_CHARACTER", "hayley"),
         node_failure_threshold=int(os.environ.get("NODE_FAILURE_THRESHOLD", "2")),
         node_cooldown_seconds=float(os.environ.get("NODE_COOLDOWN_SECONDS", "30.0")),
         node_score_penalty=int(os.environ.get("NODE_SCORE_PENALTY", "50")),

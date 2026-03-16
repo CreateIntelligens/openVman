@@ -95,14 +95,14 @@ def classify_gcp_error(exc: Exception) -> str:
     return REASON_UNKNOWN
 
 
-def classify_node_error(exc: Exception) -> str:
-    """Classify an error from a self-hosted TTS node (httpx / NodeHTTPError)."""
+def _classify_http_error(exc: Exception, error_class: type) -> str:
+    """Shared logic for HTTP-based TTS providers (httpx + custom error class)."""
     exc_type = type(exc).__name__
     message = str(exc).lower()
 
-    # NodeHTTPError with status code
+    # Custom error class with status code
     status_code = getattr(exc, "status_code", None)
-    if status_code is not None:
+    if status_code is not None and isinstance(exc, error_class):
         if status_code == 422:
             return REASON_BAD_REQUEST
         if status_code >= 500:
@@ -121,3 +121,15 @@ def classify_node_error(exc: Exception) -> str:
         return REASON_NETWORK_ERROR
 
     return REASON_UNKNOWN
+
+
+def classify_node_error(exc: Exception) -> str:
+    """Classify an error from a self-hosted TTS node."""
+    from app.providers.node_adapter import NodeHTTPError
+    return _classify_http_error(exc, NodeHTTPError)
+
+
+def classify_index_error(exc: Exception) -> str:
+    """Classify an error from an Index TTS node."""
+    from app.providers.index_tts_adapter import IndexTTSHTTPError
+    return _classify_http_error(exc, IndexTTSHTTPError)

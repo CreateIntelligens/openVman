@@ -61,14 +61,15 @@ class TestFullChain:
     """Test the complete node → AWS → GCP fallback chain."""
 
     def test_primary_node_success_returns_immediately(self):
-        svc = TTSRouterService(_config())
+        # Disable cloud providers to test node priority (though nodes are now last)
+        svc = TTSRouterService(_config(tts_aws_enabled=False, tts_gcp_enabled=False))
         with patch.object(svc._node_adapters["tts-primary"], "synthesize", return_value=_ok_result("tts-primary")):
             result = svc.synthesize(_REQUEST)
         assert result.route_target == "tts-primary"
         assert result.route_kind == "node"
 
     def test_primary_fails_secondary_succeeds(self):
-        svc = TTSRouterService(_config())
+        svc = TTSRouterService(_config(tts_aws_enabled=False, tts_gcp_enabled=False))
         with (
             patch.object(svc._node_adapters["tts-primary"], "synthesize", side_effect=NodeHTTPError(500)),
             patch.object(svc._node_adapters["tts-secondary"], "synthesize", return_value=_ok_result("tts-secondary")),
@@ -76,43 +77,41 @@ class TestFullChain:
             result = svc.synthesize(_REQUEST)
         assert result.route_target == "tts-secondary"
 
-    def test_both_nodes_fail_falls_to_aws(self):
-        svc = TTSRouterService(_config())
+    def test_both_nodes_fail_raises(self):
+        # When cloud providers are disabled and nodes fail
+        svc = TTSRouterService(_config(tts_aws_enabled=False, tts_gcp_enabled=False))
         with (
             patch.object(svc._node_adapters["tts-primary"], "synthesize", side_effect=NodeHTTPError(500)),
             patch.object(svc._node_adapters["tts-secondary"], "synthesize", side_effect=NodeHTTPError(500)),
+        ):
+            with pytest.raises(RuntimeError):
+                svc.synthesize(_REQUEST)
+
+    def test_gcp_fails_falls_to_aws(self):
+        svc = TTSRouterService(_config(tts_primary_node="", tts_secondary_node=""))
+        with (
+            patch.object(svc._gcp, "synthesize", side_effect=Exception("gcp down")),
             patch.object(svc._aws, "synthesize", return_value=_ok_result("aws-polly", "provider")),
         ):
             result = svc.synthesize(_REQUEST)
         assert result.route_target == "aws-polly"
 
-    def test_nodes_and_aws_fail_falls_to_gcp(self):
+    def test_gcp_aws_fail_falls_to_nodes(self):
         svc = TTSRouterService(_config())
         with (
-            patch.object(svc._node_adapters["tts-primary"], "synthesize", side_effect=NodeHTTPError(500)),
-            patch.object(svc._node_adapters["tts-secondary"], "synthesize", side_effect=NodeHTTPError(500)),
+            patch.object(svc._gcp, "synthesize", side_effect=Exception("gcp down")),
             patch.object(svc._aws, "synthesize", side_effect=Exception("aws down")),
-            patch.object(svc._gcp, "synthesize", return_value=_ok_result("gcp-tts", "provider")),
+            patch.object(svc._node_adapters["tts-primary"], "synthesize", return_value=_ok_result("tts-primary")),
         ):
             result = svc.synthesize(_REQUEST)
-        assert result.route_target == "gcp-tts"
+        assert result.route_target == "tts-primary"
 
-    def test_all_fail_raises_runtime_error(self):
-        svc = TTSRouterService(_config())
-        with (
-            patch.object(svc._node_adapters["tts-primary"], "synthesize", side_effect=NodeHTTPError(500)),
-            patch.object(svc._node_adapters["tts-secondary"], "synthesize", side_effect=NodeHTTPError(500)),
-            patch.object(svc._aws, "synthesize", side_effect=Exception("aws down")),
-            patch.object(svc._gcp, "synthesize", side_effect=Exception("gcp down")),
-        ):
-            with pytest.raises(RuntimeError, match="所有 TTS fallback chain hops 皆失敗"):
-                svc.synthesize(_REQUEST)
-
-    def test_chain_order_is_primary_secondary_aws_gcp(self):
+    def test_chain_order_is_gcp_aws_nodes(self):
         svc = TTSRouterService(_config())
         chain = svc.build_chain()
         targets = [t.target for t in chain]
-        assert targets == ["tts-primary", "tts-secondary", "aws-polly", "gcp-tts"]
+        # Order: GCP -> AWS -> Nodes
+        assert targets == ["gcp-tts", "aws-polly", "tts-primary", "tts-secondary"]
 
 
 class TestHealthIntegration:
@@ -127,7 +126,7 @@ class TestHealthIntegration:
         assert "tts-secondary" in targets
 
     def test_node_success_updates_health(self):
-        svc = TTSRouterService(_config())
+        svc = TTSRouterService(_config(tts_aws_enabled=False, tts_gcp_enabled=False))
         # Fail once
         svc._health.record_failure("tts-primary")
         assert svc._health.get_state("tts-primary").score == 50
@@ -140,7 +139,7 @@ class TestHealthIntegration:
         assert svc._health.get_state("tts-primary").consecutive_failures == 0
 
     def test_node_failure_updates_health(self):
-        svc = TTSRouterService(_config())
+        svc = TTSRouterService(_config(tts_aws_enabled=False, tts_gcp_enabled=False))
         with (
             patch.object(svc._node_adapters["tts-primary"], "synthesize", side_effect=NodeHTTPError(500)),
             patch.object(svc._node_adapters["tts-secondary"], "synthesize", return_value=_ok_result("tts-secondary")),
@@ -152,14 +151,15 @@ class TestHealthIntegration:
         svc = TTSRouterService(_config(tts_primary_node="", tts_secondary_node=""))
         chain = svc.build_chain()
         targets = [t.target for t in chain]
-        assert targets == ["aws-polly", "gcp-tts"]
+        # Order: GCP -> AWS
+        assert targets == ["gcp-tts", "aws-polly"]
 
 
 class TestMetricsRecorded:
     """Test that metrics are properly emitted during node fallback."""
 
     def test_node_failover_recorded(self):
-        svc = TTSRouterService(_config())
+        svc = TTSRouterService(_config(tts_aws_enabled=False, tts_gcp_enabled=False))
         with (
             patch.object(svc._node_adapters["tts-primary"], "synthesize", side_effect=NodeHTTPError(500)),
             patch.object(svc._node_adapters["tts-secondary"], "synthesize", return_value=_ok_result("tts-secondary")),

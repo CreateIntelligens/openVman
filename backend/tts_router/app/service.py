@@ -22,9 +22,11 @@ from app.providers.base import NormalizedTTSResult, ProviderAdapter, SynthesizeR
 from app.providers.error_mapping import (
     classify_aws_error,
     classify_gcp_error,
+    classify_index_error,
     classify_node_error,
 )
 from app.providers.gcp_adapter import GCPTTSAdapter
+from app.providers.index_tts_adapter import IndexTTSAdapter
 from app.providers.node_adapter import NodeAdapter
 
 
@@ -39,10 +41,11 @@ class RouteTarget:
 
 
 class TTSRouterService:
-    """Execute a bounded fallback chain: nodes -> AWS -> GCP."""
+    """Execute a bounded fallback chain: Index TTS -> GCP -> AWS -> Edge-TTS."""
 
     def __init__(self, config: TTSRouterConfig | None = None) -> None:
         self._config = config or get_tts_config()
+        self._index = IndexTTSAdapter(self._config)
         self._aws = AWSPollyAdapter(self._config)
         self._gcp = GCPTTSAdapter(self._config)
 
@@ -85,7 +88,25 @@ class TTSRouterService:
         """Build the ordered fallback chain based on config and health state."""
         chain: list[RouteTarget] = []
 
-        # Self-hosted nodes — only include healthy ones
+        # 1-3. Cloud Providers (Prioritized Order)
+        providers = [
+            ("index-tts", self._index, classify_index_error),
+            ("gcp-tts", self._gcp, classify_gcp_error),
+            ("aws-polly", self._aws, classify_aws_error),
+        ]
+
+        for target_id, adapter, classifier in providers:
+            if adapter.enabled:
+                chain.append(
+                    RouteTarget(
+                        kind="provider",
+                        target=target_id,
+                        adapter=adapter,
+                        error_classifier=classifier,
+                    )
+                )
+
+        # 4. Self-hosted nodes (Edge-TTS) — only include healthy ones
         healthy_nodes = self._health.get_healthy_nodes()
         healthy_ids = {n.node_id for n in healthy_nodes}
 
@@ -111,28 +132,6 @@ class TTSRouterService:
                         error_classifier=classify_node_error,
                     )
                 )
-
-        # AWS provider
-        if self._aws.enabled:
-            chain.append(
-                RouteTarget(
-                    kind="provider",
-                    target="aws-polly",
-                    adapter=self._aws,
-                    error_classifier=classify_aws_error,
-                )
-            )
-
-        # GCP provider
-        if self._gcp.enabled:
-            chain.append(
-                RouteTarget(
-                    kind="provider",
-                    target="gcp-tts",
-                    adapter=self._gcp,
-                    error_classifier=classify_gcp_error,
-                )
-            )
 
         return chain
 
