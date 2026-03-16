@@ -303,8 +303,8 @@ export async function streamGenerate(
   });
 
   if (!res.ok) {
-    const message = await parseErrorMessage(res);
-    throw new Error(message);
+    const errorMessage = await parseErrorMessage(res);
+    throw new Error(errorMessage);
   }
   if (!res.body) {
     throw new Error("Streaming response is not available.");
