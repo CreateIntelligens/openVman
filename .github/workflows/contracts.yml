@@ -1,0 +1,52 @@
+name: Contracts
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "brain/api/protocol/**"
+      - "brain/api/tests/test_protocol_events.py"
+      - "brain/web/src/protocol/**"
+      - "brain/web/tsconfig.json"
+      - ".github/workflows/contracts.yml"
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  protocol-contracts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "brain/web/package-lock.json"
+
+      - name: Check generated contracts are up to date
+        run: python3 contracts/scripts/generate_protocol_contracts.py --check
+
+      - name: Install backend test dependencies
+        run: python3 -m pip install pytest "pydantic>=2.0.0,<3"
+
+      - name: Run backend protocol tests
+        run: python3 -m pytest brain/api/tests/test_protocol_events.py -v
+
+      - name: Install frontend dependencies
+        working-directory: brain/web
+        run: npm ci
+
+      - name: Run frontend typecheck
+        working-directory: brain/web
+        run: npx tsc --noEmit

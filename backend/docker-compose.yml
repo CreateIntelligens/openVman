@@ -1,0 +1,64 @@
+x-tts-worker: &tts-worker
+  build: ./tts_service
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9000/healthz')"]
+    interval: 10s
+    timeout: 5s
+    retries: 3
+
+services:
+  tts-primary:
+    <<: *tts-worker
+    environment:
+      TTS_VOICE: "${TTS_PRIMARY_VOICE:-zh-TW-HsiaoChenNeural}"
+      TTS_SAMPLE_RATE: "${TTS_PRIMARY_SAMPLE_RATE:-24000}"
+      TTS_MAX_TEXT_LENGTH: "${TTS_PRIMARY_MAX_TEXT_LENGTH:-2000}"
+      TTS_PORT: "9000"
+    ports:
+      - "${TTS_PRIMARY_PORT:-9001}:9000"
+
+  tts-secondary:
+    <<: *tts-worker
+    environment:
+      TTS_VOICE: "${TTS_SECONDARY_VOICE:-zh-TW-YunJheNeural}"
+      TTS_SAMPLE_RATE: "${TTS_SECONDARY_SAMPLE_RATE:-24000}"
+      TTS_MAX_TEXT_LENGTH: "${TTS_SECONDARY_MAX_TEXT_LENGTH:-2000}"
+      TTS_PORT: "9000"
+    ports:
+      - "${TTS_SECONDARY_PORT:-9002}:9000"
+
+  tts-router:
+    build: ./tts_router
+    restart: unless-stopped
+    environment:
+      TTS_PRIMARY_NODE: "http://tts-primary:9000"
+      TTS_SECONDARY_NODE: "http://tts-secondary:9000"
+      # --- Node health policy ---
+      NODE_FAILURE_THRESHOLD: "${NODE_FAILURE_THRESHOLD:-2}"
+      NODE_COOLDOWN_SECONDS: "${NODE_COOLDOWN_SECONDS:-30}"
+      NODE_SCORE_PENALTY: "${NODE_SCORE_PENALTY:-50}"
+      NODE_TIMEOUT_MS: "${NODE_TIMEOUT_MS:-10000}"
+      # --- AWS Polly (optional) ---
+      TTS_AWS_ENABLED: "${TTS_AWS_ENABLED:-false}"
+      TTS_AWS_REGION: "${TTS_AWS_REGION:-ap-northeast-1}"
+      TTS_AWS_ACCESS_KEY_ID: "${TTS_AWS_ACCESS_KEY_ID:-}"
+      TTS_AWS_SECRET_ACCESS_KEY: "${TTS_AWS_SECRET_ACCESS_KEY:-}"
+      TTS_AWS_POLLY_VOICE_ID: "${TTS_AWS_POLLY_VOICE_ID:-Zhiyu}"
+      TTS_AWS_POLLY_ENGINE: "${TTS_AWS_POLLY_ENGINE:-neural}"
+      TTS_AWS_OUTPUT_FORMAT: "${TTS_AWS_OUTPUT_FORMAT:-pcm}"
+      TTS_AWS_SAMPLE_RATE: "${TTS_AWS_SAMPLE_RATE:-24000}"
+      # --- GCP Cloud TTS (optional) ---
+      TTS_GCP_ENABLED: "${TTS_GCP_ENABLED:-false}"
+      TTS_GCP_PROJECT_ID: "${TTS_GCP_PROJECT_ID:-}"
+      TTS_GCP_CREDENTIALS_JSON: "${TTS_GCP_CREDENTIALS_JSON:-}"
+      TTS_GCP_VOICE_NAME: "${TTS_GCP_VOICE_NAME:-cmn-TW-Standard-A}"
+      TTS_GCP_AUDIO_ENCODING: "${TTS_GCP_AUDIO_ENCODING:-LINEAR16}"
+      TTS_GCP_SAMPLE_RATE: "${TTS_GCP_SAMPLE_RATE:-24000}"
+    ports:
+      - "${TTS_ROUTER_PORT:-8200}:8200"
+    depends_on:
+      tts-primary:
+        condition: service_healthy
+      tts-secondary:
+        condition: service_healthy

@@ -6,7 +6,7 @@
 
 ### 1. 核心技術與目標 (Tech Stack & Core Goals)
 * **核心技術**：Node.js (搭配 `ws` 或 `socket.io`) 或 Python (搭配 `FastAPI` + `WebSockets`)。
-* **主要職責**：維持與多台機台 (Kiosk) 的 WebSocket 連線、調用 LLM 生成對話、調用 TTS 服務合成語音並提取唇形時間軸 (Visemes)，最後將資料打包推播。
+* **主要職責**：維持與多台機台 (Kiosk) 的 WebSocket 連線、執行訊息處理層 (message handling layer)、調用大腦層生成對話、調用 TTS 服務合成語音並提取唇形時間軸 (Visemes)，最後將資料打包推播。
 * **效能要求**：必須非阻塞 (Non-blocking/Async)，確保高併發下各 Session 互不干擾。首字節延遲 (TTFB) 需控制在 1 秒內。
 
 ### 2. 連線與 Session 管理 (Session Management)
@@ -29,7 +29,29 @@ wss.on('connection', (ws) => {
 
 ```
 
-### 3. LLM 串流與句讀切分 (LLM Streaming & Chunking)
+### 3. 訊息處理層 (Message Handling Layer)
+
+後端不能只是單純的 WebSocket relay。必須參考 OpenClaw 的外圍編排思路，在 Backend 內建立一層輕量 message layer，負責把「前端事件」轉成「可被大腦層與 TTS 層消化的任務」。
+
+**職責至少包含**：
+1. **事件正規化**：將 `client_init`、`user_speak`、`client_interrupt` 統一轉為內部 message envelope。
+2. **排程與去重**：同一個 `client_id` 在同一時間只允許一條主回應管線；重複封包需以 `message_id` 去重。
+3. **狀態同步**：維護 `idle` / `thinking` / `speaking` / `interrupting` / `error` 狀態，避免前後端認知不一致。
+4. **ACK 與追蹤**：所有進入後端的事件都應產生 trace id / session id，方便串接日誌與 metrics。
+5. **錯誤封裝**：將大腦層、TTS 層、網路層錯誤統一轉成 `server_error`。
+
+```javascript
+const messageEnvelope = {
+  trace_id: crypto.randomUUID(),
+  session_id: currentSessionId,
+  client_id: data.client_id,
+  event: data.event,
+  payload: data,
+  received_at: Date.now()
+};
+```
+
+### 4. LLM 串流與句讀切分 (LLM Streaming & Chunking)
 
 為了達到超低延遲，**絕對不能**等 LLM 整段話生成完才去轉 TTS。必須實作「標點符號截斷 (Punctuation Chunking)」的非同步管線 (Pipeline)。
 
@@ -37,23 +59,68 @@ wss.on('connection', (ws) => {
 2. **文字緩衝區 (Text Buffer)**：接收 LLM 吐出的 token。
 3. **觸發條件**：當緩衝區遇到標點符號（如 `，`、`。`、`？`、`！`）時，立即將這段完整的短句截斷，並丟給下一關 (TTS 模組)，同時清空緩衝區繼續接收後續 Token。
 
-### 4. TTS 與唇形時間軸提取 (TTS & Viseme Extraction)
+### 5. TTS 與唇形時間軸提取 (TTS & Viseme Extraction)
 
 這是後端最關鍵的技術點。每一段生成的文字，都必須同步產生「音頻 (Audio Buffer)」與「唇形時間軸 (Viseme JSON)」。
 
-**推薦方案 A：依賴雲端原生支援 (Azure TTS / AWS Polly)**
-這是最快且最穩定的做法，雲端 API 原生支援回傳 Viseme 事件。
+**推薦方案 A：自建 `IndexTTS2`-style zh-TW TTS（主方案）**
+這裡的前提不是「能說中文」而已，而是**要穩定輸出台灣口音、可客製化聲線、可控停頓與語氣**。因此正式方案應以自建的 `IndexTTS2` 類型 TTS 為核心：
+
+* 以公司自己的 speaker index / voice profile 管理角色聲線。
+* 支援 zh-TW 發音詞典、數字/專有名詞讀法覆寫。
+* TTS 產音與 viseme / phoneme alignment 由同一條 pipeline 輸出，避免前後處理割裂。
 
 * 呼叫 API 傳入短句文字。
 * 收集回傳的 Audio Buffer 與 Viseme 陣列。
-* 將雲端的 Viseme ID 映射到 `00_CORE_PROTOCOL.md` 定義的 6 種基礎嘴型 (`closed`, `A`, `E`, `I`, `O`, `U`)。
+* 將 phoneme / viseme ID 映射到 `00_CORE_PROTOCOL.md` 定義的 6 種基礎嘴型 (`closed`, `A`, `E`, `I`, `O`, `U`)。
+* 每個 persona 至少準備主 speaker profile 與備援 profile。
 
-**推薦方案 B：開源本地方案 (Edge-TTS + Rhubarb / 輕量模型)**
+**備援方案 B：AWS Polly / GCP TTS**
 
-* 使用開源 TTS 快速生成音頻檔。
-* 在記憶體中將音頻傳給輕量級的音素提取工具（如開源的 `Rhubarb Lip Sync`，或基於 WebRTC VAD + 能量閥值的極簡算法）算出時間軸。
+公司現況沒有 Azure，因此雲端備援應落在 **AWS** 或 **GCP**：
+* AWS 可作為快速 fallback provider。
+* GCP 可用於通用朗讀或某些營運工具語音。
+* 雲端備援主要用途是保服務不中斷，不作為品牌語音主體。
 
-### 5. 資料打包與下發 (Data Serialization & Broadcast)
+**不建議方案：Edge-TTS**
+
+Edge-TTS 雖可快速驗證流程，但在此專案的需求下不適合作為正式方案：
+* 台灣中文口音一致性不足。
+* 語氣、停頓與商業場景穩定性不夠。
+* 後續做品牌化語音體驗時可控性較差。
+
+**補充：離線或私有備援**
+
+* 若主自建 TTS pipeline 失敗，可切換到第二組推理節點或第二個 speaker index。
+* 若雲端 provider 失敗，可在 AWS / GCP 之間切換。
+* 在記憶體中將音頻傳給音素/唇形工具（如 `Rhubarb Lip Sync` 或自研 phoneme aligner）算出時間軸。
+
+### 6. Provider 與 Key Fallback 機制 (Provider / Key Fallback)
+
+後端雖然主要調大腦層與 TTS 層，但對外部依賴仍要有 fallback 思維，尤其是 TTS。
+
+**最低要求**：
+1. **自建 TTS 節點 fallback**：先切同叢集不同節點，再切不同 speaker index。
+2. **雲端 provider fallback**：自建失敗時切 AWS，再切 GCP（或依成本反過來）。
+3. **同供應商多 key fallback**：雲端 provider 仍需多把 key 輪替與失敗切換。
+4. **明確錯誤分類**：`401/403` 視為 key 問題、`429` 視為限流、`5xx` 視為節點或服務異常。
+5. **降級順序固定**：先切 node，再切 speaker profile，再切 provider。
+
+```javascript
+async function synthesizeWithFallback(text, session) {
+  for (const target of ttsTargets) {
+    try {
+      return await ttsProviderRouter(target, text, session.voice);
+    } catch (error) {
+      markTargetFailure(target, error);
+      if (!isRetryable(error)) continue;
+    }
+  }
+  throw new Error("All TTS targets failed");
+}
+```
+
+### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
 將完成的 Audio 與 Visemes 封裝成 JSON 透過 WebSocket 發送。
 
@@ -74,7 +141,7 @@ ws.send(JSON.stringify(payload));
 
 ```
 
-### 6. 打斷機制處理 (Interruption Handling)
+### 8. 打斷機制處理 (Interruption Handling)
 
 當收到前端發送的 `client_interrupt` 事件時，後端必須立即執行以下清理動作，避免浪費算力與頻寬：
 
@@ -82,29 +149,40 @@ ws.send(JSON.stringify(payload));
 2. **清空佇列**：清空該 Session 尚未丟給 TTS 的文字緩衝區，以及尚未下發的 WebSocket 佇列。
 3. **更新狀態**：將 Session 的狀態重置，準備接收新的 `user_speak` 事件。
 
-### 7. 錯誤處理與斷線重連 (Error Handling & Reconnection)
+### 9. 錯誤處理與斷線重連 (Error Handling & Reconnection)
 
 * **Ping/Pong 機制**：實作心跳包 (Heartbeat) 定期檢查 Kiosk 設備是否在線（頻率建議：每 30 秒，連續 3 次無回應視為斷線）。
 * **死區清理**：當連線異常中斷時，務必從 `activeSessions` 中移除並釋放相關記憶體與 LLM Stream，防止 Memory Leak。
 * **錯誤推播**：所有內部異常皆應封裝為 `server_error` 事件推送給前端（事件格式詳見 `00_CORE_PROTOCOL.md` 4.3 節）。
 
-### 8. 環境變數與配置管理 (Configuration)
+### 10. 環境變數與配置管理 (Configuration)
 
 所有外部服務的連線資訊與行為參數，統一透過環境變數注入，禁止硬編碼 (Hardcode)。
 
 ```env
 # === LLM 設定 ===
-LLM_PROVIDER=openai          # openai | azure | claude | vllm
+LLM_PROVIDER=openai          # openai | claude | vllm | bedrock
 LLM_API_KEY=sk-***
 LLM_MODEL=gpt-4o             # 預設模型名稱
 LLM_STREAM=true              # 必須為 true
 
 # === TTS 設定 ===
-TTS_PROVIDER=azure            # azure | edge-tts
-TTS_API_KEY=***
-TTS_REGION=eastasia           # Azure 區域
-TTS_VOICE=zh-TW-HsiaoChenNeural  # 預設語音角色
+TTS_PROVIDER=indextts2        # indextts2 | aws | gcp
+TTS_PRIMARY_NODE=http://tts-node-a:9000
+TTS_SECONDARY_NODE=http://tts-node-b:9000
+TTS_AWS_ACCESS_KEY_ID=***
+TTS_AWS_SECRET_ACCESS_KEY=***
+TTS_AWS_REGION=ap-northeast-1
+TTS_GCP_PROJECT_ID=my-project
+TTS_GCP_CREDENTIALS_JSON=/secrets/gcp-tts.json
+TTS_SPEAKER_PRIMARY=brand_zh_tw_female_a
+TTS_SPEAKER_SECONDARY=brand_zh_tw_female_b
 TTS_OUTPUT_FORMAT=audio-16khz-32kbitrate-mono-mp3
+TTS_REQUIRE_LOCALE=zh-TW      # 強制台灣中文口音
+
+# === 訊息處理層 ===
+MESSAGE_DEDUP_WINDOW_MS=3000
+MESSAGE_MAX_INFLIGHT_PER_SESSION=1
 
 # === 大腦層連線 ===
 BRAIN_ENDPOINT=http://localhost:8100
@@ -120,7 +198,7 @@ MAX_CONCURRENT_SESSIONS=50
 CHUNK_PUNCTUATION=，。？！；：  # 標點截斷字元集
 ```
 
-### 9. 健康檢查端點 (Health Check)
+### 11. 健康檢查端點 (Health Check)
 
 後端必須暴露 HTTP 健康檢查端點，供負載平衡器 (Load Balancer) 與監控系統探測：
 
@@ -144,7 +222,7 @@ GET /health
 * `status`：`ok` | `degraded` | `error`
 * `dependencies`：各上游服務的即時健康狀態
 
-### 10. 效能監控指標 (Performance Metrics)
+### 12. 效能監控指標 (Performance Metrics)
 
 後端應暴露以下指標供 Prometheus / Grafana 等監控工具收集：
 
@@ -157,7 +235,7 @@ GET /health
 | `vman_chunk_queue_depth` | Gauge | 等待 TTS 處理的文字佇列深度 | < 5 |
 | `vman_error_total` | Counter | 錯誤次數（按 error_code 分類） | 最小化 |
 
-### 11. 優雅關機 (Graceful Shutdown)
+### 13. 優雅關機 (Graceful Shutdown)
 
 當伺服器收到終止訊號時，必須有序地清理資源，避免使用者體驗中斷：
 
@@ -188,7 +266,7 @@ process.on('SIGTERM', async () => {
 });
 ```
 
-### 12. 日誌規範 (Logging)
+### 14. 日誌規範 (Logging)
 
 所有日誌必須採用結構化 JSON 格式 (Structured Logging)，方便後續 ELK / Loki 等日誌系統查詢：
 
@@ -205,4 +283,3 @@ process.on('SIGTERM', async () => {
   "message": "TTS synthesis completed"
 }
 ```
-

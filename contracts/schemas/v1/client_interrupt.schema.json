@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openvman://protocol/v1/client_interrupt",
+  "title": "Client Interrupt Event",
+  "type": "object",
+  "additionalProperties": false,
+  "x-direction": "client_to_server",
+  "x-contract-version": "1.0.0",
+  "properties": {
+    "event": {
+      "const": "client_interrupt"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "event",
+    "timestamp"
+  ]
+}

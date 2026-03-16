@@ -4,7 +4,7 @@
 
 ### 1. 核心定位與設計哲學 (Core Philosophy)
 本層級負責虛擬人的「靈魂、記憶與技能」。
-採用基於檔案系統 (File-system as truth) 與 **LanceDB 向量資料庫**的混合檢索架構。與 `01_BACKEND_SPEC.md` 完全解耦：本層只負責接收文字輸入、檢索記憶、產出 LLM 串流字串，**不處理**任何 WebSocket 或語音合成邏輯。
+採用基於檔案系統 (File-system as truth) 與 **LanceDB 向量資料庫**的混合檢索架構。設計上需參考 OpenClaw 的大腦：除了 RAG 與 Prompt 組裝外，還要有 **message handling layer** 與 **API key / model fallback router**。與 `01_BACKEND_SPEC.md` 解耦：本層不處理 WebSocket 或語音合成，但會處理訊息語義、上下文、工具與模型路由。
 
 * **為什麼選 LanceDB**：LanceDB 是嵌入式向量資料庫（Embedded），無需獨立部署服務端，直接運行在應用行程內。比傳統 RAG 方案（如 ChromaDB、Pinecone）更輕量、更低延遲，且原生支援 Lance 格式的高效列存儲，適合本地部署場景。
 * **為什麼選 bge-m3**：BAAI/bge-m3 是目前最強的開源多語言 Embedding 模型，原生支援中文、英文、日文等 100+ 語言，且支援 Dense + Sparse + ColBERT 三種檢索模式，在 MTEB 排行榜上表現優異。本地部署無需依賴外部 API，保障資料隱私。
@@ -18,6 +18,7 @@
 | LLM | OpenAI / Claude / vLLM | 依 `BRAIN_LLM_PROVIDER` 環境變數切換 |
 | 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
 | 知識庫格式 | Markdown 檔案系統 | 人類可讀、Git 可追蹤 |
+| 路由層 | Provider Router + Key Pool | Key fallback、模型切換、限流保護 |
 
 #### 2.1 bge-m3 部署方式
 
@@ -154,7 +155,51 @@ async def retrieve_context(user_input: str, top_k: int = 5):
     return all_results[:top_k]
 ```
 
-### 6. Token 預算管理 (Token Budget)
+### 6. 訊息處理層 (Message Handling Layer)
+
+大腦不能只把 `user_input` 直接丟給 LLM。必須先進入一層 message pipeline，這層是整個 OpenClaw-style brain 的核心之一。
+
+**處理步驟**：
+1. **Normalize**：將來自 Backend 的輸入標準化成 `system / user / assistant / tool / control` 五類訊息。
+2. **Enrich**：補上 `trace_id`、`session_id`、`persona_id`、`channel`、`locale`。
+3. **Route**：根據訊息類型決定是否需要檢索、工具、審核或直接回答。
+4. **Guard**：執行 injection 檢測、敏感內容攔截、輪次限制。
+5. **Assemble**：在最後一步才組裝 LLM prompt。
+
+```python
+class BrainMessage(TypedDict):
+    role: str           # system | user | assistant | tool | control
+    content: str
+    trace_id: str
+    session_id: str
+    persona_id: str
+    locale: str
+    metadata: dict
+```
+
+### 7. Key / Model Fallback 機制 (Provider Router)
+
+必須內建金鑰與模型回退機制，不能假設單一 API key、單一模型永遠可用。
+
+**最低要求**：
+* **同 provider 多 key fallback**：例如 OpenAI key pool、Anthropic key pool。
+* **同 provider 多 model fallback**：主模型失敗時可切換次模型。
+* **跨 provider fallback**：如 `openai -> anthropic -> vllm`。
+* **限流感知**：遇到 `429`、`quota exceeded`、`insufficient credits` 時自動切換。
+* **訊息層重試而非盲重送**：保留原本 message envelope 與 trace id。
+
+```python
+MODEL_ROUTE = [
+    ("openai", "gpt-4.1"),
+    ("openai", "gpt-4o"),
+    ("anthropic", "claude-sonnet-4"),
+    ("vllm", "qwen2.5-72b-instruct"),
+]
+```
+
+當任一路由失敗時，需把失敗原因記入 metrics 與 structured logs，並將同一次對話綁定在同一條 fallback chain 中，避免出現無限制輪轉。
+
+### 8. Token 預算管理 (Token Budget)
 
 為防止 Prompt 超出 LLM 的 Context Window，必須嚴格控制各區塊的 Token 分配：
 
@@ -176,7 +221,7 @@ Total Context Budget = 8192 tokens（依實際 LLM 模型調整）
 2. 再減少 RAG Context（只保留最相關的 Top-3）。
 3. 最後對 System Prompt 做摘要壓縮（不建議，最後手段）。
 
-### 7. 工具調用與擴充 (Tool Calling / Plugins)
+### 9. 工具調用與擴充 (Tool Calling / Plugins)
 
 虛擬人必須具備與現實世界互動的能力（如查訂單、建立客訴）。
 
@@ -196,7 +241,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
     return result  # 將結果餵回 LLM 繼續生成
 ```
 
-### 8. 睡眠與反思機制 (Sleep & Reflection)
+### 10. 睡眠與反思機制 (Sleep & Reflection)
 
 為了避免記憶無限膨脹，系統必須實作非同步的「記憶整理」排程 (Cron Job)：
 
@@ -223,7 +268,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
                                                     └──────────────────┘
 ```
 
-### 9. 多角色切換 (Multi-Persona)
+### 11. 多角色切換 (Multi-Persona)
 
 系統應支援透過 `client_init` 帶入 `persona_id` 來切換不同虛擬人角色：
 
@@ -231,28 +276,30 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 * `MEMORY.md`、`memory/`、`.learnings/` 可以共享（全域知識）或獨立（角色專屬記憶），依業務需求設定。
 * LanceDB 檢索時，可透過 metadata 中的 `persona_id` 欄位進行過濾。
 
-### 10. 安全防護 (Guardrails)
+### 12. 安全防護 (Guardrails)
 
 **10.1 輸入過濾 (Input Sanitization)**
 * 偵測 Prompt Injection 攻擊：使用規則引擎或專用分類模型攔截惡意指令。
 * 長度限制：單輪 `user_input` 最大 500 字，超出截斷並提示使用者。
 
 **10.2 輸出過濾 (Output Filtering)**
-* 敏感內容攔截：可串接內容安全分類器（如 Azure Content Safety）。
+* 敏感內容攔截：可串接內容安全分類器（如 GCP Vertex AI Safety、AWS Bedrock Guardrails 或自建分類器）。
 * 角色一致性檢查：確保 LLM 輸出不脫離 `SOUL.md` 定義的人格範圍。
 
 **10.3 對話限制**
 * 單 Session 最大對話輪次：100 輪（超出後提示使用者重新開始）。
 * 單 Session 最大存活時間：30 分鐘（可透過環境變數調整）。
 
-### 11. 環境變數 (Configuration)
+### 13. 環境變數 (Configuration)
 
 ```env
 # === 大腦層設定 ===
 BRAIN_PORT=8100
-BRAIN_LLM_PROVIDER=openai       # openai | azure | claude | vllm
-BRAIN_LLM_API_KEY=sk-***
-BRAIN_LLM_MODEL=gpt-4o
+BRAIN_LLM_PROVIDER=openai       # 預設主 provider
+BRAIN_LLM_API_KEYS=sk-***,sk-***
+BRAIN_LLM_MODEL_PRIMARY=gpt-4.1
+BRAIN_LLM_MODEL_SECONDARY=gpt-4o
+BRAIN_FALLBACK_CHAIN=openai:gpt-4.1,openai:gpt-4o,claude:sonnet,vllm:qwen2.5-72b
 
 # === Embedding 設定 ===
 EMBEDDING_MODEL=BAAI/bge-m3     # 本地 Embedding 模型
@@ -265,33 +312,40 @@ SHORT_TERM_MEMORY_ROUNDS=20     # 短期記憶保留輪次
 RAG_TOP_K=5                     # 向量檢索 Top-K
 MAX_SESSION_ROUNDS=100          # 單 Session 最大輪次
 MAX_SESSION_TTL_MINUTES=30      # Session 最大存活時間
+MESSAGE_LOCALE_DEFAULT=zh-TW
+MESSAGE_MAX_RETRY=2
 
 # === 安全設定 ===
 MAX_INPUT_LENGTH=500            # 單輪輸入最大字數
 ENABLE_CONTENT_FILTER=true      # 是否啟用內容安全過濾
 ```
 
-### 12. 與 Backend 層的介面約定 (Interface with Backend Layer)
+### 14. 與 Backend 層的介面約定 (Interface with Backend Layer)
 
-大腦層暴露出一個核心異步生成函數供 `01_BACKEND_SPEC` 調用：
+大腦層暴露出一個核心異步生成函數供 `01_BACKEND_SPEC` 調用。雖然對外仍可輸出字串流，但內部輸入必須是 message envelope，而不是只有裸 `user_input`：
 
 ```python
 # 核心介面 (Python)
 async def generate_response_stream(
     client_id: str,
     user_input: str,
-    persona_id: str = "default"
+    persona_id: str = "default",
+    trace_id: str | None = None,
+    locale: str = "zh-TW",
+    metadata: dict | None = None
 ) -> AsyncIterator[str]:
     """
     完整流程：
-    1. 從短期記憶提取對話歷史
-    2. 將 user_input 透過 bge-m3 向量化
-    3. 在 LanceDB 中執行 Top-K 語意檢索
-    4. 根據 Token Budget 組裝完整 Prompt
-    5. 呼叫 LLM (stream=True)
-    6. 逐 Token yield 回傳給後端
+    1. 先將輸入正規化為 message envelope
+    2. 從短期記憶提取對話歷史
+    3. 將 user_input 透過 bge-m3 向量化
+    4. 在 LanceDB 中執行 Top-K 語意檢索
+    5. 根據 Token Budget 組裝完整 Prompt
+    6. 透過 provider router 做 key/model fallback
+    7. 呼叫 LLM (stream=True)
+    8. 逐 Token yield 回傳給後端
        → 後端負責標點截斷 + TTS
-    7. (若觸發 Tool Calling) 暫停 yield → 執行工具 → 繼續生成
+    9. (若觸發 Tool Calling) 暫停 yield → 執行工具 → 繼續生成
     """
     pass
 ```

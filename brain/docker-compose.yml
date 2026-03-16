@@ -1,0 +1,48 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    volumes:
+      - ./api:/app
+      - ./data:/data
+      - ../contracts:/contracts:ro
+      - brain-data:/root/.openclaw/lancedb
+      - hf-cache:/root/.cache/huggingface
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    volumes:
+      - ./web:/app
+      - ../contracts:/contracts:ro
+      - /app/node_modules
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${PORT:-8787}:8787"
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    environment:
+      - NGINX_PORT=8787
+    depends_on:
+      - api
+      - web
+    restart: unless-stopped
+
+volumes:
+  brain-data:
+  hf-cache:

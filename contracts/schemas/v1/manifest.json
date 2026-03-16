@@ -1,0 +1,31 @@
+{
+  "protocol": "openvman-core",
+  "version": "1.0.0",
+  "schema_dialect": "https://json-schema.org/draft/2020-12/schema",
+  "events": {
+    "client_init": {
+      "direction": "client_to_server",
+      "schema": "client_init.schema.json"
+    },
+    "user_speak": {
+      "direction": "client_to_server",
+      "schema": "user_speak.schema.json"
+    },
+    "client_interrupt": {
+      "direction": "client_to_server",
+      "schema": "client_interrupt.schema.json"
+    },
+    "server_stream_chunk": {
+      "direction": "server_to_client",
+      "schema": "server_stream_chunk.schema.json"
+    },
+    "server_error": {
+      "direction": "server_to_client",
+      "schema": "server_error.schema.json"
+    },
+    "server_init_ack": {
+      "direction": "server_to_client",
+      "schema": "server_init_ack.schema.json"
+    }
+  }
+}
