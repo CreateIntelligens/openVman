@@ -104,6 +104,22 @@ export default function Search() {
                       <span className="px-2 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
                         {response.table}
                       </span>
+                      {(() => {
+                        if (response.table === "memories" && item.metadata) {
+                          try {
+                            const meta = JSON.parse(item.metadata);
+                            if (meta.persona_id && meta.persona_id !== "default") {
+                              return (
+                                <span className="flex items-center gap-1 font-semibold text-primary/80 uppercase text-[10px] bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                                  <span className="material-symbols-outlined text-[12px]">masks</span>
+                                  {meta.persona_id}
+                                </span>
+                              );
+                            }
+                          } catch (e) { }
+                        }
+                        return null;
+                      })()}
                       <span className="text-xs text-slate-500">Source: {item.source}</span>
                     </div>
                     <div className="text-right">

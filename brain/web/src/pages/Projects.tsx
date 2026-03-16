@@ -5,10 +5,12 @@ import {
   fetchProjects,
   ProjectSummary,
 } from "../api";
+import { useProject } from "../context/ProjectContext";
 
 type Status = { type: "success" | "error"; message: string } | null;
 
 export default function Projects() {
+  const { refreshProjects, setProjectId, projectId: currentProjectId } = useProject();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [newProjectId, setNewProjectId] = useState("");
@@ -45,6 +47,7 @@ export default function Projects() {
       setNewProjectId("");
       setNewProjectLabel("");
       setStatus({ type: "success", message: `專案 "${id}" 已建立` });
+      refreshProjects();
       await loadProjects();
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
@@ -60,6 +63,10 @@ export default function Projects() {
     try {
       await deleteProject(projectId);
       setStatus({ type: "success", message: `專案 "${projectId}" 已刪除` });
+      refreshProjects();
+      if (projectId === currentProjectId) {
+        setProjectId("default");
+      }
       await loadProjects();
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
@@ -85,11 +92,10 @@ export default function Projects() {
       <div className="p-8 space-y-8">
         {status && (
           <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${
-              status.type === "success"
-                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-                : "border-red-500/20 bg-red-500/10 text-red-400"
-            }`}
+            className={`rounded-2xl border px-4 py-3 text-sm ${status.type === "success"
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+              : "border-red-500/20 bg-red-500/10 text-red-400"
+              }`}
           >
             {status.message}
           </div>
