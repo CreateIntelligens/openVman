@@ -218,8 +218,6 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
         user_message="current",
         request_context={"persona_id": "default"},
         session_messages=[],
-        knowledge_results=[],
-        memory_results=[],
     )
 
     assert len(result) == 2
@@ -311,19 +309,13 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     )
     monkeypatch.setattr(
         chat_service,
-        "retrieve_context",
-        lambda query="", persona_id="default", project_id="default": (_ for _ in ()).throw(AssertionError("retrieve_context should be skipped")),
-    )
-    monkeypatch.setattr(
-        chat_service,
         "build_chat_messages",
         lambda **kwargs: [{"role": "system", "content": "sys"}, {"role": "user", "content": kwargs["user_message"]}],
     )
 
     context = chat_service.prepare_generation(_make_envelope(message_type="control"))
 
-    assert context.knowledge_results == []
-    assert context.memory_results == []
+    assert context.prompt_messages is not None
 
 
 def test_execute_generation_skips_tool_loop_for_direct_route(monkeypatch: pytest.MonkeyPatch) -> None:

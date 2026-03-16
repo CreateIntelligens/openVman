@@ -372,8 +372,6 @@ class TestGracefulDegradation:
         ctx.trace_id = "trace1"
         ctx.session_id = "sess1"
         ctx.request_context = {}
-        ctx.knowledge_results = []
-        ctx.memory_results = []
 
         async def collect():
             events = []
@@ -426,8 +424,6 @@ class TestGracefulDegradation:
         ctx.trace_id = "t2"
         ctx.session_id = "s2"
         ctx.request_context = {}
-        ctx.knowledge_results = []
-        ctx.memory_results = []
 
         async def collect():
             events = []

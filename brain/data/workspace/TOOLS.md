@@ -1,56 +1,36 @@
 # 工具描述 (TOOLS)
 
-## 目的
-- 集中列出目前可調用的工具、用途、輸入欄位與限制。
+## 重要：你必須主動使用以下工具
 
-## 文件讀取
+回答任何問題前，請先考慮是否需要搜尋知識庫或記憶。如果使用者提到過去的對話、之前設定過的偏好、或任何需要查詢的資訊，你**必須**先呼叫對應的搜尋工具。
 
-- `get_document(path: string)`
-  - 讀取 workspace 內的 `.md`、`.txt`、`.csv` 文件內容。
-  - 參數：`path` — 相對於 workspace 的文件路徑。
-  - 回傳：`{ path, content, truncated, size }`
+## 核心搜尋工具（已啟用）
 
-## 知識搜尋
+### search_knowledge
+- 在知識庫向量表中查詢相關知識片段
+- 參數：`query`（搜尋文字）、`top_k`（回傳筆數，預設 3）
+- 用途：查詢產品資訊、流程說明、公司政策等 workspace 內容
+- **每次回答都應優先搜尋知識庫確認是否有相關資料**
 
-- `search_knowledge(query: string, top_k?: integer)`
-  - 在 knowledge 向量表查詢相關知識片段。
-  - 參數：`query` — 查詢文字；`top_k` — 最多回傳幾筆，預設 3。
-  - 回傳：`{ table, query, results }`
+### search_memory
+- 在記憶向量表中查詢相關記憶片段
+- 參數：`query`（搜尋文字）、`top_k`（回傳筆數，預設 3）
+- 用途：查詢過去對話中記錄的使用者偏好、歷史互動、已知事實
+- **當使用者提到「之前」「上次」「我說過」等詞時，必須呼叫此工具**
 
-## 記憶搜尋
+### get_document
+- 讀取 workspace 裡的 markdown、txt 或 csv 文件內容
+- 參數：`path`（相對於 workspace 的文件路徑）
+- 用途：需要完整閱讀某份文件時使用
 
-- `search_memory(query: string, top_k?: integer)`
-  - 在 memories 向量表查詢相關記憶片段。
-  - 參數：`query` — 查詢文字；`top_k` — 最多回傳幾筆，預設 3。
-  - 回傳：`{ table, query, results }`
+## 業務工具（規劃中）
 
-## FAQ 查詢
-
-- `query_faq(query: string)`
-  - 用關鍵字比對常見問題資料庫，回傳匹配的問答項目。
-  - 參數：`query` — 使用者問題的關鍵字，例如「退貨」、「運費」。
-  - 回傳：`{ query, results: [{ id, question, answer, keywords }], total }`
-  - 無匹配時 results 為空陣列，total 為 0。
-
-## 訂單查詢
-
-- `query_order(order_id: string)`
-  - 用訂單編號精確查詢訂單詳情。
-  - 參數：`order_id` — 訂單編號，格式如 `ORD-20260301-001`。
-  - 回傳（找到）：`{ order_id, found: true, order: { order_id, customer_name, status, items, total, created_at } }`
-  - 回傳（未找到）：`{ order_id, found: false, order: null }`
-
-## CRM API（尚未實作）
+### CRM API
 - `get_customer_profile(customer_id)`
 - `list_customer_orders(customer_id)`
 - `create_support_ticket(payload)`
 
-## 預約 API（尚未實作）
+### 預約 API
 - `list_available_slots(department, date)`
 - `create_appointment(payload)`
 - `cancel_appointment(appointment_id)`
-
-## 注意事項
-- 所有工具輸入都要先做欄位驗證。
-- 涉及個資或醫療資料時，不可把完整敏感資料直接回顯給最終使用者。
-- 工具失敗時，要回傳簡短錯誤並建議下一步。

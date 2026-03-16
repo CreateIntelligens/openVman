@@ -82,9 +82,6 @@ def _make_generation_context(
         user_message=user_message,
         request_context={"channel": "web"},
         prompt_messages=prompt_messages,
-        knowledge_results=[],
-        memory_results=[],
-        retrieval_diagnostics={},
     )
 
 

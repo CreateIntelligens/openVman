@@ -23,8 +23,9 @@ from core.sse_events import (
     ToolEvent,
 )
 from infra.learnings import capture_learnings_from_message, record_error_event
-from core.retrieval_service import retrieve_context
+from memory.embedder import encode_text
 from memory.memory import (
+    add_memory,
     append_session_message,
     archive_session_turn,
     get_or_create_session,
@@ -46,13 +47,14 @@ class GenerationContext:
     user_message: str
     request_context: dict[str, Any]
     prompt_messages: list[dict[str, str]]
-    knowledge_results: list[dict[str, Any]]
-    memory_results: list[dict[str, Any]]
-    retrieval_diagnostics: dict[str, Any]
 
 
 def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
-    """Build prompt inputs and update the user side of the session."""
+    """Build prompt inputs and update the user side of the session.
+
+    Knowledge and memory retrieval is no longer done here — the LLM will
+    call search_knowledge / search_memory tools during the agent loop.
+    """
     cleaned_message = envelope.content.strip()
     cfg = get_settings()
     persona_id = envelope.context.persona_id
@@ -70,16 +72,11 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
     append_session_message(session.session_id, persona_id, "user", cleaned_message, project_id=project_id)
 
-    knowledge_results, memory_results, retrieval_diagnostics = _retrieve_rag_context(
-        route, cleaned_message, persona_id, project_id=project_id,
-    )
     request_ctx = serialize_context(envelope.context)
     prompt_messages = build_chat_messages(
         user_message=cleaned_message,
         request_context=request_ctx,
         session_messages=prior_messages,
-        knowledge_results=knowledge_results,
-        memory_results=memory_results,
     )
 
     return GenerationContext(
@@ -91,24 +88,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         user_message=cleaned_message,
         request_context=request_ctx,
         prompt_messages=prompt_messages,
-        knowledge_results=knowledge_results,
-        memory_results=memory_results,
-        retrieval_diagnostics=retrieval_diagnostics,
     )
-
-
-def _retrieve_rag_context(
-    route: RouteDecision,
-    message: str,
-    persona_id: str,
-    *,
-    project_id: str = "default",
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    """Fetch knowledge and memory results when RAG is enabled for this route."""
-    if route.skip_rag:
-        return [], [], {}
-    bundle = retrieve_context(query=message, persona_id=persona_id, project_id=project_id)
-    return bundle.knowledge_results, bundle.memory_results, bundle.diagnostics
 
 
 def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any]:
@@ -125,6 +105,19 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         context.persona_id,
         project_id=context.project_id,
     )
+
+    # Embed only the user message to keep the vector space focused.
+    turn_text = f"User: {context.user_message}\nAssistant: {cleaned_reply}"
+    user_vector = encode_text(context.user_message)
+    add_memory(
+        text=turn_text,
+        vector=user_vector,
+        source="conversation_turn",
+        metadata={"session_id": context.session_id, "trace_id": context.trace_id},
+        persona_id=context.persona_id,
+        project_id=context.project_id,
+    )
+
     learnings_added = capture_learnings_from_message(context.user_message, project_id=context.project_id)
     maintenance = maybe_run_memory_maintenance(project_id=context.project_id)
 
@@ -143,9 +136,6 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         "session_id": context.session_id,
         "request_context": context.request_context,
         "reply": cleaned_reply,
-        "knowledge_results": context.knowledge_results,
-        "memory_results": context.memory_results,
-        "retrieval_diagnostics": context.retrieval_diagnostics,
         "history": list_session_messages(context.session_id, context.persona_id, project_id=context.project_id),
         "learnings_added": learnings_added,
         "memory_maintenance": maintenance,
@@ -237,12 +227,6 @@ def _tool_event_from_step(trace_id: str, step: dict[str, Any]) -> ToolEvent:
 async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEvent]:
     """Stream a chat generation from prepared prompt context."""
     yield SessionEvent(session_id=context.session_id, trace_id=context.trace_id)
-    yield ContextEvent(
-        trace_id=context.trace_id,
-        knowledge_count=len(context.knowledge_results),
-        memory_count=len(context.memory_results),
-        request_context=context.request_context,
-    )
 
     reply_parts: list[str] = []
     tool_steps: list[dict[str, Any]] = []
@@ -267,6 +251,15 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
             yield _tool_error_event_from_phase_error(context.trace_id, exc)
             stream_messages = _fallback_messages_for_tool_phase_error(context, exc)
 
+    # Emit context event after tool phase so counts reflect actual tool usage
+    knowledge_count, memory_count = _count_retrieval_from_tool_steps(tool_steps)
+    yield ContextEvent(
+        trace_id=context.trace_id,
+        knowledge_count=knowledge_count,
+        memory_count=memory_count,
+        request_context=context.request_context,
+    )
+
     async for token in stream_chat_reply(stream_messages):
         reply_parts.append(token)
         yield TokenEvent(trace_id=context.trace_id, token=token)
@@ -277,10 +270,27 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
         trace_id=context.trace_id,
         session_id=context.session_id,
         reply=full_reply,
-        knowledge_results=context.knowledge_results,
-        memory_results=context.memory_results,
+        knowledge_results=[],
+        memory_results=[],
         tool_steps=tool_steps,
     )
+
+
+def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[int, int]:
+    """Count knowledge and memory results from completed tool call steps."""
+    knowledge_count = 0
+    memory_count = 0
+    for step in tool_steps:
+        name = step.get("name", "")
+        parsed = parse_tool_result(step.get("result", ""))
+        if parsed is None or parsed.status != "ok":
+            continue
+        result_count = len(parsed.data.get("results", []))
+        if name == "search_knowledge":
+            knowledge_count += result_count
+        elif name == "search_memory":
+            memory_count += result_count
+    return knowledge_count, memory_count
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:

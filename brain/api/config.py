@@ -28,17 +28,17 @@ class BrainSettings(BaseSettings):
     llm_key_long_cooldown_seconds: int = 300
     llm_fallback_chain: str = ""
     llm_max_fallback_hops: int = 4
-    prompt_system_char_budget: int = 6000
-    prompt_total_char_budget: int = 12000
-    prompt_context_char_budget: int = 2800
-    prompt_history_char_budget: int = 2200
-    prompt_history_summary_char_budget: int = 900
-    prompt_soul_char_budget: int = 1800
-    prompt_memory_char_budget: int = 1200
-    prompt_agents_char_budget: int = 1000
-    prompt_tools_char_budget: int = 1000
-    prompt_learnings_char_budget: int = 900
-    prompt_errors_char_budget: int = 700
+    prompt_system_char_budget: int = 100000
+    prompt_total_char_budget: int = 150000
+    prompt_context_char_budget: int = 20000
+    prompt_history_char_budget: int = 15000
+    prompt_history_summary_char_budget: int = 5000
+    prompt_soul_char_budget: int = 20000
+    prompt_memory_char_budget: int = 20000
+    prompt_agents_char_budget: int = 10000
+    prompt_tools_char_budget: int = 10000
+    prompt_learnings_char_budget: int = 8000
+    prompt_errors_char_budget: int = 5000
 
     # === Embedding 設定 ===
     embedding_model: str = "BAAI/bge-m3"
