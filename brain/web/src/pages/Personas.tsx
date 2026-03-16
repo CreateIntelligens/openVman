@@ -176,28 +176,16 @@ export default function Personas() {
               // eslint-disable-next-line react-hooks/exhaustive-deps
        }, [projectId]);
 
+       // Default persona uses workspace-root paths; others use personas/<id>/
+       const docPrefix = selectedPersona?.is_default ? "" : `personas/${selectedPersona?.persona_id}/`;
        const coreDocs = selectedPersona
               ? [
                      { path: selectedPersona.path, label: "SOUL.md", icon: "psychology" },
-                     { path: `personas/${selectedPersona.persona_id}/AGENTS.md`, label: "AGENTS.md", icon: "group_work" },
-                     { path: `personas/${selectedPersona.persona_id}/TOOLS.md`, label: "TOOLS.md", icon: "build" },
-                     { path: `personas/${selectedPersona.persona_id}/MEMORY.md`, label: "MEMORY.md", icon: "memory" },
-              ].filter(
-                     (d) =>
-                            !selectedPersona.is_default ||
-                            d.label === "SOUL.md" ||
-                            d.label === "AGENTS.md" ||
-                            d.label === "TOOLS.md" ||
-                            d.label === "MEMORY.md"
-              )
+                     { path: `${docPrefix}AGENTS.md`, label: "AGENTS.md", icon: "group_work" },
+                     { path: `${docPrefix}TOOLS.md`, label: "TOOLS.md", icon: "build" },
+                     { path: `${docPrefix}MEMORY.md`, label: "MEMORY.md", icon: "memory" },
+              ]
               : [];
-
-       // Default project uses global paths
-       if (selectedPersona && selectedPersona.is_default && projectId === "default") {
-              coreDocs[1].path = "AGENTS.md";
-              coreDocs[2].path = "TOOLS.md";
-              coreDocs[3].path = "MEMORY.md";
-       }
 
        return (
               <div className="flex h-full w-full overflow-hidden bg-background">
