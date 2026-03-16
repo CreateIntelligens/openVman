@@ -165,6 +165,29 @@ export interface KnowledgeReindexResponse {
   workspace_root: string;
 }
 
+export interface MetricsTimingBucket {
+  count: number;
+  sum_ms: number;
+  max_ms: number;
+  avg_ms: number;
+}
+
+export interface MetricsSnapshot {
+  counters: Record<string, number>;
+  timings: Record<string, MetricsTimingBucket>;
+  counter_count: number;
+  timing_count: number;
+}
+
+export interface MemoryMaintenanceResponse {
+  status: string;
+  summaries_written?: number;
+  records_before?: number;
+  records_after?: number;
+  deduped?: number;
+  [key: string]: unknown;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
@@ -246,6 +269,17 @@ export async function uploadKnowledgeDocuments(files: File[], targetDir = "") {
 
 export function reindexKnowledge() {
   return post<KnowledgeReindexResponse>("/admin/knowledge/reindex", {
+    project_id: activeProjectId,
+  });
+}
+
+export async function fetchMetrics() {
+  const res = await fetch(`${BASE}/metrics`);
+  return parseJson<MetricsSnapshot>(res);
+}
+
+export function runMemoryMaintenance() {
+  return post<MemoryMaintenanceResponse>("/admin/memory/maintain", {
     project_id: activeProjectId,
   });
 }

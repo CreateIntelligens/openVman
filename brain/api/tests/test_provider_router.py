@@ -233,8 +233,8 @@ def _stub_config(
     fake_cfg.resolved_llm_api_keys = keys
     fake_cfg.resolved_llm_models = models
     fake_cfg.resolved_llm_base_url = "https://api.example.com"
-    fake_cfg.brain_llm_key_cooldown_seconds = 60
-    fake_cfg.brain_llm_key_long_cooldown_seconds = 300
+    fake_cfg.llm_key_cooldown_seconds = 60
+    fake_cfg.llm_key_long_cooldown_seconds = 300
 
     import config
     monkeypatch.setattr(config, "get_settings", lambda: fake_cfg)

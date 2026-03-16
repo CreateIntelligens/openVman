@@ -78,8 +78,8 @@ def build_health_payload(project_id: str = "default") -> dict[str, object]:
         "personas": len(list_personas(project_id)),
         "chat_enabled": True,
         "embedding_model": cfg.embedding_model,
-        "llm_provider": cfg.brain_llm_provider,
-        "llm_model": cfg.brain_llm_model,
+        "llm_provider": cfg.llm_provider,
+        "llm_model": cfg.llm_model,
         "metrics_summary": {
             "counter_count": len(metrics["counters"]),
             "timing_count": len(metrics["timings"]),
@@ -138,55 +138,31 @@ app = FastAPI(
 async def metrics_middleware(request: Request, call_next):
     trace_id = request.headers.get("x-trace-id", "").strip() or str(uuid4())
     request.state.trace_id = trace_id
+    method = request.method
+    path = request.url.path
+    store = get_metrics_store()
     start = perf_counter()
 
     try:
         response = await call_next(request)
     except Exception as exc:
         duration_ms = round((perf_counter() - start) * 1000, 2)
-        get_metrics_store().increment(
-            "http_requests_total",
-            method=request.method,
-            path=request.url.path,
-            status=500,
-        )
-        get_metrics_store().observe(
-            "http_request_duration_ms",
-            duration_ms,
-            method=request.method,
-            path=request.url.path,
-        )
+        store.increment("http_requests_total", method=method, path=path, status=500)
+        store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
         log_exception(
-            "http_request_error",
-            exc,
-            trace_id=trace_id,
-            method=request.method,
-            path=request.url.path,
-            duration_ms=duration_ms,
+            "http_request_error", exc,
+            trace_id=trace_id, method=method, path=path, duration_ms=duration_ms,
         )
         raise
 
     duration_ms = round((perf_counter() - start) * 1000, 2)
     response.headers["X-Trace-Id"] = trace_id
-    get_metrics_store().increment(
-        "http_requests_total",
-        method=request.method,
-        path=request.url.path,
-        status=response.status_code,
-    )
-    get_metrics_store().observe(
-        "http_request_duration_ms",
-        duration_ms,
-        method=request.method,
-        path=request.url.path,
-    )
+    store.increment("http_requests_total", method=method, path=path, status=response.status_code)
+    store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
     log_event(
         "http_request",
-        trace_id=trace_id,
-        method=request.method,
-        path=request.url.path,
-        status=response.status_code,
-        duration_ms=duration_ms,
+        trace_id=trace_id, method=method, path=path,
+        status=response.status_code, duration_ms=duration_ms,
     )
     return response
 

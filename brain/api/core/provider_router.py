@@ -27,8 +27,8 @@ class ProviderRouter:
             cfg = get_settings()
             self._pool = KeyPoolManager(
                 cfg.resolved_llm_api_keys,
-                short_cooldown=cfg.brain_llm_key_cooldown_seconds,
-                long_cooldown=cfg.brain_llm_key_long_cooldown_seconds,
+                short_cooldown=cfg.llm_key_cooldown_seconds,
+                long_cooldown=cfg.llm_key_long_cooldown_seconds,
             )
         return self._pool
 

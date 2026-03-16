@@ -24,11 +24,11 @@ def build_fallback_chain(trace_id: str) -> list[RouteHop]:
     """Build an ordered list of route hops from the configured fallback chain.
 
     Each (provider, model) pair in the chain gets one hop entry.
-    The chain is bounded by ``brain_llm_max_fallback_hops``.
+    The chain is bounded by ``llm_max_fallback_hops``.
     """
     cfg = get_settings()
     chain_spec = cfg.resolved_fallback_chain
-    max_hops = cfg.brain_llm_max_fallback_hops
+    max_hops = cfg.llm_max_fallback_hops
 
     hops: list[RouteHop] = []
     for idx, (provider, model) in enumerate(chain_spec):
