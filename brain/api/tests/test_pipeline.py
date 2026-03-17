@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import sys
-import types
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -67,23 +66,13 @@ def _make_envelope(
     )
 
 
-def _import(module_name: str):
-    return importlib.import_module(module_name)
-
-
-def _make_fake_agent_loop() -> types.ModuleType:
-    from conftest import make_fake_agent_loop
-
-    return make_fake_agent_loop()
-
-
 def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
-    from conftest import stub_chat_service_deps
+    from conftest import make_fake_agent_loop, stub_chat_service_deps
 
     stub_chat_service_deps(monkeypatch)
-    monkeypatch.setitem(sys.modules, "core.agent_loop", _make_fake_agent_loop())
+    monkeypatch.setitem(sys.modules, "core.agent_loop", make_fake_agent_loop())
     sys.modules.pop("core.chat_service", None)
-    return _import("core.chat_service")
+    return importlib.import_module("core.chat_service")
 
 
 # --- route tests ---
@@ -218,8 +207,6 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
         user_message="current",
         request_context={"persona_id": "default"},
         session_messages=[],
-        knowledge_results=[],
-        memory_results=[],
     )
 
     assert len(result) == 2
@@ -232,12 +219,12 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
 
 def test_enforce_session_round_limit_raises_when_exceeded(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "safety.guardrails._get_session_updated_at",
-        lambda session_id, persona_id: None,
+        "memory.memory.get_session_updated_at",
+        lambda session_id, persona_id, project_id="default": None,
     )
     monkeypatch.setattr(
-        "safety.guardrails._count_session_rounds",
-        lambda session_id, persona_id: 100,
+        "memory.memory.list_session_messages",
+        lambda session_id, persona_id, project_id="default": [{"role": "user"}] * 100,
     )
 
     with pytest.raises(ValueError, match="輪上限"):
@@ -246,12 +233,12 @@ def test_enforce_session_round_limit_raises_when_exceeded(monkeypatch: pytest.Mo
 
 def test_enforce_session_round_within_limit_does_not_raise(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "safety.guardrails._get_session_updated_at",
-        lambda session_id, persona_id: None,
+        "memory.memory.get_session_updated_at",
+        lambda session_id, persona_id, project_id="default": None,
     )
     monkeypatch.setattr(
-        "safety.guardrails._count_session_rounds",
-        lambda session_id, persona_id: 5,
+        "memory.memory.list_session_messages",
+        lambda session_id, persona_id, project_id="default": [{"role": "user"}] * 5,
     )
 
     # should not raise
@@ -261,13 +248,12 @@ def test_enforce_session_round_within_limit_does_not_raise(monkeypatch: pytest.M
 def test_enforce_session_limits_rejects_expired_session(monkeypatch: pytest.MonkeyPatch) -> None:
     expired_at = (datetime.now() - timedelta(minutes=45)).isoformat(timespec="seconds")
     monkeypatch.setattr(
-        "safety.guardrails._count_session_rounds",
-        lambda session_id, persona_id: 0,
+        "memory.memory.get_session_updated_at",
+        lambda session_id, persona_id, project_id="default": expired_at,
     )
     monkeypatch.setattr(
-        "safety.guardrails._get_session_updated_at",
-        lambda session_id, persona_id: expired_at,
-        raising=False,
+        "memory.memory.list_session_messages",
+        lambda session_id, persona_id, project_id="default": [],
     )
 
     with pytest.raises(ValueError, match="TTL"):
@@ -287,7 +273,7 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         chat_service,
         "enforce_session_limits",
-        lambda session_id, persona_id: None,
+        lambda session_id, persona_id, project_id="default": None,
     )
     monkeypatch.setattr(
         chat_service,
@@ -311,19 +297,13 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     )
     monkeypatch.setattr(
         chat_service,
-        "retrieve_context",
-        lambda query="", persona_id="default", project_id="default": (_ for _ in ()).throw(AssertionError("retrieve_context should be skipped")),
-    )
-    monkeypatch.setattr(
-        chat_service,
         "build_chat_messages",
         lambda **kwargs: [{"role": "system", "content": "sys"}, {"role": "user", "content": kwargs["user_message"]}],
     )
 
     context = chat_service.prepare_generation(_make_envelope(message_type="control"))
 
-    assert context.knowledge_results == []
-    assert context.memory_results == []
+    assert context.prompt_messages is not None
 
 
 def test_execute_generation_skips_tool_loop_for_direct_route(monkeypatch: pytest.MonkeyPatch) -> None:

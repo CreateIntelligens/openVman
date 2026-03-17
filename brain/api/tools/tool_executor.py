@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import json
 from dataclasses import asdict, dataclass
 from queue import Empty, Queue
@@ -158,10 +159,13 @@ def _run_tool_handler_with_timeout(
     timeout: int,
 ) -> Any:
     queue: Queue[tuple[str, Any]] = Queue(maxsize=1)
+    # Capture current context so ContextVars (project_id, persona_id)
+    # propagate into the worker thread.
+    ctx = contextvars.copy_context()
 
     def runner() -> None:
         try:
-            queue.put(("result", handler(arguments)))
+            queue.put(("result", ctx.run(handler, arguments)))
         except Exception as exc:  # pragma: no cover - exercised via queue consumer
             queue.put(("error", exc))
 

@@ -157,6 +157,54 @@ class SessionStore:
                         raise ValueError("session_id 已綁定其他 persona")
                 return str(row[1] or "")
 
+    def list_sessions(self, persona_id: str | None = None) -> list[dict[str, object]]:
+        """List all sessions with message count and last message preview."""
+        with self._lock:
+            with self._connect() as conn:
+                base_sql = """
+                    SELECT
+                        s.session_id,
+                        s.persona_id,
+                        s.created_at,
+                        s.updated_at,
+                        (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) AS message_count,
+                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_preview
+                    FROM sessions s
+                """
+                if persona_id:
+                    persona_key = normalize_persona_id(persona_id)
+                    rows = conn.execute(
+                        base_sql + " WHERE s.persona_id = ? ORDER BY s.updated_at DESC",
+                        (persona_key,),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        base_sql + " ORDER BY s.updated_at DESC",
+                    ).fetchall()
+
+                return [
+                    {
+                        "session_id": row[0],
+                        "persona_id": row[1],
+                        "created_at": row[2],
+                        "updated_at": row[3],
+                        "message_count": row[4],
+                        "last_message_preview": (row[5] or "")[:120],
+                    }
+                    for row in rows
+                ]
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a session and its messages (CASCADE)."""
+        with self._lock:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    "DELETE FROM sessions WHERE session_id = ?",
+                    (session_id,),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+
     def _init_db(self) -> None:
         with self._connect() as conn:
             conn.execute(

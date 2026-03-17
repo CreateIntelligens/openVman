@@ -5,16 +5,21 @@ import {
   fetchProjects,
   ProjectSummary,
 } from "../api";
+import { useProject } from "../context/ProjectContext";
+import ConfirmModal from "../components/ConfirmModal";
+import StatusAlert from "../components/StatusAlert";
 
 type Status = { type: "success" | "error"; message: string } | null;
 
 export default function Projects() {
+  const { refreshProjects, setProjectId, projectId: currentProjectId } = useProject();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [newProjectId, setNewProjectId] = useState("");
   const [newProjectLabel, setNewProjectLabel] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState("");
   const [status, setStatus] = useState<Status>(null);
 
   const loadProjects = async () => {
@@ -45,6 +50,7 @@ export default function Projects() {
       setNewProjectId("");
       setNewProjectLabel("");
       setStatus({ type: "success", message: `專案 "${id}" 已建立` });
+      refreshProjects();
       await loadProjects();
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
@@ -54,12 +60,17 @@ export default function Projects() {
   };
 
   const handleDelete = async (projectId: string) => {
+    setDeleteTargetId("");
     if (deletingId) return;
     setDeletingId(projectId);
     setStatus(null);
     try {
       await deleteProject(projectId);
       setStatus({ type: "success", message: `專案 "${projectId}" 已刪除` });
+      refreshProjects();
+      if (projectId === currentProjectId) {
+        setProjectId("default");
+      }
       await loadProjects();
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
@@ -83,17 +94,7 @@ export default function Projects() {
       </header>
 
       <div className="p-8 space-y-8">
-        {status && (
-          <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${
-              status.type === "success"
-                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
-                : "border-red-500/20 bg-red-500/10 text-red-400"
-            }`}
-          >
-            {status.message}
-          </div>
-        )}
+        {status && <StatusAlert type={status.type} message={status.message} />}
 
         {/* Create new project */}
         <section className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
@@ -185,7 +186,7 @@ export default function Projects() {
 
                 {project.project_id !== "default" && (
                   <button
-                    onClick={() => handleDelete(project.project_id)}
+                    onClick={() => setDeleteTargetId(project.project_id)}
                     disabled={!!deletingId}
                     className="mt-auto rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:border-red-500/30 transition-colors disabled:opacity-50"
                   >
@@ -203,6 +204,16 @@ export default function Projects() {
           </div>
         </section>
       </div>
+
+      <ConfirmModal
+        open={deleteTargetId !== ""}
+        title="Delete Project"
+        message={`確定要刪除專案「${deleteTargetId}」嗎？\n\n此操作會刪除該專案的所有 knowledge、persona 和 memory 資料，且無法復原。`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => handleDelete(deleteTargetId)}
+        onCancel={() => setDeleteTargetId("")}
+      />
     </>
   );
 }

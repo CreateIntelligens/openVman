@@ -11,6 +11,7 @@ venv/
 .venv/
 *.egg-info/
 dist/
+dist_bak/
 
 # LanceDB 資料庫（runtime 資料）
 .openclaw/

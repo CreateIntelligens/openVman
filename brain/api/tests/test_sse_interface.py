@@ -29,17 +29,11 @@ from core.sse_events import (
 from protocol.protocol_events import validate_server_event
 
 
-def _make_fake_agent_loop() -> types.ModuleType:
-    from conftest import make_fake_agent_loop
-
-    return make_fake_agent_loop()
-
-
 def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
-    from conftest import stub_chat_service_deps
+    from conftest import make_fake_agent_loop, stub_chat_service_deps
 
     stub_chat_service_deps(monkeypatch)
-    monkeypatch.setitem(sys.modules, "core.agent_loop", _make_fake_agent_loop())
+    monkeypatch.setitem(sys.modules, "core.agent_loop", make_fake_agent_loop())
 
     fake_llm_client = types.ModuleType("core.llm_client")
     fake_llm_client.generate_chat_reply = lambda messages: "sync reply"
@@ -58,9 +52,7 @@ def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
 def _stub_finalize_dependencies(monkeypatch: pytest.MonkeyPatch, chat_service) -> None:
     monkeypatch.setattr(chat_service, "append_session_message", lambda *args, **kwargs: None)
     monkeypatch.setattr(chat_service, "archive_session_turn", lambda *args, **kwargs: None)
-    monkeypatch.setattr(chat_service, "capture_learnings_from_message", lambda message, project_id="default": [])
     monkeypatch.setattr(chat_service, "maybe_run_memory_maintenance", lambda project_id="default": {})
-    monkeypatch.setattr(chat_service, "write_summary_and_reindex", lambda **kw: {"status": "skipped"})
     monkeypatch.setattr(chat_service, "list_session_messages", lambda session_id, persona_id, project_id="default": [])
 
 
@@ -82,9 +74,6 @@ def _make_generation_context(
         user_message=user_message,
         request_context={"channel": "web"},
         prompt_messages=prompt_messages,
-        knowledge_results=[],
-        memory_results=[],
-        retrieval_diagnostics={},
     )
 
 
@@ -282,9 +271,10 @@ async def test_stream_generation_with_tools_uses_native_stream_after_tool_phase(
 
     events = [event async for event in chat_service.stream_generation(context)]
 
-    assert [event.event for event in events] == ["session", "context", "tool", "token", "token", "done"]
-    assert events[2].trace_id == "trace_tool"
-    assert events[2].name == "get_weather"
+    # Context event is emitted after tool phase so counts reflect actual tool usage
+    assert [event.event for event in events] == ["session", "tool", "context", "token", "token", "done"]
+    assert events[1].trace_id == "trace_tool"
+    assert events[1].name == "get_weather"
     assert events[-1].reply == "Final answer"
     assert events[-1].tool_steps == [
         {

@@ -106,7 +106,7 @@ export function postAddMemory(
   source = "user",
   metadata: Record<string, unknown> = {},
 ) {
-  return post<Record<string, unknown>>("/add_memory", { text, source, metadata, project_id: activeProjectId });
+  return post<Record<string, unknown>>("/memories", { text, source, metadata, project_id: activeProjectId });
 }
 
 export interface PersonaSummary {
@@ -194,7 +194,7 @@ export interface ChatMessage {
   created_at?: string;
 }
 
-export interface GenerateResponse {
+export interface ChatResponse {
   status: string;
   session_id: string;
   persona_id?: string;
@@ -202,7 +202,6 @@ export interface GenerateResponse {
   knowledge_results: RetrievalResult[];
   memory_results: RetrievalResult[];
   history: ChatMessage[];
-  learnings_added: string[];
 }
 
 export interface RetrievalResult {
@@ -213,20 +212,87 @@ export interface RetrievalResult {
   _distance?: number;
 }
 
-export interface GenerateContextEvent {
+export interface ChatContextEvent {
   knowledge_count: number;
   memory_count: number;
 }
 
-export type GenerateDoneEvent = GenerateResponse;
+export type ChatDoneEvent = ChatResponse;
 
-export interface GenerateStreamHandlers {
+export interface ChatStreamHandlers {
   onSession?: (payload: { session_id: string }) => void;
-  onContext?: (payload: GenerateContextEvent) => void;
+  onContext?: (payload: ChatContextEvent) => void;
   onToken?: (payload: { token: string }) => void;
-  onDone?: (payload: GenerateDoneEvent) => void;
+  onDone?: (payload: ChatDoneEvent) => void;
   onError?: (payload: { message: string }) => void;
 }
+
+// ---------------------------------------------------------------------------
+// Memory Browse
+// ---------------------------------------------------------------------------
+
+export interface MemoryRecord {
+  text: string;
+  source: string;
+  date: string;
+  metadata?: string;
+}
+
+export interface MemoriesListResponse {
+  memories: MemoryRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export async function fetchMemories(page = 1, pageSize = 20) {
+  const res = await fetch(projectUrl("/memories", { page: String(page), page_size: String(pageSize) }));
+  return parseJson<MemoriesListResponse>(res);
+}
+
+export function deleteMemory(text: string) {
+  return jsonRequest<{ status: string }>(
+    "DELETE",
+    "/memories",
+    { project_id: activeProjectId, text },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Session Management
+// ---------------------------------------------------------------------------
+
+export interface SessionSummary {
+  session_id: string;
+  persona_id: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  last_message_preview: string;
+}
+
+export interface SessionsListResponse {
+  sessions: SessionSummary[];
+  session_count: number;
+}
+
+export async function fetchSessions(personaId?: string) {
+  const params: Record<string, string> = {};
+  if (personaId) params.persona_id = personaId;
+  const res = await fetch(projectUrl("/sessions", params));
+  return parseJson<SessionsListResponse>(res);
+}
+
+export async function deleteSession(sessionId: string) {
+  const res = await fetch(projectUrl(`/sessions/${encodeURIComponent(sessionId)}`), {
+    method: "DELETE",
+  });
+  return parseJson<{ status: string; session_id: string }>(res);
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge
+// ---------------------------------------------------------------------------
 
 export async function fetchKnowledgeDocuments() {
   const res = await fetch(projectUrl("/admin/knowledge/documents"));
@@ -244,6 +310,13 @@ export function saveKnowledgeDocument(path: string, content: string) {
     "/admin/knowledge/document",
     { path, content, project_id: activeProjectId },
   );
+}
+
+export async function deleteKnowledgeDocument(path: string) {
+  const res = await fetch(projectUrl("/admin/knowledge/document", { path }), {
+    method: "DELETE",
+  });
+  return parseJson<{ status: string }>(res);
 }
 
 export function moveKnowledgeDocument(sourcePath: string, targetPath: string) {
@@ -313,23 +386,14 @@ export function clonePersona(sourcePersonaId: string, targetPersonaId: string) {
   });
 }
 
-export function postGenerate(message: string, personaId = "default", sessionId?: string) {
-  return post<GenerateResponse>("/generate", {
-    message,
-    persona_id: personaId,
-    session_id: sessionId,
-    project_id: activeProjectId,
-  });
-}
-
-export async function streamGenerate(
+export async function streamChat(
   message: string,
   personaId: string,
   sessionId: string | undefined,
-  handlers: GenerateStreamHandlers,
+  handlers: ChatStreamHandlers,
   signal?: AbortSignal,
 ) {
-  const res = await fetch(`${BASE}/generate/stream`, {
+  const res = await fetch(`${BASE}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, persona_id: personaId, session_id: sessionId, project_id: activeProjectId }),
@@ -348,13 +412,12 @@ export async function streamGenerate(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+  let done = false;
+  while (!done) {
+    const result = await reader.read();
+    done = result.done;
+    buffer += decoder.decode(result.value ?? new Uint8Array(), { stream: !done });
     buffer = processSseBuffer(buffer, handlers);
-    if (done) {
-      break;
-    }
   }
 }
 
@@ -373,7 +436,7 @@ async function parseErrorMessage(res: Response) {
   return text || `Request failed: ${res.status}`;
 }
 
-function processSseBuffer(buffer: string, handlers: GenerateStreamHandlers) {
+function processSseBuffer(buffer: string, handlers: ChatStreamHandlers) {
   let working = buffer.replace(/\r/g, "");
   let boundary = working.indexOf("\n\n");
 
@@ -412,26 +475,15 @@ function parseSsePayload(payload: string) {
   }
 }
 
-function dispatchSseEvent(eventName: string, payload: unknown, handlers: GenerateStreamHandlers) {
-  switch (eventName) {
-    case "session":
-      handlers.onSession?.(payload as { session_id: string });
-      return;
-    case "context":
-      handlers.onContext?.(payload as GenerateContextEvent);
-      return;
-    case "token":
-      handlers.onToken?.(payload as { token: string });
-      return;
-    case "done":
-      handlers.onDone?.(payload as GenerateDoneEvent);
-      return;
-    case "error":
-      handlers.onError?.(payload as { message: string });
-      return;
-    default:
-      return;
-  }
+function dispatchSseEvent(eventName: string, payload: unknown, handlers: ChatStreamHandlers) {
+  const handlerMap: Record<string, ((p: never) => void) | undefined> = {
+    session: handlers.onSession,
+    context: handlers.onContext,
+    token: handlers.onToken,
+    done: handlers.onDone,
+    error: handlers.onError,
+  };
+  handlerMap[eventName]?.(payload as never);
 }
 
 function getApiErrorMessage(payload: ApiErrorPayload, status: number) {

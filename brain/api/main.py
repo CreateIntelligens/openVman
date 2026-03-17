@@ -34,6 +34,7 @@ from infra.project_admin import (
 )
 from knowledge.indexer import rebuild_knowledge_index
 from knowledge.knowledge_admin import (
+    delete_workspace_document,
     list_workspace_documents,
     move_workspace_document,
     read_workspace_document,
@@ -42,7 +43,15 @@ from knowledge.knowledge_admin import (
 )
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import encode_text, get_embedder
-from memory.memory import add_memory as store_memory, get_or_create_session, list_session_messages
+from memory.memory import (
+    add_memory as store_memory,
+    delete_memory as remove_memory,
+    delete_session_for_project,
+    get_or_create_session,
+    list_memories as query_memories,
+    list_session_messages,
+    list_sessions_for_project,
+)
 from memory.memory_governance import maybe_run_memory_maintenance
 from memory.retrieval import search_records
 from personas.personas import (
@@ -53,16 +62,26 @@ from personas.personas import (
 )
 from protocol.message_envelope import build_message_envelope
 from protocol.protocol_events import ProtocolValidationError, validate_client_event, validate_server_event
+from protocol.schemas import (
+    AddMemoryRequest,
+    AdminActionRequest,
+    EmbedRequest,
+    ChatRequest,
+    KnowledgeDocumentMoveRequest,
+    KnowledgeDocumentPutRequest,
+    PersonaCloneRequest,
+    PersonaCreateRequest,
+    PersonaDeleteRequest,
+    ProjectCreateRequest,
+    ProjectDeleteRequest,
+    ProtocolValidateRequest,
+    SearchRequest,
+)
 from safety.guardrails import enforce_guardrails
 from safety.observability import get_metrics_store, log_event, log_exception
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brain")
-
-
-def get_request_text(body: dict[str, object], key: str, default: str = "") -> str:
-    """Read a request body field as trimmed text."""
-    return str(body.get(key, default)).strip()
 
 
 def build_health_payload(project_id: str = "default") -> dict[str, object]:
@@ -98,7 +117,7 @@ async def warmup_resources() -> None:
 
 
 async def cancel_task(task: asyncio.Task[None] | None) -> None:
-    """在 shutdown 時安全取消背景任務。"""
+    """在 shutdown 時 safe 取消背景任務。"""
     if task is None or task.done():
         return
 
@@ -192,25 +211,20 @@ async def admin_list_projects():
 
 
 @app.post("/api/admin/projects")
-async def admin_create_project(request: Request):
-    body = await request.json()
-    project_id = get_request_text(body, "project_id")
-    label = get_request_text(body, "label")
+async def admin_create_project(payload: ProjectCreateRequest):
     try:
-        result = create_project(project_id, label)
-        log_event("project_created", project_id=project_id)
+        result = create_project(payload.project_id, payload.label)
+        log_event("project_created", project_id=payload.project_id)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.delete("/api/admin/projects")
-async def admin_delete_project(request: Request):
-    body = await request.json()
-    project_id = get_request_text(body, "project_id")
+async def admin_delete_project(payload: ProjectDeleteRequest):
     try:
-        result = delete_project(project_id)
-        log_event("project_deleted", project_id=project_id)
+        result = delete_project(payload.project_id)
+        log_event("project_deleted", project_id=payload.project_id)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -235,45 +249,34 @@ async def personas(project_id: str = "default"):
 
 
 @app.post("/api/admin/personas")
-async def create_persona(request: Request):
-    body = await request.json()
-    persona_id = get_request_text(body, "persona_id")
-    label = get_request_text(body, "label")
-    project_id = get_request_text(body, "project_id") or "default"
+async def create_persona(payload: PersonaCreateRequest):
     try:
-        result = create_persona_scaffold(persona_id, label, project_id)
-        log_event("persona_created", persona_id=persona_id, project_id=project_id)
+        result = create_persona_scaffold(payload.persona_id, payload.label, payload.project_id)
+        log_event("persona_created", persona_id=payload.persona_id, project_id=payload.project_id)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.delete("/api/admin/personas")
-async def delete_persona(request: Request):
-    body = await request.json()
-    persona_id = get_request_text(body, "persona_id")
-    project_id = get_request_text(body, "project_id") or "default"
+async def delete_persona(payload: PersonaDeleteRequest):
     try:
-        result = delete_persona_scaffold(persona_id, project_id)
-        log_event("persona_deleted", persona_id=persona_id, project_id=project_id)
+        result = delete_persona_scaffold(payload.persona_id, payload.project_id)
+        log_event("persona_deleted", persona_id=payload.persona_id, project_id=payload.project_id)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/admin/personas/clone")
-async def clone_persona(request: Request):
-    body = await request.json()
-    source_persona_id = get_request_text(body, "source_persona_id")
-    target_persona_id = get_request_text(body, "target_persona_id")
-    project_id = get_request_text(body, "project_id") or "default"
+async def clone_persona(payload: PersonaCloneRequest):
     try:
-        result = clone_persona_scaffold(source_persona_id, target_persona_id, project_id)
+        result = clone_persona_scaffold(payload.source_persona_id, payload.target_persona_id, payload.project_id)
         log_event(
             "persona_cloned",
-            source_persona_id=source_persona_id,
-            target_persona_id=target_persona_id,
-            project_id=project_id,
+            source_persona_id=payload.source_persona_id,
+            target_persona_id=payload.target_persona_id,
+            project_id=payload.project_id,
         )
         return result
     except ValueError as exc:
@@ -285,24 +288,14 @@ async def clone_persona(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/protocol/validate")
-async def protocol_validate(request: Request):
+async def protocol_validate(payload: ProtocolValidateRequest):
     """Validate a protocol event payload against the versioned contract."""
-    body = await request.json()
-    direction = str(body.get("direction", "")).strip()
-    payload = body.get("payload")
-    version = str(body.get("version", "1.0.0")).strip()
-
-    if not direction or direction not in {"client_to_server", "server_to_client"}:
-        raise HTTPException(status_code=400, detail="direction 須為 client_to_server 或 server_to_client")
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="payload 須為 JSON object")
-
     try:
-        if direction == "client_to_server":
-            event = validate_client_event(payload, version)
+        if payload.direction == "client_to_server":
+            event = validate_client_event(payload.payload, payload.version)
         else:
-            event = validate_server_event(payload, version)
-        return {"valid": True, "event": event.event, "version": version}
+            event = validate_server_event(payload.payload, payload.version)
+        return {"valid": True, "event": event.event, "version": payload.version}
     except ProtocolValidationError as exc:
         return {
             "valid": False,
@@ -318,14 +311,9 @@ async def protocol_validate(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/embed")
-async def embed(request: Request):
-    """測試用：向量化文字"""
-    body = await request.json()
-    texts = body.get("texts", [])
-    if not texts:
-        raise HTTPException(status_code=400, detail="texts 不可為空")
-
-    vectors = get_embedder().encode(texts)
+async def embed(payload: EmbedRequest):
+    """向量化文字"""
+    vectors = get_embedder().encode(payload.texts)
     return {
         "count": len(vectors),
         "dim": len(vectors[0]) if vectors else 0,
@@ -338,19 +326,15 @@ async def embed(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/search")
-async def search(request: Request):
-    """測試用：在 LanceDB 中語意搜尋"""
-    body = await request.json()
-    envelope = build_message_envelope(request, body, content_key="query")
+async def search(request: Request, payload: SearchRequest):
+    """在 LanceDB 中語意搜尋"""
+    envelope = build_message_envelope(request, payload.model_dump(), content_key="query")
     query = envelope.content
-    table_name = body.get("table", "memories")
-    top_k = body.get("top_k", 5)
     project_id = envelope.context.project_id
 
     if not query:
         raise HTTPException(status_code=400, detail="query 不可為空")
-    if table_name not in {"knowledge", "memories"}:
-        raise HTTPException(status_code=400, detail="table 僅支援 knowledge 或 memories")
+
     try:
         enforce_guardrails("search", query, envelope.context)
     except ValueError as exc:
@@ -359,17 +343,17 @@ async def search(request: Request):
 
     query_vec = encode_text(query)
     results = search_records(
-        table_name=table_name,
+        table_name=payload.table,
         query_vector=query_vec,
-        top_k=top_k,
+        top_k=payload.top_k,
         persona_id=envelope.context.persona_id,
         project_id=project_id,
     )
     log_event(
         "search_complete",
         trace_id=envelope.context.trace_id,
-        table=table_name,
-        top_k=top_k,
+        table=payload.table,
+        top_k=payload.top_k,
         result_count=len(results),
         project_id=project_id,
     )
@@ -377,18 +361,16 @@ async def search(request: Request):
     return {
         "trace_id": envelope.context.trace_id,
         "query": query,
-        "table": table_name,
+        "table": payload.table,
         "results": results,
     }
 
 
-@app.post("/api/add_memory")
-async def add_memory(request: Request):
-    """測試用：新增一筆記憶。"""
-    body = await request.json()
-    envelope = build_message_envelope(request, body, content_key="text")
+@app.post("/api/memories")
+async def add_memory(request: Request, payload: AddMemoryRequest):
+    """新增一筆記憶。"""
+    envelope = build_message_envelope(request, payload.model_dump(), content_key="text")
     text = envelope.content
-    source = body.get("source", "user")
     project_id = envelope.context.project_id
 
     if not text:
@@ -403,15 +385,15 @@ async def add_memory(request: Request):
     store_memory(
         text=text,
         vector=vector,
-        source=source,
-        metadata=body.get("metadata", {}),
+        source=payload.source,
+        metadata=payload.metadata,
         persona_id=envelope.context.persona_id,
         project_id=project_id,
     )
     log_event(
         "memory_added",
         trace_id=envelope.context.trace_id,
-        source=source,
+        source=payload.source,
         project_id=project_id,
     )
 
@@ -426,52 +408,54 @@ async def add_memory(request: Request):
 # Chat Generation
 # ---------------------------------------------------------------------------
 
-@app.post("/api/generate")
-async def generate(request: Request):
+@app.post("/api/chat")
+async def chat(request: Request, payload: ChatRequest):
     """Generate a reply using workspace context, retrieval, and recent session history."""
-    envelope = await read_generation_request(request)
-
     try:
+        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
         context = prepare_generation(envelope)
         result = await asyncio.to_thread(execute_generation, context)
         response = finalize_generation(context, result.reply)
         response["tool_steps"] = result.tool_steps
         log_event(
-            "generate_complete",
+            "chat_complete",
             trace_id=context.trace_id,
             session_id=context.session_id,
             tool_steps=len(result.tool_steps),
             project_id=context.project_id,
         )
         return response
-    except ValueError as exc:
-        get_metrics_store().increment("guardrail_blocks_total", action="generate")
-        record_generation_failure("generate", "validation", str(exc))
+    except (ValueError, ProtocolValidationError) as exc:
+        get_metrics_store().increment("guardrail_blocks_total", action="chat")
+        record_generation_failure("chat", "validation", str(exc))
         error_payload = build_exception_protocol_error(exc)
         raise HTTPException(status_code=400, detail=error_payload) from exc
-    except Exception as exc:  # pragma: no cover - external provider failures
+    except Exception as exc:  # pragma: no cover
         log_exception(
-            "generate_error",
+            "chat_error",
             exc,
             trace_id=getattr(request.state, "trace_id", ""),
         )
-        record_generation_failure("generate", "llm_failure", str(exc))
+        record_generation_failure("chat", "llm_failure", str(exc))
         error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
         raise HTTPException(status_code=502, detail=error_payload) from exc
 
 
-@app.post("/api/generate/stream")
-async def generate_stream(request: Request):
+@app.post("/api/chat/stream")
+async def chat_stream(request: Request, payload: ChatRequest):
     """Stream chat generation through SSE."""
-    envelope = await read_generation_request(request)
-
     try:
+        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
         context = prepare_generation(envelope)
-    except ValueError as exc:
-        get_metrics_store().increment("guardrail_blocks_total", action="stream_generate")
-        record_generation_failure("stream_generate", "validation", str(exc))
+    except (ValueError, ProtocolValidationError) as exc:
+        get_metrics_store().increment("guardrail_blocks_total", action="chat_stream")
+        record_generation_failure("chat_stream", "validation", str(exc))
         error_payload = build_exception_protocol_error(exc)
         raise HTTPException(status_code=400, detail=error_payload) from exc
+    except Exception as exc:  # pragma: no cover
+        log_exception("chat_stream_init_error", exc, trace_id=getattr(request.state, "trace_id", ""))
+        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 串流初始化失敗")
+        raise HTTPException(status_code=502, detail=error_payload) from exc
 
     return EventSourceResponse(_stream_generation_events(context))
 
@@ -487,6 +471,51 @@ async def get_chat_history(session_id: str, persona_id: str = "default", project
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Memory Browse & Session Management
+# ---------------------------------------------------------------------------
+
+@app.get("/api/memories")
+async def list_memories(project_id: str = "default", page: int = 1, page_size: int = 20):
+    try:
+        return query_memories(project_id=project_id, page=page, page_size=page_size)
+    except Exception as exc:
+        log_exception("list_memories_error", exc)
+        raise HTTPException(status_code=500, detail="無法讀取記憶列表") from exc
+
+
+@app.delete("/api/memories")
+async def delete_memory(payload: AddMemoryRequest):
+    if not payload.text:
+        raise HTTPException(status_code=400, detail="text 不可為空")
+    try:
+        remove_memory(project_id=payload.project_id, text=payload.text)
+        log_event("memory_deleted", project_id=payload.project_id)
+        return {"status": "ok"}
+    except Exception as exc:
+        log_exception("delete_memory_error", exc)
+        raise HTTPException(status_code=500, detail="刪除記憶失敗") from exc
+
+
+@app.get("/api/sessions")
+async def list_sessions(project_id: str = "default", persona_id: str | None = None):
+    try:
+        sessions = list_sessions_for_project(project_id=project_id, persona_id=persona_id)
+        return {"sessions": sessions, "session_count": len(sessions)}
+    except Exception as exc:
+        log_exception("list_sessions_error", exc)
+        raise HTTPException(status_code=500, detail="無法讀取 session 列表") from exc
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str, project_id: str = "default"):
+    deleted = delete_session_for_project(project_id=project_id, session_id=session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session 不存在")
+    log_event("session_deleted", session_id=session_id, project_id=project_id)
+    return {"status": "ok", "session_id": session_id}
 
 
 # ---------------------------------------------------------------------------
@@ -513,29 +542,30 @@ async def get_knowledge_document(path: str, project_id: str = "default"):
 
 
 @app.put("/api/admin/knowledge/document")
-async def put_knowledge_document(request: Request):
-    body = await request.json()
-    path = get_request_text(body, "path")
-    content = str(body.get("content", ""))
-    project_id = get_request_text(body, "project_id") or "default"
-
+async def put_knowledge_document(payload: KnowledgeDocumentPutRequest):
     try:
-        document = save_workspace_document(path, content, project_id)
+        document = save_workspace_document(payload.path, payload.content, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {"status": "ok", "document": document}
 
 
-@app.post("/api/admin/knowledge/move")
-async def post_move_knowledge_document(request: Request):
-    body = await request.json()
-    source_path = get_request_text(body, "source_path")
-    target_path = get_request_text(body, "target_path")
-    project_id = get_request_text(body, "project_id") or "default"
-
+@app.delete("/api/admin/knowledge/document")
+async def delete_knowledge_document(path: str, project_id: str = "default"):
     try:
-        document = move_workspace_document(source_path, target_path, project_id)
+        delete_workspace_document(path, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="找不到指定文件") from exc
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/knowledge/move")
+async def post_move_knowledge_document(payload: KnowledgeDocumentMoveRequest):
+    try:
+        document = move_workspace_document(payload.source_path, payload.target_path, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
@@ -570,30 +600,26 @@ async def upload_knowledge_documents(
 
 
 @app.post("/api/admin/knowledge/reindex")
-async def reindex_knowledge(request: Request):
-    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    project_id = get_request_text(body, "project_id") or "default"
+async def reindex_knowledge(payload: AdminActionRequest):
     try:
-        result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
-        log_event("knowledge_reindex", project_id=project_id, **result)
+        result = await asyncio.to_thread(rebuild_knowledge_index, payload.project_id)
+        log_event("knowledge_reindex", project_id=payload.project_id, **result)
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # pragma: no cover - indexing failures
+    except Exception as exc:  # pragma: no cover
         log_exception("knowledge_reindex_error", exc)
         record_generation_failure("reindex", "index_failure", str(exc))
         raise HTTPException(status_code=500, detail="知識重建失敗") from exc
 
 
 @app.post("/api/admin/memory/maintain")
-async def maintain_memory(request: Request):
-    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    project_id = get_request_text(body, "project_id") or "default"
+async def maintain_memory(payload: AdminActionRequest):
     try:
-        result = await asyncio.to_thread(maybe_run_memory_maintenance, True, project_id)
-        log_event("memory_maintenance", project_id=project_id, **result)
+        result = await asyncio.to_thread(maybe_run_memory_maintenance, True, payload.project_id)
+        log_event("memory_maintenance", project_id=payload.project_id, **result)
         return result
-    except Exception as exc:  # pragma: no cover - maintenance failures
+    except Exception as exc:  # pragma: no cover
         log_exception("memory_maintenance_error", exc)
         record_generation_failure("memory_maintain", "maintenance_failure", str(exc))
         raise HTTPException(status_code=500, detail="記憶整理失敗") from exc
@@ -602,11 +628,6 @@ async def maintain_memory(request: Request):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-async def read_generation_request(request: Request):
-    body = await request.json()
-    return build_message_envelope(request, body, content_key="message")
-
 
 async def _stream_generation_events(context: GenerationContext) -> AsyncIterator[dict[str, str]]:
     """Yield SSE events from the chat service generator."""
@@ -620,24 +641,24 @@ async def _stream_generation_events(context: GenerationContext) -> AsyncIterator
             yield sse_event_to_dict(event)
 
         log_event(
-            "stream_generate_complete",
+            "chat_stream_complete",
             trace_id=context.trace_id,
             session_id=context.session_id,
             tool_steps=tool_count,
             project_id=context.project_id,
         )
     except asyncio.CancelledError:
-        record_generation_failure("stream_generate", "cancelled", context.user_message[:120])
+        record_generation_failure("chat_stream", "cancelled", context.user_message[:120])
         raise
     except ValueError as exc:
-        record_generation_failure("stream_generate", "validation", str(exc))
+        record_generation_failure("chat_stream", "validation", str(exc))
         yield sse_error_to_dict(
             build_exception_protocol_error(exc),
             context.trace_id,
         )
-    except Exception as exc:  # pragma: no cover - external provider failures
-        log_exception("stream_generate_error", exc, trace_id=context.trace_id)
-        record_generation_failure("stream_generate", "llm_failure", str(exc))
+    except Exception as exc:  # pragma: no cover
+        log_exception("chat_stream_error", exc, trace_id=context.trace_id)
+        record_generation_failure("chat_stream", "llm_failure", str(exc))
         yield sse_error_to_dict(
             build_protocol_error("LLM_OVERLOAD", "LLM 串流生成失敗", retry_after_ms=3000),
             context.trace_id,
