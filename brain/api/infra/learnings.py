@@ -1,50 +1,11 @@
-"""Automatic learning and error journaling for workspace files."""
+"""Error journaling for workspace files."""
 
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from pathlib import Path
 
 from knowledge.workspace import get_core_documents, ensure_workspace_scaffold
-
-_LEARNING_PATTERNS = (
-    (re.compile(r"(簡短|簡潔|精簡|直接)"), "使用者偏好簡潔、直接的回答。"),
-    (re.compile(r"(繁體中文|繁中)"), "使用者偏好使用繁體中文回覆。"),
-    (re.compile(r"(不要|別用).*(emoji|表情|貼圖)"), "使用者偏好不要使用 emoji 或表情符號。"),
-    (re.compile(r"(條列|列表|bullet)"), "使用者在整理資訊時偏好條列式輸出。"),
-    (re.compile(r"(不要|別)長篇大論"), "使用者偏好避免長篇大論。"),
-)
-
-
-def capture_learnings_from_message(user_message: str, project_id: str = "default") -> list[str]:
-    """Append stable user preferences into LEARNINGS.md if they are new."""
-    ensure_workspace_scaffold(project_id)
-    normalized = " ".join(user_message.strip().split())
-    if not normalized:
-        return []
-
-    candidates = [
-        learning
-        for pattern, learning in _LEARNING_PATTERNS
-        if pattern.search(normalized)
-    ]
-    if not candidates:
-        return []
-
-    core_docs = get_core_documents(project_id)
-    path = core_docs["learnings"]
-    existing = path.read_text(encoding="utf-8-sig")
-    appended: list[str] = []
-
-    with path.open("a", encoding="utf-8") as handle:
-        for learning in candidates:
-            if learning in existing or learning in appended:
-                continue
-            handle.write(f"- {learning}\n")
-            appended.append(learning)
-
-    return appended
 
 
 def record_error_event(area: str, summary: str, detail: str = "", project_id: str = "default") -> None:

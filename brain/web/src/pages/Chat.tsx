@@ -9,7 +9,7 @@ import {
   PersonaSummary,
   RetrievalResult,
   SessionSummary,
-  streamGenerate,
+  streamChat,
 } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
 import MarkdownPreview from "../components/MarkdownPreview";
@@ -42,7 +42,6 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [lastContext, setLastContext] = useState({ knowledge: 0, memory: 0 });
-  const [lastLearned, setLastLearned] = useState<string[]>([]);
   const [lastSources, setLastSources] = useState(emptySources);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -68,17 +67,15 @@ export default function Chat() {
     setSessionId("");
     setMessages([]);
     setLastContext({ knowledge: 0, memory: 0 });
-    setLastLearned([]);
     setLastSources(emptySources);
     setError("");
   };
 
-  const applyGenerationResult = (payload: {
+  const applyChatResult = (payload: {
     session_id: string;
     reply: string;
     knowledge_results: RetrievalResult[];
     memory_results: RetrievalResult[];
-    learnings_added?: string[];
     history?: ChatMessage[];
   }) => {
     // done event carries `reply` (final text), not necessarily `history`.
@@ -101,7 +98,6 @@ export default function Chat() {
     const memory = payload.memory_results ?? [];
     setLastContext({ knowledge: knowledge.length, memory: memory.length });
     setLastSources({ knowledge, memory });
-    setLastLearned(payload.learnings_added ?? []);
   };
 
   const loadSessions = () => {
@@ -206,7 +202,6 @@ export default function Chat() {
 
     setSending(true);
     setError("");
-    setLastLearned([]);
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -215,7 +210,7 @@ export default function Chat() {
     setInput("");
 
     try {
-      await streamGenerate(
+      await streamChat(
         nextMessage,
         selectedPersonaId,
         sessionId || undefined,
@@ -232,7 +227,7 @@ export default function Chat() {
           onToken: ({ token }) => {
             setMessages((current) => appendStreamingToken(current, token));
           },
-          onDone: applyGenerationResult,
+          onDone: applyChatResult,
           onError: ({ message }) => setError(message),
         },
         controller.signal,
@@ -534,22 +529,6 @@ export default function Chat() {
                   </div>
                 </div>
               </div>
-
-              {/* Learned Traits */}
-              {lastLearned.length > 0 && (
-                <div>
-                  <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-emerald-500 mb-3 border-b border-slate-800/50 pb-2">
-                    <span className="material-symbols-outlined text-[14px]">auto_awesome</span> New Learnings Extracted
-                  </h4>
-                  <div className="space-y-2">
-                    {lastLearned.map(learning => (
-                      <div key={learning} className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 text-xs text-emerald-300 leading-relaxed">
-                        {learning}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Evidence Sources */}
               <div className="space-y-5">

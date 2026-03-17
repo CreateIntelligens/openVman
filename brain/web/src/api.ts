@@ -106,7 +106,7 @@ export function postAddMemory(
   source = "user",
   metadata: Record<string, unknown> = {},
 ) {
-  return post<Record<string, unknown>>("/add_memory", { text, source, metadata, project_id: activeProjectId });
+  return post<Record<string, unknown>>("/memories", { text, source, metadata, project_id: activeProjectId });
 }
 
 export interface PersonaSummary {
@@ -194,7 +194,7 @@ export interface ChatMessage {
   created_at?: string;
 }
 
-export interface GenerateResponse {
+export interface ChatResponse {
   status: string;
   session_id: string;
   persona_id?: string;
@@ -202,7 +202,6 @@ export interface GenerateResponse {
   knowledge_results: RetrievalResult[];
   memory_results: RetrievalResult[];
   history: ChatMessage[];
-  learnings_added: string[];
 }
 
 export interface RetrievalResult {
@@ -213,18 +212,18 @@ export interface RetrievalResult {
   _distance?: number;
 }
 
-export interface GenerateContextEvent {
+export interface ChatContextEvent {
   knowledge_count: number;
   memory_count: number;
 }
 
-export type GenerateDoneEvent = GenerateResponse;
+export type ChatDoneEvent = ChatResponse;
 
-export interface GenerateStreamHandlers {
+export interface ChatStreamHandlers {
   onSession?: (payload: { session_id: string }) => void;
-  onContext?: (payload: GenerateContextEvent) => void;
+  onContext?: (payload: ChatContextEvent) => void;
   onToken?: (payload: { token: string }) => void;
-  onDone?: (payload: GenerateDoneEvent) => void;
+  onDone?: (payload: ChatDoneEvent) => void;
   onError?: (payload: { message: string }) => void;
 }
 
@@ -387,23 +386,14 @@ export function clonePersona(sourcePersonaId: string, targetPersonaId: string) {
   });
 }
 
-export function postGenerate(message: string, personaId = "default", sessionId?: string) {
-  return post<GenerateResponse>("/generate", {
-    message,
-    persona_id: personaId,
-    session_id: sessionId,
-    project_id: activeProjectId,
-  });
-}
-
-export async function streamGenerate(
+export async function streamChat(
   message: string,
   personaId: string,
   sessionId: string | undefined,
-  handlers: GenerateStreamHandlers,
+  handlers: ChatStreamHandlers,
   signal?: AbortSignal,
 ) {
-  const res = await fetch(`${BASE}/generate/stream`, {
+  const res = await fetch(`${BASE}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, persona_id: personaId, session_id: sessionId, project_id: activeProjectId }),
@@ -446,7 +436,7 @@ async function parseErrorMessage(res: Response) {
   return text || `Request failed: ${res.status}`;
 }
 
-function processSseBuffer(buffer: string, handlers: GenerateStreamHandlers) {
+function processSseBuffer(buffer: string, handlers: ChatStreamHandlers) {
   let working = buffer.replace(/\r/g, "");
   let boundary = working.indexOf("\n\n");
 
@@ -485,7 +475,7 @@ function parseSsePayload(payload: string) {
   }
 }
 
-function dispatchSseEvent(eventName: string, payload: unknown, handlers: GenerateStreamHandlers) {
+function dispatchSseEvent(eventName: string, payload: unknown, handlers: ChatStreamHandlers) {
   const handlerMap: Record<string, ((p: never) => void) | undefined> = {
     session: handlers.onSession,
     context: handlers.onContext,

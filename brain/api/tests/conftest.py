@@ -139,7 +139,6 @@ def stub_chat_service_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_memory.get_session_store = lambda project_id="default": MagicMock()
 
     fake_learnings = types.ModuleType("infra.learnings")
-    fake_learnings.capture_learnings_from_message = lambda user_message, project_id="default": []
     fake_learnings.record_error_event = lambda area, summary, detail="", project_id="default": None
 
     fake_governance = types.ModuleType("memory.memory_governance")

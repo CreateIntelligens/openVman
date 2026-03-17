@@ -22,7 +22,7 @@ from core.sse_events import (
     ToolErrorEvent,
     ToolEvent,
 )
-from infra.learnings import capture_learnings_from_message, record_error_event
+from infra.learnings import record_error_event
 from memory.embedder import encode_text
 from memory.memory import (
     add_memory,
@@ -64,7 +64,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         raise ValueError("message 不可為空")
     if len(cleaned_message) > cfg.max_input_length:
         raise ValueError(f"message 不可超過 {cfg.max_input_length} 字")
-    enforce_guardrails("generate", cleaned_message, envelope.context)
+    enforce_guardrails("chat", cleaned_message, envelope.context)
     enforce_session_limits(envelope.context.session_id, persona_id, project_id)
 
     route = route_message(normalize_to_brain_message(envelope))
@@ -106,11 +106,11 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         project_id=context.project_id,
     )
 
-    # Embed only the user message to keep the vector space focused.
-    turn_text = f"User: {context.user_message}\nAssistant: {cleaned_reply}"
+    # Store only the user message as memory text so that RAG recall
+    # is not polluted by the assistant's reply.
     user_vector = encode_text(context.user_message)
     add_memory(
-        text=turn_text,
+        text=context.user_message,
         vector=user_vector,
         source="conversation_turn",
         metadata={"session_id": context.session_id, "trace_id": context.trace_id},
@@ -118,13 +118,12 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         project_id=context.project_id,
     )
 
-    learnings_added = capture_learnings_from_message(context.user_message, project_id=context.project_id)
     maintenance = maybe_run_memory_maintenance(project_id=context.project_id)
 
     writeback = write_summary_and_reindex(
         persona_id=context.persona_id,
         day=date.today().isoformat(),
-        summary_text=f"User: {context.user_message[:200]}\nAssistant: {cleaned_reply[:200]}",
+        summary_text=context.user_message[:400],
         source_turns=1,
         session_id=context.session_id,
         project_id=context.project_id,
@@ -137,7 +136,6 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         "request_context": context.request_context,
         "reply": cleaned_reply,
         "history": list_session_messages(context.session_id, context.persona_id, project_id=context.project_id),
-        "learnings_added": learnings_added,
         "memory_maintenance": maintenance,
         "memory_writeback": writeback,
     }

@@ -65,7 +65,7 @@ def detect_prompt_injection(text: str) -> list[str]:
     ]
 
 
-_INJECTION_CHECKED_ACTIONS = frozenset({"generate", "stream_generate", "add_memory"})
+_INJECTION_CHECKED_ACTIONS = frozenset({"chat", "chat_stream", "add_memory"})
 
 
 def _enforce_prompt_injection_rules(action: str, text: str) -> None:
