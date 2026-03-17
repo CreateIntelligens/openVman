@@ -166,7 +166,9 @@ def is_persona_core_relative_path(relative_path: str) -> bool:
 def _build_default_persona_summary(project_id: str = "default") -> dict[str, Any]:
     core_docs = workspace.get_core_documents(project_id)
     soul_path = core_docs["soul"]
-    return _build_persona_summary("default", soul_path, is_default=True, project_id=project_id)
+    return _build_persona_summary(
+        "default", soul_path, is_default=True, label="default", project_id=project_id,
+    )
 
 
 def _require_text(value: str | None, field_name: str) -> str:
@@ -181,12 +183,13 @@ def _build_persona_summary(
     soul_path: Path,
     *,
     is_default: bool,
+    label: str = "",
     project_id: str = "default",
 ) -> dict[str, Any]:
     ws = workspace.get_workspace_root(project_id)
     return {
         "persona_id": persona_id,
-        "label": _extract_heading_or_name(soul_path, persona_id),
+        "label": label or _extract_heading_or_name(soul_path, persona_id),
         "path": soul_path.relative_to(ws).as_posix(),
         "preview": _read_preview(soul_path),
         "is_default": is_default,
@@ -203,10 +206,13 @@ def _build_persona_files(label: str) -> dict[str, str]:
 
 
 def _extract_heading_or_name(path: Path, fallback: str) -> str:
+    """Extract the first heading text from a markdown file, or return fallback."""
     for line in path.read_text(encoding="utf-8-sig").splitlines():
-        stripped = line.strip().lstrip("#").strip()
-        if stripped:
-            return stripped
+        line = line.strip()
+        if line.startswith("#"):
+            heading = line.lstrip("#").strip()
+            if heading:
+                return heading
     return fallback
 
 

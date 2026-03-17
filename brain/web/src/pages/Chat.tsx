@@ -290,7 +290,7 @@ export default function Chat() {
             >
               {personas.map((persona) => (
                 <option key={persona.persona_id} value={persona.persona_id}>
-                  {persona.label || persona.persona_id} ({persona.persona_id})
+                  {persona.label && persona.label !== persona.persona_id ? `${persona.label} (${persona.persona_id})` : persona.persona_id}
                 </option>
               ))}
             </select>

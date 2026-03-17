@@ -188,40 +188,42 @@ export default function Personas() {
               : [];
 
        return (
-              <div className="flex h-full w-full overflow-hidden bg-background">
+              <div className="flex h-full w-full overflow-hidden bg-[#0A0A0A]">
                      {/* Contextual Sidebar */}
-                     <aside className="w-[300px] lg:w-[340px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 flex flex-col hidden md:flex">
+                     <aside className="w-[300px] lg:w-[320px] flex-shrink-0 border-r border-[#1e1e1e] bg-[#0A0A0A] flex flex-col hidden md:flex z-10">
                             {/* Sidebar Header */}
-                            <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
-                                   <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Personas Hub</h2>
+                            <div className="px-5 py-5 border-b border-[#1e1e1e] flex items-center justify-between shrink-0">
+                                   <div className="flex items-center gap-2.5">
+                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-[#1e1e1e] text-slate-300">
+                                                 <span className="material-symbols-outlined text-[14px]">groups_2</span>
+                                          </div>
+                                          <h2 className="text-[13px] font-semibold tracking-wide text-slate-200">Personas</h2>
+                                   </div>
                                    <button
                                           onClick={() => loadPersonas(selectedPersona?.persona_id)}
                                           disabled={loadingList}
-                                          className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+                                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-[#1e1e1e] hover:text-slate-200 transition-colors disabled:opacity-50"
                                           title="Refresh"
                                    >
-                                          <span className={`material-symbols-outlined text-[16px] ${loadingList ? "animate-spin" : ""}`}>
+                                          <span className={`material-symbols-outlined text-[16px] ${loadingList ? "animate-spin text-slate-200" : ""}`}>
                                                  refresh
                                           </span>
                                    </button>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-4 space-y-6 select-none">
+                            <div className="flex-1 overflow-y-auto p-4 space-y-6 select-none no-scrollbar">
                                    {/* Persona List */}
                                    <div>
-                                          <div className="flex items-center justify-between mb-3 text-xs font-bold text-slate-500 uppercase tracking-widest">
-                                                 <div className="flex items-center gap-2">
-                                                        <span className="material-symbols-outlined text-[14px]">groups</span>
-                                                        <span>{personas.length} Personas</span>
-                                                 </div>
+                                          <div className="flex items-center justify-between mb-3 px-1 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                                                 <span>Library ({personas.length})</span>
                                           </div>
-                                          <div className="grid gap-2">
+                                          <div className="grid gap-1">
                                                  {personas.map((persona) => (
                                                         <div
                                                                key={persona.persona_id}
-                                                               className={`rounded-xl border p-3 text-left transition-all cursor-pointer ${selectedPersona?.persona_id === persona.persona_id
-                                                                             ? "border-primary/40 bg-primary/10 shadow-sm"
-                                                                             : "border-slate-800/60 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-800/40"
+                                                               className={`rounded-md p-2.5 text-left transition-colors cursor-pointer border ${selectedPersona?.persona_id === persona.persona_id
+                                                                      ? "bg-[#1e1e1e] border-[#333] shadow-sm"
+                                                                      : "bg-transparent border-transparent hover:bg-[#161616]"
                                                                       }`}
                                                                onClick={() => {
                                                                       setSelectedPersona(persona);
@@ -262,85 +264,88 @@ export default function Personas() {
                                           </div>
                                    </div>
 
-                                   <hr className="border-slate-800/60" />
+                                   <hr className="border-[#1e1e1e]" />
 
                                    {/* Create / Clone Persona Form */}
-                                   <div className="rounded-xl border border-slate-800/80 bg-slate-900/30 p-4 space-y-3">
-                                          <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Add Persona</h3>
-                                          <div className="space-y-2">
+                                   <div className="rounded-md border border-[#1e1e1e] bg-[#0A0A0A] p-4 space-y-4">
+                                          <h3 className="text-[12px] font-semibold text-slate-300 flex items-center gap-1.5">Add Persona</h3>
+                                          <div className="space-y-3">
                                                  <input
                                                         value={newPersonaId}
                                                         onChange={(event) => setNewPersonaId(event.target.value)}
                                                         placeholder="ID (e.g. support)"
-                                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
+                                                        className="w-full rounded-md border border-[#333] bg-[#0A0A0A] px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-400 focus:outline-none transition-colors"
                                                         title="Unique Persona ID (used in folder path)"
                                                  />
                                                  <input
                                                         value={newPersonaLabel}
                                                         onChange={(event) => setNewPersonaLabel(event.target.value)}
                                                         placeholder="Name (e.g. Support Bot)"
-                                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
+                                                        className="w-full rounded-md border border-[#333] bg-[#0A0A0A] px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-400 focus:outline-none transition-colors"
                                                         title="Display Name (only applied to Blank Template)"
                                                  />
-                                                 <select
-                                                        value={templateSourceId}
-                                                        onChange={(event) => setTemplateSourceId(event.target.value)}
-                                                        className="w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-xs text-slate-300 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
-                                                        title="Select a template or an existing persona to copy configuration from"
-                                                 >
-                                                        <option value="">-- Blank Template --</option>
-                                                        {personas.map((persona) => (
-                                                               <option key={persona.persona_id} value={persona.persona_id}>
-                                                                      Copy from {persona.persona_id}
-                                                               </option>
-                                                        ))}
-                                                 </select>
+                                                 <div className="relative">
+                                                        <select
+                                                               value={templateSourceId}
+                                                               onChange={(event) => setTemplateSourceId(event.target.value)}
+                                                               className="w-full rounded-md border border-[#333] bg-[#0A0A0A] px-3 py-2 text-[13px] text-slate-300 focus:border-slate-400 focus:outline-none appearance-none transition-colors"
+                                                               title="Select a template or an existing persona to copy configuration from"
+                                                        >
+                                                               <option value="">-- Blank Template --</option>
+                                                               {personas.map((persona) => (
+                                                                      <option key={persona.persona_id} value={persona.persona_id}>
+                                                                             Copy from {persona.persona_id}
+                                                                      </option>
+                                                               ))}
+                                                        </select>
+                                                        <span className="material-symbols-outlined text-[14px] text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
+                                                 </div>
                                           </div>
                                           <button
                                                  onClick={handleCreateOrClone}
                                                  disabled={creatingPersona || cloningPersona || !newPersonaId.trim()}
-                                                 className="w-full rounded-md bg-slate-800 text-slate-300 px-3 py-2 text-xs font-bold hover:bg-slate-700 hover:text-white transition-colors disabled:opacity-50 uppercase tracking-widest"
+                                                 className="w-full rounded-md bg-[#ededed] text-[#0A0A0A] px-3 py-2 text-[13px] font-medium hover:bg-white transition-colors disabled:opacity-50"
                                           >
-                                                 {(creatingPersona || cloningPersona) ? "Creating..." : "Create"}
+                                                 {(creatingPersona || cloningPersona) ? "Creating..." : "Create Persona"}
                                           </button>
                                    </div>
                             </div>
                      </aside>
 
                      {/* Main Editor Content */}
-                     <main className="flex-1 flex flex-col min-w-0 bg-background relative">
+                     <main className="flex-1 flex flex-col min-w-0 bg-[#0A0A0A] relative overflow-hidden">
                             {status && (
-                                   <div className="p-4 shrink-0 shadow-sm z-10 border-b border-slate-800/30 bg-background/80 backdrop-blur-sm">
+                                   <div className="p-4 shrink-0 shadow-sm z-20 border-b border-[#1e1e1e] bg-[#0A0A0A]">
                                           <StatusAlert type={status.type} message={status.message} />
                                    </div>
                             )}
 
                             {selectedPersona ? (
-                                   <div className="flex-1 flex flex-col min-h-0 p-4 lg:p-6 lg:pl-8">
-                                          <div className="flex flex-col gap-4 mb-4 shrink-0">
+                                   <div className="flex-1 flex flex-col min-h-0 p-4 lg:p-8 z-10">
+                                          <div className="flex flex-col gap-6 mb-6 shrink-0">
                                                  <div className="flex items-end justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                               <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary border border-primary/30">
-                                                                      <span className="material-symbols-outlined">psychology</span>
+                                                        <div className="flex items-center gap-4">
+                                                               <div className="w-10 h-10 rounded border border-[#333] bg-[#161616] flex items-center justify-center text-slate-300">
+                                                                      <span className="material-symbols-outlined text-[20px]">psychology</span>
                                                                </div>
                                                                <div>
-                                                                      <h3 className="text-2xl font-bold text-white leading-tight">
+                                                                      <h3 className="text-[20px] font-semibold text-slate-200 leading-tight tracking-tight mb-0.5">
                                                                              {selectedPersona.label || selectedPersona.persona_id}
                                                                       </h3>
-                                                                      <div className="flex items-center gap-2 mt-0.5">
-                                                                             <span className="text-xs font-mono text-slate-500">{selectedPath}</span>
+                                                                      <div className="flex items-center gap-2">
+                                                                             <span className="text-[11px] font-mono text-slate-500">{selectedPath}</span>
                                                                       </div>
                                                                </div>
                                                         </div>
                                                         <div className="flex items-center gap-4 shrink-0">
-                                                               <div className="flex rounded-md border border-slate-700 overflow-hidden bg-slate-900">
+                                                               <div className="flex p-1 rounded-md border border-[#333] bg-[#161616]">
                                                                       {(["edit", "split", "preview"] as EditorMode[]).map((mode) => (
                                                                              <button
                                                                                     key={mode}
                                                                                     onClick={() => setEditorMode(mode)}
-                                                                                    className={`px-3 py-1.5 text-xs font-semibold transition-colors ${editorMode === mode
-                                                                                                  ? "bg-slate-700 text-white"
-                                                                                                  : "text-slate-400 hover:text-white hover:bg-slate-800"
+                                                                                    className={`px-3 py-1 text-[11px] font-medium rounded transition-colors ${editorMode === mode
+                                                                                           ? "bg-[#333] text-white"
+                                                                                           : "text-slate-400 hover:text-slate-200"
                                                                                            }`}
                                                                              >
                                                                                     {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -350,28 +355,28 @@ export default function Personas() {
                                                         </div>
                                                  </div>
 
-                                                 <div className="flex gap-2 overflow-x-auto no-scrollbar border-b border-slate-800/60 pb-3">
+                                                 <div className="flex gap-2 overflow-x-auto no-scrollbar border-b border-[#1e1e1e] pb-3">
                                                         {coreDocs.map((doc) => (
                                                                <button
                                                                       key={doc.path}
                                                                       onClick={() => openDocument(doc.path)}
-                                                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${selectedPath === doc.path
-                                                                                    ? "bg-primary text-white shadow-shadow-primary/20"
-                                                                                    : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                                                                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors whitespace-nowrap border ${selectedPath === doc.path
+                                                                             ? "bg-[#1e1e1e] border-[#333] text-slate-200 shadow-sm"
+                                                                             : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#161616]"
                                                                              }`}
                                                                >
-                                                                      <span className={`material-symbols-outlined text-[16px] ${selectedPath === doc.path ? "text-white" : ""}`}>{doc.icon}</span>
+                                                                      <span className={`material-symbols-outlined text-[16px] ${selectedPath === doc.path ? "text-slate-200" : ""}`}>{doc.icon}</span>
                                                                       {doc.label}
                                                                </button>
                                                         ))}
                                                  </div>
                                           </div>
 
-                                          <div className="flex-1 min-h-0 relative mb-4 rounded-xl border border-slate-800/50 bg-slate-950/30 overflow-hidden shadow-inner flex">
+                                          <div className="flex-1 min-h-0 relative mb-5 rounded-md border border-[#333] bg-[#0A0A0A] overflow-hidden flex">
                                                  {loadingDocument && (
-                                                        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-10 flex items-center justify-center">
-                                                               <div className="flex items-center gap-2 text-primary font-bold">
-                                                                      <span className="material-symbols-outlined animate-spin">refresh</span>
+                                                        <div className="absolute inset-0 bg-[#0A0A0A]/50 backdrop-blur-sm z-10 flex items-center justify-center">
+                                                               <div className="flex items-center gap-2 text-slate-300 font-medium">
+                                                                      <span className="material-symbols-outlined animate-spin text-[16px]">refresh</span>
                                                                       Loading...
                                                                </div>
                                                         </div>
@@ -380,23 +385,23 @@ export default function Personas() {
                                                         <textarea
                                                                value={draftContent}
                                                                onChange={(event) => setDraftContent(event.target.value)}
-                                                               className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none ${editorMode === "split" ? "border-r border-slate-800/50" : ""
+                                                               className={`h-full w-full bg-transparent p-6 text-[13px] leading-relaxed text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none ${editorMode === "split" ? "border-r border-[#333]" : ""
                                                                       }`}
                                                         />
                                                  ) : null}
                                                  {editorMode === "preview" || editorMode === "split" ? (
-                                                        <div className="h-full w-full p-6 overflow-y-auto prose-container bg-slate-900/20">
+                                                        <div className="h-full w-full p-8 overflow-y-auto prose-container bg-[#0A0A0A]">
                                                                <MarkdownPreview content={draftContent} />
                                                         </div>
                                                  ) : null}
                                           </div>
 
-                                          <div className="flex items-center justify-between shrink-0 pt-2 px-1 border-t border-slate-800/50 pt-4">
-                                                 <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                        <span className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}></span>
+                                          <div className="flex items-center justify-between shrink-0 pt-2 px-1">
+                                                 <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                                        <span className={`w-2 h-2 rounded-full transition-colors duration-300 ${hasUnsavedChanges ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}></span>
                                                         {hasUnsavedChanges ? "Unsaved changes" : "Saved"}
-                                                        <span className="mx-2 opacity-30">•</span>
-                                                        {draftContent.length.toLocaleString()} chars
+                                                        <span className="mx-1.5 opacity-30 text-slate-600">•</span>
+                                                        <span className="font-mono">{draftContent.length.toLocaleString()} chars</span>
                                                  </div>
                                                  <div className="flex items-center gap-3">
                                                         <button
@@ -404,16 +409,16 @@ export default function Personas() {
                                                                       setDraftContent(loadedContent);
                                                                }}
                                                                disabled={!hasUnsavedChanges}
-                                                               className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30"
+                                                               className="rounded-md px-4 py-2 text-[12px] font-medium text-slate-400 border border-transparent hover:text-slate-200 hover:bg-[#1e1e1e] transition-colors disabled:opacity-30"
                                                         >
                                                                Discard
                                                         </button>
                                                         <button
                                                                onClick={saveDocument}
                                                                disabled={saving || !hasUnsavedChanges}
-                                                               className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/10"
+                                                               className="flex items-center gap-1.5 rounded-md bg-[#ededed] px-4 py-2 text-[12px] font-medium text-[#0A0A0A] hover:bg-white transition-colors disabled:opacity-50"
                                                         >
-                                                               <span className="material-symbols-outlined text-[18px]">save</span>
+                                                               <span className="material-symbols-outlined text-[16px]">save</span>
                                                                {saving ? "Saving..." : "Save Config"}
                                                         </button>
                                                  </div>
@@ -421,12 +426,12 @@ export default function Personas() {
                                    </div>
                             ) : (
                                    <div className="flex-1 flex items-center justify-center p-12">
-                                          <div className="max-w-md text-center">
-                                                 <div className="w-20 h-20 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 mx-auto mb-6">
-                                                        <span className="material-symbols-outlined text-[40px]">groups</span>
+                                          <div className="max-w-sm text-center">
+                                                 <div className="w-16 h-16 rounded-xl bg-[#161616] border border-[#333] flex items-center justify-center text-slate-500 mx-auto mb-6">
+                                                        <span className="material-symbols-outlined text-[32px]">groups</span>
                                                  </div>
-                                                 <h3 className="text-xl font-bold text-slate-300 mb-2">No Persona Selected</h3>
-                                                 <p className="text-sm text-slate-500">
+                                                 <h3 className="text-xl font-semibold text-slate-200 mb-2">No Persona Selected</h3>
+                                                 <p className="text-[13px] text-slate-500 leading-relaxed">
                                                         Select a persona from the left sidebar to edit its core configuration, or create a brand new persona to experiment with.
                                                  </p>
                                           </div>
