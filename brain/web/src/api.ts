@@ -299,6 +299,11 @@ export async function fetchKnowledgeDocuments() {
   return parseJson<KnowledgeDocumentsResponse>(res);
 }
 
+export async function fetchKnowledgeBaseDocuments() {
+  const res = await fetch(projectUrl("/admin/knowledge/base/documents"));
+  return parseJson<KnowledgeDocumentsResponse>(res);
+}
+
 export async function fetchKnowledgeDocument(path: string) {
   const res = await fetch(projectUrl("/admin/knowledge/document", { path }));
   return parseJson<KnowledgeDocument>(res);

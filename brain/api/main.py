@@ -35,6 +35,7 @@ from infra.project_admin import (
 from knowledge.indexer import rebuild_knowledge_index
 from knowledge.knowledge_admin import (
     delete_workspace_document,
+    list_knowledge_base_documents,
     list_workspace_documents,
     move_workspace_document,
     read_workspace_document,
@@ -525,6 +526,15 @@ async def delete_session(session_id: str, project_id: str = "default"):
 @app.get("/api/admin/knowledge/documents")
 async def list_knowledge_documents(project_id: str = "default"):
     documents = list_workspace_documents(project_id)
+    return {
+        "documents": documents,
+        "document_count": len(documents),
+    }
+
+
+@app.get("/api/admin/knowledge/base/documents")
+async def list_knowledge_base_docs(project_id: str = "default"):
+    documents = list_knowledge_base_documents(project_id)
     return {
         "documents": documents,
         "document_count": len(documents),

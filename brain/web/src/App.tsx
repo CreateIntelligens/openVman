@@ -6,6 +6,7 @@ import Embed from "./pages/Embed";
 import Search from "./pages/Search";
 import Memory from "./pages/Memory";
 import Knowledge from "./pages/Knowledge";
+import KnowledgeBase from "./pages/KnowledgeBase";
 import Projects from "./pages/Projects";
 import Personas from "./pages/Personas";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
@@ -41,6 +42,7 @@ const projectTabs = [
   { key: "Chat", label: "Chat", icon: "chat" },
   { key: "Personas", label: "Personas", icon: "groups" },
   { key: "Knowledge", label: "Workspace", icon: "folder_managed" },
+  { key: "KnowledgeBase", label: "Knowledge", icon: "school" },
   { key: "Memory", label: "Memory", icon: "memory" },
   { key: "Search", label: "Search", icon: "search" },
 ] as const;
@@ -55,7 +57,7 @@ const allTabs = [...projectTabs, ...globalTabs] as const;
 
 type Tab = (typeof allTabs)[number]["key"];
 
-const components: Record<Tab, FC> = { Chat, Health, Embed, Search, Memory, Personas, Knowledge, Projects };
+const components: Record<Tab, FC> = { Chat, Health, Embed, Search, Memory, Personas, Knowledge, KnowledgeBase, Projects };
 
 function AppContent() {
   const [active, setActive] = useState<Tab>("Chat");

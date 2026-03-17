@@ -114,6 +114,7 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     (ws / "memory").mkdir(parents=True, exist_ok=True)
     (ws / ".learnings").mkdir(parents=True, exist_ok=True)
     (ws / "personas").mkdir(parents=True, exist_ok=True)
+    (ws / "knowledge").mkdir(parents=True, exist_ok=True)
 
     for relative_path, template in WORKSPACE_TEMPLATES.items():
         path = ws / relative_path
@@ -186,6 +187,16 @@ def iter_indexable_documents(project_id: str = "default") -> list[Path]:
         if path.is_file() and path.suffix.lower() in ALLOWED_INDEX_SUFFIXES
     )
     return [path for path in all_files if is_indexable_document(path, project_id)]
+
+
+def iter_knowledge_documents(project_id: str = "default") -> list[Path]:
+    """Return documents stored under the workspace knowledge/ directory."""
+    knowledge_dir = ensure_workspace_scaffold(project_id) / "knowledge"
+    return sorted(
+        path
+        for path in knowledge_dir.rglob("*")
+        if path.is_file() and path.suffix.lower() in ALLOWED_INDEX_SUFFIXES
+    )
 
 
 def _is_persona_core_document(relative_path: str) -> bool:
