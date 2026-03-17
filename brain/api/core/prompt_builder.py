@@ -34,7 +34,9 @@ def build_chat_messages(
         block
         for block in [
             "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。"
-            "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。",
+            "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。"
+            "當使用者要求你記住某事、或對話中出現值得長期保留的偏好/事實/指令時，使用 save_memory 工具儲存。"
+            "儲存時用簡潔的陳述句（如「使用者是男生」），不要儲存閒聊或普通問題。",
             _format_workspace_block("SOUL", workspace["soul"], cfg.prompt_soul_char_budget),
             _format_workspace_block("MEMORY", workspace["memory"], cfg.prompt_memory_char_budget),
             _format_workspace_block("AGENTS", workspace["agents"], cfg.prompt_agents_char_budget),

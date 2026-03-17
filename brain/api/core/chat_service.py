@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import date
 from typing import Any
 
 from config import get_settings
@@ -23,15 +22,13 @@ from core.sse_events import (
     ToolEvent,
 )
 from infra.learnings import record_error_event
-from memory.embedder import encode_text
 from memory.memory import (
-    add_memory,
     append_session_message,
     archive_session_turn,
     get_or_create_session,
     list_session_messages,
 )
-from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
+from memory.memory_governance import maybe_run_memory_maintenance
 from protocol.message_envelope import MessageEnvelope, normalize_to_brain_message, serialize_context
 from safety.guardrails import enforce_guardrails, enforce_session_limits
 from tools.tool_executor import parse_tool_result
@@ -106,28 +103,9 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         project_id=context.project_id,
     )
 
-    # Store only the user message as memory text so that RAG recall
-    # is not polluted by the assistant's reply.
-    user_vector = encode_text(context.user_message)
-    add_memory(
-        text=context.user_message,
-        vector=user_vector,
-        source="conversation_turn",
-        metadata={"session_id": context.session_id, "trace_id": context.trace_id},
-        persona_id=context.persona_id,
-        project_id=context.project_id,
-    )
-
+    # Memory is now written by the LLM via the save_memory tool —
+    # no automatic per-turn memory write here.
     maintenance = maybe_run_memory_maintenance(project_id=context.project_id)
-
-    writeback = write_summary_and_reindex(
-        persona_id=context.persona_id,
-        day=date.today().isoformat(),
-        summary_text=context.user_message[:400],
-        source_turns=1,
-        session_id=context.session_id,
-        project_id=context.project_id,
-    )
 
     return {
         "status": "ok",
@@ -137,7 +115,6 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         "reply": cleaned_reply,
         "history": list_session_messages(context.session_id, context.persona_id, project_id=context.project_id),
         "memory_maintenance": maintenance,
-        "memory_writeback": writeback,
     }
 
 

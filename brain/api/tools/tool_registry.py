@@ -121,6 +121,24 @@ def _query_order(args: dict[str, Any]) -> dict[str, Any]:
     return {"order_id": order_id, "found": True, "order": deepcopy(record)}
 
 
+def _save_memory(args: dict[str, Any]) -> dict[str, Any]:
+    """Save a durable memory record via LLM tool call."""
+    from memory.memory import add_memory as store_memory
+
+    content = str(args.get("content", "")).strip()
+    if not content:
+        raise ValueError("content 不可為空")
+    vector = encode_text(content)
+    store_memory(
+        text=content,
+        vector=vector,
+        source="agent",
+        persona_id=_active_persona_id.get(),
+        project_id=_active_project_id.get(),
+    )
+    return {"saved": True, "content": content}
+
+
 _registry: ToolRegistry | None = None
 
 
@@ -207,6 +225,23 @@ def get_tool_registry() -> ToolRegistry:
                     "required": ["order_id"],
                 },
                 handler=_query_order,
+            )
+        )
+        registry.register(
+            Tool(
+                name="save_memory",
+                description="將重要的使用者偏好、事實或指令儲存為長期記憶。只在使用者明確要求記住某事、或對話中出現值得長期保留的資訊時使用。儲存簡潔的陳述句，不要儲存閒聊或問題。",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "要記住的內容，用簡潔的陳述句表達，例如「使用者是男生」、「使用者偏好繁體中文」",
+                        },
+                    },
+                    "required": ["content"],
+                },
+                handler=_save_memory,
             )
         )
         _registry = registry

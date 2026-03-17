@@ -87,10 +87,6 @@ class FakeRetrievalBundle:
     diagnostics: dict[str, Any]
 
 
-def _empty_bundle(**_kwargs: Any) -> FakeRetrievalBundle:
-    return FakeRetrievalBundle(knowledge_results=[], memory_results=[], diagnostics={})
-
-
 def _empty_bundle_with_project(*, query: str = "", persona_id: str = "default", project_id: str = "default") -> FakeRetrievalBundle:
     return FakeRetrievalBundle(knowledge_results=[], memory_results=[], diagnostics={})
 
