@@ -149,6 +149,7 @@ def _merge_metadata(*values: object) -> dict[str, Any]:
 
 
 def _read_text(payload: dict[str, Any], key: str, fallback: object = "") -> str:
-    if key in payload:
-        return str(payload[key]).strip()
-    return str(fallback).strip()
+    value = payload.get(key, fallback)
+    if value is None:
+        return ""
+    return str(value).strip()
