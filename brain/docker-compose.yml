@@ -11,6 +11,8 @@ services:
       - hf-cache:/root/.cache/huggingface
     env_file:
       - .env
+    environment:
+      - TZ=Asia/Taipei
     deploy:
       resources:
         reservations:
@@ -28,6 +30,8 @@ services:
       - ./web:/app
       - ../contracts:/contracts:ro
       - /app/node_modules
+    environment:
+      - TZ=Asia/Taipei
     restart: unless-stopped
 
   nginx:
