@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type FC } from "react";
+import { type CSSProperties, type FC, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Chat from "./pages/Chat";
 import Health from "./pages/Health";
 import Embed from "./pages/Embed";
@@ -8,6 +9,33 @@ import Knowledge from "./pages/Knowledge";
 import Projects from "./pages/Projects";
 import Personas from "./pages/Personas";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
+
+/* ── Sidebar style constants ── */
+
+const SIDEBAR_EXPAND = {
+  tab: {
+    pinned: "w-full gap-3 pl-[13px]",
+    collapsed: "w-12 justify-center group-hover/sidebar:w-full group-hover/sidebar:gap-3 group-hover/sidebar:justify-start group-hover/sidebar:pl-[13px]",
+  },
+  projectBtn: {
+    pinned: "w-full gap-2.5 pl-[10px] pr-3",
+    collapsed: "w-12 justify-center group-hover/sidebar:w-full group-hover/sidebar:gap-2.5 group-hover/sidebar:justify-start group-hover/sidebar:pl-[10px] group-hover/sidebar:pr-3",
+  },
+  label: {
+    pinned: "opacity-100 max-w-full",
+    collapsed: "opacity-0 max-w-0 group-hover/sidebar:opacity-100 group-hover/sidebar:max-w-full",
+  },
+  sectionLabel: {
+    pinned: "text-left pl-[13px]",
+    collapsed: "text-center group-hover/sidebar:text-left group-hover/sidebar:pl-[13px]",
+  },
+} as const;
+
+const TAB_BASE = "h-12 mx-auto flex items-center rounded-xl transition-all duration-300 shrink-0 overflow-hidden";
+const TAB_ACTIVE = "bg-slate-800/80 text-primary border border-slate-700/50";
+const TAB_INACTIVE = "hover:bg-slate-800/50 text-slate-400 border border-transparent hover:text-slate-200";
+const LABEL_BASE = "font-semibold text-[13.5px] whitespace-nowrap tracking-wide transition-all duration-300 overflow-hidden";
+const PROJECT_BTN_BASE = "h-12 mx-auto rounded-xl border border-primary/30 bg-primary/10 flex items-center text-primary transition-all duration-300 hover:bg-primary/20 disabled:opacity-50 overflow-hidden shrink-0 cursor-pointer";
 
 const projectTabs = [
   { key: "Chat", label: "Chat", icon: "chat" },
@@ -38,7 +66,7 @@ function AppContent() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* 1. Icon Sidebar (First Column) */}
+      {/* Sidebar */}
       <div className={`flex-shrink-0 hidden md:block z-50 relative transition-all duration-300 ${isPinned ? "w-64" : "w-[72px]"}`}>
         <aside className={`absolute top-0 left-0 h-full ${isPinned ? "w-64" : "w-[72px] hover:w-64"} group/sidebar transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden bg-background-dark/95 backdrop-blur-xl border-r border-primary/20 shadow-[-10px_0_30px_rgba(0,0,0,0.5)_inset] hover:shadow-[10px_0_30px_rgba(0,0,0,0.6)_inset] flex flex-col py-5 z-50`}>
           {/* Project Selector at top */}
@@ -68,7 +96,7 @@ function AppContent() {
         </aside>
       </div>
 
-      {/* Main Container for Contextual Sidebar + Main Content */}
+      {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden bg-background">
         {/* Mobile Top Bar */}
         <div className="sticky top-0 z-20 border-b border-primary/10 bg-background-dark/90 px-4 py-3 backdrop-blur md:hidden flex flex-col gap-3">
@@ -78,7 +106,7 @@ function AppContent() {
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
               disabled={loadingProjects}
-              className="flex-1 bg-transparent text-xs font-bold text-white outline-none min-w-0"
+              className="select-dark flex-1 text-xs font-bold min-w-0"
             >
               {projects.map((p) => (
                 <option key={p.project_id} value={p.project_id} className="bg-slate-900 font-normal">
@@ -109,7 +137,7 @@ function AppContent() {
           </div>
         </div>
 
-        {/* 2. Contextual Sidebar & 3. Main Content Wrapper */}
+        {/* Active Page */}
         <div className="flex-1 h-full min-h-0 overflow-hidden relative">
           <ActiveComponent key={`${active}-${projectId}`} />
         </div>
@@ -133,21 +161,16 @@ function TabGroup({
 }) {
   return (
     <nav className="flex flex-col gap-3 w-full">
-      <div className={`text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 transition-all duration-300 w-full whitespace-nowrap overflow-hidden text-ellipsis ${isPinned ? "text-left pl-[13px]" : "text-center group-hover/sidebar:text-left group-hover/sidebar:pl-[13px]"}`}>{label}</div>
+      <div className={`text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 transition-all duration-300 w-full whitespace-nowrap overflow-hidden text-ellipsis ${isPinned ? SIDEBAR_EXPAND.sectionLabel.pinned : SIDEBAR_EXPAND.sectionLabel.collapsed}`}>{label}</div>
       {tabs.map((tab) => (
         <button
           key={tab.key}
           onClick={() => onSelect(tab.key)}
           title={tab.label}
-          className={`h-12 mx-auto flex items-center rounded-xl transition-all duration-300 shrink-0 overflow-hidden ${isPinned ? "w-full gap-3 pl-[13px]" : "w-12 justify-center group-hover/sidebar:w-full group-hover/sidebar:gap-3 group-hover/sidebar:justify-start group-hover/sidebar:pl-[13px]"} ${active === tab.key
-            ? "bg-slate-800/80 text-primary border border-slate-700/50"
-            : "hover:bg-slate-800/50 text-slate-400 border border-transparent hover:text-slate-200"
-            }`}
+          className={`${TAB_BASE} ${isPinned ? SIDEBAR_EXPAND.tab.pinned : SIDEBAR_EXPAND.tab.collapsed} ${active === tab.key ? TAB_ACTIVE : TAB_INACTIVE}`}
         >
-          <span className="material-symbols-outlined shrink-0 text-[22px]">
-            {tab.icon}
-          </span>
-          <span className={`font-semibold text-[13.5px] whitespace-nowrap tracking-wide transition-all duration-300 overflow-hidden ${isPinned ? "opacity-100 max-w-full" : "opacity-0 max-w-0 group-hover/sidebar:opacity-100 group-hover/sidebar:max-w-full"}`}>
+          <span className="material-symbols-outlined shrink-0 text-[22px]">{tab.icon}</span>
+          <span className={`${LABEL_BASE} ${isPinned ? SIDEBAR_EXPAND.label.pinned : SIDEBAR_EXPAND.label.collapsed}`}>
             {tab.label}
           </span>
         </button>
@@ -170,43 +193,59 @@ function ProjectDropdown({
   isPinned: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const activeProject = projects.find((p) => p.project_id === projectId);
   const displayLabel = activeProject?.label || projectId;
 
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  // Close dropdown when sidebar collapses (mouse leaves sidebar area)
+  // Close when sidebar collapses (mouse leaves sidebar area)
   useEffect(() => {
     if (!open || isPinned) return;
-    const sidebar = ref.current?.closest("aside");
+    const sidebar = btnRef.current?.closest("aside");
     if (!sidebar) return;
     const handleLeave = () => setOpen(false);
     sidebar.addEventListener("mouseleave", handleLeave);
     return () => sidebar.removeEventListener("mouseleave", handleLeave);
   }, [open, isPinned]);
 
+  const getMenuStyle = (): CSSProperties => {
+    if (!btnRef.current) return { display: "none" };
+    const rect = btnRef.current.getBoundingClientRect();
+    return {
+      position: "fixed",
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+    };
+  };
+
   return (
-    <div ref={ref} className="relative w-full px-3 shrink-0">
+    <div className="w-full px-3 shrink-0">
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         disabled={loadingProjects}
-        className={`h-12 mx-auto rounded-xl border border-primary/30 bg-primary/10 flex items-center text-primary transition-all duration-300 hover:bg-primary/20 disabled:opacity-50 overflow-hidden shrink-0 cursor-pointer ${isPinned ? "w-full gap-2.5 pl-[10px] pr-3" : "w-12 justify-center group-hover/sidebar:w-full group-hover/sidebar:gap-2.5 group-hover/sidebar:justify-start group-hover/sidebar:pl-[10px] group-hover/sidebar:pr-3"}`}
+        className={`${PROJECT_BTN_BASE} ${isPinned ? SIDEBAR_EXPAND.projectBtn.pinned : SIDEBAR_EXPAND.projectBtn.collapsed}`}
         title={`Project: ${displayLabel}`}
       >
         <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 shadow-sm border border-primary/30">
           <span className="material-symbols-outlined text-[16px]">dataset</span>
         </div>
-        {/* Expanded: project name + unfold icon */}
-        <div className={`flex items-center gap-2 min-w-0 flex-1 transition-all duration-300 overflow-hidden ${isPinned ? "opacity-100" : "opacity-0 max-w-0 group-hover/sidebar:opacity-100 group-hover/sidebar:max-w-full"}`}>
+        <div className={`flex items-center gap-2 min-w-0 flex-1 transition-all duration-300 overflow-hidden ${isPinned ? SIDEBAR_EXPAND.label.pinned : SIDEBAR_EXPAND.label.collapsed}`}>
           <div className="flex flex-col items-start min-w-0 flex-1">
             <span className="text-[9px] font-bold uppercase tracking-widest text-primary/60 leading-none mb-[2px]">Switch Project</span>
             <span className="text-[13px] font-semibold truncate w-full text-left leading-none text-slate-100">{displayLabel}</span>
@@ -215,8 +254,8 @@ function ProjectDropdown({
         </div>
       </button>
 
-      {open && (
-        <div className="absolute top-full left-3 right-3 mt-2 rounded-xl border border-slate-600 bg-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.6)] z-[100] overflow-hidden">
+      {open && createPortal(
+        <div ref={menuRef} style={getMenuStyle()} className="rounded-xl border border-slate-600 bg-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.6)] overflow-hidden">
           <div className="px-3 py-2.5 border-b border-slate-700/60">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Switch Project</p>
           </div>
@@ -252,7 +291,8 @@ function ProjectDropdown({
               <p className="px-3 py-4 text-xs text-slate-500 text-center">No projects</p>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

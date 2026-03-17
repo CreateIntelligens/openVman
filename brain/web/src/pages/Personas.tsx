@@ -288,7 +288,7 @@ export default function Personas() {
                                                         <select
                                                                value={templateSourceId}
                                                                onChange={(event) => setTemplateSourceId(event.target.value)}
-                                                               className="w-full rounded-md border border-[#333] bg-[#0A0A0A] px-3 py-2 text-[13px] text-slate-300 focus:border-slate-400 focus:outline-none appearance-none transition-colors"
+                                                               className="select-dark w-full text-[13px]"
                                                                title="Select a template or an existing persona to copy configuration from"
                                                         >
                                                                <option value="">-- Blank Template --</option>

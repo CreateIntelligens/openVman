@@ -38,7 +38,7 @@ export default function Search() {
   };
 
   return (
-    <>
+    <div className="page-scroll">
       {/* Header */}
       <header className="sticky top-0 z-10 px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <h2 className="text-2xl font-bold">Search Knowledge Base</h2>
@@ -63,7 +63,7 @@ export default function Search() {
           <div className="h-auto w-px bg-slate-700 hidden md:block mx-2 my-2" />
           <div className="flex items-center px-4">
             <select
-              className="bg-transparent border-none focus:ring-0 text-slate-300 font-medium cursor-pointer py-4"
+              className="select-dark text-sm py-2.5"
               value={table}
               onChange={(e) => setTable(e.target.value)}
             >
@@ -75,7 +75,7 @@ export default function Search() {
           <div className="flex items-center gap-2 px-4">
             <label className="text-xs text-slate-500 font-bold whitespace-nowrap">Top K</label>
             <select
-              className="bg-transparent border-none focus:ring-0 text-slate-300 font-medium cursor-pointer py-4"
+              className="select-dark text-sm py-2.5"
               value={topK}
               onChange={(e) => setTopK(Number(e.target.value))}
             >
@@ -160,7 +160,7 @@ export default function Search() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

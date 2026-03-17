@@ -112,7 +112,7 @@ export default function Memory() {
   };
 
   return (
-    <>
+    <div className="page-scroll">
       <header className="sticky top-0 z-10 px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <div className="flex items-center justify-between">
           <div>
@@ -374,7 +374,7 @@ export default function Memory() {
         onConfirm={confirmDeleteMemory}
         onCancel={() => setDeleteTarget(null)}
       />
-    </>
+    </div>
   );
 }
 

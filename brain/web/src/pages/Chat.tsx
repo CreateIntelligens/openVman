@@ -286,7 +286,7 @@ export default function Chat() {
               value={selectedPersonaId}
               onChange={(event) => handlePersonaChange(event.target.value)}
               disabled={sending || loadingPersonas}
-              className="w-full rounded-lg border border-slate-800/80 bg-slate-900/40 px-3 py-2.5 text-sm text-slate-200 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
+              className="select-dark w-full"
             >
               {personas.map((persona) => (
                 <option key={persona.persona_id} value={persona.persona_id}>

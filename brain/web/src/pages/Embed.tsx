@@ -42,7 +42,7 @@ export default function Embed() {
   const hasMore = allValues.length > PREVIEW_LIMIT;
 
   return (
-    <>
+    <div className="page-scroll">
       {/* Header */}
       <header className="sticky top-0 z-10 px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <h2 className="text-2xl font-bold">Embed Text</h2>
@@ -136,6 +136,6 @@ export default function Embed() {
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
