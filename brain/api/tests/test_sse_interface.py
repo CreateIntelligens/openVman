@@ -29,17 +29,11 @@ from core.sse_events import (
 from protocol.protocol_events import validate_server_event
 
 
-def _make_fake_agent_loop() -> types.ModuleType:
-    from conftest import make_fake_agent_loop
-
-    return make_fake_agent_loop()
-
-
 def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
-    from conftest import stub_chat_service_deps
+    from conftest import make_fake_agent_loop, stub_chat_service_deps
 
     stub_chat_service_deps(monkeypatch)
-    monkeypatch.setitem(sys.modules, "core.agent_loop", _make_fake_agent_loop())
+    monkeypatch.setitem(sys.modules, "core.agent_loop", make_fake_agent_loop())
 
     fake_llm_client = types.ModuleType("core.llm_client")
     fake_llm_client.generate_chat_reply = lambda messages: "sync reply"

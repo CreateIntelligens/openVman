@@ -48,45 +48,9 @@ function AppContent() {
         />
 
         <div className="flex-1 flex flex-col w-full px-3 overflow-y-auto no-scrollbar gap-6 mt-4">
-          <nav className="flex flex-col gap-3 w-full">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-1">Project</div>
-            {projectTabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActive(tab.key)}
-                title={tab.label}
-                className={`w-12 h-12 mx-auto flex items-center justify-center rounded-xl transition-all group relative ${active === tab.key
-                    ? "bg-slate-800/80 text-primary border border-slate-700/50 shadow-inner"
-                    : "hover:bg-slate-800/50 text-slate-400 border border-transparent hover:text-slate-200"
-                  }`}
-              >
-                <span className={`material-symbols-outlined text-[22px] transition-transform ${active === tab.key ? "scale-110" : "group-hover:scale-110"}`}>
-                  {tab.icon}
-                </span>
-              </button>
-            ))}
-          </nav>
-
+          <TabGroup label="Project" tabs={projectTabs} active={active} onSelect={setActive} />
           <hr className="border-slate-800/60 w-8 mx-auto" />
-
-          <nav className="flex flex-col gap-3 w-full">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-1">Global</div>
-            {globalTabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActive(tab.key)}
-                title={tab.label}
-                className={`w-12 h-12 mx-auto flex items-center justify-center rounded-xl transition-all group relative ${active === tab.key
-                    ? "bg-slate-800/80 text-primary border border-slate-700/50 shadow-inner"
-                    : "hover:bg-slate-800/50 text-slate-400 border border-transparent hover:text-slate-200"
-                  }`}
-              >
-                <span className={`material-symbols-outlined text-[22px] transition-transform ${active === tab.key ? "scale-110" : "group-hover:scale-110"}`}>
-                  {tab.icon}
-                </span>
-              </button>
-            ))}
-          </nav>
+          <TabGroup label="Global" tabs={globalTabs} active={active} onSelect={setActive} />
         </div>
       </aside>
 
@@ -137,6 +101,39 @@ function AppContent() {
         </div>
       </main>
     </div>
+  );
+}
+
+function TabGroup({
+  label,
+  tabs,
+  active,
+  onSelect,
+}: {
+  label: string;
+  tabs: readonly { key: Tab; label: string; icon: string }[];
+  active: Tab;
+  onSelect: (tab: Tab) => void;
+}) {
+  return (
+    <nav className="flex flex-col gap-3 w-full">
+      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center mb-1">{label}</div>
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          onClick={() => onSelect(tab.key)}
+          title={tab.label}
+          className={`w-12 h-12 mx-auto flex items-center justify-center rounded-xl transition-all group relative ${active === tab.key
+              ? "bg-slate-800/80 text-primary border border-slate-700/50 shadow-inner"
+              : "hover:bg-slate-800/50 text-slate-400 border border-transparent hover:text-slate-200"
+            }`}
+        >
+          <span className={`material-symbols-outlined text-[22px] transition-transform ${active === tab.key ? "scale-110" : "group-hover:scale-110"}`}>
+            {tab.icon}
+          </span>
+        </button>
+      ))}
+    </nav>
   );
 }
 

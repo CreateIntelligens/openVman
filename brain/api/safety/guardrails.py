@@ -7,7 +7,6 @@ from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from threading import Lock
 from time import monotonic
-from typing import Any
 
 from config import get_settings
 from protocol.message_envelope import ALLOWED_ROLES, RequestContext
@@ -84,31 +83,21 @@ def enforce_session_limits(session_id: str | None, persona_id: str, project_id: 
     """Raise if the session has exceeded the configured round limit."""
     if session_id is None:
         return
+
+    from memory.memory import get_session_updated_at, list_session_messages
+
     cfg = get_settings()
-    updated_at = _get_session_updated_at(session_id, persona_id, project_id)
-    if updated_at is not None and _session_ttl_exceeded(updated_at, cfg.max_session_ttl_minutes):
-        raise ValueError(f"session 已超過 TTL {cfg.max_session_ttl_minutes} 分鐘")
-    round_count = _count_session_rounds(session_id, persona_id, project_id)
-    if round_count >= cfg.max_session_rounds:
-        raise ValueError(f"session 已達 {cfg.max_session_rounds} 輪上限")
 
-
-def _get_session_updated_at(session_id: str, persona_id: str, project_id: str = "default") -> str | None:
-    from memory.memory import get_session_updated_at
-
-    return get_session_updated_at(session_id, persona_id, project_id)
-
-
-def _session_ttl_exceeded(updated_at: str, ttl_minutes: int) -> bool:
-    deadline = datetime.now() - timedelta(minutes=ttl_minutes)
-    return datetime.fromisoformat(updated_at) < deadline
-
-
-def _count_session_rounds(session_id: str, persona_id: str, project_id: str = "default") -> int:
-    from memory.memory import list_session_messages
+    updated_at = get_session_updated_at(session_id, persona_id, project_id)
+    if updated_at is not None:
+        deadline = datetime.now() - timedelta(minutes=cfg.max_session_ttl_minutes)
+        if datetime.fromisoformat(updated_at) < deadline:
+            raise ValueError(f"session 已超過 TTL {cfg.max_session_ttl_minutes} 分鐘")
 
     messages = list_session_messages(session_id, persona_id, project_id)
-    return sum(1 for m in messages if m.get("role") == "user")
+    round_count = sum(1 for m in messages if m.get("role") == "user")
+    if round_count >= cfg.max_session_rounds:
+        raise ValueError(f"session 已達 {cfg.max_session_rounds} 輪上限")
 
 
 def _enforce_rate_limit(action: str, context: RequestContext) -> None:

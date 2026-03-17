@@ -131,14 +131,11 @@ def _inject_tool_fallback_hint(
 
     The original list is NOT mutated.
     """
-    result = list(messages)
-    insert_idx = len(result)
-    for i in range(len(result) - 1, -1, -1):
-        if result[i].get("role") == "user":
-            insert_idx = i
-            break
-    result.insert(insert_idx, {"role": "system", "content": _TOOL_FALLBACK_HINT})
-    return result
+    insert_idx = next(
+        (i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"),
+        len(messages),
+    )
+    return [*messages[:insert_idx], {"role": "system", "content": _TOOL_FALLBACK_HINT}, *messages[insert_idx:]]
 
 
 def _fallback_messages_for_tool_phase_error(
