@@ -48,6 +48,23 @@ function projectUrl(path: string, params: Record<string, string> = {}): string {
 }
 
 // ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+export interface AgentIdentity {
+  name: string;
+  emoji: string;
+  theme: string;
+}
+
+export async function fetchIdentity(personaId?: string): Promise<AgentIdentity> {
+  const params: Record<string, string> = {};
+  if (personaId) params.persona_id = personaId;
+  const res = await fetch(projectUrl("/identity", params));
+  return parseJson<AgentIdentity>(res);
+}
+
+// ---------------------------------------------------------------------------
 // Project CRUD
 // ---------------------------------------------------------------------------
 
