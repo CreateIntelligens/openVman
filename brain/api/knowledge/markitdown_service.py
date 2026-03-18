@@ -6,8 +6,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from markitdown import MarkItDown
-
 logger = logging.getLogger(__name__)
 
 
@@ -15,6 +13,7 @@ class MarkItDownService:
     """使用 MarkItDown 將多種格式轉換為 Markdown 的服務。"""
 
     def __init__(self):
+        from markitdown import MarkItDown
         self._md = MarkItDown()
 
     def convert(self, file_path: Path | str) -> Optional[str]:

@@ -11,8 +11,7 @@ from typing import Optional
 
 from knowledge.workspace import get_workspace_root, ensure_workspace_scaffold
 from infra.db import get_memories_table, encode_text, ensure_fts_index
-from .importance import calculate_importance 
-from core.llm_client import generate_chat_turn 
+from .importance import score_importance
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ class MemoryReflector:
             return
 
         # 2. 計算重要性
-        importance = calculate_importance(summary)
+        importance = score_importance(summary).score
 
         # 3. 寫入 LanceDB
         record = {

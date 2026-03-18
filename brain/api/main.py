@@ -57,8 +57,6 @@ from memory.memory import (
 )
 from memory.memory_governance import maybe_run_memory_maintenance
 from memory.retrieval import search_records
-from knowledge.ingestion_manager import run_ingestion
-from memory.reflector import MemoryReflector
 from personas.personas import (
     clone_persona_scaffold,
     create_persona_scaffold,
@@ -88,6 +86,10 @@ from safety.observability import get_metrics_store, log_event, log_exception
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brain")
 
+
+# ---------------------------------------------------------------------------
+# Startup & Lifespan
+# ---------------------------------------------------------------------------
 
 def build_health_payload(project_id: str = "default") -> dict[str, object]:
     """組裝 health response。"""
@@ -125,7 +127,6 @@ async def cancel_task(task: asyncio.Task[None] | None) -> None:
     """在 shutdown 時 safe 取消背景任務。"""
     if task is None or task.done():
         return
-
     task.cancel()
     with suppress(asyncio.CancelledError):
         await task
@@ -138,7 +139,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ensure_workspace_scaffold("default")
     get_db("default")
 
-    # Run data migration if needed
     from scripts.migrate_to_projects import run_migration
     await asyncio.to_thread(run_migration)
 
@@ -192,7 +192,7 @@ async def metrics_middleware(request: Request, call_next):
 
 
 # ---------------------------------------------------------------------------
-# Health & Metrics
+# Health & Metrics & Identity
 # ---------------------------------------------------------------------------
 
 @app.get("/api/health")
@@ -204,10 +204,6 @@ async def health(project_id: str = "default"):
 async def metrics():
     return get_metrics_store().snapshot()
 
-
-# ---------------------------------------------------------------------------
-# Identity
-# ---------------------------------------------------------------------------
 
 @app.get("/api/identity")
 async def get_identity(persona_id: str = "default", project_id: str = "default"):
@@ -298,30 +294,68 @@ async def clone_persona(payload: PersonaCloneRequest):
 
 
 # ---------------------------------------------------------------------------
-# Protocol Validation
+# Chat
 # ---------------------------------------------------------------------------
 
-@app.post("/api/protocol/validate")
-async def protocol_validate(payload: ProtocolValidateRequest):
-    """Validate a protocol event payload against the versioned contract."""
+@app.post("/api/chat")
+async def chat(request: Request, payload: ChatRequest):
+    """Generate a reply using workspace context, retrieval, and recent session history."""
     try:
-        if payload.direction == "client_to_server":
-            event = validate_client_event(payload.payload, payload.version)
-        else:
-            event = validate_server_event(payload.payload, payload.version)
-        return {"valid": True, "event": event.event, "version": payload.version}
-    except ProtocolValidationError as exc:
-        return {
-            "valid": False,
-            "event": exc.event,
-            "version": exc.version,
-            "error": str(exc),
-            "details": exc.details,
-        }
+        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
+        context = prepare_generation(envelope)
+        result = await asyncio.to_thread(execute_generation, context)
+        response = finalize_generation(context, result.reply)
+        response["tool_steps"] = result.tool_steps
+        log_event(
+            "chat_complete",
+            trace_id=context.trace_id,
+            session_id=context.session_id,
+            tool_steps=len(result.tool_steps),
+            project_id=context.project_id,
+        )
+        return response
+    except (ValueError, ProtocolValidationError) as exc:
+        get_metrics_store().increment("guardrail_blocks_total", action="chat")
+        record_generation_failure("chat", "validation", str(exc))
+        error_payload = build_exception_protocol_error(exc)
+        raise HTTPException(status_code=400, detail=error_payload) from exc
+    except Exception as exc:  # pragma: no cover
+        log_exception("chat_error", exc, trace_id=getattr(request.state, "trace_id", ""))
+        record_generation_failure("chat", "llm_failure", str(exc))
+        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
+        raise HTTPException(status_code=502, detail=error_payload) from exc
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: Request, payload: ChatRequest):
+    """Stream chat generation through SSE."""
+    try:
+        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
+        context = prepare_generation(envelope)
+    except (ValueError, ProtocolValidationError) as exc:
+        get_metrics_store().increment("guardrail_blocks_total", action="chat_stream")
+        record_generation_failure("chat_stream", "validation", str(exc))
+        error_payload = build_exception_protocol_error(exc)
+        raise HTTPException(status_code=400, detail=error_payload) from exc
+    except Exception as exc:  # pragma: no cover
+        log_exception("chat_stream_init_error", exc, trace_id=getattr(request.state, "trace_id", ""))
+        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 串流初始化失敗")
+        raise HTTPException(status_code=502, detail=error_payload) from exc
+
+    return EventSourceResponse(_stream_generation_events(context))
+
+
+@app.get("/api/chat/history")
+async def get_chat_history(session_id: str, persona_id: str = "default", project_id: str = "default"):
+    try:
+        messages = list_session_messages(session_id, persona_id, project_id=project_id)
+        return {"session_id": session_id, "persona_id": persona_id, "history": messages}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------
-# Embedding
+# Search & Embedding
 # ---------------------------------------------------------------------------
 
 @app.post("/api/embed")
@@ -334,10 +368,6 @@ async def embed(payload: EmbedRequest):
         "vectors": [v[:5] for v in vectors],
     }
 
-
-# ---------------------------------------------------------------------------
-# Search & Memory
-# ---------------------------------------------------------------------------
 
 @app.post("/api/search")
 async def search(request: Request, payload: SearchRequest):
@@ -382,6 +412,10 @@ async def search(request: Request, payload: SearchRequest):
     }
 
 
+# ---------------------------------------------------------------------------
+# Memory & Sessions
+# ---------------------------------------------------------------------------
+
 @app.post("/api/memories")
 async def add_memory(request: Request, payload: AddMemoryRequest):
     """新增一筆記憶。"""
@@ -413,85 +447,8 @@ async def add_memory(request: Request, payload: AddMemoryRequest):
         project_id=project_id,
     )
 
-    return {
-        "status": "ok",
-        "trace_id": envelope.context.trace_id,
-        "text": text,
-    }
+    return {"status": "ok", "trace_id": envelope.context.trace_id, "text": text}
 
-
-# ---------------------------------------------------------------------------
-# Chat Generation
-# ---------------------------------------------------------------------------
-
-@app.post("/api/chat")
-async def chat(request: Request, payload: ChatRequest):
-    """Generate a reply using workspace context, retrieval, and recent session history."""
-    try:
-        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
-        context = prepare_generation(envelope)
-        result = await asyncio.to_thread(execute_generation, context)
-        response = finalize_generation(context, result.reply)
-        response["tool_steps"] = result.tool_steps
-        log_event(
-            "chat_complete",
-            trace_id=context.trace_id,
-            session_id=context.session_id,
-            tool_steps=len(result.tool_steps),
-            project_id=context.project_id,
-        )
-        return response
-    except (ValueError, ProtocolValidationError) as exc:
-        get_metrics_store().increment("guardrail_blocks_total", action="chat")
-        record_generation_failure("chat", "validation", str(exc))
-        error_payload = build_exception_protocol_error(exc)
-        raise HTTPException(status_code=400, detail=error_payload) from exc
-    except Exception as exc:  # pragma: no cover
-        log_exception(
-            "chat_error",
-            exc,
-            trace_id=getattr(request.state, "trace_id", ""),
-        )
-        record_generation_failure("chat", "llm_failure", str(exc))
-        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
-        raise HTTPException(status_code=502, detail=error_payload) from exc
-
-
-@app.post("/api/chat/stream")
-async def chat_stream(request: Request, payload: ChatRequest):
-    """Stream chat generation through SSE."""
-    try:
-        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
-        context = prepare_generation(envelope)
-    except (ValueError, ProtocolValidationError) as exc:
-        get_metrics_store().increment("guardrail_blocks_total", action="chat_stream")
-        record_generation_failure("chat_stream", "validation", str(exc))
-        error_payload = build_exception_protocol_error(exc)
-        raise HTTPException(status_code=400, detail=error_payload) from exc
-    except Exception as exc:  # pragma: no cover
-        log_exception("chat_stream_init_error", exc, trace_id=getattr(request.state, "trace_id", ""))
-        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 串流初始化失敗")
-        raise HTTPException(status_code=502, detail=error_payload) from exc
-
-    return EventSourceResponse(_stream_generation_events(context))
-
-
-@app.get("/api/chat/history")
-async def get_chat_history(session_id: str, persona_id: str = "default", project_id: str = "default"):
-    try:
-        messages = list_session_messages(session_id, persona_id, project_id=project_id)
-        return {
-            "session_id": session_id,
-            "persona_id": persona_id,
-            "history": messages,
-        }
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-# ---------------------------------------------------------------------------
-# Memory Browse & Session Management
-# ---------------------------------------------------------------------------
 
 @app.get("/api/memories")
 async def list_memories(project_id: str = "default", page: int = 1, page_size: int = 20):
@@ -541,21 +498,14 @@ async def delete_session(session_id: str, project_id: str = "default"):
 @app.get("/api/admin/knowledge/documents")
 async def list_knowledge_documents(project_id: str = "default"):
     documents = list_workspace_documents(project_id)
-    return {
-        "documents": documents,
-        "document_count": len(documents),
-    }
+    return {"documents": documents, "document_count": len(documents)}
 
 
 @app.get("/api/admin/knowledge/base/documents")
 async def list_knowledge_base_docs(project_id: str = "default"):
     documents = list_knowledge_base_documents(project_id)
     directories = list_knowledge_base_directories(project_id)
-    return {
-        "documents": documents,
-        "document_count": len(documents),
-        "directories": directories,
-    }
+    return {"documents": documents, "document_count": len(documents), "directories": directories}
 
 
 @app.get("/api/admin/knowledge/document")
@@ -574,7 +524,6 @@ async def put_knowledge_document(payload: KnowledgeDocumentPutRequest):
         document = save_workspace_document(payload.path, payload.content, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
     return {"status": "ok", "document": document}
 
 
@@ -586,7 +535,6 @@ async def delete_knowledge_document(path: str, project_id: str = "default"):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="找不到指定文件") from exc
-
     asyncio.create_task(_background_reindex(project_id))
     return {"status": "ok"}
 
@@ -599,7 +547,6 @@ async def post_move_knowledge_document(payload: KnowledgeDocumentMoveRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-
     asyncio.create_task(_background_reindex(payload.project_id))
     return {"status": "ok", "document": document}
 
@@ -632,31 +579,14 @@ async def upload_knowledge_documents(
     try:
         for upload in files:
             uploaded.append(
-                save_uploaded_document(
-                    upload.filename or "",
-                    await upload.read(),
-                    target_dir,
-                    project_id,
-                )
+                save_uploaded_document(upload.filename or "", await upload.read(), target_dir, project_id)
             )
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=400, detail="檔案需為 UTF-8 編碼") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    # Trigger background reindex so new files are indexed automatically
     asyncio.create_task(_background_reindex(project_id))
-
     return {"status": "ok", "files": uploaded}
-
-
-async def _background_reindex(project_id: str) -> None:
-    """Run reindex in background thread, log errors but don't raise."""
-    try:
-        result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
-        log_event("knowledge_reindex_auto", project_id=project_id, **result)
-    except Exception as exc:
-        log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
 
 
 @app.post("/api/admin/knowledge/reindex")
@@ -672,10 +602,12 @@ async def reindex_knowledge(payload: AdminActionRequest):
         record_generation_failure("reindex", "index_failure", str(exc))
         raise HTTPException(status_code=500, detail="知識重建失敗") from exc
 
+
 @app.post("/api/admin/knowledge/sync")
 async def sync_knowledge(payload: AdminActionRequest):
-    """手動觸發知識庫 Ingestion 同步。"""
+    """手動觸發 raw/ 目錄 Ingestion 同步（需要 markitdown 套件）。"""
     try:
+        from knowledge.ingestion_manager import run_ingestion
         await asyncio.to_thread(run_ingestion, payload.project_id)
         log_event("knowledge_sync", project_id=payload.project_id)
         return {"status": "ok", "message": "知識庫同步完成"}
@@ -684,10 +616,28 @@ async def sync_knowledge(payload: AdminActionRequest):
         raise HTTPException(status_code=500, detail="知識庫同步失敗") from exc
 
 
+# ---------------------------------------------------------------------------
+# Admin: Memory Maintenance & Reflection
+# ---------------------------------------------------------------------------
+
+@app.post("/api/admin/memory/maintain")
+async def maintain_memory(payload: AdminActionRequest):
+    """記憶整理：去重、摘要、歸檔過期 transcripts。"""
+    try:
+        result = await asyncio.to_thread(maybe_run_memory_maintenance, True, payload.project_id)
+        log_event("memory_maintenance", project_id=payload.project_id, **result)
+        return result
+    except Exception as exc:
+        log_exception("memory_maintenance_error", exc)
+        record_generation_failure("memory_maintain", "maintenance_failure", str(exc))
+        raise HTTPException(status_code=500, detail="記憶整理失敗") from exc
+
+
 @app.post("/api/admin/memory/reflect")
 async def reflect_memory(payload: AdminActionRequest):
-    """手動觸發長期記憶反思與歸檔。"""
+    """LLM 驅動的長期記憶反思。"""
     try:
+        from memory.reflector import MemoryReflector
         reflector = MemoryReflector(payload.project_id)
         await reflector.reflect_daily_logs()
         log_event("memory_reflect", project_id=payload.project_id)
@@ -698,8 +648,40 @@ async def reflect_memory(payload: AdminActionRequest):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Protocol Validation
 # ---------------------------------------------------------------------------
+
+@app.post("/api/protocol/validate")
+async def protocol_validate(payload: ProtocolValidateRequest):
+    """Validate a protocol event payload against the versioned contract."""
+    try:
+        if payload.direction == "client_to_server":
+            event = validate_client_event(payload.payload, payload.version)
+        else:
+            event = validate_server_event(payload.payload, payload.version)
+        return {"valid": True, "event": event.event, "version": payload.version}
+    except ProtocolValidationError as exc:
+        return {
+            "valid": False,
+            "event": exc.event,
+            "version": exc.version,
+            "error": str(exc),
+            "details": exc.details,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Internal Helpers
+# ---------------------------------------------------------------------------
+
+async def _background_reindex(project_id: str) -> None:
+    """Run reindex in background thread, log errors but don't raise."""
+    try:
+        result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
+        log_event("knowledge_reindex_auto", project_id=project_id, **result)
+    except Exception as exc:
+        log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
+
 
 async def _stream_generation_events(context: GenerationContext) -> AsyncIterator[dict[str, str]]:
     """Yield SSE events from the chat service generator."""
@@ -709,7 +691,6 @@ async def _stream_generation_events(context: GenerationContext) -> AsyncIterator
             if event.event == "tool":
                 tool_count += 1
                 get_metrics_store().increment("tool_calls_total", tool_name=event.name)
-
             yield sse_event_to_dict(event)
 
         log_event(
@@ -724,10 +705,7 @@ async def _stream_generation_events(context: GenerationContext) -> AsyncIterator
         raise
     except ValueError as exc:
         record_generation_failure("chat_stream", "validation", str(exc))
-        yield sse_error_to_dict(
-            build_exception_protocol_error(exc),
-            context.trace_id,
-        )
+        yield sse_error_to_dict(build_exception_protocol_error(exc), context.trace_id)
     except Exception as exc:  # pragma: no cover
         log_exception("chat_stream_error", exc, trace_id=context.trace_id)
         record_generation_failure("chat_stream", "llm_failure", str(exc))
