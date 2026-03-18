@@ -1,10 +1,10 @@
-import manifestJson from "../../../../contracts/schemas/v1/manifest.json";
-import clientInitSchemaJson from "../../../../contracts/schemas/v1/client_init.schema.json";
-import userSpeakSchemaJson from "../../../../contracts/schemas/v1/user_speak.schema.json";
-import clientInterruptSchemaJson from "../../../../contracts/schemas/v1/client_interrupt.schema.json";
-import serverStreamChunkSchemaJson from "../../../../contracts/schemas/v1/server_stream_chunk.schema.json";
-import serverErrorSchemaJson from "../../../../contracts/schemas/v1/server_error.schema.json";
-import serverInitAckSchemaJson from "../../../../contracts/schemas/v1/server_init_ack.schema.json";
+import manifestJson from "@contracts/schemas/v1/manifest.json";
+import clientInitSchemaJson from "@contracts/schemas/v1/client_init.schema.json";
+import userSpeakSchemaJson from "@contracts/schemas/v1/user_speak.schema.json";
+import clientInterruptSchemaJson from "@contracts/schemas/v1/client_interrupt.schema.json";
+import serverStreamChunkSchemaJson from "@contracts/schemas/v1/server_stream_chunk.schema.json";
+import serverErrorSchemaJson from "@contracts/schemas/v1/server_error.schema.json";
+import serverInitAckSchemaJson from "@contracts/schemas/v1/server_init_ack.schema.json";
 import type {
   ClientEvent,
   ClientInitEvent,
@@ -18,7 +18,7 @@ import type {
   ServerStreamChunkEvent,
   UserSpeakEvent,
   VisemeFrame,
-} from "../../../../contracts/generated/typescript/protocol-contracts";
+} from "@contracts/generated/typescript/protocol-contracts";
 
 type JsonValue = boolean | number | string | null | JsonObject | JsonValue[];
 type JsonObject = { [key: string]: JsonValue };

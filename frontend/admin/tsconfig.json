@@ -16,7 +16,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@contracts/*": ["../../contracts/*"]
+    }
   },
   "include": ["src", "../../contracts/schemas/v1/**/*.json", "../../contracts/generated/typescript/**/*.d.ts"]
 }

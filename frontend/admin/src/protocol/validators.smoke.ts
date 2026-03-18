@@ -8,7 +8,7 @@ import type {
   ClientInterruptEvent,
   ServerErrorEvent,
   ServerInitAckEvent,
-} from "../../../../contracts/generated/typescript/protocol-contracts";
+} from "@contracts/generated/typescript/protocol-contracts";
 
 const contract = loadProtocolContract();
 const clientPayload: ClientInterruptEvent = {
