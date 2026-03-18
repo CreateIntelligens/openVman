@@ -26,9 +26,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     workspace_root.mkdir(exist_ok=True)
     memory_dir = workspace_root / "memory" / "default"
     memory_dir.mkdir(parents=True, exist_ok=True)
-    learnings_dir = workspace_root / ".learnings"
-    learnings_dir.mkdir(exist_ok=True)
-    summaries_path = learnings_dir / "MEMORY_SUMMARIES.md"
+    summaries_path = workspace_root / "MEMORY_SUMMARIES.md"
     summaries_path.write_text("# 記憶摘要 (MEMORY_SUMMARIES)\n", encoding="utf-8")
 
     # Stub embedder
@@ -55,8 +53,6 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     # Stub workspace
     fake_workspace_mod = types.ModuleType("knowledge.workspace")
     fake_workspace_mod.ensure_workspace_scaffold = lambda project_id="default": workspace_root
-    fake_workspace_mod.WORKSPACE_ROOT = workspace_root
-    fake_workspace_mod.CORE_DOCUMENTS = {"memory_summaries": summaries_path}
     fake_workspace_mod.get_workspace_root = lambda project_id="default": workspace_root
     fake_workspace_mod.get_core_documents = lambda project_id="default": {"memory_summaries": summaries_path}
     fake_workspace_mod.iter_indexable_documents = lambda project_id="default": []

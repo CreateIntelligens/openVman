@@ -13,6 +13,18 @@ from infra.reflection import (
 )
 from knowledge.workspace import load_core_workspace_context
 
+# Workspace blocks injected into the system prompt, ordered by priority.
+# Each entry: (label used in prompt, config attribute for char budget).
+_WORKSPACE_BLOCK_CONFIG: list[tuple[str, str]] = [
+    ("IDENTITY",  "prompt_identity_char_budget"),
+    ("SOUL",      "prompt_soul_char_budget"),
+    ("MEMORY",    "prompt_memory_char_budget"),
+    ("AGENTS",    "prompt_agents_char_budget"),
+    ("TOOLS",     "prompt_tools_char_budget"),
+    ("LEARNINGS", "prompt_learnings_char_budget"),
+    ("ERRORS",    "prompt_errors_char_budget"),
+]
+
 
 def build_chat_messages(
     user_message: str,
@@ -30,6 +42,11 @@ def build_chat_messages(
         project_id=str(request_context.get("project_id", "default")),
     )
     history_summary = summarize_message_history(session_messages)
+    workspace_blocks = [
+        _format_workspace_block(label, workspace[label.lower()], getattr(cfg, budget_attr))
+        for label, budget_attr in _WORKSPACE_BLOCK_CONFIG
+    ]
+
     system_prompt = "\n\n".join(
         block
         for block in [
@@ -37,12 +54,7 @@ def build_chat_messages(
             "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。"
             "當使用者要求你記住某事、或對話中出現值得長期保留的偏好/事實/指令時，使用 save_memory 工具儲存。"
             "儲存時用簡潔的陳述句（如「使用者是男生」），不要儲存閒聊或普通問題。",
-            _format_workspace_block("SOUL", workspace["soul"], cfg.prompt_soul_char_budget),
-            _format_workspace_block("MEMORY", workspace["memory"], cfg.prompt_memory_char_budget),
-            _format_workspace_block("AGENTS", workspace["agents"], cfg.prompt_agents_char_budget),
-            _format_workspace_block("TOOLS", workspace["tools"], cfg.prompt_tools_char_budget),
-            _format_workspace_block("LEARNINGS", workspace["learnings"], cfg.prompt_learnings_char_budget),
-            _format_workspace_block("ERRORS", workspace["errors"], cfg.prompt_errors_char_budget),
+            *workspace_blocks,
             _format_request_context(request_context),
             history_summary,
             "回答規則：如果資訊不足，先嘗試使用工具搜尋；若仍不足，直接說明缺少什麼；若問題涉及流程，給出清楚下一步；除非使用者要求，否則用繁體中文。",

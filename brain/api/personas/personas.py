@@ -9,19 +9,15 @@ from typing import Any
 
 from knowledge import workspace
 
-PERSONA_CORE_FILENAMES = {
-    "SOUL.md",
-    "AGENTS.md",
-    "TOOLS.md",
-    "MEMORY.md",
-}
-PERSONA_CORE_KEYS = {"soul", "agents", "tools", "memory"}
-PERSONA_CORE_KEYS_TO_FILES = {
+PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
     "soul": "SOUL.md",
     "agents": "AGENTS.md",
     "tools": "TOOLS.md",
     "memory": "MEMORY.md",
+    "identity": "IDENTITY.md",
 }
+PERSONA_CORE_KEYS = frozenset(PERSONA_CORE_KEYS_TO_FILES.keys())
+PERSONA_CORE_FILENAMES = frozenset(PERSONA_CORE_KEYS_TO_FILES.values())
 _PERSONA_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
@@ -198,19 +194,17 @@ def _build_persona_summary(
 
 def _build_persona_files(label: str) -> dict[str, str]:
     return {
-        "SOUL.md": _build_soul_template(label),
-        "AGENTS.md": _build_agents_template(label),
-        "TOOLS.md": _build_tools_template(label),
-        "MEMORY.md": _build_memory_template(label),
+        filename: _PERSONA_TEMPLATES[key](label)
+        for key, filename in PERSONA_CORE_KEYS_TO_FILES.items()
     }
 
 
 def _extract_heading_or_name(path: Path, fallback: str) -> str:
     """Extract the first heading text from a markdown file, or return fallback."""
     for line in path.read_text(encoding="utf-8-sig").splitlines():
-        line = line.strip()
-        if line.startswith("#"):
-            heading = line.lstrip("#").strip()
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            heading = stripped.lstrip("#").strip()
             if heading:
                 return heading
     return fallback
@@ -221,8 +215,19 @@ def _read_preview(path: Path, limit: int = 120) -> str:
     return snippet[:limit]
 
 
-def _build_soul_template(label: str) -> str:
-    return f"""# {label} Persona SOUL
+def _simple_persona_template(section: str, description: str) -> callable:
+    """Return a template builder for a standard persona override section."""
+    def builder(label: str) -> str:
+        return (
+            f"# {label} Persona {section}\n\n"
+            f"- {description}\n"
+            f"- 若沒有特別覆蓋，系統仍會沿用全域 {section} 設定。\n"
+        )
+    return builder
+
+
+_PERSONA_TEMPLATES: dict[str, callable] = {
+    "soul": lambda label: f"""# {label} Persona SOUL
 
 你是「{label}」這個 persona 的對話核心。
 
@@ -233,28 +238,25 @@ def _build_soul_template(label: str) -> str:
 ## 語氣要求
 - 先說重點，再補充必要細節。
 - 若資訊不足，直接指出缺口，不要編造。
-"""
+""",
+    "agents": _simple_persona_template(
+        "AGENTS", "在這裡定義 persona 專屬的工作流程或轉派規則。",
+    ),
+    "tools": _simple_persona_template(
+        "TOOLS", "在這裡記錄 persona 專屬工具、參數限制或使用規範。",
+    ),
+    "memory": _simple_persona_template(
+        "MEMORY", "在這裡記錄 persona 的長期核心記憶或固定事實。",
+    ),
+    "identity": lambda label: f"""# {label} Persona IDENTITY
 
+## 基本資訊
+- name: {label}
+- emoji: 🤖
+- theme: default
 
-def _build_agents_template(label: str) -> str:
-    return f"""# {label} Persona AGENTS
-
-- 在這裡定義 {label} persona 專屬的工作流程或轉派規則。
-- 若沒有特別覆蓋，系統仍會沿用全域 AGENTS 設定。
-"""
-
-
-def _build_tools_template(label: str) -> str:
-    return f"""# {label} Persona TOOLS
-
-- 在這裡記錄 {label} persona 專屬工具、參數限制或使用規範。
-- 若沒有特別覆蓋，系統仍會沿用全域 TOOLS 設定。
-"""
-
-
-def _build_memory_template(label: str) -> str:
-    return f"""# {label} Persona MEMORY
-
-- 在這裡記錄 {label} persona 的長期核心記憶或固定事實。
-- 若沒有特別覆蓋，系統仍會沿用全域 MEMORY 設定。
-"""
+## 說明
+- 此檔定義 {label} persona 的外部身份與視覺主題。
+- 若沒有特別覆蓋，系統仍會沿用全域 IDENTITY 設定。
+""",
+}

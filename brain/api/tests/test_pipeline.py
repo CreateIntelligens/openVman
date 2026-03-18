@@ -168,6 +168,7 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
             "Cfg",
             (),
             {
+                "prompt_identity_char_budget": 0,
                 "prompt_soul_char_budget": 500,
                 "prompt_memory_char_budget": 0,
                 "prompt_agents_char_budget": 0,
@@ -187,6 +188,7 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
             "memory": "",
             "agents": "",
             "tools": "",
+            "identity": "",
             "learnings": "",
             "errors": "",
         },

@@ -14,15 +14,6 @@ ALLOWED_CODE_SUFFIXES = {
     ".toml", ".ini", ".cfg", ".vue", ".svelte",
 }
 ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
-RESERVED_INDEX_PATHS = {
-    "SOUL.md",
-    "AGENTS.md",
-    "TOOLS.md",
-    "MEMORY.md",
-    ".learnings/LEARNINGS.md",
-    ".learnings/ERRORS.md",
-    ".learnings/MEMORY_SUMMARIES.md",
-}
 EXCLUDED_INDEX_PREFIXES = ("memory/",)
 WORKSPACE_TEMPLATES = {
     "SOUL.md": """# 核心人格設定 (SOUL)
@@ -67,20 +58,39 @@ WORKSPACE_TEMPLATES = {
 - 你的主管：陳經理
 - 公司主要產品：智能客服機台、AI 虛擬人解決方案
 """,
-    ".learnings/LEARNINGS.md": """# 學到的新知 (LEARNINGS)
+    "IDENTITY.md": """# 代理身份設定 (IDENTITY)
+
+## 基本資訊
+- name: 小V
+- emoji: 🤖
+- theme: professional
+
+## 說明
+- 此檔定義代理的外部身份與視覺主題。
+- persona 可覆寫此檔以呈現不同角色形象。
+""",
+    "LEARNINGS.md": """# 學到的新知 (LEARNINGS)
 
 - 使用者偏好簡潔、直接的回答。
 - 重要的新偏好與穩定事實，整理後再決定是否升級到 `MEMORY.md`。
 """,
-    ".learnings/ERRORS.md": """# 錯誤紀錄 (ERRORS)
+    "ERRORS.md": """# 錯誤紀錄 (ERRORS)
 
 - 尚未建立正式錯誤紀錄。
 - 後續發生重複性錯誤時，記錄原因、影響與修正方式。
 """,
-    ".learnings/MEMORY_SUMMARIES.md": """# 記憶摘要 (MEMORY_SUMMARIES)
+    "MEMORY_SUMMARIES.md": """# 記憶摘要 (MEMORY_SUMMARIES)
 
 - 每日對話整理後會寫在這裡，作為長期記憶治理的摘要輸出。
 """,
+}
+RESERVED_INDEX_PATHS = frozenset(WORKSPACE_TEMPLATES.keys())
+
+# Mapping from lowercase key to filename, derived from WORKSPACE_TEMPLATES.
+# e.g. "soul" -> "SOUL.md", "memory_summaries" -> "MEMORY_SUMMARIES.md"
+_CORE_DOCUMENT_KEYS: dict[str, str] = {
+    filename.removesuffix(".md").lower(): filename
+    for filename in WORKSPACE_TEMPLATES
 }
 
 
@@ -96,32 +106,20 @@ def get_workspace_root(project_id: str = "default") -> Path:
 def get_core_documents(project_id: str = "default") -> dict[str, Path]:
     """Return the core document map for a given project."""
     ws = get_workspace_root(project_id)
-    return {
-        "soul": ws / "SOUL.md",
-        "agents": ws / "AGENTS.md",
-        "tools": ws / "TOOLS.md",
-        "memory": ws / "MEMORY.md",
-        "learnings": ws / ".learnings" / "LEARNINGS.md",
-        "errors": ws / ".learnings" / "ERRORS.md",
-        "memory_summaries": ws / ".learnings" / "MEMORY_SUMMARIES.md",
-    }
+    return {key: ws / filename for key, filename in _CORE_DOCUMENT_KEYS.items()}
 
 
 def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     """Ensure the workspace root, core docs, and support directories exist."""
     ws = get_workspace_root(project_id)
     ws.mkdir(parents=True, exist_ok=True)
-    (ws / "memory").mkdir(parents=True, exist_ok=True)
-    (ws / ".learnings").mkdir(parents=True, exist_ok=True)
-    (ws / "personas").mkdir(parents=True, exist_ok=True)
-    (ws / "knowledge").mkdir(parents=True, exist_ok=True)
+    for subdir in ("memory", "personas", "knowledge"):
+        (ws / subdir).mkdir(parents=True, exist_ok=True)
 
-    for relative_path, template in WORKSPACE_TEMPLATES.items():
-        path = ws / relative_path
-        if path.exists():
-            continue
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(template, encoding="utf-8")
+    for filename, template in WORKSPACE_TEMPLATES.items():
+        path = ws / filename
+        if not path.exists():
+            path.write_text(template, encoding="utf-8")
 
     return ws
 
