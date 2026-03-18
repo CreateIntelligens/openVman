@@ -64,10 +64,19 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_personas_mod.extract_persona_id_from_relative_path = lambda _: "default"
     monkeypatch.setitem(sys.modules, "personas.personas", fake_personas_mod)
 
+    # Stub archive paths
+    archive_memory_dir = workspace_root / "archive" / "memory"
+    archive_memory_dir.mkdir(parents=True, exist_ok=True)
+    fake_workspace_mod.get_archive_paths = lambda project_id="default": {
+        "errors_dir": workspace_root / "archive" / "errors",
+        "memory_dir": archive_memory_dir,
+    }
+
     # Stub config
     fake_cfg = MagicMock()
     fake_cfg.memory_maintenance_interval_seconds = 0
     fake_cfg.memory_merge_similarity_threshold = 0.92
+    fake_cfg.transcript_retention_days = 30
     fake_config_mod = types.ModuleType("config")
     fake_config_mod.get_settings = lambda: fake_cfg
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)
@@ -317,3 +326,52 @@ class TestSemanticDedup:
         gov._semantic_dedupe_records(records)
         event_types = [e["event"] for e in events]
         assert "memory_semantic_dedup" in event_types
+
+
+class TestTranscriptArchival:
+    def test_old_transcripts_are_moved_to_archive(self, monkeypatch, tmp_path):
+        """Transcripts older than retention_days should be archived."""
+        gov, ws, _ = _stub_deps(monkeypatch, tmp_path)
+
+        # Create an old transcript (60 days ago)
+        from datetime import date, timedelta
+        old_date = (date.today() - timedelta(days=60)).isoformat()
+        old_file = ws / "memory" / "default" / f"{old_date}.md"
+        old_file.parent.mkdir(parents=True, exist_ok=True)
+        old_file.write_text("# Old transcript\n\n## Turn\n### User\nhello\n", encoding="utf-8")
+
+        count = gov._archive_old_transcripts()
+        assert count == 1
+        assert not old_file.exists()
+
+        archive_file = ws / "archive" / "memory" / "default" / f"{old_date}.md"
+        assert archive_file.exists()
+        assert "Old transcript" in archive_file.read_text(encoding="utf-8")
+
+    def test_recent_transcripts_are_not_archived(self, monkeypatch, tmp_path):
+        """Transcripts within retention_days should stay in place."""
+        gov, ws, _ = _stub_deps(monkeypatch, tmp_path)
+
+        from datetime import date, timedelta
+        recent_date = (date.today() - timedelta(days=5)).isoformat()
+        recent_file = ws / "memory" / "default" / f"{recent_date}.md"
+        recent_file.parent.mkdir(parents=True, exist_ok=True)
+        recent_file.write_text("# Recent transcript\n", encoding="utf-8")
+
+        count = gov._archive_old_transcripts()
+        assert count == 0
+        assert recent_file.exists()
+
+    def test_maintenance_result_includes_archived_count(self, monkeypatch, tmp_path):
+        """run_memory_maintenance result should include transcripts_archived."""
+        gov, ws, _ = _stub_deps(monkeypatch, tmp_path)
+
+        from datetime import date, timedelta
+        old_date = (date.today() - timedelta(days=60)).isoformat()
+        old_file = ws / "memory" / "default" / f"{old_date}.md"
+        old_file.parent.mkdir(parents=True, exist_ok=True)
+        old_file.write_text("# Old\n## T\n### User\nhi\n### Assistant\nbye\n", encoding="utf-8")
+
+        result = gov.run_memory_maintenance()
+        assert "transcripts_archived" in result
+        assert result["transcripts_archived"] == 1

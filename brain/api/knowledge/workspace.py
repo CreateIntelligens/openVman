@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from infra.project_context import resolve_project_context
@@ -113,7 +114,7 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     """Ensure the workspace root, core docs, and support directories exist."""
     ws = get_workspace_root(project_id)
     ws.mkdir(parents=True, exist_ok=True)
-    for subdir in ("memory", "personas", "knowledge"):
+    for subdir in ("memory", "personas", "knowledge", "archive/errors", "archive/memory"):
         (ws / subdir).mkdir(parents=True, exist_ok=True)
 
     for filename, template in WORKSPACE_TEMPLATES.items():
@@ -122,6 +123,12 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
             path.write_text(template, encoding="utf-8")
 
     return ws
+
+
+def get_archive_paths(project_id: str = "default") -> dict[str, Path]:
+    """Return archive directory paths for errors and memory."""
+    ws = get_workspace_root(project_id)
+    return {"errors_dir": ws / "archive" / "errors", "memory_dir": ws / "archive" / "memory"}
 
 
 def resolve_workspace_document(relative_path: str, project_id: str = "default") -> Path:
@@ -201,3 +208,40 @@ def _is_persona_core_document(relative_path: str) -> bool:
     from personas.personas import is_persona_core_relative_path
 
     return is_persona_core_relative_path(relative_path)
+
+
+# ---------------------------------------------------------------------------
+# Identity parsing
+# ---------------------------------------------------------------------------
+
+_IDENTITY_DEFAULTS = {"name": "", "emoji": "🤖", "theme": "default"}
+_IDENTITY_KEYS = frozenset(_IDENTITY_DEFAULTS.keys())
+_FIELD_RE = re.compile(r"^-\s+(\w+)\s*:\s*(.+)$")
+
+
+def parse_identity(project_id: str = "default", persona_id: str | None = None) -> dict[str, str]:
+    """Parse IDENTITY.md into structured fields (name, emoji, theme)."""
+    from personas.personas import resolve_core_document_paths
+
+    paths = resolve_core_document_paths(persona_id, project_id=project_id)
+    identity_path = paths.get("identity")
+    if identity_path is None or not identity_path.exists():
+        return dict(_IDENTITY_DEFAULTS)
+
+    content = identity_path.read_text(encoding="utf-8-sig")
+
+    # Only parse fields inside the ## 基本資訊 section
+    in_section = False
+    result = dict(_IDENTITY_DEFAULTS)
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            in_section = stripped == "## 基本資訊"
+            continue
+        if not in_section:
+            continue
+        match = _FIELD_RE.match(stripped)
+        if match and match.group(1) in _IDENTITY_KEYS:
+            result[match.group(1)] = match.group(2).strip()
+
+    return result

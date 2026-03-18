@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
+import shutil
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from threading import Lock
 from time import monotonic
@@ -16,7 +18,7 @@ import numpy as np
 
 from config import get_settings
 from infra.db import get_db, get_memories_table, normalize_vector, parse_record_metadata
-from knowledge.workspace import get_core_documents, get_workspace_root, ensure_workspace_scaffold
+from knowledge.workspace import ensure_workspace_scaffold, get_archive_paths, get_core_documents, get_workspace_root
 from memory.embedder import get_embedder
 from memory.importance import score_importance
 from personas.personas import normalize_persona_id
@@ -54,6 +56,7 @@ def maybe_run_memory_maintenance(force: bool = False, project_id: str = "default
 def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
     """Summarize archived logs and rewrite the memories table without duplicates."""
     ensure_workspace_scaffold(project_id)
+    archived_count = _archive_old_transcripts(project_id)
     summaries = _build_daily_summaries(project_id)
     _write_summary_document(summaries, project_id)
 
@@ -83,6 +86,7 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
         "status": "ok",
         "summary_days": len(summaries),
         "memory_records": len(curated_records),
+        "transcripts_archived": archived_count,
     }
 
 
@@ -210,6 +214,49 @@ def _append_summary_block(path: Path, block: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+_DATE_STEM_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _archive_old_transcripts(project_id: str = "default") -> int:
+    """Move transcript files older than retention_days to archive/memory/."""
+    cfg = get_settings()
+    cutoff = date.today() - timedelta(days=cfg.transcript_retention_days)
+
+    ws = get_workspace_root(project_id)
+    memory_dir = ws / "memory"
+    archive_paths = get_archive_paths(project_id)
+    archive_memory_dir = archive_paths["memory_dir"]
+
+    archived = 0
+    for path in sorted(memory_dir.rglob("*.md")):
+        if not _DATE_STEM_RE.match(path.stem):
+            continue
+        try:
+            file_date = date.fromisoformat(path.stem)
+        except ValueError:
+            continue
+        if file_date >= cutoff:
+            continue
+
+        # Compute relative persona subpath
+        rel = path.relative_to(memory_dir)
+        dest = archive_memory_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        if dest.exists():
+            # Merge: append source content to existing archive
+            existing = dest.read_text(encoding="utf-8-sig")
+            incoming = path.read_text(encoding="utf-8-sig")
+            dest.write_text(existing.rstrip() + "\n\n" + incoming, encoding="utf-8")
+            path.unlink()
+        else:
+            shutil.move(str(path), str(dest))
+
+        archived += 1
+
+    return archived
+
+
 def _build_daily_summaries(project_id: str = "default") -> list[DailyMemorySummary]:
     summaries: list[DailyMemorySummary] = []
     ws = get_workspace_root(project_id)
@@ -286,19 +333,11 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
     current_assistant: list[str] = []
     section: str | None = None
 
-    def _flush_turn() -> None:
-        if current_user or current_assistant:
-            turns.append(
-                {
-                    "user": " ".join(current_user),
-                    "assistant": " ".join(current_assistant),
-                }
-            )
-
     for raw_line in content.splitlines():
         line = raw_line.strip()
         if line.startswith("## "):
-            _flush_turn()
+            if current_user or current_assistant:
+                turns.append({"user": " ".join(current_user), "assistant": " ".join(current_assistant)})
             current_user = []
             current_assistant = []
             section = None
@@ -316,7 +355,10 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
         else:
             current_assistant.append(line)
 
-    _flush_turn()
+    # Flush final turn
+    if current_user or current_assistant:
+        turns.append({"user": " ".join(current_user), "assistant": " ".join(current_assistant)})
+
     return [turn for turn in turns if turn["user"] or turn["assistant"]]
 
 

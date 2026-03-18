@@ -66,6 +66,10 @@ class BrainSettings(BaseSettings):
     memory_merge_similarity_threshold: float = 0.92
     memory_importance_weight: float = 0.03
 
+    # === 歸檔設定 ===
+    errors_rotation_max_lines: int = 200
+    transcript_retention_days: int = 30
+
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6
     tool_call_timeout_seconds: int = 10
