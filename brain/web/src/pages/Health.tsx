@@ -59,7 +59,7 @@ export default function Health() {
   const isOk = data?.status === "ok";
 
   return (
-    <>
+    <div className="page-scroll">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <div>
@@ -219,7 +219,7 @@ export default function Health() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

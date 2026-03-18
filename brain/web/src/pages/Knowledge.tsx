@@ -40,6 +40,7 @@ export default function Knowledge() {
   const [docSearch, setDocSearch] = useState("");
   const [editorMode, setEditorMode] = useState<EditorMode>("edit");
   const [dragOver, setDragOver] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -210,8 +211,67 @@ export default function Knowledge() {
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      {/* 2. Contextual Sidebar */}
-      <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 flex flex-col hidden md:flex">
+      {/* Mobile Sidebar Overlay */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMobileSidebarOpen(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <aside
+            className="absolute inset-y-0 left-0 w-[300px] border-r border-slate-800/60 bg-slate-950 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
+              <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Workspace</h2>
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+            <div className="px-4 mt-5 mb-3 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                <span className="material-symbols-outlined text-[14px]">folder_open</span>
+                <span className="uppercase tracking-widest">{documents.length} FILES</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={createDocument}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                  title="New Document"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                </button>
+              </div>
+            </div>
+            <div className="px-4 mb-3 shrink-0 relative">
+              <span className="material-symbols-outlined absolute left-7 top-1/2 -translate-y-1/2 text-slate-500 text-[16px]">search</span>
+              <input
+                value={docSearch}
+                onChange={(e) => setDocSearch(e.target.value)}
+                placeholder="Search files..."
+                className="w-full rounded-lg border border-slate-800/80 bg-slate-900/50 pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 pb-4 select-none">
+              {loadingList ? (
+                <div className="flex items-center justify-center h-full text-slate-500 text-sm">
+                  <span className="material-symbols-outlined animate-spin mr-2 text-[18px]">refresh</span> Loading...
+                </div>
+              ) : (
+                <FileTree
+                  documents={documents}
+                  selectedPath={selectedPath}
+                  onSelect={(path) => { openDocument(path); setMobileSidebarOpen(false); }}
+                  searchQuery={docSearch}
+                />
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* 2. Contextual Sidebar (desktop) */}
+      <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 hidden md:flex flex-col">
         {/* Sidebar Header */}
         <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
           <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Workspace</h2>
@@ -230,7 +290,7 @@ export default function Knowledge() {
               className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
               title="Reindex Knowledge Base"
             >
-              <span className={`material-symbols-outlined text-[16px] ${syncing ? 'animate-spin' : ''}`}>data_object</span>
+              <span className={`material-symbols-outlined text-[16px] ${syncing ? 'animate-spin' : ''}`}>sync</span>
             </button>
           </div>
         </div>
@@ -297,6 +357,20 @@ export default function Knowledge() {
 
       {/* 3. Main Editor */}
       <main className="flex-1 flex flex-col min-w-0 relative bg-background">
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 bg-slate-900/20 md:hidden shrink-0">
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <span className="material-symbols-outlined text-[16px]">folder_open</span>
+            <span className="font-bold">Workspace</span>
+            <span className="text-xs text-slate-500">({documents.length})</span>
+          </div>
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <span className="material-symbols-outlined text-[20px]">menu</span>
+          </button>
+        </div>
         {dragOver && (
           <div className="absolute inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
             <div className="bg-slate-900 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
@@ -324,6 +398,9 @@ export default function Knowledge() {
                 placeholder="e.g. docs/guide.md"
                 className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none font-mono truncate"
               />
+              {!selectedPath && draftPath && (
+                <span className="shrink-0 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">New</span>
+              )}
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
@@ -369,7 +446,7 @@ export default function Knowledge() {
                 id="knowledge-content"
                 value={draftContent}
                 onChange={(event) => setDraftContent(event.target.value)}
-                className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none ${editorMode === "split" ? "border-r border-slate-800/50" : ""
+                className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none overflow-y-auto ${editorMode === "split" ? "border-r border-slate-800/50" : ""
                   }`}
                 placeholder="# Markdown Content\n\n..."
               />

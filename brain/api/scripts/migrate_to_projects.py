@@ -36,6 +36,7 @@ def run_migration() -> None:
     migrated_any |= _migrate_lancedb()
     migrated_any |= _migrate_sessions_db()
     migrated_any |= _migrate_index_state()
+    migrated_any |= _migrate_learnings()
 
     # Write marker so future startups skip entirely
     _DEFAULT_PROJECT.mkdir(parents=True, exist_ok=True)
@@ -69,6 +70,33 @@ def _migrate_index_state() -> bool:
     src = Path("/data/knowledge_index_state.json")
     dst = _DEFAULT_PROJECT / "knowledge_index_state.json"
     return _move_if_needed(src, dst, "knowledge_index_state.json")
+
+
+def _migrate_learnings() -> bool:
+    """Move .learnings/*.md to workspace root for all projects."""
+    projects_dir = _DATA_ROOT / "projects"
+    if not projects_dir.exists():
+        return False
+
+    migrated = False
+    for project_dir in projects_dir.iterdir():
+        if not project_dir.is_dir():
+            continue
+        ws = project_dir / "workspace"
+        learnings_dir = ws / ".learnings"
+        if not learnings_dir.exists():
+            continue
+        for md_file in learnings_dir.glob("*.md"):
+            target = ws / md_file.name
+            if not target.exists():
+                shutil.move(str(md_file), str(target))
+                logger.info("遷移 %s → %s", md_file, target)
+                migrated = True
+        # Remove .learnings/ if empty
+        if learnings_dir.exists() and not any(learnings_dir.iterdir()):
+            learnings_dir.rmdir()
+            logger.info("移除空目錄 %s", learnings_dir)
+    return migrated
 
 
 def _move_if_needed(src: Path, dst: Path, label: str) -> bool:

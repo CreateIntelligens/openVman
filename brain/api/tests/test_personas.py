@@ -52,19 +52,20 @@ def _configure_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pat
         "agents": root / "AGENTS.md",
         "tools": root / "TOOLS.md",
         "memory": root / "MEMORY.md",
-        "learnings": root / ".learnings" / "LEARNINGS.md",
-        "errors": root / ".learnings" / "ERRORS.md",
-        "memory_summaries": root / ".learnings" / "MEMORY_SUMMARIES.md",
+        "identity": root / "IDENTITY.md",
+        "learnings": root / "LEARNINGS.md",
+        "errors": root / "ERRORS.md",
+        "memory_summaries": root / "MEMORY_SUMMARIES.md",
     }
     monkeypatch.setattr(workspace, "get_workspace_root", lambda project_id="default": root)
     monkeypatch.setattr(workspace, "get_core_documents", lambda project_id="default": core_documents)
     root.mkdir(parents=True, exist_ok=True)
-    (root / ".learnings").mkdir(parents=True, exist_ok=True)
     (root / "memory").mkdir(parents=True, exist_ok=True)
     core_documents["soul"].write_text("global soul", encoding="utf-8")
     core_documents["agents"].write_text("global agents", encoding="utf-8")
     core_documents["tools"].write_text("global tools", encoding="utf-8")
     core_documents["memory"].write_text("global memory", encoding="utf-8")
+    core_documents["identity"].write_text("global identity", encoding="utf-8")
     core_documents["learnings"].write_text("global learnings", encoding="utf-8")
     core_documents["errors"].write_text("global errors", encoding="utf-8")
     core_documents["memory_summaries"].write_text("global summaries", encoding="utf-8")
@@ -212,6 +213,7 @@ def test_create_persona_scaffold_creates_core_files_and_rejects_duplicates(
         "personas/doctor/AGENTS.md",
         "personas/doctor/TOOLS.md",
         "personas/doctor/MEMORY.md",
+        "personas/doctor/IDENTITY.md",
     ):
         assert (root / relative_path).exists()
 

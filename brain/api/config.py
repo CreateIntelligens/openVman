@@ -37,6 +37,7 @@ class BrainSettings(BaseSettings):
     prompt_memory_char_budget: int = 20000
     prompt_agents_char_budget: int = 10000
     prompt_tools_char_budget: int = 10000
+    prompt_identity_char_budget: int = 3000
     prompt_learnings_char_budget: int = 8000
     prompt_errors_char_budget: int = 5000
 
@@ -64,6 +65,10 @@ class BrainSettings(BaseSettings):
     memory_decay_rate_per_day: float = 0.005
     memory_merge_similarity_threshold: float = 0.92
     memory_importance_weight: float = 0.03
+
+    # === 歸檔設定 ===
+    errors_rotation_max_lines: int = 200
+    transcript_retention_days: int = 30
 
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6

@@ -10,11 +10,17 @@ from knowledge.workspace import (
     get_core_documents,
     ensure_workspace_scaffold,
     is_indexable_document,
+    iter_knowledge_documents,
     iter_workspace_documents,
     resolve_workspace_document,
     get_workspace_root,
 )
 from personas.personas import is_persona_core_relative_path
+
+
+def list_knowledge_base_documents(project_id: str = "default") -> list[dict[str, Any]]:
+    """Return documents under the workspace knowledge/ directory."""
+    return [_build_document_summary(path, project_id) for path in iter_knowledge_documents(project_id)]
 
 
 def list_workspace_documents(project_id: str = "default") -> list[dict[str, Any]]:

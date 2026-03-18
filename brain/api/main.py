@@ -35,13 +35,14 @@ from infra.project_admin import (
 from knowledge.indexer import rebuild_knowledge_index
 from knowledge.knowledge_admin import (
     delete_workspace_document,
+    list_knowledge_base_documents,
     list_workspace_documents,
     move_workspace_document,
     read_workspace_document,
     save_uploaded_document,
     save_workspace_document,
 )
-from knowledge.workspace import ensure_workspace_scaffold
+from knowledge.workspace import ensure_workspace_scaffold, parse_identity
 from memory.embedder import encode_text, get_embedder
 from memory.memory import (
     add_memory as store_memory,
@@ -198,6 +199,15 @@ async def health(project_id: str = "default"):
 @app.get("/api/metrics")
 async def metrics():
     return get_metrics_store().snapshot()
+
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+
+@app.get("/api/identity")
+async def get_identity(persona_id: str = "default", project_id: str = "default"):
+    return parse_identity(project_id, persona_id)
 
 
 # ---------------------------------------------------------------------------
@@ -525,6 +535,15 @@ async def delete_session(session_id: str, project_id: str = "default"):
 @app.get("/api/admin/knowledge/documents")
 async def list_knowledge_documents(project_id: str = "default"):
     documents = list_workspace_documents(project_id)
+    return {
+        "documents": documents,
+        "document_count": len(documents),
+    }
+
+
+@app.get("/api/admin/knowledge/base/documents")
+async def list_knowledge_base_docs(project_id: str = "default"):
+    documents = list_knowledge_base_documents(project_id)
     return {
         "documents": documents,
         "document_count": len(documents),
