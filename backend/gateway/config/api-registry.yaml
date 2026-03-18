@@ -1,0 +1,28 @@
+apis:
+  # Example CRM Order Query
+  crm_orders:
+    url: "http://localhost:3000/api/orders"
+    method: GET
+    auth_type: bearer            # bearer | api_key | basic | none
+    auth_value: "${CRM_API_KEY}" # supports env var interpolation
+    rate_limit: 60               # requests per minute
+    description: "Query CRM order records"
+
+  # Example: create support ticket
+  crm_ticket:
+    url: "http://localhost:3000/api/tickets"
+    method: POST
+    auth_type: bearer
+    auth_value: "${CRM_API_KEY}"
+    rate_limit: 30
+    description: "Create a new CRM support ticket"
+
+  # Example: public weather API (no auth)
+  weather_tw:
+    url: "https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001"
+    method: GET
+    auth_type: api_key
+    auth_header: "Authorization"
+    auth_value: "${CWA_API_KEY}"
+    rate_limit: 10
+    description: "Taiwan Central Weather Administration current weather"

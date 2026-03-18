@@ -221,3 +221,27 @@ ws.onclose = () => { reconnect(); };
 | `BRAIN_UNAVAILABLE` | 全螢幕遮罩「服務維護中」 | 不自動恢復，需管理員介入 |
 | `AUTH_FAILED` | 斷線 + 顯示「認證失敗」 | 不自動恢復 |
 | `SESSION_EXPIRED` | 自動重新發送 `client_init` | 自動恢復 |
+| `GATEWAY_TIMEOUT` | 浮動提示「插件服務回應逾時」 | 顯示提示 |
+| `UPLOAD_FAILED` | 紅色提示「檔案上傳失敗」 | 顯示提示 |
+
+### 12. 媒體上傳工作流 (Media Upload Workflow)
+
+當使用者選取檔案（圖片/影片/文件）時，前端不透過 WebSocket 發送二進位資料，而是透過標準 HTTP POST 上傳至 Gateway：
+
+1. **Endpoint**: `POST ${GATEWAY_URL}/upload?session_id=${session_id}`
+2. **Payload**: `multipart/form-data` (欄位名：`file`)
+3. **Response**: 取得 `job_id` 並記錄在前端狀態中。
+4. **Enrichment**: Gateway 處理完後會通知 Backend，Backend 再透過 WebSocket 發送 `gateway_status` 通知前端處理進度。
+
+### 13. 網關狀態監控 (Gateway Status Monitoring)
+
+前端應處理 `gateway_status` 事件，以更新 UI 狀態（例如：顯示「正在分析圖片…」或「攝影機連線中」）：
+
+```javascript
+ws.onmessage = (msg) => {
+  const data = JSON.parse(msg.data);
+  if (data.event === 'gateway_status') {
+    updatePluginUI(data.plugin, data.status, data.message);
+  }
+};
+```

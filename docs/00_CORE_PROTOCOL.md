@@ -69,6 +69,11 @@
 }
 ```
 
+**3.5 媒體檔案上傳 (Media Upload)**
+當使用者透過 Kiosk UI（或語音指令後端請求）上傳圖片、影音或文件時，客戶端應將檔案 `POST` 至 Gateway 的 `/upload` 端點。
+Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 Backend。
+*(此流程在 HTTP 層進行，不佔用 WebSocket 頻寬)*
+
 ### 4. 伺服器發送格式 (Server -> Client)
 
 **4.1 音頻與動作串流 (Stream Chunk)**
@@ -143,6 +148,18 @@
   "server_version": "1.0.0",
   "status": "ok",
   "timestamp": 1710123457
+}
+```
+
+**4.6 網關狀態同步 (Gateway Status)**
+當 Gateway 的外掛狀態變更（如攝影機斷線、限流觸發）或非同步任務完成時，由 Backend 轉發狀態給前端。
+```
+{
+  "event": "gateway_status",
+  "plugin": "camera-live",
+  "status": "unavailable",
+  "message": "攝影機連線中斷",
+  "timestamp": 1710123490
 }
 ```
 

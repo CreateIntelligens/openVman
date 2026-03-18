@@ -18,7 +18,7 @@
 | LLM | OpenAI / Claude / vLLM | 依 `BRAIN_LLM_PROVIDER` 環境變數切換 |
 | 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
 | 知識庫格式 | Markdown + Raw (多模態) | 人類可讀、支援 PDF/DOCX 自動轉換 |
-| 解析引擎 | **MarkItDown** + **Header-based** | 支援多格式轉檔與語義標題切分 |
+| 解析引擎 | **Gateway (MarkItDown)** | 由 Gateway 負責轉檔並透過 API 注入 |
 | 路由層 | Provider Router + Key Pool | Key fallback、模型切換、限流保護 |
 
 #### 2.1 bge-m3 部署方式
@@ -99,12 +99,12 @@ memories_table = db.open_table("memories")
 └──────────────┘                    └──────────────┘              └──────────────┘
 ```
 
-**Ingestion 管線流程**：
-1. **Detect**: 掃描 `workspace/raw/` 中的新檔案。
-2. **Convert**: 使用 **MarkItDown** 將多模態檔案轉為 Markdown。
-3. **Chunking**: 使用 `HeaderBasedChunker` 以 Markdown 標題 (`##`, `###`) 為自然分界點切分，控制在 200-500 字之間。
+**Ingestion 管線流程 (與 Gateway 協作)**：
+1. **Prepare (Gateway)**: Gateway 接收檔案或爬取網頁，使用 **MarkItDown** 轉為 Markdown。
+2. **Ingest API (Brain)**: Gateway 呼叫 `POST /api/knowledge/ingest` 將內容送入大腦。
+3. **Chunking**: 大腦使用 `HeaderBasedChunker` 切分片段 (200-500 字)。
 4. **Index**: 透過 bge-m3 生成向量並存入 LanceDB。
-5. **FTS Refresh**: 更新全文本索引以支援 BM25 搜尋。
+5. **FTS Refresh**: 更新全文本索引。
 
 ### 5. 記憶檢索與注入機制 (Hybrid Search)
 
@@ -360,20 +360,21 @@ async def generate_response_stream(
     persona_id: str = "default",
     trace_id: str | None = None,
     locale: str = "zh-TW",
+    enriched_context: list[dict] | None = None,
     metadata: dict | None = None
 ) -> AsyncIterator[str]:
     """
     完整流程：
     1. 先將輸入正規化為 message envelope
-    2. 從短期記憶提取對話歷史
-    3. 將 user_input 透過 bge-m3 向量化
-    4. 在 LanceDB 中執行 Top-K 語意檢索
-    5. 根據 Token Budget 組裝完整 Prompt
-    6. 透過 provider router 做 key/model fallback
-    7. 呼叫 LLM (stream=True)
+    2. 注入 enriched_context (來自 Gateway 的視覺/檔案描述)
+    3. 從短期記憶提取對話歷史
+    4. 將 user_input 透過 bge-m3 向量化
+    5. 在 LanceDB 中執行 Top-K 語意檢索
+    6. 根據 Token Budget 組裝完整 Prompt
+    7. 透過 provider router 做 key/model fallback
     8. 逐 Token yield 回傳給後端
        → 後端負責標點截斷 + TTS
-    9. (若觸發 Tool Calling) 暫停 yield → 執行工具 → 繼續生成
+    9. (若觸發 Tool Calling) 透過 Gateway 執行工具 → 繼續生成
     """
     pass
 ```

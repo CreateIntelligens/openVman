@@ -188,6 +188,10 @@ MESSAGE_MAX_INFLIGHT_PER_SESSION=1
 BRAIN_ENDPOINT=http://localhost:8100
 BRAIN_TIMEOUT_MS=5000         # 呼叫大腦層逾時
 
+# === 網關層連線 ===
+GATEWAY_ENDPOINT=http://localhost:8050
+GATEWAY_INTERNAL_TOKEN=change-me-in-production
+
 # === WebSocket 伺服器 ===
 WS_PORT=8080
 WS_PING_INTERVAL_MS=30000    # 心跳頻率
@@ -283,3 +287,19 @@ process.on('SIGTERM', async () => {
   "message": "TTS synthesis completed"
 }
 ```
+
+### 15. 與網關層整合 (Gateway Integration)
+
+後端作為「神經中樞」，必須接收來自 Gateway 的增強訊息並轉發給大腦。
+
+#### 15.1 內部增強介面 (Internal Enrichment)
+* **POST `/internal/enrich`**
+* **Payload**: `UserInputEnriched` (詳見 `04_GATEWAY_SPEC.md`)
+* **行為**:
+    1. 驗證 `GATEWAY_INTERNAL_TOKEN`。
+    2. 根據 `session_id` 找到活躍的 WebSocket。
+    3. 將 `enriched_context` 暫存於 Session 狀態。
+    4. 當下一個 `user_speak` 抵達時（或若為非同步通知則直接），將增強內容送往大腦層。
+
+#### 15.2 狀態轉發 (Status Relay)
+當 Gateway 回報插件狀態（如攝影機斷線）至後端時，後端應透過 WebSocket 發送 `gateway_status` 事件告知前端。
