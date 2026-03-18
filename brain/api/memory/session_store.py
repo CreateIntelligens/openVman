@@ -12,6 +12,13 @@ from config import get_settings
 from personas.personas import normalize_persona_id
 
 
+def _validate_persona_match(existing_raw: str | None, expected: str) -> None:
+    """Raise if a session's persona doesn't match the expected one."""
+    existing = normalize_persona_id(str(existing_raw or "default"))
+    if existing != normalize_persona_id(expected):
+        raise ValueError("session_id 已綁定其他 persona")
+
+
 @dataclass(slots=True)
 class SessionMessage:
     role: str
@@ -69,32 +76,20 @@ class SessionStore:
             with self._connect() as conn:
                 self._ensure_session_persona_locked(conn, session_id, persona_key, now)
                 conn.execute(
-                    """
-                    INSERT INTO messages(session_id, role, content, created_at)
-                    VALUES (?, ?, ?, ?)
-                    """,
+                    "INSERT INTO messages(session_id, role, content, created_at) VALUES (?, ?, ?, ?)",
                     (session_id, role, content, now),
                 )
 
-                message_ids = [
-                    row[0]
-                    for row in conn.execute(
-                        """
-                        SELECT id
-                        FROM messages
-                        WHERE session_id = ?
-                        ORDER BY created_at DESC, id DESC
-                        LIMIT -1 OFFSET ?
-                        """,
+                # Prune oldest messages beyond the limit
+                overflow_ids = [
+                    row[0] for row in conn.execute(
+                        "SELECT id FROM messages WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?",
                         (session_id, max_messages),
                     ).fetchall()
                 ]
-                if message_ids:
-                    placeholders = ",".join("?" for _ in message_ids)
-                    conn.execute(
-                        f"DELETE FROM messages WHERE id IN ({placeholders})",
-                        message_ids,
-                    )
+                if overflow_ids:
+                    placeholders = ",".join("?" for _ in overflow_ids)
+                    conn.execute(f"DELETE FROM messages WHERE id IN ({placeholders})", overflow_ids)
                 conn.commit()
                 return self._load_session_locked(conn, session_id)
 
@@ -106,14 +101,15 @@ class SessionStore:
         with self._lock:
             self._prune_expired_sessions_locked()
             with self._connect() as conn:
-                if persona_id is None:
-                    self._ensure_session_exists_locked(conn, session_id)
-                else:
-                    self._ensure_session_persona_locked(
-                        conn,
-                        session_id,
-                        normalize_persona_id(persona_id),
-                    )
+                # Validate session exists and persona matches, but don't create
+                row = conn.execute(
+                    "SELECT persona_id FROM sessions WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()
+                if row is None:
+                    return []
+                if persona_id is not None:
+                    _validate_persona_match(row[0], persona_id)
                 rows = conn.execute(
                     """
                     SELECT role, content, created_at
@@ -152,13 +148,11 @@ class SessionStore:
                 if row is None:
                     return None
                 if persona_id is not None:
-                    existing_persona = normalize_persona_id(str(row[0] or "default"))
-                    if existing_persona != normalize_persona_id(persona_id):
-                        raise ValueError("session_id 已綁定其他 persona")
+                    _validate_persona_match(row[0], persona_id)
                 return str(row[1] or "")
 
     def list_sessions(self, persona_id: str | None = None) -> list[dict[str, object]]:
-        """List all sessions with message count and last message preview."""
+        """List sessions that have at least one message."""
         with self._lock:
             with self._connect() as conn:
                 base_sql = """
@@ -170,17 +164,13 @@ class SessionStore:
                         (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) AS message_count,
                         (SELECT m.content FROM messages m WHERE m.session_id = s.session_id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_preview
                     FROM sessions s
+                    WHERE EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
                 """
+                params: tuple[str, ...] = ()
                 if persona_id:
-                    persona_key = normalize_persona_id(persona_id)
-                    rows = conn.execute(
-                        base_sql + " WHERE s.persona_id = ? ORDER BY s.updated_at DESC",
-                        (persona_key,),
-                    ).fetchall()
-                else:
-                    rows = conn.execute(
-                        base_sql + " ORDER BY s.updated_at DESC",
-                    ).fetchall()
+                    base_sql += " AND s.persona_id = ?"
+                    params = (normalize_persona_id(persona_id),)
+                base_sql += " ORDER BY s.updated_at DESC"
 
                 return [
                     {
@@ -191,7 +181,7 @@ class SessionStore:
                         "message_count": row[4],
                         "last_message_preview": (row[5] or "")[:120],
                     }
-                    for row in rows
+                    for row in conn.execute(base_sql, params).fetchall()
                 ]
 
     def delete_session(self, session_id: str) -> bool:
@@ -248,34 +238,16 @@ class SessionStore:
         return conn
 
     def _load_session_locked(self, conn: sqlite3.Connection, session_id: str) -> SessionState:
+        """Load a session that is known to exist (called after _ensure_session_persona_locked)."""
         row = conn.execute(
-            """
-            SELECT session_id, persona_id, created_at, updated_at
-            FROM sessions
-            WHERE session_id = ?
-            """,
+            "SELECT session_id, persona_id, created_at, updated_at FROM sessions WHERE session_id = ?",
             (session_id,),
         ).fetchone()
-        if row is None:
-            self._ensure_session_exists_locked(conn, session_id)
-            row = conn.execute(
-                """
-                SELECT session_id, persona_id, created_at, updated_at
-                FROM sessions
-                WHERE session_id = ?
-                """,
-                (session_id,),
-            ).fetchone()
 
         messages = [
             SessionMessage(role=msg[0], content=msg[1], created_at=msg[2])
             for msg in conn.execute(
-                """
-                SELECT role, content, created_at
-                FROM messages
-                WHERE session_id = ?
-                ORDER BY created_at ASC, id ASC
-                """,
+                "SELECT role, content, created_at FROM messages WHERE session_id = ? ORDER BY created_at ASC, id ASC",
                 (session_id,),
             ).fetchall()
         ]
@@ -286,18 +258,6 @@ class SessionStore:
             updated_at=row[3],
             messages=messages,
         )
-
-    def _ensure_session_exists_locked(self, conn: sqlite3.Connection, session_id: str) -> None:
-        now = datetime.now().isoformat(timespec="seconds")
-        conn.execute(
-            """
-            INSERT INTO sessions(session_id, persona_id, created_at, updated_at)
-            VALUES (?, 'default', ?, ?)
-            ON CONFLICT(session_id) DO NOTHING
-            """,
-            (session_id, now, now),
-        )
-        conn.commit()
 
     def _ensure_session_persona_locked(
         self,
@@ -321,9 +281,7 @@ class SessionStore:
             )
             return
 
-        existing_persona = normalize_persona_id(str(row[0] or "default"))
-        if existing_persona != persona_id:
-            raise ValueError("session_id 已綁定其他 persona")
+        _validate_persona_match(row[0], persona_id)
         conn.execute(
             "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
             (timestamp, session_id),
@@ -336,5 +294,15 @@ class SessionStore:
             conn.execute(
                 "DELETE FROM sessions WHERE updated_at < ?",
                 (expiry.isoformat(timespec="seconds"),),
+            )
+            # Also prune empty sessions older than 5 minutes (orphaned from page loads)
+            empty_cutoff = (datetime.now() - timedelta(minutes=5)).isoformat(timespec="seconds")
+            conn.execute(
+                """
+                DELETE FROM sessions
+                WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = sessions.session_id)
+                  AND updated_at < ?
+                """,
+                (empty_cutoff,),
             )
             conn.commit()

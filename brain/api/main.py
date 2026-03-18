@@ -34,7 +34,10 @@ from infra.project_admin import (
 )
 from knowledge.indexer import rebuild_knowledge_index
 from knowledge.knowledge_admin import (
+    create_workspace_directory,
+    delete_workspace_directory,
     delete_workspace_document,
+    list_knowledge_base_directories,
     list_knowledge_base_documents,
     list_workspace_documents,
     move_workspace_document,
@@ -48,7 +51,6 @@ from memory.memory import (
     add_memory as store_memory,
     delete_memory as remove_memory,
     delete_session_for_project,
-    get_or_create_session,
     list_memories as query_memories,
     list_session_messages,
     list_sessions_for_project,
@@ -477,11 +479,11 @@ async def chat_stream(request: Request, payload: ChatRequest):
 @app.get("/api/chat/history")
 async def get_chat_history(session_id: str, persona_id: str = "default", project_id: str = "default"):
     try:
-        session = get_or_create_session(session_id, persona_id, project_id=project_id)
+        messages = list_session_messages(session_id, persona_id, project_id=project_id)
         return {
-            "session_id": session.session_id,
-            "persona_id": session.persona_id,
-            "history": list_session_messages(session.session_id, session.persona_id, project_id=project_id),
+            "session_id": session_id,
+            "persona_id": persona_id,
+            "history": messages,
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -548,9 +550,11 @@ async def list_knowledge_documents(project_id: str = "default"):
 @app.get("/api/admin/knowledge/base/documents")
 async def list_knowledge_base_docs(project_id: str = "default"):
     documents = list_knowledge_base_documents(project_id)
+    directories = list_knowledge_base_directories(project_id)
     return {
         "documents": documents,
         "document_count": len(documents),
+        "directories": directories,
     }
 
 
@@ -582,6 +586,8 @@ async def delete_knowledge_document(path: str, project_id: str = "default"):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="找不到指定文件") from exc
+
+    asyncio.create_task(_background_reindex(project_id))
     return {"status": "ok"}
 
 
@@ -594,7 +600,26 @@ async def post_move_knowledge_document(payload: KnowledgeDocumentMoveRequest):
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    asyncio.create_task(_background_reindex(payload.project_id))
     return {"status": "ok", "document": document}
+
+
+@app.post("/api/admin/knowledge/mkdir")
+async def mkdir_knowledge(payload: KnowledgeDocumentPutRequest):
+    try:
+        return create_workspace_directory(payload.path, payload.project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/admin/knowledge/directory")
+async def rmdir_knowledge(path: str, project_id: str = "default"):
+    try:
+        return delete_workspace_directory(path, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/admin/knowledge/upload")
@@ -619,7 +644,19 @@ async def upload_knowledge_documents(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # Trigger background reindex so new files are indexed automatically
+    asyncio.create_task(_background_reindex(project_id))
+
     return {"status": "ok", "files": uploaded}
+
+
+async def _background_reindex(project_id: str) -> None:
+    """Run reindex in background thread, log errors but don't raise."""
+    try:
+        result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
+        log_event("knowledge_reindex_auto", project_id=project_id, **result)
+    except Exception as exc:
+        log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
 
 
 @app.post("/api/admin/knowledge/reindex")

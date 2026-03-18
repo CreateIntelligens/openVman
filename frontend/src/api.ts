@@ -158,6 +158,7 @@ export interface KnowledgeDocumentSummary {
   updated_at: string;
   is_core: boolean;
   is_indexable: boolean;
+  is_indexed: boolean;
   preview: string;
 }
 
@@ -168,6 +169,7 @@ export interface KnowledgeDocument extends KnowledgeDocumentSummary {
 export interface KnowledgeDocumentsResponse {
   documents: KnowledgeDocumentSummary[];
   document_count: number;
+  directories?: string[];
 }
 
 export interface KnowledgeUploadResponse {
@@ -209,6 +211,7 @@ export interface ChatMessage {
   role: string;
   content: string;
   created_at?: string;
+  sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
 }
 
 export interface ChatResponse {
@@ -339,6 +342,21 @@ export async function deleteKnowledgeDocument(path: string) {
     method: "DELETE",
   });
   return parseJson<{ status: string }>(res);
+}
+
+export function createKnowledgeDirectory(dirPath: string) {
+  return post<{ status: string; path: string }>("/admin/knowledge/mkdir", {
+    project_id: activeProjectId,
+    path: dirPath,
+    content: "",
+  });
+}
+
+export async function deleteKnowledgeDirectory(dirPath: string) {
+  const res = await fetch(projectUrl("/admin/knowledge/directory", { path: dirPath }), {
+    method: "DELETE",
+  });
+  return parseJson<{ status: string; path: string }>(res);
 }
 
 export function moveKnowledgeDocument(sourcePath: string, targetPath: string) {

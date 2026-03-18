@@ -31,6 +31,17 @@ class ChunkSpec:
     metadata: dict[str, Any]
 
 
+def load_index_state(project_id: str = "default") -> dict[str, str]:
+    """回傳 { relative_path: fingerprint } 映射。"""
+    state = _load_index_state(project_id)
+    return state.get("documents", {})
+
+
+def fingerprint_document(path: Path) -> str:
+    """回傳文件的 SHA-256 fingerprint。"""
+    return _fingerprint_document(path)
+
+
 def rebuild_knowledge_index(project_id: str = "default") -> dict[str, Any]:
     """Incrementally rebuild the knowledge table from indexable workspace documents."""
     workspace_root = ensure_workspace_scaffold(project_id)

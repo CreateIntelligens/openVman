@@ -258,60 +258,63 @@ def _archive_old_transcripts(project_id: str = "default") -> int:
 
 
 def _build_daily_summaries(project_id: str = "default") -> list[DailyMemorySummary]:
-    summaries: list[DailyMemorySummary] = []
     ws = get_workspace_root(project_id)
     memory_dir = ws / "memory"
+    summaries: list[DailyMemorySummary] = []
     for path in sorted(memory_dir.rglob("*.md")):
         if path.stem == "_summaries":
             continue
-        content = path.read_text(encoding="utf-8-sig").strip()
-        if not content:
-            continue
-        turns = _extract_turns(content)
-        if not turns:
-            continue
-
-        persona_id = _persona_id_from_memory_path(path, memory_dir)
-        day = path.stem
-        fingerprint = hashlib.sha256(content.encode("utf-8")).hexdigest()
-        user_topics = _collect_unique([turn["user"] for turn in turns], 6, 80)
-        assistant_notes = _collect_unique([turn["assistant"] for turn in turns], 6, 100)
-        summary_text = "\n".join(
-            [
-                f"Persona：{persona_id}",
-                f"日期：{day}",
-                f"對話輪次：{len(turns)}",
-                "使用者主題：",
-                *[f"- {topic}" for topic in user_topics],
-                "回覆重點：",
-                *[f"- {note}" for note in assistant_notes],
-            ]
-        )
-        markdown = "\n".join(
-            [
-                f"## [{persona_id}] {day}",
-                "",
-                f"- 指紋：`{fingerprint[:12]}`",
-                f"- 對話輪次：{len(turns)}",
-                "",
-                "### 使用者主題",
-                *[f"- {topic}" for topic in user_topics],
-                "",
-                "### 回覆重點",
-                *[f"- {note}" for note in assistant_notes],
-                "",
-            ]
-        ).strip()
-        summaries.append(
-            DailyMemorySummary(
-                persona_id=persona_id,
-                day=day,
-                fingerprint=fingerprint,
-                summary_text=summary_text,
-                markdown=markdown,
-            )
-        )
+        summary = _summarize_daily_file(path, memory_dir)
+        if summary is not None:
+            summaries.append(summary)
     return summaries
+
+
+def _summarize_daily_file(path: Path, memory_dir: Path) -> DailyMemorySummary | None:
+    """Build a summary from a single daily transcript file, or None if empty."""
+    content = path.read_text(encoding="utf-8-sig").strip()
+    if not content:
+        return None
+    turns = _extract_turns(content)
+    if not turns:
+        return None
+
+    persona_id = _persona_id_from_memory_path(path, memory_dir)
+    day = path.stem
+    fingerprint = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    user_topics = _collect_unique([t["user"] for t in turns], 6, 80)
+    assistant_notes = _collect_unique([t["assistant"] for t in turns], 6, 100)
+
+    summary_text = "\n".join([
+        f"Persona：{persona_id}",
+        f"日期：{day}",
+        f"對話輪次：{len(turns)}",
+        "使用者主題：",
+        *[f"- {topic}" for topic in user_topics],
+        "回覆重點：",
+        *[f"- {note}" for note in assistant_notes],
+    ])
+    markdown = "\n".join([
+        f"## [{persona_id}] {day}",
+        "",
+        f"- 指紋：`{fingerprint[:12]}`",
+        f"- 對話輪次：{len(turns)}",
+        "",
+        "### 使用者主題",
+        *[f"- {topic}" for topic in user_topics],
+        "",
+        "### 回覆重點",
+        *[f"- {note}" for note in assistant_notes],
+        "",
+    ]).strip()
+
+    return DailyMemorySummary(
+        persona_id=persona_id,
+        day=day,
+        fingerprint=fingerprint,
+        summary_text=summary_text,
+        markdown=markdown,
+    )
 
 
 def _write_summary_document(summaries: list[DailyMemorySummary], project_id: str = "default") -> None:
@@ -333,33 +336,28 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
     current_assistant: list[str] = []
     section: str | None = None
 
+    def _flush_turn() -> None:
+        if current_user or current_assistant:
+            turns.append({"user": " ".join(current_user), "assistant": " ".join(current_assistant)})
+
     for raw_line in content.splitlines():
         line = raw_line.strip()
         if line.startswith("## "):
-            if current_user or current_assistant:
-                turns.append({"user": " ".join(current_user), "assistant": " ".join(current_assistant)})
-            current_user = []
-            current_assistant = []
+            _flush_turn()
+            current_user.clear()
+            current_assistant.clear()
             section = None
-            continue
-        if line == "### User":
+        elif line == "### User":
             section = "user"
-            continue
-        if line == "### Assistant":
+        elif line == "### Assistant":
             section = "assistant"
-            continue
-        if not line or section is None:
-            continue
-        if section == "user":
+        elif line and section == "user":
             current_user.append(line)
-        else:
+        elif line and section == "assistant":
             current_assistant.append(line)
 
-    # Flush final turn
-    if current_user or current_assistant:
-        turns.append({"user": " ".join(current_user), "assistant": " ".join(current_assistant)})
-
-    return [turn for turn in turns if turn["user"] or turn["assistant"]]
+    _flush_turn()
+    return turns
 
 
 def _collect_unique(items: list[str], limit: int, max_chars: int) -> list[str]:

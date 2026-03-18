@@ -165,10 +165,12 @@ def load_core_workspace_context(persona_id: str = "default", project_id: str = "
 
 def is_indexable_document(path: Path, project_id: str = "default") -> bool:
     """Return whether a workspace file should be embedded into knowledge."""
+    from personas.personas import is_persona_core_relative_path
+
     relative = path.relative_to(ensure_workspace_scaffold(project_id)).as_posix()
     if relative in RESERVED_INDEX_PATHS:
         return False
-    if _is_persona_core_document(relative):
+    if is_persona_core_relative_path(relative):
         return False
     return not any(relative.startswith(prefix) for prefix in EXCLUDED_INDEX_PREFIXES)
 
@@ -202,12 +204,6 @@ def iter_knowledge_documents(project_id: str = "default") -> list[Path]:
         for path in knowledge_dir.rglob("*")
         if path.is_file() and path.suffix.lower() in ALLOWED_INDEX_SUFFIXES
     )
-
-
-def _is_persona_core_document(relative_path: str) -> bool:
-    from personas.personas import is_persona_core_relative_path
-
-    return is_persona_core_relative_path(relative_path)
 
 
 # ---------------------------------------------------------------------------

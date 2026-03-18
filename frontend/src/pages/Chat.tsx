@@ -81,28 +81,38 @@ export default function Chat() {
     // done event carries `reply` (final text), not necessarily `history`.
     // If history is provided use it; otherwise keep the streamed messages as-is
     // and just ensure the last assistant message has the final reply text.
+    const knowledge = payload.knowledge_results ?? [];
+    const memory = payload.memory_results ?? [];
+    const sources = { knowledge, memory };
+
     if (payload.history) {
-      setMessages(payload.history);
+      // Attach sources to the last assistant message in history
+      const hist = [...payload.history];
+      for (let i = hist.length - 1; i >= 0; i--) {
+        if (hist[i].role === "assistant") {
+          hist[i] = { ...hist[i], sources };
+          break;
+        }
+      }
+      setMessages(hist);
     } else if (payload.reply != null) {
       setMessages((current) => {
         const next = [...current];
         const last = next[next.length - 1];
         if (last?.role === "assistant") {
-          next[next.length - 1] = { ...last, content: payload.reply };
+          next[next.length - 1] = { ...last, content: payload.reply, sources };
         }
         return next;
       });
     }
     persistSessionId(payload.session_id);
-    const knowledge = payload.knowledge_results ?? [];
-    const memory = payload.memory_results ?? [];
     setLastContext({ knowledge: knowledge.length, memory: memory.length });
     setLastSources({ knowledge, memory });
   };
 
   const loadSessions = () => {
     setLoadingSessions(true);
-    fetchSessions(selectedPersonaId !== "default" ? selectedPersonaId : undefined)
+    fetchSessions(selectedPersonaId)
       .then((res) => setSessions(res.sessions ?? []))
       .catch((e) => setError(String(e)))
       .finally(() => setLoadingSessions(false));
@@ -444,6 +454,9 @@ export default function Chat() {
                 ) : (
                   <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{message.content}</p>
                 )}
+                {message.role === "assistant" && message.sources && (
+                  <SourceChips sources={message.sources} />
+                )}
               </article>
             ))}
             <div ref={chatEndRef} />
@@ -657,6 +670,49 @@ function resolvePersonaId(personas: PersonaSummary[], preferredPersonaId: string
   return personas.some((persona) => persona.persona_id === preferredPersonaId)
     ? preferredPersonaId
     : "default";
+}
+
+function SourceChips({ sources }: { sources: { knowledge: RetrievalResult[]; memory: RetrievalResult[] } }) {
+  const allSources = [
+    ...sources.knowledge.map((item) => ({ ...item, kind: "knowledge" as const })),
+    ...sources.memory.map((item) => ({ ...item, kind: "memory" as const })),
+  ];
+  if (!allSources.length) return null;
+
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-700/40">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-300 transition-colors"
+      >
+        <span className="material-symbols-outlined text-[14px]">source</span>
+        {allSources.length} source{allSources.length > 1 ? "s" : ""} referenced
+        <span className={`material-symbols-outlined text-[14px] transition-transform ${expanded ? "rotate-180" : ""}`}>expand_more</span>
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-1.5">
+          {allSources.slice(0, 5).map((item, i) => {
+            const meta = parseMetadata(item.metadata);
+            const label = meta.path || item.source || "unknown";
+            const isKnowledge = item.kind === "knowledge";
+            return (
+              <div key={i} className="flex items-start gap-2 text-[11px]">
+                <span className={`shrink-0 rounded px-1.5 py-0.5 font-bold uppercase tracking-wider ${isKnowledge ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" : "bg-purple-500/10 text-purple-400 border border-purple-500/20"}`}>
+                  {isKnowledge ? "KB" : "MEM"}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-300 truncate">{label}</p>
+                  <p className="text-slate-500 line-clamp-1">{item.text.slice(0, 120)}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatRelativeTime(iso: string) {

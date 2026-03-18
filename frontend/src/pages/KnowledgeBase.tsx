@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  createKnowledgeDirectory,
+  deleteKnowledgeDirectory,
+  deleteKnowledgeDocument,
   fetchKnowledgeBaseDocuments,
+  fetchKnowledgeDocument,
+  moveKnowledgeDocument,
   reindexKnowledge,
+  saveKnowledgeDocument,
   uploadKnowledgeDocuments,
   KnowledgeDocumentSummary,
 } from "../api";
@@ -25,12 +31,22 @@ function formatDate(iso: string): string {
 export default function KnowledgeBase() {
   const { projectId } = useProject();
   const [documents, setDocuments] = useState<KnowledgeDocumentSummary[]>([]);
+  const [serverDirs, setServerDirs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [search, setSearch] = useState("");
+  const [currentDir, setCurrentDir] = useState("knowledge");
   const [dragOver, setDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
+  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [movingPath, setMovingPath] = useState<string | null>(null);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,6 +55,7 @@ export default function KnowledgeBase() {
     try {
       const response = await fetchKnowledgeBaseDocuments();
       setDocuments(response.documents);
+      setServerDirs(response.directories ?? []);
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
     } finally {
@@ -68,7 +85,7 @@ export default function KnowledgeBase() {
     setUploading(true);
     setStatus(null);
     try {
-      const response = await uploadKnowledgeDocuments(files, "knowledge");
+      const response = await uploadKnowledgeDocuments(files, currentDir);
       setStatus({
         type: "success",
         message: `已上傳 ${response.files.length} 個檔案。`,
@@ -86,10 +103,91 @@ export default function KnowledgeBase() {
     if (uploadInputRef.current) uploadInputRef.current.value = "";
   };
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    if (dragCounterRef.current === 1) setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current === 0) setDragOver(false);
+  };
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
+    dragCounterRef.current = 0;
     setDragOver(false);
     await uploadFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const handleDelete = async (path: string) => {
+    if (!confirm(`確定要刪除 ${path} 嗎？`)) return;
+    setStatus(null);
+    try {
+      await deleteKnowledgeDocument(path);
+      setStatus({ type: "success", message: `已刪除 ${path}` });
+      await loadDocuments();
+    } catch (error) {
+      setStatus({ type: "error", message: String(error) });
+    }
+  };
+
+  const handleDeleteDir = async (dir: string) => {
+    if (!confirm(`確定要刪除資料夾 ${dir} 嗎？`)) return;
+    setStatus(null);
+    try {
+      await deleteKnowledgeDirectory(`${currentDir}/${dir}`);
+      setStatus({ type: "success", message: `已刪除資料夾 ${dir}` });
+      await loadDocuments();
+    } catch (error) {
+      setStatus({ type: "error", message: String(error) });
+    }
+  };
+
+  const handleMove = async (sourcePath: string, targetDir: string) => {
+    const filename = sourcePath.split("/").pop() || "";
+    const targetPath = targetDir ? `${targetDir}/${filename}` : filename;
+    if (sourcePath === targetPath) return;
+    setStatus(null);
+    try {
+      await moveKnowledgeDocument(sourcePath, targetPath);
+      setStatus({ type: "success", message: `已移動到 ${targetPath}` });
+      setMovingPath(null);
+      await loadDocuments();
+    } catch (error) {
+      setStatus({ type: "error", message: String(error) });
+    }
+  };
+
+  const handleOpenEditor = async (path: string) => {
+    setEditingPath(path);
+    setEditLoading(true);
+    try {
+      const doc = await fetchKnowledgeDocument(path);
+      setEditContent(doc.content);
+    } catch (error) {
+      setStatus({ type: "error", message: String(error) });
+      setEditingPath(null);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleSaveEditor = async () => {
+    if (!editingPath) return;
+    setSaving(true);
+    try {
+      await saveKnowledgeDocument(editingPath, editContent);
+      setStatus({ type: "success", message: `已儲存 ${editingPath}` });
+      setEditingPath(null);
+      await loadDocuments();
+    } catch (error) {
+      setStatus({ type: "error", message: String(error) });
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -97,20 +195,52 @@ export default function KnowledgeBase() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const indexableCount = documents.filter((d) => d.is_indexable).length;
+  const indexedCount = documents.filter((d) => d.is_indexed).length;
+  const pendingCount = documents.filter((d) => d.is_indexable && !d.is_indexed).length;
+  const excludedCount = documents.filter((d) => !d.is_indexable).length;
+
+  // Directory navigation: show only items directly inside currentDir
+  const dirPrefix = currentDir ? currentDir + "/" : "";
+  const docsInDir = documents.filter((d) => d.path.startsWith(dirPrefix));
+
+  // Extract immediate subdirectories from files AND server-reported empty dirs
+  const subdirs = new Set<string>();
+  const directFiles: KnowledgeDocumentSummary[] = [];
+  for (const doc of docsInDir) {
+    const rest = doc.path.slice(dirPrefix.length);
+    const slashIdx = rest.indexOf("/");
+    if (slashIdx === -1) {
+      directFiles.push(doc);
+    } else {
+      subdirs.add(rest.slice(0, slashIdx));
+    }
+  }
+  for (const dir of serverDirs) {
+    if (dir.startsWith(dirPrefix)) {
+      const rest = dir.slice(dirPrefix.length);
+      const slashIdx = rest.indexOf("/");
+      const immediate = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
+      if (immediate) subdirs.add(immediate);
+    }
+  }
+  const sortedSubdirs = [...subdirs].sort();
 
   const filtered = search.trim()
-    ? documents.filter((d) =>
+    ? directFiles.filter((d) =>
         d.path.toLowerCase().includes(search.toLowerCase()) ||
         d.title.toLowerCase().includes(search.toLowerCase())
       )
-    : documents;
+    : directFiles;
+
+  // Breadcrumb segments
+  const breadcrumbs = currentDir ? currentDir.split("/") : [];
 
   return (
     <div
       className="page-scroll bg-background"
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {/* Drag overlay */}
@@ -149,10 +279,11 @@ export default function KnowledgeBase() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <StatCard icon="description" label="Total Documents" value={documents.length} />
-          <StatCard icon="check_circle" label="Indexed" value={indexableCount} color="emerald" />
-          <StatCard icon="block" label="Not Indexed" value={documents.length - indexableCount} color="slate" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatCard icon="description" label="Total" value={documents.length} />
+          <StatCard icon="check_circle" label="Indexed" value={indexedCount} color="emerald" />
+          <StatCard icon="schedule" label="Pending" value={pendingCount} color="amber" />
+          <StatCard icon="block" label="Excluded" value={excludedCount} color="slate" />
         </div>
 
         {/* Upload Dropzone */}
@@ -171,6 +302,99 @@ export default function KnowledgeBase() {
           </span>
           <span className="text-xs text-slate-500">Supports all file types</span>
         </button>
+
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-sm flex-wrap">
+          <button
+            onClick={() => setCurrentDir("knowledge")}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${currentDir === "knowledge" ? "text-white" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+          >
+            <span className="material-symbols-outlined text-[16px]">school</span>
+            <span className="font-medium">knowledge</span>
+          </button>
+          {breadcrumbs.slice(1).map((seg, i) => {
+            const path = breadcrumbs.slice(0, i + 2).join("/");
+            const isLast = i === breadcrumbs.length - 2;
+            return (
+              <span key={path} className="flex items-center gap-1.5">
+                <span className="text-slate-600">/</span>
+                <button
+                  onClick={() => setCurrentDir(path)}
+                  className={`px-2 py-1 rounded-md transition-colors ${isLast ? "text-white font-medium" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+                >
+                  {seg}
+                </button>
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Subdirectories */}
+        <div className="flex gap-2 flex-wrap">
+          {sortedSubdirs.map((dir) => (
+            <div
+              key={dir}
+              className="group/dir flex items-center gap-2 rounded-xl border border-slate-800/60 bg-slate-900/40 px-4 py-3 hover:bg-slate-800/60 hover:border-slate-700 transition-colors cursor-pointer"
+              onClick={() => setCurrentDir(`${currentDir}/${dir}`)}
+            >
+              <span className="material-symbols-outlined text-primary text-[20px]">folder</span>
+              <span className="text-sm font-medium text-white">{dir}</span>
+              <span className="text-xs text-slate-500">
+                {docsInDir.filter((d) => d.path.startsWith(`${currentDir}/${dir}/`)).length}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteDir(dir); }}
+                className="opacity-0 group-hover/dir:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-500/10 text-slate-600 hover:text-red-400 ml-auto"
+                title="刪除資料夾"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+              </button>
+            </div>
+          ))}
+          {showNewFolder ? (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newFolderName.trim()) return;
+                const newDir = `${currentDir}/${newFolderName.trim()}`;
+                try {
+                  await createKnowledgeDirectory(newDir);
+                  await loadDocuments();
+                  setCurrentDir(newDir);
+                } catch (error) {
+                  setStatus({ type: "error", message: String(error) });
+                }
+                setNewFolderName("");
+                setShowNewFolder(false);
+              }}
+              className="flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2"
+            >
+              <span className="material-symbols-outlined text-primary text-[20px]">create_new_folder</span>
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="資料夾名稱"
+                className="bg-transparent text-sm text-white placeholder:text-slate-500 outline-none w-32"
+                onKeyDown={(e) => { if (e.key === "Escape") { setShowNewFolder(false); setNewFolderName(""); } }}
+              />
+              <button type="submit" disabled={!newFolderName.trim()} className="p-1 rounded-md text-primary hover:bg-primary/10 transition-colors disabled:opacity-30">
+                <span className="material-symbols-outlined text-[18px]">check</span>
+              </button>
+              <button type="button" onClick={() => { setShowNewFolder(false); setNewFolderName(""); }} className="p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors">
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </form>
+          ) : (
+            <button
+              onClick={() => setShowNewFolder(true)}
+              className="flex items-center gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-900/20 px-4 py-3 hover:bg-slate-800/40 hover:border-slate-600 transition-colors text-slate-500 hover:text-slate-300"
+            >
+              <span className="material-symbols-outlined text-[20px]">create_new_folder</span>
+              <span className="text-sm font-medium">新增資料夾</span>
+            </button>
+          )}
+        </div>
 
         {/* Search & File List */}
         <div className="space-y-4">
@@ -206,12 +430,69 @@ export default function KnowledgeBase() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {filtered.map((doc) => (
-                <DocumentCard key={doc.path} doc={doc} />
+                <DocumentCard key={doc.path} doc={doc} onDelete={handleDelete} onEdit={handleOpenEditor} onMove={(p) => setMovingPath(p)} />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Move Modal */}
+      {movingPath && (
+        <MoveModal
+          sourcePath={movingPath}
+          allDocuments={documents}
+          serverDirs={serverDirs}
+          onMove={handleMove}
+          onClose={() => setMovingPath(null)}
+        />
+      )}
+
+      {/* Editor Modal */}
+      {editingPath && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setEditingPath(null)}>
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col mx-4" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-primary text-[20px]">edit_document</span>
+                <span className="text-sm font-semibold text-white truncate">{editingPath}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleSaveEditor}
+                  disabled={saving || editLoading}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[16px]">{saving ? "sync" : "save"}</span>
+                  {saving ? "儲存中..." : "儲存"}
+                </button>
+                <button
+                  onClick={() => setEditingPath(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            </div>
+            {/* Modal Body */}
+            <div className="flex-1 overflow-hidden p-1">
+              {editLoading ? (
+                <div className="flex items-center justify-center h-64 text-slate-500">
+                  <span className="material-symbols-outlined animate-spin mr-2">refresh</span> 載入中...
+                </div>
+              ) : (
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full h-full min-h-[50vh] bg-transparent text-sm text-slate-200 font-mono p-4 resize-none focus:outline-none"
+                  spellCheck={false}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -220,6 +501,7 @@ function StatCard({ icon, label, value, color = "primary" }: { icon: string; lab
   const colorMap: Record<string, string> = {
     primary: "text-primary bg-primary/10 border-primary/20",
     emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+    amber: "text-amber-400 bg-amber-500/10 border-amber-500/20",
     slate: "text-slate-400 bg-slate-800/50 border-slate-700/50",
   };
   const cls = colorMap[color] ?? colorMap.primary;
@@ -235,23 +517,50 @@ function StatCard({ icon, label, value, color = "primary" }: { icon: string; lab
   );
 }
 
-function DocumentCard({ doc }: { doc: KnowledgeDocumentSummary }) {
+function DocumentCard({ doc, onDelete, onEdit, onMove }: { doc: KnowledgeDocumentSummary; onDelete: (path: string) => void; onEdit: (path: string) => void; onMove: (path: string) => void }) {
   return (
-    <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-4 hover:bg-slate-900/60 transition-colors">
+    <div
+      className="group rounded-xl border border-slate-800/60 bg-slate-900/40 p-4 hover:bg-slate-900/60 transition-colors cursor-pointer"
+      onClick={() => onEdit(doc.path)}
+    >
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className="material-symbols-outlined text-slate-500 text-[18px] shrink-0">description</span>
           <span className="text-sm font-semibold text-white truncate">{doc.title || doc.path}</span>
         </div>
-        {doc.is_indexable ? (
-          <span className="shrink-0 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-            Indexed
-          </span>
-        ) : (
-          <span className="shrink-0 rounded-full bg-slate-800/60 border border-slate-700/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Not Indexed
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {doc.is_indexed ? (
+            <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+              Indexed
+            </span>
+          ) : doc.is_indexable ? (
+            <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+              Pending
+            </span>
+          ) : (
+            <span className="rounded-full bg-slate-800/60 border border-slate-700/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Excluded
+            </span>
+          )}
+          {!doc.is_core && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); onMove(doc.path); }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-primary/10 text-slate-600 hover:text-primary"
+                title="移動文件"
+              >
+                <span className="material-symbols-outlined text-[16px]">drive_file_move</span>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(doc.path); }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-500/10 text-slate-600 hover:text-red-400"
+                title="刪除文件"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <p className="text-xs text-slate-500 font-mono truncate mb-2">{doc.path}</p>
       <div className="flex items-center gap-3 text-[11px] text-slate-500">
@@ -267,6 +576,120 @@ function DocumentCard({ doc }: { doc: KnowledgeDocumentSummary }) {
           <span className="material-symbols-outlined text-[13px]">schedule</span>
           {formatDate(doc.updated_at)}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function MoveModal({
+  sourcePath,
+  allDocuments,
+  serverDirs,
+  onMove,
+  onClose,
+}: {
+  sourcePath: string;
+  allDocuments: KnowledgeDocumentSummary[];
+  serverDirs: string[];
+  onMove: (source: string, targetDir: string) => void;
+  onClose: () => void;
+}) {
+  const [selectedDir, setSelectedDir] = useState(() => {
+    const parts = sourcePath.split("/");
+    return parts.slice(0, -1).join("/") || "";
+  });
+
+  // Build directory tree from all document paths + server-reported dirs
+  const dirs = new Set<string>();
+  dirs.add("knowledge");
+  for (const doc of allDocuments) {
+    const parts = doc.path.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      dirs.add(parts.slice(0, i).join("/"));
+    }
+  }
+  for (const d of serverDirs) {
+    dirs.add(d);
+    // Also add parent segments
+    const parts = d.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      dirs.add(parts.slice(0, i).join("/"));
+    }
+  }
+  const sortedDirs = [...dirs].sort();
+
+  const sourceDir = sourcePath.split("/").slice(0, -1).join("/");
+  const filename = sourcePath.split("/").pop() || "";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] flex flex-col mx-4" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="material-symbols-outlined text-primary text-[20px]">drive_file_move</span>
+            <span className="text-sm font-semibold text-white">移動文件</span>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        {/* File info */}
+        <div className="px-5 py-3 border-b border-slate-800/50">
+          <p className="text-xs text-slate-500 mb-1">檔案</p>
+          <p className="text-sm text-white font-mono truncate">{filename}</p>
+        </div>
+
+        {/* Directory list */}
+        <div className="flex-1 overflow-y-auto py-2">
+          <p className="px-5 py-1 text-xs text-slate-500 font-semibold uppercase tracking-wider">選擇目標資料夾</p>
+          {sortedDirs.map((dir) => {
+            const depth = dir.split("/").length - 1;
+            const isCurrentDir = dir === sourceDir;
+            const isSelected = dir === selectedDir;
+            const label = dir.split("/").pop() || dir;
+            return (
+              <button
+                key={dir}
+                onClick={() => setSelectedDir(dir)}
+                className={`w-full text-left px-5 py-2.5 flex items-center gap-2 transition-colors ${
+                  isSelected
+                    ? "bg-primary/10 text-primary"
+                    : "text-slate-300 hover:bg-slate-800/50"
+                }`}
+                style={{ paddingLeft: `${20 + depth * 16}px` }}
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {isSelected ? "folder_open" : "folder"}
+                </span>
+                <span className="text-sm truncate">{label}</span>
+                {isCurrentDir && (
+                  <span className="text-[10px] text-slate-500 ml-auto shrink-0">目前位置</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-slate-800 flex items-center justify-between gap-3">
+          <p className="text-xs text-slate-500 truncate min-w-0">
+            → {selectedDir}/{filename}
+          </p>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              取消
+            </button>
+            <button
+              onClick={() => onMove(sourcePath, selectedDir)}
+              disabled={selectedDir === sourceDir}
+              className="px-4 py-1.5 rounded-lg bg-primary text-sm font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-30"
+            >
+              移動
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

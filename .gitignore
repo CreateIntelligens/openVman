@@ -29,6 +29,7 @@ brain/data/projects/
 
 # Node
 node_modules/
+.vite/
 
 # SQLite
 *.db-journal
