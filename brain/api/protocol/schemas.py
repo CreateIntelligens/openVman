@@ -44,6 +44,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., description="Semantic search query")
     table: str = Field("memories", pattern="^(knowledge|memories)$")
     top_k: int = 5
+    query_type: str = Field("vector", pattern="^(vector|hybrid)$")
     project_id: str = "default"
     persona_id: str = "default"
 

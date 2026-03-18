@@ -17,7 +17,8 @@
 | Embedding 模型 | **BAAI/bge-m3** (本地) | 多語言、Dense+Sparse 混合檢索 |
 | LLM | OpenAI / Claude / vLLM | 依 `BRAIN_LLM_PROVIDER` 環境變數切換 |
 | 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
-| 知識庫格式 | Markdown 檔案系統 | 人類可讀、Git 可追蹤 |
+| 知識庫格式 | Markdown + Raw (多模態) | 人類可讀、支援 PDF/DOCX 自動轉換 |
+| 解析引擎 | **MarkItDown** + **Header-based** | 支援多格式轉檔與語義標題切分 |
 | 路由層 | Provider Router + Key Pool | Key fallback、模型切換、限流保護 |
 
 #### 2.1 bge-m3 部署方式
@@ -70,6 +71,8 @@ memories_table = db.open_table("memories")
 ```text
 ~/.openclaw/
 ├── workspace/
+│   ├── raw/               # 原始檔案入口 (PDF, DOCX, XLSX, etc.)
+│   ├── knowledge/         # 自動轉出的 Markdown 片段 (.md)
 │   ├── SOUL.md            # 絕對核心：人格設定、語氣限制、核心價值觀
 │   ├── AGENTS.md          # 任務分派：若需調用外部系統，定義工作流程
 │   ├── TOOLS.md           # 工具描述：定義可用的 CRM API / 電商 API Schema
@@ -80,8 +83,8 @@ memories_table = db.open_table("memories")
 │       ├── LEARNINGS.md   # 從對話中總結出的新知識與偏好
 │       └── ERRORS.md      # 曾經犯過的錯誤與修正紀錄
 └── lancedb/               # LanceDB 嵌入式資料庫目錄
-    ├── memories.lance/     # 記憶向量表
-    └── knowledge.lance/    # 知識庫向量表（從 Markdown 索引而來）
+    ├── memories.lance/     # 記憶向量表 (含 FTS 索引)
+    └── knowledge.lance/    # 知識庫向量表 (含 FTS 索引)
 ```
 
 ### 4. 知識索引管線 (Knowledge Indexing Pipeline)
@@ -96,15 +99,23 @@ memories_table = db.open_table("memories")
 └──────────────┘                    └──────────────┘              └──────────────┘
 ```
 
-**Chunking 策略**：
-* 以 Markdown 標題 (`##`, `###`) 為自然分界點切分。
-* 每個 Chunk 控制在 200-500 字之間，過長則在段落邊界再切。
-* 每個 Chunk 攜帶 metadata：`{ source_file, heading, date, chunk_index }`。
+**Ingestion 管線流程**：
+1. **Detect**: 掃描 `workspace/raw/` 中的新檔案。
+2. **Convert**: 使用 **MarkItDown** 將多模態檔案轉為 Markdown。
+3. **Chunking**: 使用 `HeaderBasedChunker` 以 Markdown 標題 (`##`, `###`) 為自然分界點切分，控制在 200-500 字之間。
+4. **Index**: 透過 bge-m3 生成向量並存入 LanceDB。
+5. **FTS Refresh**: 更新全文本索引以支援 BM25 搜尋。
 
-### 5. 記憶檢索與注入機制 (Memory & Retrieval Pipeline)
+### 5. 記憶檢索與注入機制 (Hybrid Search)
 
-當收到使用者的輸入 (`user_input`) 時，必須經過以下管線才能組裝出最終的 LLM Prompt：
+當收到使用者的輸入 (`user_input`) 時，必須經過以下管線組裝出最終的 LLM Prompt。系統優先使用 **Hybrid Search (Vector + BM25)**：
+- **向量搜尋 (Vector)**：尋找語義相近的概念。
+- **關鍵字搜尋 (BM25)**：尋找包含特定專有名詞 (如 "David", "TX-500") 的內容。
 
+```python
+async def retrieve_context(user_input: str, top_k: int = 5, query_type: str = "hybrid"):
+    # ... 實作邏輯應包含對 table.search(..., query_type="hybrid") 的調用
+```
 ```
 user_input
     │

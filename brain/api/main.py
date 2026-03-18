@@ -55,6 +55,8 @@ from memory.memory import (
 )
 from memory.memory_governance import maybe_run_memory_maintenance
 from memory.retrieval import search_records
+from knowledge.ingestion_manager import run_ingestion
+from memory.reflector import MemoryReflector
 from personas.personas import (
     clone_persona_scaffold,
     create_persona_scaffold,
@@ -356,6 +358,8 @@ async def search(request: Request, payload: SearchRequest):
         table_name=payload.table,
         query_vector=query_vec,
         top_k=payload.top_k,
+        query_text=query,
+        query_type=payload.query_type,
         persona_id=envelope.context.persona_id,
         project_id=project_id,
     )
@@ -631,17 +635,29 @@ async def reindex_knowledge(payload: AdminActionRequest):
         record_generation_failure("reindex", "index_failure", str(exc))
         raise HTTPException(status_code=500, detail="知識重建失敗") from exc
 
-
-@app.post("/api/admin/memory/maintain")
-async def maintain_memory(payload: AdminActionRequest):
+@app.post("/api/admin/knowledge/sync")
+async def sync_knowledge(payload: AdminActionRequest):
+    """手動觸發知識庫 Ingestion 同步。"""
     try:
-        result = await asyncio.to_thread(maybe_run_memory_maintenance, True, payload.project_id)
-        log_event("memory_maintenance", project_id=payload.project_id, **result)
-        return result
-    except Exception as exc:  # pragma: no cover
-        log_exception("memory_maintenance_error", exc)
-        record_generation_failure("memory_maintain", "maintenance_failure", str(exc))
-        raise HTTPException(status_code=500, detail="記憶整理失敗") from exc
+        await asyncio.to_thread(run_ingestion, payload.project_id)
+        log_event("knowledge_sync", project_id=payload.project_id)
+        return {"status": "ok", "message": "知識庫同步完成"}
+    except Exception as exc:
+        log_exception("knowledge_sync_error", exc)
+        raise HTTPException(status_code=500, detail="知識庫同步失敗") from exc
+
+
+@app.post("/api/admin/memory/reflect")
+async def reflect_memory(payload: AdminActionRequest):
+    """手動觸發長期記憶反思與歸檔。"""
+    try:
+        reflector = MemoryReflector(payload.project_id)
+        await reflector.reflect_daily_logs()
+        log_event("memory_reflect", project_id=payload.project_id)
+        return {"status": "ok", "message": "記憶反思完成"}
+    except Exception as exc:
+        log_exception("memory_reflect_error", exc)
+        raise HTTPException(status_code=500, detail="記憶反思失敗") from exc
 
 
 # ---------------------------------------------------------------------------

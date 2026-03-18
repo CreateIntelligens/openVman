@@ -69,10 +69,13 @@ def ensure_fts_index(table_name: str, project_id: str = "default") -> None:
     """Create a full-text search index on the text column if not already present."""
     table = get_table(table_name, project_id)
     try:
-        table.create_fts_index("text", replace=True)
-    except Exception:
+        # 確保有資料才建立索引，否則 LanceDB 可能會報錯
+        if len(table) > 0:
+            table.create_fts_index("text", replace=True)
+    except Exception as e:
         # FTS index may already exist or not be supported in this version
-        pass
+        import logging
+        logging.getLogger(__name__).debug(f"FTS index creation skipped/failed for {table_name}: {e}")
 
 
 def get_memories_table(project_id: str = "default") -> lancedb.table.Table:

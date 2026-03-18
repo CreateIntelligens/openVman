@@ -114,7 +114,7 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     """Ensure the workspace root, core docs, and support directories exist."""
     ws = get_workspace_root(project_id)
     ws.mkdir(parents=True, exist_ok=True)
-    for subdir in ("memory", "personas", "knowledge", "archive/errors", "archive/memory"):
+    for subdir in ("memory", "personas", "knowledge", "raw", "archive/errors", "archive/memory"):
         (ws / subdir).mkdir(parents=True, exist_ok=True)
 
     for filename, template in WORKSPACE_TEMPLATES.items():

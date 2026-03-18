@@ -1,7 +1,7 @@
 # openVman — 虛擬人系統架構總覽 (Architecture Index)
 
-> **版本**：v0.2  
-> **最後更新**：2026-03-11  
+> **版本**：v0.3  
+> **最後更新**：2026-03-18  
 > **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
 
 ---
@@ -10,10 +10,10 @@
 
 | 編號 | 文件 | 職責 | 狀態 |
 |------|------|------|------|
-| 00 | [00_CORE_PROTOCOL.md](./00_CORE_PROTOCOL.md) | 通訊協定 · WebSocket JSON · Viseme Map · 狀態機 · 錯誤事件 · 心跳 · 版本管理 | ✅ 已完成 |
-| 01 | [01_BACKEND_SPEC.md](./01_BACKEND_SPEC.md) | 後端 (神經)：Session · 訊息處理層 · Chunking · zh-TW TTS · Key Fallback · 中斷 · 配置 · 健檢 · 指標 · 關機 · 日誌 | ✅ 已完成 |
-| 02 | [02_FRONTEND_SPEC.md](./02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
-| 03 | [03_BRAIN_SPEC.md](./03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
+| 00 | [00_CORE_PROTOCOL.md](./docs/00_CORE_PROTOCOL.md) | 通訊協定 · WebSocket JSON · Viseme Map · 狀態機 · 錯誤事件 · 心跳 · 版本管理 | ✅ 已完成 |
+| 01 | [01_BACKEND_SPEC.md](./docs/01_BACKEND_SPEC.md) | 後端 (神經)：Session · 訊息處理層 · Chunking · zh-TW TTS · Key Fallback · 中斷 · 配置 · 健檢 · 指標 · 關機 · 日誌 | ✅ 已完成 |
+| 02 | [02_FRONTEND_SPEC.md](./docs/02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
+| 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
 | -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
 
 
@@ -225,8 +225,8 @@
 - ✅ 感官 / 神經 / 靈魂 三層解耦，職責零重疊
 - ✅ LLM → Chunker → TTS → WebSocket 串流管線，延遲最小化
 - ✅ AudioContext 唯一時鐘源，杜絕嘴型漂移
-- ✅ LanceDB + bge-m3 全本地部署，資料不出站
-- ✅ **Brain Skills 模組化擴充系統**：支援動態載入外部技能工具
+- ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + MarkItDown 多模態檔案處理
+- ✅ **Brain Skills 模組化擴充系統**：支援動態載載入外部技能工具
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
 - ✅ 完整的錯誤處理、斷線重連、優雅關機機制
 - ✅ Token 預算管理 + 安全防護 (Guardrails)

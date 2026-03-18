@@ -21,10 +21,10 @@ def get_search_table(table_name: str, project_id: str = "default"):
 def search_records(
     table_name: str,
     query_vector: list[float],
-    top_k: int,
+    top_k: int = 5,
+    query_text: str | None = None,
+    query_type: str = "vector",
     persona_id: str = "default",
-    *,
-    query_text: str = "",
     project_id: str = "default",
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
@@ -36,7 +36,13 @@ def search_records(
     limit = max(top_k, 1)
     table = get_search_table(table_name, project_id)
 
-    raw_records = _hybrid_search(table, query_vector, query_text, limit * 4)
+    raw_records = _safe_search(
+        table,
+        query_vector,
+        query_text=query_text or "",
+        query_type=query_type,
+        limit=top_k * 2,
+    )
 
     filtered: list[dict[str, Any]] = []
     for record in raw_records:
@@ -49,6 +55,23 @@ def search_records(
     return filtered
 
 
+def _safe_search(
+    table: Any,
+    query_vector: list[float],
+    query_text: str = "",
+    query_type: str = "vector",
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Execute search with fallback and error handling."""
+    try:
+        if query_type == "hybrid":
+            return _hybrid_search(table, query_vector, query_text, limit)
+        return _search_to_records(table.search(query_vector).limit(limit))
+    except Exception as exc:
+        logger.warning("Search failed for %s: %s", table, exc)
+        return []
+
+
 def _hybrid_search(
     table: Any,
     query_vector: list[float],
@@ -58,21 +81,18 @@ def _hybrid_search(
     """Try hybrid search (vector + FTS), fall back to vector-only."""
     if query_text:
         try:
+            # LanceDB hybrid search: combines vector and FTS
+            # Make sure FTS index exists before calling this
             result = (
-                table.search(
-                    query_text,
-                    query_type="hybrid",
-                    vector_column_name="vector",
-                    fts_columns="text",
-                )
-                .vector(query_vector)
+                table.search(query_vector, query_type="hybrid")
+                .text(query_text)
                 .limit(limit)
             )
             records = _search_to_records(result)
             if records:
                 return records
         except Exception as exc:
-            logger.debug("hybrid search unavailable, falling back to vector: %s", exc)
+            logger.debug("hybrid search failed or unavailable, falling back to vector: %s", exc)
 
     # Vector-only fallback
     return _search_to_records(table.search(query_vector).limit(limit))
