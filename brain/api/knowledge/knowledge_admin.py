@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from knowledge.indexer import fingerprint_document, load_index_state
 from knowledge.workspace import (
@@ -19,10 +21,71 @@ from knowledge.workspace import (
 from personas.personas import is_persona_core_relative_path
 
 
+def ingest_text_content(
+    content: str,
+    metadata: dict[str, Any],
+    project_id: str = "default",
+) -> dict[str, Any]:
+    """Save ingested text from Gateway into workspace/raw/ingested/ and return summary.
+
+    This is the main entry point for Gateway's Web Crawler worker to push
+    processed text into the Brain knowledge base.
+    """
+    if not content.strip():
+        raise ValueError("content 不可為空")
+
+    now = datetime.now(timezone.utc)
+    ingested_at = now.isoformat(timespec="seconds")
+    ts = now.strftime("%Y%m%d_%H%M%S")
+
+    # Generate filename from source_url or timestamp
+    source_url = metadata.get("source_url", "")
+    if source_url:
+        parsed = urlparse(source_url)
+        slug = re.sub(r"[^a-zA-Z0-9_\-]", "_", f"{parsed.netloc}{parsed.path}")
+        slug = re.sub(r"_+", "_", slug).strip("_")[:120]
+        filename = f"{slug}.md"
+    else:
+        filename = f"ingested_{ts}.md"
+
+    # Build frontmatter
+    extra_metadata = {k: v for k, v in metadata.items() if k != "source_url"}
+    frontmatter_lines = [
+        "---",
+        f"source_url: {source_url or 'unknown'}",
+        f"ingested_at: {ingested_at}",
+        *(f"{k}: {v}" for k, v in extra_metadata.items()),
+        "---",
+        "",
+    ]
+    full_content = "\n".join(frontmatter_lines) + content
+
+    # Save to workspace/raw/ingested/
+    root = ensure_workspace_scaffold(project_id)
+    ingested_dir = root / "raw" / "ingested"
+    ingested_dir.mkdir(parents=True, exist_ok=True)
+
+    target_path = ingested_dir / filename
+    # Avoid overwriting -- append timestamp suffix if file exists
+    if target_path.exists():
+        target_path = ingested_dir / f"{Path(filename).stem}_{ts}.md"
+
+    target_path.write_text(full_content, encoding="utf-8")
+
+    relative_path = target_path.relative_to(root).as_posix()
+    return {
+        "status": "ok",
+        "path": relative_path,
+        "filename": target_path.name,
+        "size": target_path.stat().st_size,
+        "ingested_at": ingested_at,
+    }
+
+
 def list_knowledge_base_directories(project_id: str = "default") -> list[str]:
     """Return all subdirectory paths under knowledge/, relative to workspace root."""
-    knowledge_dir = ensure_workspace_scaffold(project_id) / "knowledge"
     root = ensure_workspace_scaffold(project_id)
+    knowledge_dir = root / "knowledge"
     return sorted(
         p.relative_to(root).as_posix()
         for p in knowledge_dir.rglob("*")

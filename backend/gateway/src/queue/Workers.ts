@@ -69,9 +69,10 @@ export function startWorkers() {
       // Task 7.6 – Trigger Brain ingestion if success
       if (result.type === 'crawl_result' && result.content) {
           try {
-              await axios.post(`${config.BACKEND_INTERNAL_URL}/api/knowledge/ingest`, {
+              await axios.post(`${config.BRAIN_URL}/api/knowledge/ingest`, {
                   content: result.content,
-                  metadata: { source_url: result.metadata?.url }
+                  metadata: { source_url: result.metadata?.url },
+                  project_id: job.data.projectId || 'default',
               });
           } catch (err) {
               logger.warn({ event: 'brain_ingestion_failed', url: result.metadata?.url });

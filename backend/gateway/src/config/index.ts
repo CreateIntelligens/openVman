@@ -32,7 +32,7 @@ const envSchema = z.object({
   WHISPER_LOCAL_BIN: z.string().default('/usr/local/bin/whisper'),
 
   // MarkItDown
-  MARKITDOWN_URL: z.string().default('http://localhost:8200'),
+  MARKITDOWN_URL: z.string().default('http://markitdown:8000'),
 
   // Camera Live
   CAMERA_SNAPSHOT_INTERVAL_SEC: z.coerce.number().default(5),
@@ -50,6 +50,9 @@ const envSchema = z.object({
 
   // Backend internal
   BACKEND_INTERNAL_URL: z.string().default('http://localhost:8080'),
+
+  // Brain (knowledge ingestion)
+  BRAIN_URL: z.string().default('http://brain:8100'),
 
   // Queue
   QUEUE_JOB_TIMEOUT_MS: z.coerce.number().default(30000),

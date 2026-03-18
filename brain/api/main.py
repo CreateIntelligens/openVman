@@ -37,6 +37,7 @@ from knowledge.knowledge_admin import (
     create_workspace_directory,
     delete_workspace_directory,
     delete_workspace_document,
+    ingest_text_content,
     list_knowledge_base_directories,
     list_knowledge_base_documents,
     list_workspace_documents,
@@ -45,6 +46,7 @@ from knowledge.knowledge_admin import (
     save_uploaded_document,
     save_workspace_document,
 )
+
 from knowledge.workspace import ensure_workspace_scaffold, parse_identity
 from memory.embedder import encode_text, get_embedder
 from memory.memory import (
@@ -72,6 +74,7 @@ from protocol.schemas import (
     ChatRequest,
     KnowledgeDocumentMoveRequest,
     KnowledgeDocumentPutRequest,
+    KnowledgeIngestRequest,
     PersonaCloneRequest,
     PersonaCreateRequest,
     PersonaDeleteRequest,
@@ -492,7 +495,24 @@ async def delete_session(session_id: str, project_id: str = "default"):
 
 
 # ---------------------------------------------------------------------------
-# Knowledge Admin
+# Knowledge Ingestion (Gateway entry point)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/knowledge/ingest")
+async def ingest_knowledge_content(payload: KnowledgeIngestRequest):
+    """接收 Gateway 傳來的處理過文字，存進 workspace 並觸發 reindex。"""
+    try:
+        result = ingest_text_content(payload.content, payload.metadata, payload.project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    asyncio.create_task(_background_reindex(payload.project_id))
+    log_event("knowledge_ingested", project_id=payload.project_id, path=result["path"])
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Knowledge Admin (前台管理介面用)
 # ---------------------------------------------------------------------------
 
 @app.get("/api/admin/knowledge/documents")
@@ -601,19 +621,6 @@ async def reindex_knowledge(payload: AdminActionRequest):
         log_exception("knowledge_reindex_error", exc)
         record_generation_failure("reindex", "index_failure", str(exc))
         raise HTTPException(status_code=500, detail="知識重建失敗") from exc
-
-
-@app.post("/api/admin/knowledge/sync")
-async def sync_knowledge(payload: AdminActionRequest):
-    """手動觸發 raw/ 目錄 Ingestion 同步（需要 markitdown 套件）。"""
-    try:
-        from knowledge.ingestion_manager import run_ingestion
-        result = await asyncio.to_thread(run_ingestion, payload.project_id)
-        log_event("knowledge_sync", project_id=payload.project_id, **result)
-        return {"status": "ok", "message": "知識庫同步完成", **result}
-    except Exception as exc:
-        log_exception("knowledge_sync_error", exc)
-        raise HTTPException(status_code=500, detail="知識庫同步失敗") from exc
 
 
 # ---------------------------------------------------------------------------
