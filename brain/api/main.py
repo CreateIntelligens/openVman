@@ -608,16 +608,16 @@ async def sync_knowledge(payload: AdminActionRequest):
     """手動觸發 raw/ 目錄 Ingestion 同步（需要 markitdown 套件）。"""
     try:
         from knowledge.ingestion_manager import run_ingestion
-        await asyncio.to_thread(run_ingestion, payload.project_id)
-        log_event("knowledge_sync", project_id=payload.project_id)
-        return {"status": "ok", "message": "知識庫同步完成"}
+        result = await asyncio.to_thread(run_ingestion, payload.project_id)
+        log_event("knowledge_sync", project_id=payload.project_id, **result)
+        return {"status": "ok", "message": "知識庫同步完成", **result}
     except Exception as exc:
         log_exception("knowledge_sync_error", exc)
         raise HTTPException(status_code=500, detail="知識庫同步失敗") from exc
 
 
 # ---------------------------------------------------------------------------
-# Admin: Memory Maintenance & Reflection
+# Admin: Memory Maintenance
 # ---------------------------------------------------------------------------
 
 @app.post("/api/admin/memory/maintain")
@@ -631,20 +631,6 @@ async def maintain_memory(payload: AdminActionRequest):
         log_exception("memory_maintenance_error", exc)
         record_generation_failure("memory_maintain", "maintenance_failure", str(exc))
         raise HTTPException(status_code=500, detail="記憶整理失敗") from exc
-
-
-@app.post("/api/admin/memory/reflect")
-async def reflect_memory(payload: AdminActionRequest):
-    """LLM 驅動的長期記憶反思。"""
-    try:
-        from memory.reflector import MemoryReflector
-        reflector = MemoryReflector(payload.project_id)
-        await reflector.reflect_daily_logs()
-        log_event("memory_reflect", project_id=payload.project_id)
-        return {"status": "ok", "message": "記憶反思完成"}
-    except Exception as exc:
-        log_exception("memory_reflect_error", exc)
-        raise HTTPException(status_code=500, detail="記憶反思失敗") from exc
 
 
 # ---------------------------------------------------------------------------
