@@ -12,7 +12,10 @@ from config import get_settings
 from knowledge.workspace import get_workspace_root, resolve_workspace_document
 from memory.embedder import encode_text
 from memory.retrieval import search_records
-from tools.mock_data import FAQ_ENTRIES, ORDER_RECORDS
+from .mock_data import FAQ_ENTRIES, ORDER_RECORDS
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .skill import Skill
 
 ToolHandler = Callable[[dict[str, Any]], Any]
 _active_persona_id: ContextVar[str] = ContextVar("brain_active_persona_id", default="default")
@@ -33,6 +36,26 @@ class ToolRegistry:
 
     def register(self, tool: Tool) -> None:
         self._tools[tool.name] = tool
+
+    def register_skill_tools(self, skill: Skill) -> None:
+        """Register all tools provided by a skill, with namespacing."""
+        for tool_def in skill.manifest.tools:
+            handler = skill.handlers.get(tool_def.name)
+            if not handler:
+                continue
+            
+            # Namespace tool name: skill_id:tool_name
+            namespaced_name = f"{skill.manifest.id}:{tool_def.name}"
+            # Also allow direct name if no collision? 
+            # Better to be strict: primary way is namespaced.
+            
+            tool = Tool(
+                name=namespaced_name,
+                description=f"[{skill.manifest.name}] {tool_def.description}",
+                parameters=tool_def.parameters,
+                handler=handler
+            )
+            self.register(tool)
 
     def get(self, name: str) -> Tool:
         if name not in self._tools:
@@ -244,6 +267,22 @@ def get_tool_registry() -> ToolRegistry:
                 handler=_save_memory,
             )
         )
+        
+        # Load and register skills
+        try:
+            from .skill_manager import get_skill_manager
+            manager = get_skill_manager()
+            manager.scan_and_load_skills()
+            for skill in manager.list_skills():
+                registry.register_skill_tools(skill)
+        except Exception as exc:
+            # Observability not yet available at this stage in some contexts, but we can try
+            try:
+                from safety.observability import log_exception
+                log_exception("skill_registry_init_failed", exc)
+            except ImportError:
+                print(f"Failed to load skills: {exc}")
+
         _registry = registry
     return _registry
 

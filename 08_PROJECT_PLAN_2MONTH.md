@@ -18,15 +18,15 @@ openVman 兩個月開發規劃（8 週）
 ### Phase 1：架構定版與骨架落地（Week 1-2）
 
 **Project Items**
-1. Backend service skeleton
+1. [x] Backend service skeleton
    * 建立 WebSocket server、session manager、message envelope、trace id。
-2. Brain service skeleton
+2. [x] Brain service skeleton
    * 建立 HTTP/SSE 介面、message pipeline、provider router 介面。
-3. Frontend skeleton
+3. [x] Frontend skeleton
    * 建立音訊播放層、canvas 嘴型層、連線狀態機。
-4. Shared protocol package
+4. [x] Shared protocol package
    * 抽出 event schema、error code、viseme mapping、TypeScript/Python 共用型別。
-5. 開發環境與 repo 規範
+5. [x] 開發環境與 repo 規範
    * `.env.example`、lint、format、pre-commit、Docker Compose。
 
 **Deliverables**
@@ -56,14 +56,14 @@ openVman 兩個月開發規劃（8 週）
 ### Phase 3：OpenClaw-style brain 能力（Week 5-6）
 
 **Project Items**
-1. LanceDB + bge-m3 indexing
-   * `SOUL.md`、`MEMORY.md`、`TOOLS.md`、FAQ 文檔索引。
-2. Brain message handling layer
+1. [x] LanceDB + bge-m3 indexing
+   * `SOUL.md`、`MEMORY.md`、`TOOLS.md`、FAQ 文檔索引自 LanceDB。
+2. [x] Brain message handling layer
    * normalize、enrich、route、guard、assemble。
-3. LLM provider/model fallback
+3. [x] LLM provider/model fallback
    * key pool、模型切換、跨 provider fallback policy。
-4. Tool calling v1
-   * 至少接一個 mock tool + 一個真實業務 tool。
+4. [x] Tool calling v1 (Brain Skills System)
+   * 建立模組化技能系統，支援動態載入工具。
 5. Reflection / memory writeback
    * 將對話摘要寫回 daily memory，支援重新索引。
 
@@ -93,16 +93,16 @@ openVman 兩個月開發規劃（8 週）
 
 ## 3. 週別節奏
 
-| 週次 | 目標 | 主要輸出 |
-|------|------|----------|
-| W1 | 架構骨架 | Backend/Brain/Frontend skeleton、shared protocol |
-| W2 | 通訊打通 | WebSocket + mock brain + 基礎狀態機 |
-| W3 | 語音打通 | 自建 zh-TW TTS、viseme、播放鏈路 |
-| W4 | 中斷與 fallback | interrupt、queue control、TTS fallback |
-| W5 | RAG 上線 | LanceDB indexing、memory retrieval |
-| W6 | Brain router | message layer、tool calling、LLM fallback |
-| W7 | 系統整合 | 端到端測試、監控、錯誤修復 |
-| W8 | 內測交付 | demo polish、staging、release checklist |
+| 週次 | 目標 | 主要輸出 | 狀態 |
+|------|------|----------|------|
+| W1 | 架構骨架 | Backend/Brain/Frontend skeleton、shared protocol | ✅ |
+| W2 | 通訊打通 | WebSocket + mock brain + 基礎狀態機 | ✅ |
+| W3 | 語音打通 | 自建 zh-TW TTS、viseme、播放鏈路 | 🚧 |
+| W4 | 中斷與 fallback | interrupt、queue control、TTS fallback | 🚧 |
+| W5 | RAG 上線 | LanceDB indexing、memory retrieval | ✅ |
+| W6 | Brain router | message layer、tool calling、LLM fallback | ✅ |
+| W7 | 系統整合 | 端到端測試、監控、錯誤修復 | 📅 |
+| W8 | 內測交付 | demo polish、staging、release checklist | 📅 |
 
 ## 4. 建議人力配置
 

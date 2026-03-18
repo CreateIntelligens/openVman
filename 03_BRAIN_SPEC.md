@@ -186,6 +186,8 @@ class BrainMessage(TypedDict):
 * **同 provider 多 model fallback**：主模型失敗時可切換次模型。
 * **跨 provider fallback**：如 `openai -> anthropic -> vllm`。
 * **限流感知**：遇到 `429`、`quota exceeded`、`insufficient credits` 時自動切換。
+* **有界跳轉 (Bounded Hops)**：單次請求限制跳轉次數 (如 `max_hops=4`)，防止無限迴圈。
+* **跨 Provider 容災 (DR Mode)**：支援如 `gemini:flash -> gemini:pro -> openai:gpt-4o -> groq:llama-3` 的完整連鎖。
 * **訊息層重試而非盲重送**：保留原本 message envelope 與 trace id。
 
 ```python
@@ -241,7 +243,22 @@ async def handle_tool_call(tool_name: str, arguments: dict):
     return result  # 將結果餵回 LLM 繼續生成
 ```
 
-### 10. 睡眠與反思機制 (Sleep & Reflection)
+### 10. 大腦技能系統 (Brain Skills System)
+
+為了實現高度模組化，大腦支援透過外部 Skills 套件擴充工具能力。
+
+* **Skills 目錄**: 定義在 `brain/skills/`，每個技能為一個獨立資料夾。
+* **技能清單 (Manifest)**: `skill.yaml` 定義技能名稱、版本及所包含的工具 Schema。
+* **處理邏輯**: `main.py` 實作工具的 Python 處理函式。
+* **自動掃描**: 系統啟動時自動掃描 Skills 目錄，動態加載工具並自動進行命名空間隔離 (如 `weather:get_weather`)。
+
+#### 10.1 技能開發規範
+1. 建立 `brain/skills/my_skill/`。
+2. 撰寫 `skill.yaml` (包含 id, name, tools[])。
+3. 撰寫 `main.py` (實作與 tools[] 對應的函式)。
+4. 技能工具會自動整合進 `ToolRegistry` 並供 LLM 調用。
+
+### 11. 睡眠與反思機制 (Sleep & Reflection)
 
 為了避免記憶無限膨脹，系統必須實作非同步的「記憶整理」排程 (Cron Job)：
 

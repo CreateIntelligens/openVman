@@ -9,3 +9,4 @@ pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.9
 sse-starlette>=1.8.0
+PyYAML>=6.0.0

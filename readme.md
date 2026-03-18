@@ -14,6 +14,7 @@
 | 01 | [01_BACKEND_SPEC.md](./01_BACKEND_SPEC.md) | 後端 (神經)：Session · 訊息處理層 · Chunking · zh-TW TTS · Key Fallback · 中斷 · 配置 · 健檢 · 指標 · 關機 · 日誌 | ✅ 已完成 |
 | 02 | [02_FRONTEND_SPEC.md](./02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
 | 03 | [03_BRAIN_SPEC.md](./03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
+| -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
 
 
 ### AI Coding 餵檔策略
@@ -225,9 +226,12 @@
 - ✅ LLM → Chunker → TTS → WebSocket 串流管線，延遲最小化
 - ✅ AudioContext 唯一時鐘源，杜絕嘴型漂移
 - ✅ LanceDB + bge-m3 全本地部署，資料不出站
+- ✅ **Brain Skills 模組化擴充系統**：支援動態載入外部技能工具
+- ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
 - ✅ 完整的錯誤處理、斷線重連、優雅關機機制
 - ✅ Token 預算管理 + 安全防護 (Guardrails)
 
 **後續方向**：
 - 📋 撰寫 `04~07` 補充文件（部署 / 安全 / 素材 / 監控）
+- 📋 擴充更多專業領域的 Brain Skills
 - 📋 進入實作階段
