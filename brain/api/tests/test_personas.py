@@ -53,14 +53,15 @@ def _configure_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pat
         "tools": root / "TOOLS.md",
         "memory": root / "MEMORY.md",
         "identity": root / "IDENTITY.md",
-        "learnings": root / "LEARNINGS.md",
-        "errors": root / "ERRORS.md",
+        "learnings": root / ".learnings" / "LEARNINGS.md",
+        "errors": root / ".learnings" / "ERRORS.md",
         "memory_summaries": root / "MEMORY_SUMMARIES.md",
     }
     monkeypatch.setattr(workspace, "get_workspace_root", lambda project_id="default": root)
     monkeypatch.setattr(workspace, "get_core_documents", lambda project_id="default": core_documents)
     root.mkdir(parents=True, exist_ok=True)
     (root / "memory").mkdir(parents=True, exist_ok=True)
+    (root / ".learnings").mkdir(parents=True, exist_ok=True)
     core_documents["soul"].write_text("global soul", encoding="utf-8")
     core_documents["agents"].write_text("global agents", encoding="utf-8")
     core_documents["tools"].write_text("global tools", encoding="utf-8")

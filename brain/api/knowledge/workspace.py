@@ -15,7 +15,7 @@ ALLOWED_CODE_SUFFIXES = {
     ".toml", ".ini", ".cfg", ".vue", ".svelte",
 }
 ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
-EXCLUDED_INDEX_PREFIXES = ("memory/",)
+EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/")
 WORKSPACE_TEMPLATES = {
     "SOUL.md": """# 核心人格設定 (SOUL)
 
@@ -70,12 +70,12 @@ WORKSPACE_TEMPLATES = {
 - 此檔定義代理的外部身份與視覺主題。
 - persona 可覆寫此檔以呈現不同角色形象。
 """,
-    "LEARNINGS.md": """# 學到的新知 (LEARNINGS)
+    ".learnings/LEARNINGS.md": """# 學到的新知 (LEARNINGS)
 
 - 使用者偏好簡潔、直接的回答。
 - 重要的新偏好與穩定事實，整理後再決定是否升級到 `MEMORY.md`。
 """,
-    "ERRORS.md": """# 錯誤紀錄 (ERRORS)
+    ".learnings/ERRORS.md": """# 錯誤紀錄 (ERRORS)
 
 - 尚未建立正式錯誤紀錄。
 - 後續發生重複性錯誤時，記錄原因、影響與修正方式。
@@ -87,11 +87,11 @@ WORKSPACE_TEMPLATES = {
 }
 RESERVED_INDEX_PATHS = frozenset(WORKSPACE_TEMPLATES.keys())
 
-# Mapping from lowercase key to filename, derived from WORKSPACE_TEMPLATES.
-# e.g. "soul" -> "SOUL.md", "memory_summaries" -> "MEMORY_SUMMARIES.md"
+# Mapping from lowercase key to template path, derived from WORKSPACE_TEMPLATES.
+# e.g. "soul" -> "SOUL.md", "learnings" -> ".learnings/LEARNINGS.md"
 _CORE_DOCUMENT_KEYS: dict[str, str] = {
-    filename.removesuffix(".md").lower(): filename
-    for filename in WORKSPACE_TEMPLATES
+    Path(template_path).stem.lower(): template_path
+    for template_path in WORKSPACE_TEMPLATES
 }
 
 
@@ -114,15 +114,27 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     """Ensure the workspace root, core docs, and support directories exist."""
     ws = get_workspace_root(project_id)
     ws.mkdir(parents=True, exist_ok=True)
-    for subdir in ("memory", "personas", "knowledge", "raw", "archive/errors", "archive/memory"):
+    for subdir in ("memory", "personas", "knowledge", "raw", ".learnings", "archive/errors", "archive/memory"):
         (ws / subdir).mkdir(parents=True, exist_ok=True)
 
-    for filename, template in WORKSPACE_TEMPLATES.items():
-        path = ws / filename
+    _migrate_learnings_layout(ws)
+
+    for template_path, template in WORKSPACE_TEMPLATES.items():
+        path = ws / template_path
         if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(template, encoding="utf-8")
 
     return ws
+
+
+def _migrate_learnings_layout(ws: Path) -> None:
+    """Move LEARNINGS.md and ERRORS.md from workspace root into .learnings/."""
+    for filename in ("LEARNINGS.md", "ERRORS.md"):
+        old = ws / filename
+        new = ws / ".learnings" / filename
+        if old.exists() and not new.exists():
+            old.rename(new)
 
 
 def get_archive_paths(project_id: str = "default") -> dict[str, Path]:
