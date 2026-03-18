@@ -4,7 +4,7 @@
 ### 1. 技術棧與核心目標 (Tech Stack & Goals)
 * **核心技術**：HTML5 `<video>`、`<canvas>`、Web Audio API、WebSockets、Vanilla JS (或任意前端框架如 React/Vue)。
 * **渲染模式**：2.5D 擬真切片 (Sprite Overlay)。
-* **唯一對時標準**：`AudioContext.currentTime` + `requestAnimationFrame`。嚴禁使用 `setTimeout` 或 `setInterval` 來控制嘴型。
+* **唯一對時標準**：`VideoSyncManager` (以 `video.currentTime` 為主基準，確保影音不漂移)。嚴禁使用 `setTimeout` 或 `setInterval` 來控制嘴型。
 
 ### 2. DOM 結構與圖層疊加 (DOM Structure & Layering)
 畫面由底層影片與上層畫布疊加而成。必須確保大小一致且絕對定位對齊。
@@ -46,8 +46,8 @@ let currentStartTime = 0; // 當前音頻塊開始播放的 AudioContext.current
 ```javascript
 function renderLoop() {
   if (isPlaying && currentAudioChunk) {
-    // 1. 計算當前音軌已經播放了幾秒
-    const elapsedTime = audioContext.currentTime - currentStartTime;
+    // 1. 取得當前播放對時時鐘
+    const elapsedTime = syncManager.getCurrentTime();
     
     // 2. 防錯機制：如果播放完畢，準備播下一個 Chunk
     if (elapsedTime >= currentAudioChunk.duration) {
@@ -83,12 +83,16 @@ function findActiveViseme(visemes, currentTime) {
 
 ```
 
-### 5. Canvas 繪圖邏輯 (Sprite Rendering)
+### 5. Canvas 繪圖與羽化邏輯 (Sprite Rendering & Blending)
 
-* 預先載入 6 種基礎嘴型的去背圖片 (PNG/WebP)：`closed`, `A`, `E`, `I`, `O`, `U`。
-* `drawMouthOnCanvas(visemeValue)`：
-1. 使用 `ctx.clearRect(0, 0, canvas.width, canvas.height)` 清空上一幀。
-2. 如果 `visemeValue` 不是 `closed`，則使用 `ctx.drawImage()` 將對應的嘴型圖片畫到精確的臉部座標上。
+前端支援兩種對嘴渲染策略，依據設備能力或使用者設定切換：
+
+1. **Viseme 查表法 (VisemeStrategy)**：
+   * 預先載入 6 種基礎嘴型的去背圖片 (PNG/WebP)。
+   * 如果 `visemeValue` 不是 `closed`，則清空上一幀並繪製對應圖片。
+2. **ONNX Wav2Lip AI 生成 (Wav2LipStrategy)**：
+   * 透過 ONNX Runtime Web 即時推論。
+   * **徑向漸變羽化 (Radial Gradient Feathering)**：為了消除矩形邊界，渲染時會套用一個徑向漸變遮罩 (Alpha Mask)，讓嘴唇外圍的 20% 平滑過渡至全透明，無縫與底層 `<video>` 人臉融合。
 
 
 
@@ -244,4 +248,32 @@ ws.onmessage = (msg) => {
     updatePluginUI(data.plugin, data.status, data.message);
   }
 };
+```
+
+### 14. 設備自適應對嘴系統 (Device-Adaptive Lip-Sync)
+
+為了兼顧畫質與終端效能，前端實作 `LipSyncManager` 來調度對嘴策略：
+
+1. **硬體能力自動偵測**：
+   * 初始化時偵測 `navigator.gpu` (WebGPU) 以及裝置記憶體與 CPU 核心數。
+   * **高階設備**：載入 ONNX Runtime Web (WebGPU/WASM 優先)，在前端動態推論 Wav2Lip。
+   * **低階設備**：平滑降級至資源耗費極低的 Viesme 查表法。
+2. **協定狀態通知 (`SET_LIP_SYNC_MODE`)**：
+   * 為了節省網路頻寬與後端算力，前端在初始化或切換對嘴模式時，必須透過 WebSocket 發送 `SET_LIP_SYNC_MODE`。
+   * 當處於 `wav2lip-high` 等 AI 模式時，後端不再下發冗餘的 Viseme JSON 資料。
+3. **無縫動態切換**：
+   * 允許使用者在 UI 手動切換，或在效能嚴重掉幀時自動降級。切換過程不中斷當前 AudioContext 與播放佇列。
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    LipSyncManager                       │
+│  • 設備偵測 → 發送模式通知 → 自動選擇對嘴策略 → 渲染循環     │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+   ┌─────────┐   ┌─────────┐   ┌─────────┐
+   │ Viseme  │   │Wav2Lip │   │ Device  │
+   │Strategy │   │Strategy│   │Detection│
+   └─────────┘   └─────────┘   └─────────┘
 ```

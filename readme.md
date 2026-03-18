@@ -47,9 +47,10 @@
   │  │  (底層背景)     │  │   ◄── server_error    │  └────────────────┘  │
   │  ├────────────────┤  │   ◄── ping / pong ──►  │  ┌────────────────┐  │
   │  │ <canvas>       │  │                        │  │ TTS Engine     │  │
-  │  │  嘴型 Sprite   │  │   ┌────────────────┐   │  │ IndexTTS2 zh-TW│  │
-  │  │  (即時覆蓋)     │  │   │   🛡️ 網關層     │   │  │ + Viseme 提取  │  │
-  │  ├────────────────┤  │   │ (Gateway/Async)│   │  └────────────────┘  │
+  │  │  ONNX Wav2Lip / │  │   ┌────────────────┐   │  │ IndexTTS2 zh-TW│  │
+  │  │  Viseme 查表    │  │   │   🛡️ 網關層     │   │  │ + Viseme 提取  │  │
+  │  │  (動態自適應切換)│  │   │ (Gateway/Async)│   │  └────────────────┘  │
+  │  ├────────────────┤  │   │  Media / Task  │   │  ┌────────────────┐  │
   │  │ Web Audio API  │  │   │  Media / Task  │   │  ┌────────────────┐  │
   │  │  播放+對時時鐘  │  │   │  Plugins       │   │  │ LLM Chunker    │  │
   │  ├────────────────┤  │   └──────┬─────────┘   │  │ 標點符號截斷    │  │
@@ -196,11 +197,14 @@
 
 | 層級 | 關鍵技術 | 說明 |
 |------|----------|------|
-| 前端 | `AudioContext.currentTime` | 唯一對嘴時鐘源，嚴禁 setTimeout |
-| 前端 | `<video>` + `<canvas>` 雙層疊加 | 2.5D 擬真切片渲染 |
+| 前端 | `video.currentTime` + VideoSyncManager | 高精度對嘴時鐘源，解決影音漂移 |
+| 前端 | `<video>` + `<canvas>` Alpha 漸變混合 | 2.5D 擬真切片渲染與無縫羽化 |
+| 前端 | **ONNX Runtime Web (Wav2Lip)** | 依設備能力動態選用 WebGPU/WASM AI 對嘴或 Viseme 查表 |
 | 後端 | 標點符號截斷 (Punctuation Chunking) | LLM 串流 → 短句 → TTS，最小化延遲 |
 | 後端 | IndexTTS2-style zh-TW + Viseme 提取 | 以台灣口音為預設，支援品牌聲線與客製化發音 |
 | 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
+| 網關 | **BullMQ + Redis 佇列** | 非同步處理多模態素材 (影像/語音) 的 CPU 密集型預處理管線 |
+| 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、Web Crawler 爬蟲等前置工具能力 |
 | 大腦 | **LanceDB** (嵌入式向量 DB) | 無服務端、低延遲、本地部署 |
 | 大腦 | **BAAI/bge-m3** (本地 Embedding) | 1024 維、多語言、Dense+Sparse 混合檢索 |
 | 大腦 | Markdown 檔案系統 | 人類可讀、Git 可追蹤的知識庫 |
@@ -224,9 +228,12 @@
 **核心架構完整度高**，四份 Spec 共 41 個章節，覆蓋了從通訊協定到認知系統的完整技術棧。
 
 **架構亮點**：
-- ✅ 感官 / 神經 / 靈魂 三層解耦，職責零重疊
+- ✅ 感官 / 神經 / 靈魂 三層解耦，職責零重疊 (Frontend 獨立運作)
+- ✅ **獨立網關層 (Gateway)**：前置消化多模態素材與非同步任務 (BullMQ)，保持大腦與核心後端輕量、穩定。
+- ✅ **系統外掛擴充 (Gateway Plugins)**：原生支援 Camera Live 與 Web Crawler，強化視覺感知與即時爬網能力。
 - ✅ LLM → Chunker → TTS → WebSocket 串流管線，延遲最小化
-- ✅ AudioContext 唯一時鐘源，杜絕嘴型漂移
+- ✅ **設備自適應對嘴 (Device-Adaptive Lip-Sync)**：ONNX WebGPU 高畫質 AI 對嘴，平滑降級至 Viseme 查表
+- ✅ VideoSync 唯一時鐘源 + 徑向漸變羽化，杜絕嘴型漂移與生硬邊界
 - ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + MarkItDown 多模態檔案處理
 - ✅ **Brain Skills 模組化擴充系統**：支援動態載載入外部技能工具
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移

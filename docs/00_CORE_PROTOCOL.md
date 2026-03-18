@@ -74,6 +74,17 @@
 Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 Backend。
 *(此流程在 HTTP 層進行，不佔用 WebSocket 頻寬)*
 
+**3.6 切換對嘴模式 (Set Lip Sync Mode)**
+客戶端於初始化設備偵測後、或動態切換對嘴策略時發送。告知後端目前使用的對嘴方式，以便優化頻寬（如在 AI 模式停止下發冗餘的 Viseme JSON）。
+```json
+{
+  "event": "set_lip_sync_mode",
+  "mode": "wav2lip-high",
+  "need_visemes": false,
+  "timestamp": 1710123472
+}
+```
+
 ### 4. 伺服器發送格式 (Server -> Client)
 
 **4.1 音頻與動作串流 (Stream Chunk)**
@@ -173,7 +184,7 @@ Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 
 
 **5.2 絕對時鐘原則 (The Golden Sync Rule)**
 嚴格禁止前端使用 `setTimeout` 或 `setInterval` 進行嘴型動畫對時。
-前端必須使用 `AudioContext.currentTime` 作為唯一真相來源 (Source of Truth)。在 `requestAnimationFrame` 迴圈中，比對當前音頻播放時間與 Viseme JSON 的 `time` 標籤，決定 `<canvas>` 該渲染哪一張圖。
+前端必須優先使用 `video.currentTime` (透過 `VideoSyncManager` 封裝) 作為唯一真相來源 (Source of Truth) 以確保影音不漂移。在 `requestAnimationFrame` 迴圈中，比對當前播放時間與 Viseme JSON 的 `time` 標籤，決定 `<canvas>` 該渲染哪一張圖。
 
 ### 6. 協定版本管理 (Protocol Versioning)
 
