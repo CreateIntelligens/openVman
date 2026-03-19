@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from threading import Lock
 from typing import TYPE_CHECKING, Any, Protocol
 from urllib import request
@@ -18,6 +19,15 @@ if TYPE_CHECKING:
 _embedder_cache: dict[str, "TextEmbedder"] = {}
 _embedder_lock = Lock()
 _encode_lock = Lock()
+
+
+@dataclass(frozen=True, slots=True)
+class QueryEmbeddingRoute:
+    """Resolved query vector and the embedding version used to produce it."""
+
+    version: str
+    vector: list[float]
+    attempted_versions: list[dict[str, str]]
 
 
 class TextEmbedder(Protocol):
@@ -40,6 +50,52 @@ def get_embedder(embedding_version: str | None = None) -> TextEmbedder:
         if backend.version not in _embedder_cache:
             _embedder_cache[backend.version] = _build_embedder(backend)
     return _embedder_cache[backend.version]
+
+
+def encode_query_with_fallback(
+    query: str,
+    *,
+    project_id: str = "default",
+    table_names: tuple[str, ...] = ("knowledge", "memories"),
+) -> QueryEmbeddingRoute:
+    """Encode a search query using the first queryable embedding version."""
+    cfg = get_settings()
+    active_version = cfg.resolved_embedding_active_version
+    attempted_versions: list[dict[str, str]] = []
+
+    for version in cfg.resolved_embedding_version_order:
+        if version != active_version and not _version_has_queryable_tables(
+            project_id,
+            version,
+            table_names,
+        ):
+            attempted_versions.append(
+                {
+                    "version": version,
+                    "status": "skipped",
+                    "reason": "missing_tables",
+                }
+            )
+            continue
+        try:
+            vector = get_embedder(version).encode([query], input_type="query")[0]
+        except Exception as exc:
+            attempted_versions.append(
+                {
+                    "version": version,
+                    "status": "error",
+                    "reason": type(exc).__name__,
+                }
+            )
+            continue
+        attempted_versions.append({"version": version, "status": "selected"})
+        return QueryEmbeddingRoute(
+            version=version,
+            vector=vector,
+            attempted_versions=attempted_versions,
+        )
+
+    raise RuntimeError("沒有可用的 embedding version 可供查詢")
 
 
 def _build_embedder(backend: EmbeddingBackend) -> TextEmbedder:
@@ -85,7 +141,7 @@ class BgeTextEmbedder:
         with _encode_lock:
             result = self._model.encode(texts)
         dense_vectors = result["dense_vecs"]
-        return [list(vector.tolist()) for vector in dense_vectors]
+        return [vector.tolist() for vector in dense_vectors]
 
 
 class OpenAITextEmbedder:
@@ -203,6 +259,23 @@ def _resolve_gemini_task_type(input_type: str) -> str:
     return "RETRIEVAL_QUERY" if input_type == "query" else "RETRIEVAL_DOCUMENT"
 
 
-def encode_text(text: str) -> list[float]:
+def _version_has_queryable_tables(
+    project_id: str,
+    embedding_version: str,
+    table_names: tuple[str, ...],
+) -> bool:
+    from infra.db import vector_table_exists
+
+    unique_tables = {name.strip() for name in table_names if name.strip()}
+    return any(
+        vector_table_exists(table_name, project_id, embedding_version)
+        for table_name in unique_tables
+    )
+
+
+def encode_text(
+    text: str,
+    embedding_version: str | None = None,
+) -> list[float]:
     """Encode a single text using the active embedding version."""
-    return get_embedder().encode([text])[0]
+    return get_embedder(embedding_version).encode([text])[0]

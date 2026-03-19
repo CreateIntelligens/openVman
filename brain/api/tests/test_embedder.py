@@ -12,11 +12,14 @@ if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
 
-def _load_embedder(monkeypatch, backend):
-    fake_config_mod = types.ModuleType("config")
-    fake_config_mod.get_settings = lambda: types.SimpleNamespace(
+def _load_embedder(monkeypatch, backend, *, settings=None):
+    fake_settings = settings or types.SimpleNamespace(
+        resolved_embedding_active_version=backend.version,
+        resolved_embedding_version_order=[backend.version],
         resolve_embedding_backend=lambda version=None: backend,
     )
+    fake_config_mod = types.ModuleType("config")
+    fake_config_mod.get_settings = lambda: fake_settings
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)
 
     fake_flag_mod = types.ModuleType("FlagEmbedding")
@@ -185,3 +188,136 @@ def test_voyage_embedder_uses_query_input_type(monkeypatch):
         "input_type": "query",
         "output_dimension": 512,
     }
+
+
+def test_encode_query_with_fallback_uses_next_version_after_error(monkeypatch):
+    backends = {
+        "bge": types.SimpleNamespace(
+            version="bge",
+            provider="bge",
+            model="BAAI/bge-m3",
+            api_key="",
+            base_url="",
+            dimensions=None,
+            use_fp16=False,
+            device="cpu",
+            multimodal=False,
+        ),
+        "gemini": types.SimpleNamespace(
+            version="gemini",
+            provider="gemini",
+            model="gemini-embedding-001",
+            api_key="gk",
+            base_url="",
+            dimensions=128,
+            use_fp16=False,
+            device="api",
+            multimodal=False,
+        ),
+    }
+    settings = types.SimpleNamespace(
+        resolved_embedding_active_version="bge",
+        resolved_embedding_version_order=["bge", "gemini"],
+        resolve_embedding_backend=lambda version=None: backends[(version or "bge")],
+    )
+
+    module, _ = _load_embedder(monkeypatch, backends["bge"], settings=settings)
+    fake_db_mod = types.ModuleType("infra.db")
+    fake_db_mod.vector_table_exists = (
+        lambda table_name, project_id="default", embedding_version=None: embedding_version == "gemini"
+    )
+    monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
+
+    def fake_get_embedder(version=None):
+        if version == "bge":
+            raise RuntimeError("bge unavailable")
+        return types.SimpleNamespace(
+            encode=lambda texts, input_type="document": [[0.9, 0.8]]
+        )
+
+    monkeypatch.setattr(module, "get_embedder", fake_get_embedder)
+
+    route = module.encode_query_with_fallback(
+        "hello",
+        project_id="proj-1",
+        table_names=("knowledge",),
+    )
+
+    assert route.version == "gemini"
+    assert route.vector == [0.9, 0.8]
+    assert route.attempted_versions == [
+        {"version": "bge", "status": "error", "reason": "RuntimeError"},
+        {"version": "gemini", "status": "selected"},
+    ]
+
+
+def test_encode_query_with_fallback_skips_versions_without_tables(monkeypatch):
+    backends = {
+        "bge": types.SimpleNamespace(
+            version="bge",
+            provider="bge",
+            model="BAAI/bge-m3",
+            api_key="",
+            base_url="",
+            dimensions=None,
+            use_fp16=False,
+            device="cpu",
+            multimodal=False,
+        ),
+        "gemini": types.SimpleNamespace(
+            version="gemini",
+            provider="gemini",
+            model="gemini-embedding-001",
+            api_key="gk",
+            base_url="",
+            dimensions=128,
+            use_fp16=False,
+            device="api",
+            multimodal=False,
+        ),
+        "openai": types.SimpleNamespace(
+            version="openai",
+            provider="openai",
+            model="text-embedding-3-small",
+            api_key="ok",
+            base_url="",
+            dimensions=256,
+            use_fp16=False,
+            device="api",
+            multimodal=False,
+        ),
+    }
+    settings = types.SimpleNamespace(
+        resolved_embedding_active_version="bge",
+        resolved_embedding_version_order=["bge", "gemini", "openai"],
+        resolve_embedding_backend=lambda version=None: backends[(version or "bge")],
+    )
+
+    module, _ = _load_embedder(monkeypatch, backends["bge"], settings=settings)
+    fake_db_mod = types.ModuleType("infra.db")
+    fake_db_mod.vector_table_exists = (
+        lambda table_name, project_id="default", embedding_version=None: embedding_version == "openai"
+    )
+    monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
+
+    def fake_get_embedder(version=None):
+        if version == "bge":
+            raise RuntimeError("bge unavailable")
+        return types.SimpleNamespace(
+            encode=lambda texts, input_type="document": [[1.1, 1.2]]
+        )
+
+    monkeypatch.setattr(module, "get_embedder", fake_get_embedder)
+
+    route = module.encode_query_with_fallback(
+        "hello",
+        project_id="proj-1",
+        table_names=("knowledge",),
+    )
+
+    assert route.version == "openai"
+    assert route.attempted_versions == [
+        {"version": "bge", "status": "error", "reason": "RuntimeError"},
+        {"version": "gemini", "status": "skipped", "reason": "missing_tables"},
+        {"version": "openai", "status": "selected"},
+    ]

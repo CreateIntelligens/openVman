@@ -245,6 +245,13 @@ class BrainSettings(BaseSettings):
             if channel.strip()
         ]
 
+    # Lookup for API-based embedding providers: version -> (model_attr, key_attr, base_url, dims_attr)
+    _API_EMBEDDING_PROVIDERS: dict[str, tuple[str, str, str, str]] = {
+        "gemini": ("embedding_gemini_model", "gemini_api_key", "https://generativelanguage.googleapis.com/v1beta", "embedding_gemini_dimensions"),
+        "openai": ("embedding_openai_model", "openai_api_key", "", "embedding_openai_dimensions"),
+        "voyage": ("embedding_voyage_model", "voyage_api_key", "https://api.voyageai.com/v1", "embedding_voyage_dimensions"),
+    }
+
     def resolve_embedding_backend(
         self,
         version: str | None = None,
@@ -262,43 +269,21 @@ class BrainSettings(BaseSettings):
                 device=self.embedding_device,
                 multimodal=False,
             )
-        if resolved_version == "gemini":
-            return EmbeddingBackend(
-                version="gemini",
-                provider="gemini",
-                model=self.embedding_gemini_model,
-                api_key=self.gemini_api_key,
-                base_url="https://generativelanguage.googleapis.com/v1beta",
-                dimensions=self._normalize_embedding_dimensions(self.embedding_gemini_dimensions),
-                use_fp16=False,
-                device="api",
-                multimodal=False,
-            )
-        if resolved_version == "openai":
-            return EmbeddingBackend(
-                version="openai",
-                provider="openai",
-                model=self.embedding_openai_model,
-                api_key=self.openai_api_key,
-                base_url="",
-                dimensions=self._normalize_embedding_dimensions(self.embedding_openai_dimensions),
-                use_fp16=False,
-                device="api",
-                multimodal=False,
-            )
-        if resolved_version == "voyage":
-            return EmbeddingBackend(
-                version="voyage",
-                provider="voyage",
-                model=self.embedding_voyage_model,
-                api_key=self.voyage_api_key,
-                base_url="https://api.voyageai.com/v1",
-                dimensions=self._normalize_embedding_dimensions(self.embedding_voyage_dimensions),
-                use_fp16=False,
-                device="api",
-                multimodal=False,
-            )
-        raise ValueError(f"embedding version 不支援: {resolved_version}")
+        spec = self._API_EMBEDDING_PROVIDERS.get(resolved_version)
+        if spec is None:
+            raise ValueError(f"embedding version 不支援: {resolved_version}")
+        model_attr, key_attr, base_url, dims_attr = spec
+        return EmbeddingBackend(
+            version=resolved_version,
+            provider=resolved_version,
+            model=getattr(self, model_attr),
+            api_key=getattr(self, key_attr),
+            base_url=base_url,
+            dimensions=self._normalize_embedding_dimensions(getattr(self, dims_attr)),
+            use_fp16=False,
+            device="api",
+            multimodal=False,
+        )
 
     def _normalize_embedding_dimensions(self, value: int) -> int | None:
         return value if value > 0 else None
