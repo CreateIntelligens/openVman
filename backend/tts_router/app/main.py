@@ -5,11 +5,11 @@ Serves both TTS synthesis and MarkItDown document conversion.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import tempfile
 import uuid
+from contextlib import suppress
 
 from fastapi import FastAPI, File, Response, UploadFile
 from fastapi.responses import JSONResponse
@@ -25,7 +25,8 @@ logger = logging.getLogger("tts-router")
 
 app = FastAPI(title="TTS Router")
 _service: TTSRouterService | None = None
-_md_converter = MarkItDown()
+_md_converter: MarkItDown | None = None
+_UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 def _get_service() -> TTSRouterService:
@@ -33,6 +34,43 @@ def _get_service() -> TTSRouterService:
     if _service is None:
         _service = TTSRouterService(get_tts_config())
     return _service
+
+
+def _get_md_converter() -> MarkItDown:
+    global _md_converter
+    if _md_converter is None:
+        _md_converter = MarkItDown()
+    return _md_converter
+
+
+class UploadTooLargeError(Exception):
+    """Raised when an uploaded file exceeds the configured limit."""
+
+    def __init__(self, limit_bytes: int) -> None:
+        super().__init__(f"uploaded file too large: limit={limit_bytes}")
+        self.limit_bytes = limit_bytes
+
+
+async def _persist_upload_to_tempfile(
+    file: UploadFile,
+    *,
+    suffix: str,
+    max_bytes: int,
+) -> tuple[str, int]:
+    total_bytes = 0
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp_path = tmp.name
+        try:
+            while chunk := await file.read(_UPLOAD_CHUNK_SIZE):
+                total_bytes += len(chunk)
+                if total_bytes > max_bytes:
+                    raise UploadTooLargeError(max_bytes)
+                tmp.write(chunk)
+        except Exception:
+            with suppress(FileNotFoundError):
+                os.unlink(tmp_path)
+            raise
+    return tmp_path, total_bytes
 
 
 class SynthesizeBody(BaseModel):
@@ -76,11 +114,7 @@ async def synthesize(body: SynthesizeBody) -> Response:
     try:
         result = svc.synthesize(request)
     except RuntimeError as exc:
-        return Response(
-            content=json.dumps({"error": str(exc)}),
-            status_code=502,
-            media_type="application/json",
-        )
+        return JSONResponse(status_code=502, content={"error": str(exc)})
 
     return Response(
         content=result.audio_bytes,
@@ -107,21 +141,26 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
         _, suffix = os.path.splitext(file.filename)
 
     tmp_path: str | None = None
+    cfg = get_tts_config()
     try:
-        content = await file.read()
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-
-        logger.info("Converting file: %s (%d bytes)", file.filename, len(content))
-        result = _md_converter.convert(tmp_path)
+        tmp_path, total_bytes = await _persist_upload_to_tempfile(
+            file,
+            suffix=suffix,
+            max_bytes=cfg.markitdown_max_upload_bytes,
+        )
+        logger.info("Converting file: %s (%d bytes)", file.filename, total_bytes)
+        result = _get_md_converter().convert(tmp_path)
 
         return JSONResponse(
             content={
                 "markdown": result.text_content,
                 "page_count": None,
             }
+        )
+    except UploadTooLargeError:
+        return JSONResponse(
+            status_code=413,
+            content={"error": "uploaded file too large"},
         )
     except Exception as exc:
         logger.error("Conversion failed: %s", exc)
@@ -130,5 +169,7 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
             content={"error": str(exc)},
         )
     finally:
+        await file.close()
         if tmp_path is not None:
-            os.unlink(tmp_path)
+            with suppress(FileNotFoundError):
+                os.unlink(tmp_path)

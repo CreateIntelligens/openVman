@@ -5,6 +5,8 @@ services:
     volumes:
       - ./tts_router/app:/app/app
     environment:
+      UVICORN_RELOAD: "${UVICORN_RELOAD:-1}"
+      MARKITDOWN_MAX_UPLOAD_BYTES: "${MARKITDOWN_MAX_UPLOAD_BYTES:-10485760}"
       # --- Edge-TTS (in-process, enabled by default) ---
       TTS_EDGE_ENABLED: "${TTS_EDGE_ENABLED:-true}"
       TTS_EDGE_VOICE: "${TTS_EDGE_VOICE:-zh-TW-HsiaoChenNeural}"

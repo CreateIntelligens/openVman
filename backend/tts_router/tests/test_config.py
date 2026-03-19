@@ -23,6 +23,7 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
                 "TTS_INDEX_URL=http://mock-index:8001",
                 "TTS_AWS_ENABLED=true",
                 "TTS_EDGE_SAMPLE_RATE=16000",
+                "MARKITDOWN_MAX_UPLOAD_BYTES=1234",
             ]
         ),
         encoding="utf-8",
@@ -33,3 +34,4 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
     assert config.tts_index_url == "http://mock-index:8001"
     assert config.tts_aws_enabled is True
     assert config.edge_tts_sample_rate == 16000
+    assert config.markitdown_max_upload_bytes == 1234

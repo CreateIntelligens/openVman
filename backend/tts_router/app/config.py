@@ -53,6 +53,10 @@ class TTSRouterConfig(BaseSettings):
         default=2000,
         validation_alias="TTS_EDGE_MAX_TEXT_LENGTH",
     )
+    markitdown_max_upload_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        validation_alias="MARKITDOWN_MAX_UPLOAD_BYTES",
+    )
 
 
 @lru_cache(maxsize=1)
