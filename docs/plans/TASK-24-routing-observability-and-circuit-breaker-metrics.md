@@ -3,7 +3,7 @@
 > Issue: #33 — Routing observability and circuit-breaker metrics
 > Epic: #8
 > Branch: `feature/brain`
-> Status: **Planned**
+> Status: **Draft**
 
 ---
 
@@ -27,11 +27,11 @@
 
 | 來源 | 內容 |
 |------|------|
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L200) | Spec 已要求 fallback 失敗原因記入 metrics 與 structured logs |
-| [observability.py](/home/human/openVman/brain/api/safety/observability.py#L1) | 目前已有 lightweight metrics store 與 structured logging helper |
-| [provider_router.py](/home/human/openVman/brain/api/core/provider_router.py#L1) | 目前已有部分 route failure 記錄，但還不夠完整 |
-| [TASK-22-llm-key-pool-manager-and-quota-aware-routing.md](/home/human/openVman/docs/plans/TASK-22-llm-key-pool-manager-and-quota-aware-routing.md#L1) | task22 已規劃 key pool health / cooldown |
-| [TASK-23-model-and-provider-fallback-chain-execution.md](/home/human/openVman/docs/plans/TASK-23-model-and-provider-fallback-chain-execution.md#L1) | task23 已規劃 bounded model/provider fallback chain |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L200) | Spec 已要求 fallback 失敗原因記入 metrics 與 structured logs |
+| [observability.py](brain/api/safety/observability.py#L1) | 目前已有 lightweight metrics store 與 structured logging helper |
+| [provider_router.py](brain/api/core/provider_router.py#L1) | 目前已有部分 route failure 記錄，但還不夠完整 |
+| [TASK-22-llm-key-pool-manager-and-quota-aware-routing.md](docs/plans/TASK-22-llm-key-pool-manager-and-quota-aware-routing.md#L1) | task22 已規劃 key pool health / cooldown |
+| [TASK-23-model-and-provider-fallback-chain-execution.md](docs/plans/TASK-23-model-and-provider-fallback-chain-execution.md#L1) | task23 已規劃 bounded model/provider fallback chain |
 
 ### 缺口
 

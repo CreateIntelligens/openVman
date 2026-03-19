@@ -3,7 +3,7 @@
 > Issue: #15 — Generate shared TS and Python protocol types
 > Epic: #2
 > Branch: `feature/brain`
-> Status: **Done**
+> Status: **Draft**
 
 ---
 
@@ -45,7 +45,7 @@ contracts/scripts/generate_protocol_contracts.py  ← 程式碼產生器
 | 1. 寫失敗測試 | 新增測試確認 generated module 可被 import | `brain/api/tests/test_protocol_events.py` |
 | 2. 實作 generator | 讀取 manifest + schema → 輸出 TS/Python | `contracts/scripts/generate_protocol_contracts.py` |
 | 3. 重構 backend | 改為從 generated Python package import event models | `brain/api/protocol/protocol_events.py` |
-| 4. 重構 frontend | 改為從 generated TS contracts import types | `brain/web/src/protocol/validators.ts`, `tsconfig.json` |
+| 4. 重構 frontend | 改為從 generated TS contracts import types | `frontend/admin/src/protocol/validators.ts`, `tsconfig.json` |
 | 5. CI drift 偵測 | `--check` 模式 + pytest + tsc --noEmit | `.github/workflows/contracts.yml` |
 | 6. 端對端驗證 | 本地跑 generator → tests → typecheck → smoke | 全部 |
 
@@ -91,7 +91,7 @@ python3 contracts/scripts/generate_protocol_contracts.py --check
 python3 -m pytest brain/api/tests/test_protocol_events.py -v
 
 # 4. 跑 frontend typecheck
-cd brain/web && npx tsc --noEmit
+cd frontend/admin && npx tsc --noEmit
 ```
 
 ---
@@ -107,8 +107,8 @@ cd brain/web && npx tsc --noEmit
 | `contracts/generated/python/openvman_contracts/__init__.py` | 產生 | Python package init |
 | `contracts/generated/typescript/protocol-contracts.d.ts` | 產生 | TS type declarations |
 | `brain/api/protocol/protocol_events.py` | 修改 | 改 import generated models |
-| `brain/web/src/protocol/validators.ts` | 修改 | 改 import generated types |
-| `brain/web/src/protocol/validators.smoke.ts` | 修改 | Smoke test 配合新 imports |
-| `brain/web/tsconfig.json` | 修改 | 加 contracts path mapping |
+| `frontend/admin/src/protocol/validators.ts` | 修改 | 改 import generated types |
+| `frontend/admin/src/protocol/validators.smoke.ts` | 修改 | Smoke test 配合新 imports |
+| `frontend/admin/tsconfig.json` | 修改 | 加 contracts path mapping |
 | `.github/workflows/contracts.yml` | 新增 | CI drift detection |
 | `brain/api/tests/test_protocol_events.py` | 修改 | 測試 generated contracts |

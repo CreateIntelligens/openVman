@@ -3,7 +3,7 @@
 > Issue: #28 — Markdown chunking and LanceDB indexing pipeline
 > Epic: #7
 > Branch: `feature/brain`
-> Status: **Planned**
+> Status: **Draft**
 
 ---
 
@@ -27,11 +27,11 @@
 
 | 來源 | 內容 |
 |------|------|
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L89) | 已明確要求將 Markdown 知識庫索引到 LanceDB |
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L102) | 每個 chunk 必須帶 `source_file`、`heading`、`date`、`chunk_index` 等 metadata |
-| [brain/README.md](/home/human/openVman/brain/README.md#L245) | README 已指出 indexer 應負責 markdown chunking 與 knowledge 重建 |
-| [indexer.py](/home/human/openVman/brain/api/knowledge/indexer.py#L1) | 現有 indexer 已有 workspace 掃描、基本 chunking、embedding、overwrite rebuild |
-| [workspace.py](/home/human/openVman/brain/api/knowledge/workspace.py#L1) | 現有 workspace helper 已有 indexable document 過濾規則 |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L89) | 已明確要求將 Markdown 知識庫索引到 LanceDB |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L102) | 每個 chunk 必須帶 `source_file`、`heading`、`date`、`chunk_index` 等 metadata |
+| [brain/README.md](brain/README.md#L245) | README 已指出 indexer 應負責 markdown chunking 與 knowledge 重建 |
+| [indexer.py](brain/api/knowledge/indexer.py#L1) | 現有 indexer 已有 workspace 掃描、基本 chunking、embedding、overwrite rebuild |
+| [workspace.py](brain/api/knowledge/workspace.py#L1) | 現有 workspace helper 已有 indexable document 過濾規則 |
 
 ### 缺口
 

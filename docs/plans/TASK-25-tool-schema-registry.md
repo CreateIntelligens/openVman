@@ -3,7 +3,7 @@
 > Issue: #34 — Tool schema registry and execution bridge
 > Epic: #9
 > Branch: `feature/brain`
-> Status: **Not Started**
+> Status: **Draft**
 
 ---
 

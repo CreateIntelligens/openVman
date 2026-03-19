@@ -3,7 +3,7 @@
 > Issue: #29 — Retrieval and reranking service for brain context
 > Epic: #7
 > Branch: `feature/brain`
-> Status: **Planned**
+> Status: **Draft**
 
 ---
 
@@ -27,10 +27,10 @@
 
 | 來源 | 內容 |
 |------|------|
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L114) | Brain 需從 LanceDB `knowledge` / `memories` 取 Top-K context |
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L139) | Spec 已提供 knowledge + memories 檢索概念 |
-| [retrieval.py](/home/human/openVman/brain/api/memory/retrieval.py#L1) | 現有模組已有 low-level LanceDB search 與 persona filter |
-| [chat_service.py](/home/human/openVman/brain/api/core/chat_service.py#L95) | 現行 RAG path 直接在 `chat_service` 中做 embedding + table search |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L114) | Brain 需從 LanceDB `knowledge` / `memories` 取 Top-K context |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L139) | Spec 已提供 knowledge + memories 檢索概念 |
+| [retrieval.py](brain/api/memory/retrieval.py#L1) | 現有模組已有 low-level LanceDB search 與 persona filter |
+| [chat_service.py](brain/api/core/chat_service.py#L95) | 現行 RAG path 直接在 `chat_service` 中做 embedding + table search |
 
 ### 缺口
 

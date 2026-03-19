@@ -3,7 +3,7 @@
 > Issue: #32 — Model and provider fallback chain execution
 > Epic: #8
 > Branch: `feature/brain`
-> Status: **Planned**
+> Status: **Draft**
 
 ---
 
@@ -27,12 +27,12 @@
 
 | 來源 | 內容 |
 |------|------|
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L185) | 已要求同 provider 多 key fallback |
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L186) | 已要求同 provider 多 model fallback |
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L187) | 已要求跨 provider fallback |
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L200) | 已要求同一次對話綁定在同一條 fallback chain |
-| [llm_client.py](/home/human/openVman/brain/api/core/llm_client.py#L1) | 現有 client 已有 route loop，但還是簡單線性嘗試 |
-| [provider_router.py](/home/human/openVman/brain/api/core/provider_router.py#L1) | 現有 router 只處理單 provider key/model 的簡化 route |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L185) | 已要求同 provider 多 key fallback |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L186) | 已要求同 provider 多 model fallback |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L187) | 已要求跨 provider fallback |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L200) | 已要求同一次對話綁定在同一條 fallback chain |
+| [llm_client.py](brain/api/core/llm_client.py#L1) | 現有 client 已有 route loop，但還是簡單線性嘗試 |
+| [provider_router.py](brain/api/core/provider_router.py#L1) | 現有 router 只處理單 provider key/model 的簡化 route |
 
 ### 缺口
 

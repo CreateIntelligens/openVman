@@ -3,7 +3,7 @@
 > Issue: #27 — Brain HTTP-SSE interface with trace propagation
 > Epic: #6
 > Branch: `feature/brain`
-> Status: **Done**
+> Status: **Draft**
 
 ---
 

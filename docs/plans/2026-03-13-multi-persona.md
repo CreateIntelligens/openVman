@@ -134,8 +134,8 @@ git commit -m "feat: add persona-aware retrieval and APIs"
 ### Task 4: Add persona switching to the chat UI
 
 **Files:**
-- Modify: `brain/web/src/api.ts`
-- Modify: `brain/web/src/pages/Chat.tsx`
+- Modify: `frontend/admin/src/api.ts`
+- Modify: `frontend/admin/src/pages/Chat.tsx`
 
 **Step 1: Write the failing test or reproduction**
 
@@ -163,7 +163,7 @@ Expected: PASS
 **Step 4: Commit**
 
 ```bash
-git add brain/web/src/api.ts brain/web/src/pages/Chat.tsx
+git add frontend/admin/src/api.ts frontend/admin/src/pages/Chat.tsx
 git commit -m "feat: add persona switcher to chat"
 ```
 

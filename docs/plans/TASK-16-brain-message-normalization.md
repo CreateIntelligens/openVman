@@ -3,7 +3,7 @@
 > Issue: #25 — Brain message normalization and enrichment stage
 > Epic: #6
 > Branch: `feature/brain`
-> Status: **Not Started**
+> Status: **Draft**
 
 ---
 

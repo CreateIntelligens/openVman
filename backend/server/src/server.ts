@@ -1,12 +1,22 @@
 import Fastify from 'fastify';
 import { WebSocketServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import pino from 'pino';
+import pino, { type LoggerOptions } from 'pino';
 
-const logger = pino({
-  level: 'info',
-  transport: { target: 'pino-pretty', options: { colorize: true } }
-});
+import { config } from './config';
+
+const loggerOptions: LoggerOptions = {
+  level: config.LOG_LEVEL,
+};
+
+if (config.LOG_PRETTY) {
+  loggerOptions.transport = {
+    target: 'pino-pretty',
+    options: { colorize: true },
+  };
+}
+
+const logger = pino(loggerOptions);
 
 const fastify = Fastify({ logger: false });
 
@@ -61,8 +71,10 @@ wss.on('connection', (ws: WebSocket) => {
 
 async function start() {
   try {
-    const port = 8080;
-    await fastify.listen({ port, host: '0.0.0.0' });
+    await fastify.listen({
+      port: config.BACKEND_SERVER_PORT,
+      host: config.BACKEND_SERVER_HOST,
+    });
     
     // Integrate WS with Fastify
     fastify.server.on('upgrade', (request, socket, head) => {
@@ -71,7 +83,11 @@ async function start() {
       });
     });
 
-    logger.info({ event: 'backend_started', port });
+    logger.info({
+      event: 'backend_started',
+      port: config.BACKEND_SERVER_PORT,
+      host: config.BACKEND_SERVER_HOST,
+    });
   } catch (err) {
     logger.error(err);
     process.exit(1);

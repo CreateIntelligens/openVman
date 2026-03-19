@@ -3,7 +3,7 @@
 > Issue: #36 — Tool error handling and reinjection into stream
 > Epic: #9
 > Branch: `feature/brain`
-> Status: **Implemented**
+> Status: **Draft**
 
 ---
 

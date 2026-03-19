@@ -3,7 +3,7 @@
 > Issue: #16 — Protocol handshake and compatibility checks
 > Epic: #2
 > Branch: `feature/brain`
-> Status: **In Progress**
+> Status: **Draft**
 
 ---
 
@@ -47,8 +47,8 @@ server_init_ack (server → client)
 | 2. 產生 contracts | 執行 generator → `ServerInitAckEvent` | `contracts/generated/` |
 | 3. 寫失敗測試 | handshake 成功/失敗、version check、ack 驗證 | `brain/api/tests/test_protocol_events.py` |
 | 4. Backend handshake | `perform_handshake()` + `check_version_compatible()` | `brain/api/protocol/protocol_events.py` |
-| 5. Frontend validators | `validateServerInitAck` + `checkVersionCompatible()` | `brain/web/src/protocol/validators.ts` |
-| 6. Smoke test | 加入 server_init_ack 驗證 | `brain/web/src/protocol/validators.smoke.ts` |
+| 5. Frontend validators | `validateServerInitAck` + `checkVersionCompatible()` | `frontend/admin/src/protocol/validators.ts` |
+| 6. Smoke test | 加入 server_init_ack 驗證 | `frontend/admin/src/protocol/validators.smoke.ts` |
 
 ### `server_init_ack` Schema 設計
 
@@ -83,7 +83,7 @@ MAJOR 相同即相容（`1.0.0` ↔ `1.2.0` ✓，`1.0.0` ↔ `2.0.0` ✗）。
 |---------|------|---------|
 | Generated code 同步 | `python3 contracts/scripts/generate_protocol_contracts.py --check` | 新 schema 已被 generator 處理 |
 | Backend 測試 | `python3 -m pytest brain/api/tests/test_protocol_events.py -v` | handshake + version check + ack 驗證 |
-| Frontend 型別檢查 | `cd brain/web && npx tsc --noEmit` | ServerInitAckEvent 型別正確 |
+| Frontend 型別檢查 | `cd frontend/admin && npx tsc --noEmit` | ServerInitAckEvent 型別正確 |
 
 ### 手動驗收
 
@@ -103,7 +103,7 @@ python3 contracts/scripts/generate_protocol_contracts.py --check
 python3 -m pytest brain/api/tests/test_protocol_events.py -v
 
 # 3. Frontend typecheck
-cd brain/web && npx tsc --noEmit
+cd frontend/admin && npx tsc --noEmit
 ```
 
 ---
@@ -117,7 +117,7 @@ cd brain/web && npx tsc --noEmit
 | `contracts/generated/python/openvman_contracts/protocol_contracts.py` | 產生 | 新增 ServerInitAckEvent model |
 | `contracts/generated/typescript/protocol-contracts.d.ts` | 產生 | 新增 ServerInitAckEvent interface |
 | `brain/api/protocol/protocol_events.py` | 修改 | 新增 perform_handshake + check_version_compatible |
-| `brain/web/src/protocol/validators.ts` | 修改 | 新增 validateServerInitAck + checkVersionCompatible |
-| `brain/web/src/protocol/validators.smoke.ts` | 修改 | 加入 server_init_ack smoke test |
+| `frontend/admin/src/protocol/validators.ts` | 修改 | 新增 validateServerInitAck + checkVersionCompatible |
+| `frontend/admin/src/protocol/validators.smoke.ts` | 修改 | 加入 server_init_ack smoke test |
 | `brain/api/tests/test_protocol_events.py` | 修改 | 新增 handshake 相關測試 |
 | `docs/plans/TASK-06-protocol-handshake.md` | 新增 | 計畫書 |

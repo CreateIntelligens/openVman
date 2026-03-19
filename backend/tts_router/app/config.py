@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-@dataclass(frozen=True, slots=True)
-class TTSRouterConfig:
+class TTSRouterConfig(BaseSettings):
     """Immutable TTS router settings loaded from environment."""
+
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        frozen=True,
+        populate_by_name=True,
+    )
 
     # --- Index TTS ---
     tts_index_url: str = ""
@@ -34,41 +43,19 @@ class TTSRouterConfig:
     tts_gcp_sample_rate: int = 24000
 
     # --- Edge-TTS (in-process) ---
-    edge_tts_enabled: bool = True
-    edge_tts_voice: str = "zh-TW-HsiaoChenNeural"
-    edge_tts_sample_rate: int = 24000
-    edge_tts_max_text_length: int = 2000
-
-
-def _bool_env(key: str, default: bool = False) -> bool:
-    val = os.environ.get(key, "").strip().lower()
-    if not val:
-        return default
-    return val in ("1", "true", "yes")
+    edge_tts_enabled: bool = Field(default=True, validation_alias="TTS_EDGE_ENABLED")
+    edge_tts_voice: str = Field(
+        default="zh-TW-HsiaoChenNeural",
+        validation_alias="TTS_EDGE_VOICE",
+    )
+    edge_tts_sample_rate: int = Field(default=24000, validation_alias="TTS_EDGE_SAMPLE_RATE")
+    edge_tts_max_text_length: int = Field(
+        default=2000,
+        validation_alias="TTS_EDGE_MAX_TEXT_LENGTH",
+    )
 
 
 @lru_cache(maxsize=1)
 def get_tts_config() -> TTSRouterConfig:
     """Build config from environment variables (cached)."""
-    return TTSRouterConfig(
-        tts_index_url=os.environ.get("TTS_INDEX_URL", ""),
-        tts_index_character=os.environ.get("TTS_INDEX_CHARACTER", "hayley"),
-        tts_aws_enabled=_bool_env("TTS_AWS_ENABLED"),
-        tts_aws_region=os.environ.get("TTS_AWS_REGION", "ap-northeast-1"),
-        tts_aws_access_key_id=os.environ.get("TTS_AWS_ACCESS_KEY_ID", ""),
-        tts_aws_secret_access_key=os.environ.get("TTS_AWS_SECRET_ACCESS_KEY", ""),
-        tts_aws_polly_voice_id=os.environ.get("TTS_AWS_POLLY_VOICE_ID", "Zhiyu"),
-        tts_aws_polly_engine=os.environ.get("TTS_AWS_POLLY_ENGINE", "neural"),
-        tts_aws_output_format=os.environ.get("TTS_AWS_OUTPUT_FORMAT", "pcm"),
-        tts_aws_sample_rate=int(os.environ.get("TTS_AWS_SAMPLE_RATE", "24000")),
-        tts_gcp_enabled=_bool_env("TTS_GCP_ENABLED"),
-        tts_gcp_project_id=os.environ.get("TTS_GCP_PROJECT_ID", ""),
-        tts_gcp_credentials_json=os.environ.get("TTS_GCP_CREDENTIALS_JSON", ""),
-        tts_gcp_voice_name=os.environ.get("TTS_GCP_VOICE_NAME", "cmn-TW-Standard-A"),
-        tts_gcp_audio_encoding=os.environ.get("TTS_GCP_AUDIO_ENCODING", "LINEAR16"),
-        tts_gcp_sample_rate=int(os.environ.get("TTS_GCP_SAMPLE_RATE", "24000")),
-        edge_tts_enabled=_bool_env("TTS_EDGE_ENABLED", default=True),
-        edge_tts_voice=os.environ.get("TTS_EDGE_VOICE", "zh-TW-HsiaoChenNeural"),
-        edge_tts_sample_rate=int(os.environ.get("TTS_EDGE_SAMPLE_RATE", "24000")),
-        edge_tts_max_text_length=int(os.environ.get("TTS_EDGE_MAX_TEXT_LENGTH", "2000")),
-    )
+    return TTSRouterConfig()

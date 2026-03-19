@@ -3,7 +3,7 @@
 > Issue: #31 — LLM key pool manager and quota-aware routing
 > Epic: #8
 > Branch: `feature/brain`
-> Status: **Planned**
+> Status: **Draft**
 
 ---
 
@@ -27,11 +27,11 @@
 
 | 來源 | 內容 |
 |------|------|
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L182) | Brain 必須內建金鑰與模型回退機制 |
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L185) | 已要求同 provider 多 key fallback |
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L188) | 已要求限流 / quota exceeded 時自動切換 |
-| [provider_router.py](/home/human/openVman/brain/api/core/provider_router.py#L1) | 現有 router 已有基本 key cooldown 與 round-robin |
-| [config.py](/home/human/openVman/brain/api/config.py#L12) | 目前已有單 key 與多 key env 設定 |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L182) | Brain 必須內建金鑰與模型回退機制 |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L185) | 已要求同 provider 多 key fallback |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L188) | 已要求限流 / quota exceeded 時自動切換 |
+| [provider_router.py](brain/api/core/provider_router.py#L1) | 現有 router 已有基本 key cooldown 與 round-robin |
+| [config.py](brain/api/config.py#L12) | 目前已有單 key 與多 key env 設定 |
 
 ### 缺口
 

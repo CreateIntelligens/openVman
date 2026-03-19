@@ -3,7 +3,7 @@
 > Issue: #14 — Shared protocol schema definitions and validators
 > Epic: #2
 > Branch: `feature/brain`
-> Status: **Done**
+> Status: **Draft**
 
 ---
 
@@ -36,7 +36,7 @@ contracts/schemas/v1/
   └─ server_error.schema.json   ← server → client: 錯誤
 
 brain/api/protocol/protocol_events.py   ← Python validator (Pydantic)
-brain/web/src/protocol/validators.ts    ← TypeScript validator (手寫 runtime)
+frontend/admin/src/protocol/validators.ts    ← TypeScript validator (手寫 runtime)
 ```
 
 ### 實作步驟
@@ -46,7 +46,7 @@ brain/web/src/protocol/validators.ts    ← TypeScript validator (手寫 runtime
 | 1. 寫失敗測試 | 覆蓋 contract loading、合法/非法 payload 驗證 | `brain/api/tests/test_protocol_events.py` |
 | 2. 定義 JSON Schema | manifest + 5 個 event schema，帶 `additionalProperties: false` | `contracts/schemas/v1/*.json` |
 | 3. 實作 backend validator | contract loader + Pydantic models + validation API | `brain/api/protocol/protocol_events.py` |
-| 4. 實作 frontend validator | TS runtime validators + 逐欄位型別檢查 | `brain/web/src/protocol/validators.ts` |
+| 4. 實作 frontend validator | TS runtime validators + 逐欄位型別檢查 | `frontend/admin/src/protocol/validators.ts` |
 | 5. 端對端驗證 | backend tests + frontend typecheck + smoke test | 全部 |
 
 ### 關鍵技術決策
@@ -66,7 +66,7 @@ brain/web/src/protocol/validators.ts    ← TypeScript validator (手寫 runtime
 | 檢查項目 | 指令 | 驗證內容 |
 |---------|------|---------|
 | Backend 測試 | `python3 -m pytest brain/api/tests/test_protocol_events.py -v` | contract loading、合法 payload 通過、非法 payload 被拒絕 |
-| Frontend 型別檢查 | `cd brain/web && npx tsc --noEmit` | validators.ts 型別正確 |
+| Frontend 型別檢查 | `cd frontend/admin && npx tsc --noEmit` | validators.ts 型別正確 |
 | Frontend smoke test | 執行 `validators.smoke.ts` | runtime validation 邏輯正確 |
 
 ### 手動驗收
@@ -84,10 +84,10 @@ brain/web/src/protocol/validators.ts    ← TypeScript validator (手寫 runtime
 python3 -m pytest brain/api/tests/test_protocol_events.py -v
 
 # 2. Frontend typecheck
-cd brain/web && npx tsc --noEmit
+cd frontend/admin && npx tsc --noEmit
 
 # 3. Frontend smoke (in Docker)
-docker compose -f brain/docker-compose.yml exec web npx tsc --noEmit
+cd frontend/admin && npx tsc --noEmit
 ```
 
 ---
@@ -103,7 +103,7 @@ docker compose -f brain/docker-compose.yml exec web npx tsc --noEmit
 | `contracts/schemas/v1/server_stream_chunk.schema.json` | 新增 | server_stream_chunk payload schema |
 | `contracts/schemas/v1/server_error.schema.json` | 新增 | server_error payload schema |
 | `brain/api/protocol/protocol_events.py` | 新增 | Python contract loader + validator |
-| `brain/web/src/protocol/validators.ts` | 新增 | TypeScript runtime validator |
-| `brain/web/src/protocol/validators.smoke.ts` | 新增 | Frontend smoke test |
-| `brain/web/tsconfig.json` | 修改 | 啟用 JSON import + path mapping |
+| `frontend/admin/src/protocol/validators.ts` | 新增 | TypeScript runtime validator |
+| `frontend/admin/src/protocol/validators.smoke.ts` | 新增 | Frontend smoke test |
+| `frontend/admin/tsconfig.json` | 修改 | 啟用 JSON import + path mapping |
 | `brain/api/tests/test_protocol_events.py` | 新增 | Backend 測試 |

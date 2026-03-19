@@ -3,7 +3,7 @@
 > Issue: #35 — Mock FAQ and order-query business tool flow
 > Epic: #9
 > Branch: `feature/brain`
-> Status: **Done**
+> Status: **Draft**
 
 ---
 
@@ -145,6 +145,6 @@ python3 -m pytest brain/api/tests/ -v
 |------|------|------|
 | `brain/api/tools/mock_data.py` | 新增 | FAQ 6 筆 + 訂單 3 筆 mock 資料常數 |
 | `brain/api/tools/tool_registry.py` | 修改 | 新增 `_query_faq` + `_query_order` handler 並註冊到 registry |
-| `brain/data/workspace/TOOLS.md` | 修改 | 描述新工具的用途、參數、回傳格式 |
+| `brain/data/projects/{project_id}/workspace/TOOLS.md` | 修改 | 描述新工具的用途、參數、回傳格式 |
 | `brain/api/tests/test_business_tools.py` | 新增 | 16 個商業工具測試 |
 | `docs/plans/TASK-26-mock-business-tools.md` | 新增 | 計畫書（本文件） |

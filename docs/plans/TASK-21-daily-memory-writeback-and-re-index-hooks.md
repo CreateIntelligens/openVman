@@ -3,7 +3,7 @@
 > Issue: #30 — Daily memory writeback and re-index hooks
 > Epic: #7
 > Branch: `feature/brain`
-> Status: **Planned**
+> Status: **Draft**
 
 ---
 
@@ -27,10 +27,10 @@
 
 | 來源 | 內容 |
 |------|------|
-| [03_BRAIN_SPEC.md](/home/human/openVman/03_BRAIN_SPEC.md#L243) | Spec 已要求把當日摘要寫入 `memory/YYYY-MM-DD.md` 並重建 `memories` 表 |
-| [memory.py](/home/human/openVman/brain/api/memory/memory.py#L84) | 目前已有 `archive_session_turn()` 將原始對話寫入 `memory/YYYY-MM-DD.md` |
-| [memory_governance.py](/home/human/openVman/brain/api/memory/memory_governance.py#L1) | 目前已有每日摘要生成、去重與 memories overwrite 重建的骨架 |
-| [workspace.py](/home/human/openVman/brain/api/knowledge/workspace.py#L15) | 目前已有 `.learnings/MEMORY_SUMMARIES.md` scaffold |
+| [03_BRAIN_SPEC.md](docs/03_BRAIN_SPEC.md#L243) | Spec 已要求把當日摘要寫入 `memory/YYYY-MM-DD.md` 並重建 `memories` 表 |
+| [memory.py](brain/api/memory/memory.py#L84) | 目前已有 `archive_session_turn()` 將原始對話寫入 `memory/YYYY-MM-DD.md` |
+| [memory_governance.py](brain/api/memory/memory_governance.py#L1) | 目前已有每日摘要生成、去重與 memories overwrite 重建的骨架 |
+| [workspace.py](brain/api/knowledge/workspace.py#L15) | 目前已有 `.learnings/MEMORY_SUMMARIES.md` scaffold |
 
 ### 缺口
 
