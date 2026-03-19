@@ -41,6 +41,7 @@ def _stub_db_module(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_db.get_db = lambda project_id="default": None
     fake_db.parse_record_metadata = _parse_record_metadata
     fake_db.normalize_vector = _normalize_vector
+    fake_db.vector_table_exists = lambda table_name, project_id="default", embedding_version=None: True
     monkeypatch.setitem(sys.modules, "infra.db", fake_db)
 
 
@@ -175,7 +176,11 @@ def test_search_records_returns_matching_persona_and_global_records(monkeypatch:
         def search(self, _query_vector):
             return FakeSearch(records)
 
-    monkeypatch.setattr(retrieval, "get_search_table", lambda _table_name, project_id="default": FakeTable())
+    monkeypatch.setattr(
+        retrieval,
+        "get_search_table",
+        lambda _table_name, project_id="default", embedding_version=None: FakeTable(),
+    )
 
     result = retrieval.search_records("knowledge", [0.1], 2, persona_id="doctor")
 

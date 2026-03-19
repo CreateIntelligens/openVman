@@ -29,9 +29,12 @@ def get_db(project_id: str = "default") -> lancedb.DBConnection:
     return get_project_db(ctx)
 
 
-def ensure_tables(project_id: str = "default") -> None:
+def ensure_tables(
+    project_id: str = "default",
+    embedding_version: str | None = None,
+) -> None:
     """確保所需資料表存在，不存在則以初始資料建立。"""
-    table_key = _table_cache_key(project_id)
+    table_key = _table_cache_key(project_id, embedding_version)
     if table_key in _tables_ready:
         return
 
@@ -39,39 +42,58 @@ def ensure_tables(project_id: str = "default") -> None:
         if table_key in _tables_ready:
             return
 
-        _create_missing_tables(get_db(project_id))
+        _create_missing_tables(get_db(project_id), embedding_version)
         _tables_ready.add(table_key)
 
 
-def _create_missing_tables(db: lancedb.DBConnection) -> None:
+def _create_missing_tables(
+    db: lancedb.DBConnection,
+    embedding_version: str | None = None,
+) -> None:
     existing_tables = set(db.table_names())
 
     for logical_name, seed_text in TABLE_SEED_TEXTS.items():
-        physical_name = resolve_vector_table_name(logical_name)
+        physical_name = resolve_vector_table_name(logical_name, embedding_version)
         if physical_name in existing_tables:
             continue
-        db.create_table(physical_name, data=[_build_seed_record(seed_text)])
+        db.create_table(
+            physical_name,
+            data=[_build_seed_record(seed_text, embedding_version)],
+        )
 
 
-def _build_seed_record(text: str) -> dict[str, Any]:
+def _build_seed_record(
+    text: str,
+    embedding_version: str | None = None,
+) -> dict[str, Any]:
     return {
         "text": text,
-        "vector": encode_text(text),
+        "vector": encode_text(text, embedding_version),
         "source": "system",
         "date": date.today().isoformat(),
         "metadata": "{}",
     }
 
 
-def get_table(table_name: str, project_id: str = "default") -> lancedb.table.Table:
+def get_table(
+    table_name: str,
+    project_id: str = "default",
+    embedding_version: str | None = None,
+) -> lancedb.table.Table:
     """依表名開啟 LanceDB 資料表。"""
-    ensure_tables(project_id)
-    return get_db(project_id).open_table(resolve_vector_table_name(table_name))
+    ensure_tables(project_id, embedding_version)
+    return get_db(project_id).open_table(
+        resolve_vector_table_name(table_name, embedding_version)
+    )
 
 
-def ensure_fts_index(table_name: str, project_id: str = "default") -> None:
+def ensure_fts_index(
+    table_name: str,
+    project_id: str = "default",
+    embedding_version: str | None = None,
+) -> None:
     """Create a full-text search index on the text column if not already present."""
-    table = get_table(table_name, project_id)
+    table = get_table(table_name, project_id, embedding_version)
     try:
         # 確保有資料才建立索引，否則 LanceDB 可能會報錯
         if len(table) > 0:
@@ -82,14 +104,20 @@ def ensure_fts_index(table_name: str, project_id: str = "default") -> None:
         logging.getLogger(__name__).debug(f"FTS index creation skipped/failed for {table_name}: {e}")
 
 
-def get_memories_table(project_id: str = "default") -> lancedb.table.Table:
+def get_memories_table(
+    project_id: str = "default",
+    embedding_version: str | None = None,
+) -> lancedb.table.Table:
     """取得 memories 表"""
-    return get_table("memories", project_id)
+    return get_table("memories", project_id, embedding_version)
 
 
-def get_knowledge_table(project_id: str = "default") -> lancedb.table.Table:
+def get_knowledge_table(
+    project_id: str = "default",
+    embedding_version: str | None = None,
+) -> lancedb.table.Table:
     """取得 knowledge 表"""
-    return get_table("knowledge", project_id)
+    return get_table("knowledge", project_id, embedding_version)
 
 
 def parse_record_metadata(record: dict[str, Any]) -> dict[str, Any]:
@@ -111,16 +139,38 @@ def normalize_vector(vector: Any) -> list[float]:
     return list(vector)
 
 
-def resolve_vector_table_name(table_name: str) -> str:
+def resolve_vector_table_name(
+    table_name: str,
+    embedding_version: str | None = None,
+) -> str:
     """Resolve a logical table name to the active embedding version's physical table name."""
     logical_name = table_name.strip()
     if logical_name not in TABLE_SEED_TEXTS:
         raise ValueError(f"未知的向量資料表: {table_name}")
-    version = get_settings().resolved_embedding_active_version
+    version = (
+        (embedding_version or "").strip().lower()
+        or get_settings().resolved_embedding_active_version
+    )
     if version == "bge":
         return logical_name
     return f"{logical_name}__{version}"
 
 
-def _table_cache_key(project_id: str) -> str:
-    return f"{project_id}:{get_settings().resolved_embedding_active_version}"
+def vector_table_exists(
+    table_name: str,
+    project_id: str = "default",
+    embedding_version: str | None = None,
+) -> bool:
+    physical_name = resolve_vector_table_name(table_name, embedding_version)
+    return physical_name in set(get_db(project_id).table_names())
+
+
+def _table_cache_key(
+    project_id: str,
+    embedding_version: str | None = None,
+) -> str:
+    version = (
+        (embedding_version or "").strip().lower()
+        or get_settings().resolved_embedding_active_version
+    )
+    return f"{project_id}:{version}"

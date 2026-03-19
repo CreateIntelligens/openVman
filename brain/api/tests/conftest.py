@@ -97,7 +97,12 @@ def _empty_bundle_with_project(*, query: str = "", persona_id: str = "default", 
 
 def _make_fake_embedder() -> types.ModuleType:
     mod = types.ModuleType("memory.embedder")
-    mod.encode_text = lambda text: [0.1]
+    mod.encode_text = lambda text, embedding_version=None: [0.1]
+    mod.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): types.SimpleNamespace(
+        version="bge",
+        vector=[0.1],
+        attempted_versions=[{"version": "bge", "status": "selected"}],
+    )
     return mod
 
 

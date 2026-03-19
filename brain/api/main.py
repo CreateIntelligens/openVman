@@ -48,7 +48,7 @@ from knowledge.knowledge_admin import (
 )
 
 from knowledge.workspace import ensure_workspace_scaffold, parse_identity
-from memory.embedder import encode_text, get_embedder
+from memory.embedder import encode_query_with_fallback, encode_text, get_embedder
 from memory.memory import (
     add_memory as store_memory,
     delete_memory as remove_memory,
@@ -390,20 +390,26 @@ async def search(request: Request, payload: SearchRequest):
         get_metrics_store().increment("guardrail_blocks_total", action="search")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    query_vec = encode_text(query)
+    embedding_route = encode_query_with_fallback(
+        query,
+        project_id=project_id,
+        table_names=(payload.table,),
+    )
     results = search_records(
         table_name=payload.table,
-        query_vector=query_vec,
+        query_vector=embedding_route.vector,
         top_k=payload.top_k,
         query_text=query,
         query_type=payload.query_type,
         persona_id=envelope.context.persona_id,
         project_id=project_id,
+        embedding_version=embedding_route.version,
     )
     log_event(
         "search_complete",
         trace_id=envelope.context.trace_id,
         table=payload.table,
+        embedding_version=embedding_route.version,
         top_k=payload.top_k,
         result_count=len(results),
         project_id=project_id,
@@ -413,6 +419,8 @@ async def search(request: Request, payload: SearchRequest):
         "trace_id": envelope.context.trace_id,
         "query": query,
         "table": payload.table,
+        "embedding_version": embedding_route.version,
+        "embedding_attempts": embedding_route.attempted_versions,
         "results": results,
     }
 

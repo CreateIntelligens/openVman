@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from config import get_settings
 from knowledge.workspace import get_workspace_root, resolve_workspace_document
-from memory.embedder import encode_text
+from memory.embedder import encode_query_with_fallback, encode_text
 from memory.retrieval import search_records
 from .mock_data import FAQ_ENTRIES, ORDER_RECORDS
 from typing import TYPE_CHECKING
@@ -83,16 +83,23 @@ def _search_tool(table_name: str, query: str, top_k: int) -> dict[str, Any]:
     if not query.strip():
         raise ValueError("query 不可為空")
 
+    embedding_route = encode_query_with_fallback(
+        query.strip(),
+        project_id=_active_project_id.get(),
+        table_names=(table_name,),
+    )
     results = search_records(
         table_name=table_name,
-        query_vector=encode_text(query.strip()),
+        query_vector=embedding_route.vector,
         top_k=max(1, min(int(top_k), 8)),
         persona_id=_active_persona_id.get(),
         project_id=_active_project_id.get(),
+        embedding_version=embedding_route.version,
     )
     return {
         "table": table_name,
         "query": query.strip(),
+        "embedding_version": embedding_route.version,
         "results": results,
     }
 

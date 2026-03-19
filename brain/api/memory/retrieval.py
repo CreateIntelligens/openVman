@@ -5,17 +5,26 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from infra.db import get_knowledge_table, get_memories_table, parse_record_metadata
+from infra.db import (
+    get_knowledge_table,
+    get_memories_table,
+    parse_record_metadata,
+    vector_table_exists,
+)
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
 
 
-def get_search_table(table_name: str, project_id: str = "default"):
+def get_search_table(
+    table_name: str,
+    project_id: str = "default",
+    embedding_version: str | None = None,
+):
     """根據請求表名回傳對應資料表，維持既有預設行為。"""
     if table_name == "memories":
-        return get_memories_table(project_id)
-    return get_knowledge_table(project_id)
+        return get_memories_table(project_id, embedding_version)
+    return get_knowledge_table(project_id, embedding_version)
 
 
 def search_records(
@@ -26,6 +35,7 @@ def search_records(
     query_type: str = "vector",
     persona_id: str = "default",
     project_id: str = "default",
+    embedding_version: str | None = None,
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
 
@@ -34,7 +44,9 @@ def search_records(
     """
     normalized_persona = normalize_persona_id(persona_id)
     limit = max(top_k, 1)
-    table = get_search_table(table_name, project_id)
+    if not vector_table_exists(table_name, project_id, embedding_version):
+        return []
+    table = get_search_table(table_name, project_id, embedding_version)
 
     raw_records = _safe_search(
         table,
