@@ -1,9 +1,25 @@
 """大腦層集中設定 — 從 .env 讀取所有環境變數"""
 
+from dataclasses import dataclass
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_INTERNAL_PORT = 8100
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingBackend:
+    """Resolved embedding backend contract for one version alias."""
+
+    version: str
+    provider: str
+    model: str
+    api_key: str
+    base_url: str
+    dimensions: int | None
+    use_fp16: bool
+    device: str
+    multimodal: bool
 
 
 class BrainSettings(BaseSettings):
@@ -42,9 +58,17 @@ class BrainSettings(BaseSettings):
     prompt_errors_char_budget: int = 5000
 
     # === Embedding 設定 ===
+    embedding_active_version: str = "bge"
+    embedding_version_order: str = "bge,gemini,openai,voyage"
     embedding_model: str = "BAAI/bge-m3"
     embedding_use_fp16: bool = True
     embedding_device: str = "cuda"
+    embedding_gemini_model: str = "gemini-embedding-001"
+    embedding_gemini_dimensions: int = 0
+    embedding_openai_model: str = "text-embedding-3-small"
+    embedding_openai_dimensions: int = 0
+    embedding_voyage_model: str = "voyage-3-large"
+    embedding_voyage_dimensions: int = 0
     lancedb_path: str = "~/.openclaw/lancedb"
     knowledge_index_state_path: str = "/data/knowledge_index_state.json"
     chunk_char_limit: int = 500
@@ -79,6 +103,7 @@ class BrainSettings(BaseSettings):
     gemini_api_key: str = ""
     groq_api_key: str = ""
     openai_api_key: str = ""
+    voyage_api_key: str = ""
 
     # === 安全設定 ===
     max_input_length: int = 500
@@ -105,6 +130,20 @@ class BrainSettings(BaseSettings):
     def knowledge_index_state_resolved_path(self) -> str:
         """展開知識索引狀態檔路徑。"""
         return str(Path(self.knowledge_index_state_path).expanduser())
+
+    @property
+    def resolved_embedding_active_version(self) -> str:
+        return self._normalize_embedding_version(self.embedding_active_version)
+
+    @property
+    def resolved_embedding_version_order(self) -> list[str]:
+        active = self.resolved_embedding_active_version
+        ordered = [active]
+        for raw_entry in self.embedding_version_order.split(","):
+            version = self._normalize_embedding_version(raw_entry)
+            if version not in ordered:
+                ordered.append(version)
+        return ordered
 
     @property
     def resolved_llm_api_keys(self) -> list[str]:
@@ -205,6 +244,70 @@ class BrainSettings(BaseSettings):
             for channel in self.allowed_channels.split(",")
             if channel.strip()
         ]
+
+    def resolve_embedding_backend(
+        self,
+        version: str | None = None,
+    ) -> EmbeddingBackend:
+        resolved_version = self._normalize_embedding_version(version or self.embedding_active_version)
+        if resolved_version == "bge":
+            return EmbeddingBackend(
+                version="bge",
+                provider="bge",
+                model=self.embedding_model,
+                api_key="",
+                base_url="",
+                dimensions=None,
+                use_fp16=self.embedding_use_fp16,
+                device=self.embedding_device,
+                multimodal=False,
+            )
+        if resolved_version == "gemini":
+            return EmbeddingBackend(
+                version="gemini",
+                provider="gemini",
+                model=self.embedding_gemini_model,
+                api_key=self.gemini_api_key,
+                base_url="https://generativelanguage.googleapis.com/v1beta",
+                dimensions=self._normalize_embedding_dimensions(self.embedding_gemini_dimensions),
+                use_fp16=False,
+                device="api",
+                multimodal=False,
+            )
+        if resolved_version == "openai":
+            return EmbeddingBackend(
+                version="openai",
+                provider="openai",
+                model=self.embedding_openai_model,
+                api_key=self.openai_api_key,
+                base_url="",
+                dimensions=self._normalize_embedding_dimensions(self.embedding_openai_dimensions),
+                use_fp16=False,
+                device="api",
+                multimodal=False,
+            )
+        if resolved_version == "voyage":
+            return EmbeddingBackend(
+                version="voyage",
+                provider="voyage",
+                model=self.embedding_voyage_model,
+                api_key=self.voyage_api_key,
+                base_url="https://api.voyageai.com/v1",
+                dimensions=self._normalize_embedding_dimensions(self.embedding_voyage_dimensions),
+                use_fp16=False,
+                device="api",
+                multimodal=False,
+            )
+        raise ValueError(f"embedding version 不支援: {resolved_version}")
+
+    def _normalize_embedding_dimensions(self, value: int) -> int | None:
+        return value if value > 0 else None
+
+    def _normalize_embedding_version(self, value: str | None) -> str:
+        normalized = (value or "").strip().lower()
+        if normalized in {"bge", "gemini", "openai", "voyage"}:
+            return normalized
+        raise ValueError(f"embedding version 不支援: {value}")
 
 
 _settings: BrainSettings | None = None
