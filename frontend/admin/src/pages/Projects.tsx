@@ -15,12 +15,14 @@ export default function Projects() {
   const { refreshProjects, setProjectId, projectId: currentProjectId } = useProject();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [newProjectId, setNewProjectId] = useState("");
   const [newProjectLabel, setNewProjectLabel] = useState("");
+  const [lastCreatedId, setLastCreatedId] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [deleteTargetId, setDeleteTargetId] = useState("");
   const [status, setStatus] = useState<Status>(null);
+  const trimmedNewProjectLabel = newProjectLabel.trim();
+  const canCreateProject = trimmedNewProjectLabel !== "" && !creating;
 
   const loadProjects = async () => {
     setLoading(true);
@@ -34,24 +36,30 @@ export default function Projects() {
     }
   };
 
+  const refreshProjectList = async () => {
+    refreshProjects();
+    await loadProjects();
+  };
+
   useEffect(() => {
-    loadProjects();
+    void loadProjects();
   }, []);
 
   const handleCreate = async () => {
-    const id = newProjectId.trim();
-    const label = newProjectLabel.trim();
-    if (!id || !label || creating) return;
+    if (!canCreateProject) return;
 
     setCreating(true);
     setStatus(null);
+    setLastCreatedId("");
     try {
-      await createProject(id, label);
-      setNewProjectId("");
+      const result = await createProject(trimmedNewProjectLabel);
       setNewProjectLabel("");
-      setStatus({ type: "success", message: `專案 "${id}" 已建立` });
-      refreshProjects();
-      await loadProjects();
+      setLastCreatedId(result.project_id);
+      setStatus({
+        type: "success",
+        message: `專案「${trimmedNewProjectLabel}」已建立（ID: ${result.project_id}）`,
+      });
+      await refreshProjectList();
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
     } finally {
@@ -67,11 +75,10 @@ export default function Projects() {
     try {
       await deleteProject(projectId);
       setStatus({ type: "success", message: `專案 "${projectId}" 已刪除` });
-      refreshProjects();
       if (projectId === currentProjectId) {
         setProjectId("default");
       }
-      await loadProjects();
+      await refreshProjectList();
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
     } finally {
@@ -104,33 +111,33 @@ export default function Projects() {
           <h3 className="mt-2 text-lg font-bold text-white">建立新專案</h3>
           <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-400">Project ID</label>
-              <input
-                type="text"
-                value={newProjectId}
-                onChange={(e) => setNewProjectId(e.target.value)}
-                placeholder="my-project"
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-primary/40 focus:outline-none"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-slate-400">Label</label>
+              <label className="mb-1 block text-xs text-slate-400">專案名稱</label>
               <input
                 type="text"
                 value={newProjectLabel}
                 onChange={(e) => setNewProjectLabel(e.target.value)}
-                placeholder="我的專案"
+                placeholder="例：My Project 或 慧誠醫院"
                 className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:border-primary/40 focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    void handleCreate();
+                  }
+                }}
               />
             </div>
             <button
               onClick={handleCreate}
-              disabled={creating || !newProjectId.trim() || !newProjectLabel.trim()}
+              disabled={!canCreateProject}
               className="rounded-xl bg-primary px-6 py-3 font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create"}
             </button>
           </div>
+          {lastCreatedId && (
+            <p className="mt-3 text-xs text-slate-400">
+              自動產生的 ID：<code className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-primary">{lastCreatedId}</code>
+            </p>
+          )}
         </section>
 
         {/* Project list */}

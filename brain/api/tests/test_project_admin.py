@@ -1,12 +1,9 @@
-"""Tests for infra.project_admin — CRUD, default protection, format validation."""
+"""Tests for infra.project_admin — CRUD, default protection, and generated IDs."""
 
 from __future__ import annotations
 
-import shutil
 import sys
-import types
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -58,6 +55,7 @@ from infra.project_admin import (
     get_project_info,
     list_projects,
 )
+from infra.project_context import generate_project_id
 
 
 class TestListProjects:
@@ -65,38 +63,35 @@ class TestListProjects:
         assert list_projects() == []
 
     def test_lists_created_projects(self):
-        create_project("alpha", "Alpha Label")
-        create_project("beta")
+        alpha = create_project("Alpha Label")
+        beta = create_project("beta")
         projects = list_projects()
         ids = [p["project_id"] for p in projects]
-        assert "alpha" in ids
-        assert "beta" in ids
+        assert alpha["project_id"] in ids
+        assert beta["project_id"] in ids
 
 
 class TestCreateProject:
     def test_creates_workspace(self):
-        result = create_project("new-proj", "My Project")
+        result = create_project("My Project")
         assert result["status"] == "ok"
-        assert result["project_id"] == "new-proj"
+        assert result["project_id"] == generate_project_id("My Project")
         assert result["label"] == "My Project"
 
-    def test_duplicate_raises(self):
-        create_project("dup")
-        with pytest.raises(ValueError, match="已存在"):
-            create_project("dup")
-
-    def test_invalid_id_raises(self):
-        with pytest.raises(ValueError, match="project_id"):
-            create_project("bad/id")
+    def test_duplicate_label_gets_suffix(self):
+        first = create_project("dup")
+        second = create_project("dup")
+        assert first["project_id"] == generate_project_id("dup")
+        assert second["project_id"] == f"{first['project_id']}-2"
 
 
 class TestDeleteProject:
     def test_deletes_existing(self):
-        create_project("to-delete")
-        result = delete_project("to-delete")
+        created = create_project("to-delete")
+        result = delete_project(created["project_id"])
         assert result["status"] == "ok"
         assert list_projects() == [] or all(
-            p["project_id"] != "to-delete" for p in list_projects()
+            p["project_id"] != created["project_id"] for p in list_projects()
         )
 
     def test_default_cannot_be_deleted(self):
@@ -110,9 +105,9 @@ class TestDeleteProject:
 
 class TestGetProjectInfo:
     def test_returns_metadata(self):
-        create_project("info-test", "Info Test")
-        info = get_project_info("info-test")
-        assert info["project_id"] == "info-test"
+        created = create_project("Info Test")
+        info = get_project_info(created["project_id"])
+        assert info["project_id"] == created["project_id"]
         assert info["label"] == "Info Test"
         assert isinstance(info["document_count"], int)
         assert isinstance(info["persona_count"], int)

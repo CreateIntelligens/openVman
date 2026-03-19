@@ -80,6 +80,13 @@ export interface ProjectsResponse {
   project_count: number;
 }
 
+export interface ProjectCreateResponse {
+  status: string;
+  project_id: string;
+  label: string;
+  project_root: string;
+}
+
 export async function fetchProjects() {
   const res = await fetch(`${BASE}/admin/projects`);
   return parseJson<ProjectsResponse>(res);
@@ -90,11 +97,8 @@ export async function fetchProjectInfo(projectId: string) {
   return parseJson<ProjectSummary>(res);
 }
 
-export function createProject(projectId: string, label: string) {
-  return post<{ status: string; project_id: string }>("/admin/projects", {
-    project_id: projectId,
-    label,
-  });
+export function createProject(label: string) {
+  return post<ProjectCreateResponse>("/admin/projects", { label });
 }
 
 export function deleteProject(projectId: string) {

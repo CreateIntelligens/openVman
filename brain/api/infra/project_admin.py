@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from infra.project_context import (
+    generate_project_id,
     get_data_root,
     normalize_project_id,
     resolve_project_context,
@@ -30,12 +31,13 @@ def list_projects() -> list[dict[str, Any]]:
     return projects
 
 
-def create_project(project_id: str, label: str = "") -> dict[str, Any]:
+def create_project(label: str) -> dict[str, Any]:
     """Create a new project directory and scaffold its workspace."""
-    pid = normalize_project_id(project_id)
+    clean_label = label.strip()
+    if not clean_label:
+        raise ValueError("專案名稱不可為空白")
+    pid = _next_available_project_id(generate_project_id(clean_label))
     ctx = resolve_project_context(pid)
-    if ctx.workspace_root.exists():
-        raise ValueError(f"專案 '{pid}' 已存在")
 
     from knowledge.workspace import ensure_workspace_scaffold
 
@@ -43,12 +45,12 @@ def create_project(project_id: str, label: str = "") -> dict[str, Any]:
 
     # Write a project metadata label file
     meta_path = ctx.project_root / "project.label"
-    meta_path.write_text(label.strip() or pid, encoding="utf-8")
+    meta_path.write_text(clean_label, encoding="utf-8")
 
     return {
         "status": "ok",
         "project_id": pid,
-        "label": label.strip() or pid,
+        "label": clean_label,
         "project_root": str(ctx.project_root),
     }
 
@@ -118,3 +120,13 @@ def _read_label(project_root: Path) -> str:
     if label_path.exists():
         return label_path.read_text(encoding="utf-8").strip()
     return project_root.name
+
+
+def _next_available_project_id(base_project_id: str) -> str:
+    """Return a project ID, adding a numeric suffix when needed."""
+    project_id = base_project_id
+    counter = 2
+    while resolve_project_context(project_id).workspace_root.exists():
+        project_id = f"{base_project_id}-{counter}"
+        counter += 1
+    return project_id

@@ -70,8 +70,8 @@ from protocol.protocol_events import ProtocolValidationError, validate_client_ev
 from protocol.schemas import (
     AddMemoryRequest,
     AdminActionRequest,
-    EmbedRequest,
     ChatRequest,
+    EmbedRequest,
     KnowledgeDocumentMoveRequest,
     KnowledgeDocumentPutRequest,
     KnowledgeIngestRequest,
@@ -226,8 +226,8 @@ async def admin_list_projects():
 @app.post("/api/admin/projects")
 async def admin_create_project(payload: ProjectCreateRequest):
     try:
-        result = create_project(payload.project_id, payload.label)
-        log_event("project_created", project_id=payload.project_id)
+        result = create_project(payload.label)
+        log_event("project_created", project_id=result["project_id"])
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

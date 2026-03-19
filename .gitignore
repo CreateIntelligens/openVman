@@ -16,15 +16,7 @@ dist_bak/
 # LanceDB 資料庫（runtime 資料）
 .openclaw/
 
-# Brain data（runtime 產生的資料）
-brain/data/lancedb/
-brain/data/sessions.db
-brain/data/knowledge_index_state.json
-brain/data/raw/
-brain/data/workspace/.learnings/
-brain/data/workspace/memory/*
-!brain/data/workspace/memory/.gitkeep
-brain/data/workspace/scratch/
+# Brain data（runtime 產生的資料，multi-project 架構）
 brain/data/projects/
 
 # Node

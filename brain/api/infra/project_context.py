@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,6 +97,15 @@ def get_project_session_store(ctx: ProjectContext):
         store = SessionStore(db_path=str(ctx.session_db_path))
         _session_store_cache[ctx.project_id] = store
         return store
+
+
+def generate_project_id(label: str) -> str:
+    """從用戶輸入的名稱自動產生 project_id。"""
+    slug = re.sub(r"[^a-z0-9]+", "-", label.lower().strip()).strip("-")
+    suffix = hashlib.sha256(label.encode()).hexdigest()[:10]
+    if slug and len(slug) <= 50:
+        return f"{slug}-{suffix}"
+    return f"proj-{suffix}"
 
 
 def get_data_root() -> Path:

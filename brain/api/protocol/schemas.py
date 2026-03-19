@@ -1,12 +1,19 @@
 """Pydantic schemas for API requests and responses."""
 
 from typing import Any
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class ProjectCreateRequest(BaseModel):
-    project_id: str = Field(..., description="Unique ID for the project")
-    label: str = Field(..., description="Display label for the project")
+    label: str = Field(..., min_length=1, description="專案名稱")
+
+    @field_validator("label")
+    @classmethod
+    def label_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("專案名稱不可為空白")
+        return v
 
 
 class ProjectDeleteRequest(BaseModel):
