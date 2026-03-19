@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.4.0] - 2026-03-19
+
+### Added
+- **Unified Python Backend**: Consolidated TS gateway, Node server, and TTS router into a single FastAPI service on port 8200.
+- **Image Ingestion**: Vision LLM description (OpenAI GPT-4o compatible) with pytesseract OCR fallback (chi_tra+eng).
+- **Audio Ingestion**: Whisper API transcription (OpenAI or local binary) with graceful error handling.
+- **Video Ingestion**: ffmpeg frame extraction (1 fps) with per-frame Vision LLM description.
+- **MediaDispatcher**: MIME-based routing with configurable timeout (`asyncio.wait_for`).
+- **Forward-to-Brain**: Fire-and-forget POST to brain `/internal/enrich` endpoint via httpx.
+- **Dead-Letter Queue (DLQ)**: Failed jobs pushed to Redis list with `GET /admin/queue/dlq` endpoint.
+- **Plugin System (Python)**: `IPlugin` protocol with singleton lifecycle management.
+  - **CameraLive**: Periodic HTTP snapshot + Vision LLM description, per-session asyncio task management.
+  - **ApiTool**: YAML registry with `${ENV_VAR}` interpolation, sliding-window rate limiting, multi-auth support.
+  - **WebCrawler**: readability-lxml extraction, domain blocking, in-memory TTL cache.
+- **156 unit tests** covering all new and existing modules.
+
+### Changed
+- Removed old TS `backend/gateway/`, `backend/server/`, consolidated `backend/tts_router/` into `backend/app/`.
+- Updated `Dockerfile` to include `tesseract-ocr` and `tesseract-ocr-chi-tra`.
+- Updated `docker-compose.yml` (root and backend) with new env vars for Vision LLM, Whisper, Camera, ApiTool, Crawler, Brain URL.
+- Updated `nginx/default.conf` routing from `tts-router` to `backend` with `/upload` and `/health` locations.
+- Removed unused `rag_top_k` from brain config; removed dead `summarize_supporting_context` from brain reflection.
+- Fixed contracts CI workflow by removing missing `brain/web/` steps.
+
 ## [0.3.0] - 2026-03-18
 
 ### Added
