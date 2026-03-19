@@ -77,7 +77,6 @@ class BrainSettings(BaseSettings):
 
     # === 記憶設定 ===
     short_term_memory_rounds: int = 20
-    rag_top_k: int = 5
     rag_knowledge_top_k: int = 5
     rag_memory_top_k: int = 3
     rag_rerank_candidate_multiplier: int = 4

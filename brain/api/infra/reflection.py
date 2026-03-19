@@ -34,32 +34,6 @@ def select_recent_messages(messages: list[dict[str, Any]]) -> list[dict[str, str
     return selected
 
 
-def summarize_supporting_context(
-    results: list[dict[str, Any]],
-    label: str,
-    max_chars: int | None = None,
-    max_items: int = 4,
-) -> str:
-    """Format retrieval results into a readable prompt block."""
-    cfg = get_settings()
-    budget = max_chars or cfg.prompt_context_char_budget
-    if not results:
-        return f"{label}：無"
-
-    lines = [f"{label}："]
-    used_chars = len(lines[0])
-    for index, result in enumerate(results[:max_items], start=1):
-        text = compress_text(str(result.get("text", "")).strip(), 260)
-        source = str(result.get("source", "workspace")).strip()
-        line = f"{index}. [{source}] {text}"
-        if used_chars + len(line) > budget and len(lines) > 1:
-            lines.append("... 其餘內容已省略")
-            break
-        lines.append(line)
-        used_chars += len(line)
-    return "\n".join(lines)
-
-
 def summarize_message_history(messages: list[dict[str, Any]]) -> str:
     """Compress older session messages into a short textual recap."""
     cfg = get_settings()

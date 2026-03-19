@@ -1,9 +1,11 @@
 services:
-  tts-router:
-    build: ./tts_router
+  backend:
+    build: .
     restart: unless-stopped
+    depends_on:
+      - redis
     volumes:
-      - ./tts_router/app:/app/app
+      - ./app:/app/app
     environment:
       UVICORN_RELOAD: "${UVICORN_RELOAD:-1}"
       MARKITDOWN_MAX_UPLOAD_BYTES: "${MARKITDOWN_MAX_UPLOAD_BYTES:-10485760}"
@@ -28,5 +30,43 @@ services:
       TTS_GCP_VOICE_NAME: "${TTS_GCP_VOICE_NAME:-cmn-TW-Standard-A}"
       TTS_GCP_AUDIO_ENCODING: "${TTS_GCP_AUDIO_ENCODING:-LINEAR16}"
       TTS_GCP_SAMPLE_RATE: "${TTS_GCP_SAMPLE_RATE:-24000}"
+      # --- Gateway ---
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
+      GATEWAY_TEMP_DIR: "${GATEWAY_TEMP_DIR:-/tmp/vman-gateway}"
+      GATEWAY_TEMP_TTL_MIN: "${GATEWAY_TEMP_TTL_MIN:-30}"
+      GATEWAY_TEMP_DIR_MAX_MB: "${GATEWAY_TEMP_DIR_MAX_MB:-2048}"
+      GATEWAY_MAX_FILE_SIZE_MB: "${GATEWAY_MAX_FILE_SIZE_MB:-100}"
+      MEDIA_PROCESSING_TIMEOUT_MS: "${MEDIA_PROCESSING_TIMEOUT_MS:-5000}"
+      QUEUE_JOB_TIMEOUT_MS: "${QUEUE_JOB_TIMEOUT_MS:-30000}"
+      # --- Vision LLM ---
+      VISION_LLM_API_KEY: "${VISION_LLM_API_KEY:-}"
+      VISION_LLM_MODEL: "${VISION_LLM_MODEL:-gpt-4o}"
+      VISION_LLM_BASE_URL: "${VISION_LLM_BASE_URL:-}"
+      # --- Whisper ---
+      WHISPER_PROVIDER: "${WHISPER_PROVIDER:-openai}"
+      WHISPER_API_KEY: "${WHISPER_API_KEY:-}"
+      WHISPER_LOCAL_BIN: "${WHISPER_LOCAL_BIN:-/usr/local/bin/whisper}"
+      # --- Camera ---
+      CAMERA_SNAPSHOT_INTERVAL_SEC: "${CAMERA_SNAPSHOT_INTERVAL_SEC:-5}"
+      # --- API Tool ---
+      API_TOOL_TIMEOUT_MS: "${API_TOOL_TIMEOUT_MS:-10000}"
+      API_TOOL_MAX_QUEUE: "${API_TOOL_MAX_QUEUE:-10}"
+      API_REGISTRY_PATH: "${API_REGISTRY_PATH:-./config/api-registry.yaml}"
+      # --- Web Crawler ---
+      CRAWLER_TIMEOUT_MS: "${CRAWLER_TIMEOUT_MS:-15000}"
+      CRAWLER_CACHE_TTL_MIN: "${CRAWLER_CACHE_TTL_MIN:-60}"
+      CRAWLER_IGNORE_ROBOTS: "${CRAWLER_IGNORE_ROBOTS:-false}"
+      CRAWLER_BLOCKED_DOMAINS: "${CRAWLER_BLOCKED_DOMAINS:-}"
+      # --- Internal ---
+      BRAIN_URL: "${BRAIN_URL:-http://brain:8100}"
     ports:
-      - "${TTS_ROUTER_PORT:-8200}:8200"
+      - "${BACKEND_PORT:-8200}:8200"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:

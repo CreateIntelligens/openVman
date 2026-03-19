@@ -35,6 +35,26 @@ services:
       - admin-node-modules:/app/node_modules
       - ./contracts:/contracts:ro
 
+  backend:
+    <<: *shared
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+    volumes:
+      - ./backend/app:/app/app
+    env_file:
+      - ./backend/.env
+    ports:
+      - "${BACKEND_PORT:-8200}:8200"
+
+  redis:
+    <<: *shared
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+
   nginx:
     <<: *shared
     image: nginx:alpine
@@ -46,8 +66,10 @@ services:
     depends_on:
       - api
       - admin
+      - backend
 
 volumes:
   brain-data:
   hf-cache:
   admin-node-modules:
+  redis-data:
