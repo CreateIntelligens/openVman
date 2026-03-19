@@ -95,41 +95,39 @@ def classify_gcp_error(exc: Exception) -> str:
     return REASON_UNKNOWN
 
 
-def _classify_http_error(exc: Exception, error_class: type) -> str:
-    """Shared logic for HTTP-based TTS providers (httpx + custom error class)."""
+def _classify_network_error(exc: Exception) -> str | None:
+    """Check for common network/timeout errors. Returns reason or None."""
     exc_type = type(exc).__name__
     message = str(exc).lower()
 
-    # Custom error class with status code
-    status_code = getattr(exc, "status_code", None)
-    if status_code is not None and isinstance(exc, error_class):
-        if status_code == 422:
-            return REASON_BAD_REQUEST
-        if status_code >= 500:
-            return REASON_PROVIDER_UNAVAILABLE
-
-    # httpx timeouts
     if exc_type in ("TimeoutException", "ReadTimeout", "ConnectTimeout", "PoolTimeout"):
         return REASON_NETWORK_ERROR
-    if "timeout" in message:
-        return REASON_NETWORK_ERROR
-
-    # httpx connection errors
     if exc_type in ("ConnectError", "RemoteProtocolError"):
         return REASON_NETWORK_ERROR
-    if "connection" in message or "refused" in message:
+    if "timeout" in message or "connection" in message or "refused" in message:
         return REASON_NETWORK_ERROR
 
-    return REASON_UNKNOWN
-
-
-def classify_node_error(exc: Exception) -> str:
-    """Classify an error from a self-hosted TTS node."""
-    from app.providers.node_adapter import NodeHTTPError
-    return _classify_http_error(exc, NodeHTTPError)
+    return None
 
 
 def classify_index_error(exc: Exception) -> str:
     """Classify an error from an Index TTS node."""
     from app.providers.index_tts_adapter import IndexTTSHTTPError
-    return _classify_http_error(exc, IndexTTSHTTPError)
+
+    if isinstance(exc, IndexTTSHTTPError):
+        if exc.status_code == 422:
+            return REASON_BAD_REQUEST
+        if exc.status_code >= 500:
+            return REASON_PROVIDER_UNAVAILABLE
+
+    return _classify_network_error(exc) or REASON_UNKNOWN
+
+
+def classify_edge_tts_error(exc: Exception) -> str:
+    """Classify an error from in-process Edge-TTS."""
+    from app.providers.edge_tts_adapter import EdgeTTSError
+
+    if isinstance(exc, EdgeTTSError):
+        return REASON_BAD_REQUEST
+
+    return _classify_network_error(exc) or REASON_UNKNOWN

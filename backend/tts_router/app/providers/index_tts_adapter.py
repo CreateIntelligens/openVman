@@ -16,7 +16,7 @@ class IndexTTSAdapter:
     def __init__(self, config: TTSRouterConfig) -> None:
         self._config = config
         self._url = config.tts_index_url.rstrip("/") + "/tts" if config.tts_index_url else ""
-        self._timeout = config.node_timeout_ms / 1000
+        self._timeout = 10.0  # seconds
 
     @property
     def provider_name(self) -> str:

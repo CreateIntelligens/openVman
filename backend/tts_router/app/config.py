@@ -11,10 +11,6 @@ from functools import lru_cache
 class TTSRouterConfig:
     """Immutable TTS router settings loaded from environment."""
 
-    # --- Self-hosted nodes (Edge-TTS) ---
-    tts_primary_node: str = ""
-    tts_secondary_node: str = ""
-
     # --- Index TTS ---
     tts_index_url: str = ""
     tts_index_character: str = "hayley"
@@ -29,12 +25,6 @@ class TTSRouterConfig:
     tts_aws_output_format: str = "pcm"
     tts_aws_sample_rate: int = 24000
 
-    # --- Node health policy ---
-    node_failure_threshold: int = 2
-    node_cooldown_seconds: float = 30.0
-    node_score_penalty: int = 50
-    node_timeout_ms: float = 10_000
-
     # --- GCP Cloud TTS ---
     tts_gcp_enabled: bool = False
     tts_gcp_project_id: str = ""
@@ -42,6 +32,12 @@ class TTSRouterConfig:
     tts_gcp_voice_name: str = "cmn-TW-Standard-A"
     tts_gcp_audio_encoding: str = "LINEAR16"
     tts_gcp_sample_rate: int = 24000
+
+    # --- Edge-TTS (in-process) ---
+    edge_tts_enabled: bool = True
+    edge_tts_voice: str = "zh-TW-HsiaoChenNeural"
+    edge_tts_sample_rate: int = 24000
+    edge_tts_max_text_length: int = 2000
 
 
 def _bool_env(key: str, default: bool = False) -> bool:
@@ -55,14 +51,8 @@ def _bool_env(key: str, default: bool = False) -> bool:
 def get_tts_config() -> TTSRouterConfig:
     """Build config from environment variables (cached)."""
     return TTSRouterConfig(
-        tts_primary_node=os.environ.get("TTS_PRIMARY_NODE", ""),
-        tts_secondary_node=os.environ.get("TTS_SECONDARY_NODE", ""),
         tts_index_url=os.environ.get("TTS_INDEX_URL", ""),
         tts_index_character=os.environ.get("TTS_INDEX_CHARACTER", "hayley"),
-        node_failure_threshold=int(os.environ.get("NODE_FAILURE_THRESHOLD", "2")),
-        node_cooldown_seconds=float(os.environ.get("NODE_COOLDOWN_SECONDS", "30.0")),
-        node_score_penalty=int(os.environ.get("NODE_SCORE_PENALTY", "50")),
-        node_timeout_ms=float(os.environ.get("NODE_TIMEOUT_MS", "10000")),
         tts_aws_enabled=_bool_env("TTS_AWS_ENABLED"),
         tts_aws_region=os.environ.get("TTS_AWS_REGION", "ap-northeast-1"),
         tts_aws_access_key_id=os.environ.get("TTS_AWS_ACCESS_KEY_ID", ""),
@@ -77,4 +67,8 @@ def get_tts_config() -> TTSRouterConfig:
         tts_gcp_voice_name=os.environ.get("TTS_GCP_VOICE_NAME", "cmn-TW-Standard-A"),
         tts_gcp_audio_encoding=os.environ.get("TTS_GCP_AUDIO_ENCODING", "LINEAR16"),
         tts_gcp_sample_rate=int(os.environ.get("TTS_GCP_SAMPLE_RATE", "24000")),
+        edge_tts_enabled=_bool_env("TTS_EDGE_ENABLED", default=True),
+        edge_tts_voice=os.environ.get("TTS_EDGE_VOICE", "zh-TW-HsiaoChenNeural"),
+        edge_tts_sample_rate=int(os.environ.get("TTS_EDGE_SAMPLE_RATE", "24000")),
+        edge_tts_max_text_length=int(os.environ.get("TTS_EDGE_MAX_TEXT_LENGTH", "2000")),
     )

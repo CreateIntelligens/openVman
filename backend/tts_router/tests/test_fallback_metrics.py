@@ -1,28 +1,10 @@
-"""Tests for TTS fallback metrics and observability (TASK-15)."""
+"""Tests for TTS fallback metrics and observability."""
 
 from __future__ import annotations
 
-import sys
-import types
 from unittest.mock import MagicMock
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# Stub external deps
-# ---------------------------------------------------------------------------
-
-sys.modules.setdefault("boto3", types.ModuleType("boto3"))
-
-_fake_tts_mod = types.ModuleType("google.cloud.texttospeech")
-_fake_tts_mod.TextToSpeechClient = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.SynthesisInput = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.VoiceSelectionParams = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.AudioConfig = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.AudioEncoding = types.SimpleNamespace(LINEAR16="LINEAR16")  # type: ignore[attr-defined]
-sys.modules.setdefault("google", types.ModuleType("google"))
-sys.modules.setdefault("google.cloud", types.ModuleType("google.cloud"))
-sys.modules.setdefault("google.cloud.texttospeech", _fake_tts_mod)
 
 from app.config import TTSRouterConfig
 from app.observability import get_metrics_snapshot, reset_metrics
@@ -38,6 +20,7 @@ def _make_config() -> TTSRouterConfig:
         tts_aws_secret_access_key="secret",
         tts_gcp_enabled=True,
         tts_gcp_project_id="test-proj",
+        edge_tts_enabled=False,
     )
 
 
@@ -137,7 +120,6 @@ class TestFallbackMetrics:
         route_events = [e for e in snap["events"] if e["event"] == "tts_route_attempt"]
         assert len(route_events) >= 1
         evt = route_events[0]
-        assert evt["kind"] == "provider"
         assert evt["target"] == "gcp-tts"
         assert evt["result"] == "success"
         assert "latency_ms" in evt

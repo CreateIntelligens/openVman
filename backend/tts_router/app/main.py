@@ -1,7 +1,8 @@
-"""TTS Router — FastAPI entry point with node failover."""
+"""TTS Router — FastAPI entry point."""
 
 from __future__ import annotations
 
+import json
 import uuid
 
 from fastapi import FastAPI, Response
@@ -33,21 +34,7 @@ class SynthesizeBody(BaseModel):
 
 @app.get("/healthz")
 async def healthz() -> dict:
-    svc = _get_service()
-    nodes = svc.health_manager.get_all_states()
-    return {
-        "status": "ok",
-        "service": "tts-router",
-        "nodes": [
-            {
-                "node_id": n.node_id,
-                "role": n.role,
-                "healthy": n.healthy,
-                "score": n.score,
-            }
-            for n in nodes
-        ],
-    }
+    return {"status": "ok", "service": "tts-router"}
 
 
 @app.post("/v1/synthesize")
@@ -64,7 +51,7 @@ async def synthesize(body: SynthesizeBody) -> Response:
         result = svc.synthesize(request)
     except RuntimeError as exc:
         return Response(
-            content=f'{{"error": "{exc}"}}',
+            content=json.dumps({"error": str(exc)}),
             status_code=502,
             media_type="application/json",
         )

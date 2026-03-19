@@ -69,20 +69,18 @@ def reset_metrics() -> None:
 
 def record_route_attempt(
     *,
-    kind: str,
     target: str,
     result: str,
     latency_ms: float,
     reason: str = "",
 ) -> None:
     """Record a single TTS route attempt."""
-    increment_counter(f"tts_route_attempts_total|kind={kind}|target={target}|result={result}")
-    record_timing(f"tts_provider_latency_ms|{kind}:{target}|{result}", latency_ms)
+    increment_counter(f"tts_route_attempts_total|target={target}|result={result}")
+    record_timing(f"tts_provider_latency_ms|{target}|{result}", latency_ms)
     if result == "failure":
         increment_counter(f"tts_provider_failures_total|provider={target}|reason={reason}")
     log_event(
         "tts_route_attempt",
-        kind=kind,
         target=target,
         result=result,
         latency_ms=round(latency_ms, 2),
@@ -92,22 +90,18 @@ def record_route_attempt(
 
 def record_fallback_hop(
     *,
-    from_kind: str,
     from_target: str,
-    to_kind: str,
     to_target: str,
     reason: str,
 ) -> None:
     """Record a fallback hop between routes."""
     increment_counter(
-        f"tts_fallback_hops_total|from_kind={from_kind}|from_target={from_target}"
-        f"|to_kind={to_kind}|to_target={to_target}|reason={reason}"
+        f"tts_fallback_hops_total|from_target={from_target}"
+        f"|to_target={to_target}|reason={reason}"
     )
     log_event(
         "tts_fallback_hop",
-        from_kind=from_kind,
         from_target=from_target,
-        to_kind=to_kind,
         to_target=to_target,
         reason=reason,
     )
@@ -122,32 +116,3 @@ def record_chain_exhausted(*, final_reason: str, hops: int) -> None:
 def record_provider_request(*, provider: str, result: str) -> None:
     """Record a provider-level request."""
     increment_counter(f"tts_provider_requests_total|provider={provider}|result={result}")
-
-
-# ---------------------------------------------------------------------------
-# Node-specific metrics helpers (TASK-13)
-# ---------------------------------------------------------------------------
-
-def record_node_selected(*, node_id: str, role: str, score: int) -> None:
-    """Record that a node was selected for synthesis."""
-    increment_counter(f"tts_node_selected_total|node_id={node_id}|role={role}")
-    log_event("tts_node_selected", node_id=node_id, role=role, score=score)
-
-
-def record_node_bypassed(*, node_id: str, reason: str) -> None:
-    """Record that a node was bypassed (unhealthy or in cooldown)."""
-    increment_counter(f"tts_node_bypassed_total|node_id={node_id}|reason={reason}")
-    log_event("tts_node_bypassed", node_id=node_id, reason=reason)
-
-
-def record_node_failover(*, from_node: str, to_target: str, reason: str) -> None:
-    """Record failover from one node to another target."""
-    increment_counter(
-        f"tts_node_failover_total|from_node={from_node}|to_target={to_target}"
-    )
-    log_event(
-        "tts_node_failover",
-        from_node=from_node,
-        to_target=to_target,
-        reason=reason,
-    )

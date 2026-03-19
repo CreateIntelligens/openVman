@@ -1,28 +1,10 @@
-"""Tests for TTS router service fallback chain (TASK-14 + TASK-15)."""
+"""Tests for TTS router service fallback chain."""
 
 from __future__ import annotations
 
-import sys
-import types
 from unittest.mock import MagicMock
 
 import pytest
-
-# ---------------------------------------------------------------------------
-# Stub external deps
-# ---------------------------------------------------------------------------
-
-sys.modules.setdefault("boto3", types.ModuleType("boto3"))
-
-_fake_tts_mod = types.ModuleType("google.cloud.texttospeech")
-_fake_tts_mod.TextToSpeechClient = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.SynthesisInput = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.VoiceSelectionParams = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.AudioConfig = MagicMock  # type: ignore[attr-defined]
-_fake_tts_mod.AudioEncoding = types.SimpleNamespace(LINEAR16="LINEAR16")  # type: ignore[attr-defined]
-sys.modules.setdefault("google", types.ModuleType("google"))
-sys.modules.setdefault("google.cloud", types.ModuleType("google.cloud"))
-sys.modules.setdefault("google.cloud.texttospeech", _fake_tts_mod)
 
 from app.config import TTSRouterConfig
 from app.observability import get_metrics_snapshot, reset_metrics
@@ -30,7 +12,7 @@ from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.service import TTSRouterService
 
 
-def _make_config(index_url: str = "http://index", aws_enabled: bool = True, gcp_enabled: bool = True) -> TTSRouterConfig:
+def _make_config(index_url: str = "http://index", aws_enabled: bool = True, gcp_enabled: bool = True, edge_enabled: bool = False) -> TTSRouterConfig:
     return TTSRouterConfig(
         tts_index_url=index_url,
         tts_index_character="hayley",
@@ -47,6 +29,7 @@ def _make_config(index_url: str = "http://index", aws_enabled: bool = True, gcp_
         tts_gcp_voice_name="cmn-TW-Standard-A",
         tts_gcp_audio_encoding="LINEAR16",
         tts_gcp_sample_rate=24000,
+        edge_tts_enabled=edge_enabled,
     )
 
 
@@ -133,7 +116,7 @@ class TestRouterFallback:
 
     def test_disabled_all_raises_empty_chain(self):
         """All disabled -> empty chain error."""
-        svc = TTSRouterService(_make_config(index_url="", aws_enabled=False, gcp_enabled=False))
+        svc = TTSRouterService(_make_config(index_url="", aws_enabled=False, gcp_enabled=False, edge_enabled=False))
         with pytest.raises(RuntimeError, match="chain 為空"):
             svc.synthesize(SynthesizeRequest(text="test"))
 

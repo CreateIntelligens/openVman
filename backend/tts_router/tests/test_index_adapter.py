@@ -1,7 +1,9 @@
 """Tests for the Index TTS provider adapter."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from app.config import TTSRouterConfig
 from app.providers.base import SynthesizeRequest
 from app.providers.index_tts_adapter import IndexTTSAdapter, IndexTTSHTTPError
@@ -13,7 +15,6 @@ def index_config():
     return TTSRouterConfig(
         tts_index_url="http://mock-index:8001",
         tts_index_character="hayley",
-        node_timeout_ms=5000,
     )
 
 
