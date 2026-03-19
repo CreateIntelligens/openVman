@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const envSchema = z.object({
+const gatewayEnvSchema = z.object({
   // Server
   GATEWAY_PORT: z.coerce.number().default(8050),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -32,7 +32,7 @@ const envSchema = z.object({
   WHISPER_LOCAL_BIN: z.string().default('/usr/local/bin/whisper'),
 
   // MarkItDown
-  MARKITDOWN_URL: z.string().default('http://markitdown:8000'),
+  MARKITDOWN_URL: z.string().default('http://tts-router:8200'),
 
   // Camera Live
   CAMERA_SNAPSHOT_INTERVAL_SEC: z.coerce.number().default(5),
@@ -65,29 +65,30 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
 });
 
-export type Config = z.infer<typeof envSchema>;
+export type GatewayConfig = z.infer<typeof gatewayEnvSchema>;
 
-const parsed = envSchema.safeParse(process.env);
+const parsedGatewayEnv = gatewayEnvSchema.safeParse(process.env);
 
-if (!parsed.success) {
-  console.error('❌ Invalid environment variables:', parsed.error.format());
+if (!parsedGatewayEnv.success) {
+  console.error('❌ Invalid environment variables:', parsedGatewayEnv.error.format());
   process.exit(1);
 }
 
-export const config: Config = parsed.data;
+export const gatewayConfig: GatewayConfig = parsedGatewayEnv.data;
+export const config = gatewayConfig;
 
 // Derived helper values
 export const supportedMimeTypes = new Set(
-  config.MEDIA_SUPPORTED_TYPES.split(',').map((t) => t.trim())
+  gatewayConfig.MEDIA_SUPPORTED_TYPES.split(',').map((t) => t.trim())
 );
 
 export const blockedDomains = new Set(
-  config.CRAWLER_BLOCKED_DOMAINS.split(',').map((d) => d.trim()).filter(Boolean)
+  gatewayConfig.CRAWLER_BLOCKED_DOMAINS.split(',').map((d) => d.trim()).filter(Boolean)
 );
 
 // Clamp camera interval to valid range
 export function getValidCameraInterval(): number {
-  const interval = config.CAMERA_SNAPSHOT_INTERVAL_SEC;
+  const interval = gatewayConfig.CAMERA_SNAPSHOT_INTERVAL_SEC;
   if (interval < 2 || interval > 60) {
     console.warn(
       `WARN: CAMERA_SNAPSHOT_INTERVAL_SEC=${interval} out of range [2, 60], using default 5s`

@@ -1,18 +1,9 @@
 services:
-  markitdown:
-    build: ./markitdown
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    ports:
-      - "${MARKITDOWN_PORT:-8787}:8000"
-
   tts-router:
     build: ./tts_router
     restart: unless-stopped
+    volumes:
+      - ./tts_router/app:/app/app
     environment:
       # --- Edge-TTS (in-process, enabled by default) ---
       TTS_EDGE_ENABLED: "${TTS_EDGE_ENABLED:-true}"
