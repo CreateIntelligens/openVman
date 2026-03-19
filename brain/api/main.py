@@ -98,6 +98,7 @@ def build_health_payload(project_id: str = "default") -> dict[str, object]:
     """組裝 health response。"""
     cfg = get_settings()
     db = get_db(project_id)
+    embedding_backend = cfg.resolve_embedding_backend()
     metrics = get_metrics_store().snapshot()
     return {
         "status": "ok",
@@ -106,7 +107,8 @@ def build_health_payload(project_id: str = "default") -> dict[str, object]:
         "workspace_documents": len(list_workspace_documents(project_id)),
         "personas": len(list_personas(project_id)),
         "chat_enabled": True,
-        "embedding_model": cfg.embedding_model,
+        "embedding_version": embedding_backend.version,
+        "embedding_model": embedding_backend.model,
         "llm_provider": cfg.llm_provider,
         "llm_model": cfg.llm_model,
         "metrics_summary": {

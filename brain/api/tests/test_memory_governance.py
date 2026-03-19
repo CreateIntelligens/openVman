@@ -48,6 +48,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_db_mod.normalize_vector = lambda v: v
     fake_db_mod.parse_record_metadata = lambda r: json.loads(r.get("metadata", "{}"))
     fake_db_mod.ensure_fts_index = lambda table_name, project_id="default": None
+    fake_db_mod.resolve_vector_table_name = lambda table_name: table_name
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
 
     # Stub workspace

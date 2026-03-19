@@ -14,8 +14,15 @@ from typing import Any
 
 from config import get_settings
 
-from infra.db import ensure_fts_index, get_db, get_knowledge_table, normalize_vector, parse_record_metadata
-from infra.project_context import resolve_project_context
+from infra.db import (
+    ensure_fts_index,
+    get_db,
+    get_knowledge_table,
+    normalize_vector,
+    parse_record_metadata,
+    resolve_vector_table_name,
+)
+from infra.project_context import resolve_embedding_index_state_path
 from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold, iter_indexable_documents
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
@@ -76,7 +83,11 @@ def rebuild_knowledge_index(project_id: str = "default") -> dict[str, Any]:
     records = reusable_records + _build_knowledge_records(chunk_specs)
     if not records:
         records = _build_placeholder_records()
-    get_db(project_id).create_table("knowledge", data=records, mode="overwrite")
+    get_db(project_id).create_table(
+        resolve_vector_table_name("knowledge"),
+        data=records,
+        mode="overwrite",
+    )
     ensure_fts_index("knowledge", project_id)
     _save_index_state(current_fingerprints, project_id)
 
@@ -732,7 +743,8 @@ def _fingerprint_document(path: Path) -> str:
 
 def _load_existing_knowledge_records(project_id: str = "default") -> list[dict[str, Any]]:
     db = get_db(project_id)
-    if "knowledge" not in db.table_names():
+    table_name = resolve_vector_table_name("knowledge")
+    if table_name not in db.table_names():
         return []
     return get_knowledge_table(project_id).to_arrow().to_pylist()
 
@@ -757,8 +769,7 @@ def _collect_reusable_records(
 
 
 def _load_index_state(project_id: str = "default") -> dict[str, Any]:
-    ctx = resolve_project_context(project_id)
-    path = ctx.index_state_path
+    path = resolve_embedding_index_state_path(project_id)
     if not path.exists():
         return {}
     try:
@@ -769,8 +780,7 @@ def _load_index_state(project_id: str = "default") -> dict[str, Any]:
 
 
 def _save_index_state(documents: dict[str, str], project_id: str = "default") -> None:
-    ctx = resolve_project_context(project_id)
-    path = ctx.index_state_path
+    path = resolve_embedding_index_state_path(project_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(

@@ -42,7 +42,7 @@ def retrieve_context(
     importance_weight = cfg.memory_importance_weight
 
     # Encode query
-    query_vector = get_embedder().encode([query])[0]
+    query_vector = get_embedder().encode([query], input_type="query")[0]
 
     # Fetch candidates (wider than final top-k for reranking)
     # Pass query text to enable hybrid search (vector + FTS)

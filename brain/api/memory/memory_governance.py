@@ -17,7 +17,13 @@ from typing import Any
 import numpy as np
 
 from config import get_settings
-from infra.db import get_db, get_memories_table, normalize_vector, parse_record_metadata
+from infra.db import (
+    get_db,
+    get_memories_table,
+    normalize_vector,
+    parse_record_metadata,
+    resolve_vector_table_name,
+)
 from knowledge.workspace import ensure_workspace_scaffold, get_archive_paths, get_core_documents, get_workspace_root
 from memory.embedder import get_embedder
 from memory.importance import score_importance
@@ -81,7 +87,11 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
             }
         ]
 
-    get_db(project_id).create_table("memories", data=curated_records, mode="overwrite")
+    get_db(project_id).create_table(
+        resolve_vector_table_name("memories"),
+        data=curated_records,
+        mode="overwrite",
+    )
     return {
         "status": "ok",
         "summary_days": len(summaries),

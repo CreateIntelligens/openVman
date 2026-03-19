@@ -9,6 +9,8 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
+from config import get_settings
+
 if TYPE_CHECKING:
     import lancedb
 
@@ -48,6 +50,18 @@ def resolve_project_context(project_id: str | None = None) -> ProjectContext:
         session_db_path=root / "sessions.db",
         index_state_path=root / "knowledge_index_state.json",
     )
+
+
+def resolve_embedding_index_state_path(
+    project_id: str | None = None,
+    embedding_version: str | None = None,
+) -> Path:
+    """Return the per-project knowledge index state path for an embedding version."""
+    ctx = resolve_project_context(project_id)
+    version = (embedding_version or get_settings().resolved_embedding_active_version).strip().lower()
+    if version == "bge":
+        return ctx.index_state_path
+    return ctx.project_root / f"knowledge_index_state__{version}.json"
 
 
 # ---------------------------------------------------------------------------

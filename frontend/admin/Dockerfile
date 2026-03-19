@@ -2,6 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+COPY package*.json ./
+RUN npm install
+
 EXPOSE 5173
 
-CMD ["sh", "-c", "npm install && npx vite"]
+CMD ["npx", "vite", "--host"]

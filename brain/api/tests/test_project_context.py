@@ -13,6 +13,7 @@ if str(API_ROOT) not in sys.path:
 
 from infra.project_context import (
     ProjectContext,
+    resolve_embedding_index_state_path,
     normalize_project_id,
     resolve_project_context,
     get_data_root,
@@ -79,3 +80,15 @@ class TestDataRoot:
         root = get_data_root()
         assert root.name == "projects"
         assert root.parent.name == "data"
+
+
+class TestEmbeddingIndexStatePath:
+    def test_bge_version_keeps_legacy_path(self):
+        ctx = resolve_project_context("default")
+
+        assert resolve_embedding_index_state_path("default", "bge") == ctx.index_state_path
+
+    def test_non_bge_version_uses_namespaced_path(self):
+        path = resolve_embedding_index_state_path("default", "gemini")
+
+        assert path.name == "knowledge_index_state__gemini.json"

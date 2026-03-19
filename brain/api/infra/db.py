@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 from datetime import date
 from threading import Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import lancedb
-
+from config import get_settings
 from infra.project_context import get_project_db, resolve_project_context
 from memory.embedder import encode_text
+
+if TYPE_CHECKING:
+    import lancedb
 
 _tables_ready: set[str] = set()
 _tables_lock = Lock()
@@ -29,24 +31,26 @@ def get_db(project_id: str = "default") -> lancedb.DBConnection:
 
 def ensure_tables(project_id: str = "default") -> None:
     """確保所需資料表存在，不存在則以初始資料建立。"""
-    if project_id in _tables_ready:
+    table_key = _table_cache_key(project_id)
+    if table_key in _tables_ready:
         return
 
     with _tables_lock:
-        if project_id in _tables_ready:
+        if table_key in _tables_ready:
             return
 
         _create_missing_tables(get_db(project_id))
-        _tables_ready.add(project_id)
+        _tables_ready.add(table_key)
 
 
 def _create_missing_tables(db: lancedb.DBConnection) -> None:
     existing_tables = set(db.table_names())
 
-    for table_name, seed_text in TABLE_SEED_TEXTS.items():
-        if table_name in existing_tables:
+    for logical_name, seed_text in TABLE_SEED_TEXTS.items():
+        physical_name = resolve_vector_table_name(logical_name)
+        if physical_name in existing_tables:
             continue
-        db.create_table(table_name, data=[_build_seed_record(seed_text)])
+        db.create_table(physical_name, data=[_build_seed_record(seed_text)])
 
 
 def _build_seed_record(text: str) -> dict[str, Any]:
@@ -62,7 +66,7 @@ def _build_seed_record(text: str) -> dict[str, Any]:
 def get_table(table_name: str, project_id: str = "default") -> lancedb.table.Table:
     """依表名開啟 LanceDB 資料表。"""
     ensure_tables(project_id)
-    return get_db(project_id).open_table(table_name)
+    return get_db(project_id).open_table(resolve_vector_table_name(table_name))
 
 
 def ensure_fts_index(table_name: str, project_id: str = "default") -> None:
@@ -105,3 +109,18 @@ def normalize_vector(vector: Any) -> list[float]:
     if hasattr(vector, "tolist"):
         return vector.tolist()
     return list(vector)
+
+
+def resolve_vector_table_name(table_name: str) -> str:
+    """Resolve a logical table name to the active embedding version's physical table name."""
+    logical_name = table_name.strip()
+    if logical_name not in TABLE_SEED_TEXTS:
+        raise ValueError(f"未知的向量資料表: {table_name}")
+    version = get_settings().resolved_embedding_active_version
+    if version == "bge":
+        return logical_name
+    return f"{logical_name}__{version}"
+
+
+def _table_cache_key(project_id: str) -> str:
+    return f"{project_id}:{get_settings().resolved_embedding_active_version}"

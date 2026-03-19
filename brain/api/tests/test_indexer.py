@@ -50,6 +50,7 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_db_mod.normalize_vector = lambda v: v
     fake_db_mod.parse_record_metadata = lambda r: json.loads(r.get("metadata", "{}"))
     fake_db_mod.ensure_fts_index = lambda table_name, project_id="default": None
+    fake_db_mod.resolve_vector_table_name = lambda table_name: table_name
 
     # Stub workspace
     workspace_root = tmp_path / "workspace"
@@ -96,6 +97,9 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
             self.index_state_path = tmp_path / "index_state.json"
 
     fake_project_context_mod.resolve_project_context = lambda pid="default": FakeProjectContext(pid)
+    fake_project_context_mod.resolve_embedding_index_state_path = (
+        lambda pid="default", embedding_version=None: tmp_path / "index_state.json"
+    )
 
     monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder_mod)
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
