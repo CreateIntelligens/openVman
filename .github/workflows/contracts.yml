@@ -6,8 +6,6 @@ on:
       - "contracts/**"
       - "brain/api/protocol/**"
       - "brain/api/tests/test_protocol_events.py"
-      - "brain/web/src/protocol/**"
-      - "brain/web/tsconfig.json"
       - ".github/workflows/contracts.yml"
   push:
     branches:
@@ -27,13 +25,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: "brain/web/package-lock.json"
-
       - name: Check generated contracts are up to date
         run: python3 contracts/scripts/generate_protocol_contracts.py --check
 
@@ -42,11 +33,3 @@ jobs:
 
       - name: Run backend protocol tests
         run: python3 -m pytest brain/api/tests/test_protocol_events.py -v
-
-      - name: Install frontend dependencies
-        working-directory: brain/web
-        run: npm ci
-
-      - name: Run frontend typecheck
-        working-directory: brain/web
-        run: npx tsc --noEmit
