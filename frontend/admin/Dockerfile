@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-COPY nginx/ /etc/nginx/conf.d/
+COPY nginx/ /etc/nginx/http.d/
 COPY supervisord.conf /etc/supervisord.conf
 
 EXPOSE 80 5173
