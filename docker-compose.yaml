@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  index-tts:
+    build: .
+    image: index-tts-server
+    env_file:
+      - .env.example
+    container_name: index-tts-server
+    environment:
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - CUDA_LAUNCH_BLOCKING=1
+      - TORCH_CUDA_ARCH_LIST=8.9
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    ports:
+      - "${PORT:-8011}:${PORT:-8011}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      # - ./audio_prompts:/app/audio_prompts
+      # - ./assets:/app/assets
+      # - ./logs:/app/logs  # 添加logs目錄mapping
+      - .:/app
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8011}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
