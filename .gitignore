@@ -5,6 +5,7 @@
 
 # Python
 __pycache__/
+**/.pytest_cache/
 *.py[cod]
 *.pyo
 venv/
@@ -15,6 +16,9 @@ dist_bak/
 
 # LanceDB 資料庫（runtime 資料）
 .openclaw/
+
+# Backend logs（runtime 產生）
+backend/logs/
 
 # Brain data（runtime 產生的資料，multi-project 架構）
 brain/data/projects/
