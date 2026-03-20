@@ -36,7 +36,7 @@ services:
     volumes:
       - ./frontend/admin:/app
       - admin-node-modules:/app/node_modules
-      - ./frontend/admin/nginx:/etc/nginx/conf.d
+      - ./frontend/admin/nginx:/etc/nginx/http.d
       - ./contracts:/contracts:ro
     depends_on:
       - api

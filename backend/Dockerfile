@@ -30,18 +30,10 @@ RUN pip install --no-cache-dir --break-system-packages --upgrade \
     && pip install --no-cache-dir --break-system-packages -r /app/index-tts-vllm/requirements.txt \
     && pip install --no-cache-dir --break-system-packages "modelscope>=1.22,<2"
 
-COPY app /app/app
-COPY index-tts-vllm /app/index-tts-vllm
 COPY docker /app/docker
 
-RUN sed -i 's/\r$//' \
-    /app/docker/start-backend-container.sh \
-    /app/index-tts-vllm/entrypoint.sh \
-    /app/index-tts-vllm/convert_hf_format.sh \
-    && chmod +x \
-    /app/docker/start-backend-container.sh \
-    /app/index-tts-vllm/entrypoint.sh \
-    /app/index-tts-vllm/convert_hf_format.sh
+RUN sed -i 's/\r$//' /app/docker/start-backend-container.sh \
+    && chmod +x /app/docker/start-backend-container.sh
 
 EXPOSE 8200 8011
 

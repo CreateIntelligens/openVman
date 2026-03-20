@@ -1,4 +1,4 @@
-"""Tests for POST /upload route."""
+"""Tests for POST /uploads and GET /jobs routes."""
 
 from __future__ import annotations
 
@@ -38,38 +38,41 @@ def client(tmp_path):
         from app.main import app
 
         # Patch enqueue_job at the module where it's imported
-        with patch(
-            "app.gateway.routes.enqueue_job",
-            new_callable=AsyncMock,
-            return_value=EnqueueResult(job_id="test-job-id", mode="sync"),
+        with (
+            patch(
+                "app.gateway.routes.enqueue_job",
+                new_callable=AsyncMock,
+                return_value=EnqueueResult(job_id="test-job-id", mode="sync"),
+            ),
+            patch("app.gateway.routes.set_job_status", new_callable=AsyncMock),
         ):
             with TestClient(app, raise_server_exceptions=False) as c:
                 yield c
 
 
 class TestUploadSuccess:
-    def test_upload_returns_202(self, client: TestClient):
+    def test_gateway_upload_returns_202(self, client: TestClient):
         data = b"fake pdf content"
         resp = client.post(
-            "/upload?session_id=test-session",
+            "/uploads?session_id=test-session",
             files={"file": ("test.pdf", BytesIO(data), "application/pdf")},
         )
         assert resp.status_code == 202
         body = resp.json()
         assert body["status"] == "accepted"
-        assert body["session_id"] == "test-session"
-        assert "job_id" in body
-        assert "trace_id" in body
+        assert body["status_url"] == "/jobs/test-job-id"
 
 
 class TestUploadMIME:
     def test_unsupported_mime_returns_400(self, client: TestClient):
         resp = client.post(
-            "/upload?session_id=test-session",
+            "/uploads?session_id=test-session",
             files={"file": ("test.xyz", BytesIO(b"data"), "application/x-unknown")},
         )
         assert resp.status_code == 400
         assert "unsupported_mime_type" in resp.json()["error"]
+        assert resp.json()["error_code"] == "UPLOAD_FAILED"
+        assert resp.json()["message"] == "檔案上傳失敗"
 
 
 class TestUploadSize:
@@ -77,11 +80,13 @@ class TestUploadSize:
         # Max is 1 MB in fixture env
         big = b"x" * (2 * 1024 * 1024)
         resp = client.post(
-            "/upload?session_id=test-session",
+            "/uploads?session_id=test-session",
             files={"file": ("big.pdf", BytesIO(big), "application/pdf")},
         )
         assert resp.status_code == 413
         assert "file_too_large" in resp.json()["error"]
+        assert resp.json()["error_code"] == "UPLOAD_FAILED"
+        assert resp.json()["message"] == "檔案上傳失敗"
 
 
 class TestUploadQuota:
@@ -98,8 +103,31 @@ class TestUploadQuota:
             fpath.write_bytes(b"x" * 1024)
 
             resp = client.post(
-                "/upload?session_id=test-session",
+                "/uploads?session_id=test-session",
                 files={"file": ("test.pdf", BytesIO(b"pdf"), "application/pdf")},
             )
             assert resp.status_code == 413
             assert "quota" in resp.json()["error"]
+            assert resp.json()["error_code"] == "UPLOAD_FAILED"
+            assert resp.json()["message"] == "檔案上傳失敗"
+
+
+class TestJobStatusRoute:
+    def test_gateway_job_status_returns_payload_when_found(self, client: TestClient):
+        payload = {
+            "job_id": "test-job-id",
+            "status": "processing",
+        }
+
+        with patch("app.gateway.routes.get_job_status", new_callable=AsyncMock, return_value=payload):
+            resp = client.get("/jobs/test-job-id")
+
+        assert resp.status_code == 200
+        assert resp.json() == payload
+
+    def test_job_status_returns_404_when_missing(self, client: TestClient):
+        with patch("app.gateway.routes.get_job_status", new_callable=AsyncMock, return_value=None):
+            resp = client.get("/jobs/missing-job")
+
+        assert resp.status_code == 404
+        assert resp.json()["error"] == "job_not_found"

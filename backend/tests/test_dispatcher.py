@@ -111,6 +111,7 @@ class TestDispatch:
             result = await dispatch("/tmp/test.jpg", "image/jpeg", "t6")
 
         assert result["type"] == "processing_error"
+        assert result["error_code"] == "GATEWAY_TIMEOUT"
         assert "timeout" in result["reason"]
 
     @pytest.mark.asyncio

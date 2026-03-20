@@ -58,14 +58,16 @@ async def enqueue_job(
     job_name: str,
     data: dict[str, Any],
     *,
+    job_id: str | None = None,
     sync_fallback: SyncFallback | None = None,
 ) -> EnqueueResult:
-    job_id = uuid.uuid4().hex
+    job_id = job_id or uuid.uuid4().hex
+    payload = {"job_id": job_id, **data}
     pool = await _get_arq_pool()
 
     if pool is not None:
         try:
-            await pool.enqueue_job(job_name, data, _job_id=job_id)
+            await pool.enqueue_job(job_name, payload, _job_id=job_id)
             logger.info("job_enqueued job_id=%s job_name=%s", job_id, job_name)
             return EnqueueResult(job_id=job_id, mode="queued")
         except Exception as exc:
@@ -74,7 +76,7 @@ async def enqueue_job(
     # sync fallback
     if sync_fallback is not None:
         logger.info("job_sync_fallback job_id=%s job_name=%s", job_id, job_name)
-        await sync_fallback({"__job_id": job_id, **data})
+        await sync_fallback(payload)
         return EnqueueResult(job_id=job_id, mode="sync")
 
     logger.warning("no queue and no sync fallback for job_name=%s", job_name)

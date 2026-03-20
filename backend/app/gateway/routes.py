@@ -11,8 +11,10 @@ from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.config import get_tts_config
+from app.error_payloads import upload_failed_response
+from app.gateway.job_status import get_job_status, set_job_status
 from app.gateway.queue import DLQ_KEY, enqueue_job
-from app.gateway.redis_pool import get_redis, redis_available
+from app.gateway.redis_pool import get_redis
 from app.gateway.temp_storage import get_temp_storage
 from app.gateway.worker import process_media
 
@@ -27,29 +29,33 @@ async def _process_media_sync(data: dict[str, Any]) -> None:
     await process_media({}, data)
 
 
-@router.post("/upload")
+@router.post("/uploads", tags=["Uploads"])
 async def upload(
     file: UploadFile = File(...),
     session_id: str = Query(...),
 ) -> JSONResponse:
     cfg = get_tts_config()
     storage = get_temp_storage()
+    job_id = uuid.uuid4().hex
     trace_id = uuid.uuid4().hex
 
     # 1. quota check
     quota = storage.check_quota()
     if not quota.ok:
-        return JSONResponse(
+        return upload_failed_response(
             status_code=413,
-            content={"error": "storage_quota_exceeded", "usage_mb": quota.usage_mb, "limit_mb": quota.limit_mb},
+            error="storage_quota_exceeded",
+            usage_mb=quota.usage_mb,
+            limit_mb=quota.limit_mb,
         )
 
     # 2. MIME check
     mime_type = file.content_type or "application/octet-stream"
     if mime_type not in cfg.supported_mime_types:
-        return JSONResponse(
+        return upload_failed_response(
             status_code=400,
-            content={"error": "unsupported_mime_type", "mime_type": mime_type},
+            error="unsupported_mime_type",
+            mime_type=mime_type,
         )
 
     # 3. read file + size check
@@ -63,9 +69,10 @@ async def upload(
         total_size += len(chunk)
 
     if not storage.validate_file_size(total_size):
-        return JSONResponse(
+        return upload_failed_response(
             status_code=413,
-            content={"error": "file_too_large", "size_bytes": total_size},
+            error="file_too_large",
+            size_bytes=total_size,
         )
 
     # 4. write to temp storage
@@ -73,7 +80,10 @@ async def upload(
     try:
         file_path = storage.write_file(session_id, data, mime_type)
     except ValueError as exc:
-        return JSONResponse(status_code=400, content={"error": str(exc)})
+        return upload_failed_response(
+            status_code=400,
+            error=str(exc),
+        )
 
     # 5. enqueue job
     job_data = {
@@ -83,7 +93,14 @@ async def upload(
         "trace_id": trace_id,
     }
 
-    result = await enqueue_job("process_media", job_data, sync_fallback=_process_media_sync)
+    await set_job_status(
+        job_id,
+        "accepted",
+        session_id=session_id,
+        trace_id=trace_id,
+    )
+
+    result = await enqueue_job("process_media", job_data, job_id=job_id, sync_fallback=_process_media_sync)
 
     return JSONResponse(
         status_code=202,
@@ -93,31 +110,22 @@ async def upload(
             "mode": result.mode,
             "session_id": session_id,
             "trace_id": trace_id,
+            "status_url": f"/jobs/{result.job_id}",
         },
     )
 
 
-@router.get("/health")
-async def health() -> JSONResponse:
-    storage = get_temp_storage()
-    quota = storage.check_quota()
-    is_redis_up = await redis_available()
+@router.get("/jobs/{job_id}", tags=["Uploads"])
+async def get_job(job_id: str) -> JSONResponse:
+    payload = await get_job_status(job_id)
+    if payload is None:
+        return JSONResponse(status_code=404, content={"error": "job_not_found"})
 
-    overall = "ok" if is_redis_up else "degraded"
-
-    return JSONResponse(content={
-        "status": overall,
-        "service": "openVman-backend",
-        "redis": "connected" if is_redis_up else "disconnected",
-        "temp_storage": {
-            "usage_mb": round(quota.usage_mb, 2),
-            "limit_mb": quota.limit_mb,
-            "ok": quota.ok,
-        },
-    })
+    return JSONResponse(content=payload)
 
 
-@router.get("/admin/queue/dlq")
+
+@router.get("/admin/dlq", tags=["Admin"])
 async def get_dlq(limit: int = Query(default=20, ge=1, le=100)) -> JSONResponse:
     """Return dead-letter queue entries from Redis."""
     redis = await get_redis()

@@ -72,18 +72,17 @@ redis-server \
 redis_pid=$!
 wait_for_redis
 
-log "starting IndexTTS on 127.0.0.1:${INDEX_TTS_PORT}"
+log "starting IndexTTS on 127.0.0.1:${INDEX_TTS_PORT} (background, TTS will fallback until ready)"
 (
     cd /app/index-tts-vllm
     export PORT="${INDEX_TTS_PORT}"
     exec /app/index-tts-vllm/entrypoint.sh
 ) &
 index_tts_pid=$!
-wait_for_index_tts
 
 log "starting backend API on 0.0.0.0:${BACKEND_PORT}"
-case "${UVICORN_RELOAD:-0}" in
-    1|true|TRUE|yes|YES)
+case "${ENV:-prod}" in
+    dev|DEV)
         uvicorn app.main:app --host 0.0.0.0 --port "${BACKEND_PORT}" --reload &
         ;;
     *)

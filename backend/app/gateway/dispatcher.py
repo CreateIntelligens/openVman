@@ -87,6 +87,7 @@ async def dispatch(file_path: str, mime_type: str, trace_id: str) -> dict[str, A
         logger.error("dispatch_timeout trace_id=%s category=%s", trace_id, category)
         return {
             "type": "processing_error",
+            "error_code": "GATEWAY_TIMEOUT",
             "reason": f"processing timeout ({cfg.media_processing_timeout_ms}ms)",
             "mime_type": mime_type,
         }

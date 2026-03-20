@@ -1,4 +1,4 @@
-"""Tests for GET /health route."""
+"""Tests for backend health routes."""
 
 from __future__ import annotations
 
@@ -37,22 +37,28 @@ def client(tmp_path):
             yield c
 
 
-class TestHealthRedisUp:
-    def test_health_ok_when_redis_connected(self, client: TestClient):
-        with patch("app.gateway.routes.redis_available", new_callable=AsyncMock, return_value=True):
-            resp = client.get("/health")
-            assert resp.status_code == 200
-            body = resp.json()
-            assert body["status"] == "ok"
-            assert body["redis"] == "connected"
-            assert body["temp_storage"]["ok"] is True
+class TestHealthzOk:
+    def test_healthz_ok_when_redis_connected(self, client: TestClient):
+        with patch("app.main.redis_available", new_callable=AsyncMock, return_value=True):
+            resp = client.get("/healthz")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "ok"
+        assert body["service"] == "tts-router"
+        assert body["redis"] == "connected"
+        assert body["temp_storage"]["ok"] is True
+        assert body["dependencies"]["redis"]["status"] == "ok"
+        assert body["dependencies"]["temp_storage"]["status"] == "ok"
 
 
-class TestHealthRedisDown:
-    def test_health_degraded_when_redis_down(self, client: TestClient):
-        with patch("app.gateway.routes.redis_available", new_callable=AsyncMock, return_value=False):
-            resp = client.get("/health")
-            assert resp.status_code == 200
-            body = resp.json()
-            assert body["status"] == "degraded"
-            assert body["redis"] == "disconnected"
+class TestHealthzDegraded:
+    def test_healthz_degraded_when_redis_down(self, client: TestClient):
+        with patch("app.main.redis_available", new_callable=AsyncMock, return_value=False):
+            resp = client.get("/healthz")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "degraded"
+        assert body["redis"] == "disconnected"
+        assert body["dependencies"]["redis"]["status"] == "error"

@@ -17,6 +17,7 @@ def _read_text(path: Path) -> str:
 def test_backend_env_example_prefers_local_index_tts_and_redis():
     env_example = _read_text(BACKEND_ROOT / ".env.example")
 
+    assert "ENV=dev" in env_example
     assert "TTS_INDEX_URL=http://127.0.0.1:8011" in env_example
     assert "REDIS_URL=redis://127.0.0.1:6379" in env_example
 
@@ -55,4 +56,6 @@ def test_backend_image_starts_local_redis_and_index_tts():
 
     assert "redis-server" in entrypoint
     assert "/app/index-tts-vllm/entrypoint.sh" in entrypoint
+    assert 'case "${ENV:-prod}"' in entrypoint
     assert "uvicorn app.main:app" in entrypoint
+    assert "--reload" in entrypoint

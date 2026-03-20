@@ -33,6 +33,10 @@ class TTSRouterConfig(BaseSettings):
         populate_by_name=True,
     )
 
+    # --- Environment ---
+    env: str = "prod"
+    backend_port: int = Field(default=8200, validation_alias="BACKEND_PORT")
+
     # --- Index TTS ---
     tts_index_url: str = ""
     tts_index_character: str = "hayley"
@@ -110,11 +114,16 @@ class TTSRouterConfig(BaseSettings):
     crawler_blocked_domains: str = ""
 
     # --- Internal ---
-    brain_url: str = "http://brain:8100"
+    brain_url: str = "http://api:8100"
+    gateway_internal_token: str = "change-me-in-production"
 
     @property
     def supported_mime_types(self) -> frozenset[str]:
         return frozenset(_split_csv_values(self.media_supported_types))
+
+    @property
+    def is_dev(self) -> bool:
+        return self.env == "dev"
 
     @property
     def blocked_domain_set(self) -> frozenset[str]:

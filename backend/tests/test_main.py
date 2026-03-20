@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
+import warnings
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -40,19 +41,75 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
     return module, FakeMarkItDown
 
 
+def test_app_import_avoids_on_event_deprecation(monkeypatch):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        _load_main(monkeypatch, max_upload_bytes=1024)
+
+    deprecations = [
+        str(item.message)
+        for item in caught
+        if issubclass(item.category, DeprecationWarning) and "on_event is deprecated" in str(item.message)
+    ]
+
+    assert deprecations == []
+
+
+def test_run_server_uses_configured_dev_mode(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    fake_cfg = types.SimpleNamespace(backend_port=9999, is_dev=True)
+    captured: dict[str, object] = {}
+
+    def _fake_run(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=_fake_run))
+    module.get_tts_config = lambda: fake_cfg
+
+    module.run_server()
+
+    assert captured["args"] == ("app.main:app",)
+    assert captured["kwargs"] == {
+        "host": "0.0.0.0",
+        "port": 9999,
+        "reload": True,
+    }
+
+
 def test_convert_rejects_oversized_upload(monkeypatch):
     module, fake_markitdown = _load_main(monkeypatch, max_upload_bytes=4)
     client = TestClient(module.app)
 
     response = client.post(
-        "/convert",
+        "/documents/convert",
         files={"file": ("note.txt", b"abcdef", "text/plain")},
     )
 
     assert response.status_code == 413
-    assert response.json()["error"] == "uploaded file too large"
+    assert response.json()["error_code"] == "UPLOAD_FAILED"
     assert fake_markitdown.init_count == 0
-    assert fake_markitdown.convert_paths == []
+
+
+def test_convert_returns_upload_failed_code_when_conversion_crashes(monkeypatch):
+    module, _fake_markitdown = _load_main(monkeypatch, max_upload_bytes=1024)
+    client = TestClient(module.app)
+
+    class BrokenConverter:
+        def convert(self, path: str):
+            raise RuntimeError("boom")
+
+    module._md_converter = BrokenConverter()
+
+    response = client.post(
+        "/documents/convert",
+        files={"file": ("note.txt", b"hello", "text/plain")},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error"] == "boom"
+    assert response.json()["error_code"] == "UPLOAD_FAILED"
+    assert response.json()["message"] == "檔案上傳失敗"
 
 
 def test_convert_lazily_initializes_markitdown_once(monkeypatch):
@@ -62,11 +119,11 @@ def test_convert_lazily_initializes_markitdown_once(monkeypatch):
     assert fake_markitdown.init_count == 0
 
     first = client.post(
-        "/convert",
+        "/documents/convert",
         files={"file": ("note.txt", b"hello", "text/plain")},
     )
     second = client.post(
-        "/convert",
+        "/documents/convert",
         files={"file": ("note.txt", b"world", "text/plain")},
     )
 
@@ -76,3 +133,53 @@ def test_convert_lazily_initializes_markitdown_once(monkeypatch):
     assert second.json()["markdown"] == "converted markdown"
     assert fake_markitdown.init_count == 1
     assert len(fake_markitdown.convert_paths) == 2
+
+
+def test_openapi_merges_brain_request_schema(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    module.app.openapi_schema = None
+    monkeypatch.setattr(
+        module,
+        "_fetch_brain_openapi",
+        lambda: {
+            "paths": {
+                "/brain/chat": {
+                    "post": {
+                        "tags": ["Chat"],
+                        "summary": "Chat",
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/ChatRequest"}
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "Successful Response"}},
+                    }
+                }
+            },
+            "components": {
+                "schemas": {
+                    "ChatRequest": {
+                        "title": "ChatRequest",
+                        "type": "object",
+                        "properties": {"message": {"type": "string"}},
+                        "required": ["message"],
+                    }
+                }
+            },
+            "tags": [{"name": "Chat", "description": "Chat endpoints."}],
+        },
+        raising=False,
+    )
+    client = TestClient(module.app)
+
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    operation = response.json()["paths"]["/api/chat"]["post"]
+    assert operation["requestBody"]["required"] is True
+    assert operation["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ChatRequest"
+    }
