@@ -5,11 +5,11 @@
 本系統採用高度模組化的三層架構，確保認知、感官與表現完全獨立，專為高併發與低延遲互動設計：
 
 * **1. 前端表現層 (Frontend / Client)**：
-  * **職責**：感官（聽覺輸入/視覺輸出）。負責 ASR 語音轉文字、維持 WebSocket 連線、播放音訊，以及純粹的畫面渲染（底層 `<video>` 播放待機動畫，上層 `<canvas>` 根據音訊時鐘即時切換嘴型 Sprite 圖片）。
+  * **職責**：感官（聽覺輸入/視覺輸出）。負責 ASR 語音轉文字、維持 WebSocket 連線、播放音訊，以及純粹的畫面渲染（底層 `<video>` 播放待機動畫，上層 `<canvas>` 根據音訊時鐘執行 DINet AI 對嘴生成）。
   * **參考規格**：詳見 `02_FRONTEND_SPEC.md`。
 
 * **2. 後端通訊與發聲層 (Backend / Nervous System)**：
-  * **職責**：神經網路與發聲器官。負責 WebSocket 連線與 Session 管理，並包含一個輕量的訊息處理層 (message handling layer)，用來做事件正規化、排程、ACK、中斷與回傳封裝。它會向「大腦層」請求文字串流，並負責將文字轉為語音 (TTS)、提取唇形時間軸 (Viseme Extraction)，最後打包推播給前端。**絕對不處理影像，也不在此層維護 RAG 知識庫。**
+  * **職責**：神經網路與發聲器官。負責 WebSocket 連線與 Session 管理，並包含一個輕量的訊息處理層 (message handling layer)，用來做事件正規化、排程、ACK、中斷與回傳封裝。它會向「大腦層」請求文字串流，並負責將文字轉為語音 (TTS)，最後將音訊推送給前端由 DINet AI 即時生成嘴型。**絕對不處理影像，也不在此層維護 RAG 知識庫。**
   * **參考規格**：詳見 `01_BACKEND_SPEC.md`。
 
 * **3. 大腦認知層 (Brain / Cognitive Core)**：
@@ -75,12 +75,11 @@ Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 
 *(此流程在 HTTP 層進行，不佔用 WebSocket 頻寬)*
 
 **3.6 切換對嘴模式 (Set Lip Sync Mode)**
-客戶端於初始化設備偵測後、或動態切換對嘴策略時發送。告知後端目前使用的對嘴方式，以便優化頻寬（如在 AI 模式停止下發冗餘的 Viseme JSON）。
+客戶端於初始化設備偵測後、或動態切換對嘴策略時發送。告知後端目前使用的對嘴方式，以便優化頻寬（在 DINet 或 Wav2Lip 模式下，後端無需傳送 viseme 資料）。
 ```json
 {
   "event": "set_lip_sync_mode",
-  "mode": "wav2lip-high",
-  "need_visemes": false,
+  "mode": "dinet",
   "timestamp": 1710123472
 }
 ```
@@ -88,35 +87,28 @@ Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 
 ### 4. 伺服器發送格式 (Server -> Client)
 
 **4.1 音頻與動作串流 (Stream Chunk)**
-後端通訊層從大腦層拿到文字短句後，呼叫 TTS 生成音訊與 Viseme 陣列，並下發給前端。
+後端通訊層從大腦層拿到文字短句後，呼叫 TTS 生成音訊並下發給前端。前端接收音訊後，由 DINet 或 Wav2Lip AI 模型即時生成嘴型畫面。
 * `audio_base64`: 該段落的音訊二進位資料。
-* `visemes`: 陣列，`time` 是相對於此段音檔的絕對秒數（從 0 開始），`value` 是嘴型代碼。
 ```
 {
   "event": "server_stream_chunk",
   "chunk_id": "msg_001_chunk_01",
   "text": "這套架構最大的優勢，",
   "audio_base64": "UklGRi... (Base64 String)",
-  "visemes": [
-    {"time": 0.00, "value": "closed"},
-    {"time": 0.05, "value": "A"},
-    {"time": 0.15, "value": "E"},
-    {"time": 0.30, "value": "closed"}
-  ],
   "emotion": "smile",
   "is_final": false 
 }
 ```
+
+*(註：viseme 資料已廢除，由前端 AI 對嘴模型根據音訊直接生成嘴型)*
 *(註：`is_final: true` 代表大腦層已經結束生成，且這是最後一段音檔，前端播放完畢後應切換回待機狀態。)*
 
-**4.2 標準嘴型對應表 (Viseme Map)**
-為求前端 Sprite 切換簡化，定義以下 6 種基礎嘴型：
-* `closed`: 閉合 (待機狀態)
-* `A`: 張大嘴 (如：啊、哈)
-* `E`: 扁平嘴 (如：誒、一)
-* `I`: 微張露齒 (如：嘶、西)
-* `O`: 圓唇 (如：喔、我)
-* `U`: 嘟嘴 (如：嗚、不)
+**4.2 對嘴技術對應表 (Lip-Sync Technology Map)**
+本系統支援以下對嘴技術，由前端根據設備能力自動選擇：
+* `dinet`: DINet (Deformation Inpainting Network) - 2023 年新技術，**低算力需求 (39 Mflops)**，高畫質，可保留牙齒與口腔細節，適用於手機/無 GPU 設備
+* `wav2lip`: Wav2Lip AI - 2D 卷積生成，算力需求中等，適用於有 GPU 的高階設備
+
+*(註：舊版 Viseme 查表法已廢除)*
 
 **4.3 錯誤事件 (Error Event)**
 當後端或大腦層發生異常時，推播錯誤事件給前端，前端應據此顯示使用者友善訊息或觸發重試。
@@ -183,8 +175,8 @@ Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 
 3. SPEAKING (說話)：依賴 Web Audio API 時鐘，在 `<canvas>` 上繪製對應的嘴型。
 
 **5.2 絕對時鐘原則 (The Golden Sync Rule)**
-嚴格禁止前端使用 `setTimeout` 或 `setInterval` 進行嘴型動畫對時。
-前端必須優先使用 `video.currentTime` (透過 `VideoSyncManager` 封裝) 作為唯一真相來源 (Source of Truth) 以確保影音不漂移。在 `requestAnimationFrame` 迴圈中，比對當前播放時間與 Viseme JSON 的 `time` 標籤，決定 `<canvas>` 該渲染哪一張圖。
+嚴格禁止前端使用 `setTimeout` 或 `setInterval` 進行對時。
+前端必須優先使用 `video.currentTime` (透過 `VideoSyncManager` 封裝) 作為唯一真相來源 (Source of Truth) 以確保影音不漂移。在 `requestAnimationFrame` 迴圈中，驅動 DINet 或 Wav2Lip AI 模型生成當前幀的嘴型畫面。
 
 ### 6. 協定版本管理 (Protocol Versioning)
 

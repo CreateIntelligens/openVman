@@ -29,7 +29,7 @@
 * **初始化 AudioContext**：必須在使用者第一次點擊 `tap-to-start` 時初始化或 `resume()`，否則會被瀏覽器靜音。
 * **佇列結構**：
 ```javascript
-const audioQueue = []; // 存放 { buffer: AudioBuffer, visemes: Array, duration: number }
+const audioQueue = []; // 存放 { buffer: AudioBuffer, duration: number }
 let isPlaying = false;
 let currentStartTime = 0; // 當前音頻塊開始播放的 AudioContext.currentTime
 
@@ -37,7 +37,7 @@ let currentStartTime = 0; // 當前音頻塊開始播放的 AudioContext.current
 
 
 * **解碼與推入佇列**：
-收到 `server_stream_chunk` 時，將 Base64 轉為 ArrayBuffer，用 `audioContext.decodeAudioData` 解碼，並連同 Viseme JSON 推入佇列。
+收到 `server_stream_chunk` 時，將 Base64 轉為 ArrayBuffer，用 `audioContext.decodeAudioData` 解碼，並推入佇列。
 
 ### 4. 黃金時鐘對嘴邏輯 (The Golden Sync Loop)
 
@@ -55,11 +55,11 @@ function renderLoop() {
       return requestAnimationFrame(renderLoop);
     }
     
-    // 3. 查表找出當下該用哪個嘴型 (Viseme)
-    const currentViseme = findActiveViseme(currentAudioChunk.visemes, elapsedTime);
+    // 3. 驅動 DINet/Wav2Lip AI 模型生成嘴型
+    const mouthFrame = await generateLipSyncFrame(currentAudioChunk.buffer, elapsedTime);
     
     // 4. 繪製到 Canvas
-    drawMouthOnCanvas(currentViseme.value); 
+    drawMouthOnCanvas(mouthFrame);
   } else {
     // 待機狀態：清除 Canvas，露出底層 Video 的閉嘴狀態
     clearCanvas();
@@ -68,32 +68,29 @@ function renderLoop() {
   requestAnimationFrame(renderLoop);
 }
 
-// 輔助函式：找到時間軸上最近且生效的 Viseme
-function findActiveViseme(visemes, currentTime) {
-  let active = visemes[0];
-  for (let i = 0; i < visemes.length; i++) {
-    if (currentTime >= visemes[i].time) {
-      active = visemes[i];
-    } else {
-      break;
-    }
-  }
-  return active;
+// 輔助函式：驅動 AI 模型生成嘴型
+async function generateLipSyncFrame(audioBuffer, currentTime) {
+  // 根據 LipSyncManager 選擇的策略 (DINet 或 Wav2Lip) 驅動 AI 推論
+  // 返回渲染好的嘴型 frame
+  return await lipSyncManager.generateFrame(audioBuffer, currentTime);
 }
 
 ```
 
 ### 5. Canvas 繪圖與羽化邏輯 (Sprite Rendering & Blending)
 
-前端支援兩種對嘴渲染策略，依據設備能力或使用者設定切換：
+前端支援兩種對嘴渲染策略，依據設備能力自動選擇：
 
-1. **Viseme 查表法 (VisemeStrategy)**：
-   * 預先載入 6 種基礎嘴型的去背圖片 (PNG/WebP)。
-   * 如果 `visemeValue` 不是 `closed`，則清空上一幀並繪製對應圖片。
-2. **ONNX Wav2Lip AI 生成 (Wav2LipStrategy)**：
-   * 透過 ONNX Runtime Web 即時推論。
+1. **DINet (DinetStrategy)**：
+   * 2023 年新技術，**低算力需求 (39 Mflops)**，可在無 GPU 手機網頁執行
+   * 高畫質，可保留牙齒與口腔細節
+   * 透過 ONNX Runtime Web (WebGL) 即時推論
+2. **Wav2Lip AI 生成 (Wav2LipStrategy)**：
+   * 需要較高算力，適合有 GPU 的高階設備
+   * 透過 ONNX Runtime Web (WebGPU) 即時推論
    * **徑向漸變羽化 (Radial Gradient Feathering)**：為了消除矩形邊界，渲染時會套用一個徑向漸變遮罩 (Alpha Mask)，讓嘴唇外圍的 20% 平滑過渡至全透明，無縫與底層 `<video>` 人臉融合。
 
+*(註：舊版 Viseme 查表法已廢除)*
 
 
 ### 6. ASR 與語音輸入 (Speech Recognition)
@@ -118,13 +115,9 @@ function findActiveViseme(visemes, currentTime) {
 assets/
 ├── idle.mp4             # 待機循環動畫（底層 <video>）
 ├── thinking.mp4         # (可選) 思考中動畫
-├── mouth_closed.webp    # 6 種基礎嘴型（去背 PNG 或 WebP）
-├── mouth_A.webp
-├── mouth_E.webp
-├── mouth_I.webp
-├── mouth_O.webp
-├── mouth_U.webp
-└── manifest.json        # 嘴型座標定位與素材映射
+├── dinet-model.onnx     # DINet_mini 模型
+├── wav2lip-model.onnx   # Wav2Lip 模型
+└── manifest.json        # 模型配置與素材映射
 ```
 
 **`manifest.json` 範例**：
@@ -136,13 +129,9 @@ assets/
   },
   "mouth_offset": { "x": 420, "y": 1100 },
   "mouth_size":   { "w": 240, "h": 160 },
-  "sprites": {
-    "closed": "mouth_closed.webp",
-    "A": "mouth_A.webp",
-    "E": "mouth_E.webp",
-    "I": "mouth_I.webp",
-    "O": "mouth_O.webp",
-    "U": "mouth_U.webp"
+  "lip_sync": {
+    "dinet": "dinet-model.onnx",
+    "wav2lip": "wav2lip-model.onnx"
   }
 }
 ```
@@ -211,7 +200,7 @@ ws.onclose = () => { reconnect(); };
 ```
 佇列播完但 is_final 尚未收到 →
   方案 A：維持最後一個嘴型 3 秒後回到 IDLE（防止嘴型凍結）
-  方案 B：插入短暫閉嘴 (closed) 等待新 chunk 抵達
+  方案 B：插入短暫閉嘴等待新 chunk 抵達
 ```
 
 ### 11. 錯誤處理與使用者提示 (Error Display)
@@ -256,24 +245,25 @@ ws.onmessage = (msg) => {
 
 1. **硬體能力自動偵測**：
    * 初始化時偵測 `navigator.gpu` (WebGPU) 以及裝置記憶體與 CPU 核心數。
-   * **高階設備**：載入 ONNX Runtime Web (WebGPU/WASM 優先)，在前端動態推論 Wav2Lip。
-   * **低階設備**：平滑降級至資源耗費極低的 Viesme 查表法。
+   * **高階設備 (有 GPU)**：載入 ONNX Runtime Web (WebGPU)，使用 Wav2Lip 策略。
+   * **低階設備 (無 GPU/手機)**：使用 DINet 策略（算力僅 39 Mflops，高畫質）。
 2. **協定狀態通知 (`SET_LIP_SYNC_MODE`)**：
-   * 為了節省網路頻寬與後端算力，前端在初始化或切換對嘴模式時，必須透過 WebSocket 發送 `SET_LIP_SYNC_MODE`。
-   * 當處於 `wav2lip-high` 等 AI 模式時，後端不再下發冗餘的 Viseme JSON 資料。
+    * 為了節省網路頻寬，前端在初始化或切換對嘴模式時，必須透過 WebSocket 發送 `SET_LIP_SYNC_MODE`（dinet 或 wav2lip）。
+    * 後端不再下發 viseme 資料。
 3. **無縫動態切換**：
-   * 允許使用者在 UI 手動切換，或在效能嚴重掉幀時自動降級。切換過程不中斷當前 AudioContext 與播放佇列。
+    * 允許使用者在 UI 手動切換，或在效能嚴重掉幀時自動降級。切換過程不中斷當前 AudioContext 與播放佇列。
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    LipSyncManager                       │
 │  • 設備偵測 → 發送模式通知 → 自動選擇對嘴策略 → 渲染循環     │
 └──────────────────────┬──────────────────────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-   ┌─────────┐   ┌─────────┐   ┌─────────┐
-   │ Viseme  │   │Wav2Lip │   │ Device  │
-   │Strategy │   │Strategy│   │Detection│
-   └─────────┘   └─────────┘   └─────────┘
+                        │
+         ┌──────────────┼──────────────┐
+         ▼              ▼              ▼
+    ┌─────────┐   ┌─────────┐   ┌─────────┐
+    │ DINet   │   │Wav2Lip │   │ Device  │
+    │Strategy │   │Strategy│   │Detection│
+    └─────────┘   └─────────┘   └─────────┘
+*(Viseme 查表法已廢除)*
 ```

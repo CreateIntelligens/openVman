@@ -10,7 +10,7 @@
 
 | 編號 | 文件 | 職責 | 狀態 |
 |------|------|------|------|
-| 00 | [00_CORE_PROTOCOL.md](./docs/00_CORE_PROTOCOL.md) | 通訊協定 · WebSocket JSON · Viseme Map · 狀態機 · 錯誤事件 · 心跳 · 版本管理 | ✅ 已完成 |
+| 00 | [00_CORE_PROTOCOL.md](./docs/00_CORE_PROTOCOL.md) | 通訊協定 · WebSocket JSON · Lip-Sync 技術 · 狀態機 · 錯誤事件 · 心跳 · 版本管理 | ✅ 已完成 |
 | 01 | [01_BACKEND_SPEC.md](./docs/01_BACKEND_SPEC.md) | 後端 (神經)：Session · 訊息處理層 · Chunking · zh-TW TTS · Key Fallback · 中斷 · 配置 · 健檢 · 指標 · 關機 · 日誌 | ✅ 已完成 |
 | 02 | [02_FRONTEND_SPEC.md](./docs/02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
 | 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
@@ -48,7 +48,7 @@
   │  ├────────────────┤  │   ◄── ping / pong ──►  │  ┌────────────────┐  │
   │  │ <canvas>       │  │                        │  │ TTS Engine     │  │
   │  │  ONNX Wav2Lip / │  │   ┌────────────────┐   │  │ IndexTTS2 zh-TW│  │
-  │  │  Viseme 查表    │  │   │   🛡️ 網關層     │   │  │ + Viseme 提取  │  │
+  │  │  Wav2Lip AI    │  │   │   🛡️ 網關層     │   │  │ + 音訊輸出  │  │
   │  │  (動態自適應切換)│  │   │ (Gateway/Async)│   │  └────────────────┘  │
   │  ├────────────────┤  │   │  Media / Task  │   │  ┌────────────────┐  │
   │  │ Web Audio API  │  │   │  Media / Task  │   │  ┌────────────────┐  │
@@ -126,14 +126,14 @@
                                                      │ 短句
                                                      ▼
                                               ┌─────────────┐
-                                              │ TTS + Viseme │
-                                              │  合成引擎     │
+                                              │ TTS 音訊合成 │
+                                              │   引擎       │
                                               └──────┬──────┘
-                                                     │ audio_base64 + visemes[]
+                                                     │ audio_base64
                                                      ▼
                            stream_chunk        ┌─────────────┐
 ┌─────────┐  ◄─────────────────────────────────│  WebSocket   │
-│  前端    │   { audio, visemes, text,          │   下發       │
+│  前端    │   { audio, text,                   │   下發       │
 │ Browser │     emotion, is_final }            └─────────────┘
 └────┬────┘
      │
@@ -141,7 +141,7 @@
 ┌──────────────────────────────────────┐
 │  AudioContext 解碼 → 播放佇列         │
 │  requestAnimationFrame + currentTime │
-│  → 查表 Viseme → Canvas 繪製嘴型      │
+│  → DINet/Wav2Lip AI → Canvas 繪製嘴型 │
 └──────────────────────────────────────┘
      │
      ▼
@@ -186,8 +186,8 @@
 
 | 文件 | 章節數 | 涵蓋範圍 |
 |------|--------|----------|
-| `00_CORE_PROTOCOL` | 6 章 | 三層架構總覽 · WebSocket 協定 · Viseme Map · 狀態機 · **錯誤事件 (6 種錯誤碼)** · **Ping/Pong 心跳** · **Init Ack** · **協定版本管理 (SemVer)** · **連線認證** |
-| `01_BACKEND_SPEC` | 14 章 | Session 管理 · **訊息處理層** · LLM Chunking · **zh-TW TTS/Viseme** · **Provider / Key Fallback** · 中斷處理 · **環境變數配置** · **健康檢查 /health** · **Prometheus 效能指標 (6 項)** · **優雅關機 SIGTERM** · **結構化 JSON 日誌** |
+| `00_CORE_PROTOCOL` | 6 章 | 三層架構總覽 · WebSocket 協定 · Lip-Sync 技術 · 狀態機 · **錯誤事件 (6 種錯誤碼)** · **Ping/Pong 心跳** · **Init Ack** · **協定版本管理 (SemVer)** · **連線認證** |
+| `01_BACKEND_SPEC` | 14 章 | Session 管理 · **訊息處理層** · LLM Chunking · **zh-TW TTS** · **Provider / Key Fallback** · 中斷處理 · **環境變數配置** · **健康檢查 /health** · **Prometheus 效能指標 (6 項)** · **優雅關機 SIGTERM** · **結構化 JSON 日誌** |
 | `02_FRONTEND_SPEC` | 11 章 | DOM 結構 · Audio Queue · Golden Sync Loop · Canvas Sprite · ASR · 狀態機 · **素材 Manifest (含定位座標)** · **RWD 響應式 (4 種場景)** · **指數退避斷線重連** · **server_error 前端行為表** |
 | `03_BRAIN_SPEC` | 14 章 | **LanceDB 嵌入式向量 DB** · **bge-m3 本地 Embedding (1024 維)** · 知識庫結構 · 知識索引管線 (Chunk→Embed→Lance) · RAG 檢索 · **Message Handling Layer** · **Key / Model Fallback** · **Token 預算管理** · Tool Calling · 反思機制 · **多角色切換 (persona_id)** · **安全防護 (Guardrails)** · 環境變數 · HTTP/SSE 介面 |
 
@@ -199,9 +199,9 @@
 |------|----------|------|
 | 前端 | `video.currentTime` + VideoSyncManager | 高精度對嘴時鐘源，解決影音漂移 |
 | 前端 | `<video>` + `<canvas>` Alpha 漸變混合 | 2.5D 擬真切片渲染與無縫羽化 |
-| 前端 | **ONNX Runtime Web (Wav2Lip)** | 依設備能力動態選用 WebGPU/WASM AI 對嘴或 Viseme 查表 |
+| 前端 | **ONNX Runtime Web (DINet/Wav2Lip)** | 依設備能力選用 DINet (低階) 或 Wav2Lip (高階) AI 對嘴 |
 | 後端 | 標點符號截斷 (Punctuation Chunking) | LLM 串流 → 短句 → TTS，最小化延遲 |
-| 後端 | IndexTTS2-style zh-TW + Viseme 提取 | 以台灣口音為預設，支援品牌聲線與客製化發音 |
+| 後端 | IndexTTS2-style zh-TW | 以台灣口音為預設，支援品牌聲線與客製化發音 |
 | 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
 | 網關 | **BullMQ + Redis 佇列** | 非同步處理多模態素材 (影像/語音) 的 CPU 密集型預處理管線 |
 | 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、Web Crawler 爬蟲等前置工具能力 |
@@ -232,7 +232,7 @@
 - ✅ **獨立網關層 (Gateway)**：前置消化多模態素材與非同步任務 (BullMQ)，保持大腦與核心後端輕量、穩定。
 - ✅ **系統外掛擴充 (Gateway Plugins)**：原生支援 Camera Live 與 Web Crawler，強化視覺感知與即時爬網能力。
 - ✅ LLM → Chunker → TTS → WebSocket 串流管線，延遲最小化
-- ✅ **設備自適應對嘴 (Device-Adaptive Lip-Sync)**：ONNX WebGPU 高畫質 AI 對嘴，平滑降級至 Viseme 查表
+- ✅ **設備自適應對嘴 (Device-Adaptive Lip-Sync)**：高階設備 → Wav2Lip，低階設備 → DINet (39 Mflops)
 - ✅ VideoSync 唯一時鐘源 + 徑向漸變羽化，杜絕嘴型漂移與生硬邊界
 - ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + MarkItDown 多模態檔案處理
 - ✅ **Brain Skills 模組化擴充系統**：支援動態載載入外部技能工具
