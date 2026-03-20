@@ -6,14 +6,15 @@ from copy import deepcopy
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from config import get_settings
 from knowledge.workspace import get_workspace_root, resolve_workspace_document
 from memory.embedder import encode_query_with_fallback, encode_text
 from memory.retrieval import search_records
+from safety.observability import log_exception
 from .mock_data import FAQ_ENTRIES, ORDER_RECORDS
-from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from .skill import Skill
 
@@ -43,12 +44,8 @@ class ToolRegistry:
             handler = skill.handlers.get(tool_def.name)
             if not handler:
                 continue
-            
-            # Namespace tool name: skill_id:tool_name
+
             namespaced_name = f"{skill.manifest.id}:{tool_def.name}"
-            # Also allow direct name if no collision? 
-            # Better to be strict: primary way is namespaced.
-            
             tool = Tool(
                 name=namespaced_name,
                 description=f"[{skill.manifest.name}] {tool_def.description}",
@@ -56,6 +53,13 @@ class ToolRegistry:
                 handler=handler
             )
             self.register(tool)
+
+    def unregister_skill_tools(self, skill: Skill) -> None:
+        """Remove all tools registered by a skill."""
+        prefix = f"{skill.manifest.id}:"
+        to_remove = [name for name in self._tools if name.startswith(prefix)]
+        for name in to_remove:
+            del self._tools[name]
 
     def get(self, name: str) -> Tool:
         if name not in self._tools:
@@ -283,12 +287,7 @@ def get_tool_registry() -> ToolRegistry:
             for skill in manager.list_skills():
                 registry.register_skill_tools(skill)
         except Exception as exc:
-            # Observability not yet available at this stage in some contexts, but we can try
-            try:
-                from safety.observability import log_exception
-                log_exception("skill_registry_init_failed", exc)
-            except ImportError:
-                print(f"Failed to load skills: {exc}")
+            log_exception("skill_registry_init_failed", exc)
 
         _registry = registry
     return _registry

@@ -15,6 +15,11 @@ from config import BrainSettings
 
 
 class TestEmbeddingSettings:
+    def test_session_ttl_defaults_to_30_days(self):
+        cfg = BrainSettings()
+
+        assert cfg.max_session_ttl_minutes == 30 * 24 * 60
+
     def test_defaults_prefer_bge_chain(self):
         cfg = BrainSettings()
 

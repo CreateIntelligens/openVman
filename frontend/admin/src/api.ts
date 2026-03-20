@@ -41,6 +41,12 @@ async function post<T>(
   return jsonRequest<T>("POST", path, body);
 }
 
+/** Send a request without a JSON body (useful for PATCH, DELETE). */
+async function request<T>(method: string, path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { method });
+  return parseJson<T>(res);
+}
+
 /** Build a relative URL with project_id (and optional extra params) as query string. */
 function projectUrl(path: string, params: Record<string, string> = {}): string {
   const qs = new URLSearchParams({ project_id: activeProjectId, ...params });
@@ -106,6 +112,74 @@ export function deleteProject(projectId: string) {
     "DELETE",
     "/admin/projects",
     { project_id: projectId },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tools & Skills
+// ---------------------------------------------------------------------------
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+export interface SkillInfo {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  enabled: boolean;
+  tools: string[];
+}
+export interface ToolsData {
+  tools: ToolInfo[];
+  skills: SkillInfo[];
+}
+
+export async function fetchTools(): Promise<ToolsData> {
+  const res = await fetch(`${BASE}/admin/tools`);
+  return parseJson<ToolsData>(res);
+}
+
+export function toggleSkill(skillId: string) {
+  return request<{ status: string; skill_id: string; enabled: boolean }>(
+    "PATCH",
+    `/admin/skills/${encodeURIComponent(skillId)}/toggle`,
+  );
+}
+
+export function createSkill(skillId: string, name: string, description = "") {
+  return post<{ status: string; skill_id: string; name: string }>(
+    "/admin/skills",
+    { skill_id: skillId, name, description },
+  );
+}
+
+export async function fetchSkillFiles(skillId: string) {
+  const res = await fetch(`${BASE}/admin/skills/${encodeURIComponent(skillId)}/files`);
+  return parseJson<{ skill_id: string; files: Record<string, string> }>(res);
+}
+
+export function updateSkillFiles(skillId: string, files: Record<string, string>) {
+  return jsonRequest<{ status: string; skill_id: string; enabled: boolean }>(
+    "PUT",
+    `/admin/skills/${encodeURIComponent(skillId)}/files`,
+    { files },
+  );
+}
+
+export function deleteSkill(skillId: string) {
+  return request<{ status: string; skill_id: string }>(
+    "DELETE",
+    `/admin/skills/${encodeURIComponent(skillId)}`,
+  );
+}
+
+export function reloadAllSkills() {
+  return post<{ status: string; skills_count: number; skills: string[] }>(
+    "/admin/skills/reload",
+    {},
   );
 }
 

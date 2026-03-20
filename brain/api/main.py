@@ -82,9 +82,13 @@ from protocol.schemas import (
     ProjectDeleteRequest,
     ProtocolValidateRequest,
     SearchRequest,
+    SkillCreateRequest,
+    SkillFilesUpdateRequest,
 )
 from safety.guardrails import enforce_guardrails
 from safety.observability import get_metrics_store, log_event, log_exception
+from tools.skill_manager import get_skill_manager
+from tools.tool_registry import get_tool_registry
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brain")
@@ -213,6 +217,114 @@ async def metrics():
 @app.get("/api/identity")
 async def get_identity(persona_id: str = "default", project_id: str = "default"):
     return parse_identity(project_id, persona_id)
+
+
+# ---------------------------------------------------------------------------
+# Tools & Skills
+# ---------------------------------------------------------------------------
+
+def _skill_deps() -> tuple:
+    """Return (registry, manager) pair used by all skill endpoints."""
+    return get_tool_registry(), get_skill_manager()
+
+
+@app.get("/api/admin/tools")
+async def list_tools():
+    """List all registered tools and loaded skill plugins."""
+    registry, manager = _skill_deps()
+
+    tools = [
+        {"name": t.name, "description": t.description, "parameters": t.parameters}
+        for t in registry.list_tools()
+    ]
+    skills = [
+        {
+            "id": s.manifest.id,
+            "name": s.manifest.name,
+            "description": s.manifest.description,
+            "version": s.manifest.version,
+            "enabled": s.enabled,
+            "tools": [t.name for t in s.manifest.tools],
+        }
+        for s in manager.list_skills()
+    ]
+
+    return {"tools": tools, "skills": skills}
+
+
+@app.patch("/api/admin/skills/{skill_id}/toggle")
+async def toggle_skill(skill_id: str):
+    """Enable or disable a skill."""
+    registry, manager = _skill_deps()
+    try:
+        skill = manager.toggle_skill(skill_id, registry)
+        return {"status": "ok", "skill_id": skill_id, "enabled": skill.enabled}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/admin/skills")
+async def create_skill(payload: SkillCreateRequest):
+    """Create a new skill with skeleton files."""
+    registry, manager = _skill_deps()
+    try:
+        skill = manager.create_skill(payload.skill_id, payload.name, payload.description, registry)
+        return {
+            "status": "ok",
+            "skill_id": skill.manifest.id,
+            "name": skill.manifest.name,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/admin/skills/{skill_id}/files")
+async def get_skill_files(skill_id: str):
+    """Read raw skill.yaml and main.py contents."""
+    _registry, manager = _skill_deps()
+    try:
+        files = manager.get_skill_files(skill_id)
+        return {"skill_id": skill_id, "files": files}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.put("/api/admin/skills/{skill_id}/files")
+async def update_skill_files(skill_id: str, payload: SkillFilesUpdateRequest):
+    """Update skill files and hot-reload."""
+    registry, manager = _skill_deps()
+    try:
+        skill = manager.update_skill_files(skill_id, payload.files, registry)
+        return {
+            "status": "ok",
+            "skill_id": skill.manifest.id,
+            "enabled": skill.enabled,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/api/admin/skills/{skill_id}")
+async def delete_skill(skill_id: str):
+    """Delete a skill and its directory."""
+    registry, manager = _skill_deps()
+    try:
+        manager.delete_skill(skill_id, registry)
+        return {"status": "ok", "skill_id": skill_id}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/admin/skills/reload")
+async def reload_all_skills():
+    """Reload all skills from disk."""
+    registry, manager = _skill_deps()
+    skills = manager.reload_all(registry)
+    return {
+        "status": "ok",
+        "skills_count": len(skills),
+        "skills": [s.manifest.id for s in skills],
+    }
 
 
 # ---------------------------------------------------------------------------

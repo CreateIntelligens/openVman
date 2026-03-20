@@ -92,3 +92,13 @@ class KnowledgeIngestRequest(BaseModel):
 
 class AdminActionRequest(BaseModel):
     project_id: str = "default"
+
+
+class SkillCreateRequest(BaseModel):
+    skill_id: str = Field(..., min_length=1, description="Unique skill identifier")
+    name: str = Field(..., min_length=1, description="Display name")
+    description: str = Field("", description="Skill description")
+
+
+class SkillFilesUpdateRequest(BaseModel):
+    files: dict[str, str] = Field(..., description="Map of filename → content")

@@ -9,6 +9,7 @@ import Knowledge from "./pages/Knowledge";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import Projects from "./pages/Projects";
 import Personas from "./pages/Personas";
+import Tools from "./pages/Tools";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
 
 /* ── Sidebar style constants ── */
@@ -49,6 +50,7 @@ const projectTabs = [
 
 const globalTabs = [
   { key: "Projects", label: "Projects", icon: "folder_copy" },
+  { key: "Tools", label: "Tools", icon: "build" },
   { key: "Health", label: "Health", icon: "health_metrics" },
   { key: "Embed", label: "Embed", icon: "code" },
 ] as const;
@@ -57,7 +59,7 @@ const allTabs = [...projectTabs, ...globalTabs] as const;
 
 type Tab = (typeof allTabs)[number]["key"];
 
-const components: Record<Tab, FC> = { Chat, Health, Embed, Search, Memory, Personas, Knowledge, KnowledgeBase, Projects };
+const components: Record<Tab, FC> = { Chat, Health, Embed, Search, Memory, Personas, Knowledge, KnowledgeBase, Projects, Tools };
 
 function AppContent() {
   const [active, setActive] = useState<Tab>(() => {
