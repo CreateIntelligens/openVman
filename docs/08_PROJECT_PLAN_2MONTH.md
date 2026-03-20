@@ -7,7 +7,7 @@ openVman 兩個月開發規劃（8 週）
 在 8 週內完成一個可 Demo、可內測、具備台灣中文發音、OpenClaw-style brain router、前後端串流對嘴能力的 openVman MVP。
 
 **兩個月結束時應達成**：
-* 單輪問答可穩定完成：ASR -> Backend -> Brain -> TTS -> Viseme -> Frontend。
+* 單輪問答可穩定完成：ASR -> Backend -> Brain -> TTS -> DINet/Wav2Lip AI Lip-Sync -> Frontend。
 * TTS 預設為 `zh-TW`，以自建 `IndexTTS2`-style voice pipeline 為主，具備 node / provider fallback。
 * Brain 具備 message handling layer、RAG、tool calling、provider/model fallback。
 * 前端可在 kiosk / desktop 環境穩定運作，支援中斷與重連。
@@ -25,7 +25,7 @@ openVman 兩個月開發規劃（8 週）
 3. [x] Frontend skeleton
    * 建立音訊播放層、canvas 嘴型層、連線狀態機。
 4. [x] Shared protocol package
-   * 抽出 event schema、error code、viseme mapping、TypeScript/Python 共用型別。
+   * 抽出 event schema、error code、TypeScript/Python 共用型別。
 5. [x] 開發環境與 repo 規範
    * `.env.example`、lint、format、pre-commit、Docker Compose。
 
@@ -38,13 +38,13 @@ openVman 兩個月開發規劃（8 週）
 
 **Project Items**
 1. zh-TW `IndexTTS2`-style TTS 整合
-   * speaker profile、viseme extraction、詞典覆寫。
+   * speaker profile、詞典覆寫。
 2. TTS fallback router
    * node fallback、AWS/GCP fallback、錯誤分類、熔斷計數。
 3. LLM chunking pipeline
    * 標點切句、chunk queue、is_final 收斂。
 4. Frontend lip sync
-   * AudioContext 時鐘、viseme lookup、嘴型切換、播放佇列。
+   * AudioContext 時鐘、AI 對嘴、嘴型切換、播放佇列。
 5. Interrupt / recovery
    * 使用者插話、中止當前 stream、清空 queue、回到 idle。
 
@@ -97,7 +97,7 @@ openVman 兩個月開發規劃（8 週）
 |------|------|----------|------|
 | W1 | 架構骨架 | Backend/Brain/Frontend skeleton、shared protocol | ✅ |
 | W2 | 通訊打通 | WebSocket + mock brain + 基礎狀態機 | ✅ |
-| W3 | 語音打通 | 自建 zh-TW TTS、viseme、播放鏈路 | 🚧 |
+| W3 | 語音打通 | 自建 zh-TW TTS、AI 對嘴、播放鏈路 | 🚧 |
 | W4 | 中斷與 fallback | interrupt、queue control、TTS fallback | 🚧 |
 | W5 | RAG 上線 | LanceDB indexing、memory retrieval | ✅ |
 | W6 | Brain router | message layer、tool calling、LLM fallback | ✅ |

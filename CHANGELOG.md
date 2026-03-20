@@ -34,7 +34,7 @@
 - **Backend Gateway**: New independent microservice handling multi-modal media ingestion (images, audio, video) to offload the core backend.
 - **Gateway Task Queue**: Implemented BullMQ/Redis for asynchronous request scheduling and media preprocessing.
 - **Gateway Plugin System**: Introduced `Camera Live` (RTSP/WebRTC), `API Tool` (REST proxying), and `Web Crawler` (headless extraction) plugins.
-- **Device-Adaptive Lip-Sync**: Introduced `LipSyncManager` supporting ONNX Runtime Web for Wav2Lip (WebGPU/WASM) with performance-based fallback to Viseme lookup.
+- **Device-Adaptive Lip-Sync**: Introduced `LipSyncManager` supporting DINet (low-end devices, 39 Mflops) and Wav2Lip (high-end devices with GPU) AI lip-sync.
 - **Video Sync Manager**: Built high-precision audio-video synchronization tying Web Audio to `HTMLVideoElement.currentTime`.
 - **Canvas Feathering**: Added radial gradient masking for seamless mouth overlay blending.
 
