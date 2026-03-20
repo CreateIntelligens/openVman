@@ -25,6 +25,8 @@ from core.sse_events import (
     sse_error_to_dict,
     sse_event_to_dict,
 )
+from health_payload import build_health_payload
+from internal_routes import router as internal_router
 from infra.db import ensure_tables, get_db
 from infra.project_admin import (
     create_project,
@@ -93,34 +95,33 @@ from tools.tool_registry import get_tool_registry
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brain")
 
+_OPENAPI_TAGS = [
+    {"name": "System", "description": "Health, metrics, and identity endpoints."},
+    {"name": "Tools & Skills", "description": "Tool registry and skill management APIs."},
+    {"name": "Projects", "description": "Project administration endpoints."},
+    {"name": "Personas", "description": "Persona listing and administration endpoints."},
+    {"name": "Chat", "description": "Chat generation and history endpoints."},
+    {"name": "Search & Embeddings", "description": "Embedding generation and semantic search endpoints."},
+    {"name": "Memory & Sessions", "description": "Memory storage, maintenance, and session management endpoints."},
+    {"name": "Knowledge", "description": "Knowledge ingestion and knowledge management endpoints."},
+    {"name": "Protocol", "description": "Protocol validation endpoints."},
+    {"name": "Internal", "description": "Internal service-to-service endpoints."},
+]
+
+_TAG_SYSTEM = ["System"]
+_TAG_TOOLS = ["Tools & Skills"]
+_TAG_PROJECTS = ["Projects"]
+_TAG_PERSONAS = ["Personas"]
+_TAG_CHAT = ["Chat"]
+_TAG_SEARCH = ["Search & Embeddings"]
+_TAG_MEMORY = ["Memory & Sessions"]
+_TAG_KNOWLEDGE = ["Knowledge"]
+_TAG_PROTOCOL = ["Protocol"]
+
 
 # ---------------------------------------------------------------------------
 # Startup & Lifespan
 # ---------------------------------------------------------------------------
-
-def build_health_payload(project_id: str = "default") -> dict[str, object]:
-    """組裝 health response。"""
-    cfg = get_settings()
-    db = get_db(project_id)
-    embedding_backend = cfg.resolve_embedding_backend()
-    metrics = get_metrics_store().snapshot()
-    return {
-        "status": "ok",
-        "project_id": project_id,
-        "tables": db.table_names(),
-        "workspace_documents": len(list_workspace_documents(project_id)),
-        "personas": len(list_personas(project_id)),
-        "chat_enabled": True,
-        "embedding_version": embedding_backend.version,
-        "embedding_model": embedding_backend.model,
-        "llm_provider": cfg.llm_provider,
-        "llm_model": cfg.llm_model,
-        "metrics_summary": {
-            "counter_count": len(metrics["counters"]),
-            "timing_count": len(metrics["timings"]),
-        },
-    }
-
 
 async def warmup_resources() -> None:
     """背景預熱重資源，避免第一個請求承擔初始化成本。"""
@@ -161,10 +162,13 @@ app = FastAPI(
     title="openVman Brain",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url="/brain/docs",
+    redoc_url="/brain/redoc",
+    openapi_url="/brain/openapi.json",
+    swagger_ui_oauth2_redirect_url="/brain/docs/oauth2-redirect",
+    openapi_tags=_OPENAPI_TAGS,
 )
+app.include_router(internal_router)
 
 
 @app.middleware("http")
@@ -204,17 +208,17 @@ async def metrics_middleware(request: Request, call_next):
 # Health & Metrics & Identity
 # ---------------------------------------------------------------------------
 
-@app.get("/api/health")
+@app.get("/brain/health", tags=_TAG_SYSTEM)
 async def health(project_id: str = "default"):
     return build_health_payload(project_id)
 
 
-@app.get("/api/metrics")
+@app.get("/brain/metrics", tags=_TAG_SYSTEM)
 async def metrics():
     return get_metrics_store().snapshot()
 
 
-@app.get("/api/identity")
+@app.get("/brain/identity", tags=_TAG_SYSTEM)
 async def get_identity(persona_id: str = "default", project_id: str = "default"):
     return parse_identity(project_id, persona_id)
 
@@ -228,7 +232,7 @@ def _skill_deps() -> tuple:
     return get_tool_registry(), get_skill_manager()
 
 
-@app.get("/api/admin/tools")
+@app.get("/brain/tools", tags=_TAG_TOOLS)
 async def list_tools():
     """List all registered tools and loaded skill plugins."""
     registry, manager = _skill_deps()
@@ -252,7 +256,7 @@ async def list_tools():
     return {"tools": tools, "skills": skills}
 
 
-@app.patch("/api/admin/skills/{skill_id}/toggle")
+@app.patch("/brain/skills/{skill_id}/toggle", tags=_TAG_TOOLS)
 async def toggle_skill(skill_id: str):
     """Enable or disable a skill."""
     registry, manager = _skill_deps()
@@ -263,7 +267,7 @@ async def toggle_skill(skill_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post("/api/admin/skills")
+@app.post("/brain/skills", tags=_TAG_TOOLS)
 async def create_skill(payload: SkillCreateRequest):
     """Create a new skill with skeleton files."""
     registry, manager = _skill_deps()
@@ -278,7 +282,7 @@ async def create_skill(payload: SkillCreateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get("/api/admin/skills/{skill_id}/files")
+@app.get("/brain/skills/{skill_id}/files", tags=_TAG_TOOLS)
 async def get_skill_files(skill_id: str):
     """Read raw skill.yaml and main.py contents."""
     _registry, manager = _skill_deps()
@@ -289,7 +293,7 @@ async def get_skill_files(skill_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.put("/api/admin/skills/{skill_id}/files")
+@app.put("/brain/skills/{skill_id}/files", tags=_TAG_TOOLS)
 async def update_skill_files(skill_id: str, payload: SkillFilesUpdateRequest):
     """Update skill files and hot-reload."""
     registry, manager = _skill_deps()
@@ -304,7 +308,7 @@ async def update_skill_files(skill_id: str, payload: SkillFilesUpdateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/api/admin/skills/{skill_id}")
+@app.delete("/brain/skills/{skill_id}", tags=_TAG_TOOLS)
 async def delete_skill(skill_id: str):
     """Delete a skill and its directory."""
     registry, manager = _skill_deps()
@@ -315,7 +319,7 @@ async def delete_skill(skill_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post("/api/admin/skills/reload")
+@app.post("/brain/skills/reload", tags=_TAG_TOOLS)
 async def reload_all_skills():
     """Reload all skills from disk."""
     registry, manager = _skill_deps()
@@ -328,17 +332,17 @@ async def reload_all_skills():
 
 
 # ---------------------------------------------------------------------------
-# Project Admin
+# Projects
 # ---------------------------------------------------------------------------
 
-@app.get("/api/admin/projects")
-async def admin_list_projects():
+@app.get("/brain/projects", tags=_TAG_PROJECTS)
+async def list_projects_route():
     projects = list_projects()
     return {"projects": projects, "project_count": len(projects)}
 
 
-@app.post("/api/admin/projects")
-async def admin_create_project(payload: ProjectCreateRequest):
+@app.post("/brain/projects", tags=_TAG_PROJECTS)
+async def create_project_route(payload: ProjectCreateRequest):
     try:
         result = create_project(payload.label)
         log_event("project_created", project_id=result["project_id"])
@@ -347,8 +351,8 @@ async def admin_create_project(payload: ProjectCreateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/api/admin/projects")
-async def admin_delete_project(payload: ProjectDeleteRequest):
+@app.delete("/brain/projects", tags=_TAG_PROJECTS)
+async def delete_project_route(payload: ProjectDeleteRequest):
     try:
         result = delete_project(payload.project_id)
         log_event("project_deleted", project_id=payload.project_id)
@@ -357,8 +361,8 @@ async def admin_delete_project(payload: ProjectDeleteRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get("/api/admin/projects/{project_id}")
-async def admin_get_project(project_id: str):
+@app.get("/brain/projects/{project_id}", tags=_TAG_PROJECTS)
+async def get_project_route(project_id: str):
     try:
         return get_project_info(project_id)
     except ValueError as exc:
@@ -369,14 +373,14 @@ async def admin_get_project(project_id: str):
 # Personas
 # ---------------------------------------------------------------------------
 
-@app.get("/api/personas")
-async def personas(project_id: str = "default"):
+@app.get("/brain/personas", tags=_TAG_PERSONAS)
+async def list_personas_route(project_id: str = "default"):
     items = list_personas(project_id)
     return {"personas": items, "persona_count": len(items)}
 
 
-@app.post("/api/admin/personas")
-async def create_persona(payload: PersonaCreateRequest):
+@app.post("/brain/personas", tags=_TAG_PERSONAS)
+async def create_persona_route(payload: PersonaCreateRequest):
     try:
         result = create_persona_scaffold(payload.persona_id, payload.label, payload.project_id)
         log_event("persona_created", persona_id=payload.persona_id, project_id=payload.project_id)
@@ -385,8 +389,8 @@ async def create_persona(payload: PersonaCreateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/api/admin/personas")
-async def delete_persona(payload: PersonaDeleteRequest):
+@app.delete("/brain/personas", tags=_TAG_PERSONAS)
+async def delete_persona_route(payload: PersonaDeleteRequest):
     try:
         result = delete_persona_scaffold(payload.persona_id, payload.project_id)
         log_event("persona_deleted", persona_id=payload.persona_id, project_id=payload.project_id)
@@ -395,8 +399,8 @@ async def delete_persona(payload: PersonaDeleteRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/api/admin/personas/clone")
-async def clone_persona(payload: PersonaCloneRequest):
+@app.post("/brain/personas/clone", tags=_TAG_PERSONAS)
+async def clone_persona_route(payload: PersonaCloneRequest):
     try:
         result = clone_persona_scaffold(payload.source_persona_id, payload.target_persona_id, payload.project_id)
         log_event(
@@ -414,7 +418,7 @@ async def clone_persona(payload: PersonaCloneRequest):
 # Chat
 # ---------------------------------------------------------------------------
 
-@app.post("/api/chat")
+@app.post("/brain/chat", tags=_TAG_CHAT)
 async def chat(request: Request, payload: ChatRequest):
     """Generate a reply using workspace context, retrieval, and recent session history."""
     try:
@@ -443,7 +447,7 @@ async def chat(request: Request, payload: ChatRequest):
         raise HTTPException(status_code=502, detail=error_payload) from exc
 
 
-@app.post("/api/chat/stream")
+@app.post("/brain/chat/stream", tags=_TAG_CHAT)
 async def chat_stream(request: Request, payload: ChatRequest):
     """Stream chat generation through SSE."""
     try:
@@ -462,7 +466,7 @@ async def chat_stream(request: Request, payload: ChatRequest):
     return EventSourceResponse(_stream_generation_events(context))
 
 
-@app.get("/api/chat/history")
+@app.get("/brain/chat/history", tags=_TAG_CHAT)
 async def get_chat_history(session_id: str, persona_id: str = "default", project_id: str = "default"):
     try:
         messages = list_session_messages(session_id, persona_id, project_id=project_id)
@@ -475,7 +479,7 @@ async def get_chat_history(session_id: str, persona_id: str = "default", project
 # Search & Embedding
 # ---------------------------------------------------------------------------
 
-@app.post("/api/embed")
+@app.post("/brain/embed", tags=_TAG_SEARCH)
 async def embed(payload: EmbedRequest):
     """向量化文字"""
     vectors = get_embedder().encode(payload.texts)
@@ -486,7 +490,7 @@ async def embed(payload: EmbedRequest):
     }
 
 
-@app.post("/api/search")
+@app.post("/brain/search", tags=_TAG_SEARCH)
 async def search(request: Request, payload: SearchRequest):
     """在 LanceDB 中語意搜尋"""
     envelope = build_message_envelope(request, payload.model_dump(), content_key="query")
@@ -541,7 +545,7 @@ async def search(request: Request, payload: SearchRequest):
 # Memory & Sessions
 # ---------------------------------------------------------------------------
 
-@app.post("/api/memories")
+@app.post("/brain/memories", tags=_TAG_MEMORY)
 async def add_memory(request: Request, payload: AddMemoryRequest):
     """新增一筆記憶。"""
     envelope = build_message_envelope(request, payload.model_dump(), content_key="text")
@@ -575,7 +579,7 @@ async def add_memory(request: Request, payload: AddMemoryRequest):
     return {"status": "ok", "trace_id": envelope.context.trace_id, "text": text}
 
 
-@app.get("/api/memories")
+@app.get("/brain/memories", tags=_TAG_MEMORY)
 async def list_memories(project_id: str = "default", page: int = 1, page_size: int = 20):
     try:
         return query_memories(project_id=project_id, page=page, page_size=page_size)
@@ -584,7 +588,7 @@ async def list_memories(project_id: str = "default", page: int = 1, page_size: i
         raise HTTPException(status_code=500, detail="無法讀取記憶列表") from exc
 
 
-@app.delete("/api/memories")
+@app.delete("/brain/memories", tags=_TAG_MEMORY)
 async def delete_memory(payload: AddMemoryRequest):
     if not payload.text:
         raise HTTPException(status_code=400, detail="text 不可為空")
@@ -597,7 +601,7 @@ async def delete_memory(payload: AddMemoryRequest):
         raise HTTPException(status_code=500, detail="刪除記憶失敗") from exc
 
 
-@app.get("/api/sessions")
+@app.get("/brain/sessions", tags=_TAG_MEMORY)
 async def list_sessions(project_id: str = "default", persona_id: str | None = None):
     try:
         sessions = list_sessions_for_project(project_id=project_id, persona_id=persona_id)
@@ -607,7 +611,7 @@ async def list_sessions(project_id: str = "default", persona_id: str | None = No
         raise HTTPException(status_code=500, detail="無法讀取 session 列表") from exc
 
 
-@app.delete("/api/sessions/{session_id}")
+@app.delete("/brain/sessions/{session_id}", tags=_TAG_MEMORY)
 async def delete_session(session_id: str, project_id: str = "default"):
     deleted = delete_session_for_project(project_id=project_id, session_id=session_id)
     if not deleted:
@@ -620,7 +624,7 @@ async def delete_session(session_id: str, project_id: str = "default"):
 # Knowledge Ingestion (Gateway entry point)
 # ---------------------------------------------------------------------------
 
-@app.post("/api/knowledge/ingest")
+@app.post("/brain/knowledge/ingest", tags=_TAG_KNOWLEDGE)
 async def ingest_knowledge_content(payload: KnowledgeIngestRequest):
     """接收 Gateway 傳來的處理過文字，存進 workspace 並觸發 reindex。"""
     try:
@@ -634,24 +638,24 @@ async def ingest_knowledge_content(payload: KnowledgeIngestRequest):
 
 
 # ---------------------------------------------------------------------------
-# Knowledge Admin (前台管理介面用)
+# Knowledge Management
 # ---------------------------------------------------------------------------
 
-@app.get("/api/admin/knowledge/documents")
-async def list_knowledge_documents(project_id: str = "default"):
+@app.get("/brain/knowledge/documents", tags=_TAG_KNOWLEDGE)
+async def list_knowledge_documents_route(project_id: str = "default"):
     documents = list_workspace_documents(project_id)
     return {"documents": documents, "document_count": len(documents)}
 
 
-@app.get("/api/admin/knowledge/base/documents")
-async def list_knowledge_base_docs(project_id: str = "default"):
+@app.get("/brain/knowledge/base/documents", tags=_TAG_KNOWLEDGE)
+async def list_knowledge_base_documents_route(project_id: str = "default"):
     documents = list_knowledge_base_documents(project_id)
     directories = list_knowledge_base_directories(project_id)
     return {"documents": documents, "document_count": len(documents), "directories": directories}
 
 
-@app.get("/api/admin/knowledge/document")
-async def get_knowledge_document(path: str, project_id: str = "default"):
+@app.get("/brain/knowledge/document", tags=_TAG_KNOWLEDGE)
+async def get_knowledge_document_route(path: str, project_id: str = "default"):
     try:
         return read_workspace_document(path, project_id)
     except ValueError as exc:
@@ -660,8 +664,8 @@ async def get_knowledge_document(path: str, project_id: str = "default"):
         raise HTTPException(status_code=404, detail="找不到指定文件") from exc
 
 
-@app.put("/api/admin/knowledge/document")
-async def put_knowledge_document(payload: KnowledgeDocumentPutRequest):
+@app.put("/brain/knowledge/document", tags=_TAG_KNOWLEDGE)
+async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
     try:
         document = save_workspace_document(payload.path, payload.content, payload.project_id)
     except ValueError as exc:
@@ -669,8 +673,8 @@ async def put_knowledge_document(payload: KnowledgeDocumentPutRequest):
     return {"status": "ok", "document": document}
 
 
-@app.delete("/api/admin/knowledge/document")
-async def delete_knowledge_document(path: str, project_id: str = "default"):
+@app.delete("/brain/knowledge/document", tags=_TAG_KNOWLEDGE)
+async def delete_knowledge_document_route(path: str, project_id: str = "default"):
     try:
         delete_workspace_document(path, project_id)
     except ValueError as exc:
@@ -681,8 +685,8 @@ async def delete_knowledge_document(path: str, project_id: str = "default"):
     return {"status": "ok"}
 
 
-@app.post("/api/admin/knowledge/move")
-async def post_move_knowledge_document(payload: KnowledgeDocumentMoveRequest):
+@app.post("/brain/knowledge/move", tags=_TAG_KNOWLEDGE)
+async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
     try:
         document = move_workspace_document(payload.source_path, payload.target_path, payload.project_id)
     except ValueError as exc:
@@ -693,16 +697,16 @@ async def post_move_knowledge_document(payload: KnowledgeDocumentMoveRequest):
     return {"status": "ok", "document": document}
 
 
-@app.post("/api/admin/knowledge/mkdir")
-async def mkdir_knowledge(payload: KnowledgeDocumentPutRequest):
+@app.post("/brain/knowledge/directory", tags=_TAG_KNOWLEDGE)
+async def create_knowledge_directory_route(payload: KnowledgeDocumentPutRequest):
     try:
         return create_workspace_directory(payload.path, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/api/admin/knowledge/directory")
-async def rmdir_knowledge(path: str, project_id: str = "default"):
+@app.delete("/brain/knowledge/directory", tags=_TAG_KNOWLEDGE)
+async def delete_knowledge_directory_route(path: str, project_id: str = "default"):
     try:
         return delete_workspace_directory(path, project_id)
     except ValueError as exc:
@@ -711,8 +715,8 @@ async def rmdir_knowledge(path: str, project_id: str = "default"):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post("/api/admin/knowledge/upload")
-async def upload_knowledge_documents(
+@app.post("/brain/knowledge/upload", tags=_TAG_KNOWLEDGE)
+async def upload_knowledge_documents_route(
     files: list[UploadFile] = File(...),
     target_dir: str = Form(""),
     project_id: str = Form("default"),
@@ -731,8 +735,8 @@ async def upload_knowledge_documents(
     return {"status": "ok", "files": uploaded}
 
 
-@app.post("/api/admin/knowledge/reindex")
-async def reindex_knowledge(payload: AdminActionRequest):
+@app.post("/brain/knowledge/reindex", tags=_TAG_KNOWLEDGE)
+async def reindex_knowledge_route(payload: AdminActionRequest):
     try:
         result = await asyncio.to_thread(rebuild_knowledge_index, payload.project_id)
         log_event("knowledge_reindex", project_id=payload.project_id, **result)
@@ -746,11 +750,11 @@ async def reindex_knowledge(payload: AdminActionRequest):
 
 
 # ---------------------------------------------------------------------------
-# Admin: Memory Maintenance
+# Memory Maintenance
 # ---------------------------------------------------------------------------
 
-@app.post("/api/admin/memory/maintain")
-async def maintain_memory(payload: AdminActionRequest):
+@app.post("/brain/memories/maintain", tags=_TAG_MEMORY)
+async def maintain_memory_route(payload: AdminActionRequest):
     """記憶整理：去重、摘要、歸檔過期 transcripts。"""
     try:
         result = await asyncio.to_thread(maybe_run_memory_maintenance, True, payload.project_id)
@@ -766,7 +770,7 @@ async def maintain_memory(payload: AdminActionRequest):
 # Protocol Validation
 # ---------------------------------------------------------------------------
 
-@app.post("/api/protocol/validate")
+@app.post("/brain/protocol/validate", tags=_TAG_PROTOCOL)
 async def protocol_validate(payload: ProtocolValidateRequest):
     """Validate a protocol event payload against the versioned contract."""
     try:

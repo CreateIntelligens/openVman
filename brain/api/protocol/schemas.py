@@ -43,6 +43,16 @@ class ProtocolValidateRequest(BaseModel):
     version: str = "1.0.0"
 
 
+class InternalEnrichRequest(BaseModel):
+    trace_id: str = ""
+    session_id: str | None = None
+    context: dict[str, Any] | None = None
+    enriched_context: list[dict[str, Any]] = Field(default_factory=list)
+    media_refs: list[dict[str, Any]] = Field(default_factory=list)
+    project_id: str = "default"
+    persona_id: str = "default"
+
+
 class EmbedRequest(BaseModel):
     texts: list[str] = Field(..., min_length=1)
 

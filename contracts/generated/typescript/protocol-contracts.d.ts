@@ -57,7 +57,7 @@ export interface ServerStreamChunkEvent {
 
 export interface ServerErrorEvent {
   event: "server_error";
-  error_code: "TTS_TIMEOUT" | "LLM_OVERLOAD" | "BRAIN_UNAVAILABLE" | "AUTH_FAILED" | "SESSION_EXPIRED" | "INTERNAL_ERROR";
+  error_code: "TTS_TIMEOUT" | "GATEWAY_TIMEOUT" | "UPLOAD_FAILED" | "LLM_OVERLOAD" | "BRAIN_UNAVAILABLE" | "AUTH_FAILED" | "SESSION_EXPIRED" | "INTERNAL_ERROR";
   message: string;
   retry_after_ms?: number;
   timestamp: number;

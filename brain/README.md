@@ -39,7 +39,7 @@ browser
 
 - `nginx`
   - 對外唯一入口
-  - 將 `/api/*` 代理到 `api:8100`
+  - 將 `/brain/*` 代理到 `api:8100`
   - 將前端頁面與靜態資源對外提供
 - `web`
   - 使用者操作介面
@@ -334,7 +334,7 @@ user input
 
 ### 串流生成
 
-`/api/generate/stream` 會以 SSE 傳送事件。前端目前會處理的事件類型包含：
+`/brain/chat/stream` 會以 SSE 傳送事件。前端目前會處理的事件類型包含：
 
 - `session`
   - 回傳 session id
@@ -351,34 +351,34 @@ user input
 
 ### Core API
 
-- `GET /api/health`
+- `GET /brain/health`
   - 回傳服務健康狀態
-- `POST /api/embed`
+- `POST /brain/embed`
   - 將文字轉成 embedding
-- `POST /api/search`
+- `POST /brain/search`
   - 對 `knowledge` 或 `memories` 搜尋
-- `POST /api/add_memory`
+- `POST /brain/memories`
   - 寫入 memory
-- `POST /api/generate`
+- `POST /brain/chat`
   - 一次性取得完整回答
-- `POST /api/generate/stream`
+- `POST /brain/chat/stream`
   - 以 SSE 串流回答
-- `GET /api/chat/history`
+- `GET /brain/chat/history`
   - 讀取當前 session history
 
 ### Workspace Admin API
 
-- `GET /api/admin/knowledge/documents`
+- `GET /brain/knowledge/documents`
   - 列出可管理文件
-- `GET /api/admin/knowledge/document`
+- `GET /brain/knowledge/document`
   - 讀取單一文件
-- `PUT /api/admin/knowledge/document`
+- `PUT /brain/knowledge/document`
   - 儲存文件內容
-- `POST /api/admin/knowledge/move`
+- `POST /brain/knowledge/move`
   - 移動或重新命名文件
-- `POST /api/admin/knowledge/upload`
+- `POST /brain/knowledge/upload`
   - 上傳新文件
-- `POST /api/admin/knowledge/reindex`
+- `POST /brain/knowledge/reindex`
   - 重建 knowledge index
 
 ## 9. Docker 與 Port 規則
@@ -461,7 +461,7 @@ docker compose -f brain/docker-compose.yml up -d --build
 ### 3. 檢查健康度
 
 ```bash
-curl -s http://127.0.0.1:8787/api/health
+curl -s http://127.0.0.1:8787/brain/health
 ```
 
 預期至少應看到：
@@ -477,13 +477,13 @@ curl -s http://127.0.0.1:8787/api/health
 當你新增、上傳、修改可索引文件後，需要 reindex：
 
 ```bash
-curl -s -X POST http://127.0.0.1:8787/api/admin/knowledge/reindex
+curl -s -X POST http://127.0.0.1:8787/brain/knowledge/reindex
 ```
 
 ### 新增長期記憶
 
 ```bash
-curl -s -X POST http://127.0.0.1:8787/api/add_memory \
+curl -s -X POST http://127.0.0.1:8787/brain/memories \
   -H 'Content-Type: application/json' \
   -d '{"text":"使用者偏好繁體中文、簡短回答"}'
 ```
@@ -491,7 +491,7 @@ curl -s -X POST http://127.0.0.1:8787/api/add_memory \
 ### 測試向量搜尋
 
 ```bash
-curl -s -X POST http://127.0.0.1:8787/api/search \
+curl -s -X POST http://127.0.0.1:8787/brain/search \
   -H 'Content-Type: application/json' \
   -d '{"query":"糖尿病常見症狀","target":"knowledge"}'
 ```
@@ -499,7 +499,7 @@ curl -s -X POST http://127.0.0.1:8787/api/search \
 ### 同步聊天
 
 ```bash
-curl -s -X POST http://127.0.0.1:8787/api/generate \
+curl -s -X POST http://127.0.0.1:8787/brain/chat \
   -H 'Content-Type: application/json' \
   -d '{"message":"請根據目前知識簡短說明糖尿病常見症狀"}'
 ```

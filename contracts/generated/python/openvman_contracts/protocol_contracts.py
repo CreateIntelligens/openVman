@@ -46,7 +46,7 @@ class ServerStreamChunkEvent(GeneratedProtocolModel):
 
 class ServerErrorEvent(GeneratedProtocolModel):
     event: Literal['server_error']
-    error_code: Literal['TTS_TIMEOUT', 'LLM_OVERLOAD', 'BRAIN_UNAVAILABLE', 'AUTH_FAILED', 'SESSION_EXPIRED', 'INTERNAL_ERROR']
+    error_code: Literal['TTS_TIMEOUT', 'GATEWAY_TIMEOUT', 'UPLOAD_FAILED', 'LLM_OVERLOAD', 'BRAIN_UNAVAILABLE', 'AUTH_FAILED', 'SESSION_EXPIRED', 'INTERNAL_ERROR']
     message: str = Field(min_length=1)
     retry_after_ms: int | None = Field(default=None, ge=0)
     timestamp: int = Field(ge=0)

@@ -43,6 +43,8 @@ def test_load_protocol_contract_exposes_versioned_machine_readable_schemas():
     assert contract["events"]["client_init"]["schema"]["properties"]["event"]["const"] == "client_init"
     assert contract["events"]["server_error"]["schema"]["properties"]["error_code"]["enum"] == [
         "TTS_TIMEOUT",
+        "GATEWAY_TIMEOUT",
+        "UPLOAD_FAILED",
         "LLM_OVERLOAD",
         "BRAIN_UNAVAILABLE",
         "AUTH_FAILED",
@@ -128,6 +130,22 @@ def test_validate_server_event_rejects_unknown_error_code():
         )
 
     assert "error_code" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("error_code", ["GATEWAY_TIMEOUT", "UPLOAD_FAILED"])
+def test_validate_server_event_accepts_gateway_related_error_codes(error_code):
+    protocol_events = _protocol_events()
+
+    event = protocol_events.validate_server_event(
+        {
+            "event": "server_error",
+            "error_code": error_code,
+            "message": "gateway failure",
+            "timestamp": 1710123480,
+        }
+    )
+
+    assert event.error_code == error_code
 
 
 def test_validate_client_event_rejects_extra_fields_consistently():

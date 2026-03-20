@@ -6,6 +6,7 @@
 
 ### 1. 核心技術與目標 (Tech Stack & Core Goals)
 * **核心技術**：Node.js (搭配 `ws` 或 `socket.io`) 或 Python (搭配 `FastAPI` + `WebSockets`)。
+  > **實作現況**：目前採用 Python + FastAPI，以 `uvicorn` 作為 ASGI server。
 * **主要職責**：維持與多台機台 (Kiosk) 的 WebSocket 連線、執行訊息處理層 (message handling layer)、調用大腦層生成對話、調用 TTS 服務合成語音，最後將音訊資料打包推播（前端由 DINet AI 根據音訊即時生成嘴型）。
 * **效能要求**：必須非阻塞 (Non-blocking/Async)，確保高併發下各 Session 互不干擾。首字節延遲 (TTFB) 需控制在 1 秒內。
 
@@ -13,7 +14,7 @@
 伺服器必須在記憶體中維護一個 Session Map，管理所有活躍的機台連線。
 ```javascript
 // 概念範例 (Node.js)
-const activeSessions = new Map(); 
+const activeSessions = new Map();
 // Key: client_id (e.g., 'kiosk_01')
 // Value: { socket: WebSocket, llmStream: StreamController, audioQueue: Array }
 
@@ -21,13 +22,14 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     const data = JSON.parse(message);
     if (data.event === 'client_init') {
-      activeSessions.set(data.client_id, { socket: ws, isGenerating: false });
+      activeSessions.set(data.client, { socket: ws, isGenerating: false });
     }
     // 處理 user_speak 與 client_interrupt
   });
 });
 
 ```
+> **實作現況**：Session 管理尚未實作 WebSocket 層，目前由 Brain 端以 in-memory dict 管理 LLM 對話 session。
 
 ### 3. 訊息處理層 (Message Handling Layer)
 
@@ -50,6 +52,7 @@ const messageEnvelope = {
   received_at: Date.now()
 };
 ```
+> **實作現況**：目前以 FastAPI Pydantic model 實作 message envelope，trace_id / session_id 由 `uuid.uuid4()` 產生。
 
 ### 4. LLM 串流與句讀切分 (LLM Streaming & Chunking)
 
@@ -116,6 +119,7 @@ async function synthesizeWithFallback(text, session) {
   throw new Error("All TTS targets failed");
 }
 ```
+> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`。
 
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
@@ -136,6 +140,7 @@ const payload = {
 ws.send(JSON.stringify(payload));
 
 ```
+> **實作現況**：WebSocket 下發尚未實作，目前 TTS 音訊透過 HTTP response 直接回傳。
 
 *(註：viseme 資料已廢除，前端由 DINet/Wav2Lip AI 根據音訊生成嘴型)*
 
@@ -257,16 +262,17 @@ GET /health
 process.on('SIGTERM', async () => {
   server.close();            // 停止接受新連線
   healthStatus = 'degraded';
-  
+
   await Promise.race([
     waitForAllSessions(),    // 等待進行中 Session 完成
     sleep(30000)             // 最多等 30 秒
   ]);
-  
+
   cleanupAllSessions();
   process.exit(0);
 });
 ```
+> **實作現況**：以 FastAPI `lifespan` context manager 實作 graceful shutdown，關閉 httpx client pool、Redis 連線及 temp storage cleanup。
 
 ### 14. 日誌規範 (Logging)
 
