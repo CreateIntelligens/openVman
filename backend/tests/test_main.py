@@ -136,12 +136,14 @@ def test_convert_lazily_initializes_markitdown_once(monkeypatch):
 
 
 def test_openapi_merges_brain_request_schema(monkeypatch):
+    import asyncio
+
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     module.app.openapi_schema = None
-    monkeypatch.setattr(
-        module,
-        "_fetch_brain_openapi",
-        lambda: {
+    module._openapi_built = False
+
+    async def _fake_fetch():
+        return {
             "paths": {
                 "/brain/chat": {
                     "post": {
@@ -170,15 +172,12 @@ def test_openapi_merges_brain_request_schema(monkeypatch):
                 }
             },
             "tags": [{"name": "Chat", "description": "Chat endpoints."}],
-        },
-        raising=False,
-    )
-    client = TestClient(module.app)
+        }
 
-    response = client.get("/openapi.json")
+    monkeypatch.setattr(module, "_fetch_brain_openapi", _fake_fetch)
+    schema = asyncio.run(module._build_openapi_schema())
 
-    assert response.status_code == 200
-    operation = response.json()["paths"]["/api/chat"]["post"]
+    operation = schema["paths"]["/api/chat"]["post"]
     assert operation["requestBody"]["required"] is True
     assert operation["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ChatRequest"

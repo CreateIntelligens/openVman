@@ -43,6 +43,7 @@ from app.service import TTSRouterService
 logger = logging.getLogger("backend")
 _service: TTSRouterService | None = None
 _md_converter: MarkItDown | None = None
+_health_client: httpx.AsyncClient | None = None
 _UPLOAD_CHUNK_SIZE = 1024 * 1024
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
 
@@ -83,6 +84,8 @@ async def _shutdown_gateway_resources() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    global _health_client
+    _health_client = httpx.AsyncClient()
     await _startup_gateway_resources()
     await _build_openapi_schema()
     logger.info("backend startup complete")
@@ -92,6 +95,9 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await close_brain_proxy_client()
         await close_internal_client()
         await close_forward_client()
+        if _health_client is not None:
+            await _health_client.aclose()
+            _health_client = None
         await _shutdown_gateway_resources()
         logger.info("backend shutdown complete")
 
@@ -162,10 +168,10 @@ def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
 async def _fetch_brain_openapi() -> dict | None:
     brain_openapi_url = f"{get_tts_config().brain_url}/brain/openapi.json"
     try:
-        async with httpx.AsyncClient(timeout=_BRAIN_OPENAPI_TIMEOUT_SECONDS) as client:
-            resp = await client.get(brain_openapi_url)
-            resp.raise_for_status()
-            return resp.json()
+        client = _health_client or httpx.AsyncClient()
+        resp = await client.get(brain_openapi_url, timeout=_BRAIN_OPENAPI_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        return resp.json()
     except Exception as exc:
         logger.warning("failed to fetch brain openapi from %s: %s", brain_openapi_url, exc)
         return None
@@ -276,10 +282,11 @@ class SpeechRequest(BaseModel):
 async def healthz() -> dict:
     storage = get_temp_storage()
     quota = storage.check_quota()
-    return build_backend_health_payload(
+    return await build_backend_health_payload(
         service="tts-router",
         redis_available=await redis_available(),
         quota=quota,
+        client=_health_client,
     )
 
 

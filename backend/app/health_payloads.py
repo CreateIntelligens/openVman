@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import time
+from typing import Any
+
+import httpx
+
+from app.config import get_tts_config
 from app.gateway.temp_storage import QuotaStatus
+
+logger = logging.getLogger("backend")
+
+_HEALTH_TIMEOUT_SECONDS = 3
 
 
 def _temp_storage_payload(quota: QuotaStatus) -> dict[str, float | int | bool | str]:
@@ -14,28 +26,93 @@ def _temp_storage_payload(quota: QuotaStatus) -> dict[str, float | int | bool | 
     }
 
 
-def build_backend_health_payload(
+async def _probe_service(
+    client: httpx.AsyncClient,
+    name: str,
+    url: str,
+) -> dict[str, Any]:
+    """Probe a downstream service health endpoint."""
+    try:
+        resp = await client.get(url, timeout=_HEALTH_TIMEOUT_SECONDS)
+        body = resp.json()
+        status = body.get("status", "unknown")
+        return {"status": status, "http": resp.status_code, **body}
+    except httpx.TimeoutException:
+        return {"status": "unreachable", "error": "timeout"}
+    except httpx.ConnectError:
+        return {"status": "unreachable", "error": "connection_refused"}
+    except Exception as exc:
+        logger.warning("health probe %s failed: %s", name, exc)
+        return {"status": "unreachable", "error": str(exc)}
+
+
+async def _probe_downstream_services(
+    client: httpx.AsyncClient,
+) -> dict[str, dict[str, Any]]:
+    """Probe all known downstream services in parallel."""
+    cfg = get_tts_config()
+
+    targets: dict[str, str] = {
+        "brain": f"{cfg.brain_url}/brain/health",
+    }
+    if cfg.tts_index_url:
+        targets["index-tts"] = f"{cfg.tts_index_url}/health"
+
+    results = await asyncio.gather(
+        *(
+            _probe_service(client, name, url)
+            for name, url in targets.items()
+        ),
+    )
+    return dict(zip(targets.keys(), results))
+
+
+def _overall_status(
+    *,
+    redis_ok: bool,
+    quota_ok: bool,
+    downstream: dict[str, dict[str, Any]],
+) -> str:
+    if not redis_ok or not quota_ok:
+        return "degraded"
+    for svc in downstream.values():
+        status = svc.get("status", "unknown")
+        if status in ("unreachable", "error", "unhealthy"):
+            return "degraded"
+    return "ok"
+
+
+async def build_backend_health_payload(
     *,
     service: str,
     redis_available: bool,
     quota: QuotaStatus,
+    client: httpx.AsyncClient | None = None,
 ) -> dict[str, object]:
     temp_storage = _temp_storage_payload(quota)
-    dependencies = {
+    dependencies: dict[str, Any] = {
         "redis": {
             "status": "ok" if redis_available else "error",
             "connection": "connected" if redis_available else "disconnected",
         },
         "temp_storage": temp_storage,
     }
+
+    if client is not None:
+        downstream = await _probe_downstream_services(client)
+        dependencies.update(downstream)
+    else:
+        downstream = {}
+
+    status = _overall_status(
+        redis_ok=redis_available,
+        quota_ok=quota.ok,
+        downstream=downstream,
+    )
+
     return {
-        "status": "ok" if redis_available and quota.ok else "degraded",
+        "status": status,
         "service": service,
-        "redis": "connected" if redis_available else "disconnected",
-        "temp_storage": {
-            "usage_mb": temp_storage["usage_mb"],
-            "limit_mb": temp_storage["limit_mb"],
-            "ok": temp_storage["ok"],
-        },
+        "timestamp": time.time(),
         "dependencies": dependencies,
     }
