@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChatMessage,
   deleteSession,
@@ -10,6 +10,7 @@ import {
   RetrievalResult,
   SessionSummary,
   streamChat,
+  synthesizeSpeech,
 } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
 import MarkdownPreview from "../components/MarkdownPreview";
@@ -44,6 +45,55 @@ export default function Chat() {
   const [lastContext, setLastContext] = useState({ knowledge: 0, memory: 0 });
   const [lastSources, setLastSources] = useState(emptySources);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
+
+  const playingIndexRef = useRef<number | null>(null);
+  playingIndexRef.current = playingIndex;
+
+  const playTts = useCallback(async (text: string, index: number) => {
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    ttsAbortRef.current?.abort();
+
+    // Toggle off if clicking the same message
+    if (playingIndexRef.current === index) {
+      setPlayingIndex(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    ttsAbortRef.current = controller;
+    setPlayingIndex(index);
+
+    try {
+      const buf = await synthesizeSpeech(text, controller.signal);
+      const blob = new Blob([buf], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => {
+        setPlayingIndex(null);
+        audioRef.current = null;
+        URL.revokeObjectURL(url);
+      };
+      await audio.play();
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        console.error("TTS playback failed:", err);
+      }
+      if (audioRef.current) {
+        const src = audioRef.current.src;
+        audioRef.current = null;
+        if (src.startsWith("blob:")) URL.revokeObjectURL(src);
+      }
+      setPlayingIndex(null);
+    }
+  }, []);
 
   const activePersona = personas.find((persona) => persona.persona_id === selectedPersonaId) ?? defaultPersona;
   const conversationTitle = getConversationTitle(loadingHistory, sending);
@@ -108,6 +158,21 @@ export default function Chat() {
     persistSessionId(payload.session_id);
     setLastContext({ knowledge: knowledge.length, memory: memory.length });
     setLastSources({ knowledge, memory });
+
+    // Auto-play TTS for the new reply
+    if (payload.reply) {
+      const replyText = payload.reply;
+      const tts = playTts;
+      setTimeout(() => {
+        setMessages((current) => {
+          const idx = current.length - 1;
+          if (idx >= 0 && current[idx].role === "assistant") {
+            tts(replyText, idx);
+          }
+          return current;
+        });
+      }, 100);
+    }
   };
 
   const loadSessions = () => {
@@ -204,6 +269,12 @@ export default function Chat() {
     }
   }, [messages]);
 
+  // Cleanup audio on unmount
+  useEffect(() => () => {
+    ttsAbortRef.current?.abort();
+    audioRef.current?.pause();
+  }, []);
+
   const submit = async (value = input) => {
     const nextMessage = value.trim();
     if (!nextMessage || sending || loadingPersonas) {
@@ -255,8 +326,18 @@ export default function Chat() {
     }
   };
 
+  const stopAudio = () => {
+    ttsAbortRef.current?.abort();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPlayingIndex(null);
+  };
+
   const resetConversation = () => {
     abortControllerRef.current?.abort();
+    stopAudio();
     window.localStorage.removeItem(getSessionStorageKey(selectedPersonaId));
     resetViewState();
   };
@@ -438,13 +519,24 @@ export default function Chat() {
                   <span>{message.role === "user" ? "You" : "Brain"}</span>
                   {message.created_at && <span>{new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
                   {message.role === "assistant" && message.content && (
-                    <button
-                      onClick={() => navigator.clipboard.writeText(message.content)}
-                      className="opacity-0 group-hover/msg:opacity-100 transition-opacity ml-auto text-slate-500 hover:text-white"
-                      title="Copy"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                    </button>
+                    <div className="flex items-center gap-1 ml-auto opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => playTts(message.content, index)}
+                        className={`text-slate-500 hover:text-white ${playingIndex === index ? "!opacity-100 text-primary" : ""}`}
+                        title={playingIndex === index ? "Stop" : "Play"}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {playingIndex === index ? "stop" : "volume_up"}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(message.content)}
+                        className="text-slate-500 hover:text-white"
+                        title="Copy"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">content_copy</span>
+                      </button>
+                    </div>
                   )}
                 </div>
                 {message.role === "assistant" ? (

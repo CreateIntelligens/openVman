@@ -38,6 +38,9 @@ node_modules/
 .vscode/
 .idea/
 
+# Firebase
+firebase-debug.log
+
 # OS
 .DS_Store
 Thumbs.db

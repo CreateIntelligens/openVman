@@ -502,6 +502,24 @@ export function reindexKnowledge() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// TTS
+// ---------------------------------------------------------------------------
+
+export async function synthesizeSpeech(text: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+  const res = await fetch("/v1/audio/speech", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input: text }),
+    signal,
+  });
+  if (!res.ok) {
+    const msg = await parseErrorMessage(res);
+    throw new Error(msg);
+  }
+  return res.arrayBuffer();
+}
+
 export async function fetchMetrics() {
   return fetchJson<MetricsSnapshot>(apiUrl("/metrics"));
 }
