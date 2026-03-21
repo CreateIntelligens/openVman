@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.5.0] - 2026-03-21
+
+### Added
+- **Brain Gateway Integration**: Backend reverse-proxies all `/brain/*` and `/api/*` traffic to brain service, with OpenAPI schema auto-merge.
+- **Frontend Unified Routing**: Admin frontend traffic routed through backend gateway; removed standalone nginx proxy.
+- **Index-TTS Background Init**: Model loads in background thread; port binds immediately, health returns 503 until ready.
+- **Stale CUDA Lock Cleanup**: Detect and remove leftover `build/lock` from killed containers; pre-compile BigVGAN CUDA kernels on main thread.
+- **Aggregated Health Check**: `/healthz` probes all downstream services (brain, index-tts, redis) in parallel and returns unified status with `ok`/`degraded`.
+- **TTS Chat Playback**: Speaker button on assistant messages with auto-play on new replies, abort support, and Object URL lifecycle management.
+- **Brain Tool Loop**: `agent_loop.py` with `ToolRegistry`, `ToolExecutor`, and `SkillManager` — model can call tools, observe results, and continue reasoning.
+- **Brain Provider Fallback**: `ProviderRouter` with `KeyPool` round-robin, per-key cooldown, and `FallbackChain` for cross-provider/model failover.
+- **Brain Session Persistence**: SQLite-backed `SessionStore` replacing in-process memory; sessions survive container restarts.
+- **Brain Memory Governance**: `memory_governance.py` with importance scoring for memory lifecycle management.
+- **Brain Input Guardrails**: `guardrails.py` for input validation and content filtering.
+- **Brain Observability**: `observability.py` structured logging and routing metrics.
+- **Brain Message Protocol**: `MessageEnvelope` with trace ID, channel, and type standardization; `ProtocolEvents` for SSE.
+- **Brain Multi-Persona**: `personas.py` with persona-aware retrieval and isolation.
+- **Brain Retrieval Service**: Unified `retrieval_service.py` coordinating knowledge + memory search with configurable strategy.
+- **Internal Enrich Endpoint**: `/internal/enrich` for gateway-to-brain document forwarding.
+- **Multi-GPU Architecture**: `TORCH_CUDA_ARCH_LIST=8.6;8.9` supporting both RTX A4000 (Ampere) and RTX 4090 (Ada Lovelace).
+- **434 unit tests** across backend (175) and brain (259).
+
+### Changed
+- Consolidated single-container backend with embedded Index-TTS and Redis.
+- Removed redundant sub-project `docker-compose.yml` files (backend, brain).
+- Extracted WebSocket headers into shared nginx snippet.
+- Health payload simplified: removed redundant top-level `redis`/`temp_storage` fields in favor of `dependencies` object.
+- TTS endpoints deduplicated via shared `_tts_response()` helper; cached `speaker.json` reads.
+- `_fetch_brain_openapi` reuses shared `httpx.AsyncClient` instead of creating per-call clients.
+
 ## [0.4.0] - 2026-03-19
 
 ### Added
