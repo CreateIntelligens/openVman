@@ -66,7 +66,8 @@ class IndexTTS:
         self.gpt = UnifiedVoice(gpu_memory_utilization, **self.cfg.gpt, model_dir=model_dir)
         self.gpt_path = os.path.join(self.model_dir, self.cfg.gpt_checkpoint)
         load_checkpoint(self.gpt, self.gpt_path)
-        self.gpt = self.gpt.to(self.device).eval()
+        self.gpt = self.gpt.to(self.device)
+        self.gpt.eval()  # noqa: B018 - PyTorch eval mode
 
         self.bigvgan = Generator(self.cfg.bigvgan, use_cuda_kernel=self.use_cuda_kernel)
         self.bigvgan_path = os.path.join(self.model_dir, self.cfg.bigvgan_checkpoint)
@@ -74,7 +75,7 @@ class IndexTTS:
         self.bigvgan.load_state_dict(vocoder_dict["generator"])
         self.bigvgan = self.bigvgan.to(self.device)
         self.bigvgan.remove_weight_norm()
-        self.bigvgan.eval()
+        self.bigvgan.eval()  # noqa: B018
 
         self.bpe_path = os.path.join(self.model_dir, "bpe.model")
         self.normalizer = TextNormalizer()
