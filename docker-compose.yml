@@ -55,6 +55,8 @@ services:
       - modelscope-cache:/root/.cache/modelscope
     env_file:
       - ./backend/.env
+    environment:
+      - TORCH_CUDA_ARCH_LIST=8.6;8.9
     ports:
       - "${BACKEND_PORT:-8200}:8200"
     deploy:
