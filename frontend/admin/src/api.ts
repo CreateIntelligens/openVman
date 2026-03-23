@@ -172,9 +172,11 @@ export interface SkillInfo {
   version: string;
   enabled: boolean;
   tools: string[];
+  warnings: string[];
 }
 export interface ToolsData {
   tools: ToolInfo[];
+  skill_tools: ToolInfo[];
   skills: SkillInfo[];
 }
 

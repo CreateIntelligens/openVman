@@ -33,3 +33,4 @@ class Skill:
     handlers: dict[str, Callable[[dict[str, Any]], Any]] = field(default_factory=dict)
     config: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
+    warnings: list[str] = field(default_factory=list)

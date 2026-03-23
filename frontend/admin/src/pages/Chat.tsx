@@ -5,10 +5,12 @@ import {
   fetchChatHistory,
   fetchPersonas,
   fetchSessions,
+  fetchTools,
   getActiveProjectId,
   PersonaSummary,
   RetrievalResult,
   SessionSummary,
+  SkillInfo,
   streamChat,
   synthesizeSpeech,
 } from "../api";
@@ -48,6 +50,46 @@ export default function Chat() {
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ttsAbortRef = useRef<AbortController | null>(null);
+
+  // Slash command autocomplete
+  const [slashSkills, setSlashSkills] = useState<SkillInfo[]>([]);
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashIndex, setSlashIndex] = useState(0);
+
+  useEffect(() => {
+    fetchTools()
+      .then((data) => setSlashSkills(data.skills.filter((s) => s.enabled)))
+      .catch((e) => console.warn("Failed to load skills for autocomplete:", e));
+  }, []);
+
+  const slashFilter = slashOpen
+    ? input.slice(1).toLowerCase()
+    : "";
+  const slashMatches = slashOpen
+    ? slashSkills.filter(
+        (s) => s.id.includes(slashFilter) || s.name.toLowerCase().includes(slashFilter),
+      )
+    : [];
+
+  // Clamp index when matches shrink
+  const clampedSlashIndex = Math.min(slashIndex, Math.max(slashMatches.length - 1, 0));
+
+  const handleInputChange = (value: string) => {
+    setInput(value);
+    if (value === "/") {
+      setSlashOpen(true);
+      setSlashIndex(0);
+    } else if (value.startsWith("/") && !value.includes(" ")) {
+      setSlashOpen(true);
+    } else {
+      setSlashOpen(false);
+    }
+  };
+
+  const pickSlash = (skill: SkillInfo) => {
+    setInput(`/${skill.id} `);
+    setSlashOpen(false);
+  };
 
   const playingIndexRef = useRef<number | null>(null);
   playingIndexRef.current = playingIndex;
@@ -564,23 +606,65 @@ export default function Chat() {
                 </div>
               )}
 
-              <div className="relative rounded-2xl border border-slate-700 bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-900/80 transition-all shadow-sm overflow-hidden flex flex-col">
+              <div className="relative rounded-2xl border border-slate-700 bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
+                {/* Slash command autocomplete dropdown */}
+                {slashOpen && slashMatches.length > 0 && (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[240px] overflow-y-auto">
+                    {slashMatches.map((skill, i) => (
+                      <button
+                        key={skill.id}
+                        onMouseDown={(e) => { e.preventDefault(); pickSlash(skill); }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                          i === clampedSlashIndex ? "bg-primary/20 text-white" : "text-slate-300 hover:bg-slate-800"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-primary text-lg">extension</span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold">/{skill.id}</div>
+                          <div className="text-[11px] text-slate-500 truncate">{skill.description || skill.name}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <textarea
                   value={input}
-                  onChange={(event) => setInput(event.target.value)}
+                  onChange={(event) => handleInputChange(event.target.value)}
                   onInput={(event) => {
                     const el = event.currentTarget;
                     el.style.height = "auto";
                     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
                   }}
                   onKeyDown={(event) => {
+                    if (slashOpen && slashMatches.length > 0) {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setSlashIndex((prev) => Math.min(prev + 1, slashMatches.length - 1));
+                        return;
+                      }
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setSlashIndex((prev) => Math.max(prev - 1, 0));
+                        return;
+                      }
+                      if (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey)) {
+                        event.preventDefault();
+                        pickSlash(slashMatches[clampedSlashIndex]);
+                        return;
+                      }
+                      if (event.key === "Escape") {
+                        setSlashOpen(false);
+                        return;
+                      }
+                    }
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
                       submit();
                     }
                   }}
                   rows={1}
-                  placeholder="Message Brain..."
+                  placeholder="Message Brain... (type / for commands)"
                   className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
                 />
 

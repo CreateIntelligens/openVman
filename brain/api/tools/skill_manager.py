@@ -131,6 +131,18 @@ class SkillManager:
                 if handler and callable(handler):
                     skill.handlers[tool_def.name] = handler
                 else:
+                    available_fns = [
+                        n for n, obj in vars(module).items()
+                        if callable(obj) and not n.startswith("_")
+                    ]
+                    hint = ""
+                    if available_fns:
+                        hint = f"（main.py 可用函式：{', '.join(available_fns)}）"
+                    warning = (
+                        f"tool '{tool_def.name}' 在 main.py 中找不到對應函式，"
+                        f"該工具將無法使用。{hint}"
+                    )
+                    skill.warnings.append(warning)
                     log_event("skill_handler_missing", skill_id=skill.manifest.id, tool_name=tool_def.name)
 
     # ------------------------------------------------------------------

@@ -142,26 +142,32 @@ function SkillEditor({
 // Create Skill Form
 // ---------------------------------------------------------------------------
 
+function nameToId(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+
 function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false);
-  const [skillId, setSkillId] = useState("");
   const [name, setName] = useState("");
+  const [idOverride, setIdOverride] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
+  const derivedId = idOverride || nameToId(name);
+
   const reset = () => {
-    setSkillId("");
     setName("");
+    setIdOverride("");
     setDescription("");
     setError("");
   };
 
   const handleCreate = () => {
-    if (!skillId.trim() || !name.trim()) return;
+    if (!derivedId || !name.trim()) return;
     setCreating(true);
     setError("");
-    createSkill(skillId.trim(), name.trim(), description.trim())
+    createSkill(derivedId, name.trim(), description.trim())
       .then(() => {
         reset();
         setOpen(false);
@@ -194,26 +200,34 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
 
       {error && <StatusAlert type="error" message={error} />}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Name</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="My Skill"
+          className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
+        />
+        {name.trim() && (
+          <p className="text-[10px] text-slate-500 mt-1 font-mono">
+            ID: {derivedId}
+            {!idOverride && (
+              <button onClick={() => setIdOverride(derivedId)} className="ml-2 text-primary hover:underline">edit</button>
+            )}
+          </p>
+        )}
+      </div>
+      {idOverride !== "" && (
         <div>
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Skill ID</label>
           <input
-            value={skillId}
-            onChange={(e) => setSkillId(e.target.value)}
+            value={idOverride}
+            onChange={(e) => setIdOverride(e.target.value)}
             placeholder="my_skill"
             className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
           />
         </div>
-        <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="My Skill"
-            className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
-          />
-        </div>
-      </div>
+      )}
       <div>
         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Description</label>
         <input
@@ -225,7 +239,7 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
       </div>
       <button
         onClick={handleCreate}
-        disabled={creating || !skillId.trim() || !name.trim()}
+        disabled={creating || !derivedId || !name.trim()}
         className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-bold transition-all disabled:opacity-50"
       >
         <span className="material-symbols-outlined text-sm">add</span>
@@ -241,6 +255,7 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
 
 export default function Tools() {
   const [tools, setTools] = useState<ToolInfo[]>([]);
+  const [skillTools, setSkillTools] = useState<ToolInfo[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -254,6 +269,7 @@ export default function Tools() {
     fetchTools()
       .then((data) => {
         setTools(data.tools);
+        setSkillTools(data.skill_tools ?? []);
         setSkills(data.skills);
         setError("");
       })
@@ -296,19 +312,6 @@ export default function Tools() {
       })
       .catch((e) => setError(String(e)));
   };
-
-  const getToolSource = useCallback(
-    (name: string): { label: string; isSkill: boolean } => {
-      const colonIdx = name.indexOf(":");
-      if (colonIdx > 0) {
-        const skillId = name.slice(0, colonIdx);
-        const skill = skills.find((s) => s.id === skillId);
-        return { label: skill?.name ?? skillId, isSkill: true };
-      }
-      return { label: "built-in", isSkill: false };
-    },
-    [skills],
-  );
 
   return (
     <div className="page-scroll">
@@ -391,6 +394,17 @@ export default function Tools() {
 
                 <p className="text-xs text-slate-400 mb-3 line-clamp-2">{skill.description}</p>
 
+                {skill.warnings?.length > 0 && (
+                  <div className="mb-3 space-y-1">
+                    {skill.warnings.map((w, i) => (
+                      <div key={i} className="flex items-start gap-1.5 px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                        <span className="material-symbols-outlined text-amber-400 text-[14px] mt-0.5 shrink-0">warning</span>
+                        <span className="text-[11px] text-amber-300 leading-tight">{w}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[11px] text-slate-500">
                     <span className="material-symbols-outlined text-[14px]">handyman</span>
@@ -437,11 +451,11 @@ export default function Tools() {
           </section>
         )}
 
-        {/* Tools Section */}
+        {/* Built-in Tools Section */}
         <section>
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-base">handyman</span>
-            Tools
+            <span className="material-symbols-outlined text-base">settings</span>
+            Built-in Tools
             <span className="text-xs font-mono text-slate-600">({tools.length})</span>
           </h3>
 
@@ -453,12 +467,48 @@ export default function Tools() {
                     <tr className="text-left text-xs uppercase tracking-widest text-slate-500 border-b border-slate-800">
                       <th className="px-6 py-3">Name</th>
                       <th className="px-6 py-3">Description</th>
-                      <th className="px-6 py-3">Source</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
-                    {tools.map((tool) => {
-                      const source = getToolSource(tool.name);
+                    {tools.map((tool) => (
+                      <tr key={tool.name} className="text-slate-300 hover:bg-slate-800/30 transition-colors">
+                        <td className="px-6 py-3 font-mono text-xs whitespace-nowrap">{tool.name}</td>
+                        <td className="px-6 py-3 text-xs text-slate-400 max-w-md truncate" title={tool.description}>
+                          {tool.description}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Skill Tools Section */}
+        {skillTools.length > 0 && (
+          <section>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">extension</span>
+              Skill Tools
+              <span className="text-xs font-mono text-slate-600">({skillTools.length})</span>
+            </h3>
+
+            <div className="bg-slate-900/40 border border-primary/10 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-widest text-slate-500 border-b border-slate-800">
+                      <th className="px-6 py-3">Name</th>
+                      <th className="px-6 py-3">Description</th>
+                      <th className="px-6 py-3">Skill</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {skillTools.map((tool) => {
+                      const colonIdx = tool.name.indexOf(":");
+                      const skillId = colonIdx > 0 ? tool.name.slice(0, colonIdx) : "";
+                      const skill = skills.find((s) => s.id === skillId);
                       return (
                         <tr key={tool.name} className="text-slate-300 hover:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-3 font-mono text-xs whitespace-nowrap">{tool.name}</td>
@@ -466,17 +516,9 @@ export default function Tools() {
                             {tool.description}
                           </td>
                           <td className="px-6 py-3 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                source.isSkill
-                                  ? "bg-primary/10 text-primary border border-primary/20"
-                                  : "bg-slate-800 text-slate-400 border border-slate-700"
-                              }`}
-                            >
-                              <span className="material-symbols-outlined text-[12px]">
-                                {source.isSkill ? "extension" : "settings"}
-                              </span>
-                              {source.label}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                              <span className="material-symbols-outlined text-[12px]">extension</span>
+                              {skill?.name ?? skillId}
                             </span>
                           </td>
                         </tr>
@@ -486,8 +528,8 @@ export default function Tools() {
                 </table>
               </div>
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

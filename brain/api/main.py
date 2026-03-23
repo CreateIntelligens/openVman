@@ -19,6 +19,7 @@ from core.chat_service import (
     record_generation_failure,
     stream_generation,
 )
+from core.slash_command import try_rewrite_slash
 from core.sse_events import (
     build_exception_protocol_error,
     build_protocol_error,
@@ -232,15 +233,26 @@ def _skill_deps() -> tuple:
     return get_tool_registry(), get_skill_manager()
 
 
+def _maybe_rewrite_slash(payload: ChatRequest) -> dict:
+    """If the message is a slash command, rewrite it; return the raw payload dict."""
+    raw = payload.model_dump()
+    _, manager = _skill_deps()
+    slash = try_rewrite_slash(raw["message"], manager)
+    if slash is not None:
+        raw["message"] = slash.rewritten
+    return raw
+
+
 @app.get("/brain/tools", tags=_TAG_TOOLS)
 async def list_tools():
     """List all registered tools and loaded skill plugins."""
     registry, manager = _skill_deps()
 
-    tools = [
-        {"name": t.name, "description": t.description, "parameters": t.parameters}
-        for t in registry.list_tools()
-    ]
+    all_tools = registry.list_tools()
+    serialize = lambda t: {"name": t.name, "description": t.description, "parameters": t.parameters}
+    builtin_tools = [serialize(t) for t in all_tools if ":" not in t.name]
+    skill_tools = [serialize(t) for t in all_tools if ":" in t.name]
+
     skills = [
         {
             "id": s.manifest.id,
@@ -249,11 +261,12 @@ async def list_tools():
             "version": s.manifest.version,
             "enabled": s.enabled,
             "tools": [t.name for t in s.manifest.tools],
+            "warnings": s.warnings,
         }
         for s in manager.list_skills()
     ]
 
-    return {"tools": tools, "skills": skills}
+    return {"tools": builtin_tools, "skill_tools": skill_tools, "skills": skills}
 
 
 @app.patch("/brain/skills/{skill_id}/toggle", tags=_TAG_TOOLS)
@@ -277,6 +290,7 @@ async def create_skill(payload: SkillCreateRequest):
             "status": "ok",
             "skill_id": skill.manifest.id,
             "name": skill.manifest.name,
+            "warnings": skill.warnings,
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -303,6 +317,7 @@ async def update_skill_files(skill_id: str, payload: SkillFilesUpdateRequest):
             "status": "ok",
             "skill_id": skill.manifest.id,
             "enabled": skill.enabled,
+            "warnings": skill.warnings,
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -324,10 +339,12 @@ async def reload_all_skills():
     """Reload all skills from disk."""
     registry, manager = _skill_deps()
     skills = manager.reload_all(registry)
+    all_warnings = {s.manifest.id: s.warnings for s in skills if s.warnings}
     return {
         "status": "ok",
         "skills_count": len(skills),
         "skills": [s.manifest.id for s in skills],
+        "warnings": all_warnings,
     }
 
 
@@ -422,7 +439,8 @@ async def clone_persona_route(payload: PersonaCloneRequest):
 async def chat(request: Request, payload: ChatRequest):
     """Generate a reply using workspace context, retrieval, and recent session history."""
     try:
-        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
+        raw = _maybe_rewrite_slash(payload)
+        envelope = build_message_envelope(request, raw, content_key="message")
         context = prepare_generation(envelope)
         result = await asyncio.to_thread(execute_generation, context)
         response = finalize_generation(context, result.reply)
@@ -450,8 +468,9 @@ async def chat(request: Request, payload: ChatRequest):
 @app.post("/brain/chat/stream", tags=_TAG_CHAT)
 async def chat_stream(request: Request, payload: ChatRequest):
     """Stream chat generation through SSE."""
+    raw = _maybe_rewrite_slash(payload)
     try:
-        envelope = build_message_envelope(request, payload.model_dump(), content_key="message")
+        envelope = build_message_envelope(request, raw, content_key="message")
         context = prepare_generation(envelope)
     except (ValueError, ProtocolValidationError) as exc:
         get_metrics_store().increment("guardrail_blocks_total", action="chat_stream")
