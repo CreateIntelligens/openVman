@@ -7,6 +7,9 @@
 
 export class VideoSyncManager {
     private videoElement: HTMLVideoElement | null = null;
+    private audioContext: AudioContext | null = null;
+    private audioStartTime: number = 0;
+    
     private startTime: number = 0;
     private isPlaying: boolean = false;
     private lastSyncTime: number = 0;
@@ -22,6 +25,14 @@ export class VideoSyncManager {
      */
     setVideoElement(videoElement: HTMLVideoElement): void {
         this.videoElement = videoElement;
+    }
+
+    /**
+     * Set the audio context for precise audio timing
+     */
+    setAudioContext(audioContext: AudioContext, startTimeOffset: number = 0): void {
+        this.audioContext = audioContext;
+        this.audioStartTime = audioContext.currentTime - startTimeOffset;
     }
 
     /**
@@ -47,10 +58,13 @@ export class VideoSyncManager {
 
         let currentTime: number;
 
-        if (this.videoElement) {
-            // Use video's current time if available
+        if (this.videoElement && !this.videoElement.paused) {
+            // Use video's current time if available and playing
             // This ensures we stay in sync even if the video buffers or stalls
             currentTime = this.videoElement.currentTime;
+        } else if (this.audioContext && this.audioContext.state === 'running') {
+            // Use precise WebAudio clock
+            currentTime = this.audioContext.currentTime - this.audioStartTime;
         } else {
             // Fallback to performance clock
             currentTime = (performance.now() - this.startTime) / 1000;

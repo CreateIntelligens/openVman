@@ -2,7 +2,7 @@
  * Device Capabilities Detection Module
  * 
  * Detects client device hardware capabilities to determine
- * the appropriate lip-sync method (Wav2Lip or Viseme).
+ * the appropriate lip-sync method (Wav2Lip, DINet, or WebGL).
  */
 
 // WebGPU type declarations (for browsers that support it)
@@ -177,17 +177,15 @@ export function determineDeviceTier(capabilities: DeviceCapabilities): DeviceTie
 /**
  * Get recommended lip-sync method for device tier
  */
-export function getRecommendedLipSyncMethod(tier: DeviceTier): 'wav2lip-high' | 'wav2lip-medium' | 'wav2lip-cpu' | 'viseme' {
+export function getRecommendedLipSyncMethod(tier: DeviceTier): 'wav2lip' | 'dinet' | 'webgl' {
     switch (tier) {
         case 'high':
-            return 'wav2lip-high';
+            return 'wav2lip';
         case 'medium':
-            return 'wav2lip-medium';
         case 'low':
-            return 'wav2lip-cpu';
         case 'minimal':
         default:
-            return 'viseme';
+            return 'dinet';
     }
 }
 

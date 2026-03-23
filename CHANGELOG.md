@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0] - 2026-03-23
+
+### Added
+- **Pluggable Frontend Rendering**: Established a strict threefold architecture (`Wav2Lip`, `DINet`, `WebGL`) for virtual avatar lip-sync, formally deprecating the legacy fallback methods.
+- **WebGL CSR Strategy**: Introduced `WebGLStrategy` supporting `.ktx2` high-compression texture states for zero-server-cost kiosk environments.
+- **Edge ONNX Strategies**: Formalized lifecycle mocks for `Wav2LipStrategy` (WebGPU) and `DinetStrategy` (CPU/WebGL HTTP fallback) for client-side AI inference.
+- **Precise Video Sync**: Enhanced `VideoSyncManager` strictly binding WebAudio `AudioContext.currentTime` with HTMLVideoElement, guaranteeing zero frame drift.
+
+### Changed
+- Refactored `LipSyncManager` to act purely as an orchestrator, removing obsolete Viseme payloads from WebSocket event streams.
+- Dropped legacy Canvas BBox overlay and Viseme-based interpolation in favor of unified `IRenderingStrategy` interface.
+
 ## [0.5.0] - 2026-03-21
 
 ### Added

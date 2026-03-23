@@ -33,7 +33,7 @@ export interface LipSyncManagerConfig {
 export class LipSyncManager {
     private capabilities: DeviceCapabilities | null = null;
     private tier: DeviceTier = 'minimal';
-    private method: LipSyncMethod = 'viseme';
+    private method: LipSyncMethod = 'dinet';
     private strategy: LipSyncStrategy | null = null;
     private config: LipSyncManagerConfig;
     private isInitialized = false;
@@ -82,28 +82,28 @@ export class LipSyncManager {
             this.isInitialized = true;
             console.log(`LipSync initialized: ${this.strategy.name} (tier: ${this.tier})`);
         } catch (error) {
-            // Fallback to viseme on error
-            console.warn('LipSync initialization failed, falling back to Viseme:', error);
-            await this.fallbackToViseme();
+            // Fallback to minimal on error
+            console.warn('LipSync initialization failed, falling back to DINet (Edge Inference):', error);
+            await this.fallbackToMinimal();
             this.config.onError?.(error as Error);
         }
     }
 
     /**
-     * Fallback to Viseme strategy
+     * Fallback strategy
      */
-    private async fallbackToViseme(): Promise<void> {
+    private async fallbackToMinimal(): Promise<void> {
         try {
-            this.method = 'viseme';
+            this.method = 'dinet';
             this.tier = 'minimal';
 
             this.strategy?.dispose();
-            this.strategy = await createLipSyncStrategy('viseme', 'minimal');
+            this.strategy = await createLipSyncStrategy('dinet', 'minimal');
             await this.strategy.initialize();
 
             this.config.onMethodChange?.(this.method, this.tier);
         } catch (error) {
-            console.error('Failed to fallback to Viseme:', error);
+            console.error('Failed to fallback:', error);
             throw error;
         }
     }
@@ -131,7 +131,7 @@ export class LipSyncManager {
     /**
      * Process incoming audio chunk from WebSocket
      */
-    async processAudioChunk(audioBase64: string, visemes: { time: number; value: string }[]): Promise<void> {
+    async processAudioChunk(audioBase64: string, timestamp?: number): Promise<void> {
         if (!this.strategy || !this.audioContext) {
             throw new Error('LipSync not initialized');
         }
@@ -141,7 +141,7 @@ export class LipSyncManager {
 
         const chunk: AudioChunk = {
             audioBuffer,
-            visemes
+            timestamp
         };
 
         await this.strategy.processAudio(chunk);
@@ -167,7 +167,7 @@ export class LipSyncManager {
                 type: 'SET_LIP_SYNC_MODE',
                 payload: {
                     mode: this.method,
-                    need_visemes: this.method === 'viseme'
+                    need_visemes: false
                 }
             });
         }
@@ -226,13 +226,13 @@ export class LipSyncManager {
         const currentTime = this.getCurrentAudioTime();
 
         // Different strategies handle rendering differently
-        if (this.method.startsWith('wav2lip')) {
-            // Wav2Lip: advance frame based on time
+        if (this.method === 'wav2lip' || this.method === 'dinet') {
+            // Advance frame based on time
             (this.strategy as { advanceToFrame?: (time: number) => void }).advanceToFrame?.(currentTime);
             (this.strategy as { render?: () => void }).render?.();
-        } else {
-            // Viseme: look up current viseme
-            // This would need the stored visemes from the chunk
+        } else if (this.method === 'webgl') {
+            // WebGL rendering would happen on a separate canvas or WebGL context entirely, usually bypassed here.
+            (this.strategy as { render?: (time: number) => void }).render?.(currentTime);
         }
 
         // Get frame and render to canvas
