@@ -401,11 +401,11 @@ export default function Chat() {
       {/* 2. Contextual Sidebar: Sessions & Persona */}
       <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 flex flex-col hidden md:flex">
         <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
-          <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Brain Chat</h2>
+          <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Brain 對話</h2>
           <button
             onClick={resetConversation}
             className="flex h-7 w-7 items-center justify-center rounded border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white hover:border-slate-500 transition-colors"
-            title="New Chat"
+            title="新對話"
           >
             <span className="material-symbols-outlined text-[16px]">add</span>
           </button>
@@ -414,7 +414,7 @@ export default function Chat() {
         <div className="flex-1 overflow-y-auto p-4 space-y-6 select-none flex flex-col">
           {/* Persona Selector */}
           <div className="space-y-2 shrink-0">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">Active Persona</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">使用中角色</h3>
             <select
               value={selectedPersonaId}
               onChange={(event) => handlePersonaChange(event.target.value)}
@@ -434,18 +434,18 @@ export default function Chat() {
           {/* Sessions List */}
           <div className="flex-1 flex flex-col min-h-0 space-y-3">
             <div className="flex items-center justify-between shrink-0">
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">History</h3>
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500">歷史紀錄</h3>
               <button
                 onClick={loadSessions}
                 disabled={loadingSessions}
                 className="text-xs text-slate-500 hover:text-white transition-colors"
               >
-                {loadingSessions ? "..." : "Refresh"}
+                {loadingSessions ? "..." : "重新整理"}
               </button>
             </div>
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
               {!sessions.length && !loadingSessions && (
-                <p className="text-xs text-slate-500 text-center py-6">No sessions yet for this persona.</p>
+                <p className="text-xs text-slate-500 text-center py-6">此角色尚無對話紀錄。</p>
               )}
               {sessions.map((s) => {
                 const isActive = s.session_id === sessionId;
@@ -472,7 +472,7 @@ export default function Chat() {
                             setDeleteSessionTarget(s);
                           }}
                           className="opacity-0 group-hover:opacity-100 rounded px-1.5 py-0.5 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
-                          title="Delete session"
+                          title="刪除對話"
                         >
                           <span className="material-symbols-outlined text-[14px]">delete</span>
                         </button>
@@ -515,7 +515,7 @@ export default function Chat() {
                   }`}
               >
                 <span className="material-symbols-outlined text-[16px]">width_full</span>
-                <span className="hidden xl:inline-block">Context Panel</span>
+                <span className="hidden xl:inline-block">上下文面板</span>
               </button>
             </div>
           </header>
@@ -528,10 +528,9 @@ export default function Chat() {
                   <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center text-primary border border-primary/30 mx-auto mb-4 shadow-lg shadow-primary/10">
                     <span className="material-symbols-outlined text-[32px]">psychology</span>
                   </div>
-                  <h1 className="text-2xl font-bold text-white mb-2">How can I help you today?</h1>
+                  <h1 className="text-2xl font-bold text-white mb-2">今天我能幫你什麼？</h1>
                   <p className="text-sm text-slate-400 leading-relaxed">
-                    I'm your intelligent assistant powered by the <code className="bg-slate-800 px-1 py-0.5 rounded">workspace/</code> context.
-                    I use your Persona rules, Knowledge Base, and Long-term Memory to provide accurate answers.
+                    我是你的智慧助手，基於 <code className="bg-slate-800 px-1 py-0.5 rounded">workspace/</code> 上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -565,7 +564,7 @@ export default function Chat() {
                       <button
                         onClick={() => playTts(message.content, index)}
                         className={`text-slate-500 hover:text-white ${playingIndex === index ? "!opacity-100 text-primary" : ""}`}
-                        title={playingIndex === index ? "Stop" : "Play"}
+                        title={playingIndex === index ? "停止" : "播放"}
                       >
                         <span className="material-symbols-outlined text-[14px]">
                           {playingIndex === index ? "stop" : "volume_up"}
@@ -664,19 +663,19 @@ export default function Chat() {
                     }
                   }}
                   rows={1}
-                  placeholder="Message Brain... (type / for commands)"
+                  placeholder="向 Brain 發送訊息...（輸入 / 查看指令）"
                   className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
                 />
 
                 <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
-                  <span className="text-[11px] text-slate-500 font-medium">Shift + Enter to add a new line</span>
+                  <span className="text-[11px] text-slate-500 font-medium">Shift + Enter 換行</span>
                   <div className="flex gap-2 pointer-events-auto">
                     {sending && (
                       <button
                         onClick={stopStreaming}
                         className="h-8 px-4 rounded-lg border border-slate-600 bg-slate-800 text-xs font-bold text-white hover:bg-slate-700 transition-colors shadow-sm"
                       >
-                        Stop
+                        停止
                       </button>
                     )}
                     <button
@@ -697,7 +696,7 @@ export default function Chat() {
         {panelOpen && (
           <aside className="w-[300px] xl:w-[340px] flex-shrink-0 border-l border-slate-800/60 bg-slate-950/20 flex flex-col absolute right-0 inset-y-0 z-20 md:relative shadow-2xl md:shadow-none transition-transform">
             <div className="px-5 py-4 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/30">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">Execution Context</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">執行上下文</h3>
               <button onClick={() => setPanelOpen(false)} className="text-slate-500 hover:text-white md:hidden"><span className="material-symbols-outlined text-[18px]">close</span></button>
             </div>
 
@@ -705,16 +704,16 @@ export default function Chat() {
               {/* Live Status */}
               <div>
                 <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3 border-b border-slate-800/50 pb-2">
-                  <span className="material-symbols-outlined text-[14px]">query_stats</span> Context Hit Rates
+                  <span className="material-symbols-outlined text-[14px]">query_stats</span> 上下文命中率
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800/50">
-                    <p className="text-[10px] text-slate-500 uppercase font-bold">Workspace</p>
-                    <p className="text-xl font-bold text-white mt-1">{lastContext.knowledge} <span className="text-xs text-slate-500 font-normal">chunks</span></p>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">工作區</p>
+                    <p className="text-xl font-bold text-white mt-1">{lastContext.knowledge} <span className="text-xs text-slate-500 font-normal">區塊</span></p>
                   </div>
                   <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800/50">
-                    <p className="text-[10px] text-slate-500 uppercase font-bold">Memory DB</p>
-                    <p className="text-xl font-bold text-white mt-1">{lastContext.memory} <span className="text-xs text-slate-500 font-normal">nodes</span></p>
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">記憶庫</p>
+                    <p className="text-xl font-bold text-white mt-1">{lastContext.memory} <span className="text-xs text-slate-500 font-normal">節點</span></p>
                   </div>
                 </div>
               </div>
@@ -722,12 +721,12 @@ export default function Chat() {
               {/* Evidence Sources */}
               <div className="space-y-5">
                 <h4 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-blue-400 mb-1 border-b border-slate-800/50 pb-2">
-                  <span className="material-symbols-outlined text-[14px]">find_in_page</span> Grounded Evidence
+                  <span className="material-symbols-outlined text-[14px]">find_in_page</span> 參考依據
                 </h4>
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <h5 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Knowledge</h5>
+                    <h5 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">知識庫</h5>
                     <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">{lastSources.knowledge.length}</span>
                   </div>
                   {lastSources.knowledge.length > 0 ? (
@@ -743,13 +742,13 @@ export default function Chat() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-600 italic">No exact matches from workspace.</p>
+                    <p className="text-xs text-slate-600 italic">工作區中無完全匹配結果。</p>
                   )}
                 </div>
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <h5 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Memory</h5>
+                    <h5 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">記憶</h5>
                     <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">{lastSources.memory.length}</span>
                   </div>
                   {lastSources.memory.length > 0 ? (
@@ -765,7 +764,7 @@ export default function Chat() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-600 italic">No semantic matches from episodic memory.</p>
+                    <p className="text-xs text-slate-600 italic">情節記憶中無語義匹配結果。</p>
                   )}
                 </div>
               </div>
@@ -777,7 +776,7 @@ export default function Chat() {
 
       <ConfirmModal
         open={deleteSessionTarget !== null}
-        title="Delete Session"
+        title="刪除對話"
         message={`確定要刪除 session「${deleteSessionTarget?.session_id.slice(0, 8)}...」嗎？此操作會同時刪除所有歷史訊息。`}
         confirmLabel="Delete"
         danger
@@ -789,9 +788,9 @@ export default function Chat() {
 }
 
 function getConversationTitle(loadingHistory: boolean, sending: boolean) {
-  if (loadingHistory) return "Loading previous session...";
-  if (sending) return "Streaming live reply...";
-  return "Ask the brain directly";
+  if (loadingHistory) return "載入先前對話...";
+  if (sending) return "即時串流回覆中...";
+  return "直接詢問 Brain";
 }
 
 function addPendingExchange(messages: ChatMessage[], userMessage: string, createdAt: string) {
@@ -864,7 +863,7 @@ function SourceChips({ sources }: { sources: { knowledge: RetrievalResult[]; mem
         className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-300 transition-colors"
       >
         <span className="material-symbols-outlined text-[14px]">source</span>
-        {allSources.length} source{allSources.length > 1 ? "s" : ""} referenced
+        {allSources.length} 筆參考來源
         <span className={`material-symbols-outlined text-[14px] transition-transform ${expanded ? "rotate-180" : ""}`}>expand_more</span>
       </button>
       {expanded && (

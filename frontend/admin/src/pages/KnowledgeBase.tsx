@@ -11,6 +11,7 @@ import {
   uploadKnowledgeDocuments,
   KnowledgeDocumentSummary,
 } from "../api";
+import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
 import { useProject } from "../context/ProjectContext";
 
@@ -45,6 +46,7 @@ export default function KnowledgeBase() {
   const [editLoading, setEditLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [movingPath, setMovingPath] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "file" | "dir"; value: string } | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
@@ -122,24 +124,19 @@ export default function KnowledgeBase() {
     await uploadFiles(Array.from(e.dataTransfer.files));
   };
 
-  const handleDelete = async (path: string) => {
-    if (!confirm(`確定要刪除 ${path} 嗎？`)) return;
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    const { type, value } = deleteTarget;
+    setDeleteTarget(null);
     setStatus(null);
     try {
-      await deleteKnowledgeDocument(path);
-      setStatus({ type: "success", message: `已刪除 ${path}` });
-      await loadDocuments();
-    } catch (error) {
-      setStatus({ type: "error", message: String(error) });
-    }
-  };
-
-  const handleDeleteDir = async (dir: string) => {
-    if (!confirm(`確定要刪除資料夾 ${dir} 嗎？`)) return;
-    setStatus(null);
-    try {
-      await deleteKnowledgeDirectory(`${currentDir}/${dir}`);
-      setStatus({ type: "success", message: `已刪除資料夾 ${dir}` });
+      if (type === "file") {
+        await deleteKnowledgeDocument(value);
+        setStatus({ type: "success", message: `已刪除 ${value}` });
+      } else {
+        await deleteKnowledgeDirectory(`${currentDir}/${value}`);
+        setStatus({ type: "success", message: `已刪除資料夾 ${value}` });
+      }
       await loadDocuments();
     } catch (error) {
       setStatus({ type: "error", message: String(error) });
@@ -248,7 +245,7 @@ export default function KnowledgeBase() {
         <div className="fixed inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-slate-900 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">upload_file</span>
-            <span className="text-xl font-bold text-white">Drop files to upload</span>
+            <span className="text-xl font-bold text-white">拖放檔案以上傳</span>
           </div>
         </div>
       )}
@@ -259,7 +256,7 @@ export default function KnowledgeBase() {
           <div>
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-[28px]">school</span>
-              Knowledge Base
+              知識庫
             </h1>
             <p className="text-sm text-slate-400 mt-1">查看知識庫索引狀態、重建索引、上傳文件</p>
           </div>
@@ -269,7 +266,7 @@ export default function KnowledgeBase() {
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/10"
           >
             <span className={`material-symbols-outlined text-[18px] ${reindexing ? "animate-spin" : ""}`}>sync</span>
-            {reindexing ? "Reindexing..." : "Reindex"}
+            {reindexing ? "重新索引中..." : "重新索引"}
           </button>
         </div>
 
@@ -280,10 +277,10 @@ export default function KnowledgeBase() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatCard icon="description" label="Total" value={documents.length} />
-          <StatCard icon="check_circle" label="Indexed" value={indexedCount} color="emerald" />
-          <StatCard icon="schedule" label="Pending" value={pendingCount} color="amber" />
-          <StatCard icon="block" label="Excluded" value={excludedCount} color="slate" />
+          <StatCard icon="description" label="總計" value={documents.length} />
+          <StatCard icon="check_circle" label="已索引" value={indexedCount} color="emerald" />
+          <StatCard icon="schedule" label="待處理" value={pendingCount} color="amber" />
+          <StatCard icon="block" label="已排除" value={excludedCount} color="slate" />
         </div>
 
         {/* Upload Dropzone */}
@@ -298,9 +295,9 @@ export default function KnowledgeBase() {
             cloud_upload
           </span>
           <span className="text-sm font-semibold text-slate-400 group-hover:text-slate-200 transition-colors">
-            {uploading ? "Uploading..." : "Click or drag files here to upload"}
+            {uploading ? "上傳中..." : "點擊或拖曳檔案至此上傳"}
           </span>
-          <span className="text-xs text-slate-500">Supports all file types</span>
+          <span className="text-xs text-slate-500">支援所有檔案類型</span>
         </button>
 
         {/* Breadcrumb */}
@@ -343,7 +340,7 @@ export default function KnowledgeBase() {
                 {docsInDir.filter((d) => d.path.startsWith(`${currentDir}/${dir}/`)).length}
               </span>
               <button
-                onClick={(e) => { e.stopPropagation(); handleDeleteDir(dir); }}
+                onClick={(e) => { e.stopPropagation(); setDeleteTarget({ type: "dir", value: dir }); }}
                 className="opacity-0 group-hover/dir:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-500/10 text-slate-600 hover:text-red-400 ml-auto"
                 title="刪除資料夾"
               >
@@ -404,7 +401,7 @@ export default function KnowledgeBase() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search documents..."
+                placeholder="搜尋文件..."
                 className="w-full rounded-lg border border-slate-800/80 bg-slate-900/50 pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none transition-colors"
               />
             </div>
@@ -412,7 +409,7 @@ export default function KnowledgeBase() {
               onClick={() => loadDocuments()}
               disabled={loading}
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
-              title="Refresh"
+              title="重新整理"
             >
               <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>refresh</span>
             </button>
@@ -420,17 +417,17 @@ export default function KnowledgeBase() {
 
           {loading && !documents.length ? (
             <div className="flex items-center justify-center py-16 text-slate-500">
-              <span className="material-symbols-outlined animate-spin mr-2">refresh</span> Loading...
+              <span className="material-symbols-outlined animate-spin mr-2">refresh</span> 載入中...
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500">
               <span className="material-symbols-outlined text-4xl mb-2">folder_off</span>
-              <p className="text-sm">{search ? "No matching documents" : "No documents yet"}</p>
+              <p className="text-sm">{search ? "沒有符合的文件" : "尚無文件"}</p>
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {filtered.map((doc) => (
-                <DocumentCard key={doc.path} doc={doc} onDelete={handleDelete} onEdit={handleOpenEditor} onMove={(p) => setMovingPath(p)} />
+                <DocumentCard key={doc.path} doc={doc} onDelete={(path) => setDeleteTarget({ type: "file", value: path })} onEdit={handleOpenEditor} onMove={(p) => setMovingPath(p)} />
               ))}
             </div>
           )}
@@ -447,6 +444,16 @@ export default function KnowledgeBase() {
           onClose={() => setMovingPath(null)}
         />
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title={deleteTarget?.type === "dir" ? "刪除資料夾" : "刪除文件"}
+        message={deleteTarget ? (deleteTarget.type === "dir" ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？` : `確定要刪除 ${deleteTarget.value} 嗎？`) : ""}
+        confirmLabel="刪除"
+        danger
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       {/* Editor Modal */}
       {editingPath && (
@@ -531,15 +538,15 @@ function DocumentCard({ doc, onDelete, onEdit, onMove }: { doc: KnowledgeDocumen
         <div className="flex items-center gap-2 shrink-0">
           {doc.is_indexed ? (
             <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-              Indexed
+              已索引
             </span>
           ) : doc.is_indexable ? (
             <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
-              Pending
+              待處理
             </span>
           ) : (
             <span className="rounded-full bg-slate-800/60 border border-slate-700/50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Excluded
+              已排除
             </span>
           )}
           {!doc.is_core && (
@@ -547,14 +554,14 @@ function DocumentCard({ doc, onDelete, onEdit, onMove }: { doc: KnowledgeDocumen
               <button
                 onClick={(e) => { e.stopPropagation(); onMove(doc.path); }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-primary/10 text-slate-600 hover:text-primary"
-                title="移動文件"
+                title="移動檔案"
               >
                 <span className="material-symbols-outlined text-[16px]">drive_file_move</span>
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete(doc.path); }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-500/10 text-slate-600 hover:text-red-400"
-                title="刪除文件"
+                title="刪除檔案"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
               </button>

@@ -188,22 +188,22 @@ export default function Personas() {
               : [];
 
        return (
-              <div className="flex h-full w-full overflow-hidden bg-[#0A0A0A]">
+              <div className="flex h-full w-full overflow-hidden bg-background">
                      {/* Contextual Sidebar */}
-                     <aside className="w-[300px] lg:w-[320px] flex-shrink-0 border-r border-[#1e1e1e] bg-[#0A0A0A] flex flex-col hidden md:flex z-10">
+                     <aside className="w-[300px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 flex flex-col hidden md:flex z-10">
                             {/* Sidebar Header */}
-                            <div className="px-5 py-5 border-b border-[#1e1e1e] flex items-center justify-between shrink-0">
+                            <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
                                    <div className="flex items-center gap-2.5">
-                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-[#1e1e1e] text-slate-300">
+                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-slate-800 text-slate-300">
                                                  <span className="material-symbols-outlined text-[14px]">groups_2</span>
                                           </div>
-                                          <h2 className="text-[13px] font-semibold tracking-wide text-slate-200">Personas</h2>
+                                          <h2 className="text-[13px] font-semibold tracking-wide text-slate-200">角色管理</h2>
                                    </div>
                                    <button
                                           onClick={() => loadPersonas(selectedPersona?.persona_id)}
                                           disabled={loadingList}
-                                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-[#1e1e1e] hover:text-slate-200 transition-colors disabled:opacity-50"
-                                          title="Refresh"
+                                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors disabled:opacity-50"
+                                          title="重新整理"
                                    >
                                           <span className={`material-symbols-outlined text-[16px] ${loadingList ? "animate-spin text-slate-200" : ""}`}>
                                                  refresh
@@ -215,15 +215,15 @@ export default function Personas() {
                                    {/* Persona List */}
                                    <div>
                                           <div className="flex items-center justify-between mb-3 px-1 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                                                 <span>Library ({personas.length})</span>
+                                                 <span>角色庫（{personas.length}）</span>
                                           </div>
                                           <div className="grid gap-1">
                                                  {personas.map((persona) => (
                                                         <div
                                                                key={persona.persona_id}
                                                                className={`rounded-md p-2.5 text-left transition-colors cursor-pointer border ${selectedPersona?.persona_id === persona.persona_id
-                                                                      ? "bg-[#1e1e1e] border-[#333] shadow-sm"
-                                                                      : "bg-transparent border-transparent hover:bg-[#161616]"
+                                                                      ? "bg-slate-800/60 border-slate-700 shadow-sm"
+                                                                      : "bg-transparent border-transparent hover:bg-slate-800/30"
                                                                       }`}
                                                                onClick={() => {
                                                                       setSelectedPersona(persona);
@@ -238,7 +238,7 @@ export default function Personas() {
                                                                       <div className="flex items-center gap-1.5 shrink-0">
                                                                              {persona.is_default && (
                                                                                     <span className="rounded flex items-center bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-amber-500">
-                                                                                           def
+                                                                                           預設
                                                                                     </span>
                                                                              )}
                                                                       </div>
@@ -264,37 +264,37 @@ export default function Personas() {
                                           </div>
                                    </div>
 
-                                   <hr className="border-[#1e1e1e]" />
+                                   <hr className="border-slate-800/60" />
 
                                    {/* Create / Clone Persona Form */}
-                                   <div className="rounded-md border border-[#1e1e1e] bg-[#0A0A0A] p-4 space-y-4">
-                                          <h3 className="text-[12px] font-semibold text-slate-300 flex items-center gap-1.5">Add Persona</h3>
+                                   <div className="rounded-md border border-slate-800/60 bg-slate-900/20 p-4 space-y-4">
+                                          <h3 className="text-[12px] font-semibold text-slate-300 flex items-center gap-1.5">新增角色</h3>
                                           <div className="space-y-3">
                                                  <input
                                                         value={newPersonaId}
                                                         onChange={(event) => setNewPersonaId(event.target.value)}
-                                                        placeholder="ID (e.g. support)"
-                                                        className="w-full rounded-md border border-[#333] bg-[#0A0A0A] px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-400 focus:outline-none transition-colors"
-                                                        title="Unique Persona ID (used in folder path)"
+                                                        placeholder="ID（例如 support）"
+                                                        className="w-full rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none transition-colors"
+                                                        title="唯一角色 ID（用於資料夾路徑）"
                                                  />
                                                  <input
                                                         value={newPersonaLabel}
                                                         onChange={(event) => setNewPersonaLabel(event.target.value)}
-                                                        placeholder="Name (e.g. Support Bot)"
-                                                        className="w-full rounded-md border border-[#333] bg-[#0A0A0A] px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-400 focus:outline-none transition-colors"
-                                                        title="Display Name (only applied to Blank Template)"
+                                                        placeholder="名稱（例如 Support Bot）"
+                                                        className="w-full rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none transition-colors"
+                                                        title="顯示名稱（僅套用於空白範本）"
                                                  />
                                                  <div className="relative">
                                                         <select
                                                                value={templateSourceId}
                                                                onChange={(event) => setTemplateSourceId(event.target.value)}
                                                                className="select-dark w-full text-[13px]"
-                                                               title="Select a template or an existing persona to copy configuration from"
+                                                               title="選擇範本或現有角色複製設定"
                                                         >
-                                                               <option value="">-- Blank Template --</option>
+                                                               <option value="">── 空白範本 ──</option>
                                                                {personas.map((persona) => (
                                                                       <option key={persona.persona_id} value={persona.persona_id}>
-                                                                             Copy from {persona.persona_id}
+                                                                             複製自 {persona.persona_id}
                                                                       </option>
                                                                ))}
                                                         </select>
@@ -304,18 +304,18 @@ export default function Personas() {
                                           <button
                                                  onClick={handleCreateOrClone}
                                                  disabled={creatingPersona || cloningPersona || !newPersonaId.trim()}
-                                                 className="w-full rounded-md bg-[#ededed] text-[#0A0A0A] px-3 py-2 text-[13px] font-medium hover:bg-white transition-colors disabled:opacity-50"
+                                                 className="w-full rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
                                           >
-                                                 {(creatingPersona || cloningPersona) ? "Creating..." : "Create Persona"}
+                                                 {(creatingPersona || cloningPersona) ? "建立中..." : "建立角色"}
                                           </button>
                                    </div>
                             </div>
                      </aside>
 
                      {/* Main Editor Content */}
-                     <main className="flex-1 flex flex-col min-w-0 bg-[#0A0A0A] relative overflow-hidden">
+                     <main className="flex-1 flex flex-col min-w-0 bg-background relative overflow-hidden">
                             {status && (
-                                   <div className="p-4 shrink-0 shadow-sm z-20 border-b border-[#1e1e1e] bg-[#0A0A0A]">
+                                   <div className="p-4 shrink-0 shadow-sm z-20 border-b border-slate-800/60">
                                           <StatusAlert type={status.type} message={status.message} />
                                    </div>
                             )}
@@ -325,7 +325,7 @@ export default function Personas() {
                                           <div className="flex flex-col gap-6 mb-6 shrink-0">
                                                  <div className="flex items-end justify-between">
                                                         <div className="flex items-center gap-4">
-                                                               <div className="w-10 h-10 rounded border border-[#333] bg-[#161616] flex items-center justify-center text-slate-300">
+                                                               <div className="w-10 h-10 rounded border border-slate-700 bg-slate-900/50 flex items-center justify-center text-slate-300">
                                                                       <span className="material-symbols-outlined text-[20px]">psychology</span>
                                                                </div>
                                                                <div>
@@ -338,14 +338,14 @@ export default function Personas() {
                                                                </div>
                                                         </div>
                                                         <div className="flex items-center gap-4 shrink-0">
-                                                               <div className="flex p-1 rounded-md border border-[#333] bg-[#161616]">
+                                                               <div className="flex rounded-md border border-slate-700 overflow-hidden bg-slate-900">
                                                                       {(["edit", "split", "preview"] as EditorMode[]).map((mode) => (
                                                                              <button
                                                                                     key={mode}
                                                                                     onClick={() => setEditorMode(mode)}
-                                                                                    className={`px-3 py-1 text-[11px] font-medium rounded transition-colors ${editorMode === mode
-                                                                                           ? "bg-[#333] text-white"
-                                                                                           : "text-slate-400 hover:text-slate-200"
+                                                                                    className={`px-3 py-1 text-[11px] font-medium transition-colors ${editorMode === mode
+                                                                                           ? "bg-slate-700 text-white"
+                                                                                           : "text-slate-400 hover:text-white hover:bg-slate-800"
                                                                                            }`}
                                                                              >
                                                                                     {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -355,14 +355,14 @@ export default function Personas() {
                                                         </div>
                                                  </div>
 
-                                                 <div className="flex gap-2 overflow-x-auto no-scrollbar border-b border-[#1e1e1e] pb-3">
+                                                 <div className="flex gap-2 overflow-x-auto no-scrollbar border-b border-slate-800/60 pb-3">
                                                         {coreDocs.map((doc) => (
                                                                <button
                                                                       key={doc.path}
                                                                       onClick={() => openDocument(doc.path)}
                                                                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors whitespace-nowrap border ${selectedPath === doc.path
-                                                                             ? "bg-[#1e1e1e] border-[#333] text-slate-200 shadow-sm"
-                                                                             : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#161616]"
+                                                                             ? "bg-slate-800/60 border-slate-700 text-slate-200 shadow-sm"
+                                                                             : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
                                                                              }`}
                                                                >
                                                                       <span className={`material-symbols-outlined text-[16px] ${selectedPath === doc.path ? "text-slate-200" : ""}`}>{doc.icon}</span>
@@ -372,12 +372,12 @@ export default function Personas() {
                                                  </div>
                                           </div>
 
-                                          <div className="flex-1 min-h-0 relative mb-5 rounded-md border border-[#333] bg-[#0A0A0A] overflow-hidden flex">
+                                          <div className="flex-1 min-h-0 relative mb-5 rounded-xl border border-slate-800/50 bg-slate-950/30 overflow-hidden shadow-inner flex">
                                                  {loadingDocument && (
-                                                        <div className="absolute inset-0 bg-[#0A0A0A]/50 backdrop-blur-sm z-10 flex items-center justify-center">
-                                                               <div className="flex items-center gap-2 text-slate-300 font-medium">
+                                                        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-10 flex items-center justify-center">
+                                                               <div className="flex items-center gap-2 text-primary font-bold">
                                                                       <span className="material-symbols-outlined animate-spin text-[16px]">refresh</span>
-                                                                      Loading...
+                                                                      載入中...
                                                                </div>
                                                         </div>
                                                  )}
@@ -385,12 +385,12 @@ export default function Personas() {
                                                         <textarea
                                                                value={draftContent}
                                                                onChange={(event) => setDraftContent(event.target.value)}
-                                                               className={`h-full w-full bg-transparent p-6 text-[13px] leading-relaxed text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none ${editorMode === "split" ? "border-r border-[#333]" : ""
+                                                               className={`h-full w-full bg-transparent p-6 text-[13px] leading-relaxed text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none ${editorMode === "split" ? "border-r border-slate-800/50" : ""
                                                                       }`}
                                                         />
                                                  ) : null}
                                                  {editorMode === "preview" || editorMode === "split" ? (
-                                                        <div className="h-full w-full p-8 overflow-y-auto prose-container bg-[#0A0A0A]">
+                                                        <div className="h-full w-full p-8 overflow-y-auto prose-container bg-slate-900/20">
                                                                <MarkdownPreview content={draftContent} />
                                                         </div>
                                                  ) : null}
@@ -409,17 +409,17 @@ export default function Personas() {
                                                                       setDraftContent(loadedContent);
                                                                }}
                                                                disabled={!hasUnsavedChanges}
-                                                               className="rounded-md px-4 py-2 text-[12px] font-medium text-slate-400 border border-transparent hover:text-slate-200 hover:bg-[#1e1e1e] transition-colors disabled:opacity-30"
+                                                               className="rounded-lg px-4 py-2 text-[12px] font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-30"
                                                         >
-                                                               Discard
+                                                               捨棄
                                                         </button>
                                                         <button
                                                                onClick={saveDocument}
                                                                disabled={saving || !hasUnsavedChanges}
-                                                               className="flex items-center gap-1.5 rounded-md bg-[#ededed] px-4 py-2 text-[12px] font-medium text-[#0A0A0A] hover:bg-white transition-colors disabled:opacity-50"
+                                                               className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[12px] font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/10"
                                                         >
                                                                <span className="material-symbols-outlined text-[16px]">save</span>
-                                                               {saving ? "Saving..." : "Save Config"}
+                                                               {saving ? "儲存中..." : "儲存設定"}
                                                         </button>
                                                  </div>
                                           </div>
@@ -427,12 +427,12 @@ export default function Personas() {
                             ) : (
                                    <div className="flex-1 flex items-center justify-center p-12">
                                           <div className="max-w-sm text-center">
-                                                 <div className="w-16 h-16 rounded-xl bg-[#161616] border border-[#333] flex items-center justify-center text-slate-500 mx-auto mb-6">
+                                                 <div className="w-16 h-16 rounded-xl bg-slate-900/50 border border-slate-700 flex items-center justify-center text-slate-500 mx-auto mb-6">
                                                         <span className="material-symbols-outlined text-[32px]">groups</span>
                                                  </div>
-                                                 <h3 className="text-xl font-semibold text-slate-200 mb-2">No Persona Selected</h3>
+                                                 <h3 className="text-xl font-semibold text-slate-200 mb-2">未選擇角色</h3>
                                                  <p className="text-[13px] text-slate-500 leading-relaxed">
-                                                        Select a persona from the left sidebar to edit its core configuration, or create a brand new persona to experiment with.
+                                                        從左側欄選擇要編輯的角色，或建立新角色進行實驗。
                                                  </p>
                                           </div>
                                    </div>
@@ -441,9 +441,9 @@ export default function Personas() {
 
                      <ConfirmModal
                             open={deletePersonaTarget !== null}
-                            title="Delete Persona"
-                            message={`確定要刪除 persona「${deletePersonaTarget?.persona_id}」嗎？此操作無法復原。`}
-                            confirmLabel="Delete"
+                            title="刪除角色"
+                            message={`確定要刪除角色「${deletePersonaTarget?.persona_id}」嗎？此操作無法復原。`}
+                            confirmLabel="刪除"
                             danger
                             onConfirm={confirmDeletePersona}
                             onCancel={() => setDeletePersonaTarget(null)}

@@ -14,7 +14,7 @@ export default function ConfirmModal({
   open,
   title,
   message,
-  confirmLabel = "Confirm",
+  confirmLabel = "確認",
   danger = false,
   onConfirm,
   onCancel,
@@ -58,7 +58,7 @@ export default function ConfirmModal({
             onClick={onCancel}
             className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-slate-600 hover:text-white transition-colors"
           >
-            Cancel
+            取消
           </button>
           <button
             onClick={onConfirm}

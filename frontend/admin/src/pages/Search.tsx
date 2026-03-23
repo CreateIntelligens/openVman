@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { postSearch } from "../api";
 import StatusAlert from "../components/StatusAlert";
+import { useProject } from "../context/ProjectContext";
 
 interface SearchResult {
   text: string;
@@ -19,13 +20,40 @@ interface SearchResponse {
 
 const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
 
+function getSimilarityPercentage(distance: number | null | undefined): number | null {
+  if (distance == null) return null;
+  return Math.max(0, Math.min(100, (1 - distance) * 100));
+}
+
+function getPersonaId(metadata?: string): string | null {
+  if (!metadata) return null;
+
+  try {
+    const parsed = JSON.parse(metadata) as { persona_id?: string };
+    if (!parsed.persona_id || parsed.persona_id === "default") {
+      return null;
+    }
+
+    return parsed.persona_id;
+  } catch {
+    return null;
+  }
+}
+
 export default function Search() {
+  const { projectId } = useProject();
   const [query, setQuery] = useState("");
   const [table, setTable] = useState("knowledge");
   const [topK, setTopK] = useState<number>(5);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Clear results when project changes
+  useEffect(() => {
+    setResponse(null);
+    setError("");
+  }, [projectId]);
 
   const submit = () => {
     if (!query.trim()) return;
@@ -41,9 +69,9 @@ export default function Search() {
     <div className="page-scroll">
       {/* Header */}
       <header className="sticky top-0 z-10 px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
-        <h2 className="text-2xl font-bold">Search Knowledge Base</h2>
+        <h2 className="text-2xl font-bold">知識庫搜尋</h2>
         <p className="text-sm text-slate-400">
-          Query your digital brain using high-dimensional vector similarity.
+          使用高維向量相似度查詢你的數位大腦。
         </p>
       </header>
 
@@ -54,7 +82,7 @@ export default function Search() {
             <span className="material-symbols-outlined absolute left-4 text-slate-400">search</span>
             <input
               className="w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-white placeholder:text-slate-500 text-lg"
-              placeholder="Describe what you're looking for..."
+              placeholder="描述你要搜尋的內容..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
@@ -67,8 +95,8 @@ export default function Search() {
               value={table}
               onChange={(e) => setTable(e.target.value)}
             >
-              <option value="memories">Personal Memories</option>
-              <option value="knowledge">Knowledge Base</option>
+              <option value="memories">個人記憶</option>
+              <option value="knowledge">知識庫</option>
             </select>
           </div>
           <div className="h-auto w-px bg-slate-700 hidden md:block mx-2 my-2" />
@@ -89,7 +117,7 @@ export default function Search() {
             disabled={loading || !query.trim()}
             className="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-8 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
           >
-            <span>{loading ? "Searching..." : "Execute Query"}</span>
+            <span>{loading ? "搜尋中..." : "執行查詢"}</span>
             <span className="material-symbols-outlined">bolt</span>
           </button>
         </div>
@@ -102,16 +130,16 @@ export default function Search() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">analytics</span>
-                Search Results
+                搜尋結果
               </h3>
               <span className="text-sm text-slate-500">
-                Found {response.results.length} results
+                找到 {response.results.length} 筆結果
               </span>
             </div>
 
             <div className="grid gap-4">
               {response.results.map((item, i) => {
-                const similarity = item._distance != null ? Math.max(0, Math.min(100, (1 - item._distance) * 100)) : null;
+                const similarity = getSimilarityPercentage(item._distance);
                 return (
                   <div
                     key={i}
@@ -123,10 +151,10 @@ export default function Search() {
                           {response.table}
                         </span>
                         {response.table === "memories" && <PersonaBadge metadata={item.metadata} />}
-                        <span className="text-xs text-slate-500">Source: {item.source}</span>
+                        <span className="text-xs text-slate-500">來源：{item.source}</span>
                       </div>
                       <div className="text-right min-w-[120px]">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter mb-1">Similarity</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter mb-1">相似度</p>
                         {similarity != null ? (
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-2 rounded-full bg-slate-700 overflow-hidden">
@@ -154,7 +182,7 @@ export default function Search() {
               })}
 
               {response.results.length === 0 && (
-                <p className="text-slate-500 text-center py-8">No results found.</p>
+                <p className="text-slate-500 text-center py-8">沒有找到結果。</p>
               )}
             </div>
           </div>
@@ -165,17 +193,16 @@ export default function Search() {
 }
 
 function PersonaBadge({ metadata }: { metadata?: string }) {
-  if (!metadata) return null;
-  try {
-    const meta = JSON.parse(metadata);
-    if (!meta.persona_id || meta.persona_id === "default") return null;
-    return (
-      <span className="flex items-center gap-1 font-semibold text-primary/80 uppercase text-[10px] bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-        <span className="material-symbols-outlined text-[12px]">masks</span>
-        {meta.persona_id}
-      </span>
-    );
-  } catch {
+  const personaId = getPersonaId(metadata);
+
+  if (!personaId) {
     return null;
   }
+
+  return (
+    <span className="flex items-center gap-1 font-semibold text-primary/80 uppercase text-[10px] bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+      <span className="material-symbols-outlined text-[12px]">masks</span>
+      {personaId}
+    </span>
+  );
 }

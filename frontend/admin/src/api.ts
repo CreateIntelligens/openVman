@@ -98,22 +98,6 @@ async function request<T>(method: string, path: string): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Identity
-// ---------------------------------------------------------------------------
-
-export interface AgentIdentity {
-  name: string;
-  emoji: string;
-  theme: string;
-}
-
-export async function fetchIdentity(personaId?: string): Promise<AgentIdentity> {
-  const params: QueryParams = {};
-  if (personaId) params.persona_id = personaId;
-  return fetchJson<AgentIdentity>(projectUrl("/identity", params));
-}
-
-// ---------------------------------------------------------------------------
 // Project CRUD
 // ---------------------------------------------------------------------------
 

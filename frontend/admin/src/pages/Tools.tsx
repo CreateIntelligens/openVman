@@ -13,6 +13,19 @@ import {
 import StatusAlert from "../components/StatusAlert";
 import ConfirmModal from "../components/ConfirmModal";
 
+const SKILL_EDITOR_TABS = ["skill.yaml", "main.py"] as const;
+
+type SkillEditorTab = (typeof SKILL_EDITOR_TABS)[number];
+
+function filesChanged(currentFiles: Record<string, string>, originalFiles: Record<string, string>): boolean {
+  return Object.keys(originalFiles).some((key) => currentFiles[key] !== originalFiles[key]);
+}
+
+function getSkillIdFromToolName(toolName: string): string {
+  const colonIndex = toolName.indexOf(":");
+  return colonIndex > 0 ? toolName.slice(0, colonIndex) : "";
+}
+
 // ---------------------------------------------------------------------------
 // Skill Editor Panel
 // ---------------------------------------------------------------------------
@@ -27,7 +40,7 @@ function SkillEditor({
   onSaved: () => void;
 }) {
   const [files, setFiles] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"skill.yaml" | "main.py">("skill.yaml");
+  const [activeTab, setActiveTab] = useState<SkillEditorTab>("skill.yaml");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -48,12 +61,9 @@ function SkillEditor({
   }, [skillId]);
 
   const handleChange = (content: string) => {
-    const updated = { ...files, [activeTab]: content };
-    setFiles(updated);
-    const hasChanges = Object.keys(originalFiles).some(
-      (key) => updated[key] !== originalFiles[key],
-    );
-    setDirty(hasChanges);
+    const nextFiles = { ...files, [activeTab]: content };
+    setFiles(nextFiles);
+    setDirty(filesChanged(nextFiles, originalFiles));
   };
 
   const handleSave = () => {
@@ -69,18 +79,16 @@ function SkillEditor({
       .finally(() => setSaving(false));
   };
 
-  const tabs: ("skill.yaml" | "main.py")[] = ["skill.yaml", "main.py"];
-
   return (
     <div className="bg-slate-900/60 border border-primary/10 rounded-xl overflow-hidden">
       {/* Editor Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-primary">edit_note</span>
-          <span className="font-bold text-sm">Editing: {skillId}</span>
+          <span className="font-bold text-sm">編輯：{skillId}</span>
           {dirty && (
             <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded uppercase">
-              Unsaved
+              未儲存
             </span>
           )}
         </div>
@@ -91,14 +99,14 @@ function SkillEditor({
             className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-sm">save</span>
-            {saving ? "Saving..." : "Save & Reload"}
+            {saving ? "儲存中..." : "儲存並重載"}
           </button>
           <button
             onClick={onClose}
             className="flex items-center gap-1 px-3 py-1.5 border border-slate-700 text-slate-400 hover:text-white hover:border-slate-600 rounded-lg text-xs transition-colors"
           >
             <span className="material-symbols-outlined text-sm">close</span>
-            Close
+            關閉
           </button>
         </div>
       </div>
@@ -107,7 +115,7 @@ function SkillEditor({
 
       {/* File Tabs */}
       <div className="flex border-b border-slate-800">
-        {tabs.map((tab) => (
+        {SKILL_EDITOR_TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -124,7 +132,7 @@ function SkillEditor({
 
       {/* Editor Area */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-slate-500 text-sm">Loading files...</div>
+        <div className="flex items-center justify-center py-16 text-slate-500 text-sm">載入檔案中...</div>
       ) : (
         <textarea
           value={files[activeTab] ?? ""}
@@ -154,7 +162,10 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
+  const trimmedName = name.trim();
+  const trimmedDescription = description.trim();
   const derivedId = idOverride || nameToId(name);
+  const canCreate = Boolean(derivedId && trimmedName);
 
   const reset = () => {
     setName("");
@@ -164,10 +175,10 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
   };
 
   const handleCreate = () => {
-    if (!derivedId || !name.trim()) return;
+    if (!canCreate) return;
     setCreating(true);
     setError("");
-    createSkill(derivedId, name.trim(), description.trim())
+    createSkill(derivedId, trimmedName, trimmedDescription)
       .then(() => {
         reset();
         setOpen(false);
@@ -184,7 +195,7 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
         className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-slate-700 hover:border-primary/40 text-slate-500 hover:text-primary rounded-xl transition-colors w-full justify-center"
       >
         <span className="material-symbols-outlined text-lg">add</span>
-        <span className="text-sm font-bold">Create Skill</span>
+        <span className="text-sm font-bold">建立技能</span>
       </button>
     );
   }
@@ -192,7 +203,7 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
   return (
     <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-bold text-slate-200">New Skill</h4>
+        <h4 className="text-sm font-bold text-slate-200">新增技能</h4>
         <button onClick={() => { reset(); setOpen(false); }} className="text-slate-500 hover:text-white">
           <span className="material-symbols-outlined text-lg">close</span>
         </button>
@@ -201,25 +212,25 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
       {error && <StatusAlert type="error" message={error} />}
 
       <div>
-        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Name</label>
+        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">名稱</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="My Skill"
+          placeholder="我的技能"
           className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
         />
         {name.trim() && (
           <p className="text-[10px] text-slate-500 mt-1 font-mono">
             ID: {derivedId}
             {!idOverride && (
-              <button onClick={() => setIdOverride(derivedId)} className="ml-2 text-primary hover:underline">edit</button>
+              <button onClick={() => setIdOverride(derivedId)} className="ml-2 text-primary hover:underline">編輯</button>
             )}
           </p>
         )}
       </div>
       {idOverride !== "" && (
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Skill ID</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">技能 ID</label>
           <input
             value={idOverride}
             onChange={(e) => setIdOverride(e.target.value)}
@@ -229,21 +240,21 @@ function CreateSkillForm({ onCreated }: { onCreated: () => void }) {
         </div>
       )}
       <div>
-        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Description</label>
+        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">說明</label>
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Optional description..."
+          placeholder="選填說明..."
           className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
         />
       </div>
       <button
         onClick={handleCreate}
-        disabled={creating || !derivedId || !name.trim()}
+        disabled={creating || !canCreate}
         className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-sm font-bold transition-all disabled:opacity-50"
       >
         <span className="material-symbols-outlined text-sm">add</span>
-        {creating ? "Creating..." : "Create"}
+        {creating ? "建立中..." : "建立"}
       </button>
     </div>
   );
@@ -318,9 +329,9 @@ export default function Tools() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <div>
-          <h2 className="text-2xl font-bold">Tools & Skills</h2>
+          <h2 className="text-2xl font-bold">工具與技能</h2>
           <p className="text-sm text-slate-400">
-            Manage skill plugins and view registered tools
+            管理技能插件及查看已註冊工具
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -330,7 +341,7 @@ export default function Tools() {
             className="flex items-center gap-2 px-4 py-2 border border-slate-700 hover:border-primary/40 text-slate-300 hover:text-primary rounded-lg font-bold transition-all text-sm disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-sm">sync</span>
-            {reloading ? "Reloading..." : "Reload All Skills"}
+            {reloading ? "重新載入中..." : "重新載入所有技能"}
           </button>
           <button
             onClick={load}
@@ -338,7 +349,7 @@ export default function Tools() {
             className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-bold transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-sm">refresh</span>
-            <span>{loading ? "Loading..." : "Refresh"}</span>
+            <span>{loading ? "載入中..." : "重新整理"}</span>
           </button>
         </div>
       </header>
@@ -350,12 +361,12 @@ export default function Tools() {
         <section>
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-base">extension</span>
-            Skills
+            技能
             <span className="text-xs font-mono text-slate-600">({skills.length})</span>
           </h3>
 
           {skills.length === 0 && !loading && !error && (
-            <p className="text-sm text-slate-500 px-1 mb-4">No skills loaded.</p>
+            <p className="text-sm text-slate-500 px-1 mb-4">尚未載入任何技能。</p>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
@@ -379,7 +390,7 @@ export default function Tools() {
                   <button
                     onClick={() => handleToggle(skill)}
                     disabled={togglingIds.has(skill.id)}
-                    title={skill.enabled ? "Disable skill" : "Enable skill"}
+                    title={skill.enabled ? "停用技能" : "啟用技能"}
                     className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
                       skill.enabled ? "bg-emerald-500" : "bg-slate-600"
                     }`}
@@ -408,7 +419,7 @@ export default function Tools() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[11px] text-slate-500">
                     <span className="material-symbols-outlined text-[14px]">handyman</span>
-                    {skill.tools.length} tool{skill.tools.length !== 1 ? "s" : ""}
+                    {skill.tools.length}個工具
                     <span className="text-slate-700 mx-1">|</span>
                     <span className="truncate font-mono max-w-[120px]" title={skill.tools.join(", ")}>
                       {skill.tools.join(", ")}
@@ -421,11 +432,12 @@ export default function Tools() {
                       className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-400 hover:text-primary border border-slate-700 hover:border-primary/30 rounded-lg transition-colors"
                     >
                       <span className="material-symbols-outlined text-[14px]">edit</span>
-                      Edit
+                      編輯
                     </button>
                     <button
                       onClick={() => setDeleteTarget(skill)}
                       className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-400 hover:text-red-400 border border-slate-700 hover:border-red-500/30 rounded-lg transition-colors"
+                      title="刪除"
                     >
                       <span className="material-symbols-outlined text-[14px]">delete</span>
                     </button>
@@ -455,7 +467,7 @@ export default function Tools() {
         <section>
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-base">settings</span>
-            Built-in Tools
+            內建工具
             <span className="text-xs font-mono text-slate-600">({tools.length})</span>
           </h3>
 
@@ -465,8 +477,8 @@ export default function Tools() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-widest text-slate-500 border-b border-slate-800">
-                      <th className="px-6 py-3">Name</th>
-                      <th className="px-6 py-3">Description</th>
+                      <th className="px-6 py-3">名稱</th>
+                      <th className="px-6 py-3">說明</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
@@ -490,7 +502,7 @@ export default function Tools() {
           <section>
             <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
               <span className="material-symbols-outlined text-base">extension</span>
-              Skill Tools
+              技能工具
               <span className="text-xs font-mono text-slate-600">({skillTools.length})</span>
             </h3>
 
@@ -499,15 +511,14 @@ export default function Tools() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-widest text-slate-500 border-b border-slate-800">
-                      <th className="px-6 py-3">Name</th>
-                      <th className="px-6 py-3">Description</th>
-                      <th className="px-6 py-3">Skill</th>
+                      <th className="px-6 py-3">名稱</th>
+                      <th className="px-6 py-3">說明</th>
+                      <th className="px-6 py-3">技能</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {skillTools.map((tool) => {
-                      const colonIdx = tool.name.indexOf(":");
-                      const skillId = colonIdx > 0 ? tool.name.slice(0, colonIdx) : "";
+                      const skillId = getSkillIdFromToolName(tool.name);
                       const skill = skills.find((s) => s.id === skillId);
                       return (
                         <tr key={tool.name} className="text-slate-300 hover:bg-slate-800/30 transition-colors">
@@ -535,9 +546,9 @@ export default function Tools() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         open={!!deleteTarget}
-        title="Delete Skill"
-        message={deleteTarget ? `Are you sure you want to delete "${deleteTarget.name}" (${deleteTarget.id})?\n\nThis will permanently remove the skill directory and all its files.` : ""}
-        confirmLabel="Delete"
+        title="刪除技能"
+        message={deleteTarget ? `確定要刪除「${deleteTarget.name}」（${deleteTarget.id}）嗎？\n\n此操作將永久移除技能目錄及其所有檔案。` : ""}
+        confirmLabel="刪除"
         danger
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
