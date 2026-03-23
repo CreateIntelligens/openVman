@@ -6,6 +6,7 @@ x-shared: &shared
 services:
   api:
     <<: *shared
+    user: "${UID:-1000}:${GID:-1000}"
     build:
       context: ./brain/api
       dockerfile: Dockerfile
@@ -14,10 +15,12 @@ services:
       - ./brain/data:/data
       - ./brain/skills:/skills
       - ./contracts:/contracts:ro
-      - brain-data:/root/.openclaw/lancedb
-      - hf-cache:/root/.cache/huggingface
+      - brain-data:/home/appuser/.openclaw/lancedb
+      - hf-cache:/home/appuser/.cache/huggingface
     env_file:
       - ./brain/.env
+    environment:
+      - HOME=/home/appuser
     deploy:
       resources:
         reservations:
