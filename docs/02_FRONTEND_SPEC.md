@@ -2,19 +2,27 @@
 ## 前端實作指南 (Frontend Implementation Spec)
 
 ### 1. 技術棧與核心目標 (Tech Stack & Goals)
-* **核心技術**：HTML5 `<video>`、`<canvas>`、Web Audio API、WebSockets、Vanilla JS (或任意前端框架如 React/Vue)。
-* **渲染模式**：2.5D 擬真切片 (Sprite Overlay)。
-* **唯一對時標準**：`VideoSyncManager` (以 `video.currentTime` 為主基準，確保影音不漂移)。嚴禁使用 `setTimeout` 或 `setInterval` 來控制嘴型。
+* **核心技術**：HTML5 `<video>`、`<canvas>`、WebGL (Three.js/PixiJS)、Web Audio API、WebSockets。
+* **渲染架構**：從單一的覆蓋，升級為支援三大渲染引擎的插拔式架構 (Pluggable Rendering Engines)。
+* **三大核心渲染流派支援**：
+  * **[1] Wav2Lip 引擎 (SSR / 高階 Edge)**：經典 2D 卷積生成，高併發能力強 (可伺服器推流或 WebGPU 推論)。
+  * **[2] DH_live / DINet 引擎 (邊緣運算 CSR)**：高畫質口腔細節修復，低算力 (39 Mflops)，適合客戶端 ONNX 推論。
+  * **[3] WebGL + .ktx2 引擎 (純 CSR 終端渲染)**：參數驅動 2.5D/3D 狀態機，伺服器零渲染壓力，主攻寫實派機台展場。
+* **唯一對時標準**：`VideoSyncManager` (以 `audio/video.currentTime` 為主基準)。嚴禁使用 `setTimeout` 控制。
 
 ### 2. DOM 結構與圖層疊加 (DOM Structure & Layering)
 畫面由底層影片與上層畫布疊加而成。必須確保大小一致且絕對定位對齊。
 
-```
-<div id="avatar-container" style="position: relative; width: 1080px; height: 1920px;">
-  <video id="idle-video" src="assets/idle.mp4" loop muted playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;"></video>
-  
-  <canvas id="mouth-canvas" width="1080" height="1920" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></canvas>
+```html
+<div id="avatar-container" style="position: relative; width: 1080px; height: 1920px; overflow: hidden;">
+  <!-- 策略 A: 純 Video 背景 (用於 Wav2Lip 或 DINet ONNX 推論覆蓋) -->
+  <video id="idle-video" src="assets/idle.mp4" loop muted playsinline style="position: absolute; width: 100%; height: 100%;"></video>
+  <canvas id="mouth-canvas" width="1080" height="1920" style="position: absolute; pointer-events: none; z-index: 10;"></canvas>
+
+  <!-- 策略 B: WebGL 獨立渲染層 (隱藏 video，全由 WebGL 接管) -->
+  <canvas id="webgl-canvas" width="1080" height="1920" style="position: absolute; width: 100%; height: 100%; z-index: 20; display: none;"></canvas>
 </div>
+
 
 <div id="tap-to-start" style="position: absolute; z-index: 999; ...">
   點擊開始互動 (Tap to Start)
@@ -77,21 +85,22 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 ```
 
-### 5. Canvas 繪圖與羽化邏輯 (Sprite Rendering & Blending)
+### 5. 三大核心渲染策略與前端引擎 (Core Rendering Strategies)
 
-前端支援兩種對嘴渲染策略，依據設備能力自動選擇：
+前端現在設計為一個「多引擎」架構 (`LipSyncManager`)，專注於攻破以下三條技術路線：
 
-1. **DINet (DinetStrategy)**：
-   * 2023 年新技術，**低算力需求 (39 Mflops)**，可在無 GPU 手機網頁執行
-   * 高畫質，可保留牙齒與口腔細節
-   * 透過 ONNX Runtime Web (WebGL) 即時推論
-2. **Wav2Lip AI 生成 (Wav2LipStrategy)**：
-   * 需要較高算力，適合有 GPU 的高階設備
-   * 透過 ONNX Runtime Web (WebGPU) 即時推論
-   * **徑向漸變羽化 (Radial Gradient Feathering)**：為了消除矩形邊界，渲染時會套用一個徑向漸變遮罩 (Alpha Mask)，讓嘴唇外圍的 20% 平滑過渡至全透明，無縫與底層 `<video>` 人臉融合。
+1. **Wav2Lip 策略引擎 (Wav2LipStrategy)**
+   * **原理**：經典開源架構，2D 卷積生成嘴型。
+   * **應用**：若是 SSR 模式，伺服器直接傳送生成好的視訊流；若是 CSR 模式，則要求前端設備具備較強 GPU (WebGPU) 來執行 ONNX 推論，並配合徑向漸變羽化 (Radial Gradient Feathering) 消除接縫。
+   * **優勢**：泛用性極高，對音頻的容錯率與同步率佳。
 
-*(註：舊版 Viseme 查表法已廢除)*
+2. **DH_live (DINet) 策略引擎 (DinetStrategy) [邊緣運算 CSR]**
+   * **原理**：將 `DINet_mini` 模型編譯成 ONNX 格式，透過客戶端 WebGL/WebGPU 即時推論。給定音軌特徵與臉部 3D 姿態，當場算出嘴部像素。
+   * **優勢**：極度輕量的神經網路修復 (僅 39 Mflops)，可在普通手機網頁端順跑，且能保留高解析度的牙齒與口腔內部細節。
 
+3. **WebGL + .ktx2 參數驅動引擎 (WebGLStrategy) [純 CSR 終端渲染]**
+   * **原理**：丟棄像素生成，完全依賴預備好的 `.ktx2` 超高壓圖片素材與 3D 網格 (Mesh) 參數。收到語音時間戳後，前端的三維引擎 (Three.js/PixiJS) 即時切換貼圖並拉扯頂點 (Blendshapes)。
+   * **優勢**：完全無神經網路的計算開銷，伺服器零渲染負擔，完美支援無限路多設備併發（尤適合展場機台 Kiosk），畫質寫實無瑕疵。
 
 ### 6. ASR 與語音輸入 (Speech Recognition)
 
@@ -239,31 +248,28 @@ ws.onmessage = (msg) => {
 };
 ```
 
-### 14. 設備自適應對嘴系統 (Device-Adaptive Lip-Sync)
+### 14. 設備與專案自適應策略 (Adaptive Rendering Manager)
 
-為了兼顧畫質與終端效能，前端實作 `LipSyncManager` 來調度對嘴策略：
+`LipSyncManager` 維繫著三條技術路線的切換與調度：
 
-1. **硬體能力自動偵測**：
-   * 初始化時偵測 `navigator.gpu` (WebGPU) 以及裝置記憶體與 CPU 核心數。
-   * **高階設備 (有 GPU)**：載入 ONNX Runtime Web (WebGPU)，使用 Wav2Lip 策略。
-   * **低階設備 (無 GPU/手機)**：使用 DINet 策略（算力僅 39 Mflops，高畫質）。
+1. **硬體能力與專案設定偵測**：
+   * 讀取 config，決定當前套用的 Strategy。
+   * **WebGLStrategy**：如果專案有預載極高清的素材 (.ktx2)，優先使用此模式，保障最穩定的機台體驗。
+   * **Wav2LipStrategy / DinetStrategy**：若無 3D 先期素材，改走 ONNX 即時生成。偵測到 `navigator.gpu` 高效能設備則可選 Wav2Lip；一般設備則套用極低算力的 DINet。
 2. **協定狀態通知 (`SET_LIP_SYNC_MODE`)**：
-    * 為了節省網路頻寬，前端在初始化或切換對嘴模式時，必須透過 WebSocket 發送 `SET_LIP_SYNC_MODE`（dinet 或 wav2lip）。
-    * 後端不再下發 viseme 資料。
-3. **無縫動態切換**：
-    * 允許使用者在 UI 手動切換，或在效能嚴重掉幀時自動降級。切換過程不中斷當前 AudioContext 與播放佇列。
+    * 初始化連線時，前端必須透過 WebSocket 告訴 Gateway：「我現在是 `webgl` 模式，請只發送文字與時間戳」，或「我是 `dinet` 邊緣推論模式，請給我音軌資料」。
+3. **無縫動態降級**：
+    * 若 WebGPU/WebGL 運算崩潰導致掉幀，可自動切換或降級確保不卡住對話。
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    LipSyncManager                       │
-│  • 設備偵測 → 發送模式通知 → 自動選擇對嘴策略 → 渲染循環     │
-└──────────────────────┬──────────────────────────────────┘
-                        │
-         ┌──────────────┼──────────────┐
-         ▼              ▼              ▼
-    ┌─────────┐   ┌─────────┐   ┌─────────┐
-    │ DINet   │   │Wav2Lip │   │ Device  │
-    │Strategy │   │Strategy│   │Detection│
-    └─────────┘   └─────────┘   └─────────┘
-*(Viseme 查表法已廢除)*
+┌─────────────────────────────────────────────────────────────┐
+│                      LipSyncManager                         │
+│  • 讀取專案設定 → 回報後端所需特徵 → 分發任務至三大渲染引擎之一     │
+└────────┬───────────────┬────────────────┬───────────────────┘
+         │               │                │
+         ▼               ▼                ▼
+  ┌────────────┐  ┌──────────────┐ ┌───────────────┐
+  │Wav2Lip引擎 │  │DH_live(DINet)│ │WebGL+.ktx2引擎│
+  │(2D卷積生成) │  │(高畫質邊緣推論)│ │(純CSR狀態機)    │
+  └────────────┘  └──────────────┘ └───────────────┘
 ```

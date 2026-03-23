@@ -141,7 +141,7 @@
 ┌──────────────────────────────────────┐
 │  AudioContext 解碼 → 播放佇列         │
 │  requestAnimationFrame + currentTime │
-│  → DINet/Wav2Lip AI → Canvas 繪製嘴型 │
+│  → Wav2Lip / DINet / WebGL 渲染      │
 └──────────────────────────────────────┘
      │
      ▼
@@ -197,9 +197,9 @@
 
 | 層級 | 關鍵技術 | 說明 |
 |------|----------|------|
-| 前端 | `video.currentTime` + VideoSyncManager | 高精度對嘴時鐘源，解決影音漂移 |
-| 前端 | `<video>` + `<canvas>` Alpha 漸變混合 | 2.5D 擬真切片渲染與無縫羽化 |
-| 前端 | **ONNX Runtime Web (DINet/Wav2Lip)** | 依設備能力選用 DINet (低階) 或 Wav2Lip (高階) AI 對嘴 |
+| 前端 | `video.currentTime` + `AudioContext` | 高精度對嘴時鐘源，解決影音漂移 |
+| 前端 | 渲染策略切換 (`LipSyncManager`) | 支援三大引擎流：`Wav2Lip` (WebGPU) / `DINet` (Edge 推論) / `WebGL` (.ktx2 CSR) |
+| 前端 | **ONNX Runtime Web / WebGL** | 依設備能力選用高速引擎，捨棄舊版 Viseme 常數映射 |
 | 後端 | 標點符號截斷 (Punctuation Chunking) | LLM 串流 → 短句 → TTS，最小化延遲 |
 | 後端 | IndexTTS2-style zh-TW | 以台灣口音為預設，支援品牌聲線與客製化發音 |
 | 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |

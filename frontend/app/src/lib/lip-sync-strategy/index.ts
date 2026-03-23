@@ -2,24 +2,16 @@
  * Lip Sync Strategy Interface
  * 
  * Defines the contract for different lip-sync methods
- * (Viseme lookup and Wav2Lip AI)
+ * (Wav2Lip, DINet, WebGL)
  */
 
-import { VisemeStrategy } from './viseme-strategy.js';
-import { Wav2LipStrategy } from './wav2lip-strategy.js';
-import type { LipSyncMethod } from '../wav2lip';
 import type { DeviceTier } from '../device-capabilities';
 
-export type { LipSyncMethod };
-
-export interface VisemeData {
-    time: number;
-    value: string;
-}
+export type LipSyncMethod = 'wav2lip' | 'dinet' | 'webgl';
 
 export interface AudioChunk {
     audioBuffer: AudioBuffer;
-    visemes: VisemeData[];
+    timestamp?: number;
     text?: string;
 }
 
@@ -33,10 +25,10 @@ export interface LipSyncStrategy {
     /** Initialize the strategy (load models, etc.) */
     initialize(): Promise<void>;
 
-    /** Process audio chunk and generate lip-sync frames */
+    /** Process audio chunk and generate lip-sync frames/data */
     processAudio(chunk: AudioChunk): Promise<void>;
 
-    /** Get current frame for rendering */
+    /** Get current frame for rendering (if applicable) */
     getCurrentFrame(): ImageData | null;
 
     /** Check if strategy is ready */
@@ -46,6 +38,10 @@ export interface LipSyncStrategy {
     dispose(): void;
 }
 
+import { Wav2LipStrategy } from './wav2lip-strategy';
+import { DinetStrategy } from './dinet-strategy';
+import { WebGLStrategy } from './webgl-strategy';
+
 /**
  * Factory to create the appropriate lip-sync strategy
  */
@@ -54,14 +50,14 @@ export async function createLipSyncStrategy(
     deviceTier: DeviceTier
 ): Promise<LipSyncStrategy> {
     switch (method) {
-        case 'wav2lip-high':
-        case 'wav2lip-medium':
-        case 'wav2lip-cpu':
-            return new Wav2LipStrategy(method);
-
-        case 'viseme':
+        case 'wav2lip':
+            return new Wav2LipStrategy();
+        case 'dinet':
+            return new DinetStrategy();
+        case 'webgl':
+            return new WebGLStrategy();
         default:
-            return new VisemeStrategy();
+            return new DinetStrategy();
     }
 }
 
@@ -71,14 +67,12 @@ export async function createLipSyncStrategy(
 export function getStrategyByTier(tier: DeviceTier): LipSyncMethod {
     switch (tier) {
         case 'high':
-            return 'wav2lip-high';
+            return 'wav2lip';
         case 'medium':
-            return 'wav2lip-medium';
         case 'low':
-            return 'wav2lip-cpu';
         case 'minimal':
         default:
-            return 'viseme';
+            return 'dinet';
     }
 }
 
