@@ -34,7 +34,7 @@ async def close_client() -> None:
 async def forward_to_brain(
     trace_id: str,
     session_id: str,
-    enriched_context: dict[str, Any],
+    enriched_context: list[dict[str, Any]],
     media_refs: list[dict[str, Any]] | None = None,
 ) -> bool:
     """POST enriched context to Backend's /internal/enrich endpoint.
@@ -48,7 +48,7 @@ async def forward_to_brain(
     payload = {
         "trace_id": trace_id,
         "session_id": session_id,
-        "context": enriched_context,
+        "enriched_context": enriched_context,
         "media_refs": media_refs or [],
     }
 

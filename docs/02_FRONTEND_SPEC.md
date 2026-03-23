@@ -230,7 +230,7 @@ ws.onclose = () => { reconnect(); };
 
 當使用者選取檔案（圖片/影片/文件）時，前端不透過 WebSocket 發送二進位資料，而是透過標準 HTTP POST 上傳至 Gateway：
 
-1. **Endpoint**: `POST ${GATEWAY_URL}/upload?session_id=${session_id}`
+1. **Endpoint**: `POST ${GATEWAY_URL}/uploads?session_id=${session_id}`
 2. **Payload**: `multipart/form-data` (欄位名：`file`)
 3. **Response**: 取得 `job_id` 並記錄在前端狀態中。
 4. **Enrichment**: Gateway 處理完後會通知 Backend，Backend 再透過 WebSocket 發送 `gateway_status` 通知前端處理進度。

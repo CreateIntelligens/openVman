@@ -27,7 +27,8 @@
 ### 3. API 端點規範 (API Endpoints)
 
 #### 3.1 媒體上傳 (Media Upload)
-* **POST `/upload?session_id={id}&trace_id={id}`**
+* **POST `/uploads?session_id={id}`**
+  > `trace_id` 由 Gateway 自動生成（UUID），不需由 client 提供。
 * **Content-Type**: `multipart/form-data`
 * **Response (Job Accepted)**:
   ```json
@@ -35,7 +36,7 @@
   ```
 
 #### 3.2 健康檢查 (Health)
-* **GET `/health`**
+* **GET `/healthz`**
 * **Response**:
   ```json
   {

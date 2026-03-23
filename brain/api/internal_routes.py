@@ -41,12 +41,8 @@ def log_event(name: str, **kwargs: Any) -> None:
 
 
 def _normalize_enriched_items(payload: InternalEnrichRequest) -> list[dict[str, Any]]:
-    items = list(payload.enriched_context)
-    if not items and payload.context:
-        items.append(payload.context)
-
     normalized: list[dict[str, Any]] = []
-    for item in items:
+    for item in payload.enriched_context:
         content = str(item.get("content", "")).strip()
         if not content:
             continue

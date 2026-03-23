@@ -113,7 +113,7 @@ async def process_media(ctx: dict[str, Any], data: dict[str, Any]) -> dict[str, 
         forward_ok = await forward_to_brain(
             trace_id=trace_id,
             session_id=session_id,
-            enriched_context=result,
+            enriched_context=[result],
             media_refs=[{"path": file_path, "mime_type": mime_type}],
         )
 

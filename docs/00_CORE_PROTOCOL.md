@@ -70,7 +70,7 @@
 ```
 
 **3.5 媒體檔案上傳 (Media Upload)**
-當使用者透過 Kiosk UI（或語音指令後端請求）上傳圖片、影音或文件時，客戶端應將檔案 `POST` 至 Gateway 的 `/upload` 端點。
+當使用者透過 Kiosk UI（或語音指令後端請求）上傳圖片、影音或文件時，客戶端應將檔案 `POST` 至 Gateway 的 `/uploads` 端點。
 Gateway 會回傳 `job_id`，處理完成後會透過 `/internal/enrich` 通知 Backend。
 *(此流程在 HTTP 層進行，不佔用 WebSocket 頻寬)*
 

@@ -46,7 +46,6 @@ class ProtocolValidateRequest(BaseModel):
 class InternalEnrichRequest(BaseModel):
     trace_id: str = ""
     session_id: str | None = None
-    context: dict[str, Any] | None = None
     enriched_context: list[dict[str, Any]] = Field(default_factory=list)
     media_refs: list[dict[str, Any]] = Field(default_factory=list)
     project_id: str = "default"

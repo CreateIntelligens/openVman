@@ -27,7 +27,7 @@ def test_internal_enrich_accepts_forward_payload_and_stores_system_message():
                 json={
                     "trace_id": "trace-1",
                     "session_id": "sess-1",
-                    "context": {"type": "image_description", "content": "有一張胸腔 X 光"},
+                    "enriched_context": [{"type": "image_description", "content": "有一張胸腔 X 光"}],
                     "media_refs": [{"path": "/tmp/xray.jpg"}],
                 },
             )
@@ -85,7 +85,6 @@ def test_internal_enrich_rejects_empty_context_payload():
                 json={
                     "trace_id": "trace-3",
                     "session_id": "sess-3",
-                    "context": {},
                     "enriched_context": [],
                 },
             )

@@ -37,7 +37,7 @@ class TestForwardToBrain:
             ok = await forward_to_brain(
                 trace_id="t1",
                 session_id="s1",
-                enriched_context={"type": "image_description", "content": "test"},
+                enriched_context=[{"type": "image_description", "content": "test"}],
                 media_refs=[{"path": "/tmp/test.jpg"}],
             )
 
@@ -62,7 +62,7 @@ class TestForwardToBrain:
             ok = await forward_to_brain(
                 trace_id="t2",
                 session_id="s2",
-                enriched_context={"type": "test"},
+                enriched_context=[{"type": "test"}],
             )
 
         assert ok is False
@@ -79,7 +79,7 @@ class TestForwardToBrain:
             ok = await forward_to_brain(
                 trace_id="t3",
                 session_id="s3",
-                enriched_context={"type": "test"},
+                enriched_context=[{"type": "test"}],
             )
 
         assert ok is True
