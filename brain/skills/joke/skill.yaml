@@ -1,0 +1,14 @@
+id: joke
+name: Joke
+description: 從 JokeAPI 取得隨機笑話
+version: "1.0.0"
+tools:
+  - name: get_joke
+    description: 取得一則隨機笑話，可指定類別。回傳內容為英文，請翻譯成繁體中文後再回覆使用者。
+    parameters:
+      type: object
+      properties:
+        category:
+          type: string
+          description: "笑話類別：Any, Programming, Misc, Dark, Pun, Spooky, Christmas"
+      required: []
