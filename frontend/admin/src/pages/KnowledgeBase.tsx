@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  crawlUrl as apiCrawlUrl,
   createKnowledgeDirectory,
   deleteKnowledgeDirectory,
   deleteKnowledgeDocument,
@@ -48,6 +49,8 @@ export default function KnowledgeBase() {
   const [movingPath, setMovingPath] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "file" | "dir"; value: string } | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [crawlUrlValue, setCrawlUrlValue] = useState("");
+  const [crawling, setCrawling] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -103,6 +106,23 @@ export default function KnowledgeBase() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     await uploadFiles(Array.from(e.target.files ?? []));
     if (uploadInputRef.current) uploadInputRef.current.value = "";
+  };
+
+  const handleCrawl = async () => {
+    const url = crawlUrlValue.trim();
+    if (!url) return;
+    setCrawling(true);
+    setStatus(null);
+    try {
+      const result = await apiCrawlUrl(url);
+      setStatus({ type: "success", message: `已匯入「${result.title}」` });
+      setCrawlUrlValue("");
+      await loadDocuments();
+    } catch (error) {
+      setStatus({ type: "error", message: String(error) });
+    } finally {
+      setCrawling(false);
+    }
   };
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -224,9 +244,9 @@ export default function KnowledgeBase() {
 
   const filtered = search.trim()
     ? directFiles.filter((d) =>
-        d.path.toLowerCase().includes(search.toLowerCase()) ||
-        d.title.toLowerCase().includes(search.toLowerCase())
-      )
+      d.path.toLowerCase().includes(search.toLowerCase()) ||
+      d.title.toLowerCase().includes(search.toLowerCase())
+    )
     : directFiles;
 
   // Breadcrumb segments
@@ -299,6 +319,38 @@ export default function KnowledgeBase() {
           </span>
           <span className="text-xs text-slate-500">支援所有檔案類型</span>
         </button>
+
+        {/* URL Import */}
+        <div className="rounded-xl border border-slate-800/60 bg-slate-900/30 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="material-symbols-outlined text-primary text-lg">link</span>
+            <h4 className="text-sm font-bold text-white">網址匯入</h4>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              className="flex-1 bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none transition-all"
+              placeholder="https://example.com/article"
+              value={crawlUrlValue}
+              onChange={(e) => setCrawlUrlValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCrawl()}
+              disabled={crawling}
+            />
+            <button
+              onClick={handleCrawl}
+              disabled={crawling || !crawlUrlValue.trim()}
+              className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {crawling ? "hourglass_top" : "download"}
+              </span>
+              {crawling ? "擷取中..." : "匯入網址"}
+            </button>
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            支援任何公開網頁，內容將自動擷取並加入知識庫
+          </p>
+        </div>
 
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm flex-wrap">
@@ -660,11 +712,10 @@ function MoveModal({
               <button
                 key={dir}
                 onClick={() => setSelectedDir(dir)}
-                className={`w-full text-left px-5 py-2.5 flex items-center gap-2 transition-colors ${
-                  isSelected
+                className={`w-full text-left px-5 py-2.5 flex items-center gap-2 transition-colors ${isSelected
                     ? "bg-primary/10 text-primary"
                     : "text-slate-300 hover:bg-slate-800/50"
-                }`}
+                  }`}
                 style={{ paddingLeft: `${20 + depth * 16}px` }}
               >
                 <span className="material-symbols-outlined text-[18px]">

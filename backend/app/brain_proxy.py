@@ -58,7 +58,6 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/memories/maintain", "methods": ["POST"], "tags": _TAG_MEMORY, "summary": "Maintain Memories"},
     {"path": f"{_PUBLIC_API_PREFIX}/sessions", "methods": ["GET"], "tags": _TAG_MEMORY, "summary": "List Sessions"},
     {"path": f"{_PUBLIC_API_PREFIX}/sessions/{{session_id}}", "methods": ["DELETE"], "tags": _TAG_MEMORY, "summary": "Delete Session"},
-    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/ingest", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Ingest Knowledge"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/documents", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "List Knowledge Documents"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/base/documents", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "List Base Knowledge Documents"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/document", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Document"},

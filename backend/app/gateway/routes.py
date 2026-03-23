@@ -4,14 +4,20 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from typing import Any
+from urllib.parse import urlparse as parse_url
 
+import httpx
 from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
+from app.brain_proxy import _get_client as _get_brain_client
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
+from app.gateway.crawl_adapter import fetch_page
 from app.gateway.job_status import get_job_status, set_job_status
 from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
@@ -149,3 +155,78 @@ async def get_dlq(limit: int = Query(default=20, ge=1, le=100)) -> JSONResponse:
     except Exception as exc:
         logger.error("dlq_read_error err=%s", exc)
         return JSONResponse(status_code=500, content={"error": str(exc)})
+
+
+# ---------------------------------------------------------------------------
+# Knowledge: URL Crawl + Ingest
+# ---------------------------------------------------------------------------
+
+class CrawlIngestRequest(BaseModel):
+    url: str = Field(..., min_length=1)
+    project_id: str = "default"
+
+
+@router.post("/api/knowledge/crawl", tags=["Knowledge"])
+async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
+    """抓取網址內容並匯入知識庫。"""
+    # 1. 抓取
+    try:
+        result = await fetch_page(req.url)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
+    except httpx.TimeoutException:
+        return JSONResponse(status_code=504, content={
+            "error": f"抓取逾時（{get_tts_config().crawler_timeout_ms}ms）",
+            "url": req.url,
+        })
+    except httpx.HTTPStatusError as exc:
+        return JSONResponse(status_code=502, content={
+            "error": f"網頁回傳錯誤：{exc.response.status_code}",
+            "url": req.url,
+        })
+    except RuntimeError as exc:
+        return JSONResponse(status_code=422, content={"error": str(exc)})
+
+    # 2. 組裝 markdown
+    md = f"# {result.title}\n\nSource: {result.source_url}\n\n{result.content}"
+    file_bytes = md.encode("utf-8")
+
+    # 3. 檔名從 URL 產生
+    parsed_url = parse_url(result.source_url)
+    slug = re.sub(r"[^a-zA-Z0-9_\-]+", "_", f"{parsed_url.netloc}{parsed_url.path}")
+    slug = slug.strip("_")[:120]
+    filename = f"{slug}.md"
+
+    # 4. 上傳到 brain（走既有 /knowledge/upload）
+    cfg = get_tts_config()
+    brain_url = f"{cfg.brain_url}/brain/knowledge/upload"
+
+    try:
+        client = _get_brain_client()
+        resp = await client.post(
+            brain_url,
+            files={"files": (filename, file_bytes, "text/markdown")},
+            data={"target_dir": "ingested", "project_id": req.project_id},
+        )
+        resp.raise_for_status()
+        upload_result = resp.json()
+    except httpx.HTTPError as exc:
+        logger.error("crawl_upload_failed url=%s err=%s", req.url, exc)
+        return JSONResponse(status_code=502, content={
+            "error": f"知識庫寫入失敗：{exc}",
+            "url": req.url,
+        })
+
+    # 5. 回傳
+    first = upload_result.get("files", [None])[0] if upload_result.get("files") else None
+    path = first.get("path", "") if first else ""
+    size = first.get("size", 0) if first else len(file_bytes)
+
+    return JSONResponse(content={
+        "status": "ok",
+        "title": result.title,
+        "source_url": result.source_url,
+        "path": path,
+        "size": size,
+    })
+

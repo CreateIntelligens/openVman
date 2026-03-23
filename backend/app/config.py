@@ -112,6 +112,7 @@ class TTSRouterConfig(BaseSettings):
     crawler_cache_ttl_min: int = 60
     crawler_ignore_robots: bool = False
     crawler_blocked_domains: str = ""
+    crawler_provider_url: str = ""
 
     # --- Internal ---
     brain_url: str = "http://api:8100"

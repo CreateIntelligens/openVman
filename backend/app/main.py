@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from app.brain_proxy import close_client as close_brain_proxy_client
 from app.brain_proxy import router as brain_proxy_router
 from app.config import get_tts_config
+from app.gateway.crawl_adapter import close_client as close_crawl_client
 from app.gateway.forward import close_client as close_forward_client
 from app.internal_routes import close_client as close_internal_client
 from app.internal_routes import router as internal_router
@@ -95,6 +96,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await close_brain_proxy_client()
         await close_internal_client()
         await close_forward_client()
+        await close_crawl_client()
         if _health_client is not None:
             await _health_client.aclose()
             _health_client = None

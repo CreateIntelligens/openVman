@@ -1,4 +1,4 @@
-"""WebCrawler plugin — HTTP fetch + readability extraction + domain blocking."""
+"""WebCrawler plugin — delegates to crawl_adapter + domain blocking + caching."""
 
 from __future__ import annotations
 
@@ -7,9 +7,8 @@ import time
 from typing import Any
 from urllib.parse import urlparse
 
-import httpx
-
 from app.config import get_tts_config
+from app.gateway.crawl_adapter import fetch_page
 
 logger = logging.getLogger("gateway.plugin.web_crawler")
 
@@ -35,7 +34,7 @@ class WebCrawlerPlugin:
         if not url:
             return {"error": "url is required"}
 
-        # Domain blocking
+        # Domain blocking（adapter 內部也會檢查，提前擋可以避免不必要的函式呼叫和 log）
         cfg = get_tts_config()
         parsed = urlparse(url)
         domain = parsed.hostname or ""
@@ -51,21 +50,13 @@ class WebCrawlerPlugin:
                 logger.info("cache_hit url=%s", url)
                 return cached
 
-        # Fetch and extract
-        timeout_sec = cfg.crawler_timeout_ms / 1000.0
-
         try:
-            async with httpx.AsyncClient(timeout=timeout_sec, follow_redirects=True) as client:
-                resp = await client.get(url, headers={"User-Agent": "openVman-crawler/1.0"})
-                resp.raise_for_status()
-                html = resp.text
-
-            content = self._extract_readable(html)
+            crawl = await fetch_page(url)
             result: dict[str, Any] = {
-                "url": url,
-                "title": content.get("title", ""),
-                "content": content.get("content", ""),
-                "status": resp.status_code,
+                "url": crawl.source_url,
+                "title": crawl.title,
+                "content": crawl.content,
+                "status": crawl.status_code,
             }
 
             self._set_cache(url, result)
@@ -75,21 +66,6 @@ class WebCrawlerPlugin:
         except Exception as exc:
             logger.error("crawl_error url=%s err=%s", url, exc)
             return {"error": str(exc), "url": url}
-
-    def _extract_readable(self, html: str) -> dict[str, str]:
-        """Extract readable content using readability-lxml."""
-        try:
-            from readability import Document
-
-            doc = Document(html)
-            return {
-                "title": doc.title(),
-                "content": doc.summary(),
-            }
-        except Exception as exc:
-            logger.warning("readability_fallback err=%s", exc)
-            # Fallback: return raw HTML trimmed
-            return {"title": "", "content": html[:5000]}
 
     def _get_cached(self, url: str) -> dict[str, Any] | None:
         entry = self._cache.get(url)
@@ -114,3 +90,4 @@ class WebCrawlerPlugin:
 
     async def cleanup(self, session_id: str) -> None:
         pass
+

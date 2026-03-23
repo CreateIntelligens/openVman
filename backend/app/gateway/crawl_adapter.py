@@ -1,0 +1,270 @@
+"""Thin adapter for web content extraction via configurable provider."""
+
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass
+from urllib.parse import urlparse
+
+import httpx
+
+from app.config import get_tts_config
+
+logger = logging.getLogger("gateway.crawl_adapter")
+
+
+@dataclass(frozen=True, slots=True)
+class CrawlResult:
+    title: str
+    content: str
+    source_url: str
+    status_code: int
+
+
+# ---------------------------------------------------------------------------
+# Title extraction
+# ---------------------------------------------------------------------------
+
+
+def _extract_markdown_title(content: str) -> str:
+    lines = [line.rstrip() for line in content.splitlines()]
+    while lines and not lines[0].strip():
+        lines.pop(0)
+
+    if not lines:
+        return ""
+
+    first = lines[0].strip()
+    if first.startswith("# "):
+        return first[2:].strip()
+
+    if len(lines) >= 2:
+        underline = lines[1].strip()
+        if underline and set(underline) <= {"=", "-"}:
+            return first
+
+    return ""
+
+
+def _strip_leading_markdown_title(content: str, title: str) -> str:
+    lines = [line.rstrip() for line in content.splitlines()]
+    while lines and not lines[0].strip():
+        lines.pop(0)
+
+    if not lines:
+        return ""
+
+    first = lines[0].strip()
+    if title and first == title and len(lines) >= 2:
+        underline = lines[1].strip()
+        if underline and set(underline) <= {"=", "-"}:
+            lines = lines[2:]
+    elif title and first == f"# {title}":
+        lines = lines[1:]
+
+    while lines and not lines[0].strip():
+        lines.pop(0)
+
+    return "\n".join(lines).strip()
+
+
+# ---------------------------------------------------------------------------
+# Content cleaning — filter navigation, ads, cookie banners, etc.
+# ---------------------------------------------------------------------------
+
+_NOISE_KEYWORDS: frozenset[str] = frozenset({
+    "cookie", "cookies", "advertisement", "subscribe", "sign up",
+    "sign in", "log in", "follow us", "privacy policy", "terms of service",
+    "terms of use", "all rights reserved", "©", "newsletter",
+    "share this", "read more", "click here", "sponsored",
+})
+
+_LINK_DENSE_RE = re.compile(r"\[.*?\]\(.*?\)")
+
+
+def _is_noise_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    low = stripped.lower()
+
+    # Very short non-heading lines are likely nav items
+    if len(stripped) < 5 and not stripped.startswith("#"):
+        return True
+
+    if any(kw in low for kw in _NOISE_KEYWORDS):
+        return True
+
+    # Lines with 3+ markdown links are navigation / footer
+    if stripped.count("[") >= 3 and sum(1 for _ in _LINK_DENSE_RE.finditer(stripped)) >= 3:
+        return True
+
+    return False
+
+
+def _clean_markdown(raw: str) -> str:
+    """Filter navigation, ads, and noise blocks from markdown content."""
+    lines = raw.split("\n")
+    result: list[str] = []
+    pending_short: list[str] = []  # buffer for consecutive short lines
+    blank_count = 0
+
+    def _flush_pending() -> None:
+        """Commit pending short lines only if fewer than 3 (nav threshold)."""
+        if len(pending_short) < 3:
+            result.extend(pending_short)
+        pending_short.clear()
+
+    for line in lines:
+        stripped = line.strip()
+
+        if not stripped:
+            _flush_pending()
+            blank_count += 1
+            if blank_count <= 2:
+                result.append(line)
+            continue
+
+        blank_count = 0
+
+        if _is_noise_line(stripped):
+            continue
+
+        if len(stripped) < 30 and not stripped.startswith("#"):
+            pending_short.append(line)
+        else:
+            _flush_pending()
+            result.append(line)
+
+    _flush_pending()
+    return "\n".join(result).strip()
+
+
+# ---------------------------------------------------------------------------
+# Response parsing (provider wrapper format)
+# ---------------------------------------------------------------------------
+
+
+def _parse_provider_response(raw_text: str, fallback_url: str) -> tuple[str, str, str]:
+    title = ""
+    source_url = fallback_url
+    content = raw_text
+
+    lines = raw_text.splitlines()
+    markdown_start: int | None = None
+
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("Title:"):
+            value = stripped.partition(":")[2].strip()
+            if value:
+                title = value
+        elif stripped.startswith("URL Source:"):
+            value = stripped.partition(":")[2].strip()
+            if value:
+                source_url = value
+        elif stripped == "Markdown Content:":
+            markdown_start = idx + 1
+            break
+
+    if markdown_start is not None:
+        content = "\n".join(lines[markdown_start:]).strip()
+
+    if not title:
+        title = _extract_markdown_title(content)
+
+    stripped_content = _strip_leading_markdown_title(content, title)
+    if stripped_content:
+        content = stripped_content
+
+    return title, content, source_url
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+# Shared httpx client — reuse across calls to avoid per-request overhead.
+_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=5, read=30, write=10, pool=5),
+            follow_redirects=True,
+        )
+    return _client
+
+
+async def close_client() -> None:
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
+
+
+async def fetch_page(url: str) -> CrawlResult:
+    """透過 CRAWLER_PROVIDER_URL 抓取網頁內容。
+
+    Args:
+        url: 完整網址，例如 https://example.com/article
+
+    Returns:
+        CrawlResult with title, content, source_url, status_code
+
+    Raises:
+        ValueError: URL 格式錯誤或 domain 被封鎖
+        httpx.HTTPStatusError: provider 回傳非 2xx
+        httpx.TimeoutException: 超時
+        RuntimeError: 抓回的內容為空
+    """
+    cfg = get_tts_config()
+
+    # 驗證 URL
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError(f"無效的網址：{url}")
+
+    # Domain blocking（複用現有設定）
+    domain = parsed.hostname.lower()
+    if domain in cfg.blocked_domain_set:
+        raise ValueError(f"該網域已被封鎖：{domain}")
+
+    # 組裝 provider URL
+    provider_url = cfg.crawler_provider_url.rstrip("/")
+    if not provider_url:
+        raise RuntimeError("未設定 CRAWLER_PROVIDER_URL")
+    target = f"{domain}{parsed.path}"
+    if parsed.query:
+        target += f"?{parsed.query}"
+    fetch_url = f"{provider_url}/{target}"
+
+    logger.info("fetch_page url=%s provider_url=%s", url, fetch_url)
+
+    client = _get_client()
+    resp = await client.get(fetch_url)
+    resp.raise_for_status()
+
+    raw_text = resp.text.strip()
+    if not raw_text:
+        raise RuntimeError(f"抓取結果為空：{url}")
+
+    title, content, source_url = _parse_provider_response(raw_text, url)
+
+    # Clean navigation / ad noise
+    content = _clean_markdown(content)
+    if not content:
+        raise RuntimeError(f"清理後內容為空：{url}")
+
+    if not title:
+        title = f"{domain}{parsed.path}"
+
+    return CrawlResult(
+        title=title,
+        content=content,
+        source_url=source_url,
+        status_code=resp.status_code,
+    )

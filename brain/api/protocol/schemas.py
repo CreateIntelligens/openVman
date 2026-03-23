@@ -93,12 +93,6 @@ class KnowledgeDocumentMoveRequest(BaseModel):
     project_id: str = "default"
 
 
-class KnowledgeIngestRequest(BaseModel):
-    content: str = Field(..., min_length=1, description="Text content to ingest")
-    metadata: dict[str, Any] = Field(default_factory=dict, description="Source metadata (source_url, etc.)")
-    project_id: str = "default"
-
-
 class AdminActionRequest(BaseModel):
     project_id: str = "default"
 

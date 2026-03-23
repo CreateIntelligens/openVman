@@ -488,6 +488,21 @@ export function reindexKnowledge() {
   });
 }
 
+export interface CrawlIngestResponse {
+  status: string;
+  title: string;
+  source_url: string;
+  path: string;
+  size: number;
+}
+
+export function crawlUrl(url: string) {
+  return post<CrawlIngestResponse>(knowledgePath("/crawl"), {
+    url,
+    project_id: activeProjectId,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // TTS
 // ---------------------------------------------------------------------------

@@ -40,7 +40,6 @@ from knowledge.knowledge_admin import (
     create_workspace_directory,
     delete_workspace_directory,
     delete_workspace_document,
-    ingest_text_content,
     list_knowledge_base_directories,
     list_knowledge_base_documents,
     list_workspace_documents,
@@ -77,7 +76,6 @@ from protocol.schemas import (
     EmbedRequest,
     KnowledgeDocumentMoveRequest,
     KnowledgeDocumentPutRequest,
-    KnowledgeIngestRequest,
     PersonaCloneRequest,
     PersonaCreateRequest,
     PersonaDeleteRequest,
@@ -637,23 +635,6 @@ async def delete_session(session_id: str, project_id: str = "default"):
         raise HTTPException(status_code=404, detail="Session 不存在")
     log_event("session_deleted", session_id=session_id, project_id=project_id)
     return {"status": "ok", "session_id": session_id}
-
-
-# ---------------------------------------------------------------------------
-# Knowledge Ingestion (Gateway entry point)
-# ---------------------------------------------------------------------------
-
-@app.post("/brain/knowledge/ingest", tags=_TAG_KNOWLEDGE)
-async def ingest_knowledge_content(payload: KnowledgeIngestRequest):
-    """接收 Gateway 傳來的處理過文字，存進 workspace 並觸發 reindex。"""
-    try:
-        result = ingest_text_content(payload.content, payload.metadata, payload.project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    asyncio.create_task(_background_reindex(payload.project_id))
-    log_event("knowledge_ingested", project_id=payload.project_id, path=result["path"])
-    return result
 
 
 # ---------------------------------------------------------------------------
