@@ -15,3 +15,4 @@ pytesseract>=0.3,<1
 pyyaml>=6,<7
 readability-lxml>=0.8,<1
 Pillow>=10,<11
+opencc-python-reimplemented>=0.1,<1

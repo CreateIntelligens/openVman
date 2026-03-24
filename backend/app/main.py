@@ -28,6 +28,7 @@ from app.gateway.forward import _http as _forward_http
 from app.internal_routes import _http as _internal_http
 from app.internal_routes import router as internal_router
 from app.error_payloads import upload_failed_response
+from app.tts_text_cleaner import clean_for_tts
 from app.gateway.redis_pool import close_redis, get_redis, redis_available
 from app.gateway.routes import router as gateway_router
 from app.gateway.temp_storage import get_temp_storage, reset_temp_storage
@@ -317,7 +318,7 @@ async def metrics() -> dict:
 async def create_speech(body: SpeechRequest) -> Response:
     svc = _get_service()
     request = SynthesizeRequest(
-        text=body.input,
+        text=clean_for_tts(body.input),
         voice_hint=body.voice,
     )
 

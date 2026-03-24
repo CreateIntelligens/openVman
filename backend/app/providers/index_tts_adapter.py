@@ -2,12 +2,32 @@
 
 from __future__ import annotations
 
+import logging
 from time import monotonic
 
 import httpx
 
 from app.config import TTSRouterConfig
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+
+logger = logging.getLogger("provider.index_tts")
+
+# Lazy-loaded opencc converter: IndexTTS models are trained on simplified Chinese,
+# so Traditional Chinese input must be converted before synthesis.
+_NOT_LOADED = object()
+_t2s = _NOT_LOADED
+
+
+def _get_t2s():
+    global _t2s
+    if _t2s is _NOT_LOADED:
+        try:
+            import opencc
+            _t2s = opencc.OpenCC("t2s")
+        except ImportError:
+            logger.warning("opencc-python-reimplemented not installed, skipping t2s conversion")
+            _t2s = None
+    return _t2s
 
 
 class IndexTTSAdapter:
@@ -16,7 +36,7 @@ class IndexTTSAdapter:
     def __init__(self, config: TTSRouterConfig) -> None:
         self._config = config
         self._url = config.tts_index_url.rstrip("/") + "/tts" if config.tts_index_url else ""
-        self._timeout = 10.0  # seconds
+        self._client = httpx.Client(timeout=10.0)
 
     @property
     def provider_name(self) -> str:
@@ -31,14 +51,18 @@ class IndexTTSAdapter:
         if not self._url:
             raise RuntimeError("Index TTS URL is not configured")
 
+        text = request.text
+        converter = _get_t2s()
+        if converter is not None:
+            text = converter.convert(text)
+
         payload = {
-            "text": request.text,
+            "text": text,
             "character": request.voice_hint or self._config.tts_index_character,
         }
 
         t0 = monotonic()
-        with httpx.Client(timeout=self._timeout) as client:
-            resp = client.post(self._url, json=payload)
+        resp = self._client.post(self._url, json=payload)
 
         latency_ms = (monotonic() - t0) * 1000
 
