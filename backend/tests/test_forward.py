@@ -32,7 +32,7 @@ class TestForwardToBrain:
 
         with (
             patch("app.gateway.forward.get_tts_config", return_value=_mock_cfg()),
-            patch("app.gateway.forward._get_client", return_value=mock_client),
+            patch("app.gateway.forward._http.get", return_value=mock_client),
         ):
             ok = await forward_to_brain(
                 trace_id="t1",
@@ -57,7 +57,7 @@ class TestForwardToBrain:
 
         with (
             patch("app.gateway.forward.get_tts_config", return_value=_mock_cfg()),
-            patch("app.gateway.forward._get_client", return_value=mock_client),
+            patch("app.gateway.forward._http.get", return_value=mock_client),
         ):
             ok = await forward_to_brain(
                 trace_id="t2",
@@ -74,7 +74,7 @@ class TestForwardToBrain:
 
         with (
             patch("app.gateway.forward.get_tts_config", return_value=_mock_cfg()),
-            patch("app.gateway.forward._get_client", return_value=mock_client),
+            patch("app.gateway.forward._http.get", return_value=mock_client),
         ):
             ok = await forward_to_brain(
                 trace_id="t3",

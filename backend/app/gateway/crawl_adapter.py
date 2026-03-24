@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import get_tts_config
+from app.http_client import SharedAsyncClient
 
 logger = logging.getLogger("gateway.crawl_adapter")
 
@@ -225,25 +226,7 @@ def _parse_provider_response(raw_text: str, fallback_url: str) -> tuple[str, str
 # Public API
 # ---------------------------------------------------------------------------
 
-# Shared httpx client — reuse across calls to avoid per-request overhead.
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=5, read=30, write=10, pool=5),
-            follow_redirects=True,
-        )
-    return _client
-
-
-async def close_client() -> None:
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
+_http = SharedAsyncClient(read=30, follow_redirects=True)
 
 
 async def fetch_page(url: str) -> CrawlResult:
@@ -285,7 +268,7 @@ async def fetch_page(url: str) -> CrawlResult:
 
     logger.info("fetch_page url=%s provider_url=%s", url, fetch_url)
 
-    client = _get_client()
+    client = _http.get()
 
     for attempt in range(1, _MAX_FETCH_RETRIES + 1):
         try:

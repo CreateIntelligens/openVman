@@ -11,6 +11,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.config import get_tts_config
+from app.http_client import SharedAsyncClient
 
 logger = logging.getLogger("backend.internal")
 
@@ -18,23 +19,7 @@ router = APIRouter(tags=["Internal"])
 
 INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=5, read=30, write=10, pool=5),
-        )
-    return _client
-
-
-async def close_client() -> None:
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
+_http = SharedAsyncClient(read=30)
 
 
 class InternalEnrichRequest(BaseModel):
@@ -57,10 +42,9 @@ async def internal_enrich(
         raise HTTPException(status_code=403, detail="invalid internal token")
 
     brain_url = f"{cfg.brain_url}/internal/enrich"
-    client = _get_client()
 
     try:
-        resp = await client.post(brain_url, json=payload.model_dump())
+        resp = await _http.get().post(brain_url, json=payload.model_dump())
         resp.raise_for_status()
         result = resp.json()
         logger.info(

@@ -50,7 +50,7 @@ def test_gateway_brain_proxy_forwards_to_brain_api(client: TestClient):
 
     with (
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
-        patch("app.brain_proxy._get_client", return_value=mock_client),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
         response = client.get("/api/health?project_id=default")
 
@@ -73,7 +73,7 @@ def test_gateway_brain_proxy_closes_sse_upstream(client: TestClient):
 
     with (
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
-        patch("app.brain_proxy._get_client", return_value=mock_client),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
         with client.stream("GET", "/api/chat/stream") as response:
             body = b"".join(response.iter_bytes())
@@ -103,7 +103,7 @@ def test_explicit_brain_routes_still_forward_options(client: TestClient):
 
     with (
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
-        patch("app.brain_proxy._get_client", return_value=mock_client),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
         response = client.options("/api/health")
 

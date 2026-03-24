@@ -164,7 +164,7 @@ async def test_fetch_page_parses_provider_wrapper_format():
 
     with (
         patch("app.gateway.crawl_adapter.get_tts_config", return_value=_crawler_cfg()),
-        patch("app.gateway.crawl_adapter._get_client", return_value=mock_client),
+        patch("app.gateway.crawl_adapter._http.get", return_value=mock_client),
     ):
         result = await fetch_page("https://cnn.com")
 
@@ -204,7 +204,7 @@ async def test_fetch_page_empty_response_raises():
 
     with (
         patch("app.gateway.crawl_adapter.get_tts_config", return_value=_crawler_cfg()),
-        patch("app.gateway.crawl_adapter._get_client", return_value=mock_client),
+        patch("app.gateway.crawl_adapter._http.get", return_value=mock_client),
     ):
         with pytest.raises(RuntimeError, match="抓取結果為空"):
             await fetch_page("https://example.com")

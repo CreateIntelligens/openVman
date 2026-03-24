@@ -5,30 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import httpx
-
 from app.config import get_tts_config
+from app.http_client import SharedAsyncClient
 from app.internal_routes import INTERNAL_TOKEN_HEADER
 
 logger = logging.getLogger("gateway.forward")
 
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=5, read=10, write=10, pool=5),
-        )
-    return _client
-
-
-async def close_client() -> None:
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
+_http = SharedAsyncClient(read=10)
 
 
 async def forward_to_brain(
@@ -57,8 +40,7 @@ async def forward_to_brain(
     logger.info("forward_to_brain trace_id=%s session_id=%s url=%s", trace_id, session_id, url)
 
     try:
-        client = _get_client()
-        response = await client.post(url, json=payload, headers=headers)
+        response = await _http.get().post(url, json=payload, headers=headers)
         response.raise_for_status()
         logger.info("forward_ok trace_id=%s status=%d", trace_id, response.status_code)
         return True

@@ -14,7 +14,7 @@ from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.brain_proxy import _get_client as _get_brain_client
+from app.brain_proxy import _http as _brain_http
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
 from app.gateway.crawl_adapter import CrawlResult, fetch_page
@@ -222,7 +222,7 @@ async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
         return result
 
     cfg = get_tts_config()
-    client = _get_brain_client()
+    client = _brain_http.get()
     file_bytes = _build_crawl_markdown(result.title, result.source_url, result.content)
     filename = _build_crawl_filename(result.source_url)
 

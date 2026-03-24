@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
 from app.config import get_tts_config
+from app.http_client import SharedAsyncClient
 
 logger = logging.getLogger("backend.brain_proxy")
 
@@ -87,25 +88,7 @@ _HOP_BY_HOP = frozenset({
     "trailers",
 })
 
-# Shared client – created lazily so the event loop is available.
-_client: httpx.AsyncClient | None = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=10, read=120, write=30, pool=10),
-            follow_redirects=False,
-        )
-    return _client
-
-
-async def close_client() -> None:
-    global _client
-    if _client is not None:
-        await _client.aclose()
-        _client = None
+_http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
 
 
 def _filter_headers(headers: httpx.Headers | dict) -> dict[str, str]:
@@ -135,7 +118,7 @@ async def _stream_upstream_bytes(upstream: httpx.Response) -> AsyncIterator[byte
 async def _proxy_to_brain(request: Request, path: str) -> Response:
     headers = _filter_headers(request.headers)
     body = await request.body()
-    client = _get_client()
+    client = _http.get()
 
     try:
         upstream = await client.send(

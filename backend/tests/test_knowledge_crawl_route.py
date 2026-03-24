@@ -71,7 +71,7 @@ def test_crawl_route_syncs_web_metadata(client: TestClient):
                 content="Hello world",
             ),
         ),
-        patch("app.gateway.routes._get_brain_client", return_value=mock_client),
+        patch("app.gateway.routes._brain_http.get", return_value=mock_client),
         patch("app.gateway.routes.get_tts_config", return_value=_mock_cfg()),
     ):
         response = client.post(
