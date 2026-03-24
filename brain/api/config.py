@@ -95,8 +95,12 @@ class BrainSettings(BaseSettings):
 
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6
-    tool_call_timeout_seconds: int = 10
+    tool_call_timeout_seconds: int = 30
     tool_document_char_limit: int = 4000
+
+    # === Web Search ===
+    gateway_base_url: str = "http://backend:8200"
+    web_search_max_chars: int = 3000
 
     # === 備用 Provider Keys ===
     gemini_api_key: str = ""

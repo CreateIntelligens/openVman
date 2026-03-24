@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -12,6 +13,8 @@ import httpx
 from app.config import get_tts_config
 
 logger = logging.getLogger("gateway.crawl_adapter")
+
+_MAX_FETCH_RETRIES = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +145,43 @@ def _clean_markdown(raw: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Content quality gate — reject login pages, CAPTCHAs, empty shells
+# ---------------------------------------------------------------------------
+
+_JUNK_PATTERNS: tuple[str, ...] = (
+    "sign in",
+    "sign-in",
+    "log in",
+    "login",
+    "captcha",
+    "verify you are human",
+    "access denied",
+    "403 forbidden",
+    "401 unauthorized",
+    "enable javascript",
+    "enable cookies",
+    "browser is not supported",
+    "please enable",
+    "you need to sign in",
+    "continue to google",
+    "to continue to g",
+    "one account. all of google",
+    "before you continue",
+    "consent.google",
+)
+
+def _is_junk_content(title: str, content: str) -> str | None:
+    """Return a rejection reason if the content looks like a login/gate page, else None."""
+    combined = f"{title}\n{content}".lower()
+
+    for pattern in _JUNK_PATTERNS:
+        if pattern in combined:
+            return f"抓取到的是登入頁或驗證頁面（偵測到「{pattern}」），非實際內容"
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Response parsing (provider wrapper format)
 # ---------------------------------------------------------------------------
 
@@ -237,7 +277,8 @@ async def fetch_page(url: str) -> CrawlResult:
     provider_url = cfg.crawler_provider_url.rstrip("/")
     if not provider_url:
         raise RuntimeError("未設定 CRAWLER_PROVIDER_URL")
-    target = f"{domain}{parsed.path}"
+    host = f"{domain}:{parsed.port}" if parsed.port else domain
+    target = f"{host}{parsed.path}"
     if parsed.query:
         target += f"?{parsed.query}"
     fetch_url = f"{provider_url}/{target}"
@@ -245,8 +286,27 @@ async def fetch_page(url: str) -> CrawlResult:
     logger.info("fetch_page url=%s provider_url=%s", url, fetch_url)
 
     client = _get_client()
-    resp = await client.get(fetch_url)
-    resp.raise_for_status()
+
+    for attempt in range(1, _MAX_FETCH_RETRIES + 1):
+        try:
+            resp = await client.get(fetch_url)
+            resp.raise_for_status()
+            break
+        except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError) as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            logger.warning(
+                "fetch_page attempt=%d/%d failed url=%s status=%s err=%s",
+                attempt, _MAX_FETCH_RETRIES, url, status, exc,
+            )
+            # 4xx errors are deterministic — don't retry
+            if isinstance(exc, httpx.HTTPStatusError) and 400 <= (status or 0) < 500:
+                raise ValueError(f"無法擷取該網址（HTTP {status}），請確認網址是否正確且可公開存取") from exc
+            if attempt < _MAX_FETCH_RETRIES:
+                await asyncio.sleep(1 * attempt)
+                continue
+            if isinstance(exc, httpx.HTTPStatusError):
+                raise ValueError(f"無法擷取該網址（HTTP {status}），請確認網址是否正確且可公開存取") from exc
+            raise
 
     raw_text = resp.text.strip()
     if not raw_text:
@@ -254,13 +314,17 @@ async def fetch_page(url: str) -> CrawlResult:
 
     title, content, source_url = _parse_provider_response(raw_text, url)
 
-    # Clean navigation / ad noise
+    if not title:
+        title = f"{domain}{parsed.path}"
+
+    # Run junk detection before cleaning so gate-page indicators aren't stripped
+    junk_reason = _is_junk_content(title, content)
+    if junk_reason:
+        raise ValueError(junk_reason)
+
     content = _clean_markdown(content)
     if not content:
         raise RuntimeError(f"清理後內容為空：{url}")
-
-    if not title:
-        title = f"{domain}{parsed.path}"
 
     return CrawlResult(
         title=title,

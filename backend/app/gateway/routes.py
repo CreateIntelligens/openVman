@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from app.brain_proxy import _get_client as _get_brain_client
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
-from app.gateway.crawl_adapter import fetch_page
+from app.gateway.crawl_adapter import CrawlResult, fetch_page
 from app.gateway.job_status import get_job_status, set_job_status
 from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
@@ -33,6 +33,40 @@ _UPLOAD_CHUNK_SIZE = 1024 * 1024
 async def _process_media_sync(data: dict[str, Any]) -> None:
     """Sync fallback: run process_media in-process when no queue is available."""
     await process_media({}, data)
+
+
+def _error_response(status_code: int, error: str, **extra: Any) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"error": error, **extra})
+
+
+def _build_crawl_markdown(title: str, source_url: str, content: str) -> bytes:
+    return f"# {title}\n\nSource: {source_url}\n\n{content}".encode("utf-8")
+
+
+def _build_crawl_filename(source_url: str) -> str:
+    parsed_url = parse_url(source_url)
+    slug = re.sub(r"[^a-zA-Z0-9_\-]+", "_", f"{parsed_url.netloc}{parsed_url.path}")
+    return f"{slug.strip('_')[:120]}.md"
+
+
+async def _sync_crawled_document_meta(
+    client: httpx.AsyncClient,
+    brain_url: str,
+    path: str,
+    project_id: str,
+    source_url: str,
+) -> None:
+    response = await client.patch(
+        f"{brain_url}/brain/knowledge/document/meta",
+        json={
+            "path": path,
+            "project_id": project_id,
+            "source_type": "web",
+            "source_url": source_url,
+            "enabled": True,
+        },
+    )
+    response.raise_for_status()
 
 
 @router.post("/uploads", tags=["Uploads"])
@@ -166,61 +200,55 @@ class CrawlIngestRequest(BaseModel):
     project_id: str = "default"
 
 
+async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
+    """Fetch a page, returning CrawlResult on success or JSONResponse on error."""
+    try:
+        return await fetch_page(url)
+    except ValueError as exc:
+        return _error_response(400, str(exc))
+    except httpx.TimeoutException:
+        return _error_response(504, "抓取逾時", url=url)
+    except httpx.HTTPStatusError as exc:
+        return _error_response(502, f"網頁回傳錯誤：{exc.response.status_code}", url=url)
+    except RuntimeError as exc:
+        return _error_response(422, str(exc))
+
+
 @router.post("/api/knowledge/crawl", tags=["Knowledge"])
 async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
     """抓取網址內容並匯入知識庫。"""
-    # 1. 抓取
-    try:
-        result = await fetch_page(req.url)
-    except ValueError as exc:
-        return JSONResponse(status_code=400, content={"error": str(exc)})
-    except httpx.TimeoutException:
-        return JSONResponse(status_code=504, content={
-            "error": f"抓取逾時（{get_tts_config().crawler_timeout_ms}ms）",
-            "url": req.url,
-        })
-    except httpx.HTTPStatusError as exc:
-        return JSONResponse(status_code=502, content={
-            "error": f"網頁回傳錯誤：{exc.response.status_code}",
-            "url": req.url,
-        })
-    except RuntimeError as exc:
-        return JSONResponse(status_code=422, content={"error": str(exc)})
+    result = await _safe_fetch_page(req.url)
+    if isinstance(result, JSONResponse):
+        return result
 
-    # 2. 組裝 markdown
-    md = f"# {result.title}\n\nSource: {result.source_url}\n\n{result.content}"
-    file_bytes = md.encode("utf-8")
-
-    # 3. 檔名從 URL 產生
-    parsed_url = parse_url(result.source_url)
-    slug = re.sub(r"[^a-zA-Z0-9_\-]+", "_", f"{parsed_url.netloc}{parsed_url.path}")
-    slug = slug.strip("_")[:120]
-    filename = f"{slug}.md"
-
-    # 4. 上傳到 brain（走既有 /knowledge/upload）
     cfg = get_tts_config()
-    brain_url = f"{cfg.brain_url}/brain/knowledge/upload"
+    client = _get_brain_client()
+    file_bytes = _build_crawl_markdown(result.title, result.source_url, result.content)
+    filename = _build_crawl_filename(result.source_url)
 
     try:
-        client = _get_brain_client()
         resp = await client.post(
-            brain_url,
+            f"{cfg.brain_url}/brain/knowledge/upload",
             files={"files": (filename, file_bytes, "text/markdown")},
-            data={"target_dir": "ingested", "project_id": req.project_id},
+            data={"target_dir": "knowledge/ingested", "project_id": req.project_id},
         )
         resp.raise_for_status()
         upload_result = resp.json()
     except httpx.HTTPError as exc:
         logger.error("crawl_upload_failed url=%s err=%s", req.url, exc)
-        return JSONResponse(status_code=502, content={
-            "error": f"知識庫寫入失敗：{exc}",
-            "url": req.url,
-        })
+        return _error_response(502, f"知識庫寫入失敗：{exc}", url=req.url)
 
-    # 5. 回傳
-    first = upload_result.get("files", [None])[0] if upload_result.get("files") else None
+    uploaded_files = upload_result.get("files") or []
+    first = uploaded_files[0] if uploaded_files else None
     path = first.get("path", "") if first else ""
     size = first.get("size", 0) if first else len(file_bytes)
+
+    if path:
+        try:
+            await _sync_crawled_document_meta(client, cfg.brain_url, path, req.project_id, result.source_url)
+        except httpx.HTTPError as exc:
+            logger.error("crawl_meta_sync_failed path=%s err=%s", path, exc)
+            return _error_response(502, f"知識 metadata 寫入失敗：{exc}", path=path, url=req.url)
 
     return JSONResponse(content={
         "status": "ok",
@@ -230,3 +258,17 @@ async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
         "size": size,
     })
 
+
+@router.post("/api/knowledge/fetch", tags=["Knowledge"])
+async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
+    """抓取網址內容但不存入知識庫，供 agent tool 即時查詢使用。"""
+    result = await _safe_fetch_page(req.url)
+    if isinstance(result, JSONResponse):
+        return result
+
+    return JSONResponse(content={
+        "status": "ok",
+        "title": result.title,
+        "source_url": result.source_url,
+        "content": result.content,
+    })

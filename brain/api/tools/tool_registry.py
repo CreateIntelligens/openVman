@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from copy import deepcopy
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
+
+import httpx
 
 from config import get_settings
 from knowledge.workspace import get_workspace_root, resolve_workspace_document
@@ -14,6 +17,8 @@ from memory.embedder import encode_query_with_fallback, encode_text
 from memory.retrieval import search_records
 from safety.observability import log_exception
 from .mock_data import FAQ_ENTRIES, ORDER_RECORDS
+
+logger = logging.getLogger("brain.tools")
 
 if TYPE_CHECKING:
     from .skill import Skill
@@ -155,6 +160,59 @@ def _query_order(args: dict[str, Any]) -> dict[str, Any]:
     return {"order_id": order_id, "found": True, "order": deepcopy(record)}
 
 
+_gateway_client: httpx.Client | None = None
+
+
+def _get_gateway_client() -> httpx.Client:
+    global _gateway_client
+    if _gateway_client is None:
+        _gateway_client = httpx.Client(timeout=httpx.Timeout(connect=5, read=25, write=10, pool=5))
+    return _gateway_client
+
+
+def close_gateway_client() -> None:
+    global _gateway_client
+    if _gateway_client is not None:
+        _gateway_client.close()
+        _gateway_client = None
+
+
+def _search_web(args: dict[str, Any]) -> dict[str, Any]:
+    """Fetch a URL via the gateway crawl API and return content (not saved to knowledge base)."""
+    url = str(args.get("url", "")).strip()
+    if not url:
+        raise ValueError("url 不可為空")
+
+    cfg = get_settings()
+    gateway_url = cfg.gateway_base_url.rstrip("/")
+    fetch_endpoint = f"{gateway_url}/api/knowledge/fetch"
+
+    logger.info("search_web url=%s gateway=%s", url, fetch_endpoint)
+
+    resp = _get_gateway_client().post(fetch_endpoint, json={"url": url})
+
+    if not resp.is_success:
+        try:
+            error_msg = resp.json().get("error", f"HTTP {resp.status_code}")
+        except Exception:
+            error_msg = f"HTTP {resp.status_code}"
+        raise ValueError(f"無法擷取網頁：{error_msg}")
+
+    data = resp.json()
+
+    content = data.get("content", "")
+    max_chars = cfg.web_search_max_chars
+    truncated = len(content) > max_chars
+    content = content[:max_chars]
+
+    return {
+        "title": data.get("title", ""),
+        "url": data.get("source_url", url),
+        "content": content,
+        "truncated": truncated,
+    }
+
+
 def _save_memory(args: dict[str, Any]) -> dict[str, Any]:
     """Save a durable memory record via LLM tool call."""
     from memory.memory import add_memory as store_memory
@@ -259,6 +317,23 @@ def get_tool_registry() -> ToolRegistry:
                     "required": ["order_id"],
                 },
                 handler=_query_order,
+            )
+        )
+        registry.register(
+            Tool(
+                name="search_web",
+                description="抓取指定網址的內容並回傳。當使用者提供網址要求查看或摘要時使用，或需要從網頁獲取最新資訊時使用。不會儲存到知識庫，僅用於即時查詢。",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "要抓取的完整網址，例如 https://example.com/article",
+                        },
+                    },
+                    "required": ["url"],
+                },
+                handler=_search_web,
             )
         )
         registry.register(
