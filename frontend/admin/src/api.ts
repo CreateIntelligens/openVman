@@ -264,6 +264,10 @@ export interface KnowledgeDocumentSummary {
   is_indexable: boolean;
   is_indexed: boolean;
   preview: string;
+  source_type: "upload" | "web" | "manual";
+  source_url: string | null;
+  enabled: boolean;
+  created_at: string;
 }
 
 export interface KnowledgeDocument extends KnowledgeDocumentSummary {
@@ -499,6 +503,44 @@ export interface CrawlIngestResponse {
 export function crawlUrl(url: string) {
   return post<CrawlIngestResponse>(knowledgePath("/crawl"), {
     url,
+    project_id: activeProjectId,
+  });
+}
+
+export interface KnowledgeDocumentMetaResponse {
+  status: string;
+  path: string;
+  enabled: boolean;
+  source_type: "upload" | "web" | "manual";
+  source_url: string | null;
+}
+
+export function updateKnowledgeDocumentMeta(
+  path: string,
+  metadata: {
+    enabled?: boolean;
+    source_type?: "upload" | "web" | "manual";
+    source_url?: string | null;
+  },
+) {
+  return jsonRequest<KnowledgeDocumentMetaResponse>(
+    "PATCH",
+    knowledgePath("/document/meta"),
+    { path, project_id: activeProjectId, ...metadata },
+  );
+}
+
+export interface KnowledgeNoteResponse {
+  status: string;
+  path: string;
+  size: number;
+  document: KnowledgeDocumentSummary;
+}
+
+export function createKnowledgeNote(title: string, content: string) {
+  return post<KnowledgeNoteResponse>(knowledgePath("/note"), {
+    title,
+    content,
     project_id: activeProjectId,
   });
 }

@@ -1,5 +1,5 @@
 .claude/settings.local.json
-
+.superpowers/
 # 環境變數（含 API Key，絕對不進 git）
 .env
 
