@@ -62,11 +62,13 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/base/documents", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "List Base Knowledge Documents"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/document", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Document"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/document", "methods": ["PUT"], "tags": _TAG_KNOWLEDGE, "summary": "Save Knowledge Document"},
+    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/document/meta", "methods": ["PATCH"], "tags": _TAG_KNOWLEDGE, "summary": "Update Knowledge Document Metadata"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/document", "methods": ["DELETE"], "tags": _TAG_KNOWLEDGE, "summary": "Delete Knowledge Document"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/move", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Move Knowledge Document"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/directory", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Create Knowledge Directory"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/directory", "methods": ["DELETE"], "tags": _TAG_KNOWLEDGE, "summary": "Delete Knowledge Directory"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/upload", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Upload Knowledge Documents"},
+    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/note", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Create Knowledge Note"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/reindex", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Reindex Knowledge"},
     {"path": f"{_PUBLIC_API_PREFIX}/protocol/validate", "methods": ["POST"], "tags": _TAG_PROTOCOL, "summary": "Validate Protocol Event"},
 ]

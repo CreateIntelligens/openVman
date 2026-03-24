@@ -46,7 +46,9 @@ from knowledge.knowledge_admin import (
     move_workspace_document,
     read_workspace_document,
     save_uploaded_document,
+    save_workspace_note,
     save_workspace_document,
+    update_workspace_document_meta,
 )
 
 from knowledge.workspace import ensure_workspace_scaffold, parse_identity
@@ -75,6 +77,8 @@ from protocol.schemas import (
     ChatRequest,
     EmbedRequest,
     KnowledgeDocumentMoveRequest,
+    KnowledgeDocumentMetaPatchRequest,
+    KnowledgeNoteCreateRequest,
     KnowledgeDocumentPutRequest,
     PersonaCloneRequest,
     PersonaCreateRequest,
@@ -102,7 +106,7 @@ _OPENAPI_TAGS = [
     {"name": "Chat", "description": "Chat generation and history endpoints."},
     {"name": "Search & Embeddings", "description": "Embedding generation and semantic search endpoints."},
     {"name": "Memory & Sessions", "description": "Memory storage, maintenance, and session management endpoints."},
-    {"name": "Knowledge", "description": "Knowledge ingestion and knowledge management endpoints."},
+    {"name": "Knowledge", "description": "Knowledge document management and indexing endpoints."},
     {"name": "Protocol", "description": "Protocol validation endpoints."},
     {"name": "Internal", "description": "Internal service-to-service endpoints."},
 ]
@@ -673,6 +677,29 @@ async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
     return {"status": "ok", "document": document}
 
 
+@app.patch("/brain/knowledge/document/meta", tags=_TAG_KNOWLEDGE)
+async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatchRequest):
+    try:
+        document = update_workspace_document_meta(
+            payload.path,
+            payload.project_id,
+            enabled=payload.enabled,
+            source_type=payload.source_type,
+            source_url=payload.source_url,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "status": "ok",
+        "path": document["path"],
+        "enabled": document["enabled"],
+        "source_type": document["source_type"],
+        "source_url": document["source_url"],
+    }
+
+
 @app.delete("/brain/knowledge/document", tags=_TAG_KNOWLEDGE)
 async def delete_knowledge_document_route(path: str, project_id: str = "default"):
     try:
@@ -733,6 +760,16 @@ async def upload_knowledge_documents_route(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     asyncio.create_task(_background_reindex(project_id))
     return {"status": "ok", "files": uploaded}
+
+
+@app.post("/brain/knowledge/note", tags=_TAG_KNOWLEDGE)
+async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
+    try:
+        document = save_workspace_note(payload.title, payload.content, payload.project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    asyncio.create_task(_background_reindex(payload.project_id))
+    return {"status": "ok", "document": document, "path": document["path"], "size": document["size"]}
 
 
 @app.post("/brain/knowledge/reindex", tags=_TAG_KNOWLEDGE)

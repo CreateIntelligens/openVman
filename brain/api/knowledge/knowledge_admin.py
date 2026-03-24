@@ -7,6 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from knowledge.indexer import fingerprint_document, load_index_state
+from knowledge.doc_meta import (
+    delete_document_meta,
+    get_document_meta,
+    move_document_meta,
+    touch_document_meta,
+    upsert_document_meta,
+)
 from knowledge.workspace import (
     get_core_documents,
     ensure_workspace_scaffold,
@@ -57,6 +64,7 @@ def save_workspace_document(relative_path: str, content: str, project_id: str = 
     path = resolve_workspace_document(relative_path, project_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+    touch_document_meta(path.relative_to(ensure_workspace_scaffold(project_id)).as_posix(), project_id)
     return _build_document_summary(path, project_id)
 
 
@@ -76,7 +84,34 @@ def save_uploaded_document(
     decoded = content.decode("utf-8-sig")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(decoded, encoding="utf-8")
+    upsert_document_meta(relative_path.as_posix(), project_id, source_type="upload")
     return _build_document_summary(path, project_id)
+
+
+def save_workspace_note(title: str, content: str, project_id: str = "default") -> dict[str, Any]:
+    """Create a manual note under knowledge/notes."""
+    cleaned_title = title.strip()
+    cleaned_content = content.strip()
+    if not cleaned_title:
+        raise ValueError("title 不可為空")
+    if not cleaned_content:
+        raise ValueError("content 不可為空")
+
+    filename = Path(cleaned_title).name
+    if filename != cleaned_title:
+        raise ValueError("title 不可包含路徑")
+    if not filename.lower().endswith(".md"):
+        filename = f"{filename}.md"
+
+    relative_path = Path("knowledge") / "notes" / filename
+    path = resolve_workspace_document(relative_path.as_posix(), project_id)
+    if path.exists():
+        raise ValueError("文件已存在")
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(cleaned_content, encoding="utf-8")
+    upsert_document_meta(relative_path.as_posix(), project_id, source_type="manual")
+    return _build_document_summary(path, project_id, content=cleaned_content)
 
 
 def create_workspace_directory(relative_path: str, project_id: str = "default") -> dict[str, str]:
@@ -124,6 +159,7 @@ def delete_workspace_document(relative_path: str, project_id: str = "default") -
     if not path.exists():
         raise FileNotFoundError("找不到指定文件")
     path.unlink()
+    delete_document_meta(relative_path, project_id)
 
 
 def move_workspace_document(source_path: str, target_path: str, project_id: str = "default") -> dict[str, Any]:
@@ -139,7 +175,33 @@ def move_workspace_document(source_path: str, target_path: str, project_id: str 
 
     target.parent.mkdir(parents=True, exist_ok=True)
     source.rename(target)
+    move_document_meta(source_path, target_path, project_id)
     return _build_document_summary(target, project_id)
+
+
+def update_workspace_document_meta(
+    relative_path: str,
+    project_id: str = "default",
+    *,
+    enabled: bool | None = None,
+    source_type: str | None = None,
+    source_url: str | None = None,
+) -> dict[str, Any]:
+    """Update persisted metadata for a workspace document."""
+    path = resolve_workspace_document(relative_path, project_id)
+    if not path.exists():
+        raise FileNotFoundError("找不到指定文件")
+
+    kwargs: dict[str, Any] = {}
+    if enabled is not None:
+        kwargs["enabled"] = enabled
+    if source_type is not None:
+        kwargs["source_type"] = source_type
+    if source_url is not None:
+        kwargs["source_url"] = source_url
+
+    upsert_document_meta(relative_path, project_id, **kwargs)
+    return _build_document_summary(path, project_id)
 
 
 def _build_document_summary(
@@ -165,6 +227,7 @@ def _build_document_summary(
         stored_fp = state.get(relative_text, "")
         if stored_fp:
             is_indexed = stored_fp == fingerprint_document(path)
+    document_meta = get_document_meta(relative_text, project_id)
 
     return {
         "path": relative_text,
@@ -177,4 +240,8 @@ def _build_document_summary(
         "is_indexable": is_indexable,
         "is_indexed": is_indexed,
         "preview": " ".join(preview_text.split())[:140],
+        "source_type": document_meta["source_type"],
+        "source_url": document_meta["source_url"],
+        "enabled": document_meta["enabled"],
+        "created_at": document_meta["created_at"],
     }

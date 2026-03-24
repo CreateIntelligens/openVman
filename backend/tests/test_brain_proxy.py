@@ -91,6 +91,8 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
     assert "/api/health" in paths
     assert "/api/chat" in paths
     assert "/api/knowledge/upload" in paths
+    assert "/api/knowledge/document/meta" in paths
+    assert "/api/knowledge/note" in paths
 
 
 def test_explicit_brain_routes_still_forward_options(client: TestClient):

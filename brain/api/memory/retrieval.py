@@ -11,6 +11,7 @@ from infra.db import (
     parse_record_metadata,
     vector_table_exists,
 )
+from knowledge.doc_meta import list_disabled_document_paths
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -47,18 +48,22 @@ def search_records(
     if not vector_table_exists(table_name, project_id, embedding_version):
         return []
     table = get_search_table(table_name, project_id, embedding_version)
+    disabled_paths = list_disabled_document_paths(project_id) if table_name == "knowledge" else set()
+    search_limit = top_k * 4 if disabled_paths else top_k * 2
 
     raw_records = _safe_search(
         table,
         query_vector,
         query_text=query_text or "",
         query_type=query_type,
-        limit=top_k * 2,
+        limit=search_limit,
     )
 
     filtered: list[dict[str, Any]] = []
     for record in raw_records:
         if not _matches_persona(record, normalized_persona):
+            continue
+        if disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths):
             continue
         filtered.append(_strip_vector(record))
         if len(filtered) >= limit:
@@ -128,3 +133,9 @@ def _matches_persona(record: dict[str, Any], persona_id: str) -> bool:
 
 def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in record.items() if key != "vector"}
+
+
+def _matches_disabled_knowledge_path(record: dict[str, Any], disabled_paths: set[str]) -> bool:
+    metadata = parse_record_metadata(record)
+    relative_path = str(metadata.get("path", "")).strip()
+    return relative_path in disabled_paths

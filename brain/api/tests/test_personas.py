@@ -187,6 +187,55 @@ def test_search_records_returns_matching_persona_and_global_records(monkeypatch:
     assert [item["text"] for item in result] == ["global", "doctor"]
 
 
+def test_search_records_excludes_disabled_knowledge_paths(monkeypatch: pytest.MonkeyPatch):
+    _stub_db_module(monkeypatch)
+    sys.modules.pop("memory.retrieval", None)
+    retrieval = _import("memory.retrieval")
+
+    records = [
+        {
+            "text": "enabled",
+            "vector": [0.1],
+            "metadata": json.dumps({"persona_id": "global", "path": "knowledge/enabled.md"}),
+        },
+        {
+            "text": "disabled",
+            "vector": [0.2],
+            "metadata": json.dumps({"persona_id": "global", "path": "knowledge/disabled.md"}),
+        },
+    ]
+
+    class FakeSearch:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def limit(self, _top_k):
+            return self
+
+        def to_list(self):
+            return self.payload
+
+    class FakeTable:
+        def search(self, _query_vector):
+            return FakeSearch(records)
+
+    monkeypatch.setattr(
+        retrieval,
+        "get_search_table",
+        lambda _table_name, project_id="default", embedding_version=None: FakeTable(),
+    )
+    monkeypatch.setattr(
+        retrieval,
+        "list_disabled_document_paths",
+        lambda project_id="default": {"knowledge/disabled.md"},
+        raising=False,
+    )
+
+    result = retrieval.search_records("knowledge", [0.1], 3, persona_id="doctor")
+
+    assert [item["text"] for item in result] == ["enabled"]
+
+
 def test_list_personas_includes_default_and_custom_personas(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -273,6 +322,12 @@ def test_save_uploaded_document_can_target_persona_knowledge_directory(
     _configure_workspace(monkeypatch, tmp_path)
     personas = _import("personas.personas")
     personas.create_persona_scaffold("doctor", "醫師助理")
+    fake_indexer = types.ModuleType("knowledge.indexer")
+    fake_indexer.load_index_state = lambda project_id="default": {}
+    fake_indexer.fingerprint_document = lambda path: "fp"
+    monkeypatch.setitem(sys.modules, "knowledge.indexer", fake_indexer)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
     knowledge_admin = _import("knowledge.knowledge_admin")
 
     document = knowledge_admin.save_uploaded_document(

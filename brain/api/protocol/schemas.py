@@ -93,6 +93,27 @@ class KnowledgeDocumentMoveRequest(BaseModel):
     project_id: str = "default"
 
 
+class KnowledgeDocumentMetaPatchRequest(BaseModel):
+    path: str = Field(..., description="Relative path in workspace")
+    project_id: str = "default"
+    enabled: bool | None = None
+    source_type: str | None = Field(None, pattern="^(upload|web|manual)$")
+    source_url: str | None = None
+
+
+class KnowledgeNoteCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, description="Note title")
+    content: str = Field(..., min_length=1, description="Note content")
+    project_id: str = "default"
+
+    @field_validator("title", "content")
+    @classmethod
+    def note_fields_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("欄位不可為空白")
+        return value
+
+
 class AdminActionRequest(BaseModel):
     project_id: str = "default"
 

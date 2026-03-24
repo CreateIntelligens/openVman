@@ -17,7 +17,7 @@
 - backend route：`backend/app/gateway/routes.py`
 - provider adapter：`backend/app/gateway/crawl_adapter.py`
 - shared crawler plugin：`backend/app/gateway/plugins/web_crawler.py`
-- Brain ingest 入口：`brain/api/main.py` 的 `/brain/knowledge/ingest`
+- Brain 寫入：走既有 `POST /brain/knowledge/upload`（multipart files + target_dir）
 
 也就是說，這份文件現在不是純 proposal，而是 **現況回補 + 後續缺口整理**。
 
@@ -33,8 +33,8 @@ KnowledgeBase.tsx
   -> GET {CRAWLER_PROVIDER_URL}/{domain}{path}
   -> _parse_provider_response()
   -> _clean_markdown()
-  -> POST {brain_url}/brain/knowledge/ingest
-  -> workspace/raw/ingested/ + background reindex
+  -> POST {brain_url}/brain/knowledge/upload (multipart)
+  -> workspace/knowledge/ingested/ + background reindex
   -> 回傳結果給前端並刷新列表
 ```
 
@@ -111,8 +111,8 @@ POST /api/knowledge/crawl
 這個 route 目前做的事：
 
 1. 呼叫 `fetch_page(req.url)`
-2. 組 metadata
-3. 直接 POST 到 `{brain_url}/brain/knowledge/ingest`
+2. 組裝 markdown（`# title\n\nSource: url\n\ncontent`）
+3. 從 URL 產生 slug 檔名，multipart POST 到 `{brain_url}/brain/knowledge/upload`
 4. 回傳 `{status, title, source_url, path, size}`
 
 ### 3. frontend
@@ -192,7 +192,7 @@ backend 內同時 include：
 | Provider 非 2xx | 502 | `網頁回傳錯誤：{status}` |
 | 抓取內容為空 | 422 | `抓取結果為空：{url}` |
 | 清理後內容為空 | 422 | `清理後內容為空：{url}` |
-| Brain ingest 失敗 | 502 | `知識庫寫入失敗：{err}` |
+| Brain upload 失敗 | 502 | `知識庫寫入失敗：{err}` |
 
 ---
 
@@ -201,7 +201,7 @@ backend 內同時 include：
 - [ ] Knowledge Base 頁面可看到 URL 匯入 UI
 - [ ] 貼入有效 URL 後可看到成功訊息
 - [ ] 匯入文件會出現在知識庫列表
-- [ ] 文件 frontmatter / metadata 帶有 `source_url`
+- [ ] 文件正文含 `Source: {url}` 標記
 - [ ] reindex 後可被 RAG 搜尋
 - [ ] 無效 URL 會顯示錯誤
 - [ ] blocked domain 會顯示錯誤
@@ -221,16 +221,13 @@ backend 內同時 include：
 2. 還缺 admin -> backend -> brain 的端到端驗證  
 目前有局部測試，但還沒把「貼網址後真的寫進 knowledge」這條完整手測或自動測試補起來。
 
-3. metadata 的 `provider` 目前仍會寫入實際 provider URL  
-這是 internal metadata，不會直接暴露到 frontend API response，但如果你連內部知識檔案都不想留下 vendor 痕跡，這裡還要再收斂成 generic identifier。
-
-4. 噪音清理規則還是 heuristic  
+3. 噪音清理規則還是 heuristic  
 首頁類型頁面像 `cnn.com` 這種 still 可能會留下很多導覽內容；目前不是 parser 壞掉，而是內容清理還只是 MVP 規則。
 
-5. 還沒有 preview step  
+4. 還沒有 preview step  
 現在是直接 crawl -> ingest，沒有像 NotebookLM 那種「先預覽、再確認匯入」。
 
-6. 還沒有 queue / worker 版本  
+5. 還沒有 queue / worker 版本  
 目前是同步流程，慢頁面或 provider 不穩時，使用者會直接等這個 request 完成。
 
 ---
@@ -240,7 +237,7 @@ backend 內同時 include：
 - 不做批次 URL 匯入
 - 不做聊天引用網址
 - 不把整頁內容寫進 memory
-- 不改 Brain 的 ingest 邏輯
+- 不新增 Brain 端的專用 ingest 端點（直接走 upload）
 - 不做通用 plugin 平台 UI
 - 不做 preview / approve flow
 - 不做 queue-based async ingest
