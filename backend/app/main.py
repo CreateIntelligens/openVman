@@ -268,6 +268,7 @@ class SpeechRequest(BaseModel):
 
     input: str
     voice: str = ""
+    provider: str = ""
     response_format: str = "wav"
     speed: float = 1.0
 
@@ -323,18 +324,81 @@ async def create_speech(body: SpeechRequest) -> Response:
     )
 
     try:
-        result = svc.synthesize(request)
+        output = svc.synthesize(request, provider=body.provider)
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
+    headers = {
+        "X-TTS-Latency-Ms": str(round(output.result.latency_ms, 2)),
+        "X-TTS-Provider": output.result.provider,
+    }
+    if output.fallback:
+        headers["X-TTS-Fallback"] = "true"
+        headers["X-TTS-Fallback-Reason"] = output.fallback_reason
+
     return Response(
-        content=result.audio_bytes,
-        media_type=result.content_type,
-        headers={
-            "X-TTS-Latency-Ms": str(round(result.latency_ms, 2)),
-            "X-TTS-Provider": result.provider,
-        },
+        content=output.result.audio_bytes,
+        media_type=output.result.content_type,
+        headers=headers,
     )
+
+
+@app.get(
+    "/v1/tts/providers",
+    tags=["TTS"],
+    summary="取得 TTS Provider 清單",
+    description="回傳所有已啟用的 TTS provider 及其可用 voice 清單。",
+)
+async def get_tts_providers() -> JSONResponse:
+    cfg = get_tts_config()
+    providers: list[dict] = [
+        {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
+    ]
+
+    if cfg.tts_index_url:
+        voices: list[str] = []
+        try:
+            resp = await _health_http.get().get(
+                f"{cfg.tts_index_url.rstrip('/')}/audio/voices",
+                timeout=3,
+            )
+            if resp.status_code < 400:
+                data = resp.json()
+                voices = list(data.keys()) if isinstance(data, dict) else []
+        except Exception as exc:
+            logger.warning("failed to fetch IndexTTS voices: %s", exc)
+        providers.append({
+            "id": "index",
+            "name": "IndexTTS",
+            "default_voice": cfg.tts_index_character,
+            "voices": voices or [cfg.tts_index_character],
+        })
+
+    if cfg.tts_gcp_enabled:
+        providers.append({
+            "id": "gcp",
+            "name": "GCP TTS",
+            "default_voice": cfg.tts_gcp_voice_name,
+            "voices": [cfg.tts_gcp_voice_name],
+        })
+
+    if cfg.tts_aws_enabled:
+        providers.append({
+            "id": "aws",
+            "name": "AWS Polly",
+            "default_voice": cfg.tts_aws_polly_voice_id,
+            "voices": [cfg.tts_aws_polly_voice_id],
+        })
+
+    if cfg.edge_tts_enabled:
+        providers.append({
+            "id": "edge-tts",
+            "name": "Edge TTS",
+            "default_voice": cfg.edge_tts_voice,
+            "voices": [cfg.edge_tts_voice],
+        })
+
+    return JSONResponse(content=providers)
 
 
 # ---------------------------------------------------------------------------

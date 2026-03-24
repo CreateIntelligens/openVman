@@ -6,6 +6,7 @@ import {
   fetchPersonas,
   fetchSessions,
   fetchTools,
+  fetchTtsProviders,
   getActiveProjectId,
   PersonaSummary,
   RetrievalResult,
@@ -13,6 +14,7 @@ import {
   SkillInfo,
   streamChat,
   synthesizeSpeech,
+  TtsProvider,
 } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
 import MarkdownPreview from "../components/MarkdownPreview";
@@ -50,6 +52,44 @@ export default function Chat() {
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ttsAbortRef = useRef<AbortController | null>(null);
+
+  // TTS provider/voice selection
+  const [ttsProviders, setTtsProviders] = useState<TtsProvider[]>([]);
+  const [ttsProvider, setTtsProvider] = useState(() => localStorage.getItem("brain-tts-provider") || "auto");
+  const [ttsVoice, setTtsVoice] = useState(() => localStorage.getItem("brain-tts-voice") || "");
+  const [ttsFallbackToast, setTtsFallbackToast] = useState("");
+  const [ttsPrefetching, setTtsPrefetching] = useState(false);
+  const ttsCacheRef = useRef<Map<number, { audio: ArrayBuffer; fallback?: string }>>(new Map());
+  const pendingPrefetchRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    fetchTtsProviders()
+      .then((providers) => {
+        setTtsProviders(providers);
+        const stored = localStorage.getItem("brain-tts-provider") || "auto";
+        if (!providers.some((p) => p.id === stored)) {
+          setTtsProvider("auto");
+          localStorage.setItem("brain-tts-provider", "auto");
+        }
+      })
+      .catch((e) => console.warn("Failed to load TTS providers:", e));
+  }, []);
+
+  const activeTtsProvider = ttsProviders.find((p) => p.id === ttsProvider);
+
+  const handleTtsProviderChange = (id: string) => {
+    setTtsProvider(id);
+    localStorage.setItem("brain-tts-provider", id);
+    const provider = ttsProviders.find((p) => p.id === id);
+    const nextVoice = provider?.default_voice || "";
+    setTtsVoice(nextVoice);
+    localStorage.setItem("brain-tts-voice", nextVoice);
+  };
+
+  const handleTtsVoiceChange = (voice: string) => {
+    setTtsVoice(voice);
+    localStorage.setItem("brain-tts-voice", voice);
+  };
 
   // Slash command autocomplete
   const [slashSkills, setSlashSkills] = useState<SkillInfo[]>([]);
@@ -93,6 +133,61 @@ export default function Chat() {
 
   const playingIndexRef = useRef<number | null>(null);
   playingIndexRef.current = playingIndex;
+  const ttsProviderRef = useRef(ttsProvider);
+  ttsProviderRef.current = ttsProvider;
+  const ttsVoiceRef = useRef(ttsVoice);
+  ttsVoiceRef.current = ttsVoice;
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const playAudioBuffer = useCallback((buf: ArrayBuffer, fallback?: string) => {
+    if (fallback) {
+      setTtsFallbackToast(fallback);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setTtsFallbackToast(""), 5000);
+    }
+    const blob = new Blob([buf], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    const cleanup = () => {
+      setPlayingIndex(null);
+      audioRef.current = null;
+      URL.revokeObjectURL(url);
+    };
+    audio.onended = cleanup;
+    audio.play().catch(cleanup);
+  }, []);
+
+  const prefetchTts = useCallback((text: string, index: number) => {
+    const provider = ttsProviderRef.current;
+    const voice = ttsVoiceRef.current;
+    const controller = new AbortController();
+    setTtsPrefetching(true);
+    synthesizeSpeech(text, {
+      provider: provider === "auto" ? "" : provider,
+      voice,
+      signal: controller.signal,
+    })
+      .then((result) => {
+        ttsCacheRef.current.set(index, result);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          console.warn("TTS prefetch failed:", err);
+        }
+      })
+      .finally(() => setTtsPrefetching(false));
+  }, []);
+
+  useEffect(() => {
+    const text = pendingPrefetchRef.current;
+    if (!text) return;
+    const idx = messages.length - 1;
+    if (idx >= 0 && messages[idx]?.role === "assistant") {
+      pendingPrefetchRef.current = null;
+      prefetchTts(text, idx);
+    }
+  }, [messages, prefetchTts]);
 
   const playTts = useCallback(async (text: string, index: number) => {
     // Stop any currently playing audio
@@ -108,34 +203,42 @@ export default function Chat() {
       return;
     }
 
-    const controller = new AbortController();
-    ttsAbortRef.current = controller;
     setPlayingIndex(index);
 
+    // Check cache first (prefetched from applyChatResult)
+    const cached = ttsCacheRef.current.get(index);
+    if (cached) {
+      ttsCacheRef.current.delete(index);
+      playAudioBuffer(cached.audio, cached.fallback);
+      return;
+    }
+
+    // Cache miss — fetch on demand
+    const controller = new AbortController();
+    ttsAbortRef.current = controller;
+
+    const provider = ttsProviderRef.current;
+    const voice = ttsVoiceRef.current;
+
     try {
-      const buf = await synthesizeSpeech(text, controller.signal);
-      const blob = new Blob([buf], { type: "audio/wav" });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => {
-        setPlayingIndex(null);
-        audioRef.current = null;
-        URL.revokeObjectURL(url);
-      };
-      await audio.play();
+      const { audio: buf, fallback } = await synthesizeSpeech(text, {
+        provider: provider === "auto" ? "" : provider,
+        voice,
+        signal: controller.signal,
+      });
+      playAudioBuffer(buf, fallback);
     } catch (err) {
       if (!controller.signal.aborted) {
         console.error("TTS playback failed:", err);
       }
-      if (audioRef.current) {
-        const src = audioRef.current.src;
+      const el = audioRef.current as HTMLAudioElement | null;
+      if (el) {
         audioRef.current = null;
-        if (src.startsWith("blob:")) URL.revokeObjectURL(src);
+        if (el.src.startsWith("blob:")) URL.revokeObjectURL(el.src);
       }
       setPlayingIndex(null);
     }
-  }, []);
+  }, [playAudioBuffer]);
 
   const activePersona = personas.find((persona) => persona.persona_id === selectedPersonaId) ?? defaultPersona;
   const conversationTitle = getConversationTitle(loadingHistory, sending);
@@ -161,6 +264,7 @@ export default function Chat() {
     setLastContext({ knowledge: 0, memory: 0 });
     setLastSources(emptySources);
     setError("");
+    ttsCacheRef.current.clear();
   };
 
   const applyChatResult = (payload: {
@@ -201,19 +305,8 @@ export default function Chat() {
     setLastContext({ knowledge: knowledge.length, memory: memory.length });
     setLastSources({ knowledge, memory });
 
-    // Auto-play TTS for the new reply
     if (payload.reply) {
-      const replyText = payload.reply;
-      const tts = playTts;
-      setTimeout(() => {
-        setMessages((current) => {
-          const idx = current.length - 1;
-          if (idx >= 0 && current[idx].role === "assistant") {
-            tts(replyText, idx);
-          }
-          return current;
-        });
-      }, 100);
+      pendingPrefetchRef.current = payload.reply;
     }
   };
 
@@ -311,10 +404,11 @@ export default function Chat() {
     }
   }, [messages]);
 
-  // Cleanup audio on unmount
+  // Cleanup audio and toast timer on unmount
   useEffect(() => () => {
     ttsAbortRef.current?.abort();
     audioRef.current?.pause();
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
   }, []);
 
   const submit = async (value = input) => {
@@ -563,8 +657,8 @@ export default function Chat() {
                     <div className="flex items-center gap-1 ml-auto opacity-0 group-hover/msg:opacity-100 transition-opacity">
                       <button
                         onClick={() => playTts(message.content, index)}
-                        className={`text-slate-500 hover:text-white ${playingIndex === index ? "!opacity-100 text-primary" : ""}`}
-                        title={playingIndex === index ? "停止" : "播放"}
+                        className={`text-slate-500 hover:text-white ${playingIndex === index ? "!opacity-100 text-primary" : ""} ${ttsPrefetching && index === messages.length - 1 ? "animate-pulse text-primary/50" : ""}`}
+                        title={playingIndex === index ? "停止" : ttsPrefetching && index === messages.length - 1 ? "語音準備中…" : "播放"}
                       >
                         <span className="material-symbols-outlined text-[14px]">
                           {playingIndex === index ? "stop" : "volume_up"}
@@ -598,6 +692,49 @@ export default function Chat() {
           {/* Input Area */}
           <div className="shrink-0 p-5 bg-background border-t border-slate-800/80">
             <div className="max-w-4xl mx-auto flex flex-col gap-3 relative">
+              {/* TTS Fallback Toast */}
+              {ttsFallbackToast && (
+                <div className="absolute bottom-full left-0 right-0 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400 flex items-center justify-between backdrop-blur-md z-20">
+                  <span>
+                    <span className="material-symbols-outlined text-[14px] align-middle mr-1">warning</span>
+                    TTS 已自動切換至 Edge TTS
+                  </span>
+                  <button onClick={() => setTtsFallbackToast("")} className="hover:text-amber-300"><span className="material-symbols-outlined text-[16px]">close</span></button>
+                </div>
+              )}
+
+              {/* TTS Provider/Voice Selector */}
+              {ttsProviders.length > 1 && (
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px] text-slate-500">graphic_eq</span>
+                    <select
+                      value={ttsProvider}
+                      onChange={(e) => handleTtsProviderChange(e.target.value)}
+                      className="select-dark text-xs py-1 px-2 min-w-[100px]"
+                    >
+                      {ttsProviders.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {ttsProvider !== "auto" && activeTtsProvider && activeTtsProvider.voices.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[14px] text-slate-500">record_voice_over</span>
+                      <select
+                        value={ttsVoice || activeTtsProvider.default_voice}
+                        onChange={(e) => handleTtsVoiceChange(e.target.value)}
+                        className="select-dark text-xs py-1 px-2 min-w-[120px]"
+                      >
+                        {activeTtsProvider.voices.map((v) => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {error && (
                 <div className="absolute bottom-full left-0 right-0 mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400 flex items-center justify-between backdrop-blur-md">
                   <span>{error}</span>
