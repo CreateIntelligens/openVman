@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from app.brain_proxy import _http as _brain_proxy_http
 from app.brain_proxy import router as brain_proxy_router
 from app.config import get_tts_config
+from app.http_client import SharedAsyncClient
 from app.gateway.crawl_adapter import _http as _crawl_http
 from app.gateway.forward import _http as _forward_http
 from app.internal_routes import _http as _internal_http
@@ -44,7 +45,7 @@ from app.service import TTSRouterService
 logger = logging.getLogger("backend")
 _service: TTSRouterService | None = None
 _md_converter: MarkItDown | None = None
-_health_client: httpx.AsyncClient | None = None
+_health_http = SharedAsyncClient()
 _UPLOAD_CHUNK_SIZE = 1024 * 1024
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
 
@@ -85,8 +86,6 @@ async def _shutdown_gateway_resources() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    global _health_client
-    _health_client = httpx.AsyncClient()
     await _startup_gateway_resources()
     await _build_openapi_schema()
     logger.info("backend startup complete")
@@ -97,9 +96,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         await _internal_http.close()
         await _forward_http.close()
         await _crawl_http.close()
-        if _health_client is not None:
-            await _health_client.aclose()
-            _health_client = None
+        await _health_http.close()
         await _shutdown_gateway_resources()
         logger.info("backend shutdown complete")
 
@@ -170,8 +167,7 @@ def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
 async def _fetch_brain_openapi() -> dict | None:
     brain_openapi_url = f"{get_tts_config().brain_url}/brain/openapi.json"
     try:
-        client = _health_client or httpx.AsyncClient()
-        resp = await client.get(brain_openapi_url, timeout=_BRAIN_OPENAPI_TIMEOUT_SECONDS)
+        resp = await _health_http.get().get(brain_openapi_url, timeout=_BRAIN_OPENAPI_TIMEOUT_SECONDS)
         resp.raise_for_status()
         return resp.json()
     except Exception as exc:
@@ -280,7 +276,12 @@ class SpeechRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@app.get("/healthz", tags=["System"])
+@app.get(
+    "/healthz",
+    tags=["System"],
+    summary="服務健康檢查",
+    description="檢查 Backend 的服務狀態，包含 TTS、Redis 與磁碟空間容量。",
+)
 async def healthz() -> dict:
     storage = get_temp_storage()
     quota = storage.check_quota()
@@ -288,11 +289,16 @@ async def healthz() -> dict:
         service="tts-router",
         redis_available=await redis_available(),
         quota=quota,
-        client=_health_client,
+        client=_health_http.get(),
     )
 
 
-@app.get("/metrics", tags=["System"])
+@app.get(
+    "/metrics",
+    tags=["System"],
+    summary="服務監控指標",
+    description="取得 Prometheus 格式的監控與效能指標列表。",
+)
 async def metrics() -> dict:
     return get_metrics_snapshot()
 
@@ -302,7 +308,12 @@ async def metrics() -> dict:
 # ---------------------------------------------------------------------------
 
 
-@app.post("/v1/audio/speech", tags=["TTS"])
+@app.post(
+    "/v1/audio/speech",
+    tags=["TTS"],
+    summary="文字轉語音",
+    description="將文字轉換為音訊 (TTS)。相容於 OpenAI Speech API 格式。\n\n**所需欄位**：\n- `input` (Body, str): 要轉換的文字內容\n- `voice` (Body, str, 選填): 語音音色/說話者名稱\n- `response_format` (Body, str, 預設 'wav'): 輸出音訊格式\n- `speed` (Body, float, 預設 1.0): 語速設定",
+)
 async def create_speech(body: SpeechRequest) -> Response:
     svc = _get_service()
     request = SynthesizeRequest(
@@ -330,7 +341,12 @@ async def create_speech(body: SpeechRequest) -> Response:
 # ---------------------------------------------------------------------------
 
 
-@app.post("/documents/convert", tags=["Documents"])
+@app.post(
+    "/documents/convert",
+    tags=["Documents"],
+    summary="文件轉 Markdown",
+    description="上傳文件（支援 Office 檔案等），將其轉換成 Markdown 格式回傳。\n\n**所需欄位**：\n- `file` (Form, UploadFile): 要轉換的檔案",
+)
 async def convert(file: UploadFile = File(...)) -> JSONResponse:
     suffix = os.path.splitext(file.filename or "")[1]
     tmp_path: str | None = None
