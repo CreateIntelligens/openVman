@@ -81,7 +81,11 @@ def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, An
     return "\n".join(lines)
 
 
-@router.post("/internal/enrich")
+@router.post(
+    "/internal/enrich",
+    summary="內部對話豐富化",
+    description="接收來自其他微服務的外部內容並作為系統訊息存入指定 Session 中。\n\n**所需欄位 (JSON)**：\n- `session_id` (Body, str): 歸屬的 Session ID\n- `persona_id` (Body, str, 預設 'default'): 人設 ID\n- `project_id` (Body, str, 預設 'default'): 專案 ID\n- `enriched_context` (Body, list[dict]): 要加強的內容列表\n- `media_refs` (Body, list[dict], 選填): 多媒體參考",
+)
 async def internal_enrich(payload: InternalEnrichRequest):
     items = _normalize_enriched_items(payload)
     if not items:

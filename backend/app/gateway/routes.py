@@ -69,7 +69,12 @@ async def _sync_crawled_document_meta(
     response.raise_for_status()
 
 
-@router.post("/uploads", tags=["Uploads"])
+@router.post(
+    "/uploads",
+    tags=["Uploads"],
+    summary="上傳檔案",
+    description="上傳圖文、語音等檔案至暫存區，並排入背景處理隊列。\n\n**所需欄位**：\n- `file` (Form, UploadFile): 欲上傳的檔案\n- `session_id` (Query, str): 指派歸屬的 Session ID",
+)
 async def upload(
     file: UploadFile = File(...),
     session_id: str = Query(...),
@@ -155,7 +160,12 @@ async def upload(
     )
 
 
-@router.get("/jobs/{job_id}", tags=["Uploads"])
+@router.get(
+    "/jobs/{job_id}",
+    tags=["Uploads"],
+    summary="取得上傳進度",
+    description="查詢上傳或非同步處理任務的狀態。\n\n**所需欄位**：\n- `job_id` (Path, str): 處理任務的 ID",
+)
 async def get_job(job_id: str) -> JSONResponse:
     payload = await get_job_status(job_id)
     if payload is None:
@@ -165,7 +175,12 @@ async def get_job(job_id: str) -> JSONResponse:
 
 
 
-@router.get("/admin/dlq", tags=["Admin"])
+@router.get(
+    "/admin/dlq",
+    tags=["Admin"],
+    summary="取得死信佇列",
+    description="讀取因為錯誤而未被處理的任務清單 (DLQ)。\n\n**所需欄位**：\n- `limit` (Query, int, 預設 20): 最多顯示的數量限制",
+)
 async def get_dlq(limit: int = Query(default=20, ge=1, le=100)) -> JSONResponse:
     """Return dead-letter queue entries from Redis."""
     redis = await get_redis()
@@ -214,7 +229,12 @@ async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
         return _error_response(422, str(exc))
 
 
-@router.post("/api/knowledge/crawl", tags=["Knowledge"])
+@router.post(
+    "/api/knowledge/crawl",
+    tags=["Knowledge"],
+    summary="抓取網址並匯入",
+    description="抓取指定網址頁面內容，並以 Markdown 格式直接存入知識庫（/knowledge/ingested），且更新文件 metadata。\n\n**所需欄位**：\n- `url` (Body, str): 要抓取的網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
     """抓取網址內容並匯入知識庫。"""
     result = await _safe_fetch_page(req.url)
@@ -259,7 +279,12 @@ async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
     })
 
 
-@router.post("/api/knowledge/fetch", tags=["Knowledge"])
+@router.post(
+    "/api/knowledge/fetch",
+    tags=["Knowledge"],
+    summary="即時抓取頁面內容",
+    description="抓取網址頁面內容並回傳，不存入知識庫。本端點供給 AI Tool 當作即時爬蟲功能使用。\n\n**所需欄位**：\n- `url` (Body, str): 要抓取的網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
     """抓取網址內容但不存入知識庫，供 agent tool 即時查詢使用。"""
     result = await _safe_fetch_page(req.url)

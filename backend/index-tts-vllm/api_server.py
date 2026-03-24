@@ -133,7 +133,11 @@ def wav_to_bytes(wav_data, sampling_rate):
         sf.write(wav_buffer, wav_data, sampling_rate, format='WAV')
         return wav_buffer.getvalue()
 
-@app.get("/health")
+@app.get(
+    "/health",
+    summary="TTS 健康檢查",
+    description="檢查 IndexTTS 模型是否已初始化完成。",
+)
 async def health_check():
     if not _tts_ready:
         return JSONResponse(status_code=503, content={"status": "initializing", "timestamp": time.time()})
@@ -145,7 +149,11 @@ async def _tts_response(sr: int, wav) -> Response:
         wav_bytes_16k = await convert_audio_with_ffmpeg(wav_bytes)
     return Response(content=wav_bytes_16k, media_type="audio/wav")
 
-@app.post("/tts_url")
+@app.post(
+    "/tts_url",
+    summary="指定參考音檔 TTS",
+    description="透過給定的參考音訊路徑，並使用指定的文字生合成語音。\n\n**所需欄位 (JSON)**：\n- `audio_paths` (Body, list[str]): 參考音檔的本地檔案路徑列表或網址\n- `text` (Body, str): 要生合成的目標文字\n- `seed` (Body, int, 選填): 隨機數種子",
+)
 async def tts_api_url(request: Request):
     if not _tts_ready:
         return JSONResponse(status_code=503, content={"status": "initializing"})
@@ -155,7 +163,11 @@ async def tts_api_url(request: Request):
         return await _tts_response(sr, wav)
     except Exception as ex: return JSONResponse(status_code=500, content={"status": "error", "error": str(ex)})
 
-@app.post("/tts")
+@app.post(
+    "/tts",
+    summary="角色 TTS",
+    description="根據已經註冊的角色 (character) 以及給定的文字來生合成語音。\n\n**所需欄位 (JSON)**：\n- `character` (Body, str): 已註冊的語音角色名稱\n- `text` (Body, str): 要生合成的目標文字",
+)
 async def tts_api(request: Request):
     if not _tts_ready:
         return JSONResponse(status_code=503, content={"status": "initializing"})
@@ -167,7 +179,11 @@ async def tts_api(request: Request):
 
 _voices_cache: list | dict | None = None
 
-@app.get("/audio/voices")
+@app.get(
+    "/audio/voices",
+    summary="取得所有角色",
+    description="回傳所有已註冊並支援生成的角色清單。",
+)
 async def tts_voices():
     global _voices_cache
     if _voices_cache is not None:

@@ -211,17 +211,32 @@ async def metrics_middleware(request: Request, call_next):
 # Health & Metrics & Identity
 # ---------------------------------------------------------------------------
 
-@app.get("/brain/health", tags=_TAG_SYSTEM)
+@app.get(
+    "/brain/health",
+    tags=_TAG_SYSTEM,
+    summary="大腦層健康檢查",
+    description="檢查大腦層的服務狀態與相依性連接情形。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def health(project_id: str = "default"):
     return build_health_payload(project_id)
 
 
-@app.get("/brain/metrics", tags=_TAG_SYSTEM)
+@app.get(
+    "/brain/metrics",
+    tags=_TAG_SYSTEM,
+    summary="大腦層監控指標",
+    description="取得 Prometheus 格式的大腦層監控與效能指標列表。",
+)
 async def metrics():
     return get_metrics_store().snapshot()
 
 
-@app.get("/brain/identity", tags=_TAG_SYSTEM)
+@app.get(
+    "/brain/identity",
+    tags=_TAG_SYSTEM,
+    summary="解析前端身份",
+    description="根據傳入的專案與人設 ID 回傳詳細配置設定。\n\n**所需欄位**：\n- `persona_id` (Query, str, 預設 'default'): 人設 ID\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def get_identity(persona_id: str = "default", project_id: str = "default"):
     return parse_identity(project_id, persona_id)
 
@@ -245,7 +260,12 @@ def _maybe_rewrite_slash(payload: ChatRequest) -> dict:
     return raw
 
 
-@app.get("/brain/tools", tags=_TAG_TOOLS)
+@app.get(
+    "/brain/tools",
+    tags=_TAG_TOOLS,
+    summary="列出工具與技能",
+    description="取得目前所有已註冊的 Tools 以及被載入的 Skills 清單。",
+)
 async def list_tools():
     """List all registered tools and loaded skill plugins."""
     registry, manager = _skill_deps()
@@ -271,7 +291,12 @@ async def list_tools():
     return {"tools": builtin_tools, "skill_tools": skill_tools, "skills": skills}
 
 
-@app.patch("/brain/skills/{skill_id}/toggle", tags=_TAG_TOOLS)
+@app.patch(
+    "/brain/skills/{skill_id}/toggle",
+    tags=_TAG_TOOLS,
+    summary="切換技能啟用狀態",
+    description="啟用或停用指定的技能。\n\n**所需欄位**：\n- `skill_id` (Path, str): 技能 ID",
+)
 async def toggle_skill(skill_id: str):
     """Enable or disable a skill."""
     registry, manager = _skill_deps()
@@ -282,7 +307,12 @@ async def toggle_skill(skill_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post("/brain/skills", tags=_TAG_TOOLS)
+@app.post(
+    "/brain/skills",
+    tags=_TAG_TOOLS,
+    summary="建立新技能",
+    description="建立並初始化一個新的技能檔案結構。\n\n**所需欄位 (JSON)**：\n- `skill_id` (Body, str): 技能的唯一識別碼\n- `name` (Body, str): 技能名稱\n- `description` (Body, str): 技能的詳細說明",
+)
 async def create_skill(payload: SkillCreateRequest):
     """Create a new skill with skeleton files."""
     registry, manager = _skill_deps()
@@ -298,7 +328,12 @@ async def create_skill(payload: SkillCreateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get("/brain/skills/{skill_id}/files", tags=_TAG_TOOLS)
+@app.get(
+    "/brain/skills/{skill_id}/files",
+    tags=_TAG_TOOLS,
+    summary="取得技能檔案",
+    description="讀取指定技能的原始檔內容 (skill.yaml, main.py 等)。\n\n**所需欄位**：\n- `skill_id` (Path, str): 技能 ID",
+)
 async def get_skill_files(skill_id: str):
     """Read raw skill.yaml and main.py contents."""
     _registry, manager = _skill_deps()
@@ -309,7 +344,12 @@ async def get_skill_files(skill_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.put("/brain/skills/{skill_id}/files", tags=_TAG_TOOLS)
+@app.put(
+    "/brain/skills/{skill_id}/files",
+    tags=_TAG_TOOLS,
+    summary="更新技能檔案",
+    description="更新指定技能的檔案內容並且熱重載。\n\n**所需欄位 (JSON)**：\n- `skill_id` (Path, str): 技能 ID\n- `files` (Body, list[dict]): 檔案變更列表 (含 path 及 content)",
+)
 async def update_skill_files(skill_id: str, payload: SkillFilesUpdateRequest):
     """Update skill files and hot-reload."""
     registry, manager = _skill_deps()
@@ -325,7 +365,12 @@ async def update_skill_files(skill_id: str, payload: SkillFilesUpdateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/brain/skills/{skill_id}", tags=_TAG_TOOLS)
+@app.delete(
+    "/brain/skills/{skill_id}",
+    tags=_TAG_TOOLS,
+    summary="刪除技能",
+    description="刪除技能及其目錄內容。\n\n**所需欄位**：\n- `skill_id` (Path, str): 技能 ID",
+)
 async def delete_skill(skill_id: str):
     """Delete a skill and its directory."""
     registry, manager = _skill_deps()
@@ -336,7 +381,12 @@ async def delete_skill(skill_id: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post("/brain/skills/reload", tags=_TAG_TOOLS)
+@app.post(
+    "/brain/skills/reload",
+    tags=_TAG_TOOLS,
+    summary="重新載入所有技能",
+    description="重新從磁碟讀取並載入所有技能狀態。",
+)
 async def reload_all_skills():
     """Reload all skills from disk."""
     registry, manager = _skill_deps()
@@ -354,13 +404,23 @@ async def reload_all_skills():
 # Projects
 # ---------------------------------------------------------------------------
 
-@app.get("/brain/projects", tags=_TAG_PROJECTS)
+@app.get(
+    "/brain/projects",
+    tags=_TAG_PROJECTS,
+    summary="列出所有專案",
+    description="取得大腦層配置的所有已知專案列表。",
+)
 async def list_projects_route():
     projects = list_projects()
     return {"projects": projects, "project_count": len(projects)}
 
 
-@app.post("/brain/projects", tags=_TAG_PROJECTS)
+@app.post(
+    "/brain/projects",
+    tags=_TAG_PROJECTS,
+    summary="建立新專案",
+    description="建立一個全新的專案獨立空間。\n\n**所需欄位 (JSON)**：\n- `label` (Body, str): 專案顯示名稱",
+)
 async def create_project_route(payload: ProjectCreateRequest):
     try:
         result = create_project(payload.label)
@@ -370,7 +430,12 @@ async def create_project_route(payload: ProjectCreateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/brain/projects", tags=_TAG_PROJECTS)
+@app.delete(
+    "/brain/projects",
+    tags=_TAG_PROJECTS,
+    summary="刪除專案",
+    description="刪除指定的專案及其相關資料。\n\n**所需欄位 (JSON)**：\n- `project_id` (Body, str): 要刪除的專案 ID",
+)
 async def delete_project_route(payload: ProjectDeleteRequest):
     try:
         result = delete_project(payload.project_id)
@@ -380,7 +445,12 @@ async def delete_project_route(payload: ProjectDeleteRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.get("/brain/projects/{project_id}", tags=_TAG_PROJECTS)
+@app.get(
+    "/brain/projects/{project_id}",
+    tags=_TAG_PROJECTS,
+    summary="取得單一專案資訊",
+    description="取得特定專案的詳細資訊。\n\n**所需欄位**：\n- `project_id` (Path, str): 專案 ID",
+)
 async def get_project_route(project_id: str):
     try:
         return get_project_info(project_id)
@@ -392,13 +462,23 @@ async def get_project_route(project_id: str):
 # Personas
 # ---------------------------------------------------------------------------
 
-@app.get("/brain/personas", tags=_TAG_PERSONAS)
+@app.get(
+    "/brain/personas",
+    tags=_TAG_PERSONAS,
+    summary="列出人設清單",
+    description="取得現有的 AI 人設 (Persona) 清單。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def list_personas_route(project_id: str = "default"):
     items = list_personas(project_id)
     return {"personas": items, "persona_count": len(items)}
 
 
-@app.post("/brain/personas", tags=_TAG_PERSONAS)
+@app.post(
+    "/brain/personas",
+    tags=_TAG_PERSONAS,
+    summary="建立新人設",
+    description="建立並初始化一個新的 Persona 結構與設定。\n\n**所需欄位 (JSON)**：\n- `persona_id` (Body, str): 新人設的 ID\n- `label` (Body, str): 顯示名稱\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def create_persona_route(payload: PersonaCreateRequest):
     try:
         result = create_persona_scaffold(payload.persona_id, payload.label, payload.project_id)
@@ -408,7 +488,12 @@ async def create_persona_route(payload: PersonaCreateRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/brain/personas", tags=_TAG_PERSONAS)
+@app.delete(
+    "/brain/personas",
+    tags=_TAG_PERSONAS,
+    summary="刪除人設",
+    description="刪除指定的人設。\n\n**所需欄位 (JSON)**：\n- `persona_id` (Body, str): 要刪除的人設 ID\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def delete_persona_route(payload: PersonaDeleteRequest):
     try:
         result = delete_persona_scaffold(payload.persona_id, payload.project_id)
@@ -418,7 +503,12 @@ async def delete_persona_route(payload: PersonaDeleteRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/brain/personas/clone", tags=_TAG_PERSONAS)
+@app.post(
+    "/brain/personas/clone",
+    tags=_TAG_PERSONAS,
+    summary="複製人設",
+    description="複製一個現有的人設為新的人設。\n\n**所需欄位 (JSON)**：\n- `source_persona_id` (Body, str): 來源人設 ID\n- `target_persona_id` (Body, str): 新的人設 ID\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def clone_persona_route(payload: PersonaCloneRequest):
     try:
         result = clone_persona_scaffold(payload.source_persona_id, payload.target_persona_id, payload.project_id)
@@ -437,7 +527,12 @@ async def clone_persona_route(payload: PersonaCloneRequest):
 # Chat
 # ---------------------------------------------------------------------------
 
-@app.post("/brain/chat", tags=_TAG_CHAT)
+@app.post(
+    "/brain/chat",
+    tags=_TAG_CHAT,
+    summary="非串流對話",
+    description="進行一回合完整的對話生成（同步等待直到產生完整回應）。\n\n**所需欄位 (JSON)**：\n- 見 `ChatRequest` 結構 (包含 message, session_id 等等)",
+)
 async def chat(request: Request, payload: ChatRequest):
     """Generate a reply using workspace context, retrieval, and recent session history."""
     try:
@@ -467,7 +562,12 @@ async def chat(request: Request, payload: ChatRequest):
         raise HTTPException(status_code=502, detail=error_payload) from exc
 
 
-@app.post("/brain/chat/stream", tags=_TAG_CHAT)
+@app.post(
+    "/brain/chat/stream",
+    tags=_TAG_CHAT,
+    summary="串流對話 (SSE)",
+    description="透過 Server-Sent Events (SSE) 串流回傳對話生成過程與結果。\n\n**所需欄位 (JSON)**：\n- 見 `ChatRequest` 結構",
+)
 async def chat_stream(request: Request, payload: ChatRequest):
     """Stream chat generation through SSE."""
     raw = _maybe_rewrite_slash(payload)
@@ -487,7 +587,12 @@ async def chat_stream(request: Request, payload: ChatRequest):
     return EventSourceResponse(_stream_generation_events(context))
 
 
-@app.get("/brain/chat/history", tags=_TAG_CHAT)
+@app.get(
+    "/brain/chat/history",
+    tags=_TAG_CHAT,
+    summary="取得聊天紀錄",
+    description="取得指定 session 的歷史聊天紀錄。\n\n**所需欄位**：\n- `session_id` (Query, str): 聊天對話的 Session ID\n- `persona_id` (Query, str, 預設 'default'): 人設 ID\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def get_chat_history(session_id: str, persona_id: str = "default", project_id: str = "default"):
     try:
         messages = list_session_messages(session_id, persona_id, project_id=project_id)
@@ -500,7 +605,12 @@ async def get_chat_history(session_id: str, persona_id: str = "default", project
 # Search & Embedding
 # ---------------------------------------------------------------------------
 
-@app.post("/brain/embed", tags=_TAG_SEARCH)
+@app.post(
+    "/brain/embed",
+    tags=_TAG_SEARCH,
+    summary="文字向量化",
+    description="將傳入的多筆文字進行 Embedding 轉換並回傳。\n\n**所需欄位 (JSON)**：\n- `texts` (Body, list[str]): 需要被向量化的字串陣列",
+)
 async def embed(payload: EmbedRequest):
     """向量化文字"""
     vectors = get_embedder().encode(payload.texts)
@@ -511,7 +621,12 @@ async def embed(payload: EmbedRequest):
     }
 
 
-@app.post("/brain/search", tags=_TAG_SEARCH)
+@app.post(
+    "/brain/search",
+    tags=_TAG_SEARCH,
+    summary="向量語意搜尋",
+    description="使用 Embedding 對 LanceDB 內的資料進行相近度查詢。\n\n**所需欄位 (JSON)**：\n- `query` (Body, str): 查詢字串\n- `table` (Body, str): 要查詢的資料表名稱\n- `top_k` (Body, int, 預設 5): 回傳筆數限制\n- `query_type` (Body, str, 預設 'hybrid'): 搜尋模式 (vector/fts/hybrid)\n- `session_id`, `persona_id`, `project_id` (Body, str): 其他環境參數",
+)
 async def search(request: Request, payload: SearchRequest):
     """在 LanceDB 中語意搜尋"""
     envelope = build_message_envelope(request, payload.model_dump(), content_key="query")
@@ -566,7 +681,12 @@ async def search(request: Request, payload: SearchRequest):
 # Memory & Sessions
 # ---------------------------------------------------------------------------
 
-@app.post("/brain/memories", tags=_TAG_MEMORY)
+@app.post(
+    "/brain/memories",
+    tags=_TAG_MEMORY,
+    summary="新增記憶",
+    description="新增一筆短期或長期記憶到目前專案與人設中。\n\n**所需欄位 (JSON)**：\n- `text` (Body, str): 記憶內容\n- `source` (Body, str, 選填): 記憶來源 (例如 chat/tool 等)\n- `metadata` (Body, dict, 選填): 額外的結構化資料\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def add_memory(request: Request, payload: AddMemoryRequest):
     """新增一筆記憶。"""
     envelope = build_message_envelope(request, payload.model_dump(), content_key="text")
@@ -600,7 +720,12 @@ async def add_memory(request: Request, payload: AddMemoryRequest):
     return {"status": "ok", "trace_id": envelope.context.trace_id, "text": text}
 
 
-@app.get("/brain/memories", tags=_TAG_MEMORY)
+@app.get(
+    "/brain/memories",
+    tags=_TAG_MEMORY,
+    summary="列出記憶清單",
+    description="分頁取得目前專案中的記憶清單。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID\n- `page` (Query, int, 預設 1): 頁碼\n- `page_size` (Query, int, 預設 20): 每頁筆數",
+)
 async def list_memories(project_id: str = "default", page: int = 1, page_size: int = 20):
     try:
         return query_memories(project_id=project_id, page=page, page_size=page_size)
@@ -609,7 +734,12 @@ async def list_memories(project_id: str = "default", page: int = 1, page_size: i
         raise HTTPException(status_code=500, detail="無法讀取記憶列表") from exc
 
 
-@app.delete("/brain/memories", tags=_TAG_MEMORY)
+@app.delete(
+    "/brain/memories",
+    tags=_TAG_MEMORY,
+    summary="刪除特定記憶",
+    description="根據精確的文字內容刪除對應的一筆記憶。\n\n**所需欄位 (JSON)**：\n- `text` (Body, str): 要刪除的記憶內容\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def delete_memory(payload: AddMemoryRequest):
     if not payload.text:
         raise HTTPException(status_code=400, detail="text 不可為空")
@@ -622,7 +752,12 @@ async def delete_memory(payload: AddMemoryRequest):
         raise HTTPException(status_code=500, detail="刪除記憶失敗") from exc
 
 
-@app.get("/brain/sessions", tags=_TAG_MEMORY)
+@app.get(
+    "/brain/sessions",
+    tags=_TAG_MEMORY,
+    summary="列出對話 Session",
+    description="取得指定專案或人設下的所有對話 Session 列表。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID\n- `persona_id` (Query, str, 選填): 篩選特定的人設 ID",
+)
 async def list_sessions(project_id: str = "default", persona_id: str | None = None):
     try:
         sessions = list_sessions_for_project(project_id=project_id, persona_id=persona_id)
@@ -632,7 +767,12 @@ async def list_sessions(project_id: str = "default", persona_id: str | None = No
         raise HTTPException(status_code=500, detail="無法讀取 session 列表") from exc
 
 
-@app.delete("/brain/sessions/{session_id}", tags=_TAG_MEMORY)
+@app.delete(
+    "/brain/sessions/{session_id}",
+    tags=_TAG_MEMORY,
+    summary="刪除對話 Session",
+    description="刪除特定的對話內容。\n\n**所需欄位**：\n- `session_id` (Path, str): 欲刪除的 Session ID\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def delete_session(session_id: str, project_id: str = "default"):
     deleted = delete_session_for_project(project_id=project_id, session_id=session_id)
     if not deleted:
@@ -645,20 +785,35 @@ async def delete_session(session_id: str, project_id: str = "default"):
 # Knowledge Management
 # ---------------------------------------------------------------------------
 
-@app.get("/brain/knowledge/documents", tags=_TAG_KNOWLEDGE)
+@app.get(
+    "/brain/knowledge/documents",
+    tags=_TAG_KNOWLEDGE,
+    summary="取得工作區所有文件",
+    description="取得當前專案工作區 `workspace/` 底下的所有檔案路徑列表。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def list_knowledge_documents_route(project_id: str = "default"):
     documents = list_workspace_documents(project_id)
     return {"documents": documents, "document_count": len(documents)}
 
 
-@app.get("/brain/knowledge/base/documents", tags=_TAG_KNOWLEDGE)
+@app.get(
+    "/brain/knowledge/base/documents",
+    tags=_TAG_KNOWLEDGE,
+    summary="取得知識庫樹狀結構",
+    description="取得專案知識庫目錄中的所有文件與資料夾層級結構 (主要包含 knowledge 資料夾)。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def list_knowledge_base_documents_route(project_id: str = "default"):
     documents = list_knowledge_base_documents(project_id)
     directories = list_knowledge_base_directories(project_id)
     return {"documents": documents, "document_count": len(documents), "directories": directories}
 
 
-@app.get("/brain/knowledge/document", tags=_TAG_KNOWLEDGE)
+@app.get(
+    "/brain/knowledge/document",
+    tags=_TAG_KNOWLEDGE,
+    summary="讀取單一知識文件",
+    description="讀取特定路徑的知識文件詳細內容與中繼屬性。\n\n**所需欄位**：\n- `path` (Query, str): 文件相對路徑\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def get_knowledge_document_route(path: str, project_id: str = "default"):
     try:
         return read_workspace_document(path, project_id)
@@ -668,7 +823,12 @@ async def get_knowledge_document_route(path: str, project_id: str = "default"):
         raise HTTPException(status_code=404, detail="找不到指定文件") from exc
 
 
-@app.put("/brain/knowledge/document", tags=_TAG_KNOWLEDGE)
+@app.put(
+    "/brain/knowledge/document",
+    tags=_TAG_KNOWLEDGE,
+    summary="儲存知識文件",
+    description="寫入或覆蓋特定路徑的知識文件內容。\n\n**所需欄位 (JSON)**：\n- `path` (Body, str): 欲儲存的檔案路徑\n- `content` (Body, str): Markdown 或純文字內容\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
     try:
         document = save_workspace_document(payload.path, payload.content, payload.project_id)
@@ -677,7 +837,12 @@ async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
     return {"status": "ok", "document": document}
 
 
-@app.patch("/brain/knowledge/document/meta", tags=_TAG_KNOWLEDGE)
+@app.patch(
+    "/brain/knowledge/document/meta",
+    tags=_TAG_KNOWLEDGE,
+    summary="更新文件中繼屬性 (Metadata)",
+    description="變更知識文件的屬性（例如是否啟用索引、來源網址等）。\n\n**所需欄位 (JSON)**：\n- `path` (Body, str): 文件路徑\n- `enabled` (Body, bool, 選填): 是否納入索引\n- `source_type` (Body, str, 選填): 原始來源類型\n- `source_url` (Body, str, 選填): 原始來源URL\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatchRequest):
     try:
         document = update_workspace_document_meta(
@@ -700,7 +865,12 @@ async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatc
     }
 
 
-@app.delete("/brain/knowledge/document", tags=_TAG_KNOWLEDGE)
+@app.delete(
+    "/brain/knowledge/document",
+    tags=_TAG_KNOWLEDGE,
+    summary="刪除知識文件",
+    description="刪除指定路徑的知識文件檔案並觸發背景重整索引。\n\n**所需欄位**：\n- `path` (Query, str): 欲刪除的文件路徑\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def delete_knowledge_document_route(path: str, project_id: str = "default"):
     try:
         delete_workspace_document(path, project_id)
@@ -712,7 +882,12 @@ async def delete_knowledge_document_route(path: str, project_id: str = "default"
     return {"status": "ok"}
 
 
-@app.post("/brain/knowledge/move", tags=_TAG_KNOWLEDGE)
+@app.post(
+    "/brain/knowledge/move",
+    tags=_TAG_KNOWLEDGE,
+    summary="移動/重新命名知識文件",
+    description="將知識庫內的特定文件移動至新路徑，並觸發重整索引。\n\n**所需欄位 (JSON)**：\n- `source_path` (Body, str): 原始檔案路徑\n- `target_path` (Body, str): 目的目錄或檔案路徑\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
     try:
         document = move_workspace_document(payload.source_path, payload.target_path, payload.project_id)
@@ -724,7 +899,12 @@ async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
     return {"status": "ok", "document": document}
 
 
-@app.post("/brain/knowledge/directory", tags=_TAG_KNOWLEDGE)
+@app.post(
+    "/brain/knowledge/directory",
+    tags=_TAG_KNOWLEDGE,
+    summary="建立資料夾",
+    description="在知識庫內建立一個新的空資料夾。\n\n**所需欄位 (JSON)**：\n- `path` (Body, str): 欲建立的資料夾路徑\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+)
 async def create_knowledge_directory_route(payload: KnowledgeDocumentPutRequest):
     try:
         return create_workspace_directory(payload.path, payload.project_id)
@@ -732,7 +912,12 @@ async def create_knowledge_directory_route(payload: KnowledgeDocumentPutRequest)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.delete("/brain/knowledge/directory", tags=_TAG_KNOWLEDGE)
+@app.delete(
+    "/brain/knowledge/directory",
+    tags=_TAG_KNOWLEDGE,
+    summary="刪除資料夾",
+    description="刪除特定空資料夾 (若內有檔案會報錯退回)。\n\n**所需欄位**：\n- `path` (Query, str): 欲刪除的資料夾路徑\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
 async def delete_knowledge_directory_route(path: str, project_id: str = "default"):
     try:
         return delete_workspace_directory(path, project_id)
@@ -742,7 +927,12 @@ async def delete_knowledge_directory_route(path: str, project_id: str = "default
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.post("/brain/knowledge/upload", tags=_TAG_KNOWLEDGE)
+@app.post(
+    "/brain/knowledge/upload",
+    tags=_TAG_KNOWLEDGE,
+    summary="上傳實體檔案至知識庫",
+    description="將單個或多個檔案上傳儲存到指定知識庫目錄底下，支援背景重整索引。\n\n**所需欄位 (Form)**：\n- `files` (Form, list[UploadFile]): 要上傳的檔案\n- `target_dir` (Form, str, 預設 ''): 上傳的目標資料夾\n- `project_id` (Form, str, 預設 'default'): 專案 ID",
+)
 async def upload_knowledge_documents_route(
     files: list[UploadFile] = File(...),
     target_dir: str = Form(""),
@@ -772,7 +962,12 @@ async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
     return {"status": "ok", "document": document, "path": document["path"], "size": document["size"]}
 
 
-@app.post("/brain/knowledge/reindex", tags=_TAG_KNOWLEDGE)
+@app.post(
+    "/brain/knowledge/reindex",
+    tags=_TAG_KNOWLEDGE,
+    summary="重整全域知識索引",
+    description="手動強制觸發指定專案底下知識庫向量索引的全面重建作業。\n\n**所需欄位 (JSON)**：\n- `project_id` (Body, str): 專案 ID",
+)
 async def reindex_knowledge_route(payload: AdminActionRequest):
     try:
         result = await asyncio.to_thread(rebuild_knowledge_index, payload.project_id)
@@ -790,7 +985,12 @@ async def reindex_knowledge_route(payload: AdminActionRequest):
 # Memory Maintenance
 # ---------------------------------------------------------------------------
 
-@app.post("/brain/memories/maintain", tags=_TAG_MEMORY)
+@app.post(
+    "/brain/memories/maintain",
+    tags=_TAG_MEMORY,
+    summary="執行記憶維護作業",
+    description="記憶整理：自動執行去重、摘要、歸檔過期對話等維護工作。\n\n**所需欄位 (JSON)**：\n- `project_id` (Body, str): 專案 ID",
+)
 async def maintain_memory_route(payload: AdminActionRequest):
     """記憶整理：去重、摘要、歸檔過期 transcripts。"""
     try:
@@ -807,7 +1007,12 @@ async def maintain_memory_route(payload: AdminActionRequest):
 # Protocol Validation
 # ---------------------------------------------------------------------------
 
-@app.post("/brain/protocol/validate", tags=_TAG_PROTOCOL)
+@app.post(
+    "/brain/protocol/validate",
+    tags=_TAG_PROTOCOL,
+    summary="驗證傳輸協定格式",
+    description="將給定的 Payload 使用系統指定的 Schema 進行合法性格式驗證。\n\n**所需欄位 (JSON)**：\n- `direction` (Body, str): 傳輸方向 (client_to_server / server_to_client)\n- `payload` (Body, dict): 要驗證的內文\n- `version` (Body, str): 測試針對的協定版本號",
+)
 async def protocol_validate(payload: ProtocolValidateRequest):
     """Validate a protocol event payload against the versioned contract."""
     try:
