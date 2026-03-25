@@ -60,6 +60,7 @@ export default function Chat() {
   const [ttsFallbackToast, setTtsFallbackToast] = useState("");
   const [ttsPrefetching, setTtsPrefetching] = useState(false);
   const ttsCacheRef = useRef<Map<number, { audio: ArrayBuffer; fallback?: string }>>(new Map());
+  const ttsPrefetchAbortRef = useRef<AbortController | null>(null);
   const pendingPrefetchRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -159,9 +160,11 @@ export default function Chat() {
   }, []);
 
   const prefetchTts = useCallback((text: string, index: number) => {
+    ttsPrefetchAbortRef.current?.abort();
     const provider = ttsProviderRef.current;
     const voice = ttsVoiceRef.current;
     const controller = new AbortController();
+    ttsPrefetchAbortRef.current = controller;
     setTtsPrefetching(true);
     synthesizeSpeech(text, {
       provider: provider === "auto" ? "" : provider,
@@ -176,7 +179,10 @@ export default function Chat() {
           console.warn("TTS prefetch failed:", err);
         }
       })
-      .finally(() => setTtsPrefetching(false));
+      .finally(() => {
+        ttsPrefetchAbortRef.current = null;
+        setTtsPrefetching(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -264,6 +270,7 @@ export default function Chat() {
     setLastContext({ knowledge: 0, memory: 0 });
     setLastSources(emptySources);
     setError("");
+    ttsPrefetchAbortRef.current?.abort();
     ttsCacheRef.current.clear();
   };
 
@@ -323,6 +330,8 @@ export default function Chat() {
     setError("");
     setSessionId(targetSessionId);
     persistSessionId(targetSessionId);
+    ttsPrefetchAbortRef.current?.abort();
+    ttsCacheRef.current.clear();
     fetchChatHistory(targetSessionId, selectedPersonaId)
       .then((response) => {
         setSessionId(response.session_id);
@@ -407,6 +416,7 @@ export default function Chat() {
   // Cleanup audio and toast timer on unmount
   useEffect(() => () => {
     ttsAbortRef.current?.abort();
+    ttsPrefetchAbortRef.current?.abort();
     audioRef.current?.pause();
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
   }, []);
