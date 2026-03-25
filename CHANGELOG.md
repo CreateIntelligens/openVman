@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.7.0] - 2026-03-25
+
+### Added
+- **Nervous System Architecture**: Implemented the core architecture as defined in `docs/superpowers/specs/2026-03-25-vman-nervous-system-architecture.md`.
+- **WebSocket Session Manager**: `backend/app/session_manager.py` now manages active connections and associated tasks.
+- **Guard Agent & Interrupt Sequence**: `backend/app/guard_agent.py` provides fast-reflex interruption logic based on `asyncio.Task.cancel()`.
+- **Punctuation Chunker**: `backend/app/utils/chunker.py` splits text streams for natural TTS pacing.
+- **Frontend ASR & State Machine**: `frontend/app/src/services/asr.ts` and `frontend/app/src/store/avatarState.ts` manage speech input and avatar states.
+- **Frontend WebSocket Integration**: `frontend/app/src/services/websocket.ts` handles communication with the backend.
+- **MarkItDown Integration Test**: Added `backend/tests/test_markitdown.py` to validate document conversion.
+- **Unit Tests**: Added comprehensive tests for `SessionManager`, `PunctuationChunker`, and `GuardAgent`.
+
+### Changed
+- Refactored `Session` (backend) to be a pure Python class, removing `pydantic` dependency to improve startup time.
+
+### Fixed
+- Corrected `PunctuationChunker` regex to properly handle spaces after punctuation.
+
+### Developer Note (Next Steps)
+- **Brain Integration**: The Brain cognitive core (including `SkillManager`, `ToolRegistry`, and `MessageEnvelope`) has been perfectly implemented by the team previously (see v0.5.0). The final integration step is to handle the `user_speak` event in `backend/app/main.py`: call the existing Brain streaming API, and feed the generated text into the newly written `TTSRouter` and `PunctuationChunker` pipeline to complete the Nervous System loop.
+
 ## [0.6.0] - 2026-03-23
 
 ### Added

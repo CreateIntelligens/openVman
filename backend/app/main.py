@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
 import httpx
-from fastapi import FastAPI, File, Response, UploadFile
+from fastapi import FastAPI, File, Response, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from markitdown import MarkItDown
@@ -42,10 +42,14 @@ from app.health_payloads import build_backend_health_payload
 from app.observability import get_metrics_snapshot
 from app.providers.base import SynthesizeRequest
 from app.service import TTSRouterService
+from app.session_manager import SessionManager
+from app.guard_agent import GuardAgent
 
 logger = logging.getLogger("backend")
 _service: TTSRouterService | None = None
 _md_converter: MarkItDown | None = None
+_session_manager: SessionManager = SessionManager()
+_guard_agent: GuardAgent = GuardAgent()
 _health_http = SharedAsyncClient()
 _UPLOAD_CHUNK_SIZE = 1024 * 1024
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
@@ -112,6 +116,52 @@ app.include_router(internal_router)
 
 # --- Public API facade (/api/* → internal brain service) ---
 app.include_router(brain_proxy_router)
+
+
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await websocket.accept()
+    session = _session_manager.create_session(client_id)
+    logger.info(f"WebSocket session created: {session.session_id} for client: {client_id}")
+    try:
+        while True:
+            data_str = await websocket.receive_text()
+            data = json.loads(data_str)
+            event = data.get("event")
+
+            if event == "client_interrupt":
+                text = data.get("text") or data.get("partial_asr")
+                action = await _guard_agent.classify(text)
+
+                if action == "STOP":
+                    cancelled = await session.interrupt_tasks()
+                    if cancelled > 0:
+                        logger.info(f"Interrupted {cancelled} tasks for session {session.session_id}")
+
+                    # Notify frontend to stop playing and clear queue
+                    await websocket.send_json({
+                        "event": "server_stop_audio",
+                        "session_id": session.session_id
+                    })
+                else:
+                    logger.debug(f"Ignoring potential interruption: {text}")
+
+            elif event == "user_speak":
+                # Placeholder for starting Brain/TTS pipeline
+                await websocket.send_json({
+                    "event": "server_init_ack",
+                    "status": "ok",
+                    "message": "User speak received, pipeline start pending."
+                })
+
+    except WebSocketDisconnect:
+        await session.interrupt_tasks()
+        _session_manager.remove_session(session.session_id)
+        logger.info(f"WebSocket session removed: {session.session_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        await session.interrupt_tasks()
+        _session_manager.remove_session(session.session_id)
 
 
 def _merge_tag_metadata(existing_tags: list[dict], extra_tags: list[dict]) -> list[dict]:
