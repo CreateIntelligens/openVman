@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+import types
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -219,43 +220,50 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
 # --- enforce_session_limits tests ---
 
 
+def _stub_memory_for_guardrails(monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
+    """Stub memory.memory so guardrails' lazy import works without FlagEmbedding."""
+    from conftest import stub_chat_service_deps
+
+    stub_chat_service_deps(monkeypatch)
+    return sys.modules["memory.memory"]
+
+
 def test_enforce_session_round_limit_raises_when_exceeded(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "memory.memory.get_session_updated_at",
-        lambda session_id, persona_id, project_id="default": None,
-    )
-    monkeypatch.setattr(
-        "memory.memory.list_session_messages",
-        lambda session_id, persona_id, project_id="default": [{"role": "user"}] * 100,
-    )
+    fake_memory = _stub_memory_for_guardrails(monkeypatch)
+    fake_memory.get_session_updated_at = lambda session_id, persona_id, project_id="default": None
+    fake_memory.list_session_messages = lambda session_id, persona_id, project_id="default": [{"role": "user"}] * 100
 
     with pytest.raises(ValueError, match="輪上限"):
         guardrails.enforce_session_limits("sess_full", "default")
 
 
 def test_enforce_session_round_within_limit_does_not_raise(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "memory.memory.get_session_updated_at",
-        lambda session_id, persona_id, project_id="default": None,
-    )
-    monkeypatch.setattr(
-        "memory.memory.list_session_messages",
-        lambda session_id, persona_id, project_id="default": [{"role": "user"}] * 5,
-    )
+    fake_memory = _stub_memory_for_guardrails(monkeypatch)
+    fake_memory.get_session_updated_at = lambda session_id, persona_id, project_id="default": None
+    fake_memory.list_session_messages = lambda session_id, persona_id, project_id="default": [{"role": "user"}] * 5
 
     # should not raise
     guardrails.enforce_session_limits("sess_ok", "default")
 
 
 def test_enforce_session_limits_rejects_expired_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_memory = _stub_memory_for_guardrails(monkeypatch)
     expired_at = (datetime.now() - timedelta(minutes=45)).isoformat(timespec="seconds")
+    fake_memory.get_session_updated_at = lambda session_id, persona_id, project_id="default": expired_at
+    fake_memory.list_session_messages = lambda session_id, persona_id, project_id="default": []
+
+    # Override TTL to 30 minutes so the 45-minute-old session is expired
     monkeypatch.setattr(
-        "memory.memory.get_session_updated_at",
-        lambda session_id, persona_id, project_id="default": expired_at,
-    )
-    monkeypatch.setattr(
-        "memory.memory.list_session_messages",
-        lambda session_id, persona_id, project_id="default": [],
+        guardrails,
+        "get_settings",
+        lambda: type("Cfg", (), {
+            "max_session_ttl_minutes": 30,
+            "max_session_rounds": 100,
+            "request_rate_limit_per_minute": 60,
+            "resolved_allowed_channels": {"web"},
+            "enable_content_filter": False,
+            "block_prompt_injection": False,
+        })(),
     )
 
     with pytest.raises(ValueError, match="TTL"):

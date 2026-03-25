@@ -3,7 +3,7 @@
 > Issue: #13 — Backend interrupt and unified error bridge
 > Epic: #1
 > Branch: `feature/brain`
-> Status: **Draft**
+> Status: **Done**
 
 ---
 

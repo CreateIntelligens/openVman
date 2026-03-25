@@ -3,7 +3,7 @@
 > Issue: #12 — Backend session state machine and inflight guard
 > Epic: #1
 > Branch: `feature/brain`
-> Status: **Draft**
+> Status: **Done**
 
 ---
 

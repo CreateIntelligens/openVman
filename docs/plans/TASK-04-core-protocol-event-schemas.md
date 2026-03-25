@@ -3,7 +3,7 @@
 > Issue: #14 — Shared protocol schema definitions and validators
 > Epic: #2
 > Branch: `feature/brain`
-> Status: **Draft**
+> Status: **Done**
 
 ---
 

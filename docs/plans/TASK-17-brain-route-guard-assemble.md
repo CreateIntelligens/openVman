@@ -3,7 +3,7 @@
 > Issue: #26 — Brain route-guard-assemble pipeline
 > Epic: #6
 > Branch: `feature/brain`
-> Status: **Draft**
+> Status: **Done**
 
 ---
 
