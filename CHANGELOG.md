@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0] - 2026-03-25
+
+### Added
+- **Knowledge Base Admin Panel**: Implemented a modular, IDE-inspired interface for managing knowledge base documents.
+- **Recursive KB Explorer**: New `FilesTree` component supporting deep nested folder structures and visual LanceDB sync status.
+- **Universal Markdown Editor**: Split-pane markdown editor with live preview and automated background re-indexing flow.
+- **Admin Navigation**: Integrated the "KB Admin" tab into the primary sidebar of the administration console.
+
 ## [0.7.0] - 2026-03-25
 
 ### Added
