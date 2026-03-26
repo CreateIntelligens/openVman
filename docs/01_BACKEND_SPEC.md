@@ -307,3 +307,18 @@ process.on('SIGTERM', async () => {
 
 #### 15.2 狀態轉發 (Status Relay)
 當 Gateway 回報插件狀態（如攝影機斷線）至後端時，後端應透過 WebSocket 發送 `gateway_status` 事件告知前端。
+
+### 16. 知識庫管理介面 (Knowledge Base Management)
+
+為了支援 OpenClaw/openVman 的 RAG 知識庫管理，後端需提供一組文件管理 API，對接 `~/.openclaw/workspace/` 目錄。
+
+#### 16.1 文件管理 API
+* `GET /brain/knowledge/base/documents`：取得工作區的檔案樹結構。
+* `GET /brain/knowledge/document?path=...`：讀取指定的 Markdown 檔案內容。
+* `PUT /brain/knowledge/document`：儲存/更新 Markdown 檔案，儲存後應觸發自動重新索引。
+* `POST /brain/knowledge/upload`：上傳原始檔案（PDF/DOCX/XLSX），透過 Gateway 調用 MarkItDown 轉為 `.md` 後存入工作區。
+* `DELETE /brain/knowledge/document`：刪除文件或資料夾。
+* `POST /brain/knowledge/move`：移動文件或資料夾，支援拖拽操作。
+
+#### 16.2 自動索引流程 (Auto-Indexing Pipeline)
+當文件被 `PUT` 或 `upload` 成功後，後端應非同步觸發 `LanceDB` 的重新索引任務，並透過 WebSocket 的 `gateway_status` 通知前端進度。
