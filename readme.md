@@ -242,3 +242,9 @@
 - 📋 撰寫 `04~07` 補充文件（部署 / 安全 / 素材 / 監控）
 - 📋 擴充更多專業領域的 Brain Skills
 - 📋 進入實作階段
+
+---
+
+## 九、授權協議 (License)
+
+本專案採用 **GNU General Public License v3.0 (GPLv3)** 授權。詳情請參閱 [LICENSE](./LICENSE) 檔案。
