@@ -1,12 +1,14 @@
-"""SQLite-backed session store."""
+"""SQLite-backed session store with inflight guard and dedup."""
 
 from __future__ import annotations
 
 import sqlite3
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from threading import Lock
+from time import monotonic
 
 from config import get_settings
 from personas.personas import normalize_persona_id
@@ -35,8 +37,29 @@ class SessionState:
     messages: list[SessionMessage]
 
 
+class InflightError(RuntimeError):
+    """Raised when a session already has an in-flight generation."""
+
+
+class DuplicateMessageError(RuntimeError):
+    """Raised when a duplicate message is submitted within the dedup window."""
+
+
+_DEDUP_WINDOW_SECONDS = 5.0
+
+
 class SessionStore:
-    """Persist chat sessions in SQLite so they survive process restarts."""
+    """Persist chat sessions in SQLite so they survive process restarts.
+
+    Provides three concurrency guards for WebSocket sessions:
+
+    * **Inflight guard** — ``acquire_inflight`` / ``release_inflight`` ensure
+      only one generation runs per session at a time.
+    * **Dedup window** — ``check_dedup`` rejects identical messages submitted
+      within a short time window.
+    * **Interrupt-safe reset** — ``interrupt_session`` releases the inflight
+      lock and clears pending state so the session can accept new input.
+    """
 
     def __init__(self, db_path: str | None = None) -> None:
         cfg = get_settings()
@@ -44,6 +67,14 @@ class SessionStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = Lock()
         self._init_db()
+
+        # Inflight guard: per-session lock (session_id → threading.Lock)
+        self._inflight_locks: dict[str, threading.Lock] = {}
+        self._inflight_meta_lock = Lock()
+
+        # Dedup window: session_id → (message_hash, monotonic_timestamp)
+        self._dedup_cache: dict[str, tuple[int, float]] = {}
+        self._dedup_lock = Lock()
 
     def get_or_create_session(
         self,
@@ -193,7 +224,88 @@ class SessionStore:
                     (session_id,),
                 )
                 conn.commit()
-                return cursor.rowcount > 0
+                deleted = cursor.rowcount > 0
+        if deleted:
+            self._cleanup_session_memory(session_id)
+        return deleted
+
+    # ------------------------------------------------------------------
+    # Inflight guard
+    # ------------------------------------------------------------------
+
+    def acquire_inflight(self, session_id: str) -> None:
+        """Mark a session as having an active generation.
+
+        Raises ``InflightError`` if the session already has one running.
+        This is non-blocking — it fails immediately rather than waiting.
+        """
+        lock = self._get_inflight_lock(session_id)
+        acquired = lock.acquire(blocking=False)
+        if not acquired:
+            raise InflightError(
+                f"session {session_id} 已有進行中的回應，請稍候"
+            )
+
+    def release_inflight(self, session_id: str) -> None:
+        """Release the inflight lock for a session.
+
+        Safe to call even if not currently held (e.g. after interrupt).
+        """
+        lock = self._get_inflight_lock(session_id)
+        try:
+            lock.release()
+        except RuntimeError:
+            pass  # already released
+
+    def _get_inflight_lock(self, session_id: str) -> threading.Lock:
+        with self._inflight_meta_lock:
+            if session_id not in self._inflight_locks:
+                self._inflight_locks[session_id] = threading.Lock()
+            return self._inflight_locks[session_id]
+
+    # ------------------------------------------------------------------
+    # Dedup window
+    # ------------------------------------------------------------------
+
+    def check_dedup(self, session_id: str, text: str) -> None:
+        """Reject duplicate messages within the dedup window.
+
+        Raises ``DuplicateMessageError`` if the same text was submitted
+        to this session within the last ``_DEDUP_WINDOW_SECONDS`` seconds.
+        """
+        msg_hash = hash(text)
+        now = monotonic()
+
+        with self._dedup_lock:
+            prev = self._dedup_cache.get(session_id)
+            if prev is not None:
+                prev_hash, prev_time = prev
+                if prev_hash == msg_hash and (now - prev_time) < _DEDUP_WINDOW_SECONDS:
+                    raise DuplicateMessageError(
+                        f"session {session_id} 重複訊息已忽略"
+                    )
+            self._dedup_cache[session_id] = (msg_hash, now)
+
+    # ------------------------------------------------------------------
+    # Interrupt-safe reset
+    # ------------------------------------------------------------------
+
+    def interrupt_session(self, session_id: str) -> None:
+        """Reset a session to accept new input after an interrupt.
+
+        Releases the inflight lock and clears the dedup cache entry so
+        the interrupted text can be resubmitted immediately.
+        """
+        self.release_inflight(session_id)
+        with self._dedup_lock:
+            self._dedup_cache.pop(session_id, None)
+
+    def _cleanup_session_memory(self, session_id: str) -> None:
+        """Remove in-memory state for a deleted/expired session."""
+        with self._inflight_meta_lock:
+            self._inflight_locks.pop(session_id, None)
+        with self._dedup_lock:
+            self._dedup_cache.pop(session_id, None)
 
     def _init_db(self) -> None:
         with self._connect() as conn:
@@ -291,18 +403,40 @@ class SessionStore:
         cfg = get_settings()
         expiry = datetime.now() - timedelta(minutes=cfg.max_session_ttl_minutes)
         with self._connect() as conn:
-            conn.execute(
-                "DELETE FROM sessions WHERE updated_at < ?",
-                (expiry.isoformat(timespec="seconds"),),
-            )
-            # Also prune empty sessions older than 5 minutes (orphaned from page loads)
+            # Collect session IDs to prune before deleting
+            expired_ids = [
+                row[0] for row in conn.execute(
+                    "SELECT session_id FROM sessions WHERE updated_at < ?",
+                    (expiry.isoformat(timespec="seconds"),),
+                ).fetchall()
+            ]
             empty_cutoff = (datetime.now() - timedelta(minutes=5)).isoformat(timespec="seconds")
-            conn.execute(
-                """
-                DELETE FROM sessions
-                WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = sessions.session_id)
-                  AND updated_at < ?
-                """,
-                (empty_cutoff,),
-            )
+            empty_ids = [
+                row[0] for row in conn.execute(
+                    """
+                    SELECT session_id FROM sessions
+                    WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = sessions.session_id)
+                      AND updated_at < ?
+                    """,
+                    (empty_cutoff,),
+                ).fetchall()
+            ]
+            pruned_ids = set(expired_ids) | set(empty_ids)
+            if expired_ids:
+                conn.execute(
+                    "DELETE FROM sessions WHERE updated_at < ?",
+                    (expiry.isoformat(timespec="seconds"),),
+                )
+            if empty_ids:
+                conn.execute(
+                    """
+                    DELETE FROM sessions
+                    WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = sessions.session_id)
+                      AND updated_at < ?
+                    """,
+                    (empty_cutoff,),
+                )
             conn.commit()
+        # Clean up in-memory state outside the DB lock
+        for sid in pruned_ids:
+            self._cleanup_session_memory(sid)
