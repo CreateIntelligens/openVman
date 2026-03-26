@@ -226,7 +226,23 @@ ws.onclose = () => { reconnect(); };
 | `GATEWAY_TIMEOUT` | 浮動提示「插件服務回應逾時」 | 顯示提示 |
 | `UPLOAD_FAILED` | 紅色提示「檔案上傳失敗」 | 顯示提示 |
 
-### 12. 媒體上傳工作流 (Media Upload Workflow)
+### 12. 知識庫管理面板 (Knowledge Base Admin Panel)
+
+前端提供一個 IDE 風格的「雙欄式」管理介面 (`/admin/knowledge`)，用於管理 AI 的知識儲備。
+
+#### 12.1 佈局設計 (Split-Pane Layout)
+* **左側面板 (Workspace Tree)**：遞迴顯示工作區目錄結構，支援資料夾建立、重新命名與刪除。
+* **右側面板 (Main Content)**：
+    * **資料夾視角**：顯示檔案列表與大範圍的「拖拽上傳區 (Dropzone)」。
+    * **文件視角**：開啟全螢幕 Markdown 編輯器（左側原始碼，右側即時渲染）。
+
+#### 12.2 通用 Markdown 策略 (Universal Markdown Strategy)
+前端僅負責編輯 `.md` 文件。即使上傳的是 PDF 或 DOCX，後端在處理完後也會將其視為新 Markdown 文件提供給前端編輯，確保 AI 讀取的資料格式具備最高的一致性。
+
+#### 12.3 狀態反饋
+檔案右側會顯示「已索引 (Indexed)」或「處理中 (Processing)」的燈號，數據來源於 WebSocket 的 `gateway_status`。
+
+### 13. 媒體上傳工作流 (Media Upload Workflow)
 
 當使用者選取檔案（圖片/影片/文件）時，前端不透過 WebSocket 發送二進位資料，而是透過標準 HTTP POST 上傳至 Gateway：
 
