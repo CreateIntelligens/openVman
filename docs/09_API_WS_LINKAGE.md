@@ -8,18 +8,18 @@
 | 源端 (From) | 目的端 (To) | 類型 | 說明 |
 | :--- | :--- | :--- | :--- |
 | Frontend | Backend | WebSocket | 即時語句、中斷指令、音訊接收 |
-| Frontend | Gateway | REST (POST) | 文件/媒體檔案上傳 |
+| Frontend | Backend (Gateway Routes) | REST (POST) | 文件/媒體檔案上傳 |
 | Backend | Brain | REST (POST) | 請求 LLM 生成回應文字串流 |
-| Backend | Gateway | REST (POST) | 通知 Gateway 執行特定增強任務 |
-| Gateway | Backend | REST (POST) | 回報非同步任務完成 (Enrichment) |
-| Gateway | Brain | FS/API | 將處理好的 Markdown 文件寫入 Brain 工作區 |
+| Backend (Gateway Worker) | Backend (/internal/enrich) | REST (POST) | 將媒體處理結果作為 enriched context 寫入指定 Session |
+| Backend (/internal/enrich) | Brain (/internal/enrich) | REST (POST) | 驗證 internal token 後轉發 enriched context |
+| Backend (Knowledge Upload Route) | Brain (/brain/knowledge/upload) | REST (POST) | 將標準化後的知識文件寫入 Brain 工作區並觸發背景索引 |
 
 ---
 
 ### 2. 關鍵時序圖 (Sequence Diagrams)
 
 #### 2.1 即時對話流 (Conversational Flow)
-展示從語音輸入到 AI 回應的完整閉環。
+展示目標中的即時語音閉環。註：目前 Backend WebSocket 編排仍在建設中，尚未完整接上 Brain SSE + TTS chunk pipeline。
 
 ```mermaid
 sequenceDiagram
@@ -29,7 +29,7 @@ sequenceDiagram
     participant T as TTS Provider
 
     F->>B: WS: user_speak (text)
-    B->>BR: REST: POST /generate (stream=true)
+    B->>BR: REST: POST /brain/chat/stream (SSE)
     rect rgb(200, 220, 240)
         loop Token Stream
             BR-->>B: Text Token
@@ -37,7 +37,7 @@ sequenceDiagram
             Note over B: 遇到標點符號進行切分
             B->>T: 合成音訊 (Chunk)
             T-->>B: Audio Buffer
-            B->>F: WS: server_stream_chunk (base64)
+            B->>F: WS: server_stream_chunk JSON + binary audio frame
         end
     end
     F->>F: DINet AI 對嘴播放
@@ -49,17 +49,16 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant A as Admin Frontend
-    participant G as Gateway
     participant B as Backend
     participant BR as Brain
 
-    A->>G: POST /uploads (PDF/DOCX)
-    G->>G: MarkItDown 轉為 .md
-    G->>B: POST /internal/enrich (通知上傳完成)
-    B->>BR: API/FS: 儲存至 ~/.openclaw/workspace
-    B->>A: WS: gateway_status (正在索引...)
+    A->>B: POST /api/knowledge/upload
+    B->>B: 分類與標準化
+    Note over B: .md/.txt/.csv 直通；其他格式先轉為 .md
+    B->>BR: POST /brain/knowledge/upload
     BR->>BR: LanceDB Re-indexing
-    B->>A: WS: gateway_status (索引完成/Ready)
+    BR-->>B: 上傳結果 / reindex 已排程
+    B-->>A: HTTP Response (path / files / status)
 ```
 
 ### 3. 事件列表 (Events Summary)
