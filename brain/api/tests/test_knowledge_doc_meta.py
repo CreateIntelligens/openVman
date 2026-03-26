@@ -89,6 +89,21 @@ def test_manual_note_writes_manual_meta(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert payload["knowledge/notes/我的筆記.md"]["source_type"] == "manual"
 
 
+def test_uploaded_html_document_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    with pytest.raises(ValueError, match=r"僅支援 \.md、\.txt、\.csv"):
+        knowledge_admin.save_uploaded_document(
+            "faq.html",
+            b"<h1>FAQ</h1>",
+            target_dir="knowledge/ingested",
+        )
+
+
 def test_move_and_delete_document_sync_meta(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     root = _configure_workspace(monkeypatch, tmp_path)
     _stub_knowledge_admin_deps(monkeypatch)

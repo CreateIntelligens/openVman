@@ -40,8 +40,10 @@ def create_project(label: str) -> dict[str, Any]:
     ctx = resolve_project_context(pid)
 
     from knowledge.workspace import ensure_workspace_scaffold
+    from infra.db import ensure_tables
 
     ensure_workspace_scaffold(project_id=pid)
+    ensure_tables(project_id=pid)
 
     # Write a project metadata label file
     meta_path = ctx.project_root / "project.label"

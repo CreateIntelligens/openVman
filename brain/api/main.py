@@ -834,6 +834,7 @@ async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
         document = save_workspace_document(payload.path, payload.content, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    asyncio.create_task(_background_reindex(payload.project_id))
     return {"status": "ok", "document": document}
 
 
