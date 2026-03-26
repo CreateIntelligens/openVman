@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import sys
 import types
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -248,7 +248,7 @@ def test_enforce_session_round_within_limit_does_not_raise(monkeypatch: pytest.M
 
 def test_enforce_session_limits_rejects_expired_session(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_memory = _stub_memory_for_guardrails(monkeypatch)
-    expired_at = (datetime.now() - timedelta(minutes=45)).isoformat(timespec="seconds")
+    expired_at = (datetime.now(UTC) - timedelta(minutes=45)).isoformat(timespec="seconds")
     fake_memory.get_session_updated_at = lambda session_id, persona_id, project_id="default": expired_at
     fake_memory.list_session_messages = lambda session_id, persona_id, project_id="default": []
 

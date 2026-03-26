@@ -42,6 +42,24 @@ def test_append_and_list_messages(store: SessionStore):
     assert messages[1]["role"] == "assistant"
 
 
+def test_list_messages_serializes_created_at_with_timezone(store: SessionStore):
+    store.get_or_create_session("s1", "default")
+    store.append_message("s1", "default", "user", "hello")
+
+    messages = store.list_messages("s1", "default")
+
+    assert messages[0]["created_at"].endswith("+00:00")
+
+
+def test_list_sessions_serializes_updated_at_with_timezone(store: SessionStore):
+    store.get_or_create_session("s1", "default")
+    store.append_message("s1", "default", "user", "hello")
+
+    sessions = store.list_sessions("default")
+
+    assert sessions[0]["updated_at"].endswith("+00:00")
+
+
 def test_delete_session_cascade(store: SessionStore):
     store.get_or_create_session("s1", "default")
     store.append_message("s1", "default", "user", "hello")
