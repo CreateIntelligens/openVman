@@ -1,62 +1,18 @@
-import { useEffect, useState, useCallback } from "react";
-import { fetchHealth, fetchMetrics, MetricsSnapshot } from "../api";
 import StatusAlert from "../components/StatusAlert";
-
-interface HealthData {
-  status: string;
-  tables: string[];
-  workspace_documents: number;
-  chat_enabled: boolean;
-  embedding_model: string;
-  llm_provider: string;
-  llm_model: string;
-}
-
-const REFRESH_INTERVAL = 30;
+import { useHealthDashboard } from "../hooks/useHealthDashboard";
 
 export default function Health() {
-  const [data, setData] = useState<HealthData | null>(null);
-  const [metrics, setMetrics] = useState<MetricsSnapshot | null>(null);
-  const [healthError, setHealthError] = useState("");
-  const [metricsError, setMetricsError] = useState("");
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(REFRESH_INTERVAL);
-
-  const load = useCallback(() => {
-    setLoading(true);
-    Promise.all([
-      fetchHealth<HealthData>()
-        .then((healthData) => { setData(healthData); setHealthError(""); })
-        .catch((e) => setHealthError(String(e))),
-      fetchMetrics()
-        .then((metricsData) => { setMetrics(metricsData); setMetricsError(""); })
-        .catch((e) => setMetricsError(String(e))),
-    ]).finally(() => {
-      setLastChecked(new Date());
-      setLoading(false);
-      setCountdown(REFRESH_INTERVAL);
-    });
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          load();
-          return REFRESH_INTERVAL;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [load]);
-
-  const isOk = data?.status === "ok";
+  const {
+    countdown,
+    data,
+    healthError,
+    isOk,
+    lastChecked,
+    load,
+    loading,
+    metrics,
+    metricsError,
+  } = useHealthDashboard();
 
   return (
     <div className="page-scroll">
@@ -86,24 +42,10 @@ export default function Health() {
         {/* Status Card */}
         <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="relative flex h-4 w-4">
-              {isOk ? (
-                <>
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500" />
-                </>
-              ) : data ? (
-                <>
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
-                </>
-              ) : (
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-slate-500" />
-              )}
-            </div>
+            <StatusPulse isOk={isOk} isKnown={Boolean(data)} />
             <div>
               <p className="text-sm font-medium text-slate-400">System Status</p>
-              <h3 className={`text-2xl font-bold uppercase tracking-wider ${isOk ? "text-emerald-400" : data ? "text-red-400" : "text-slate-400"}`}>
+              <h3 className={`text-2xl font-bold uppercase tracking-wider ${getStatusHeadingClass(isOk, Boolean(data))}`}>
                 {data ? data.status : "—"}
               </h3>
             </div>
@@ -219,6 +161,34 @@ export default function Health() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function getStatusHeadingClass(isOk: boolean, isKnown: boolean) {
+  if (isOk) {
+    return "text-emerald-400";
+  }
+
+  if (isKnown) {
+    return "text-red-400";
+  }
+
+  return "text-slate-400";
+}
+
+function StatusPulse({ isOk, isKnown }: { isOk: boolean; isKnown: boolean }) {
+  if (!isKnown) {
+    return <span className="relative inline-flex h-4 w-4 rounded-full bg-slate-500" />;
+  }
+
+  const pulseColor = isOk ? "bg-emerald-400" : "bg-red-400";
+  const dotColor = isOk ? "bg-emerald-500" : "bg-red-500";
+
+  return (
+    <div className="relative flex h-4 w-4">
+      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${pulseColor}`} />
+      <span className={`relative inline-flex h-4 w-4 rounded-full ${dotColor}`} />
     </div>
   );
 }

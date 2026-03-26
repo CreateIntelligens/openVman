@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { KnowledgeDocumentSummary } from "../api";
+import { KnowledgeDocumentSummary } from "../../api";
 
 interface FileNode {
        name: string;
