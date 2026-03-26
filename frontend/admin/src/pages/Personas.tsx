@@ -188,24 +188,24 @@ export default function Personas() {
               : [];
 
        return (
-              <div className="flex h-full w-full overflow-hidden bg-background">
+              <div className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background">
                      {/* Contextual Sidebar */}
-                     <aside className="w-[300px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 flex flex-col hidden md:flex z-10">
+                     <aside className="w-[300px] lg:w-[320px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 flex flex-col hidden md:flex z-10">
                             {/* Sidebar Header */}
-                            <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
+                            <div className="px-5 py-5 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-slate-900/20">
                                    <div className="flex items-center gap-2.5">
-                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-slate-800 text-slate-300">
+                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                                                  <span className="material-symbols-outlined text-[14px]">groups_2</span>
                                           </div>
-                                          <h2 className="text-[13px] font-semibold tracking-wide text-slate-200">角色管理</h2>
+                                          <h2 className="text-[13px] font-semibold tracking-wide text-slate-800 dark:text-slate-200">角色管理</h2>
                                    </div>
                                    <button
                                           onClick={() => loadPersonas(selectedPersona?.persona_id)}
                                           disabled={loadingList}
-                                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors disabled:opacity-50"
+                                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
                                           title="重新整理"
                                    >
-                                          <span className={`material-symbols-outlined text-[16px] ${loadingList ? "animate-spin text-slate-200" : ""}`}>
+                                          <span className={`material-symbols-outlined text-[16px] ${loadingList ? "animate-spin text-slate-400 dark:text-slate-200" : ""}`}>
                                                  refresh
                                           </span>
                                    </button>
@@ -222,8 +222,8 @@ export default function Personas() {
                                                         <div
                                                                key={persona.persona_id}
                                                                className={`rounded-md p-2.5 text-left transition-colors cursor-pointer border ${selectedPersona?.persona_id === persona.persona_id
-                                                                      ? "bg-slate-800/60 border-slate-700 shadow-sm"
-                                                                      : "bg-transparent border-transparent hover:bg-slate-800/30"
+                                                                      ? "bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 shadow-sm"
+                                                                      : "bg-transparent border-transparent hover:bg-slate-100/50 dark:hover:bg-slate-800/30"
                                                                       }`}
                                                                onClick={() => {
                                                                       setSelectedPersona(persona);
@@ -264,31 +264,31 @@ export default function Personas() {
                                           </div>
                                    </div>
 
-                                   <hr className="border-slate-800/60" />
+                                   <hr className="border-slate-200 dark:border-slate-800/60" />
 
                                    {/* Create / Clone Persona Form */}
-                                   <div className="rounded-md border border-slate-800/60 bg-slate-900/20 p-4 space-y-4">
-                                          <h3 className="text-[12px] font-semibold text-slate-300 flex items-center gap-1.5">新增角色</h3>
+                                   <div className="rounded-md border border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/20 p-4 space-y-4">
+                                          <h3 className="text-[12px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">新增角色</h3>
                                           <div className="space-y-3">
                                                  <input
                                                         value={newPersonaId}
                                                         onChange={(event) => setNewPersonaId(event.target.value)}
                                                         placeholder="ID（例如 support）"
-                                                        className="w-full rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none transition-colors"
+                                                        className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-3 py-2 text-[13px] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-primary/50 dark:focus:border-slate-500 focus:outline-none transition-colors"
                                                         title="唯一角色 ID（用於資料夾路徑）"
                                                  />
                                                  <input
                                                         value={newPersonaLabel}
                                                         onChange={(event) => setNewPersonaLabel(event.target.value)}
                                                         placeholder="名稱（例如 Support Bot）"
-                                                        className="w-full rounded-md border border-slate-700 bg-slate-900/50 px-3 py-2 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none transition-colors"
+                                                        className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-3 py-2 text-[13px] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-primary/50 dark:focus:border-slate-500 focus:outline-none transition-colors"
                                                         title="顯示名稱（僅套用於空白範本）"
                                                  />
                                                  <div className="relative">
                                                         <select
                                                                value={templateSourceId}
                                                                onChange={(event) => setTemplateSourceId(event.target.value)}
-                                                               className="select-dark w-full text-[13px]"
+                                                               className="select-adaptive w-full text-[13px]"
                                                                title="選擇範本或現有角色複製設定"
                                                         >
                                                                <option value="">── 空白範本 ──</option>
@@ -298,7 +298,6 @@ export default function Personas() {
                                                                       </option>
                                                                ))}
                                                         </select>
-                                                        <span className="material-symbols-outlined text-[14px] text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
                                                  </div>
                                           </div>
                                           <button
@@ -372,9 +371,9 @@ export default function Personas() {
                                                  </div>
                                           </div>
 
-                                          <div className="flex-1 min-h-0 relative mb-5 rounded-xl border border-slate-800/50 bg-slate-950/30 overflow-hidden shadow-inner flex">
+                                          <div className="flex-1 min-h-0 relative mb-5 rounded-xl border border-slate-200 dark:border-slate-800/50 bg-white dark:bg-slate-950/30 overflow-hidden shadow-inner flex">
                                                  {loadingDocument && (
-                                                        <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-10 flex items-center justify-center">
+                                                        <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/60 backdrop-blur-sm z-10 flex items-center justify-center">
                                                                <div className="flex items-center gap-2 text-primary font-bold">
                                                                       <span className="material-symbols-outlined animate-spin text-[16px]">refresh</span>
                                                                       載入中...
@@ -385,12 +384,12 @@ export default function Personas() {
                                                         <textarea
                                                                value={draftContent}
                                                                onChange={(event) => setDraftContent(event.target.value)}
-                                                               className={`h-full w-full bg-transparent p-6 text-[13px] leading-relaxed text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none ${editorMode === "split" ? "border-r border-slate-800/50" : ""
+                                                               className={`h-full w-full bg-transparent p-6 text-[13px] leading-relaxed text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none font-mono resize-none ${editorMode === "split" ? "border-r border-slate-100 dark:border-slate-800/50" : ""
                                                                       }`}
                                                         />
                                                  ) : null}
                                                  {editorMode === "preview" || editorMode === "split" ? (
-                                                        <div className="h-full w-full p-8 overflow-y-auto prose-container bg-slate-900/20">
+                                                        <div className="h-full w-full p-8 overflow-y-auto prose-container bg-slate-50 dark:bg-slate-900/20">
                                                                <MarkdownPreview content={draftContent} />
                                                         </div>
                                                  ) : null}
@@ -427,10 +426,10 @@ export default function Personas() {
                             ) : (
                                    <div className="flex-1 flex items-center justify-center p-12">
                                           <div className="max-w-sm text-center">
-                                                 <div className="w-16 h-16 rounded-xl bg-slate-900/50 border border-slate-700 flex items-center justify-center text-slate-500 mx-auto mb-6">
+                                                 <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 dark:text-slate-500 mx-auto mb-6 shadow-sm">
                                                         <span className="material-symbols-outlined text-[32px]">groups</span>
                                                  </div>
-                                                 <h3 className="text-xl font-semibold text-slate-200 mb-2">未選擇角色</h3>
+                                                 <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-200 mb-2">未選擇角色</h3>
                                                  <p className="text-[13px] text-slate-500 leading-relaxed">
                                                         從左側欄選擇要編輯的角色，或建立新角色進行實驗。
                                                  </p>

@@ -523,7 +523,7 @@ export default function Chat() {
               value={selectedPersonaId}
               onChange={(event) => handlePersonaChange(event.target.value)}
               disabled={sending || loadingPersonas}
-              className="select-dark w-full"
+              className="select-adaptive w-full"
             >
               {personas.map((persona) => (
                 <option key={persona.persona_id} value={persona.persona_id}>
@@ -599,12 +599,12 @@ export default function Chat() {
       </aside>
 
       {/* 3. Main Chat Container */}
-      <main className="flex-1 flex min-w-0 bg-background relative">
+      <main className="flex-1 flex min-w-0 bg-slate-50 dark:bg-background relative">
         <div className="flex-1 flex flex-col min-w-0">
           {/* Main Header */}
-          <header className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-primary/10 bg-background-dark/80 backdrop-blur-md z-10 w-full h-[73px]">
+          <header className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-primary/10 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md z-10 w-full h-[73px]">
             <div>
-              <h2 className="text-lg font-bold text-white leading-tight truncate">{conversationTitle}</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white leading-tight truncate">{conversationTitle}</h2>
               <p className="text-xs text-slate-500 truncate">{conversationStatus}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -625,16 +625,16 @@ export default function Chat() {
           </header>
 
           {/* Messages Area */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-5 bg-gradient-to-b from-background to-slate-950/20">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-5 bg-gradient-to-b from-slate-50 to-slate-200/20 dark:from-background dark:to-slate-950/20">
             {!messages.length && !loadingHistory && (
               <div className="max-w-2xl mx-auto mt-6 space-y-6">
                 <div className="text-center">
                   <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center text-primary border border-primary/30 mx-auto mb-4 shadow-lg shadow-primary/10">
                     <span className="material-symbols-outlined text-[32px]">psychology</span>
                   </div>
-                  <h1 className="text-2xl font-bold text-white mb-2">今天我能幫你什麼？</h1>
-                  <p className="text-sm text-slate-400 leading-relaxed">
-                    我是你的智慧助手，基於 <code className="bg-slate-800 px-1 py-0.5 rounded">workspace/</code> 上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
+                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">今天我能幫你什麼？</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                    我是你的智慧助手，基於 <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-800 dark:text-slate-200">workspace/</code> 上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -642,7 +642,7 @@ export default function Chat() {
                     <button
                       key={prompt}
                       onClick={() => submit(prompt)}
-                      className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-left text-sm text-slate-300 hover:border-primary/40 hover:bg-primary/5 hover:text-primary-light transition-all shadow-sm"
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-4 text-left text-sm text-slate-600 dark:text-slate-300 hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all shadow-sm"
                     >
                       {prompt}
                     </button>
@@ -656,7 +656,7 @@ export default function Chat() {
                 key={`${message.role}-${index}-${message.created_at ?? ""}`}
                 className={`max-w-[85%] lg:max-w-[75%] rounded-2xl px-5 py-4 shadow-sm group/msg ${message.role === "user"
                   ? "ml-auto bg-primary text-white rounded-tr-sm"
-                  : "bg-slate-900/80 text-slate-200 border border-slate-800/80 rounded-tl-sm backdrop-blur-sm"
+                  : "bg-white dark:bg-slate-900/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800/80 rounded-tl-sm backdrop-blur-sm"
                   }`}
               >
                 <div className={`mb-2 flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] font-bold ${message.role === "user" ? "text-primary-100 opacity-80" : "text-slate-500"
@@ -700,7 +700,7 @@ export default function Chat() {
           </div>
 
           {/* Input Area */}
-          <div className="shrink-0 p-5 bg-background border-t border-slate-800/80">
+          <div className="shrink-0 p-5 bg-white dark:bg-background border-t border-slate-200 dark:border-slate-800/80">
             <div className="max-w-4xl mx-auto flex flex-col gap-3 relative">
               {/* TTS Fallback Toast */}
               {ttsFallbackToast && (
@@ -721,7 +721,7 @@ export default function Chat() {
                     <select
                       value={ttsProvider}
                       onChange={(e) => handleTtsProviderChange(e.target.value)}
-                      className="select-dark text-xs py-1 px-2 min-w-[100px]"
+                      className="select-adaptive text-xs py-1 px-2 min-w-[100px]"
                     >
                       {ttsProviders.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
@@ -734,7 +734,7 @@ export default function Chat() {
                       <select
                         value={ttsVoice || activeTtsProvider.default_voice}
                         onChange={(e) => handleTtsVoiceChange(e.target.value)}
-                        className="select-dark text-xs py-1 px-2 min-w-[120px]"
+                        className="select-adaptive text-xs py-1 px-2 min-w-[120px]"
                       >
                         {activeTtsProvider.voices.map((v) => (
                           <option key={v} value={v}>{v}</option>
@@ -752,7 +752,7 @@ export default function Chat() {
                 </div>
               )}
 
-              <div className="relative rounded-2xl border border-slate-700 bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
+              <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-white dark:focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
                 {/* Slash command autocomplete dropdown */}
                 {slashOpen && slashMatches.length > 0 && (
                   <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[240px] overflow-y-auto">
@@ -811,7 +811,7 @@ export default function Chat() {
                   }}
                   rows={1}
                   placeholder="向 Brain 發送訊息...（輸入 / 查看指令）"
-                  className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
+                  className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
                 />
 
                 <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
@@ -841,10 +841,10 @@ export default function Chat() {
 
         {/* Right Context Panel */}
         {panelOpen && (
-          <aside className="w-[300px] xl:w-[340px] flex-shrink-0 border-l border-slate-800/60 bg-slate-950/20 flex flex-col absolute right-0 inset-y-0 z-20 md:relative shadow-2xl md:shadow-none transition-transform">
-            <div className="px-5 py-4 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/30">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">執行上下文</h3>
-              <button onClick={() => setPanelOpen(false)} className="text-slate-500 hover:text-white md:hidden"><span className="material-symbols-outlined text-[18px]">close</span></button>
+          <aside className="w-[300px] xl:w-[340px] flex-shrink-0 border-l border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/20 flex flex-col absolute right-0 inset-y-0 z-20 md:relative shadow-2xl md:shadow-none transition-transform">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-slate-900/30">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">執行上下文</h3>
+              <button onClick={() => setPanelOpen(false)} className="text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white md:hidden"><span className="material-symbols-outlined text-[18px]">close</span></button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
@@ -854,13 +854,13 @@ export default function Chat() {
                   <span className="material-symbols-outlined text-[14px]">query_stats</span> 上下文命中率
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800/50">
+                  <div className="bg-white dark:bg-slate-900/50 rounded-xl p-3 border border-slate-200 dark:border-slate-800/50 shadow-sm">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">工作區</p>
-                    <p className="text-xl font-bold text-white mt-1">{lastContext.knowledge} <span className="text-xs text-slate-500 font-normal">區塊</span></p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">{lastContext.knowledge} <span className="text-xs text-slate-500 font-normal">區塊</span></p>
                   </div>
-                  <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800/50">
+                  <div className="bg-white dark:bg-slate-900/50 rounded-xl p-3 border border-slate-200 dark:border-slate-800/50 shadow-sm">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">記憶庫</p>
-                    <p className="text-xl font-bold text-white mt-1">{lastContext.memory} <span className="text-xs text-slate-500 font-normal">節點</span></p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">{lastContext.memory} <span className="text-xs text-slate-500 font-normal">節點</span></p>
                   </div>
                 </div>
               </div>

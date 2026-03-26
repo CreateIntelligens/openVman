@@ -24,19 +24,19 @@ const FileEditor: React.FC<FileEditorProps> = ({
   const hasUnsavedChanges = draftContent !== content;
 
   return (
-    <div className="flex flex-col h-full bg-slate-950/20 rounded-xl border border-slate-800/60 overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-950/20 rounded-xl border border-slate-200 dark:border-slate-800/60 overflow-hidden shadow-xl dark:shadow-2xl transition-all">
       {/* Editor Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 bg-slate-900/40">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/40 transition-colors">
         <div className="flex items-center gap-3 min-w-0">
           <span className="material-symbols-outlined text-primary text-[20px]">edit_document</span>
-          <span className="text-sm font-mono text-slate-300 truncate">{path || "New File"}</span>
+          <span className="text-sm font-mono text-slate-700 dark:text-slate-300 truncate">{path || "New File"}</span>
           {hasUnsavedChanges && (
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" title="Unsaved changes" />
           )}
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-700/50">
+          <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-lg p-1 border border-slate-200 dark:border-slate-700/50">
             {(["edit", "split", "preview"] as const).map((m) => (
               <button
                 key={m}
@@ -44,7 +44,7 @@ const FileEditor: React.FC<FileEditorProps> = ({
                 className={`px-3 py-1 text-[11px] font-bold uppercase tracking-wider rounded-md transition-all ${
                   mode === m
                     ? "bg-primary text-white shadow-lg shadow-primary/20"
-                    : "text-slate-400 hover:text-slate-200"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
                 }`}
               >
                 {m}
@@ -66,13 +66,13 @@ const FileEditor: React.FC<FileEditorProps> = ({
       </div>
 
       {/* Editor Body */}
-      <div className="flex-1 flex overflow-hidden min-h-0 bg-slate-950/40">
+      <div className="flex-1 flex overflow-hidden min-h-0 bg-white dark:bg-slate-950/40">
         {(mode === "edit" || mode === "split") && (
-          <div className={`flex-1 flex flex-col min-h-0 ${mode === "split" ? "border-r border-slate-800/60" : ""}`}>
+          <div className={`flex-1 flex flex-col min-h-0 ${mode === "split" ? "border-r border-slate-200 dark:border-slate-800/60" : ""}`}>
             <textarea
               value={draftContent}
               onChange={(e) => setDraftContent(e.target.value)}
-              className="flex-1 w-full bg-transparent p-6 text-sm leading-relaxed text-slate-200 font-mono resize-none focus:outline-none scrollbar-thin overflow-y-auto"
+              className="flex-1 w-full bg-transparent p-6 text-sm leading-relaxed text-slate-900 dark:text-slate-200 font-mono resize-none focus:outline-none scrollbar-thin overflow-y-auto placeholder-slate-400 dark:placeholder-slate-500"
               spellCheck={false}
               placeholder="# Start writing..."
             />
@@ -80,8 +80,8 @@ const FileEditor: React.FC<FileEditorProps> = ({
         )}
 
         {(mode === "preview" || mode === "split") && (
-          <div className="flex-1 overflow-y-auto p-6 bg-slate-900/10 scrollbar-thin">
-            <div className="max-w-none prose-invert">
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-50 dark:bg-slate-900/10 scrollbar-thin">
+            <div className={`max-w-none ${mode === "split" ? "" : ""}`}>
               <MarkdownPreview content={draftContent} />
             </div>
           </div>
@@ -89,7 +89,7 @@ const FileEditor: React.FC<FileEditorProps> = ({
       </div>
 
       {/* Editor Footer */}
-      <div className="px-4 py-2 border-t border-slate-800/60 bg-slate-900/40 flex items-center justify-between text-[10px] text-slate-500 font-medium uppercase tracking-widest">
+      <div className="px-4 py-2 border-t border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-widest transition-colors">
         <span>{draftContent.length} characters</span>
         <div className="flex items-center gap-4">
           <span>Markdown Enabled</span>

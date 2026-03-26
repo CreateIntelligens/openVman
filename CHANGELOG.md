@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0] - 2026-03-26
+
+### Added
+- **Admin Web Light Mode**: Implemented a comprehensive theme-aware system supporting both Light and Dark modes.
+- **Persistent Theming**: Integrated `ThemeContext` with `localStorage` to preserve user theme preferences across sessions.
+- **Adaptive UI Refactor**: Systematic update of all administrative pages (Chat, Knowledge, Memory, Tools, Health, etc.) and shared components (Modals, Alerts, FileTrees) with theme-aware Tailwind classes.
+- **Theme Toggle**: Added a theme switcher UI in the sidebar footer for seamless mode transitions.
+
 ## [0.8.0] - 2026-03-25
 
 ### Added

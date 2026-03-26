@@ -32,50 +32,6 @@ const KnowledgeBaseAdmin: React.FC = () => {
   };
 
   const buildTree = (docs: KnowledgeDocumentSummary[]): KBNode[] => {
-    const root: { [key: string]: KBNode } = {};
-    
-    docs.forEach(doc => {
-      const parts = doc.path.split("/");
-      let currentLevel = root;
-      let currentPath = "";
-
-      parts.forEach((part, index) => {
-        currentPath = currentPath ? `${currentPath}/${part}` : part;
-        const isFile = index === parts.length - 1;
-        
-        if (!currentLevel[part]) {
-          currentLevel[part] = {
-            id: currentPath,
-            name: isFile ? doc.title || part : part,
-            type: isFile ? "file" : "folder",
-            status: isFile ? (doc.is_indexed ? "indexed" : "syncing") : "indexed",
-            children: isFile ? undefined : [],
-            size: isFile ? doc.size : undefined,
-            updatedAt: isFile ? doc.updated_at : undefined,
-          };
-        }
-
-        if (!isFile) {
-          if (!currentLevel[part].children) currentLevel[part].children = [];
-          // This is a bit tricky with a Record-based approach, 
-          // but for a simple tree it works if we maintain the structure.
-        }
-      });
-    });
-
-    // Convert Record-based tree to Array-based tree
-    const toArrayTree = (nodeMap: { [key: string]: KBNode }): KBNode[] => {
-      return Object.values(nodeMap).map(node => {
-        if (node.type === "folder" && node.children) {
-          // Flattening/Re-building children is complex here without a proper intermediate structure.
-          // Let's use a standard nested map approach instead.
-          return node;
-        }
-        return node;
-      });
-    };
-
-    // Re-implementing buildTree with a more robust nested approach
     const treeRoot: KBNode[] = [];
     const map: { [key: string]: KBNode } = {};
 
@@ -148,14 +104,14 @@ const KnowledgeBaseAdmin: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background p-4 lg:p-6 gap-6">
+    <div className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background p-4 lg:p-6 gap-6 transition-colors">
       {/* Sidebar Tree */}
-      <aside className="w-[300px] flex-shrink-0 flex flex-col bg-slate-900/30 rounded-2xl border border-slate-800/60 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-800/60 flex items-center justify-between">
-          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Library</h2>
+      <aside className="w-[300px] flex-shrink-0 flex flex-col bg-white dark:bg-slate-900/30 rounded-2xl border border-slate-200 dark:border-slate-800/60 overflow-hidden shadow-sm dark:shadow-none transition-all">
+        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between bg-slate-50 dark:bg-slate-900/10">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 transition-colors">Library</h2>
           <button 
             onClick={loadTree}
-            className="p-1.5 rounded-lg hover:bg-slate-800/60 text-slate-400 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
             disabled={loading}
           >
             <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>sync</span>
@@ -187,12 +143,12 @@ const KnowledgeBaseAdmin: React.FC = () => {
             saving={saving}
           />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-slate-950/20 rounded-2xl border border-slate-800/60 border-dashed transition-all">
-            <div className="w-20 h-20 rounded-full bg-slate-900/50 flex items-center justify-center mb-4 border border-slate-800/60 shadow-xl">
-              <span className="material-symbols-outlined text-4xl text-slate-600">edit_note</span>
+          <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-slate-950/20 rounded-2xl border border-slate-200 dark:border-slate-800/60 border-dashed shadow-sm dark:shadow-none transition-all">
+            <div className="w-20 h-20 rounded-full bg-slate-50 dark:bg-slate-900/50 flex items-center justify-center mb-4 border border-slate-200 dark:border-slate-800/60 shadow-xl dark:shadow-2xl transition-all">
+              <span className="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-600">edit_note</span>
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Knowledge Base Admin</h3>
-            <p className="text-sm text-slate-500 max-w-xs text-center leading-relaxed">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Knowledge Base Admin</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-500 max-w-xs text-center leading-relaxed">
               Select a file from the library to start editing, or create a new document in the workspace.
             </p>
           </div>

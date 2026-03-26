@@ -41,7 +41,7 @@ const FilesTree: React.FC<FilesTreeProps> = ({
           className={`group flex items-center py-1.5 px-2 rounded-lg cursor-pointer transition-all duration-200 ${
             isSelected
               ? "bg-primary/20 text-primary"
-              : "hover:bg-slate-800/60 text-slate-300 hover:text-white"
+              : "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
           }`}
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
           onClick={() => {
@@ -58,7 +58,7 @@ const FilesTree: React.FC<FilesTreeProps> = ({
               </span>
             ) : (
               <span className={`material-symbols-outlined text-[18px] ${
-                node.id.endsWith(".md") ? "text-sky-400" : "text-slate-400"
+                node.id.endsWith(".md") ? "text-sky-600 dark:text-sky-400" : "text-slate-400 dark:text-slate-500"
               }`}>
                 {node.id.endsWith(".md") ? "markdown" : "description"}
               </span>
@@ -97,7 +97,7 @@ const FilesTree: React.FC<FilesTreeProps> = ({
 
   if (nodes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+      <div className="flex flex-col items-center justify-center py-10 text-slate-400 dark:text-slate-500 transition-colors">
         <span className="material-symbols-outlined text-3xl mb-2 opacity-20">folder_off</span>
         <p className="text-xs uppercase tracking-widest font-bold">No files found</p>
       </div>

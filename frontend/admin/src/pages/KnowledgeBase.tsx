@@ -403,7 +403,7 @@ export default function KnowledgeBase() {
 
   return (
     <div
-      className="page-scroll bg-background"
+      className="page-scroll bg-white dark:bg-background transition-colors"
       onDragOver={(e) => e.preventDefault()}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -423,11 +423,11 @@ export default function KnowledgeBase() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
               <span className="material-symbols-outlined text-primary text-[28px]">school</span>
               知識庫
             </h1>
-            <p className="text-sm text-slate-400 mt-1">查看知識庫索引狀態、重建索引、上傳文件</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">查看知識庫索引狀態、重建索引、上傳文件</p>
           </div>
           <button
             onClick={handleReindex}
@@ -454,14 +454,14 @@ export default function KnowledgeBase() {
         </div>
 
         <input type="file" ref={uploadInputRef} onChange={handleFileUpload} className="hidden" multiple />
-        <div className="rounded-2xl border border-slate-800/60 bg-slate-950/40 p-5 shadow-xl shadow-slate-950/20">
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 p-5 shadow-xl shadow-slate-200/50 dark:shadow-slate-950/20 transition-all">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
                 <span className="material-symbols-outlined text-primary text-[22px]">library_add</span>
                 新增來源
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 用同一個入口管理上傳檔案、網址匯入和手動筆記，也可直接把檔案拖曳到頁面。
               </p>
             </div>
@@ -488,14 +488,14 @@ export default function KnowledgeBase() {
                       className={`rounded-xl border px-4 py-4 text-left transition-colors ${
                         isActive
                           ? "border-primary/40 bg-primary/10"
-                          : "border-slate-800/70 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/50"
+                          : "border-slate-200 dark:border-slate-800/70 bg-slate-50 dark:bg-slate-900/30 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-900/50"
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-[20px]">{sourceMeta.icon}</span>
-                        <span className="text-sm font-semibold text-white">{sourceMeta.label}</span>
+                        <span className={`text-sm font-semibold ${isActive ? "text-primary" : "text-slate-700 dark:text-white"}`}>{sourceMeta.label}</span>
                       </div>
-                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                      <p className={`mt-2 text-xs leading-5 ${isActive ? "text-primary/70" : "text-slate-500 dark:text-slate-400"}`}>
                         {SOURCE_MODE_COPY[mode]}
                       </p>
                     </button>
@@ -508,24 +508,24 @@ export default function KnowledgeBase() {
                   type="button"
                   onClick={() => uploadInputRef.current?.click()}
                   disabled={uploading}
-                  className="w-full rounded-xl border-2 border-dashed border-slate-700 hover:border-primary/50 bg-slate-900/30 hover:bg-primary/5 transition-all py-6 flex flex-col items-center gap-2 cursor-pointer disabled:opacity-50 group"
+                  className="w-full rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-primary/50 bg-slate-50 dark:bg-slate-900/30 hover:bg-primary/5 transition-all py-6 flex flex-col items-center gap-2 cursor-pointer disabled:opacity-50 group"
                 >
-                  <span className="material-symbols-outlined text-3xl text-slate-500 group-hover:text-primary transition-colors">
+                  <span className="material-symbols-outlined text-3xl text-slate-400 dark:text-slate-500 group-hover:text-primary transition-colors">
                     cloud_upload
                   </span>
-                  <span className="text-sm font-semibold text-slate-300">
+                  <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                     {uploading ? "上傳中..." : "選擇檔案上傳到目前資料夾"}
                   </span>
-                  <span className="text-xs text-slate-500">目前資料夾：{currentDir}</span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">目前資料夾：{currentDir}</span>
                 </button>
               )}
 
               {activeSourceMode === "web" && (
-                <div className="rounded-xl border border-slate-800/70 bg-slate-900/30 p-4">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800/70 bg-white dark:bg-slate-900/30 p-4">
                   <div className="flex gap-2">
                     <input
                       type="url"
-                      className="flex-1 bg-slate-900/60 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none transition-all"
+                      className="flex-1 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none transition-all"
                       placeholder="https://example.com/article"
                       value={crawlUrlValue}
                       onChange={(e) => setCrawlUrlValue(e.target.value)}
@@ -548,9 +548,9 @@ export default function KnowledgeBase() {
               )}
 
               {activeSourceMode === "manual" && (
-                <div className="rounded-xl border border-slate-800/70 bg-slate-900/30 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800/70 bg-white dark:bg-slate-900/30 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">貼上文字建立來源</h3>
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-white">貼上文字建立來源</h3>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
                       內容會建立在 `knowledge/notes/`，並標記為手動來源。
                     </p>
@@ -573,7 +573,7 @@ export default function KnowledgeBase() {
         <div className="flex items-center gap-1.5 text-sm flex-wrap">
           <button
             onClick={() => setCurrentDir("knowledge")}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${currentDir === "knowledge" ? "text-white" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${currentDir === "knowledge" ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"}`}
           >
             <span className="material-symbols-outlined text-[16px]">school</span>
             <span className="font-medium">knowledge</span>
@@ -583,10 +583,10 @@ export default function KnowledgeBase() {
             const isLast = i === breadcrumbs.length - 2;
             return (
               <span key={path} className="flex items-center gap-1.5">
-                <span className="text-slate-600">/</span>
+                <span className="text-slate-300 dark:text-slate-600">/</span>
                 <button
                   onClick={() => setCurrentDir(path)}
-                  className={`px-2 py-1 rounded-md transition-colors ${isLast ? "text-white font-medium" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+                  className={`px-2 py-1 rounded-md transition-colors ${isLast ? "text-slate-900 dark:text-white font-medium" : "text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"}`}
                 >
                   {seg}
                 </button>
@@ -600,11 +600,11 @@ export default function KnowledgeBase() {
           {sortedSubdirs.map((dir) => (
             <div
               key={dir}
-              className="group/dir flex items-center gap-2 rounded-xl border border-slate-800/60 bg-slate-900/40 px-4 py-3 hover:bg-slate-800/60 hover:border-slate-700 transition-colors cursor-pointer"
+              className="group/dir flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-900/40 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700 transition-colors cursor-pointer shadow-sm dark:shadow-none"
               onClick={() => setCurrentDir(`${currentDir}/${dir}`)}
             >
               <span className="material-symbols-outlined text-primary text-[20px]">folder</span>
-              <span className="text-sm font-medium text-white">{dir}</span>
+              <span className="text-sm font-medium text-slate-800 dark:text-white">{dir}</span>
               <span className="text-xs text-slate-500">
                 {subdirDocCounts.get(dir) ?? 0}
               </span>
@@ -667,18 +667,18 @@ export default function KnowledgeBase() {
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[18px]">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-[18px]">search</span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="搜尋檔名、摘要、網址..."
-                  className="w-full rounded-lg border border-slate-800/80 bg-slate-900/50 pl-10 pr-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none transition-colors"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 pl-10 pr-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 focus:outline-none transition-colors shadow-sm dark:shadow-none"
                 />
               </div>
               <button
                 onClick={() => loadDocuments()}
                 disabled={loading}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50 shadow-sm dark:shadow-none"
                 title="重新整理"
               >
                 <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>refresh</span>
@@ -690,7 +690,7 @@ export default function KnowledgeBase() {
                 <span className="material-symbols-outlined animate-spin mr-2">refresh</span> 載入中...
               </div>
             ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-500 rounded-2xl border border-slate-800/60 bg-slate-900/20">
+              <div className="flex flex-col items-center justify-center py-16 text-slate-400 dark:text-slate-500 rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-900/20 shadow-sm dark:shadow-none">
                 <span className="material-symbols-outlined text-4xl mb-2">folder_off</span>
                 <p className="text-sm">{search ? "沒有符合的文件" : "尚無文件"}</p>
               </div>
@@ -744,12 +744,12 @@ export default function KnowledgeBase() {
       {/* Editor Modal */}
       {editingPath && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setEditingPath(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col mx-4" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="material-symbols-outlined text-primary text-[20px]">edit_document</span>
-                <span className="text-sm font-semibold text-white truncate">{editingPath}</span>
+                <span className="text-sm font-semibold text-slate-900 dark:text-white truncate">{editingPath}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -762,7 +762,7 @@ export default function KnowledgeBase() {
                 </button>
                 <button
                   onClick={() => setEditingPath(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
@@ -778,7 +778,7 @@ export default function KnowledgeBase() {
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full h-full min-h-[50vh] bg-transparent text-sm text-slate-200 font-mono p-4 resize-none focus:outline-none"
+                  className="w-full h-full min-h-[50vh] bg-transparent text-sm text-slate-800 dark:text-slate-200 font-mono p-4 resize-none focus:outline-none transition-colors"
                   spellCheck={false}
                 />
               )}
@@ -789,47 +789,47 @@ export default function KnowledgeBase() {
 
       {showNoteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={closeNoteModal}>
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-4">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">edit_note</span>
-                <span className="text-sm font-semibold text-white">新增手動來源</span>
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">新增手動來源</span>
               </div>
               <button
                 type="button"
                 onClick={closeNoteModal}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">標題</label>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">標題</label>
                 <input
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
                   placeholder="例如：產品定位整理"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none"
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 focus:outline-none transition-colors"
                 />
               </div>
               <div className="space-y-2">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">內容</label>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">內容</label>
                 <textarea
                   value={noteContent}
                   onChange={(e) => setNoteContent(e.target.value)}
                   placeholder="貼上整理好的知識內容..."
-                  className="min-h-[260px] w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-slate-200 placeholder:text-slate-500 focus:border-primary/50 focus:outline-none resize-y"
+                  className="min-h-[260px] w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 px-4 py-3 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 focus:outline-none resize-y transition-colors"
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-800 px-5 py-4">
+            <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 px-5 py-4">
               <p className="text-xs text-slate-500">{noteContent.length.toLocaleString()} chars</p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={closeNoteModal}
-                  className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                  className="rounded-lg px-4 py-2 text-sm text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
                 >
                   取消
                 </button>
@@ -854,11 +854,11 @@ export default function KnowledgeBase() {
 function StatCard({ icon, label, value, color = "primary" }: { icon: string; label: string; value: number; color?: string }) {
   const colorMap: Record<string, string> = {
     primary: "text-primary bg-primary/10 border-primary/20",
-    emerald: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    amber: "text-amber-400 bg-amber-500/10 border-amber-500/20",
-    slate: "text-slate-400 bg-slate-800/50 border-slate-700/50",
-    sky: "text-sky-300 bg-sky-500/10 border-sky-500/20",
-    rose: "text-rose-300 bg-rose-500/10 border-rose-500/20",
+    emerald: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-500/20",
+    amber: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-500/20",
+    slate: "text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/50",
+    sky: "text-sky-600 dark:text-sky-300 bg-sky-50 dark:bg-sky-500/10 border-sky-500/20",
+    rose: "text-rose-600 dark:text-rose-300 bg-rose-50 dark:bg-rose-500/10 border-rose-500/20",
   };
   const cls = colorMap[color] ?? colorMap.primary;
 
@@ -902,10 +902,10 @@ function DocumentCard({
 }) {
   return (
     <div
-      className={`group rounded-2xl border p-4 transition-colors cursor-pointer ${
+      className={`group rounded-2xl border p-4 transition-all cursor-pointer shadow-sm hover:shadow-md dark:shadow-none ${
         selected
-          ? "border-primary/40 bg-primary/5 shadow-lg shadow-primary/5"
-          : "border-slate-800/60 bg-slate-900/40 hover:bg-slate-900/60"
+          ? "border-primary/40 bg-primary/5 shadow-primary/5"
+          : "border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900/60"
       } ${doc.enabled ? "" : "opacity-70"}`}
       onClick={() => onSelect(doc.path)}
     >
@@ -925,11 +925,11 @@ function DocumentCard({
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="material-symbols-outlined text-slate-500 text-[18px] shrink-0">description</span>
-              <span className="truncate text-sm font-semibold text-white">{doc.title || doc.path}</span>
+              <span className="material-symbols-outlined text-slate-400 dark:text-slate-500 text-[18px] shrink-0">description</span>
+              <span className="truncate text-sm font-semibold text-slate-900 dark:text-white">{doc.title || doc.path}</span>
             </div>
-            <p className="mt-1 text-xs text-slate-500 font-mono truncate">{doc.path}</p>
-            <p className="mt-2 max-h-[3.2rem] overflow-hidden text-sm leading-6 text-slate-400">{doc.preview || "尚無摘要"}</p>
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500 font-mono truncate">{doc.path}</p>
+            <p className="mt-2 max-h-[3.2rem] overflow-hidden text-sm leading-6 text-slate-600 dark:text-slate-400">{doc.preview || "尚無摘要"}</p>
             {doc.source_url && (
               <p className="mt-2 truncate text-xs text-sky-300/80">{doc.source_url}</p>
             )}
@@ -1012,22 +1012,22 @@ function PreviewPanel({
   onEdit?: () => void;
 }) {
   return (
-    <aside className="rounded-2xl border border-slate-800/60 bg-slate-950/40 shadow-xl shadow-slate-950/20 xl:sticky xl:top-8 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
-      <div className="border-b border-slate-800/70 px-5 py-4">
+    <aside className="rounded-2xl border border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/40 shadow-xl shadow-slate-200/50 dark:shadow-slate-950/20 xl:sticky xl:top-8 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden transition-all">
+      <div className="border-b border-slate-200 dark:border-slate-800/70 px-5 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Source Preview</h3>
-            <p className="mt-2 text-lg font-bold text-white truncate">{document?.title || "選擇一個來源"}</p>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Source Preview</h3>
+            <p className="mt-2 text-lg font-bold text-slate-900 dark:text-white truncate">{document?.title || "選擇一個來源"}</p>
           </div>
           {document && onEdit && (
             <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-            >
-              <span className="material-symbols-outlined text-[15px]">edit</span>
-              編輯
-            </button>
+               type="button"
+               onClick={onEdit}
+               className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
+             >
+               <span className="material-symbols-outlined text-[15px]">edit</span>
+               編輯
+             </button>
           )}
         </div>
       </div>
@@ -1039,9 +1039,9 @@ function PreviewPanel({
             載入中...
           </div>
         ) : !document ? (
-          <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-slate-500">
+          <div className="flex min-h-[320px] flex-col items-center justify-center text-center text-slate-400 dark:text-slate-500">
             <span className="material-symbols-outlined text-4xl mb-3">menu_book</span>
-            <p className="text-sm text-slate-400">從左側選一個文件，就能看到來源摘要與完整內容。</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">從左側選一個文件，就能看到來源摘要與完整內容。</p>
           </div>
         ) : (
           <div className="space-y-5">
@@ -1063,10 +1063,10 @@ function PreviewPanel({
               )}
             </div>
 
-            <dl className="grid gap-3 rounded-xl border border-slate-800/60 bg-slate-900/25 p-4">
+            <dl className="grid gap-3 rounded-xl border border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/25 p-4">
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-slate-500">Path</dt>
-                <dd className="mt-1 break-all text-sm text-slate-200">{document.path}</dd>
+                <dt className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Path</dt>
+                <dd className="mt-1 break-all text-sm text-slate-800 dark:text-slate-200">{document.path}</dd>
               </div>
               {document.source_url && (
                 <div>
@@ -1080,27 +1080,27 @@ function PreviewPanel({
               )}
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">大小</dt>
-                  <dd className="mt-1 text-sm text-slate-200">{formatSize(document.size)}</dd>
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">大小</dt>
+                  <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{formatSize(document.size)}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">更新時間</dt>
-                  <dd className="mt-1 text-sm text-slate-200">{formatDate(document.updated_at)}</dd>
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">更新時間</dt>
+                  <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{formatDate(document.updated_at)}</dd>
                 </div>
                 <div>
-                  <dt className="text-[11px] uppercase tracking-wide text-slate-500">建立時間</dt>
-                  <dd className="mt-1 text-sm text-slate-200">{formatDate(document.created_at)}</dd>
+                  <dt className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">建立時間</dt>
+                  <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{formatDate(document.created_at)}</dd>
                 </div>
               </div>
             </dl>
 
-            <div className="rounded-xl border border-slate-800/60 bg-slate-900/25 p-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">摘要</h4>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{document.preview || "尚無摘要。"}</p>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/25 p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">摘要</h4>
+              <p className="mt-3 text-sm leading-6 text-slate-700 dark:text-slate-300">{document.preview || "尚無摘要。"}</p>
             </div>
 
-            <div className="rounded-xl border border-slate-800/60 bg-slate-900/20 p-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">內容</h4>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/20 p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">內容</h4>
               <div className="mt-4 prose-container">
                 <MarkdownPreview content={document.content} />
               </div>
@@ -1167,9 +1167,9 @@ function MoveModal({
         </div>
 
         {/* File info */}
-        <div className="px-5 py-3 border-b border-slate-800/50">
-          <p className="text-xs text-slate-500 mb-1">檔案</p>
-          <p className="text-sm text-white font-mono truncate">{filename}</p>
+        <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800/50">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mb-1">檔案</p>
+          <p className="text-sm text-slate-900 dark:text-white font-mono truncate">{filename}</p>
         </div>
 
         {/* Directory list */}
@@ -1186,7 +1186,7 @@ function MoveModal({
                 onClick={() => setSelectedDir(dir)}
                 className={`w-full text-left px-5 py-2.5 flex items-center gap-2 transition-colors ${isSelected
                     ? "bg-primary/10 text-primary"
-                    : "text-slate-300 hover:bg-slate-800/50"
+                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/50"
                   }`}
                 style={{ paddingLeft: `${20 + depth * 16}px` }}
               >

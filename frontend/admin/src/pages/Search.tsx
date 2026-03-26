@@ -68,30 +68,30 @@ export default function Search() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="sticky top-0 z-10 px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
-        <h2 className="text-2xl font-bold">知識庫搜尋</h2>
-        <p className="text-sm text-slate-400">
+      <header className="sticky top-0 z-10 px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-primary/10">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">知識庫搜尋</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           使用高維向量相似度查詢你的數位大腦。
         </p>
       </header>
 
       <div className="p-8 max-w-5xl space-y-8">
         {/* Search Bar */}
-        <div className="bg-slate-800/40 border border-slate-800 p-1.5 rounded-2xl flex flex-col md:flex-row items-stretch gap-2 shadow-xl shadow-primary/5">
+        <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 p-1.5 rounded-2xl flex flex-col md:flex-row items-stretch gap-2 shadow-xl shadow-slate-200/50 dark:shadow-primary/5">
           <div className="flex-1 relative flex items-center">
             <span className="material-symbols-outlined absolute left-4 text-slate-400">search</span>
             <input
-              className="w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-white placeholder:text-slate-500 text-lg"
+              className="w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-lg"
               placeholder="描述你要搜尋的內容..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
           </div>
-          <div className="h-auto w-px bg-slate-700 hidden md:block mx-2 my-2" />
+          <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
           <div className="flex items-center px-4">
             <select
-              className="select-dark text-sm py-2.5"
+              className="select-adaptive text-sm py-2.5"
               value={table}
               onChange={(e) => setTable(e.target.value)}
             >
@@ -99,11 +99,11 @@ export default function Search() {
               <option value="knowledge">知識庫</option>
             </select>
           </div>
-          <div className="h-auto w-px bg-slate-700 hidden md:block mx-2 my-2" />
+          <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
           <div className="flex items-center gap-2 px-4">
-            <label className="text-xs text-slate-500 font-bold whitespace-nowrap">Top K</label>
+            <label className="text-xs text-slate-400 dark:text-slate-500 font-bold whitespace-nowrap">Top K</label>
             <select
-              className="select-dark text-sm py-2.5"
+              className="select-adaptive text-sm py-2.5"
               value={topK}
               onChange={(e) => setTopK(Number(e.target.value))}
             >
@@ -127,12 +127,12 @@ export default function Search() {
         {/* Results */}
         {response && !response.error && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                 <span className="material-symbols-outlined text-primary">analytics</span>
                 搜尋結果
               </h3>
-              <span className="text-sm text-slate-500">
+              <span className="text-sm text-slate-400 dark:text-slate-500">
                 找到 {response.results.length} 筆結果
               </span>
             </div>
@@ -143,7 +143,7 @@ export default function Search() {
                 return (
                   <div
                     key={i}
-                    className="bg-slate-800/30 border border-slate-800 p-6 rounded-2xl hover:border-primary/50 transition-all group"
+                    className="bg-white dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl hover:border-primary/50 transition-all group shadow-sm"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
@@ -172,8 +172,8 @@ export default function Search() {
                         )}
                       </div>
                     </div>
-                    <p className="text-slate-300 leading-relaxed mb-4">{item.text}</p>
-                    <div className="flex items-center gap-2 text-slate-500 text-xs pt-4 border-t border-slate-700/50">
+                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-4">{item.text}</p>
+                    <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-xs pt-4 border-t border-slate-100 dark:border-slate-700/50">
                       <span className="material-symbols-outlined text-sm">calendar_today</span>
                       <span>{item.date}</span>
                     </div>

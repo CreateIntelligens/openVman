@@ -12,6 +12,7 @@ import Personas from "./pages/Personas";
 import Tools from "./pages/Tools";
 import KnowledgeBaseAdmin from "./components/kb-admin/KnowledgeBaseAdmin";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
 
 /* ── Sidebar style constants ── */
 
@@ -35,8 +36,8 @@ const SIDEBAR_EXPAND = {
 } as const;
 
 const TAB_BASE = "h-12 mx-auto flex items-center rounded-xl transition-all duration-300 shrink-0 overflow-hidden";
-const TAB_ACTIVE = "bg-slate-800/80 text-primary border border-slate-700/50";
-const TAB_INACTIVE = "hover:bg-slate-800/50 text-slate-400 border border-transparent hover:text-slate-200";
+const TAB_ACTIVE = "bg-slate-100 dark:bg-slate-800/80 text-primary border border-slate-200 dark:border-slate-700/50";
+const TAB_INACTIVE = "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-500 dark:text-slate-400 border border-transparent hover:text-slate-900 dark:hover:text-slate-200";
 const LABEL_BASE = "font-semibold text-[13.5px] whitespace-nowrap tracking-wide transition-all duration-300 overflow-hidden";
 const PROJECT_BTN_BASE = "h-12 mx-auto rounded-xl border border-primary/30 bg-primary/10 flex items-center text-primary transition-all duration-300 hover:bg-primary/20 disabled:opacity-50 overflow-hidden shrink-0 cursor-pointer";
 
@@ -71,6 +72,7 @@ function AppContent() {
   const [isPinned, setIsPinned] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { projectId, setProjectId, projects, loadingProjects } = useProject();
+  const { theme, toggleTheme } = useTheme();
 
   const switchTab = (tab: Tab) => {
     setActive(tab);
@@ -78,10 +80,10 @@ function AppContent() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-background-dark">
       {/* Sidebar */}
       <div className={`flex-shrink-0 hidden md:block z-50 relative transition-all duration-300 ${isPinned || dropdownOpen ? "w-64" : "w-[72px]"}`}>
-        <aside className={`absolute top-0 left-0 h-full ${isPinned || dropdownOpen ? "w-64" : "w-[72px] hover:w-64"} group/sidebar transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden bg-background-dark/95 backdrop-blur-xl border-r border-primary/20 shadow-[-10px_0_30px_rgba(0,0,0,0.5)_inset] hover:shadow-[10px_0_30px_rgba(0,0,0,0.6)_inset] flex flex-col py-5 z-50`}>
+        <aside className={`absolute top-0 left-0 h-full ${isPinned || dropdownOpen ? "w-64" : "w-[72px] hover:w-64"} group/sidebar transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden bg-white/80 dark:bg-background-dark/95 backdrop-blur-xl border-r border-slate-200 dark:border-primary/20 shadow-[-10px_0_30px_rgba(0,0,0,0.02)_inset] dark:shadow-[-10px_0_30px_rgba(0,0,0,0.5)_inset] hover:shadow-[10px_0_30px_rgba(0,0,0,0.05)_inset] dark:hover:shadow-[10px_0_30px_rgba(0,0,0,0.6)_inset] flex flex-col py-5 z-50`}>
           {/* Project Selector at top */}
           <ProjectDropdown
             projectId={projectId}
@@ -98,11 +100,23 @@ function AppContent() {
             <TabGroup label="Global" tabs={globalTabs} active={active} onSelect={switchTab} isPinned={isPinned} />
           </div>
 
-          <div className="px-3 shrink-0 mt-2">
+          <div className="px-3 shrink-0 mt-2 flex items-center gap-1">
+            <button
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              className={`flex-1 flex items-center h-10 px-3 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all duration-300 ${isPinned ? "justify-start gap-3" : "justify-center"}`}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {theme === "dark" ? "light_mode" : "dark_mode"}
+              </span>
+              <span className={`text-[12.5px] font-medium transition-all duration-300 overflow-hidden whitespace-nowrap ${isPinned ? "opacity-100 max-w-full" : "opacity-0 max-w-0"}`}>
+                {theme === "dark" ? "平常模式" : "深色模式"}
+              </span>
+            </button>
             <button
               onClick={() => setIsPinned(!isPinned)}
               title={isPinned ? "Unpin Sidebar" : "Pin Sidebar"}
-              className={`w-full flex items-center h-10 px-3 rounded-lg border border-transparent hover:border-slate-700/50 hover:bg-slate-800/40 text-slate-400 hover:text-slate-200 transition-all duration-300 ${isPinned ? "justify-end" : "justify-center"}`}
+              className={`flex items-center h-10 px-3 rounded-lg border border-transparent hover:border-slate-200 dark:hover:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-all duration-300 ${isPinned ? "w-auto" : "w-full justify-center"}`}
             >
               <span className={`material-symbols-outlined text-[18px] transition-transform ${isPinned ? "origin-center rotate-45 select-none" : ""}`}>push_pin</span>
             </button>
@@ -111,19 +125,19 @@ function AppContent() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden bg-background">
+      <main className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-background-dark">
         {/* Mobile Top Bar */}
-        <div className="sticky top-0 z-20 border-b border-primary/10 bg-background-dark/90 px-4 py-3 backdrop-blur md:hidden flex flex-col gap-3">
+        <div className="sticky top-0 z-20 border-b border-primary/10 bg-white/90 dark:bg-background-dark/90 px-4 py-3 backdrop-blur md:hidden flex flex-col gap-3 text-slate-900 dark:text-slate-100">
           <div className="flex items-center gap-2 w-full rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
             <span className="material-symbols-outlined text-sm text-primary">dataset</span>
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
               disabled={loadingProjects}
-              className="select-dark flex-1 text-xs font-bold min-w-0"
+              className="select-adaptive flex-1 text-xs font-bold min-w-0"
             >
               {projects.map((p) => (
-                <option key={p.project_id} value={p.project_id} className="bg-slate-900 font-normal">
+                <option key={p.project_id} value={p.project_id} className="bg-white dark:bg-slate-900 font-normal">
                   {p.label || p.project_id}
                 </option>
               ))}
@@ -138,8 +152,8 @@ function AppContent() {
                 key={tab.key}
                 onClick={() => switchTab(tab.key)}
                 className={`whitespace-nowrap flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${active === tab.key
-                  ? "bg-slate-800 text-white border border-slate-700"
-                  : "border border-slate-800/50 bg-slate-950/30 text-slate-400"
+                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700"
+                  : "border border-slate-100 dark:border-slate-800/50 bg-white/30 dark:bg-slate-950/30 text-slate-500 dark:text-slate-400"
                   }`}
               >
                 <span className={`material-symbols-outlined text-[16px] ${active === tab.key ? "text-primary" : ""}`}>
@@ -297,9 +311,9 @@ function ProjectDropdown({
       </button>
 
       {open && createPortal(
-        <div ref={menuRef} style={getMenuStyle()} className="rounded-xl border border-slate-600 bg-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.6)] overflow-hidden">
-          <div className="px-3 py-2.5 border-b border-slate-700/60">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Switch Project</p>
+        <div ref={menuRef} style={getMenuStyle()} className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-700/60">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Switch Project</p>
           </div>
           <div className="max-h-64 overflow-y-auto py-1">
             {projects.map((p) => {
@@ -342,8 +356,10 @@ function ProjectDropdown({
 
 export default function App() {
   return (
-    <ProjectProvider>
-      <AppContent />
-    </ProjectProvider>
+    <ThemeProvider>
+      <ProjectProvider>
+        <AppContent />
+      </ProjectProvider>
+    </ThemeProvider>
   );
 }

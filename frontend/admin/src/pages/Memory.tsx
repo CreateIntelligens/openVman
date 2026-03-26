@@ -124,22 +124,22 @@ export default function Memory() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+      <header className="sticky top-0 z-10 px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-primary/10">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold">記憶管理</h2>
-            <p className="text-sm text-slate-400">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">記憶管理</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               瀏覽、新增並管理精選記憶紀錄。
             </p>
           </div>
-          <div className="flex rounded-lg border border-slate-700 overflow-hidden">
+          <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900/50 shadow-sm">
             {(["browse", "add"] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab
                     ? "bg-primary text-white"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
               >
                 {tab === "browse" ? "瀏覽" : "新增"}
@@ -161,12 +161,12 @@ export default function Memory() {
             {/* Search + stats */}
             <div className="flex items-center gap-4">
               <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[18px]">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-[18px]">search</span>
                 <input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="篩選記憶..."
-                  className="w-full pl-9 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none"
+                  className="w-full pl-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/60 px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 dark:focus:border-slate-600 focus:outline-none focus:bg-slate-50 dark:focus:bg-slate-900 shadow-sm transition-colors"
                 />
               </div>
               <div className="text-xs text-slate-500">
@@ -175,7 +175,7 @@ export default function Memory() {
               <button
                 onClick={() => loadMemories(page)}
                 disabled={loadingMemories}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:border-primary/40 hover:text-white transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-primary/40 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 shadow-sm"
               >
                 <span className="material-symbols-outlined text-sm">refresh</span>
                 {loadingMemories ? "載入中..." : "重新整理"}
@@ -185,23 +185,23 @@ export default function Memory() {
             {/* Memory list */}
             <div className="space-y-3">
               {loadingMemories && !memories.length && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-8 text-center text-sm text-slate-500">
                   載入記憶中...
                 </div>
               )}
               {!loadingMemories && !filteredMemories.length && (
-                <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center text-sm text-slate-500">
                   {searchTerm ? "沒有符合搜尋條件的記憶。" : "尚無記憶。請切換至「新增」標籤頁建立。"}
                 </div>
               )}
               {filteredMemories.map((memory, idx) => (
                 <div
                   key={`${memory.date}-${idx}`}
-                  className="rounded-xl border border-slate-800 bg-slate-950/40 p-5 hover:border-slate-700 transition-colors"
+                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-5 hover:border-primary/30 dark:hover:border-slate-700 hover:shadow-md transition-all shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm leading-7 text-slate-200 whitespace-pre-wrap">
+                      <p className="text-sm leading-7 text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
                         {memory.text}
                       </p>
                       <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
@@ -218,7 +218,7 @@ export default function Memory() {
                     </div>
                     <button
                       onClick={() => setDeleteTarget(memory)}
-                      className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 hover:bg-red-500/15 transition-colors shrink-0"
+                      className="rounded-lg border border-red-500/20 bg-red-500/5 dark:bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-300 hover:bg-red-500/10 dark:hover:bg-red-500/15 transition-colors shrink-0"
                     >
                       刪除
                     </button>
@@ -233,7 +233,7 @@ export default function Memory() {
                 <button
                   onClick={() => handlePageChange(page - 1)}
                   disabled={page <= 1}
-                  className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:text-white hover:border-slate-600 transition-colors disabled:opacity-30"
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-30"
                 >
                   上一頁
                 </button>
@@ -244,8 +244,8 @@ export default function Memory() {
                       key={pageNum}
                       onClick={() => handlePageChange(pageNum)}
                       className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${pageNum === page
-                          ? "bg-primary text-white"
-                          : "border border-slate-700 text-slate-400 hover:text-white"
+                          ? "bg-primary text-white shadow-lg shadow-primary/20"
+                          : "border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                         }`}
                     >
                       {pageNum}
@@ -255,7 +255,7 @@ export default function Memory() {
                 <button
                   onClick={() => handlePageChange(page + 1)}
                   disabled={page >= totalPages}
-                  className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:text-white hover:border-slate-600 transition-colors disabled:opacity-30"
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-30"
                 >
                   下一頁
                 </button>
@@ -268,14 +268,14 @@ export default function Memory() {
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             {/* Form */}
             <div className="xl:col-span-2 space-y-6">
-              <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6 shadow-sm space-y-6">
+              <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-6">
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-bold text-slate-300" htmlFor="memory-content">
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300" htmlFor="memory-content">
                     記憶內容
                   </label>
                   <textarea
                     id="memory-content"
-                    className="w-full rounded-lg border-slate-700 bg-slate-800 text-white focus:ring-2 focus:ring-primary focus:border-primary placeholder:text-slate-400 transition-all p-4 text-base"
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent placeholder:text-slate-400 transition-all p-4 text-base"
                     placeholder="描述 Brain 應保留的事實資料或背景脈絡..."
                     rows={6}
                     value={text}
@@ -285,7 +285,7 @@ export default function Memory() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-bold text-slate-300" htmlFor="source">
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300" htmlFor="source">
                     來源
                   </label>
                   <div className="relative">
@@ -294,7 +294,7 @@ export default function Memory() {
                     </span>
                     <input
                       id="source"
-                      className="w-full pl-10 rounded-lg border-slate-700 bg-slate-800 text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all h-11"
+                      className="w-full pl-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all h-11"
                       value={source}
                       onChange={(e) => setSource(e.target.value)}
                       placeholder="來源識別標識"
@@ -302,7 +302,7 @@ export default function Memory() {
                   </div>
                 </div>
 
-                <div className="pt-4 flex items-center justify-between gap-4 border-t border-slate-800">
+                <div className="pt-4 flex items-center justify-between gap-4 border-t border-slate-200 dark:border-slate-800">
                   <button
                     onClick={submit}
                     disabled={loading || !text.trim()}
@@ -313,7 +313,7 @@ export default function Memory() {
                   </button>
                   <button
                     onClick={() => { setText(""); setSource("user"); setStatus(null); }}
-                    className="text-sm text-slate-500 hover:text-slate-300 transition-colors font-medium"
+                    className="text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 transition-colors font-medium"
                   >
                     捨棄變更
                   </button>
@@ -324,8 +324,8 @@ export default function Memory() {
             {/* Info Column */}
             <div className="space-y-6">
               {/* Maintenance */}
-              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-                <h3 className="text-white font-bold mb-2 flex items-center gap-2">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                <h3 className="text-slate-900 dark:text-white font-bold mb-2 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">build</span>
                   記憶維護
                 </h3>
@@ -351,8 +351,8 @@ export default function Memory() {
               </div>
 
               {/* Guidelines */}
-              <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                <h3 className="text-slate-900 dark:text-white font-bold mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">info</span>
                   記憶指南
                 </h3>
@@ -404,12 +404,12 @@ function MemoryMetaBadges({ metadata }: { metadata: string }) {
         </span>
       )}
       {meta.source_type && (
-        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+        <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">
           {meta.source_type}
         </span>
       )}
       {meta.turn && (
-        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+        <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">
           turn {meta.turn}
         </span>
       )}
@@ -420,9 +420,9 @@ function MemoryMetaBadges({ metadata }: { metadata: string }) {
 function StatRow({ label, value, highlight }: { label: string; value?: number | null; highlight?: boolean }) {
   if (value == null) return null;
   return (
-    <div className="flex justify-between text-slate-400">
+    <div className="flex justify-between text-slate-600 dark:text-slate-400">
       <span>{label}</span>
-      <span className={`font-mono ${highlight ? "text-emerald-400" : "text-white"}`}>{value}</span>
+      <span className={`font-mono ${highlight ? "text-emerald-600 dark:text-emerald-400" : "text-slate-900 dark:text-white"}`}>{value}</span>
     </div>
   );
 }

@@ -206,7 +206,7 @@ export default function Knowledge() {
 
   return (
     <div
-      className="flex h-full w-full overflow-hidden bg-background"
+      className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background"
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
@@ -216,14 +216,14 @@ export default function Knowledge() {
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMobileSidebarOpen(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <aside
-            className="absolute inset-y-0 left-0 w-[300px] border-r border-slate-800/60 bg-slate-950 flex flex-col"
+            className="absolute inset-y-0 left-0 w-[300px] border-r border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
-              <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Workspace</h2>
+            <div className="px-5 py-5 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-slate-900/20">
+              <h2 className="text-sm font-bold tracking-widest uppercase text-slate-800 dark:text-slate-300">Workspace</h2>
               <button
                 onClick={() => setMobileSidebarOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
@@ -249,7 +249,7 @@ export default function Knowledge() {
                 value={docSearch}
                 onChange={(e) => setDocSearch(e.target.value)}
                 placeholder="Search files..."
-                className="w-full rounded-lg border border-slate-800/80 bg-slate-900/50 pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
+                className="w-full rounded-lg border border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/50 pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 dark:focus:border-slate-600 focus:outline-none focus:bg-white dark:focus:bg-slate-900 transition-colors"
               />
             </div>
             <div className="flex-1 overflow-y-auto px-2 pb-4 select-none">
@@ -271,15 +271,15 @@ export default function Knowledge() {
       )}
 
       {/* 2. Contextual Sidebar (desktop) */}
-      <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 hidden md:flex flex-col">
+      <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 hidden md:flex flex-col">
         {/* Sidebar Header */}
-        <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
-          <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Workspace</h2>
+        <div className="px-5 py-5 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-slate-900/20">
+          <h2 className="text-sm font-bold tracking-widest uppercase text-slate-800 dark:text-slate-300">Workspace</h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => loadDocuments()}
               disabled={loadingList}
-              className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+              className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50"
               title="Refresh"
             >
               <span className="material-symbols-outlined text-[16px]">refresh</span>
@@ -312,14 +312,14 @@ export default function Knowledge() {
             <button
               onClick={() => uploadInputRef.current?.click()}
               disabled={uploading}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50"
               title="Upload Files"
             >
               <span className="material-symbols-outlined text-[16px]">upload_file</span>
             </button>
             <button
               onClick={createDocument}
-              className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
               title="New Document"
             >
               <span className="material-symbols-outlined text-[16px]">add</span>
@@ -334,7 +334,7 @@ export default function Knowledge() {
             value={docSearch}
             onChange={(e) => setDocSearch(e.target.value)}
             placeholder="Search files..."
-            className="w-full rounded-lg border border-slate-800/80 bg-slate-900/50 pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
+            className="w-full rounded-lg border border-slate-200 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/50 pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 dark:focus:border-slate-600 focus:outline-none focus:bg-white dark:focus:bg-slate-900 transition-colors"
           />
         </div>
 
@@ -356,13 +356,13 @@ export default function Knowledge() {
       </aside>
 
       {/* 3. Main Editor */}
-      <main className="flex-1 flex flex-col min-w-0 relative bg-background">
+      <main className="flex-1 flex flex-col min-w-0 relative bg-white dark:bg-background transition-colors">
         {/* Mobile Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 bg-slate-900/20 md:hidden shrink-0">
-          <div className="flex items-center gap-2 text-sm text-slate-300">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/20 md:hidden shrink-0">
+          <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
             <span className="material-symbols-outlined text-[16px]">folder_open</span>
             <span className="font-bold">Workspace</span>
-            <span className="text-xs text-slate-500">({documents.length})</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">({documents.length})</span>
           </div>
           <button
             onClick={() => setMobileSidebarOpen(true)}
@@ -388,15 +388,15 @@ export default function Knowledge() {
 
         <div className="flex-1 flex flex-col min-h-0 p-4 lg:p-6 lg:pl-8">
           {/* Editor Top Bar */}
-          <div className="flex items-center justify-between gap-4 mb-4 shrink-0 bg-slate-900/30 rounded-xl p-3 border border-slate-800/50">
+          <div className="flex items-center justify-between gap-4 mb-4 shrink-0 bg-slate-50 dark:bg-slate-900/30 rounded-xl p-3 border border-slate-200 dark:border-slate-800/50">
             <div className="flex-1 min-w-0 flex items-center gap-3">
-              <span className="material-symbols-outlined text-slate-500">description</span>
+              <span className="material-symbols-outlined text-slate-400 dark:text-slate-500">description</span>
               <input
                 id="knowledge-path"
                 value={draftPath}
                 onChange={(event) => setDraftPath(event.target.value)}
                 placeholder="e.g. docs/guide.md"
-                className="flex-1 bg-transparent text-sm text-white placeholder:text-slate-500 focus:outline-none font-mono truncate"
+                className="flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-slate-500 focus:outline-none font-mono truncate"
               />
               {!selectedPath && draftPath && (
                 <span className="shrink-0 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">New</span>
@@ -407,21 +407,21 @@ export default function Knowledge() {
               {selectedPath && (
                 <button
                   onClick={() => setDeleteTarget(selectedPath)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/10 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-500/20 text-red-500 dark:text-red-400 text-xs font-semibold hover:bg-red-500/10 transition-colors"
                   title="Delete Document"
                 >
                   <span className="material-symbols-outlined text-[16px]">delete</span>
                   Delete
                 </button>
               )}
-              <div className="flex rounded-md border border-slate-700 overflow-hidden bg-slate-900">
+              <div className="flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-900 shadow-sm">
                 {(["edit", "split", "preview"] as EditorMode[]).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setEditorMode(mode)}
                     className={`px-3 py-1.5 text-xs font-semibold transition-colors ${editorMode === mode
-                        ? "bg-slate-700 text-white"
-                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                        ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-transparent"
+                        : "text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                       }`}
                   >
                     {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -432,9 +432,9 @@ export default function Knowledge() {
           </div>
 
           {/* Editor Content Area */}
-          <div className="flex-1 min-h-0 relative mb-4 rounded-xl border border-slate-800/50 bg-slate-950/30 overflow-hidden shadow-inner flex">
+          <div className="flex-1 min-h-0 relative mb-4 rounded-xl border border-slate-200 dark:border-slate-800/50 bg-white dark:bg-slate-950/30 overflow-hidden shadow-inner flex transition-colors">
             {loadingDocument && (
-              <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-10 flex items-center justify-center">
+              <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/60 backdrop-blur-sm z-10 flex items-center justify-center">
                 <div className="flex items-center gap-2 text-primary font-bold">
                   <span className="material-symbols-outlined animate-spin">refresh</span> Loading...
                 </div>
@@ -446,14 +446,14 @@ export default function Knowledge() {
                 id="knowledge-content"
                 value={draftContent}
                 onChange={(event) => setDraftContent(event.target.value)}
-                className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-slate-200 placeholder:text-slate-600 focus:outline-none font-mono resize-none overflow-y-auto ${editorMode === "split" ? "border-r border-slate-800/50" : ""
+                className={`h-full w-full bg-transparent p-5 text-sm leading-7 text-slate-800 dark:text-slate-200 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none font-mono resize-none overflow-y-auto ${editorMode === "split" ? "border-r border-slate-100 dark:border-slate-800/50" : ""
                   }`}
                 placeholder="# Markdown Content\n\n..."
               />
             ) : null}
 
             {editorMode === "preview" || editorMode === "split" ? (
-              <div className="h-full w-full p-6 overflow-y-auto prose-container bg-slate-900/20">
+              <div className="h-full w-full p-6 overflow-y-auto prose-container bg-slate-50 dark:bg-slate-900/20">
                 <MarkdownPreview content={draftContent} />
               </div>
             ) : null}
