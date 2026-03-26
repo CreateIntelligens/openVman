@@ -27,6 +27,7 @@ import {
   resolvePersonaId,
   starterPrompts,
 } from "../components/chat/helpers";
+import { useSpeechRecognition } from "./useSpeechRecognition";
 
 export function useChatSession() {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
@@ -63,6 +64,20 @@ export function useChatSession() {
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionSummary | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const asrBaseRef = useRef("");
+  const { listening: asrListening, supported: asrSupported, toggle: toggleAsr } = useSpeechRecognition(
+    useCallback((transcript: string) => {
+      setInput(asrBaseRef.current + transcript);
+    }, []),
+  );
+  const prevAsrListening = useRef(false);
+  useEffect(() => {
+    if (asrListening && !prevAsrListening.current) {
+      asrBaseRef.current = input;
+    }
+    prevAsrListening.current = asrListening;
+  }, [asrListening, input]);
 
   useEffect(() => {
     fetchTtsProviders()
@@ -524,5 +539,8 @@ export function useChatSession() {
     confirmDeleteSession,
     handleTtsProviderChange,
     handleTtsVoiceChange,
+    asrListening,
+    asrSupported,
+    toggleAsr,
   };
 }

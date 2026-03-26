@@ -12,6 +12,8 @@ export default function ChatInput({
   ttsVoice,
   activeTtsProvider,
   ttsFallbackToast,
+  asrListening,
+  asrSupported,
   onInputChange,
   onSubmit,
   onStopStreaming,
@@ -22,6 +24,7 @@ export default function ChatInput({
   onTtsVoiceChange,
   onDismissError,
   onDismissFallbackToast,
+  onToggleAsr,
 }: {
   input: string;
   sending: boolean;
@@ -34,6 +37,8 @@ export default function ChatInput({
   ttsVoice: string;
   activeTtsProvider: TtsProvider | undefined;
   ttsFallbackToast: string;
+  asrListening: boolean;
+  asrSupported: boolean;
   onInputChange: (value: string) => void;
   onSubmit: () => void;
   onStopStreaming: () => void;
@@ -44,6 +49,7 @@ export default function ChatInput({
   onTtsVoiceChange: (voice: string) => void;
   onDismissError: () => void;
   onDismissFallbackToast: () => void;
+  onToggleAsr: () => void;
 }) {
   return (
     <div className="shrink-0 p-5 bg-background border-t border-slate-800/80">
@@ -169,6 +175,19 @@ export default function ChatInput({
                   className="h-8 px-4 rounded-lg border border-slate-600 bg-slate-800 text-xs font-bold text-white hover:bg-slate-700 transition-colors shadow-sm"
                 >
                   停止
+                </button>
+              )}
+              {asrSupported && (
+                <button
+                  onClick={onToggleAsr}
+                  className={`h-8 w-10 flex items-center justify-center rounded-lg transition-colors shadow-sm ${
+                    asrListening
+                      ? "bg-red-500 text-white animate-pulse hover:bg-red-600"
+                      : "border border-slate-600 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                  }`}
+                  title={asrListening ? "停止語音輸入" : "語音輸入"}
+                >
+                  <span className="material-symbols-outlined text-[18px]">mic</span>
                 </button>
               )}
               <button

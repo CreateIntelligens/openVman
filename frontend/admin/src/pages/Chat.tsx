@@ -55,6 +55,9 @@ export default function Chat() {
     confirmDeleteSession,
     handleTtsProviderChange,
     handleTtsVoiceChange,
+    asrListening,
+    asrSupported,
+    toggleAsr,
   } = useChatSession();
 
   return (
@@ -136,6 +139,8 @@ export default function Chat() {
             ttsVoice={ttsVoice}
             activeTtsProvider={activeTtsProvider}
             ttsFallbackToast={ttsFallbackToast}
+            asrListening={asrListening}
+            asrSupported={asrSupported}
             onInputChange={handleInputChange}
             onSubmit={() => submit()}
             onStopStreaming={stopStreaming}
@@ -146,6 +151,7 @@ export default function Chat() {
             onTtsVoiceChange={handleTtsVoiceChange}
             onDismissError={() => setError("")}
             onDismissFallbackToast={() => setTtsFallbackToast("")}
+            onToggleAsr={toggleAsr}
           />
         </div>
 
