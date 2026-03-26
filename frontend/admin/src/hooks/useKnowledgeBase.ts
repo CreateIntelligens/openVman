@@ -183,6 +183,7 @@ export function useKnowledgeBase() {
       await loadDocuments();
       if (response.files[0]) {
         setSelectedPath(response.files[0].path);
+        setRightPane("file");
         await openFile(response.files[0].path);
       }
     } catch (error) {

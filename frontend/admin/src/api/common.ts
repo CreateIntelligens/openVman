@@ -24,7 +24,11 @@ export const setActiveProjectId = (id: string) => { activeProjectId = id; };
 // ---------------------------------------------------------------------------
 
 function getApiErrorMessage(payload: ApiErrorPayload, status: number) {
-  return payload.detail ?? payload.message ?? payload.error ?? `Request failed: ${status}`;
+  if (payload.detail) return payload.detail;
+  const message = payload.message ?? "";
+  const error = payload.error ?? "";
+  if (message && error) return `${message}：${error}`;
+  return message || error || `Request failed: ${status}`;
 }
 
 export async function parseJson<T>(res: Response): Promise<T> {
