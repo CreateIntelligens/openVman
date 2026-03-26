@@ -8,9 +8,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, File, Response, UploadFile, WebSocket, WebSocketDisconnect
@@ -29,6 +28,7 @@ from app.internal_routes import _http as _internal_http
 from app.internal_routes import router as internal_router
 from app.error_payloads import upload_failed_response
 from app.tts_text_cleaner import clean_for_tts
+from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
 from app.gateway.redis_pool import close_redis, get_redis, redis_available
 from app.gateway.routes import router as gateway_router
 from app.gateway.temp_storage import get_temp_storage, reset_temp_storage
@@ -51,7 +51,6 @@ _md_converter: MarkItDown | None = None
 _session_manager: SessionManager = SessionManager()
 _guard_agent: GuardAgent = GuardAgent()
 _health_http = SharedAsyncClient()
-_UPLOAD_CHUNK_SIZE = 1024 * 1024
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
 
 
@@ -277,42 +276,6 @@ def custom_openapi() -> dict:
 app.openapi = custom_openapi
 
 
-def _cleanup_temp_path(path: str | None) -> None:
-    if path is None:
-        return
-    with suppress(FileNotFoundError):
-        os.unlink(path)
-
-
-class UploadTooLargeError(Exception):
-    """Raised when an uploaded file exceeds the configured limit."""
-
-    def __init__(self, limit_bytes: int) -> None:
-        super().__init__(f"uploaded file too large: limit={limit_bytes}")
-        self.limit_bytes = limit_bytes
-
-
-async def _persist_upload_to_tempfile(
-    file: UploadFile,
-    *,
-    suffix: str,
-    max_bytes: int,
-) -> tuple[str, int]:
-    total_bytes = 0
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp_path = tmp.name
-        try:
-            while chunk := await file.read(_UPLOAD_CHUNK_SIZE):
-                total_bytes += len(chunk)
-                if total_bytes > max_bytes:
-                    raise UploadTooLargeError(max_bytes)
-                tmp.write(chunk)
-        except Exception:
-            _cleanup_temp_path(tmp_path)
-            raise
-    return tmp_path, total_bytes
-
-
 class SpeechRequest(BaseModel):
     """OpenAI-compatible TTS request body."""
 
@@ -467,7 +430,7 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
     tmp_path: str | None = None
     cfg = get_tts_config()
     try:
-        tmp_path, total_bytes = await _persist_upload_to_tempfile(
+        tmp_path, total_bytes = await persist_upload_to_tempfile(
             file,
             suffix=suffix,
             max_bytes=cfg.markitdown_max_upload_bytes,
@@ -481,10 +444,11 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
                 "page_count": None,
             }
         )
-    except UploadTooLargeError:
+    except UploadTooLargeError as exc:
+        limit_mb = exc.limit_bytes / (1024 * 1024)
         return upload_failed_response(
             status_code=413,
-            error="uploaded file too large",
+            error=f"檔案超過大小限制（上限 {limit_mb:.0f} MB）",
         )
     except Exception as exc:
         logger.error("Conversion failed: %s", exc)
@@ -494,7 +458,7 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
         )
     finally:
         await file.close()
-        _cleanup_temp_path(tmp_path)
+        cleanup_temp_path(tmp_path)
 
 
 def run_server() -> None:
