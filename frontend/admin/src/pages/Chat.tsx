@@ -58,6 +58,7 @@ export default function Chat() {
     asrListening,
     asrSupported,
     toggleAsr,
+    vadSpeaking,
   } = useChatSession();
 
   return (
@@ -141,6 +142,7 @@ export default function Chat() {
             ttsFallbackToast={ttsFallbackToast}
             asrListening={asrListening}
             asrSupported={asrSupported}
+            vadSpeaking={vadSpeaking}
             onInputChange={handleInputChange}
             onSubmit={() => submit()}
             onStopStreaming={stopStreaming}

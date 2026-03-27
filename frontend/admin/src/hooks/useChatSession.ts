@@ -28,6 +28,7 @@ import {
   starterPrompts,
 } from "../components/chat/helpers";
 import { useSpeechRecognition } from "./useSpeechRecognition";
+import { useVad } from "./useVad";
 
 const TTS_PROVIDER_STORAGE_KEY = "brain-tts-provider";
 const TTS_VOICE_STORAGE_KEY = "brain-tts-voice";
@@ -69,7 +70,7 @@ export function useChatSession() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const asrBaseRef = useRef("");
-  const { listening: asrListening, supported: asrSupported, toggle: toggleAsr } = useSpeechRecognition(
+  const { listening: asrListening, supported: asrSupported, toggle: toggleAsr, restart: restartAsr } = useSpeechRecognition(
     useCallback((transcript: string) => {
       setInput(asrBaseRef.current + transcript);
     }, []),
@@ -81,6 +82,24 @@ export function useChatSession() {
     }
     prevAsrListening.current = asrListening;
   }, [asrListening, input]);
+
+  const inputRef = useRef(input);
+  inputRef.current = input;
+  const submitRef = useRef<(value?: string) => Promise<void>>();
+  const restartAsrRef = useRef(restartAsr);
+  restartAsrRef.current = restartAsr;
+
+  const { speaking: vadSpeaking } = useVad({
+    enabled: asrListening,
+    onSpeechCommit: useCallback(() => {
+      const text = inputRef.current.trim();
+      if (text) {
+        submitRef.current?.(text);
+        // Restart ASR to clear accumulated results for the next utterance
+        restartAsrRef.current();
+      }
+    }, []),
+  });
 
   useEffect(() => {
     fetchTtsProviders()
@@ -434,6 +453,8 @@ export function useChatSession() {
     }
   }, [applyChatResult, input, loadSessions, loadingPersonas, persistSessionId, selectedPersonaId, sending, sessionId]);
 
+  submitRef.current = submit;
+
   const stopAudio = useCallback(() => {
     ttsAbortRef.current?.abort();
     if (audioRef.current) {
@@ -541,5 +562,6 @@ export function useChatSession() {
     asrListening,
     asrSupported,
     toggleAsr,
+    vadSpeaking,
   };
 }
