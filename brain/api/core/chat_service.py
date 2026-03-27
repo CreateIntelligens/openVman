@@ -29,7 +29,13 @@ from memory.memory import (
     list_session_messages,
 )
 from memory.memory_governance import maybe_run_memory_maintenance
-from protocol.message_envelope import MessageEnvelope, normalize_to_brain_message, serialize_context
+from protocol.message_envelope import (
+    METADATA_ORIGINAL_USER_MESSAGE,
+    MessageEnvelope,
+    normalize_to_brain_message,
+    read_text,
+    serialize_context,
+)
 from safety.guardrails import enforce_guardrails, enforce_session_limits
 from tools.tool_executor import parse_tool_result
 
@@ -53,6 +59,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     call search_knowledge / search_memory tools during the agent loop.
     """
     cleaned_message = envelope.content.strip()
+    stored_user_message = read_text(envelope.context.metadata, METADATA_ORIGINAL_USER_MESSAGE) or cleaned_message
     cfg = get_settings()
     persona_id = envelope.context.persona_id
     project_id = envelope.context.project_id
@@ -67,7 +74,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     route = route_message(normalize_to_brain_message(envelope))
     session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
     prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
-    append_session_message(session.session_id, persona_id, "user", cleaned_message, project_id=project_id)
+    append_session_message(session.session_id, persona_id, "user", stored_user_message, project_id=project_id)
 
     request_ctx = serialize_context(envelope.context)
     prompt_messages = build_chat_messages(
@@ -82,7 +89,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         project_id=project_id,
         session_id=session.session_id,
         route=route,
-        user_message=cleaned_message,
+        user_message=stored_user_message,
         request_context=request_ctx,
         prompt_messages=prompt_messages,
     )

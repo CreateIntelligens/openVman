@@ -69,7 +69,11 @@ from personas.personas import (
     delete_persona_scaffold,
     list_personas,
 )
-from protocol.message_envelope import build_message_envelope
+from protocol.message_envelope import (
+    METADATA_ORIGINAL_USER_MESSAGE,
+    build_message_envelope,
+    merge_metadata,
+)
 from protocol.protocol_events import ProtocolValidationError, validate_client_event, validate_server_event
 from protocol.schemas import (
     AddMemoryRequest,
@@ -256,6 +260,7 @@ def _maybe_rewrite_slash(payload: ChatRequest) -> dict:
     _, manager = _skill_deps()
     slash = try_rewrite_slash(raw["message"], manager)
     if slash is not None:
+        raw["metadata"] = merge_metadata(raw.get("metadata"), {METADATA_ORIGINAL_USER_MESSAGE: raw["message"]})
         raw["message"] = slash.rewritten
     return raw
 

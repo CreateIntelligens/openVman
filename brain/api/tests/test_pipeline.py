@@ -6,6 +6,7 @@ import importlib
 import sys
 import types
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -293,7 +294,7 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     monkeypatch.setattr(
         chat_service,
         "get_or_create_session",
-        lambda session_id, persona_id, project_id="default": type("Session", (), {"session_id": session_id or "sess_new"})(),
+        lambda session_id, persona_id, project_id="default": SimpleNamespace(session_id=session_id or "sess_new"),
     )
     monkeypatch.setattr(
         chat_service,
@@ -314,6 +315,57 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     context = chat_service.prepare_generation(_make_envelope(message_type="control"))
 
     assert context.prompt_messages is not None
+
+
+def test_prepare_generation_preserves_original_slash_message_in_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chat_service = _load_chat_service(monkeypatch)
+    appended_messages: list[tuple[str, str, str, str]] = []
+    prompt_user_messages: list[str] = []
+
+    monkeypatch.setattr(chat_service, "enforce_guardrails", lambda action, text, context: None)
+    monkeypatch.setattr(
+        chat_service,
+        "enforce_session_limits",
+        lambda session_id, persona_id, project_id="default": None,
+    )
+    monkeypatch.setattr(
+        chat_service,
+        "route_message",
+        lambda brain_message: RouteDecision(path="rag", skip_rag=False, skip_tools=False),
+    )
+    monkeypatch.setattr(
+        chat_service,
+        "get_or_create_session",
+        lambda session_id, persona_id, project_id="default": SimpleNamespace(session_id=session_id or "sess_new"),
+    )
+    monkeypatch.setattr(chat_service, "list_session_messages", lambda session_id, persona_id, project_id="default": [])
+    monkeypatch.setattr(
+        chat_service,
+        "append_session_message",
+        lambda session_id, persona_id, role, content, project_id="default": appended_messages.append(
+            (session_id, persona_id, role, content)
+        ),
+    )
+    monkeypatch.setattr(
+        chat_service,
+        "build_chat_messages",
+        lambda **kwargs: prompt_user_messages.append(kwargs["user_message"]) or [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": kwargs["user_message"]},
+        ],
+    )
+
+    envelope = _make_envelope(content="[系統指令] 請立即呼叫工具 `joke:get_joke`，使用者的輸入為：黑色笑話")
+    from protocol.message_envelope import METADATA_ORIGINAL_USER_MESSAGE
+    envelope.context.metadata[METADATA_ORIGINAL_USER_MESSAGE] = "/joke 黑色笑話"
+
+    context = chat_service.prepare_generation(envelope)
+
+    assert appended_messages == [("sess_test", "default", "user", "/joke 黑色笑話")]
+    assert prompt_user_messages == ["[系統指令] 請立即呼叫工具 `joke:get_joke`，使用者的輸入為：黑色笑話"]
+    assert context.user_message == "/joke 黑色笑話"
 
 
 def test_execute_generation_skips_tool_loop_for_direct_route(monkeypatch: pytest.MonkeyPatch) -> None:

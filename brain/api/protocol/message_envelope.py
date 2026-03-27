@@ -24,6 +24,8 @@ class RequestContext:
 
 ALLOWED_ROLES = frozenset({"system", "user", "assistant", "tool", "control"})
 
+METADATA_ORIGINAL_USER_MESSAGE = "original_user_message"
+
 
 @dataclass(slots=True)
 class MessageEnvelope:
@@ -56,31 +58,31 @@ def build_message_envelope(
     """Normalize legacy and structured request payloads into one envelope."""
     raw_message = body.get(content_key, "")
     message_payload = raw_message if isinstance(raw_message, dict) else {}
-    content = _read_text(message_payload, "content", fallback=raw_message)
-    session_id = _read_text(body, "session_id") or _read_text(message_payload, "session_id") or None
+    content = read_text(message_payload, "content", fallback=raw_message)
+    session_id = read_text(body, "session_id") or read_text(message_payload, "session_id") or None
     context = RequestContext(
         trace_id=_resolve_trace_id(request, body, message_payload),
         session_id=session_id,
-        message_type=_read_text(body, "message_type")
-        or _read_text(message_payload, "message_type")
+        message_type=read_text(body, "message_type")
+        or read_text(message_payload, "message_type")
         or default_message_type,
-        channel=_read_text(body, "channel")
-        or _read_text(message_payload, "channel")
-        or _read_text(dict(request.headers), "x-brain-channel")
+        channel=read_text(body, "channel")
+        or read_text(message_payload, "channel")
+        or read_text(dict(request.headers), "x-brain-channel")
         or "web",
-        locale=_read_text(body, "locale")
-        or _read_text(message_payload, "locale")
-        or _read_text(dict(request.headers), "accept-language")
+        locale=read_text(body, "locale")
+        or read_text(message_payload, "locale")
+        or read_text(dict(request.headers), "accept-language")
         or "zh-TW",
-        persona_id=_read_text(body, "persona_id")
-        or _read_text(message_payload, "persona_id")
+        persona_id=read_text(body, "persona_id")
+        or read_text(message_payload, "persona_id")
         or "default",
-        project_id=_read_text(body, "project_id")
-        or _read_text(message_payload, "project_id")
-        or _read_text(dict(request.headers), "x-brain-project")
+        project_id=read_text(body, "project_id")
+        or read_text(message_payload, "project_id")
+        or read_text(dict(request.headers), "x-brain-project")
         or "default",
         client_ip=request.client.host if request.client else "",
-        metadata=_merge_metadata(body.get("metadata"), message_payload.get("metadata")),
+        metadata=merge_metadata(body.get("metadata"), message_payload.get("metadata")),
     )
     return MessageEnvelope(content=content, context=context)
 
@@ -133,14 +135,14 @@ def _resolve_trace_id(
     state_trace_id = getattr(request.state, "trace_id", "")
     return (
         state_trace_id
-        or _read_text(body, "trace_id")
-        or _read_text(message_payload, "trace_id")
+        or read_text(body, "trace_id")
+        or read_text(message_payload, "trace_id")
         or request.headers.get("x-trace-id", "").strip()
         or str(uuid4())
     )
 
 
-def _merge_metadata(*values: object) -> dict[str, Any]:
+def merge_metadata(*values: object) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     for value in values:
         if isinstance(value, dict):
@@ -148,7 +150,7 @@ def _merge_metadata(*values: object) -> dict[str, Any]:
     return merged
 
 
-def _read_text(payload: dict[str, Any], key: str, fallback: object = "") -> str:
+def read_text(payload: dict[str, Any], key: str, fallback: object = "") -> str:
     value = payload.get(key, fallback)
     if value is None:
         return ""
