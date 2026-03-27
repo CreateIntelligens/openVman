@@ -23,8 +23,8 @@ dist_bak/
 # Backend logs（runtime 產生）
 backend/logs/
 
-# Brain data（runtime 產生的資料，multi-project 架構）
-brain/data/projects/
+# Brain data（runtime 產生的資料）
+brain/data/
 
 # Node
 node_modules/

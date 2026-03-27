@@ -83,7 +83,7 @@ class BrainSettings(BaseSettings):
     rag_memory_distance_bonus: float = 0.02
     max_session_rounds: int = 100
     max_session_ttl_minutes: int = 30 * 24 * 60
-    session_db_path: str = "/data/sessions.db"
+    session_db_path: str = "/data/projects/default/sessions.db"
     memory_maintenance_interval_seconds: int = 300
     memory_decay_rate_per_day: float = 0.005
     memory_merge_similarity_threshold: float = 0.92

@@ -20,6 +20,11 @@ class TestEmbeddingSettings:
 
         assert cfg.max_session_ttl_minutes == 30 * 24 * 60
 
+    def test_session_db_fallback_defaults_to_default_project_path(self):
+        cfg = BrainSettings()
+
+        assert cfg.session_db_resolved_path.endswith("/data/projects/default/sessions.db")
+
     def test_defaults_prefer_bge_chain(self):
         cfg = BrainSettings()
 
