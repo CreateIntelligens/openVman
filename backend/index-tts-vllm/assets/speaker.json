@@ -1,11 +1,8 @@
 {
     "jay": [
-        "assets/voices/jay_promptvn.wav"
+        "assets/jay_promptvn.wav"
     ],
     "hayley": [
-        "assets/voices/hayley_happy.wav"
-    ],
-    "jinping": [
-        "assets/voices/Jinping.wav"
+        "assets/voices/hayley/1.WAV"
     ]
 }
