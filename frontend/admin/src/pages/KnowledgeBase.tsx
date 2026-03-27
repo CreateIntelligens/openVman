@@ -1,7 +1,6 @@
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
 import FileView from "../components/kb/FileView";
-import FolderView from "../components/kb/FolderView";
 import MoveModal from "../components/kb/MoveModal";
 import NoteModal from "../components/kb/NoteModal";
 import SourcePanel from "../components/kb/SourcePanel";
@@ -18,7 +17,6 @@ export default function KnowledgeBase() {
     status,
     search,
     selectedPath,
-    expandedDirs,
     rightPane,
     openDocument,
     editContent,
@@ -39,15 +37,14 @@ export default function KnowledgeBase() {
     creatingNote,
     dragOver,
     uploadInputRef,
-    tree,
+    filteredTree,
+    visibleExpandedDirs,
+    hasActiveSearch,
     currentDir,
     indexedCount,
-    folderSubdirs,
-    filteredFiles,
+    matchingDocumentCount,
     setStatus,
     setSearch,
-    setSelectedPath,
-    setExpandedDirs,
     setDeleteTarget,
     setMovingPath,
     setShowNewFolder,
@@ -60,7 +57,6 @@ export default function KnowledgeBase() {
     setNoteContent,
     toggleExpand,
     handleTreeSelect,
-    openFile,
     handleSave,
     handleFileUpload,
     handleReindex,
@@ -79,14 +75,12 @@ export default function KnowledgeBase() {
     handleDrop,
   } = useKnowledgeBase();
 
-  const openFileHandler = (path: string) => {
-    setSelectedPath(path);
-    openFile(path);
-  };
+  const hasMatchingTreeNodes = filteredTree.children.length > 0;
+  const showSearchEmptyState = hasActiveSearch && !hasMatchingTreeNodes;
 
   return (
     <div
-      className="h-full flex flex-col overflow-hidden bg-background"
+      className="h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-background-dark"
       onDragOver={(e) => e.preventDefault()}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -94,17 +88,17 @@ export default function KnowledgeBase() {
     >
       {dragOver && (
         <div className="fixed inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-slate-900 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
+          <div className="bg-white dark:bg-slate-900 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">upload_file</span>
-            <span className="text-xl font-bold text-white">拖放檔案以上傳到 {currentDir}</span>
+            <span className="text-xl font-bold text-slate-900 dark:text-white">拖放檔案以上傳到 {currentDir}</span>
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 shrink-0">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-primary text-[24px]">school</span>
-          <h1 className="text-lg font-bold text-white">知識庫</h1>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-white">知識庫</h1>
           <span className="text-xs text-slate-500">{documents.length} 文件 · {indexedCount} 已索引</span>
         </div>
         <div className="flex items-center gap-2">
@@ -150,8 +144,8 @@ export default function KnowledgeBase() {
       <input type="file" ref={uploadInputRef} onChange={handleFileUpload} className="hidden" multiple />
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        <aside className="w-64 xl:w-72 shrink-0 border-r border-slate-800/60 flex flex-col bg-slate-950/30 overflow-hidden">
-          <div className="px-3 py-2.5 border-b border-slate-800/40 flex items-center justify-between">
+        <aside className="w-64 xl:w-72 shrink-0 border-r border-slate-200 dark:border-slate-800/60 flex flex-col bg-white dark:bg-slate-950/30 overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800/40 flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">檔案樹</span>
             <button
               onClick={() => {
@@ -165,14 +159,31 @@ export default function KnowledgeBase() {
             </button>
           </div>
 
+          <div className="border-b border-slate-200 dark:border-slate-800/40 px-3 py-2.5">
+            <div className="relative">
+              <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500">
+                search
+              </span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="搜尋檔案樹..."
+                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 py-1.5 pl-8 pr-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-primary/50"
+              />
+            </div>
+            {hasActiveSearch && (
+              <p className="mt-2 text-[11px] text-slate-500">搜尋命中 {matchingDocumentCount} 筆</p>
+            )}
+          </div>
+
           {showNewFolder && (
-            <form onSubmit={handleCreateFolderSubmit} className="flex items-center gap-1 px-3 py-2 border-b border-slate-800/40 bg-primary/5">
+            <form onSubmit={handleCreateFolderSubmit} className="flex items-center gap-1 px-3 py-2 border-b border-slate-200 dark:border-slate-800/40 bg-primary/5">
               <input
                 autoFocus
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 placeholder="資料夾名稱"
-                className="bg-transparent text-xs text-white placeholder:text-slate-500 outline-none flex-1 min-w-0"
+                className="bg-transparent text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none flex-1 min-w-0"
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     cancelCreateFolder();
@@ -182,7 +193,7 @@ export default function KnowledgeBase() {
               <button type="submit" disabled={!newFolderName.trim()} className="p-0.5 text-primary disabled:opacity-30">
                 <span className="material-symbols-outlined text-[16px]">check</span>
               </button>
-              <button type="button" onClick={cancelCreateFolder} className="p-0.5 text-slate-500 hover:text-slate-300">
+              <button type="button" onClick={cancelCreateFolder} className="p-0.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
                 <span className="material-symbols-outlined text-[16px]">close</span>
               </button>
             </form>
@@ -193,12 +204,17 @@ export default function KnowledgeBase() {
               <div className="flex items-center justify-center py-10 text-slate-500 text-xs">
                 <span className="material-symbols-outlined animate-spin mr-1 text-[16px]">refresh</span> 載入中...
               </div>
+            ) : showSearchEmptyState ? (
+              <div className="px-4 py-10 text-center text-xs text-slate-500">
+                <span className="material-symbols-outlined mb-2 text-[20px]">search_off</span>
+                <p>沒有符合搜尋的檔案</p>
+              </div>
             ) : (
               <TreeView
-                node={tree}
+                node={filteredTree}
                 depth={0}
                 selectedPath={selectedPath}
-                expandedDirs={expandedDirs}
+                expandedDirs={visibleExpandedDirs}
                 onSelect={handleTreeSelect}
                 onToggle={toggleExpand}
                 onDelete={(node) =>
@@ -210,26 +226,7 @@ export default function KnowledgeBase() {
         </aside>
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {rightPane === "folder" ? (
-            <FolderView
-              dir={currentDir}
-              files={filteredFiles}
-              subdirs={folderSubdirs}
-              search={search}
-              setSearch={setSearch}
-              loading={loading}
-              onSelectFile={openFileHandler}
-              onSelectDir={(dir) => {
-                setSelectedPath(dir);
-                setExpandedDirs((prev) => new Set([...prev, dir]));
-              }}
-              onDelete={(path) => setDeleteTarget({ type: "file", value: path })}
-              onDeleteDir={(dir) => setDeleteTarget({ type: "dir", value: dir })}
-              onEdit={openFileHandler}
-              onMove={(path) => setMovingPath(path)}
-              onToggleEnabled={handleToggleEnabled}
-            />
-          ) : (
+          {rightPane === "file" && openDocument ? (
             <FileView
               document={openDocument}
               editContent={editContent}
@@ -243,7 +240,7 @@ export default function KnowledgeBase() {
               onMove={(path) => setMovingPath(path)}
               onToggleEnabled={handleToggleEnabled}
             />
-          )}
+          ) : null}
         </div>
       </div>
 

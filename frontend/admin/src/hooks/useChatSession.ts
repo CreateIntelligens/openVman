@@ -29,6 +29,9 @@ import {
 } from "../components/chat/helpers";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 
+const TTS_PROVIDER_STORAGE_KEY = "brain-tts-provider";
+const TTS_VOICE_STORAGE_KEY = "brain-tts-voice";
+
 export function useChatSession() {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [input, setInput] = useState("");
@@ -47,8 +50,8 @@ export function useChatSession() {
   const ttsAbortRef = useRef<AbortController | null>(null);
 
   const [ttsProviders, setTtsProviders] = useState<TtsProvider[]>([]);
-  const [ttsProvider, setTtsProvider] = useState(() => localStorage.getItem("brain-tts-provider") || "auto");
-  const [ttsVoice, setTtsVoice] = useState(() => localStorage.getItem("brain-tts-voice") || "");
+  const [ttsProvider, setTtsProvider] = useState(() => localStorage.getItem(TTS_PROVIDER_STORAGE_KEY) || "auto");
+  const [ttsVoice, setTtsVoice] = useState(() => localStorage.getItem(TTS_VOICE_STORAGE_KEY) || "");
   const [ttsFallbackToast, setTtsFallbackToast] = useState("");
   const [ttsPrefetching, setTtsPrefetching] = useState(false);
   const ttsCacheRef = useRef<Map<number, { audio: ArrayBuffer; fallback?: string }>>(new Map());
@@ -83,10 +86,10 @@ export function useChatSession() {
     fetchTtsProviders()
       .then((providers) => {
         setTtsProviders(providers);
-        const stored = localStorage.getItem("brain-tts-provider") || "auto";
+        const stored = localStorage.getItem(TTS_PROVIDER_STORAGE_KEY) || "auto";
         if (!providers.some((provider) => provider.id === stored)) {
           setTtsProvider("auto");
-          localStorage.setItem("brain-tts-provider", "auto");
+          localStorage.setItem(TTS_PROVIDER_STORAGE_KEY, "auto");
         }
       })
       .catch((reason) => console.warn("Failed to load TTS providers:", reason));
@@ -126,6 +129,11 @@ export function useChatSession() {
     window.localStorage.setItem(getSessionStorageKey(personaId), nextSessionId);
   }, [selectedPersonaId]);
 
+  const clearTtsPrefetchState = useCallback(() => {
+    ttsPrefetchAbortRef.current?.abort();
+    ttsCacheRef.current.clear();
+  }, []);
+
   const resetViewState = useCallback(() => {
     setInput("");
     setSessionId("");
@@ -133,9 +141,8 @@ export function useChatSession() {
     setLastContext({ knowledge: 0, memory: 0 });
     setLastSources(emptySources);
     setError("");
-    ttsPrefetchAbortRef.current?.abort();
-    ttsCacheRef.current.clear();
-  }, []);
+    clearTtsPrefetchState();
+  }, [clearTtsPrefetchState]);
 
   const loadSessions = useCallback(() => {
     setLoadingSessions(true);
@@ -190,8 +197,7 @@ export function useChatSession() {
     setError("");
     setSessionId(targetSessionId);
     persistSessionId(targetSessionId);
-    ttsPrefetchAbortRef.current?.abort();
-    ttsCacheRef.current.clear();
+    clearTtsPrefetchState();
     fetchChatHistory(targetSessionId, selectedPersonaId)
       .then((response) => {
         setSessionId(response.session_id);
@@ -199,7 +205,7 @@ export function useChatSession() {
       })
       .catch((reason) => setError(String(reason)))
       .finally(() => setLoadingHistory(false));
-  }, [persistSessionId, selectedPersonaId]);
+  }, [clearTtsPrefetchState, persistSessionId, selectedPersonaId]);
 
   const playAudioBuffer = useCallback((buffer: ArrayBuffer, fallback?: string) => {
     if (fallback) {
@@ -223,18 +229,18 @@ export function useChatSession() {
     audio.play().catch(cleanup);
   }, []);
 
+  const buildTtsRequestOptions = useCallback((signal: AbortSignal) => ({
+    provider: ttsProviderRef.current === "auto" ? "" : ttsProviderRef.current,
+    voice: ttsProviderRef.current === "auto" ? "" : ttsVoiceRef.current,
+    signal,
+  }), []);
+
   const prefetchTts = useCallback((text: string, index: number) => {
     ttsPrefetchAbortRef.current?.abort();
-    const provider = ttsProviderRef.current;
-    const voice = ttsVoiceRef.current;
     const controller = new AbortController();
     ttsPrefetchAbortRef.current = controller;
     setTtsPrefetching(true);
-    synthesizeSpeech(text, {
-      provider: provider === "auto" ? "" : provider,
-      voice,
-      signal: controller.signal,
-    })
+    synthesizeSpeech(text, buildTtsRequestOptions(controller.signal))
       .then((result) => {
         ttsCacheRef.current.set(index, result);
       })
@@ -247,7 +253,7 @@ export function useChatSession() {
         ttsPrefetchAbortRef.current = null;
         setTtsPrefetching(false);
       });
-  }, []);
+  }, [buildTtsRequestOptions]);
 
   useEffect(() => {
     const text = pendingPrefetchRef.current;
@@ -282,15 +288,8 @@ export function useChatSession() {
 
     const controller = new AbortController();
     ttsAbortRef.current = controller;
-    const provider = ttsProviderRef.current;
-    const voice = ttsVoiceRef.current;
-
     try {
-      const { audio, fallback } = await synthesizeSpeech(text, {
-        provider: provider === "auto" ? "" : provider,
-        voice,
-        signal: controller.signal,
-      });
+      const { audio, fallback } = await synthesizeSpeech(text, buildTtsRequestOptions(controller.signal));
       playAudioBuffer(audio, fallback);
     } catch (reason) {
       if (!controller.signal.aborted) {
@@ -303,7 +302,7 @@ export function useChatSession() {
       }
       setPlayingIndex(null);
     }
-  }, [playAudioBuffer]);
+  }, [buildTtsRequestOptions, playAudioBuffer]);
 
   useEffect(() => {
     const storedPersonaId = window.localStorage.getItem(getPersonaStorageKey()) ?? "default";
@@ -479,16 +478,16 @@ export function useChatSession() {
 
   const handleTtsProviderChange = useCallback((id: string) => {
     setTtsProvider(id);
-    localStorage.setItem("brain-tts-provider", id);
+    localStorage.setItem(TTS_PROVIDER_STORAGE_KEY, id);
     const provider = ttsProviders.find((item) => item.id === id);
     const nextVoice = provider?.default_voice || "";
     setTtsVoice(nextVoice);
-    localStorage.setItem("brain-tts-voice", nextVoice);
+    localStorage.setItem(TTS_VOICE_STORAGE_KEY, nextVoice);
   }, [ttsProviders]);
 
   const handleTtsVoiceChange = useCallback((voice: string) => {
     setTtsVoice(voice);
-    localStorage.setItem("brain-tts-voice", voice);
+    localStorage.setItem(TTS_VOICE_STORAGE_KEY, voice);
   }, []);
 
   return {

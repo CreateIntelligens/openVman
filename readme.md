@@ -1,7 +1,7 @@
 # openVman — 虛擬人系統架構總覽 (Architecture Index)
 
-> **版本**：v0.8.0  
-> **最後更新**：2026-03-25  
+> **版本**：v0.9.0  
+> **最後更新**：2026-03-26  
 > **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
 
 ---
@@ -232,6 +232,7 @@
 - ✅ **設備自適應對嘴 (Device-Adaptive Lip-Sync)**：高階設備 → Wav2Lip，低階設備 → DINet (39 Mflops)
 - ✅ VideoSync 唯一時鐘源 + 徑向漸變羽化，杜絕嘴型漂移與生硬邊界
 - ✅ **Knowledge Base Admin Panel**：整合遞迴式檔案探索器與雙視窗 Markdown 編輯器，支援 LanceDB 同步狀態展示。
+- ✅ **Admin Web Light Mode**：整合專屬風格系統，支援深淺色模式切換與持久化儲存。
 - ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + MarkItDown 多模態檔案處理
 - ✅ **Brain Skills 模組化擴充系統**：支援動態載載入外部技能工具
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
@@ -242,3 +243,9 @@
 - 📋 撰寫 `04~07` 補充文件（部署 / 安全 / 素材 / 監控）
 - 📋 擴充更多專業領域的 Brain Skills
 - 📋 進入實作階段
+
+---
+
+## 九、授權協議 (License)
+
+本專案採用 **GNU General Public License v3.0 (GPLv3)** 授權。詳情請參閱 [LICENSE](./LICENSE) 檔案。

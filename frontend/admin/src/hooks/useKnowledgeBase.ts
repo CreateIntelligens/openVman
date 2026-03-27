@@ -15,7 +15,16 @@ import {
   type KnowledgeDocument,
   type KnowledgeDocumentSummary,
 } from "../api";
-import { buildTree, getFilesInDir, getSubdirs, type DeleteTarget, type RightPane, type SourceMode } from "../components/kb/helpers";
+import {
+  buildTree,
+  collectFolderPaths,
+  countFiles,
+  filterTree,
+  normalizeSearchTerm,
+  type DeleteTarget,
+  type RightPane,
+  type SourceMode,
+} from "../components/kb/helpers";
 import { useProject } from "../context/ProjectContext";
 import { useStatusState } from "./useStatusState";
 
@@ -76,47 +85,42 @@ export function useKnowledgeBase() {
     loadDocuments();
   }, [projectId, loadDocuments]);
 
+  const normalizedSearch = useMemo(() => normalizeSearchTerm(search), [search]);
+  const hasActiveSearch = normalizedSearch.length > 0;
   const tree = useMemo(() => buildTree(documents, serverDirs), [documents, serverDirs]);
-
-  const currentDir = useMemo(
-    () => (
-      rightPane === "folder"
-        ? selectedPath
-        : openDocument
-          ? openDocument.path.split("/").slice(0, -1).join("/")
-          : "knowledge"
-    ),
-    [openDocument, rightPane, selectedPath],
+  const filteredTree = useMemo(
+    () => filterTree(tree, normalizedSearch) ?? { ...tree, children: [] },
+    [normalizedSearch, tree],
   );
+  const visibleExpandedDirs = useMemo(
+    () => (hasActiveSearch ? new Set(collectFolderPaths(filteredTree)) : expandedDirs),
+    [expandedDirs, filteredTree, hasActiveSearch],
+  );
+
+  const currentDir = useMemo(() => {
+    if (rightPane === "folder") {
+      return selectedPath;
+    }
+    if (openDocument) {
+      return openDocument.path.split("/").slice(0, -1).join("/");
+    }
+    return "knowledge";
+  }, [openDocument, rightPane, selectedPath]);
 
   const indexedCount = useMemo(
     () => documents.filter((document) => document.is_indexed).length,
     [documents],
   );
 
-  const folderFiles = useMemo(
-    () => getFilesInDir(documents, currentDir),
-    [currentDir, documents],
+  const matchingDocumentCount = useMemo(
+    () => (hasActiveSearch ? countFiles(filteredTree) : documents.length),
+    [documents.length, filteredTree, hasActiveSearch],
   );
 
-  const folderSubdirs = useMemo(
-    () => getSubdirs(documents, serverDirs, currentDir),
-    [currentDir, documents, serverDirs],
-  );
-
-  const filteredFiles = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    if (!normalizedSearch) {
-      return folderFiles;
-    }
-
-    return folderFiles.filter((document) =>
-      document.path.toLowerCase().includes(normalizedSearch) ||
-      document.title.toLowerCase().includes(normalizedSearch) ||
-      document.preview.toLowerCase().includes(normalizedSearch) ||
-      (document.source_url ?? "").toLowerCase().includes(normalizedSearch),
-    );
-  }, [folderFiles, search]);
+  const resetNewFolderForm = useCallback(() => {
+    setShowNewFolder(false);
+    setNewFolderName("");
+  }, []);
 
   const toggleExpand = useCallback((path: string) => {
     setExpandedDirs((prev) => {
@@ -326,14 +330,10 @@ export function useKnowledgeBase() {
       setErrorStatus(error);
     }
 
-    setNewFolderName("");
-    setShowNewFolder(false);
-  }, [documents, loadDocuments, newFolderName, selectedPath, setErrorStatus]);
+    resetNewFolderForm();
+  }, [documents, loadDocuments, newFolderName, resetNewFolderForm, selectedPath, setErrorStatus]);
 
-  const cancelCreateFolder = useCallback(() => {
-    setShowNewFolder(false);
-    setNewFolderName("");
-  }, []);
+  const cancelCreateFolder = resetNewFolderForm;
 
   const closeFileView = useCallback(() => {
     setRightPane("folder");
@@ -375,7 +375,6 @@ export function useKnowledgeBase() {
     status,
     search,
     selectedPath,
-    expandedDirs,
     rightPane,
     openDocument,
     editContent,
@@ -396,15 +395,14 @@ export function useKnowledgeBase() {
     creatingNote,
     dragOver,
     uploadInputRef,
-    tree,
+    filteredTree,
+    visibleExpandedDirs,
+    hasActiveSearch,
     currentDir,
     indexedCount,
-    folderSubdirs,
-    filteredFiles,
+    matchingDocumentCount,
     setStatus,
     setSearch,
-    setSelectedPath,
-    setExpandedDirs,
     setDeleteTarget,
     setMovingPath,
     setShowNewFolder,
@@ -415,10 +413,8 @@ export function useKnowledgeBase() {
     setShowNoteModal,
     setNoteTitle,
     setNoteContent,
-    loadDocuments,
     toggleExpand,
     handleTreeSelect,
-    openFile,
     handleSave,
     handleFileUpload,
     handleReindex,

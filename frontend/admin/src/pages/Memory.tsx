@@ -118,22 +118,22 @@ export default function Memory() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+      <header className="sticky top-0 z-10 px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">記憶管理</h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               瀏覽、新增並管理精選記憶紀錄。
             </p>
           </div>
-          <div className="flex rounded-lg border border-slate-700 overflow-hidden">
+          <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
             {(["browse", "add"] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab
                     ? "bg-primary text-white"
-                    : "text-slate-400 hover:text-white"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
               >
                 {tab === "browse" ? "瀏覽" : "新增"}
@@ -164,12 +164,12 @@ export default function Memory() {
 
             <div className="space-y-3">
               {loadingMemories && !memories.length && (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-8 text-center text-sm text-slate-500">
                   載入記憶中...
                 </div>
               )}
               {!loadingMemories && !filteredMemories.length && (
-                <div className="rounded-xl border border-dashed border-slate-800 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center text-sm text-slate-500">
                   {searchTerm ? "沒有符合搜尋條件的記憶。" : "尚無記憶。請切換至「新增」標籤頁建立。"}
                 </div>
               )}

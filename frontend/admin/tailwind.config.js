@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "#7c3bed",
+        primary: "#0d9488",
         "background-dark": "#0f1117",
       },
       fontFamily: {

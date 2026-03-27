@@ -61,7 +61,7 @@ class TestRouterFallback:
         svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
         result = svc.synthesize(SynthesizeRequest(text="hello"))
-        assert result.provider == "index"
+        assert result.result.provider == "index"
         svc._aws.synthesize.assert_not_called()
         svc._gcp.synthesize.assert_not_called()
 
@@ -73,7 +73,7 @@ class TestRouterFallback:
         svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
         result = svc.synthesize(SynthesizeRequest(text="hello"))
-        assert result.provider == "gcp"
+        assert result.result.provider == "gcp"
         svc._aws.synthesize.assert_not_called()
 
     def test_index_gcp_fail_falls_back_to_aws(self):
@@ -84,7 +84,7 @@ class TestRouterFallback:
         svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
         result = svc.synthesize(SynthesizeRequest(text="hello"))
-        assert result.provider == "aws"
+        assert result.result.provider == "aws"
 
     def test_all_providers_fail_raises(self):
         """Index, GCP and AWS fail -> RuntimeError."""
@@ -102,9 +102,9 @@ class TestRouterFallback:
         svc._index.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
 
         result = svc.synthesize(SynthesizeRequest(text="test"))
-        assert isinstance(result, NormalizedTTSResult)
-        assert result.audio_bytes == b"\x00\x01"
-        assert result.route_kind == "provider"
+        assert isinstance(result.result, NormalizedTTSResult)
+        assert result.result.audio_bytes == b"\x00\x01"
+        assert result.result.route_kind == "provider"
 
     def test_disabled_index_skips_to_gcp(self):
         """Index disabled -> chain starts with GCP."""
@@ -112,7 +112,7 @@ class TestRouterFallback:
         svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
         result = svc.synthesize(SynthesizeRequest(text="test"))
-        assert result.provider == "gcp"
+        assert result.result.provider == "gcp"
 
     def test_disabled_all_raises_empty_chain(self):
         """All disabled -> empty chain error."""

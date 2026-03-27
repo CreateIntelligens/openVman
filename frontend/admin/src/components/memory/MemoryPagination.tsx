@@ -24,7 +24,7 @@ export default function MemoryPagination({
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:text-white hover:border-slate-600 transition-colors disabled:opacity-30"
+        className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 transition-colors disabled:opacity-30"
       >
         上一頁
       </button>
@@ -35,7 +35,7 @@ export default function MemoryPagination({
           className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
             pageNumber === page
               ? "bg-primary text-white"
-              : "border border-slate-700 text-slate-400 hover:text-white"
+              : "border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
           }`}
         >
           {pageNumber}
@@ -44,7 +44,7 @@ export default function MemoryPagination({
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:text-white hover:border-slate-600 transition-colors disabled:opacity-30"
+        className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-600 transition-colors disabled:opacity-30"
       >
         下一頁
       </button>

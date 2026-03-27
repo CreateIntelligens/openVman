@@ -26,7 +26,7 @@ export default function WorkspaceTreePanel({
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search files..."
-          className="w-full rounded-lg border border-slate-800/80 bg-slate-900/50 pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none focus:bg-slate-900 transition-colors"
+          className="w-full rounded-lg border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-900/50 pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 focus:outline-none focus:bg-white dark:focus:bg-slate-900 transition-colors"
         />
       </div>
 

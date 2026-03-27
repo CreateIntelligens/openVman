@@ -27,7 +27,7 @@ export default function TreeView({
         className={`group flex items-center py-1 px-2 cursor-pointer transition-all duration-150 ${
           isSelected
             ? "bg-primary/15 text-primary"
-            : "hover:bg-slate-800/50 text-slate-300 hover:text-white"
+            : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
         }`}
         style={{ paddingLeft: `${depth * 14 + 8}px` }}
         onClick={() => onSelect(node)}

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from time import monotonic
 
 from app.config import TTSRouterConfig, get_tts_config
@@ -178,7 +178,8 @@ class TTSRouterService:
             from_target=target.target, to_target=edge.target, reason=reason,
         )
 
-        edge_result, _, edge_error = self._try_synthesize(edge, request)
+        edge_request = replace(request, voice_hint="")
+        edge_result, _, edge_error = self._try_synthesize(edge, edge_request)
         if edge_result is not None:
             return SynthesisOutput(
                 result=edge_result,

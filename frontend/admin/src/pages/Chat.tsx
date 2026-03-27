@@ -61,7 +61,7 @@ export default function Chat() {
   } = useChatSession();
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background">
+    <div className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background-dark">
       <ChatSidebar
         personas={personas}
         selectedPersonaId={selectedPersonaId}
@@ -77,7 +77,7 @@ export default function Chat() {
         onDeleteSession={setDeleteSessionTarget}
       />
 
-      <main className="flex-1 flex min-w-0 bg-background relative">
+      <main className="flex-1 flex min-w-0 bg-slate-50 dark:bg-background-dark relative">
         <div className="flex-1 flex flex-col min-w-0">
           <ChatHeader
             conversationTitle={conversationTitle}
@@ -87,16 +87,16 @@ export default function Chat() {
             onTogglePanel={() => setPanelOpen(!panelOpen)}
           />
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-5 bg-gradient-to-b from-background to-slate-950/20">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-5 bg-gradient-to-b from-background to-slate-50 dark:to-slate-950/20">
             {!messages.length && !loadingHistory && (
               <div className="max-w-2xl mx-auto mt-6 space-y-6">
                 <div className="text-center">
                   <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center text-primary border border-primary/30 mx-auto mb-4 shadow-lg shadow-primary/10">
                     <span className="material-symbols-outlined text-[32px]">psychology</span>
                   </div>
-                  <h1 className="text-2xl font-bold text-white mb-2">今天我能幫你什麼？</h1>
-                  <p className="text-sm text-slate-400 leading-relaxed">
-                    我是你的智慧助手，基於 <code className="bg-slate-800 px-1 py-0.5 rounded">workspace/</code> 上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
+                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">今天我能幫你什麼？</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                    我是你的智慧助手，基於 <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">workspace/</code> 上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -104,7 +104,7 @@ export default function Chat() {
                     <button
                       key={prompt}
                       onClick={() => submit(prompt)}
-                      className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-left text-sm text-slate-300 hover:border-primary/40 hover:bg-primary/5 hover:text-primary-light transition-all shadow-sm"
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-4 text-left text-sm text-slate-700 dark:text-slate-300 hover:border-primary/40 hover:bg-primary/5 hover:text-primary-light transition-all shadow-sm"
                     >
                       {prompt}
                     </button>

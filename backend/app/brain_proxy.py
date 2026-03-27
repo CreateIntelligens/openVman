@@ -135,6 +135,12 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
             content={"error": "brain service unavailable"},
             status_code=502,
         )
+    except httpx.RemoteProtocolError as exc:
+        logger.warning("brain upstream disconnected path=%s error=%s", path, exc)
+        return JSONResponse(
+            content={"error": "brain upstream disconnected"},
+            status_code=502,
+        )
 
     content_type = upstream.headers.get("content-type", "")
     resp_headers = _filter_headers(upstream.headers)

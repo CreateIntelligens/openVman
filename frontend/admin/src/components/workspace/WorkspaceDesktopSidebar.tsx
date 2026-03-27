@@ -34,14 +34,14 @@ export default function WorkspaceDesktopSidebar({
   onFileUpload,
 }: WorkspaceDesktopSidebarProps) {
   return (
-    <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 hidden md:flex flex-col">
-      <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
-        <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Workspace</h2>
+    <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 hidden md:flex flex-col">
+      <div className="px-5 py-5 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-slate-900/20">
+        <h2 className="text-sm font-bold tracking-widest uppercase text-slate-700 dark:text-slate-300">Workspace</h2>
         <div className="flex items-center gap-1">
           <button
             onClick={onRefresh}
             disabled={loadingList}
-            className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+            className="flex h-7 w-7 items-center justify-center rounded border border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50"
             title="Refresh"
           >
             <span className="material-symbols-outlined text-[16px]">refresh</span>
@@ -73,14 +73,14 @@ export default function WorkspaceDesktopSidebar({
           <button
             onClick={() => uploadInputRef.current?.click()}
             disabled={uploading}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50"
             title="Upload Files"
           >
             <span className="material-symbols-outlined text-[16px]">upload_file</span>
           </button>
           <button
             onClick={onCreate}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
             title="New Document"
           >
             <span className="material-symbols-outlined text-[16px]">add</span>

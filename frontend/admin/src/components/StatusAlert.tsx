@@ -10,8 +10,8 @@ interface StatusAlertProps {
 export default function StatusAlert({ type, message, onDismiss, autoDismiss }: StatusAlertProps) {
   const isSuccess = type === "success";
   const colorClasses = isSuccess
-    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-    : "bg-red-500/10 border-red-500/20 text-red-400";
+    ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+    : "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400";
   const icon = isSuccess ? "check_circle" : "error";
 
   useEffect(() => {

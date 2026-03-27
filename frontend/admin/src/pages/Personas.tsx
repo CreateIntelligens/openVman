@@ -191,24 +191,24 @@ export default function Personas() {
               : [];
 
        return (
-              <div className="flex h-full w-full overflow-hidden bg-background">
+              <div className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background-dark">
                      {/* Contextual Sidebar */}
-                     <aside className="w-[300px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 flex flex-col hidden md:flex z-10">
+                     <aside className="w-[300px] lg:w-[320px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 flex flex-col hidden md:flex z-10">
                             {/* Sidebar Header */}
-                            <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
+                            <div className="px-5 py-5 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-slate-900/20">
                                    <div className="flex items-center gap-2.5">
-                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-slate-800 text-slate-300">
+                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                                  <span className="material-symbols-outlined text-[14px]">groups_2</span>
                                           </div>
-                                          <h2 className="text-[13px] font-semibold tracking-wide text-slate-200">角色管理</h2>
+                                          <h2 className="text-[13px] font-semibold tracking-wide text-slate-800 dark:text-slate-200">角色管理</h2>
                                    </div>
                                    <button
                                           onClick={() => loadPersonas(selectedPersona?.persona_id)}
                                           disabled={loadingList}
-                                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors disabled:opacity-50"
+                                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors disabled:opacity-50"
                                           title="重新整理"
                                    >
-                                          <span className={`material-symbols-outlined text-[16px] ${loadingList ? "animate-spin text-slate-200" : ""}`}>
+                                          <span className={`material-symbols-outlined text-[16px] ${loadingList ? "animate-spin text-slate-800 dark:text-slate-200" : ""}`}>
                                                  refresh
                                           </span>
                                    </button>
@@ -226,7 +226,7 @@ export default function Personas() {
                                           onDelete={setDeletePersonaTarget}
                                    />
 
-                                   <hr className="border-slate-800/60" />
+                                   <hr className="border-slate-200 dark:border-slate-800/60" />
 
                                    <PersonaCreateForm
                                           personas={personas}
@@ -244,9 +244,9 @@ export default function Personas() {
                      </aside>
 
                      {/* Main Editor Content */}
-                     <main className="flex-1 flex flex-col min-w-0 bg-background relative overflow-hidden">
+                     <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-background-dark relative overflow-hidden">
                             {status && (
-                                   <div className="p-4 shrink-0 shadow-sm z-20 border-b border-slate-800/60">
+                                   <div className="p-4 shrink-0 shadow-sm z-20 border-b border-slate-200 dark:border-slate-800/60">
                                           <StatusAlert type={status.type} message={status.message} />
                                    </div>
                             )}

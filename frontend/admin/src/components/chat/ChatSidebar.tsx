@@ -29,12 +29,12 @@ export default function ChatSidebar({
   onDeleteSession: (s: SessionSummary) => void;
 }) {
   return (
-    <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-800/60 bg-slate-950/30 flex flex-col hidden md:flex">
-      <div className="px-5 py-5 border-b border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-900/20">
-        <h2 className="text-sm font-bold tracking-widest uppercase text-slate-300">Brain 對話</h2>
+    <aside className="w-[280px] lg:w-[320px] flex-shrink-0 border-r border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 flex flex-col hidden md:flex">
+      <div className="px-5 py-5 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0 bg-slate-50 dark:bg-slate-900/20">
+        <h2 className="text-sm font-bold tracking-widest uppercase text-slate-700 dark:text-slate-300">Brain 對話</h2>
         <button
           onClick={onResetConversation}
-          className="flex h-7 w-7 items-center justify-center rounded border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white hover:border-slate-500 transition-colors"
+          className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-500 transition-colors"
           title="新對話"
         >
           <span className="material-symbols-outlined text-[16px]">add</span>
@@ -49,7 +49,7 @@ export default function ChatSidebar({
             value={selectedPersonaId}
             onChange={(event) => onPersonaChange(event.target.value)}
             disabled={sending || loadingPersonas}
-            className="select-dark w-full"
+            className="select-adaptive w-full"
           >
             {personas.map((persona) => (
               <option key={persona.persona_id} value={persona.persona_id}>
@@ -59,7 +59,7 @@ export default function ChatSidebar({
           </select>
         </div>
 
-        <hr className="border-slate-800/60 shrink-0" />
+        <hr className="border-slate-200 dark:border-slate-800/60 shrink-0" />
 
         {/* Sessions List */}
         <div className="flex-1 flex flex-col min-h-0 space-y-3">
@@ -68,7 +68,7 @@ export default function ChatSidebar({
             <button
               onClick={onLoadSessions}
               disabled={loadingSessions}
-              className="text-xs text-slate-500 hover:text-white transition-colors"
+              className="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               {loadingSessions ? "..." : "重新整理"}
             </button>
@@ -84,16 +84,16 @@ export default function ChatSidebar({
                   key={s.session_id}
                   className={`rounded-xl border p-3 transition-colors cursor-pointer group flex flex-col gap-1.5 ${isActive
                     ? "border-primary/40 bg-primary/10 shadow-sm"
-                    : "border-slate-800/60 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-800/40"
+                    : "border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/40"
                     }`}
                   onClick={() => onLoadSessionHistory(s.session_id)}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[11px] font-mono font-bold truncate ${isActive ? "text-primary" : "text-slate-300"}`}>
+                    <span className={`text-[11px] font-mono font-bold truncate ${isActive ? "text-primary" : "text-slate-700 dark:text-slate-300"}`}>
                       {s.session_id.slice(0, 8)}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[9px] font-bold text-slate-400">
+                      <span className="rounded bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 text-[9px] font-bold text-slate-500 dark:text-slate-400">
                         {s.message_count}
                       </span>
                       <button
@@ -109,12 +109,12 @@ export default function ChatSidebar({
                     </div>
                   </div>
                   {s.last_message_preview && (
-                    <p className={`text-xs line-clamp-2 ${isActive ? "text-slate-200" : "text-slate-500"}`}>
+                    <p className={`text-xs line-clamp-2 ${isActive ? "text-slate-800 dark:text-slate-200" : "text-slate-500"}`}>
                       {s.last_message_preview}
                     </p>
                   )}
                   {s.updated_at && (
-                    <p className="text-[10px] text-slate-600">{formatRelativeTime(s.updated_at)}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-500">{formatRelativeTime(s.updated_at)}</p>
                   )}
                 </div>
               );

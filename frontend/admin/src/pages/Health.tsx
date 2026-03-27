@@ -17,10 +17,10 @@ export default function Health() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <div>
           <h2 className="text-2xl font-bold">System Health</h2>
-          <p className="text-sm text-slate-400">Real-time status of your brain infrastructure</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Real-time status of your brain infrastructure</p>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-xs text-slate-500">auto-refresh in {countdown}s</span>
@@ -40,11 +40,11 @@ export default function Health() {
         {metricsError && <StatusAlert type="error" message={`Metrics: ${metricsError}`} />}
 
         {/* Status Card */}
-        <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900/40 border border-primary/10 rounded-xl p-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <StatusPulse isOk={isOk} isKnown={Boolean(data)} />
             <div>
-              <p className="text-sm font-medium text-slate-400">System Status</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">System Status</p>
               <h3 className={`text-2xl font-bold uppercase tracking-wider ${getStatusHeadingClass(isOk, Boolean(data))}`}>
                 {data ? data.status : "—"}
               </h3>
@@ -52,7 +52,7 @@ export default function Health() {
           </div>
           {lastChecked && (
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-slate-400">Last Checked</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Last Checked</p>
               <p className="text-sm font-bold">{lastChecked.toLocaleTimeString()}</p>
             </div>
           )}
@@ -114,15 +114,15 @@ export default function Health() {
             </h3>
 
             {metrics.counter_count > 0 && (
-              <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Counters</h4>
+              <div className="bg-white dark:bg-slate-900/40 border border-primary/10 rounded-xl p-6">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4">Counters</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Object.entries(metrics.counters)
                     .sort(([, a], [, b]) => b - a)
                     .map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between gap-3 rounded-lg bg-slate-950/50 border border-slate-800 px-4 py-3">
-                        <span className="text-xs text-slate-400 truncate" title={key}>{key}</span>
-                        <span className="text-sm font-bold font-mono text-white shrink-0">{value}</span>
+                      <div key={key} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 px-4 py-3">
+                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate" title={key}>{key}</span>
+                        <span className="text-sm font-bold font-mono text-slate-900 dark:text-white shrink-0">{value}</span>
                       </div>
                     ))}
                 </div>
@@ -130,8 +130,8 @@ export default function Health() {
             )}
 
             {metrics.timing_count > 0 && (
-              <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Timings</h4>
+              <div className="bg-white dark:bg-slate-900/40 border border-primary/10 rounded-xl p-6">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-4">Timings</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -142,12 +142,12 @@ export default function Health() {
                         <th className="pb-3 text-right">Max (ms)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {Object.entries(metrics.timings)
                         .sort(([, a], [, b]) => b.count - a.count)
                         .map(([key, bucket]) => (
-                          <tr key={key} className="text-slate-300">
-                            <td className="py-2 pr-4 text-xs text-slate-400 truncate max-w-[240px]" title={key}>{key}</td>
+                          <tr key={key} className="text-slate-700 dark:text-slate-300">
+                            <td className="py-2 pr-4 text-xs text-slate-500 dark:text-slate-400 truncate max-w-[240px]" title={key}>{key}</td>
                             <td className="py-2 pr-4 text-right font-mono">{bucket.count}</td>
                             <td className="py-2 pr-4 text-right font-mono">{bucket.avg_ms.toFixed(1)}</td>
                             <td className="py-2 text-right font-mono">{bucket.max_ms.toFixed(1)}</td>
@@ -167,14 +167,14 @@ export default function Health() {
 
 function getStatusHeadingClass(isOk: boolean, isKnown: boolean) {
   if (isOk) {
-    return "text-emerald-400";
+    return "text-emerald-600 dark:text-emerald-400";
   }
 
   if (isKnown) {
-    return "text-red-400";
+    return "text-red-600 dark:text-red-400";
   }
 
-  return "text-slate-400";
+  return "text-slate-500 dark:text-slate-400";
 }
 
 function StatusPulse({ isOk, isKnown }: { isOk: boolean; isKnown: boolean }) {
@@ -207,14 +207,14 @@ function InfoCard({ icon, label, value, detail, status = "ok" }: {
   }[status];
 
   return (
-    <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-6 transition-transform hover:scale-[1.02]">
+    <div className="bg-white dark:bg-slate-900/40 border border-primary/10 rounded-xl p-6 transition-transform hover:scale-[1.02]">
       <div className="flex justify-between items-start mb-4">
         <span className="material-symbols-outlined text-primary text-3xl">{icon}</span>
         <span className={`px-2 py-1 text-[10px] font-bold border rounded uppercase tracking-widest ${badgeConfig.classes}`}>
           {badgeConfig.text}
         </span>
       </div>
-      <h4 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">{label}</h4>
+      <h4 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">{label}</h4>
       <p className="text-xl font-bold truncate" title={value}>{value}</p>
       {detail && <p className="mt-2 text-[10px] text-slate-500 truncate" title={detail}>{detail}</p>}
     </div>

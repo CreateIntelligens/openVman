@@ -86,10 +86,10 @@ export default function Tools() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
         <div>
           <h2 className="text-2xl font-bold">工具與技能</h2>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             管理技能插件及查看已註冊工具
           </p>
         </div>
@@ -97,7 +97,7 @@ export default function Tools() {
           <button
             onClick={handleReloadAll}
             disabled={reloading}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-700 hover:border-primary/40 text-slate-300 hover:text-primary rounded-lg font-bold transition-all text-sm disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-slate-700 hover:border-primary/40 text-slate-700 dark:text-slate-300 hover:text-primary rounded-lg font-bold transition-all text-sm disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-sm">sync</span>
             {reloading ? "重新載入中..." : "重新載入所有技能"}
@@ -121,7 +121,7 @@ export default function Tools() {
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-base">extension</span>
             技能
-            <span className="text-xs font-mono text-slate-600">({skills.length})</span>
+            <span className="text-xs font-mono text-slate-500 dark:text-slate-600">({skills.length})</span>
           </h3>
 
           {skills.length === 0 && !loading && !error && (
@@ -163,7 +163,7 @@ export default function Tools() {
           <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-base">settings</span>
             內建工具
-            <span className="text-xs font-mono text-slate-600">({tools.length})</span>
+            <span className="text-xs font-mono text-slate-500 dark:text-slate-600">({tools.length})</span>
           </h3>
 
           {tools.length > 0 && (
@@ -177,7 +177,7 @@ export default function Tools() {
             <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 px-1 mb-4 flex items-center gap-2">
               <span className="material-symbols-outlined text-base">extension</span>
               技能工具
-              <span className="text-xs font-mono text-slate-600">({skillTools.length})</span>
+              <span className="text-xs font-mono text-slate-500 dark:text-slate-600">({skillTools.length})</span>
             </h3>
 
             <ToolTable tools={skillTools} resolveSkillName={(skillId) => skillNameById[skillId]} />

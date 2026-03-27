@@ -30,8 +30,8 @@ export const SIDEBAR_EXPAND = {
 } as const;
 
 export const TAB_BASE = "h-12 mx-auto flex items-center rounded-xl transition-all duration-300 shrink-0 overflow-hidden";
-export const TAB_ACTIVE = "bg-slate-800/80 text-primary border border-slate-700/50";
-export const TAB_INACTIVE = "hover:bg-slate-800/50 text-slate-400 border border-transparent hover:text-slate-200";
+export const TAB_ACTIVE = "bg-slate-100 dark:bg-slate-800/80 text-primary border border-slate-200 dark:border-slate-700/50";
+export const TAB_INACTIVE = "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-500 dark:text-slate-400 border border-transparent hover:text-slate-900 dark:hover:text-slate-200";
 export const LABEL_BASE = "font-semibold text-[13.5px] whitespace-nowrap tracking-wide transition-all duration-300 overflow-hidden";
 export const PROJECT_BTN_BASE = "h-12 mx-auto rounded-xl border border-primary/30 bg-primary/10 flex items-center text-primary transition-all duration-300 hover:bg-primary/20 disabled:opacity-50 overflow-hidden shrink-0 cursor-pointer";
 

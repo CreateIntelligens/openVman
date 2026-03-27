@@ -48,6 +48,22 @@ export function getSourceMeta(sourceType: SourceMode) {
   }
 }
 
+export function normalizeSearchTerm(search: string): string {
+  return search.trim().toLowerCase();
+}
+
+export function matchesKnowledgeDocumentSearch(document: KnowledgeDocumentSummary, search: string): boolean {
+  const normalizedSearch = normalizeSearchTerm(search);
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  return document.path.toLowerCase().includes(normalizedSearch) ||
+    document.title.toLowerCase().includes(normalizedSearch) ||
+    document.preview.toLowerCase().includes(normalizedSearch) ||
+    (document.source_url ?? "").toLowerCase().includes(normalizedSearch);
+}
+
 /* ── Tree Builder ── */
 
 export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: string[]): TreeNode {
@@ -98,32 +114,43 @@ export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: str
   return root;
 }
 
-/* ── Directory Queries ── */
+export function filterTree(node: TreeNode, normalizedSearch: string): TreeNode | null {
+  if (!normalizedSearch) {
+    return node;
+  }
 
-export function getFilesInDir(documents: KnowledgeDocumentSummary[], dir: string): KnowledgeDocumentSummary[] {
-  const prefix = dir ? `${dir}/` : "";
-  return documents.filter((doc) => {
-    if (!doc.path.startsWith(prefix)) return false;
-    const rest = doc.path.slice(prefix.length);
-    return !rest.includes("/");
-  });
+  const matchesSelf = node.doc
+    ? matchesKnowledgeDocumentSearch(node.doc, normalizedSearch)
+    : node.name.toLowerCase().includes(normalizedSearch) ||
+      node.path.toLowerCase().includes(normalizedSearch);
+
+  if (node.type === "file") {
+    return matchesSelf ? node : null;
+  }
+
+  const children = node.children
+    .map((child) => filterTree(child, normalizedSearch))
+    .filter((child): child is TreeNode => child !== null);
+
+  if (!matchesSelf && children.length === 0) {
+    return null;
+  }
+
+  return {
+    ...node,
+    children,
+  };
 }
 
-export function getSubdirs(documents: KnowledgeDocumentSummary[], serverDirs: string[], dir: string): string[] {
-  const prefix = dir ? `${dir}/` : "";
-  const subdirs = new Set<string>();
-  for (const doc of documents) {
-    if (!doc.path.startsWith(prefix)) continue;
-    const rest = doc.path.slice(prefix.length);
-    const slashIdx = rest.indexOf("/");
-    if (slashIdx !== -1) subdirs.add(rest.slice(0, slashIdx));
+export function countFiles(node: TreeNode): number {
+  if (node.type === "file") return 1;
+  return node.children.reduce((sum, child) => sum + countFiles(child), 0);
+}
+
+export function collectFolderPaths(node: TreeNode): string[] {
+  if (node.type === "file") {
+    return [];
   }
-  for (const d of serverDirs) {
-    if (!d.startsWith(prefix)) continue;
-    const rest = d.slice(prefix.length);
-    const slashIdx = rest.indexOf("/");
-    const sub = slashIdx === -1 ? rest : rest.slice(0, slashIdx);
-    if (sub) subdirs.add(sub);
-  }
-  return [...subdirs].sort();
+
+  return [node.path, ...node.children.flatMap(collectFolderPaths)];
 }

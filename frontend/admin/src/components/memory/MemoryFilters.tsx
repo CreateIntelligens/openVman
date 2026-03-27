@@ -25,7 +25,7 @@ export default function MemoryFilters({
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="篩選記憶..."
-          className="w-full pl-9 rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-primary/50 focus:outline-none"
+          className="w-full pl-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/60 px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 focus:outline-none"
         />
       </div>
       <div className="text-xs text-slate-500">
@@ -34,7 +34,7 @@ export default function MemoryFilters({
       <button
         onClick={onRefresh}
         disabled={loading}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:border-primary/40 hover:text-white transition-colors disabled:opacity-50"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-primary/40 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50"
       >
         <span className="material-symbols-outlined text-sm">refresh</span>
         {loading ? "載入中..." : "重新整理"}

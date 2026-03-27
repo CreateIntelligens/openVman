@@ -52,7 +52,7 @@ export default function ChatInput({
   onToggleAsr: () => void;
 }) {
   return (
-    <div className="shrink-0 p-5 bg-background border-t border-slate-800/80">
+    <div className="shrink-0 p-5 bg-slate-50 dark:bg-background-dark border-t border-slate-200 dark:border-slate-800/80">
       <div className="max-w-4xl mx-auto flex flex-col gap-3 relative">
         {/* TTS Fallback Toast */}
         {ttsFallbackToast && (
@@ -73,7 +73,7 @@ export default function ChatInput({
               <select
                 value={ttsProvider}
                 onChange={(e) => onTtsProviderChange(e.target.value)}
-                className="select-dark text-xs py-1 px-2 min-w-[100px]"
+                className="select-adaptive text-xs py-1 px-2 min-w-[100px]"
               >
                 {ttsProviders.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -86,7 +86,7 @@ export default function ChatInput({
                 <select
                   value={ttsVoice || activeTtsProvider.default_voice}
                   onChange={(e) => onTtsVoiceChange(e.target.value)}
-                  className="select-dark text-xs py-1 px-2 min-w-[120px]"
+                  className="select-adaptive text-xs py-1 px-2 min-w-[120px]"
                 >
                   {activeTtsProvider.voices.map((v) => (
                     <option key={v} value={v}>{v}</option>
@@ -104,16 +104,16 @@ export default function ChatInput({
           </div>
         )}
 
-        <div className="relative rounded-2xl border border-slate-700 bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
+        <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-50 dark:focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
           {/* Slash command autocomplete dropdown */}
           {slashOpen && slashMatches.length > 0 && (
-            <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[240px] overflow-y-auto">
+            <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[240px] overflow-y-auto">
               {slashMatches.map((skill, i) => (
                 <button
                   key={skill.id}
                   onMouseDown={(e) => { e.preventDefault(); onPickSlash(skill); }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                    i === clampedSlashIndex ? "bg-primary/20 text-white" : "text-slate-300 hover:bg-slate-800"
+                    i === clampedSlashIndex ? "bg-primary/20 text-slate-900 dark:text-white" : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   }`}
                 >
                   <span className="material-symbols-outlined text-primary text-lg">extension</span>
@@ -163,7 +163,7 @@ export default function ChatInput({
             }}
             rows={1}
             placeholder="向 Brain 發送訊息...（輸入 / 查看指令）"
-            className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-100 placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
+            className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
           />
 
           <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
@@ -172,7 +172,7 @@ export default function ChatInput({
               {sending && (
                 <button
                   onClick={onStopStreaming}
-                  className="h-8 px-4 rounded-lg border border-slate-600 bg-slate-800 text-xs font-bold text-white hover:bg-slate-700 transition-colors shadow-sm"
+                  className="h-8 px-4 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-sm"
                 >
                   停止
                 </button>
@@ -183,7 +183,7 @@ export default function ChatInput({
                   className={`h-8 w-10 flex items-center justify-center rounded-lg transition-colors shadow-sm ${
                     asrListening
                       ? "bg-red-500 text-white animate-pulse hover:bg-red-600"
-                      : "border border-slate-600 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                      : "border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700"
                   }`}
                   title={asrListening ? "停止語音輸入" : "語音輸入"}
                 >

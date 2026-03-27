@@ -48,15 +48,15 @@ export default function FileView({
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* File toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800/60 bg-slate-950/30 shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <button onClick={onClose} className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="返回資料夾">
+          <button onClick={onClose} className="p-1 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="返回資料夾">
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           </button>
           <span className={`material-symbols-outlined text-[18px] ${document.path.endsWith(".md") ? "text-sky-400" : "text-slate-400"}`}>
             {document.path.endsWith(".md") ? "markdown" : "description"}
           </span>
-          <span className="text-sm font-semibold text-white truncate">{document.title || document.path}</span>
+          <span className="text-sm font-semibold text-slate-900 dark:text-white truncate">{document.title || document.path}</span>
           <StatusDot doc={document} />
           {dirty && <span className="text-[10px] text-amber-400 font-bold">● 未儲存</span>}
         </div>
@@ -93,21 +93,21 @@ export default function FileView({
       {/* Split Editor: source + preview */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left: Source Editor */}
-        <div className="flex-1 flex flex-col min-w-0 border-r border-slate-800/40">
-          <div className="px-3 py-1.5 border-b border-slate-800/30 bg-slate-950/20">
+        <div className="flex-1 flex flex-col min-w-0 border-r border-slate-200 dark:border-slate-800/40">
+          <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">原始碼</span>
           </div>
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
-            className="flex-1 w-full bg-transparent text-sm text-slate-200 font-mono p-4 resize-none focus:outline-none overflow-auto"
+            className="flex-1 w-full bg-transparent text-sm text-slate-800 dark:text-slate-200 font-mono p-4 resize-none focus:outline-none overflow-auto"
             spellCheck={false}
           />
         </div>
 
         {/* Right: Live Preview */}
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="px-3 py-1.5 border-b border-slate-800/30 bg-slate-950/20">
+          <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">預覽</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 prose-container">
@@ -117,7 +117,7 @@ export default function FileView({
       </div>
 
       {/* File metadata bar */}
-      <div className="flex items-center gap-4 px-4 py-1.5 border-t border-slate-800/40 bg-slate-950/30 text-[11px] text-slate-500 shrink-0">
+      <div className="flex items-center gap-4 px-4 py-1.5 border-t border-slate-200 dark:border-slate-800/40 bg-white dark:bg-slate-950/30 text-[11px] text-slate-500 shrink-0">
         <span>{document.path}</span>
         <span>{document.extension || "—"}</span>
         <span>{formatSize(document.size)}</span>

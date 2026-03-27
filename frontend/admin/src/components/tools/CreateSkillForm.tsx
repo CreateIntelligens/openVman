@@ -45,7 +45,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-slate-700 hover:border-primary/40 text-slate-500 hover:text-primary rounded-xl transition-colors w-full justify-center"
+        className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary/40 text-slate-500 hover:text-primary rounded-xl transition-colors w-full justify-center"
       >
         <span className="material-symbols-outlined text-lg">add</span>
         <span className="text-sm font-bold">建立技能</span>
@@ -54,15 +54,15 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
   }
 
   return (
-    <div className="bg-slate-900/40 border border-primary/10 rounded-xl p-5 space-y-4">
+    <div className="bg-slate-100 dark:bg-slate-900/40 border border-primary/10 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-bold text-slate-200">新增技能</h4>
+        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">新增技能</h4>
         <button
           onClick={() => {
             reset();
             setOpen(false);
           }}
-          className="text-slate-500 hover:text-white"
+          className="text-slate-500 hover:text-slate-900 dark:hover:text-white"
         >
           <span className="material-symbols-outlined text-lg">close</span>
         </button>
@@ -76,7 +76,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="我的技能"
-          className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
+          className="w-full px-3 py-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-primary/40"
         />
         {name.trim() && (
           <p className="text-[10px] text-slate-500 mt-1 font-mono">
@@ -97,7 +97,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
             value={idOverride}
             onChange={(e) => setIdOverride(e.target.value)}
             placeholder="my_skill"
-            className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
+            className="w-full px-3 py-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-primary/40"
           />
         </div>
       )}
@@ -108,7 +108,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="選填說明..."
-          className="w-full px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-primary/40"
+          className="w-full px-3 py-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-primary/40"
         />
       </div>
 

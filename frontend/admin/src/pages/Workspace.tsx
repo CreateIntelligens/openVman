@@ -44,7 +44,7 @@ export default function Workspace() {
 
   return (
     <div
-      className="flex h-full w-full overflow-hidden bg-background"
+      className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background-dark"
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}

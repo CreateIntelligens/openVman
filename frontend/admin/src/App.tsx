@@ -3,6 +3,7 @@ import AppSidebar from "./components/app/AppSidebar";
 import MobileTopBar from "./components/app/MobileTopBar";
 import { allTabs, components, type Tab } from "./components/app/navigation";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
 
 function AppContent() {
   const [active, setActive] = useState<Tab>(() => {
@@ -12,6 +13,7 @@ function AppContent() {
   const [isPinned, setIsPinned] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { projectId, setProjectId, projects, loadingProjects } = useProject();
+  const { theme, toggleTheme } = useTheme();
 
   const switchTab = (tab: Tab) => {
     setActive(tab);
@@ -19,7 +21,7 @@ function AppContent() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-background-dark">
       <AppSidebar
         active={active}
         isPinned={isPinned}
@@ -27,13 +29,15 @@ function AppContent() {
         projectId={projectId}
         projects={projects}
         loadingProjects={loadingProjects}
+        theme={theme}
         onSelectProject={setProjectId}
         onSelectTab={switchTab}
         onTogglePin={() => setIsPinned((current) => !current)}
         onDropdownOpenChange={setDropdownOpen}
+        onToggleTheme={toggleTheme}
       />
 
-      <main className="flex-1 flex flex-col overflow-hidden bg-background">
+      <main className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-background-dark">
         <MobileTopBar
           active={active}
           projectId={projectId}
@@ -63,8 +67,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ProjectProvider>
-      <AppContent />
-    </ProjectProvider>
+    <ThemeProvider>
+      <ProjectProvider>
+        <AppContent />
+      </ProjectProvider>
+    </ThemeProvider>
   );
 }

@@ -95,15 +95,15 @@ export default function ProjectDropdown({
         <div className={`flex items-center gap-2 min-w-0 flex-1 transition-all duration-300 overflow-hidden ${isPinned ? SIDEBAR_EXPAND.label.pinned : SIDEBAR_EXPAND.label.collapsed}`}>
           <div className="flex flex-col items-start min-w-0 flex-1">
             <span className="text-[9px] font-bold uppercase tracking-widest text-primary/60 leading-none mb-[2px]">Switch Project</span>
-            <span className="text-[13px] font-semibold truncate w-full text-left leading-none text-slate-100">{displayLabel}</span>
+            <span className="text-[13px] font-semibold truncate w-full text-left leading-none text-slate-800 dark:text-slate-100">{displayLabel}</span>
           </div>
           <span className="material-symbols-outlined text-[16px] opacity-60 shrink-0">unfold_more</span>
         </div>
       </button>
 
       {open && createPortal(
-        <div ref={menuRef} style={getMenuStyle()} className="rounded-xl border border-slate-600 bg-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.6)] overflow-hidden">
-          <div className="px-3 py-2.5 border-b border-slate-700/60">
+        <div ref={menuRef} style={getMenuStyle()} className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-[0_8px_30px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.6)] overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700/60">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Switch Project</p>
           </div>
           <div className="max-h-64 overflow-y-auto py-1">
@@ -116,9 +116,9 @@ export default function ProjectDropdown({
                     onSelect(project.project_id);
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2.5 flex items-center gap-3 transition-colors cursor-pointer ${isActive ? "bg-primary/10 text-primary" : "text-slate-300 hover:bg-slate-700/50 hover:text-white"}`}
+                  className={`w-full text-left px-3 py-2.5 flex items-center gap-3 transition-colors cursor-pointer ${isActive ? "bg-primary/10 text-primary" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-white"}`}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 ${isActive ? "bg-primary/20 text-primary border border-primary/30" : "bg-slate-800 text-slate-400 border border-slate-700"}`}>
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 ${isActive ? "bg-primary/20 text-primary border border-primary/30" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"}`}>
                     {(project.label || project.project_id).slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
