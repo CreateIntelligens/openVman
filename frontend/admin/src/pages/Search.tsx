@@ -1,22 +1,5 @@
-import { useState, useEffect } from "react";
-import { postSearch } from "../api";
 import StatusAlert from "../components/StatusAlert";
-import { useProject } from "../context/ProjectContext";
-
-interface SearchResult {
-  text: string;
-  source: string;
-  date: string;
-  _distance: number;
-  metadata?: string;
-}
-
-interface SearchResponse {
-  query: string;
-  table: string;
-  results: SearchResult[];
-  error?: string;
-}
+import { useSemanticSearch } from "../hooks/useSemanticSearch";
 
 const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
 
@@ -41,29 +24,19 @@ function getPersonaId(metadata?: string): string | null {
 }
 
 export default function Search() {
-  const { projectId } = useProject();
-  const [query, setQuery] = useState("");
-  const [table, setTable] = useState("knowledge");
-  const [topK, setTopK] = useState<number>(5);
-  const [response, setResponse] = useState<SearchResponse | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Clear results when project changes
-  useEffect(() => {
-    setResponse(null);
-    setError("");
-  }, [projectId]);
-
-  const submit = () => {
-    if (!query.trim()) return;
-    setError("");
-    setLoading(true);
-    postSearch<SearchResponse>(query, table, topK)
-      .then((r) => setResponse(r))
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  };
+  const {
+    canSubmit,
+    error,
+    loading,
+    query,
+    response,
+    setQuery,
+    setTable,
+    setTopK,
+    submit,
+    table,
+    topK,
+  } = useSemanticSearch();
 
   return (
     <div className="page-scroll">
@@ -85,7 +58,11 @@ export default function Search() {
               placeholder="描述你要搜尋的內容..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  void submit();
+                }
+              }}
             />
           </div>
           <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
@@ -113,8 +90,8 @@ export default function Search() {
             </select>
           </div>
           <button
-            onClick={submit}
-            disabled={loading || !query.trim()}
+            onClick={() => void submit()}
+            disabled={!canSubmit}
             className="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-8 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
           >
             <span>{loading ? "搜尋中..." : "執行查詢"}</span>

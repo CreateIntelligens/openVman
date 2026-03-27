@@ -4,5 +4,8 @@
     ],
     "hayley": [
         "assets/voices/hayley_happy.wav"
+    ],
+    "jinping": [
+        "assets/voices/Jinping.wav"
     ]
 }

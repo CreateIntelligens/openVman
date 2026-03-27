@@ -7,6 +7,7 @@ import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 
@@ -111,3 +112,18 @@ def test_explicit_brain_routes_still_forward_options(client: TestClient):
     build_kwargs = mock_client.build_request.call_args.kwargs
     assert build_kwargs["method"] == "OPTIONS"
     assert build_kwargs["url"] == "http://brain:8100/brain/health"
+
+
+def test_gateway_brain_proxy_returns_502_when_upstream_disconnects(client: TestClient):
+    mock_client = MagicMock()
+    mock_client.build_request = MagicMock(return_value="request")
+    mock_client.send = AsyncMock(side_effect=httpx.RemoteProtocolError("Server disconnected without sending a response."))
+
+    with (
+        patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
+    ):
+        response = client.get("/api/health")
+
+    assert response.status_code == 502
+    assert response.json() == {"error": "brain upstream disconnected"}

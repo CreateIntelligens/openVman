@@ -5,12 +5,13 @@ from __future__ import annotations
 import sqlite3
 import threading
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Lock
 from time import monotonic
 
 from config import get_settings
+from infra.datetime_utils import normalize_iso_timestamp, utc_now_iso
 from personas.personas import normalize_persona_id
 
 
@@ -48,6 +49,7 @@ class DuplicateMessageError(RuntimeError):
 _DEDUP_WINDOW_SECONDS = 5.0
 
 
+
 class SessionStore:
     """Persist chat sessions in SQLite so they survive process restarts.
 
@@ -83,7 +85,7 @@ class SessionStore:
     ) -> SessionState:
         with self._lock:
             self._prune_expired_sessions_locked()
-            now = datetime.now().isoformat(timespec="seconds")
+            now = utc_now_iso()
             persona_key = normalize_persona_id(persona_id)
             with self._connect() as conn:
                 self._ensure_session_persona_locked(conn, session_id, persona_key, now)
@@ -98,7 +100,7 @@ class SessionStore:
         content: str,
     ) -> SessionState:
         cfg = get_settings()
-        now = datetime.now().isoformat(timespec="seconds")
+        now = utc_now_iso()
         max_messages = max(cfg.max_session_rounds * 2, 20)
         persona_key = normalize_persona_id(persona_id)
 
@@ -155,7 +157,7 @@ class SessionStore:
                         SessionMessage(
                             role=row[0],
                             content=row[1],
-                            created_at=row[2],
+                            created_at=normalize_iso_timestamp(row[2]),
                         )
                     )
                     for row in rows
@@ -180,7 +182,7 @@ class SessionStore:
                     return None
                 if persona_id is not None:
                     _validate_persona_match(row[0], persona_id)
-                return str(row[1] or "")
+                return normalize_iso_timestamp(row[1])
 
     def list_sessions(self, persona_id: str | None = None) -> list[dict[str, object]]:
         """List sessions that have at least one message."""
@@ -207,8 +209,8 @@ class SessionStore:
                     {
                         "session_id": row[0],
                         "persona_id": row[1],
-                        "created_at": row[2],
-                        "updated_at": row[3],
+                        "created_at": normalize_iso_timestamp(row[2]),
+                        "updated_at": normalize_iso_timestamp(row[3]),
                         "message_count": row[4],
                         "last_message_preview": (row[5] or "")[:120],
                     }
@@ -366,8 +368,8 @@ class SessionStore:
         return SessionState(
             session_id=row[0],
             persona_id=normalize_persona_id(str(row[1] or "default")),
-            created_at=row[2],
-            updated_at=row[3],
+            created_at=normalize_iso_timestamp(row[2]),
+            updated_at=normalize_iso_timestamp(row[3]),
             messages=messages,
         )
 
@@ -378,7 +380,7 @@ class SessionStore:
         persona_id: str,
         now: str | None = None,
     ) -> None:
-        timestamp = now or datetime.now().isoformat(timespec="seconds")
+        timestamp = now or utc_now_iso()
         row = conn.execute(
             "SELECT persona_id FROM sessions WHERE session_id = ?",
             (session_id,),
@@ -401,7 +403,7 @@ class SessionStore:
 
     def _prune_expired_sessions_locked(self) -> None:
         cfg = get_settings()
-        expiry = datetime.now() - timedelta(minutes=cfg.max_session_ttl_minutes)
+        expiry = datetime.now(UTC) - timedelta(minutes=cfg.max_session_ttl_minutes)
         with self._connect() as conn:
             # Collect session IDs to prune before deleting
             expired_ids = [
@@ -410,7 +412,7 @@ class SessionStore:
                     (expiry.isoformat(timespec="seconds"),),
                 ).fetchall()
             ]
-            empty_cutoff = (datetime.now() - timedelta(minutes=5)).isoformat(timespec="seconds")
+            empty_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="seconds")
             empty_ids = [
                 row[0] for row in conn.execute(
                     """

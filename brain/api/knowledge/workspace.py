@@ -7,7 +7,8 @@ from pathlib import Path
 
 from infra.project_context import resolve_project_context
 
-ALLOWED_DOCUMENT_SUFFIXES = {".md", ".txt", ".csv"}
+ALLOWED_DOCUMENT_SUFFIX_ORDER = (".md", ".txt", ".csv")
+ALLOWED_DOCUMENT_SUFFIXES = frozenset(ALLOWED_DOCUMENT_SUFFIX_ORDER)
 ALLOWED_CODE_SUFFIXES = {
     ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs",
     ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".swift",
@@ -154,7 +155,7 @@ def resolve_workspace_document(relative_path: str, project_id: str = "default") 
     if relative.is_absolute():
         raise ValueError("path 必須是相對路徑")
     if relative.suffix.lower() not in ALLOWED_DOCUMENT_SUFFIXES:
-        raise ValueError("僅支援 .md、.txt、.csv")
+        raise ValueError(f"僅支援 {'、'.join(ALLOWED_DOCUMENT_SUFFIX_ORDER)}")
 
     resolved = (root / relative).resolve()
     if resolved != root and root not in resolved.parents:

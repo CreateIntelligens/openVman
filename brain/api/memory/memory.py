@@ -129,9 +129,13 @@ def list_memories(
     """List memories with pagination, excluding vectors."""
     table = get_memories_table(project_id)
     df = table.to_pandas()
+    if df.empty:
+        return {"memories": [], "total": 0, "page": page, "page_size": page_size}
     if "vector" in df.columns:
         df = df.drop(columns=["vector"])
-    df = df.sort_values(by="date", ascending=False).reset_index(drop=True)
+    if "date" in df.columns:
+        df = df.sort_values(by="date", ascending=False, na_position="last")
+    df = df.reset_index(drop=True)
     total = len(df)
     start = (page - 1) * page_size
     end = start + page_size

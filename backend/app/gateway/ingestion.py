@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger("gateway.ingestion")
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 _md_converter: Any = None
 

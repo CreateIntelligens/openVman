@@ -1,90 +1,24 @@
-import { useEffect, useState } from "react";
-import {
-  createProject,
-  deleteProject,
-  fetchProjects,
-  ProjectSummary,
-} from "../api";
-import { useProject } from "../context/ProjectContext";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
-
-type Status = { type: "success" | "error"; message: string } | null;
+import { useProjectsAdmin } from "../hooks/useProjectsAdmin";
 
 export default function Projects() {
-  const { refreshProjects, setProjectId, projectId: currentProjectId } = useProject();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [newProjectLabel, setNewProjectLabel] = useState("");
-  const [lastCreatedId, setLastCreatedId] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [deletingId, setDeletingId] = useState("");
-  const [deleteTargetId, setDeleteTargetId] = useState("");
-  const [status, setStatus] = useState<Status>(null);
-  const trimmedNewProjectLabel = newProjectLabel.trim();
-  const canCreateProject = trimmedNewProjectLabel !== "" && !creating;
-
-  const loadProjects = async () => {
-    setLoading(true);
-    try {
-      const response = await fetchProjects();
-      setProjects(response.projects);
-    } catch (error) {
-      setStatus({ type: "error", message: String(error) });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshProjectList = async () => {
-    refreshProjects();
-    await loadProjects();
-  };
-
-  useEffect(() => {
-    void loadProjects();
-  }, []);
-
-  const handleCreate = async () => {
-    if (!canCreateProject) return;
-
-    setCreating(true);
-    setStatus(null);
-    setLastCreatedId("");
-    try {
-      const result = await createProject(trimmedNewProjectLabel);
-      setNewProjectLabel("");
-      setLastCreatedId(result.project_id);
-      setStatus({
-        type: "success",
-        message: `專案「${trimmedNewProjectLabel}」已建立（ID: ${result.project_id}）`,
-      });
-      await refreshProjectList();
-    } catch (error) {
-      setStatus({ type: "error", message: String(error) });
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleDelete = async (projectId: string) => {
-    setDeleteTargetId("");
-    if (deletingId) return;
-    setDeletingId(projectId);
-    setStatus(null);
-    try {
-      await deleteProject(projectId);
-      setStatus({ type: "success", message: `專案 "${projectId}" 已刪除` });
-      if (projectId === currentProjectId) {
-        setProjectId("default");
-      }
-      await refreshProjectList();
-    } catch (error) {
-      setStatus({ type: "error", message: String(error) });
-    } finally {
-      setDeletingId("");
-    }
-  };
+  const {
+    canCreateProject,
+    creating,
+    deleteTargetId,
+    deletingId,
+    handleCreate,
+    handleDelete,
+    lastCreatedId,
+    loadProjects,
+    loading,
+    newProjectLabel,
+    projects,
+    setDeleteTargetId,
+    setNewProjectLabel,
+    status,
+  } = useProjectsAdmin();
 
   return (
     <div className="page-scroll">
@@ -150,7 +84,7 @@ export default function Projects() {
               <h3 className="mt-2 text-lg font-bold text-slate-900 dark:text-white">專案列表</h3>
             </div>
             <button
-              onClick={loadProjects}
+              onClick={() => void loadProjects()}
               disabled={loading}
               className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm dark:shadow-none disabled:opacity-50"
             >

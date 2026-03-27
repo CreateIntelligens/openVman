@@ -2,37 +2,94 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import uuid
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse as parse_url
 
 import httpx
-from fastapi import APIRouter, File, Query, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app.brain_proxy import _http as _brain_http
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
 from app.gateway.crawl_adapter import CrawlResult, fetch_page
+from app.gateway.ingestion import ingest_document
 from app.gateway.job_status import get_job_status, set_job_status
 from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
 from app.gateway.temp_storage import get_temp_storage
 from app.gateway.worker import process_media
+from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
 
 logger = logging.getLogger("gateway.routes")
 router = APIRouter()
 
-_UPLOAD_CHUNK_SIZE = 1024 * 1024
+_KNOWLEDGE_PASSTHROUGH_SUFFIXES = frozenset({".md", ".txt", ".csv"})
 
 
 async def _process_media_sync(data: dict[str, Any]) -> None:
     """Sync fallback: run process_media in-process when no queue is available."""
     await process_media({}, data)
+
+
+async def _prepare_passthrough_upload(upload: UploadFile) -> tuple[str, bytes, str]:
+    try:
+        return (
+            upload.filename or "",
+            await upload.read(),
+            upload.content_type or "application/octet-stream",
+        )
+    finally:
+        await upload.close()
+
+
+def _should_passthrough_knowledge_upload(upload: UploadFile) -> bool:
+    return Path(upload.filename or "").suffix.lower() in _KNOWLEDGE_PASSTHROUGH_SUFFIXES
+
+
+async def _prepare_document_upload(
+    upload: UploadFile,
+    *,
+    max_bytes: int,
+) -> tuple[str, bytes, str]:
+    suffix = Path(upload.filename or "").suffix
+    safe_stem = Path(upload.filename or "document").stem or "document"
+    trace_id = uuid.uuid4().hex
+    tmp_path: str | None = None
+
+    try:
+        tmp_path, _ = await persist_upload_to_tempfile(
+            upload,
+            suffix=suffix,
+            max_bytes=max_bytes,
+        )
+        result = await asyncio.to_thread(ingest_document, tmp_path, trace_id=trace_id)
+        return (
+            f"{safe_stem}.md",
+            result.content.encode("utf-8"),
+            "text/markdown",
+        )
+    finally:
+        await upload.close()
+        cleanup_temp_path(tmp_path)
+
+
+def _relay_brain_response(resp: httpx.Response) -> Response:
+    content_type = resp.headers.get("content-type", "")
+    if "application/json" in content_type:
+        return JSONResponse(status_code=resp.status_code, content=resp.json())
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        media_type=content_type or None,
+    )
 
 
 def _error_response(status_code: int, error: str, **extra: Any) -> JSONResponse:
@@ -277,6 +334,55 @@ async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
         "path": path,
         "size": size,
     })
+
+
+@router.post(
+    "/api/knowledge/upload",
+    tags=["Knowledge"],
+    summary="上傳知識文件",
+    description="上傳文件到知識庫。UTF-8 文字檔會直接轉發給 Brain；PDF / DOCX 會先在 Backend 轉成 Markdown，再交由 Brain 存檔與重整索引。\n\n**所需欄位 (Form)**：\n- `files` (Form, list[UploadFile]): 要上傳的檔案\n- `target_dir` (Form, str, 預設 ''): 目標資料夾\n- `project_id` (Form, str, 預設 'default'): 專案 ID",
+)
+async def upload_knowledge_documents(
+    files: list[UploadFile] = File(...),
+    target_dir: str = Form(""),
+    project_id: str = Form("default"),
+) -> Response:
+    cfg = get_tts_config()
+    client = _brain_http.get()
+
+    try:
+        forwarded_files: list[tuple[str, tuple[str, bytes, str]]] = []
+        for upload in files:
+            if _should_passthrough_knowledge_upload(upload):
+                forwarded = await _prepare_passthrough_upload(upload)
+            else:
+                forwarded = await _prepare_document_upload(
+                    upload,
+                    max_bytes=cfg.markitdown_max_upload_bytes,
+                )
+            forwarded_files.append(("files", forwarded))
+
+        resp = await client.post(
+            f"{cfg.brain_url}/brain/knowledge/upload",
+            files=forwarded_files,
+            data={"target_dir": target_dir, "project_id": project_id},
+        )
+        return _relay_brain_response(resp)
+    except UploadTooLargeError as exc:
+        limit_mb = exc.limit_bytes / (1024 * 1024)
+        return upload_failed_response(
+            status_code=413,
+            error=f"檔案超過大小限制（上限 {limit_mb:.0f} MB）",
+        )
+    except httpx.ConnectError:
+        logger.warning("knowledge_upload_brain_unreachable target_dir=%s project_id=%s", target_dir, project_id)
+        return _error_response(502, "brain service unavailable")
+    except Exception as exc:
+        logger.error("knowledge_upload_failed target_dir=%s project_id=%s err=%s", target_dir, project_id, exc)
+        return upload_failed_response(
+            status_code=500,
+            error=str(exc),
+        )
 
 
 @router.post(

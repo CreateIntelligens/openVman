@@ -68,7 +68,6 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/move", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Move Knowledge Document"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/directory", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Create Knowledge Directory"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/directory", "methods": ["DELETE"], "tags": _TAG_KNOWLEDGE, "summary": "Delete Knowledge Directory"},
-    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/upload", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Upload Knowledge Documents"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/note", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Create Knowledge Note"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/reindex", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Reindex Knowledge"},
     {"path": f"{_PUBLIC_API_PREFIX}/protocol/validate", "methods": ["POST"], "tags": _TAG_PROTOCOL, "summary": "Validate Protocol Event"},
@@ -134,6 +133,12 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
         logger.warning("brain unreachable at %s", get_tts_config().brain_url)
         return JSONResponse(
             content={"error": "brain service unavailable"},
+            status_code=502,
+        )
+    except httpx.RemoteProtocolError as exc:
+        logger.warning("brain upstream disconnected path=%s error=%s", path, exc)
+        return JSONResponse(
+            content={"error": "brain upstream disconnected"},
             status_code=502,
         )
 
