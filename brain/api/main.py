@@ -35,7 +35,7 @@ from infra.project_admin import (
     get_project_info,
     list_projects,
 )
-from knowledge.indexer import rebuild_knowledge_index
+from knowledge.indexer import rebuild_knowledge_index, rename_document_records
 from knowledge.knowledge_admin import (
     create_workspace_directory,
     delete_workspace_directory,
@@ -902,7 +902,9 @@ async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    asyncio.create_task(_background_reindex(payload.project_id))
+    asyncio.create_task(_background_rename_document(
+        payload.source_path, payload.target_path, payload.project_id
+    ))
     return {"status": "ok", "document": document}
 
 
@@ -1071,6 +1073,14 @@ async def _background_reindex(project_id: str) -> None:
         log_event("knowledge_reindex_auto", project_id=project_id, **result)
     except Exception as exc:
         log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
+
+
+async def _background_rename_document(source_path: str, target_path: str, project_id: str) -> None:
+    try:
+        await asyncio.to_thread(rename_document_records, source_path, target_path, project_id)
+        log_event("knowledge_rename_auto", project_id=project_id, source_path=source_path, target_path=target_path)
+    except Exception as exc:
+        log_exception("knowledge_rename_auto_error", exc, project_id=project_id)
 
 
 async def _stream_generation_events(context: GenerationContext) -> AsyncIterator[dict[str, str]]:

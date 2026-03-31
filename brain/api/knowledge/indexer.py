@@ -793,3 +793,39 @@ def _save_index_state(documents: dict[str, str], project_id: str = "default") ->
         ),
         encoding="utf-8",
     )
+
+
+def rename_document_records(old_path: str, new_path: str, project_id: str = "default") -> None:
+    """Update LanceDB records and index state when a document is moved.
+
+    Rewrites metadata.path and metadata.chunk_id from old_path to new_path in
+    all matching chunks, then rebuilds the table in-place. No re-embedding is
+    needed because content is unchanged.
+    """
+    records = _load_existing_knowledge_records(project_id)
+    updated = []
+    for record in records:
+        metadata = parse_record_metadata(record)
+        if str(metadata.get("path", "")).strip() == old_path:
+            metadata["path"] = new_path
+            old_chunk_id = str(metadata.get("chunk_id", ""))
+            if old_chunk_id.startswith(old_path + "::"):
+                metadata["chunk_id"] = new_path + "::" + old_chunk_id[len(old_path) + 2:]
+            updated.append({**record, "metadata": json.dumps(metadata, ensure_ascii=False)})
+        else:
+            updated.append(record)
+
+    if not records:
+        updated = _build_placeholder_records()
+    get_db(project_id).create_table(
+        resolve_vector_table_name("knowledge"),
+        data=updated,
+        mode="overwrite",
+    )
+    ensure_fts_index("knowledge", project_id)
+
+    state = _load_index_state(project_id)
+    docs = state.get("documents", {})
+    if old_path in docs:
+        docs = {(new_path if k == old_path else k): v for k, v in docs.items()}
+        _save_index_state(docs, project_id)
