@@ -266,6 +266,16 @@ export default function KnowledgeBase() {
                 onDropFile={handleTreeDrop}
               />
             )}
+            {/* Empty area drop zone — drops to root */}
+            {draggingPath && (
+              <div
+                className={`flex-1 min-h-8 transition-colors ${dropTargetPath === "" ? "bg-primary/10" : ""}`}
+                onDragOver={(e) => { e.preventDefault(); setDropTargetPath(""); }}
+                onDragEnter={(e) => { e.preventDefault(); setDropTargetPath(""); }}
+                onDragLeave={() => { setDropTargetPath((p) => p === "" ? null : p); }}
+                onDrop={(e) => { e.preventDefault(); handleTreeDrop(""); }}
+              />
+            )}
           </div>
         </aside>
 

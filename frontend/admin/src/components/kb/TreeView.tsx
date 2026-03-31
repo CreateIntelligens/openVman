@@ -32,20 +32,19 @@ export default function TreeView({
 }) {
   const isExpanded = expandedDirs.has(node.path);
   const isSelected = selectedPath === node.path;
-  const isDropTarget = node.type === "folder" && dropTargetPath === node.path;
-  const canAcceptDrop = node.type === "folder" && !!draggingPath && sourceDragDir !== node.path;
+  const effectiveDropDir = node.type === "folder" ? node.path : node.path.split("/").slice(0, -1).join("/");
+  const isDropTarget = dropTargetPath === effectiveDropDir && !!draggingPath && effectiveDropDir !== sourceDragDir;
+  const canAcceptDrop = !!draggingPath && effectiveDropDir !== sourceDragDir && node.path !== draggingPath;
 
   return (
     <div>
       <div
         className={`group flex items-center py-1 px-2 cursor-pointer transition-all duration-150 ${
-          isSelected
-            ? "bg-primary/15 text-primary"
-            : isDropTarget
-              ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
-              : draggingPath && canAcceptDrop
-                ? "hover:bg-primary/5 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-                : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+          isDropTarget
+            ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
+            : isSelected
+              ? "bg-primary/15 text-primary"
+              : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
         }`}
         style={{ paddingLeft: `${depth * 14 + 8}px` }}
         onClick={() => onSelect(node)}
@@ -61,12 +60,12 @@ export default function TreeView({
           if (!canAcceptDrop) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = "move";
-          onDragTargetChange(node.path);
+          onDragTargetChange(effectiveDropDir);
         }}
         onDragEnter={(event) => {
           if (!canAcceptDrop) return;
           event.preventDefault();
-          onDragTargetChange(node.path);
+          onDragTargetChange(effectiveDropDir);
         }}
         onDragLeave={() => {
           if (isDropTarget) onDragTargetChange(null);
@@ -75,7 +74,7 @@ export default function TreeView({
           if (!canAcceptDrop) return;
           event.preventDefault();
           event.stopPropagation();
-          onDropFile(node.path);
+          onDropFile(effectiveDropDir);
         }}
       >
         {/* Expand arrow for folders */}
