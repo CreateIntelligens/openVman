@@ -55,7 +55,7 @@ def _mock_health_client(responses: dict[str, dict] | None = None):
 
     mock_client = MagicMock(spec=httpx.AsyncClient)
     mock_client.get = AsyncMock(side_effect=_fake_get)
-    return patch("app.main._health_client", mock_client)
+    return patch("app.main._health_http", MagicMock(get=lambda: mock_client))
 
 
 class TestHealthzOk:
@@ -72,6 +72,7 @@ class TestHealthzOk:
         assert body["service"] == "tts-router"
         assert body["dependencies"]["redis"]["status"] == "ok"
         assert body["dependencies"]["temp_storage"]["status"] == "ok"
+        assert body["dependencies"]["docling-serve"]["status"] == "healthy"
         assert "timestamp" in body
 
     def test_healthz_includes_downstream_brain(self, client: TestClient):
@@ -84,6 +85,7 @@ class TestHealthzOk:
         body = resp.json()
         assert "brain" in body["dependencies"]
         assert body["dependencies"]["brain"]["status"] == "ok"
+        assert "docling-serve" in body["dependencies"]
 
 
 class TestHealthzDegraded:
@@ -105,10 +107,11 @@ class TestHealthzDegraded:
         mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
         with (
             patch("app.main.redis_available", new_callable=AsyncMock, return_value=True),
-            patch("app.main._health_client", mock_client),
+            patch("app.main._health_http", MagicMock(get=lambda: mock_client)),
         ):
             resp = client.get("/healthz")
 
         body = resp.json()
         assert body["status"] == "degraded"
         assert body["dependencies"]["brain"]["status"] == "unreachable"
+        assert body["dependencies"]["docling-serve"]["status"] == "unreachable"

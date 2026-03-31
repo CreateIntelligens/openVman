@@ -233,7 +233,7 @@
 - ✅ VideoSync 唯一時鐘源 + 徑向漸變羽化，杜絕嘴型漂移與生硬邊界
 - ✅ **Knowledge Base Admin Panel**：整合遞迴式檔案探索器與雙視窗 Markdown 編輯器，支援 LanceDB 同步狀態展示。
 - ✅ **Admin Web Light Mode**：整合專屬風格系統，支援深淺色模式切換與持久化儲存。
-- ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + MarkItDown 多模態檔案處理
+- ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + Docling/Markdown 文件 ingestion 管線
 - ✅ **Brain Skills 模組化擴充系統**：支援動態載載入外部技能工具
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
 - ✅ 完整的錯誤處理、斷線重連、優雅關機機制

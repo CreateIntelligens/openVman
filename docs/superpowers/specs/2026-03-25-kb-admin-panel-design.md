@@ -5,7 +5,7 @@ Build an intuitive, zero-friction Content Management System (CMS) for the openVm
 
 ## 2. Universal Markdown Strategy (Key Decision)
 To radically simplify frontend development and maintain consistent data format for the AI:
-*   **Upload & Convert**: Regardless of the uploaded file type (PDF, DOCX, XLSX), the backend will process it through Microsoft's `MarkItDown` and save it strictly as a `.md` file in the workspace.
+*   **Upload & Convert**: Regardless of the uploaded file type (PDF, DOCX, PPTX, XLSX), the backend will preserve the source artifact under `workspace/raw/`, process it through a Docling-first conversion pipeline, and expose the resulting `.md` file as the canonical editable document in the workspace.
 *   **Edit in Markdown**: The frontend only ever deals with editing Markdown. This eliminates the need for complex rich-text or PDF editors.
 *   **Simple Editor**: A standard `textarea` coupled with `react-markdown` for live preview is sufficient.
 
@@ -25,7 +25,7 @@ The interface follows an IDE/Notion style split view:
     *   **Auto-Indexing**: Saving a document automatically triggers a background re-index in LanceDB. The user does not need to manually manage embeddings.
 
 ## 4. Core Workflows
-1.  **Ingestion**: User drops `company_handbook.pdf` -> Frontend calls upload API -> Backend saves as `company_handbook.md` (via MarkItDown) and queues indexing -> UI shows file as ready.
+1.  **Ingestion**: User drops `company_handbook.pdf` -> Frontend calls upload API -> Backend preserves the source file in `raw/`, generates `company_handbook.md` via Docling-first conversion, and queues indexing -> UI shows file as ready.
 2.  **Editing**: User clicks `company_handbook.md` -> Fixes a typo in the markdown editor -> Clicks Save -> Backend updates file and re-indexes -> AI instantly knows the updated fact.
 3.  **Organization**: User creates a `Policies/` folder and drags markdown files into it.
 

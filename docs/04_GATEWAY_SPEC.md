@@ -5,7 +5,7 @@
 **Backend Gateway** 位於 Kiosk 前端與主後端 (Backend/Nervous System) 之間，負責處理高運算負載與非同步任務，確保主後端保持輕量與響應性。
 
 **核心職責**：
-1. **多模態素材介入**：處理圖片 (Vision LLM)、影片 (Sampling)、音訊 (Whisper)、文件 (MarkItDown) 的解析。
+1. **多模態素材介入**：處理圖片 (Vision LLM)、影片 (Sampling)、音訊 (Whisper)、文件 (Docling-first Markdown conversion) 的解析。
 2. **非同步任務調度的**：使用 BullMQ + Redis 管理任務佇列，支援優先級與重試。
 3. **擴充插件系統**：
     * **Camera Live**：定時抓取即時畫面並透過 Vision LLM 轉為情境描述。
@@ -18,7 +18,7 @@
   > **實作現況**：Gateway 已整合進 Backend，以 Python FastAPI 實作，路由定義於 `backend/app/gateway/routes.py`。
 * **任務佇列**：BullMQ + Redis (Reliability)
   > **實作現況**：以 arq + Redis 實作非同步任務佇列，無 Redis 時自動 fallback 為同步處理。
-* **媒體處理**：OpenAI Vision/Whisper API, FFmpeg (Frames), Tesseract (OCR Backup), MarkItDown (Docs)
+* **媒體處理**：OpenAI Vision/Whisper API, FFmpeg (Frames), Tesseract (OCR Backup), Docling + fallback converter (Docs)
 * **爬蟲**：Readability.js + JSDOM + Playwright (JS Rendering)
   > **實作現況**：以 Python httpx + BeautifulSoup 實作 web crawler plugin。
 * **可觀測性**：Pino (JSON Log), Prometheus (Metrics)
@@ -41,7 +41,7 @@
   ```json
   {
     "status": "ok",
-    "dependencies": { "redis": "connected", "temp_storage": "ok" },
+    "dependencies": { "redis": "connected", "temp_storage": "ok", "brain": "ok", "docling-serve": "healthy" },
     "stats": { "temp_usage_mb": 45, "temp_limit_mb": 5120 }
   }
   ```

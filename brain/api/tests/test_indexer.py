@@ -229,6 +229,26 @@ class TestHeadingAwareChunking:
         for chunk in chunks:
             assert "![" not in chunk.text
 
+    def test_markdown_tables_are_preserved_in_chunks(self, monkeypatch, tmp_path):
+        """Docling-style markdown tables should remain available to retrieval."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        md = (
+            "# 產品規格\n\n"
+            "| 型號 | 價格 |\n"
+            "| --- | --- |\n"
+            "| TX-500 | 1200 |\n"
+            "| TX-700 | 1500 |\n"
+        )
+        doc = ws / "table.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        combined = "\n".join(chunk.text for chunk in chunks)
+        assert "| 型號 | 價格 |" in combined
+        assert "TX-500" in combined
+        assert "TX-700" in combined
+
     def test_overlap_between_consecutive_chunks(self, monkeypatch, tmp_path):
         """Consecutive chunks should share overlapping trailing segments."""
         indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)

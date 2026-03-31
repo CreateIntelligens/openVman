@@ -14,7 +14,9 @@ _DEFAULT_SUPPORTED_TYPES = (
     "video/mp4,video/quicktime,"
     "audio/mpeg,audio/wav,"
     "application/pdf,"
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document,"
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation,"
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
 
@@ -73,6 +75,19 @@ class TTSRouterConfig(BaseSettings):
     markitdown_max_upload_bytes: int = Field(
         default=10 * 1024 * 1024,
         validation_alias="MARKITDOWN_MAX_UPLOAD_BYTES",
+    )
+    docling_serve_url: str = Field(
+        default="http://docling-serve:5001",
+        validation_alias="DOCLING_SERVE_URL",
+    )
+    docling_timeout_ms: int = Field(
+        default=120000,
+        validation_alias="DOCLING_TIMEOUT_MS",
+    )
+    docling_api_key: str = Field(default="", validation_alias="DOCLING_API_KEY")
+    docling_fallback_to_markitdown: bool = Field(
+        default=True,
+        validation_alias="DOCLING_FALLBACK_TO_MARKITDOWN",
     )
 
     # --- Gateway: Temp Storage ---

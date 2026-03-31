@@ -20,7 +20,7 @@ from app.brain_proxy import _http as _brain_http
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
 from app.gateway.crawl_adapter import CrawlResult, fetch_page
-from app.gateway.ingestion import ingest_document
+from app.gateway.ingestion import IngestionResult, ingest_document
 from app.gateway.job_status import get_job_status, set_job_status
 from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
@@ -57,6 +57,11 @@ def _should_passthrough_knowledge_upload(upload: UploadFile) -> bool:
 async def _prepare_document_upload(
     upload: UploadFile,
     *,
+    cfg: Any,
+    brain_client: httpx.AsyncClient,
+    brain_url: str,
+    markdown_target_dir: str,
+    project_id: str,
     max_bytes: int,
 ) -> tuple[str, bytes, str]:
     suffix = Path(upload.filename or "").suffix
@@ -70,7 +75,15 @@ async def _prepare_document_upload(
             suffix=suffix,
             max_bytes=max_bytes,
         )
-        result = await asyncio.to_thread(ingest_document, tmp_path, trace_id=trace_id)
+        await _upload_raw_artifact(
+            brain_client,
+            brain_url=brain_url,
+            file_path=tmp_path,
+            original_filename=upload.filename or Path(tmp_path).name,
+            target_dir=markdown_target_dir,
+            project_id=project_id,
+        )
+        result = await asyncio.to_thread(ingest_document, tmp_path, trace_id=trace_id, cfg=cfg)
         return (
             f"{safe_stem}.md",
             result.content.encode("utf-8"),
@@ -79,6 +92,57 @@ async def _prepare_document_upload(
     finally:
         await upload.close()
         cleanup_temp_path(tmp_path)
+
+
+def _build_raw_target_dir(target_dir: str) -> str:
+    cleaned = target_dir.strip().strip("/")
+    if not cleaned:
+        return "raw"
+    relative = Path(cleaned)
+    if relative.parts and relative.parts[0] == "knowledge":
+        relative = Path(*relative.parts[1:]) if len(relative.parts) > 1 else Path()
+    raw_dir = Path("raw") / relative
+    return raw_dir.as_posix().rstrip("/") or "raw"
+
+
+def _build_markdown_target_dir(target_dir: str) -> str:
+    cleaned = target_dir.strip().strip("/")
+    if not cleaned:
+        return "knowledge/ingested"
+    relative = Path(cleaned)
+    if relative.parts and relative.parts[0] == "knowledge":
+        return relative.as_posix()
+    if relative.parts and relative.parts[0] == "raw":
+        relative = Path(*relative.parts[1:]) if len(relative.parts) > 1 else Path()
+    knowledge_dir = Path("knowledge") / relative
+    return knowledge_dir.as_posix().rstrip("/") or "knowledge/ingested"
+
+
+async def _upload_raw_artifact(
+    client: httpx.AsyncClient,
+    *,
+    brain_url: str,
+    file_path: str,
+    original_filename: str,
+    target_dir: str,
+    project_id: str,
+) -> None:
+    raw_path = Path(file_path)
+    response = await client.post(
+        f"{brain_url}/brain/knowledge/raw/upload",
+        files={
+            "files": (
+                Path(original_filename).name,
+                raw_path.read_bytes(),
+                "application/octet-stream",
+            )
+        },
+        data={
+            "target_dir": _build_raw_target_dir(target_dir),
+            "project_id": project_id,
+        },
+    )
+    response.raise_for_status()
 
 
 def _relay_brain_response(resp: httpx.Response) -> Response:
@@ -351,6 +415,7 @@ async def upload_knowledge_documents(
     client = _brain_http.get()
 
     try:
+        markdown_target_dir = _build_markdown_target_dir(target_dir)
         forwarded_files: list[tuple[str, tuple[str, bytes, str]]] = []
         for upload in files:
             if _should_passthrough_knowledge_upload(upload):
@@ -358,6 +423,11 @@ async def upload_knowledge_documents(
             else:
                 forwarded = await _prepare_document_upload(
                     upload,
+                    cfg=cfg,
+                    brain_client=client,
+                    brain_url=cfg.brain_url,
+                    markdown_target_dir=markdown_target_dir,
+                    project_id=project_id,
                     max_bytes=cfg.markitdown_max_upload_bytes,
                 )
             forwarded_files.append(("files", forwarded))
@@ -365,7 +435,7 @@ async def upload_knowledge_documents(
         resp = await client.post(
             f"{cfg.brain_url}/brain/knowledge/upload",
             files=forwarded_files,
-            data={"target_dir": target_dir, "project_id": project_id},
+            data={"target_dir": markdown_target_dir, "project_id": project_id},
         )
         return _relay_brain_response(resp)
     except UploadTooLargeError as exc:

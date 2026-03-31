@@ -28,7 +28,7 @@ async def _process(category: str, file_path: str, trace_id: str) -> IngestionRes
     Imports are kept at call-time so that handlers can be patched in tests.
     """
     if category == "document":
-        return ingest_document(file_path, trace_id)
+        return ingest_document(file_path, trace_id, get_tts_config())
 
     if category == "image":
         from app.gateway.ingestion_image import describe as describe_image

@@ -104,6 +104,39 @@ def test_uploaded_html_document_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp
         )
 
 
+def test_uploaded_artifact_is_saved_under_raw_without_doc_meta(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    artifact = knowledge_admin.save_uploaded_artifact(
+        "faq.pdf",
+        b"%PDF-1.4 fake",
+        target_dir="raw/ingested",
+    )
+    document = knowledge_admin.save_uploaded_document(
+        "faq.md",
+        b"# FAQ\n\nhello world",
+        target_dir="knowledge/ingested",
+    )
+
+    assert artifact["path"] == "raw/ingested/faq.pdf"
+    assert (root / "raw" / "ingested" / "faq.pdf").exists()
+    assert document["path"] == "knowledge/ingested/faq.md"
+
+    docs = knowledge_admin.list_knowledge_base_documents()
+    assert [item["path"] for item in docs] == ["knowledge/ingested/faq.md"]
+
+    payload = json.loads((root / ".doc_meta.json").read_text(encoding="utf-8"))
+    assert "raw/ingested/faq.pdf" not in payload
+    assert payload["knowledge/ingested/faq.md"]["source_type"] == "upload"
+
+
 def test_move_and_delete_document_sync_meta(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     root = _configure_workspace(monkeypatch, tmp_path)
     _stub_knowledge_admin_deps(monkeypatch)

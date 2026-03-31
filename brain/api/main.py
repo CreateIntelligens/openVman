@@ -44,6 +44,7 @@ from knowledge.knowledge_admin import (
     list_knowledge_base_documents,
     list_workspace_documents,
     move_workspace_document,
+    save_uploaded_artifact,
     read_workspace_document,
     save_uploaded_document,
     save_workspace_note,
@@ -931,6 +932,28 @@ async def delete_knowledge_directory_route(path: str, project_id: str = "default
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post(
+    "/brain/knowledge/raw/upload",
+    tags=_TAG_KNOWLEDGE,
+    summary="上傳原始檔案至 raw 區",
+    description="將單個或多個原始檔案上傳到 workspace/raw 底下，不觸發知識索引。\n\n**所需欄位 (Form)**：\n- `files` (Form, list[UploadFile]): 要上傳的檔案\n- `target_dir` (Form, str, 預設 'raw'): 上傳目標資料夾\n- `project_id` (Form, str, 預設 'default'): 專案 ID",
+)
+async def upload_knowledge_raw_documents_route(
+    files: list[UploadFile] = File(...),
+    target_dir: str = Form("raw"),
+    project_id: str = Form("default"),
+):
+    uploaded: list[dict[str, object]] = []
+    try:
+        for upload in files:
+            uploaded.append(
+                save_uploaded_artifact(upload.filename or "", await upload.read(), target_dir, project_id)
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "ok", "files": uploaded}
 
 
 @app.post(

@@ -41,7 +41,7 @@
     *   透過 LLM Native Tool Calling 與外部系統互動。
 
 #### 2.4 Gateway (外部感官層)
-*   **Document Processing**：使用 MarkItDown 將 PDF/DOCX 轉為 Markdown 供 Brain 讀取。
+*   **Document Processing**：以 Docling-first ingestion 將 PDF/DOCX/PPTX/XLSX 轉為 Markdown，保留原始檔於 `raw/`，並提供 Brain 可索引的 canonical Markdown。
 *   **Asynchronous Tasks**：網頁爬蟲、影像視覺分析。
 
 ---

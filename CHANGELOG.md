@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Docling Ingestion Pipeline**: Added `docling-serve` based office-document conversion for PDF, DOCX, PPTX, and XLSX ingestion.
+- **Raw Artifact Preservation**: Knowledge upload flow now preserves source artifacts under `workspace/raw/` before generating canonical Markdown in `workspace/knowledge/`.
+- **Docling Runbook**: Added [docs/05_DOCLING_RUNBOOK.md](docs/05_DOCLING_RUNBOOK.md) for service startup, health checks, and manual validation steps.
+- **OpenRAG Reference Notes**: Documented what to borrow from OpenRAG and what remains explicitly out of scope in `openspec/changes/integrate-docling-ingestion/openrag-notes.md`.
+
+### Changed
+- **Gateway Document Conversion**: Upgraded document ingestion from in-process MarkItDown-only flow to Docling-first with explicit fallback behavior.
+- **Backend Health Checks**: Aggregated `/healthz` now probes `docling-serve` alongside Brain and other dependencies.
+- **Documentation Alignment**: Updated architecture and KB-related docs to describe the `raw -> knowledge/.md -> LanceDB` ingestion model.
+
 ## [0.9.0] - 2026-03-26
 
 ### Added

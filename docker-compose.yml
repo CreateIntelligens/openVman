@@ -29,6 +29,14 @@ services:
               count: 1
               capabilities: [gpu]
 
+  docling-serve:
+    <<: *shared
+    image: quay.io/ds4sd/docling-serve-cpu
+    environment:
+      - HOME=/tmp
+    ports:
+      - "5001:5001"
+
   admin:
     <<: *shared
     build:
@@ -44,6 +52,7 @@ services:
     depends_on:
       - api
       - backend
+      - docling-serve
 
   backend:
     <<: *shared
@@ -62,6 +71,9 @@ services:
       - TORCH_CUDA_ARCH_LIST=8.6;8.9
     ports:
       - "${BACKEND_PORT:-8200}:8200"
+    depends_on:
+      - api
+      - docling-serve
     deploy:
       resources:
         reservations:

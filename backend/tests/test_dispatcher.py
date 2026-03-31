@@ -20,6 +20,16 @@ class TestRouteMime:
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ) == "document"
 
+    def test_pptx(self):
+        assert _route_mime(
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        ) == "document"
+
+    def test_xlsx(self):
+        assert _route_mime(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ) == "document"
+
     def test_image(self):
         assert _route_mime("image/jpeg") == "image"
         assert _route_mime("image/png") == "image"

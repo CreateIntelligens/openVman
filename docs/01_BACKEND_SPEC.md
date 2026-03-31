@@ -316,9 +316,10 @@ process.on('SIGTERM', async () => {
 * `GET /brain/knowledge/base/documents`：取得工作區的檔案樹結構。
 * `GET /brain/knowledge/document?path=...`：讀取指定的 Markdown 檔案內容。
 * `PUT /brain/knowledge/document`：儲存/更新 Markdown 檔案，儲存後應觸發自動重新索引。
-* `POST /brain/knowledge/upload`：上傳原始檔案（PDF/DOCX/XLSX），透過 Gateway 調用 MarkItDown 轉為 `.md` 後存入工作區。
+* `POST /brain/knowledge/upload`：上傳轉換後的 Markdown 文件並觸發知識重建。
+* `POST /brain/knowledge/raw/upload`：保存原始檔案（PDF/DOCX/PPTX/XLSX）到 `workspace/raw/`，不直接索引。
 * `DELETE /brain/knowledge/document`：刪除文件或資料夾。
 * `POST /brain/knowledge/move`：移動文件或資料夾，支援拖拽操作。
 
 #### 16.2 自動索引流程 (Auto-Indexing Pipeline)
-當文件被 `PUT` 或 `upload` 成功後，後端應非同步觸發 `LanceDB` 的重新索引任務，並透過 WebSocket 的 `gateway_status` 通知前端進度。
+當文件被 `PUT` 或 Markdown `upload` 成功後，後端應非同步觸發 `LanceDB` 的重新索引任務，並透過 WebSocket 的 `gateway_status` 通知前端進度。原始檔的保存與文件轉換由 Gateway / Docling ingestion 管線負責。

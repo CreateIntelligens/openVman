@@ -20,6 +20,7 @@ from knowledge.workspace import (
     is_indexable_document,
     iter_knowledge_documents,
     iter_workspace_documents,
+    resolve_workspace_artifact,
     resolve_workspace_document,
     get_workspace_root,
 )
@@ -86,6 +87,34 @@ def save_uploaded_document(
     path.write_text(decoded, encoding="utf-8")
     upsert_document_meta(relative_path.as_posix(), project_id, source_type="upload")
     return _build_document_summary(path, project_id)
+
+
+def save_uploaded_artifact(
+    filename: str,
+    content: bytes,
+    target_dir: str = "raw",
+    project_id: str = "default",
+) -> dict[str, Any]:
+    """Save a binary artifact into the workspace without indexing it."""
+    safe_name = Path(filename).name
+    if not safe_name:
+        raise ValueError("filename 不可為空")
+
+    relative_path = Path(target_dir.strip()) / safe_name if target_dir.strip() else Path(safe_name)
+    path = resolve_workspace_artifact(relative_path.as_posix(), project_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+
+    stat = path.stat()
+    return {
+        "path": relative_path.as_posix(),
+        "title": path.stem,
+        "extension": path.suffix.lower(),
+        "size": stat.st_size,
+        "updated_at": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+        "is_indexable": False,
+        "is_indexed": False,
+    }
 
 
 def save_workspace_note(title: str, content: str, project_id: str = "default") -> dict[str, Any]:

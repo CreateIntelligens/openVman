@@ -64,6 +64,7 @@ def _load_main_module():
         list_workspace_documents=lambda *args, **kwargs: [],
         move_workspace_document=lambda *args, **kwargs: {},
         read_workspace_document=lambda *args, **kwargs: {},
+        save_uploaded_artifact=lambda *args, **kwargs: {},
         save_uploaded_document=lambda *args, **kwargs: {},
         save_workspace_note=lambda *args, **kwargs: {},
         save_workspace_document=lambda *args, **kwargs: {},

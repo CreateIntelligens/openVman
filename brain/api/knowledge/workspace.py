@@ -164,6 +164,24 @@ def resolve_workspace_document(relative_path: str, project_id: str = "default") 
     return resolved
 
 
+def resolve_workspace_artifact(relative_path: str, project_id: str = "default") -> Path:
+    """Resolve a relative artifact path safely within the workspace."""
+    root = ensure_workspace_scaffold(project_id).resolve()
+    cleaned = relative_path.strip()
+    relative = Path(cleaned)
+
+    if not cleaned:
+        raise ValueError("path 不可為空")
+    if relative.is_absolute():
+        raise ValueError("path 必須是相對路徑")
+
+    resolved = (root / relative).resolve()
+    if resolved != root and root not in resolved.parents:
+        raise ValueError("path 超出 workspace 範圍")
+
+    return resolved
+
+
 def load_core_workspace_context(persona_id: str = "default", project_id: str = "default") -> dict[str, str]:
     """Load the core markdown files used to steer chat generation."""
     from personas.personas import resolve_core_document_paths
