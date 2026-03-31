@@ -37,6 +37,10 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString("zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+export function isUploadDerivedKnowledgeFile(doc: { source_type: string; path: string }): boolean {
+  return doc.source_type === "upload" && doc.path.startsWith("knowledge/");
+}
+
 export function getSourceMeta(sourceType: SourceMode) {
   switch (sourceType) {
     case "web":

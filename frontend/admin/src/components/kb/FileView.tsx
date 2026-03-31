@@ -1,6 +1,6 @@
 import type { KnowledgeDocument, KnowledgeDocumentSummary } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
-import { formatSize, formatDate } from "./helpers";
+import { formatSize, formatDate, isUploadDerivedKnowledgeFile } from "./helpers";
 import StatusDot from "./StatusDot";
 import SourceBadge from "./SourceBadge";
 
@@ -29,6 +29,8 @@ export default function FileView({
   onMove: (path: string) => void;
   onToggleEnabled: (doc: KnowledgeDocumentSummary) => void;
 }) {
+  const showsUploadNotice = document ? isUploadDerivedKnowledgeFile(document) : false;
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-slate-500">
@@ -89,6 +91,20 @@ export default function FileView({
           </button>
         </div>
       </div>
+
+      {showsUploadNotice && (
+        <div className="mx-4 mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-xs text-emerald-900 dark:text-emerald-100">
+          <div className="flex items-start gap-2">
+            <span className="material-symbols-outlined text-[16px] text-emerald-500">upload_file</span>
+            <div className="space-y-1">
+              <p className="font-semibold">這是由上傳檔案轉換出的知識文件</p>
+              <p className="text-emerald-800/80 dark:text-emerald-200/80">
+                刪除這份 <code className="font-mono">.md</code> 只會移除知識內容與索引；原始檔仍保留在 <code className="font-mono">raw/</code>。
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Split Editor: source + preview */}
       <div className="flex-1 flex min-h-0 overflow-hidden">

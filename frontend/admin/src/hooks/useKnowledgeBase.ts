@@ -62,6 +62,10 @@ export function useKnowledgeBase() {
   const dragCounterRef = useRef(0);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
+  const isFileDragEvent = useCallback((event: DragEvent) => {
+    return event.dataTransfer?.types?.includes("Files") ?? false;
+  }, []);
+
   const closeNoteModal = useCallback(() => {
     setShowNoteModal(false);
     setNoteTitle("");
@@ -348,23 +352,26 @@ export function useKnowledgeBase() {
   }, []);
 
   const handleDragEnter = useCallback((event: DragEvent) => {
+    if (!isFileDragEvent(event)) return;
     event.preventDefault();
     dragCounterRef.current += 1;
     if (dragCounterRef.current === 1) setDragOver(true);
-  }, []);
+  }, [isFileDragEvent]);
 
   const handleDragLeave = useCallback((event: DragEvent) => {
+    if (!isFileDragEvent(event)) return;
     event.preventDefault();
     dragCounterRef.current -= 1;
     if (dragCounterRef.current === 0) setDragOver(false);
-  }, []);
+  }, [isFileDragEvent]);
 
   const handleDrop = useCallback(async (event: DragEvent) => {
+    if (!isFileDragEvent(event)) return;
     event.preventDefault();
     dragCounterRef.current = 0;
     setDragOver(false);
     await uploadFiles(Array.from(event.dataTransfer.files));
-  }, [uploadFiles]);
+  }, [isFileDragEvent, uploadFiles]);
 
   return {
     documents,

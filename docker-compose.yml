@@ -31,7 +31,7 @@ services:
 
   docling-serve:
     <<: *shared
-    image: quay.io/ds4sd/docling-serve-cpu
+    image: ghcr.io/docling-project/docling-serve-cpu:main
     environment:
       - HOME=/tmp
     ports:

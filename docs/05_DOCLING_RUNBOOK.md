@@ -32,6 +32,12 @@ office/pdf source
 docker compose up -d docling-serve api backend admin
 ```
 
+目前 compose 預設使用的 Docling image 為：
+
+```text
+ghcr.io/docling-project/docling-serve-cpu:main
+```
+
 若只想先檢查文件轉換鏈路，可先啟：
 
 ```bash

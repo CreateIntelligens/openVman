@@ -1,3 +1,4 @@
+import { useCallback, useMemo, useState } from "react";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
 import FileView from "../components/kb/FileView";
@@ -5,6 +6,8 @@ import MoveModal from "../components/kb/MoveModal";
 import NoteModal from "../components/kb/NoteModal";
 import SourcePanel from "../components/kb/SourcePanel";
 import TreeView from "../components/kb/TreeView";
+import type { TreeNode } from "../components/kb/helpers";
+import { isUploadDerivedKnowledgeFile } from "../components/kb/helpers";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
 
 export default function KnowledgeBase() {
@@ -74,9 +77,46 @@ export default function KnowledgeBase() {
     handleDragLeave,
     handleDrop,
   } = useKnowledgeBase();
+  const [draggingPath, setDraggingPath] = useState<string | null>(null);
+  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
 
+  const sourceDragDir = useMemo(
+    () => draggingPath ? draggingPath.split("/").slice(0, -1).join("/") : "",
+    [draggingPath],
+  );
   const hasMatchingTreeNodes = filteredTree.children.length > 0;
   const showSearchEmptyState = hasActiveSearch && !hasMatchingTreeNodes;
+  const deleteTargetDocument = useMemo(
+    () => (deleteTarget?.type === "file" ? documents.find((document) => document.path === deleteTarget.value) ?? null : null),
+    [deleteTarget, documents],
+  );
+  const isUploadDerived = !!deleteTargetDocument && isUploadDerivedKnowledgeFile(deleteTargetDocument);
+  const deleteMessage = deleteTarget?.type === "dir"
+    ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？`
+    : isUploadDerived
+      ? `確定要刪除 ${deleteTarget?.value} 嗎？這只會移除知識文件與索引；原始上傳檔仍保留在 raw/。`
+      : `確定要刪除 ${deleteTarget?.value} 嗎？`;
+
+  const handleTreeDragStart = useCallback((node: TreeNode) => {
+    setDraggingPath(node.path);
+  }, []);
+
+  const handleTreeDragEnd = useCallback(() => {
+    setDraggingPath(null);
+    setDropTargetPath(null);
+  }, []);
+
+  const handleTreeDrop = useCallback(async (targetDir: string) => {
+    setDraggingPath((path) => {
+      if (!path) return null;
+      setDropTargetPath(targetDir);
+      handleMove(path, targetDir).then(() => {
+        setDraggingPath(null);
+        setDropTargetPath(null);
+      });
+      return null;
+    });
+  }, [handleMove]);
 
   return (
     <div
@@ -217,9 +257,13 @@ export default function KnowledgeBase() {
                 expandedDirs={visibleExpandedDirs}
                 onSelect={handleTreeSelect}
                 onToggle={toggleExpand}
-                onDelete={(node) =>
-                  setDeleteTarget({ type: node.type === "folder" ? "dir" : "file", value: node.path })
-                }
+                draggingPath={draggingPath}
+                sourceDragDir={sourceDragDir}
+                dropTargetPath={dropTargetPath}
+                onDragStart={handleTreeDragStart}
+                onDragEnd={handleTreeDragEnd}
+                onDragTargetChange={setDropTargetPath}
+                onDropFile={handleTreeDrop}
               />
             )}
           </div>
@@ -257,11 +301,7 @@ export default function KnowledgeBase() {
       <ConfirmModal
         open={!!deleteTarget}
         title={deleteTarget?.type === "dir" ? "刪除資料夾" : "刪除文件"}
-        message={
-          deleteTarget?.type === "dir"
-            ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？`
-            : `確定要刪除 ${deleteTarget?.value} 嗎？`
-        }
+        message={deleteMessage}
         confirmLabel="刪除"
         danger
         onConfirm={handleDeleteConfirm}
