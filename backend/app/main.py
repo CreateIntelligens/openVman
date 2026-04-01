@@ -435,12 +435,11 @@ async def get_tts_providers() -> JSONResponse:
         voices: list[str] = []
         try:
             resp = await _health_http.get().get(
-                f"{cfg.tts_vibevoice_url.rstrip('/')}/health",
+                f"{cfg.tts_vibevoice_url.rstrip('/')}/voices",
                 timeout=3,
             )
             if resp.status_code < 400:
                 data = resp.json()
-                # VibeVoice health might return supported models/voices
                 voices = data.get("voices", []) if isinstance(data, dict) else []
         except Exception as exc:
             logger.warning("failed to fetch VibeVoice voices: %s", exc)

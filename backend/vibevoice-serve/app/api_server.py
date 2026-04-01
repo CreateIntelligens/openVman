@@ -1,17 +1,20 @@
-"""VibeVoice TTS serve — supports 0.5B (fast) and 1.5B (quality) models."""
+"""VibeVoice TTS serve — uses official microsoft/VibeVoice 1.5B package."""
 
 import asyncio
+import copy
 import io
 import logging
 import os
 import tempfile
+from pathlib import Path
+from typing import Optional
 
+import torch
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vibevoice-serve")
@@ -20,88 +23,74 @@ logger = logging.getLogger("vibevoice-serve")
 # Config from env
 # ---------------------------------------------------------------------------
 
-MODEL_IDS = {
-    "0.5b": os.getenv("VIBEVOICE_MODEL_0_5B", "bezzam/VibeVoice-0.5B-hf"),
-    "1.5b": os.getenv("VIBEVOICE_MODEL_1_5B", "bezzam/VibeVoice-1.5B-hf"),
-}
-
-# Which models to load at startup (comma-separated, e.g. "0.5b" or "0.5b,1.5b")
-ENABLED_MODELS = [
-    m.strip() for m in os.getenv("VIBEVOICE_ENABLED_MODELS", "0.5b").split(",") if m.strip()
-]
-
-DEFAULT_MODEL = os.getenv("VIBEVOICE_DEFAULT_MODEL", ENABLED_MODELS[0])
+MODEL_PATH = os.getenv("VIBEVOICE_MODEL_PATH", "microsoft/VibeVoice-1.5B")
+DEFAULT_SPEAKER = os.getenv("VIBEVOICE_DEFAULT_SPEAKER", "")
+VOICES_DIR = os.getenv("VIBEVOICE_VOICES_DIR", "/app/assets/tts_references")
 
 # ---------------------------------------------------------------------------
 # Model registry
 # ---------------------------------------------------------------------------
 
-_models: dict[str, dict] = {}  # {"0.5b": {"processor": ..., "model": ..., "gen_config": ...}}
-_noise_scheduler = None
+_model = None
+_processor = None
+_available_speakers: list[str] = []
 
 
-def _patch_tokenizer_config(model_id: str) -> None:
-    """Fix extra_special_tokens list→dict in cached tokenizer_config.json."""
-    import json
-    from pathlib import Path
-    from huggingface_hub import try_to_load_from_cache
+def _scan_voices() -> dict[str, str]:
+    """Scan VOICES_DIR for WAV files, return {name: path} mapping."""
+    voices: dict[str, str] = {}
+    if not os.path.isdir(VOICES_DIR):
+        logger.warning("Voices directory not found: %s", VOICES_DIR)
+        return voices
+    for f in sorted(os.listdir(VOICES_DIR)):
+        if f.lower().endswith((".wav", ".mp3")):
+            name = Path(f).stem
+            voices[f] = os.path.join(VOICES_DIR, f)
+            # Also register without extension for convenience
+            voices[name] = os.path.join(VOICES_DIR, f)
+    return voices
 
-    cached = try_to_load_from_cache(model_id, "tokenizer_config.json")
-    if cached is None or not isinstance(cached, str):
-        return
 
-    path = Path(cached)
+_voice_paths: dict[str, str] = {}  # name_or_filename -> absolute path
+
+
+def _load_model() -> None:
+    """Load the VibeVoice 1.5B model."""
+    global _model, _processor, _voice_paths, _available_speakers
+
+    from vibevoice import VibeVoiceForConditionalGenerationInference, VibeVoiceProcessor
+
+    logger.info("Loading VibeVoice model: %s", MODEL_PATH)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    dtype = torch.bfloat16 if device == "cuda" else torch.float32
+
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data.get("extra_special_tokens"), list):
-            data["extra_special_tokens"] = {}
-            path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-            logger.info("Patched tokenizer_config.json for %s", model_id)
-    except Exception as exc:
-        logger.warning("tokenizer_config.json patch failed for %s: %s", model_id, exc)
-
-
-def _load_models() -> None:
-    """Load all enabled models."""
-    global _noise_scheduler
-
-    import diffusers
-    from transformers import AutoProcessor, VibeVoiceForConditionalGeneration, set_seed
-
-    set_seed(42)
-
-    _noise_scheduler = diffusers.DPMSolverMultistepScheduler(
-        beta_schedule="squaredcos_cap_v2",
-        prediction_type="v_prediction",
-    )
-
-    for name in ENABLED_MODELS:
-        if name in _models:
-            continue
-        model_id = MODEL_IDS.get(name)
-        if not model_id:
-            logger.warning("Unknown model name: %s, skipping", name)
-            continue
-
-        logger.info("Loading VibeVoice %s: %s", name, model_id)
-        _patch_tokenizer_config(model_id)
-
-        processor = AutoProcessor.from_pretrained(model_id)
-        model = VibeVoiceForConditionalGeneration.from_pretrained(
-            model_id, device_map="cuda",
+        _model = VibeVoiceForConditionalGenerationInference.from_pretrained(
+            MODEL_PATH,
+            torch_dtype=dtype,
+            device_map=device,
+            attn_implementation="flash_attention_2" if device == "cuda" else "sdpa",
+        )
+    except Exception:
+        logger.warning("flash_attention_2 failed, falling back to sdpa")
+        _model = VibeVoiceForConditionalGenerationInference.from_pretrained(
+            MODEL_PATH,
+            torch_dtype=dtype,
+            device_map=device,
+            attn_implementation="sdpa",
         )
 
-        gen_config = model.generation_config
-        gen_config.max_new_tokens = 120
-        gen_config.max_length = None
-        gen_config.noise_scheduler = _noise_scheduler
+    _processor = VibeVoiceProcessor.from_pretrained(MODEL_PATH)
 
-        _models[name] = {
-            "processor": processor,
-            "model": model,
-            "gen_config": gen_config,
-        }
-        logger.info("VibeVoice %s loaded on %s", name, next(model.parameters()).device)
+    # Scan voice references
+    _voice_paths = _scan_voices()
+    # Available speakers = unique filenames (with extension) for the API
+    _available_speakers = sorted(
+        f for f in _voice_paths if "." in f  # only filenames, not bare stems
+    )
+
+    logger.info("Model loaded. Available voices: %s", _available_speakers)
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +104,7 @@ _load_task: Optional[asyncio.Task] = None
 async def lifespan(app: FastAPI):
     global _load_task
     loop = asyncio.get_running_loop()
-    _load_task = asyncio.ensure_future(loop.run_in_executor(None, _load_models))
+    _load_task = asyncio.ensure_future(loop.run_in_executor(None, _load_model))
     _load_task.add_done_callback(
         lambda t: logger.error("Model loading failed: %s", t.exception()) if t.exception() else None
     )
@@ -127,32 +116,43 @@ app = FastAPI(title="VibeVoice Serve", lifespan=lifespan)
 class SynthesizeRequest(BaseModel):
     text: str
     model: Optional[str] = None
-    reference_id: Optional[str] = None
+    reference_id: Optional[str] = None  # voice filename or stem
     streaming: Optional[bool] = False
 
 
 @app.get("/health")
 async def health():
     return {
-        "status": "ok" if _models else "loading",
-        "default_model": DEFAULT_MODEL,
-        "loaded_models": list(_models.keys()),
-        "enabled_models": ENABLED_MODELS,
+        "status": "ok" if _model is not None else "loading",
+        "model": MODEL_PATH,
+        "default_speaker": DEFAULT_SPEAKER,
+        "available_speakers": _available_speakers,
     }
+
+
+@app.get("/voices")
+async def list_voices():
+    """List available voice reference files."""
+    return {"voices": _available_speakers}
 
 
 @app.post("/tts")
 async def synthesize(req: SynthesizeRequest):
-    model_name = req.model or DEFAULT_MODEL
+    if _model is None:
+        raise HTTPException(status_code=503, detail="Model still loading")
 
-    if model_name not in _models:
-        if model_name not in ENABLED_MODELS:
-            raise HTTPException(status_code=400, detail=f"Model '{model_name}' not enabled. Available: {ENABLED_MODELS}")
-        raise HTTPException(status_code=503, detail=f"Model '{model_name}' still loading")
+    speaker = req.reference_id or DEFAULT_SPEAKER
+    if speaker and speaker not in _voice_paths:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Voice '{speaker}' not found. Available: {_available_speakers}",
+        )
 
     try:
         loop = asyncio.get_running_loop()
-        audio_bytes = await loop.run_in_executor(None, _synthesize_sync, req.text, model_name)
+        audio_bytes = await loop.run_in_executor(
+            None, _synthesize_sync, req.text, speaker
+        )
 
         return StreamingResponse(
             io.BytesIO(audio_bytes),
@@ -163,25 +163,34 @@ async def synthesize(req: SynthesizeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _synthesize_sync(text: str, model_name: str) -> bytes:
+def _synthesize_sync(text: str, speaker: str) -> bytes:
     """Run TTS inference (blocking) and return WAV bytes."""
-    entry = _models[model_name]
-    processor = entry["processor"]
-    model = entry["model"]
-    gen_config = entry["gen_config"]
+    # Build voice sample list for the processor
+    voice_sample = _voice_paths.get(speaker)
+    voice_samples = [[voice_sample]] if voice_sample else None
 
-    chat = [{"role": "0", "content": [{"type": "text", "text": text}]}]
-    inputs = processor.apply_chat_template(
-        chat, tokenize=True, return_dict=True,
-    ).to(model.device, model.dtype)
+    # Format as single-speaker script
+    script = f"Speaker 1: {text}"
 
-    audio = model.generate(**inputs, generation_config=gen_config)
+    inputs = _processor(
+        text=script,
+        voice_samples=voice_samples,
+        return_tensors="pt",
+        padding=True,
+    ).to(_model.device)
+
+    outputs = _model.generate(
+        **inputs,
+        cfg_scale=1.3,
+        is_prefill=bool(voice_sample),
+        generation_config={"do_sample": False},
+    )
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp_path = tmp.name
 
     try:
-        processor.save_audio(audio, tmp_path)
+        _processor.save_audio(outputs.speech_outputs[0], output_path=tmp_path)
         with open(tmp_path, "rb") as f:
             return f.read()
     finally:

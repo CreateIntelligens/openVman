@@ -4,16 +4,12 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the transformers fork that supports VibeVoice model classes
+# Install the official VibeVoice package
 RUN pip install --no-cache-dir \
-    git+https://github.com/pengzhiliang/transformers.git \
-    diffusers \
-    soundfile \
-    accelerate \
-    sentencepiece \
-    protobuf \
+    vibevoice \
     fastapi \
     uvicorn \
     pydantic

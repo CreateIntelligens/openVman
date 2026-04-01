@@ -43,8 +43,9 @@ services:
       context: ./backend/vibevoice-serve
       dockerfile: Dockerfile
     environment:
-      - VIBEVOICE_ENABLED_MODELS=${VIBEVOICE_ENABLED_MODELS:-0.5b}
-      - VIBEVOICE_DEFAULT_MODEL=${VIBEVOICE_DEFAULT_MODEL:-0.5b}
+      - VIBEVOICE_MODEL_PATH=${VIBEVOICE_MODEL_PATH:-microsoft/VibeVoice-1.5B}
+      - VIBEVOICE_DEFAULT_SPEAKER=${VIBEVOICE_DEFAULT_SPEAKER:-}
+      - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       - ./backend/vibevoice-serve/app:/app
       - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
