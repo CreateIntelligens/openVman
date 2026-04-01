@@ -42,9 +42,12 @@ services:
     build:
       context: ./backend/vibevoice-serve
       dockerfile: Dockerfile
+    environment:
+      - VIBEVOICE_ENABLED_MODELS=${VIBEVOICE_ENABLED_MODELS:-0.5b}
+      - VIBEVOICE_DEFAULT_MODEL=${VIBEVOICE_DEFAULT_MODEL:-0.5b}
     volumes:
-      - ./backend/vibevoice-serve/app:/app/app
-      - ./backend/app/assets/tts_references:/app/app/assets/tts_references:ro
+      - ./backend/vibevoice-serve/app:/app
+      - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
       - hf-cache:/root/.cache/huggingface
     ports:
       - "3000"
