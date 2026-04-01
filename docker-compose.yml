@@ -47,7 +47,7 @@ services:
       - ./backend/app/assets/tts_references:/app/app/assets/tts_references:ro
       - hf-cache:/root/.cache/huggingface
     ports:
-      - "3000:3000"
+      - "3000"
     deploy:
       resources:
         reservations:

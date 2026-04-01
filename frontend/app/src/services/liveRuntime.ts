@@ -130,6 +130,7 @@ export class LiveRuntime {
   }
 
   public stop() {
+    this.ws.disconnect();
     this.asr.stop();
     this.vad.stop();
     this.playback.stopAll();

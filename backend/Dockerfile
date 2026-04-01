@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     libsm6 \
     libxext6 \
-    redis-server \
     tesseract-ocr \
     tesseract-ocr-chi-tra \
     wget \

@@ -32,16 +32,13 @@ class LiveVoicePipeline:
         self.config = get_tts_config()
         self.chunker = PunctuationChunker()
         self.vibevoice = VibeVoiceAdapter(self.config)
-        self._http_client = httpx.AsyncClient(timeout=30.0)
 
     async def run(self, user_text: str) -> AsyncIterator[dict]:
         """Run the end-to-end pipeline."""
         logger.info(f"Starting live pipeline for session {self.session.session_id}")
         t_start = time.monotonic()
         first_chunk_sent = False
-        
-        # 1. Start Brain chat stream
-        # Note: We use the internal brain /chat/stream endpoint
+
         brain_url = f"{self.config.brain_url}/brain/chat/stream"
         payload = {
             "message": user_text,
@@ -50,57 +47,48 @@ class LiveVoicePipeline:
         }
 
         try:
-            async with self._http_client.stream("POST", brain_url, json=payload) as response:
-                if response.status_code >= 400:
-                    error_text = await response.aread()
-                    logger.error(f"Brain stream failed: {response.status_code} - {error_text}")
-                    yield {"event": "server_error", "error_code": "brain_error", "message": "Brain service error"}
-                    return
+            async with httpx.AsyncClient(timeout=30.0) as http_client:
+                async with http_client.stream("POST", brain_url, json=payload) as response:
+                    if response.status_code >= 400:
+                        error_text = await response.aread()
+                        logger.error(f"Brain stream failed: {response.status_code} - {error_text}")
+                        yield {"event": "server_error", "error_code": "brain_error", "message": "Brain service error"}
+                        return
 
-                # Accumulator for tokens
-                text_buffer = ""
-                
-                async for line in response.aiter_lines():
-                    if not line.strip() or not line.startswith("data: "):
-                        continue
-                    
-                    data_str = line.removeprefix("data: ").strip()
-                    if data_str == "[DONE]":
-                        break
-                    
-                    try:
-                        data = json.loads(data_str)
-                        token = data.get("token", "")
-                        text_buffer += token
-                        
-                        # 2. Check for punctuation to chunk
-                        # We use a simple check here, or we can use the Chunker more formally
-                        # To keep it streaming-friendly, we look for sentence ends
-                        if any(p in token for p in "，。？！；"):
-                            # Flush chunks from buffer
-                            for chunk in self.chunker.split(text_buffer):
-                                # Synthesize and yield
-                                event = await self._synthesize_chunk(chunk, is_final=False)
-                                if event:
-                                    if not first_chunk_sent:
-                                        latency_ms = (time.monotonic() - t_start) * 1000
-                                        record_voice_latency(latency_ms)
-                                        first_chunk_sent = True
-                                    yield event
-                            text_buffer = ""
-                            
-                    except json.JSONDecodeError:
-                        continue
+                    text_buffer = ""
 
-                # 3. Final flush
-                if text_buffer.strip():
-                    for chunk in self.chunker.split(text_buffer):
-                        event = await self._synthesize_chunk(chunk, is_final=True)
-                        if event:
-                            yield event
-                else:
-                    # Send an empty final chunk if needed
-                    pass
+                    async for line in response.aiter_lines():
+                        if not line.strip() or not line.startswith("data: "):
+                            continue
+
+                        data_str = line.removeprefix("data: ").strip()
+                        if data_str == "[DONE]":
+                            break
+
+                        try:
+                            data = json.loads(data_str)
+                            token = data.get("token", "")
+                            text_buffer += token
+
+                            if any(p in token for p in "，。？！；"):
+                                for chunk in self.chunker.split(text_buffer):
+                                    event = await self._synthesize_chunk(chunk, is_final=False)
+                                    if event:
+                                        if not first_chunk_sent:
+                                            latency_ms = (time.monotonic() - t_start) * 1000
+                                            record_voice_latency(latency_ms)
+                                            first_chunk_sent = True
+                                        yield event
+                                text_buffer = ""
+
+                        except json.JSONDecodeError:
+                            continue
+
+                    if text_buffer.strip():
+                        for chunk in self.chunker.split(text_buffer):
+                            event = await self._synthesize_chunk(chunk, is_final=True)
+                            if event:
+                                yield event
 
         except Exception as e:
             logger.error(f"Live pipeline error: {e}")

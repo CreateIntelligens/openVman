@@ -5,9 +5,11 @@ Serves TTS synthesis, MarkItDown document conversion, and gateway upload/queue.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -154,7 +156,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 continue # Just keep connection alive
 
             if event == "client_init":
-                import time
                 await websocket.send_json({
                     "event": "server_init_ack",
                     "session_id": session.session_id,
@@ -174,7 +175,6 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         logger.info(f"Interrupted {cancelled} tasks for session {session.session_id}")
 
                     # Notify frontend to stop playing and clear queue
-                    import time
                     await websocket.send_json({
                         "event": "server_stop_audio",
                         "session_id": session.session_id,

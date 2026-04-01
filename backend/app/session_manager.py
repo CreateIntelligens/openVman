@@ -39,7 +39,7 @@ class Session:
         # Optionally wait for all tasks to acknowledge cancellation
         if cancelled_count > 0:
             await asyncio.gather(*self.active_tasks, return_exceptions=True)
-            self.active_tasks = []
+            self.active_tasks.clear()
             
         return cancelled_count
 

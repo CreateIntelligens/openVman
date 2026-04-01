@@ -17,6 +17,7 @@ export class WebSocketService {
   private onAudioChunk: (data: any) => void;
   private onStopAudio: () => void;
   private sessionId: string | null = null;
+  private _destroyed = false;
 
   constructor(
     private clientId: string, 
@@ -29,6 +30,7 @@ export class WebSocketService {
   }
 
   public connect(url: string) {
+    this._destroyed = false;
     this.socket = new WebSocket(`${url}/ws/${this.clientId}`);
 
     this.socket.onopen = () => {
@@ -48,8 +50,9 @@ export class WebSocketService {
     this.socket.onclose = () => {
       console.log('Disconnected from Backend');
       avatarState.setState('IDLE');
-      // Exponential backoff would be better here
-      setTimeout(() => this.connect(url), 3000); 
+      if (!this._destroyed) {
+        setTimeout(() => this.connect(url), 3000);
+      }
     };
   }
 
@@ -120,6 +123,12 @@ export class WebSocketService {
       timestamp: Date.now()
     };
     this.send(event);
+  }
+
+  public disconnect() {
+    this._destroyed = true;
+    this.socket?.close();
+    this.socket = null;
   }
 
   private send(event: ClientEvent) {
