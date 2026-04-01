@@ -39,11 +39,16 @@ from app.gateway.worker import (
     reset_plugins,
 )
 from app.health_payloads import build_backend_health_payload
-from app.observability import get_metrics_snapshot
+from app.observability import (
+    get_metrics_snapshot,
+    record_interruption,
+    set_active_sessions,
+)
 from app.providers.base import SynthesizeRequest
 from app.service import TTSRouterService
 from app.session_manager import SessionManager
 from app.guard_agent import GuardAgent
+from app.gateway.live_pipeline import LiveVoicePipeline
 
 logger = logging.getLogger("backend")
 _service: TTSRouterService | None = None
@@ -120,47 +125,105 @@ app.include_router(brain_proxy_router)
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await websocket.accept()
-    session = _session_manager.create_session(client_id)
+    session = _session_manager.create_session(client_id, websocket=websocket)
+    set_active_sessions(len(_session_manager.active_sessions))
     logger.info(f"WebSocket session created: {session.session_id} for client: {client_id}")
+    
+    heartbeat_task = None
+    
+    async def run_heartbeat():
+        try:
+            while True:
+                await asyncio.sleep(30)
+                if websocket.client_state.name == "DISCONNECTED":
+                    break
+                await websocket.send_json({"event": "ping", "timestamp": int(time.time() * 1000)})
+        except Exception as e:
+            logger.debug(f"Heartbeat stopped for {session.session_id}: {e}")
+
+    heartbeat_task = asyncio.create_task(run_heartbeat())
+    session.add_task(heartbeat_task)
+
     try:
         while True:
             data_str = await websocket.receive_text()
             data = json.loads(data_str)
             event = data.get("event")
+            
+            if event == "pong":
+                continue # Just keep connection alive
 
-            if event == "client_interrupt":
-                text = data.get("text") or data.get("partial_asr")
+            if event == "client_init":
+                import time
+                await websocket.send_json({
+                    "event": "server_init_ack",
+                    "session_id": session.session_id,
+                    "server_version": "1.0.0",
+                    "status": "success",
+                    "timestamp": int(time.time() * 1000)
+                })
+
+            elif event == "client_interrupt":
+                text = data.get("partial_asr") or ""
                 action = await _guard_agent.classify(text)
 
                 if action == "STOP":
                     cancelled = await session.interrupt_tasks()
+                    record_interruption(reason="user")
                     if cancelled > 0:
                         logger.info(f"Interrupted {cancelled} tasks for session {session.session_id}")
 
                     # Notify frontend to stop playing and clear queue
+                    import time
                     await websocket.send_json({
                         "event": "server_stop_audio",
-                        "session_id": session.session_id
+                        "session_id": session.session_id,
+                        "timestamp": int(time.time() * 1000),
+                        "reason": "user_interruption"
                     })
                 else:
                     logger.debug(f"Ignoring potential interruption: {text}")
 
+            elif event == "set_lip_sync_mode":
+                mode = data.get("mode")
+                if mode in ["dinet", "wav2lip", "webgl"]:
+                    session.lip_sync_mode = mode
+                    logger.info(f"Session {session.session_id} lip-sync mode set to {mode}")
+                else:
+                    logger.warning(f"Invalid lip-sync mode received: {mode}")
+
             elif event == "user_speak":
-                # Placeholder for starting Brain/TTS pipeline
-                await websocket.send_json({
-                    "event": "server_init_ack",
-                    "status": "ok",
-                    "message": "User speak received, pipeline start pending."
-                })
+                text = data.get("text")
+                if text:
+                    pipeline = LiveVoicePipeline(session)
+                    
+                    async def run_pipeline():
+                        try:
+                            async for chunk_event in pipeline.run(text):
+                                await websocket.send_json(chunk_event)
+                        except Exception as e:
+                            logger.error(f"Pipeline task error: {e}")
+                            await websocket.send_json({
+                                "event": "server_error",
+                                "error_code": "internal_error",
+                                "message": str(e)
+                            })
+
+                    task = asyncio.create_task(run_pipeline())
+                    session.add_task(task)
+                else:
+                    logger.warning("user_speak received with no text")
 
     except WebSocketDisconnect:
         await session.interrupt_tasks()
         _session_manager.remove_session(session.session_id)
+        set_active_sessions(len(_session_manager.active_sessions))
         logger.info(f"WebSocket session removed: {session.session_id}")
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         await session.interrupt_tasks()
         _session_manager.remove_session(session.session_id)
+        set_active_sessions(len(_session_manager.active_sessions))
 
 
 def _merge_tag_metadata(existing_tags: list[dict], extra_tags: list[dict]) -> list[dict]:
@@ -368,23 +431,24 @@ async def get_tts_providers() -> JSONResponse:
         {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
     ]
 
-    if cfg.tts_index_url:
+    if cfg.tts_vibevoice_url:
         voices: list[str] = []
         try:
             resp = await _health_http.get().get(
-                f"{cfg.tts_index_url.rstrip('/')}/audio/voices",
+                f"{cfg.tts_vibevoice_url.rstrip('/')}/health",
                 timeout=3,
             )
             if resp.status_code < 400:
                 data = resp.json()
-                voices = list(data.keys()) if isinstance(data, dict) else []
+                # VibeVoice health might return supported models/voices
+                voices = data.get("voices", []) if isinstance(data, dict) else []
         except Exception as exc:
-            logger.warning("failed to fetch IndexTTS voices: %s", exc)
+            logger.warning("failed to fetch VibeVoice voices: %s", exc)
         providers.append({
-            "id": "index",
-            "name": "IndexTTS",
-            "default_voice": cfg.tts_index_character,
-            "voices": voices or [cfg.tts_index_character],
+            "id": "vibevoice",
+            "name": "VibeVoice",
+            "default_voice": cfg.tts_vibevoice_ref_voice,
+            "voices": voices or [cfg.tts_vibevoice_ref_voice],
         })
 
     if cfg.tts_gcp_enabled:

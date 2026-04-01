@@ -8,7 +8,7 @@ openVman 兩個月開發規劃（8 週）
 
 **兩個月結束時應達成**：
 * 單輪問答可穩定完成：ASR -> Backend -> Brain -> TTS -> DINet/Wav2Lip AI Lip-Sync -> Frontend。
-* TTS 預設為 `zh-TW`，以自建 `IndexTTS2`-style voice pipeline 為主，具備 node / provider fallback。
+* TTS 預設為 `zh-TW`，以自建 `VibeVoice`-style voice pipeline 為主，具備 node / provider fallback。
 * Brain 具備 message handling layer、RAG、tool calling、provider/model fallback。
 * 前端可在 kiosk / desktop 環境穩定運作，支援中斷與重連。
 * 至少完成一條真實工具鏈（如 CRM / FAQ / 訂單查詢 mock API）。
@@ -37,7 +37,7 @@ openVman 兩個月開發規劃（8 週）
 ### Phase 2：語音與串流主鏈路（Week 3-4）
 
 **Project Items**
-1. zh-TW `IndexTTS2`-style TTS 整合
+1. zh-TW `VibeVoice`-style TTS 整合
    * speaker profile、詞典覆寫。
 2. TTS fallback router
    * node fallback、AWS/GCP fallback、錯誤分類、熔斷計數。

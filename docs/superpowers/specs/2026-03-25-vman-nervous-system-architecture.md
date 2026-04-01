@@ -28,7 +28,7 @@
         *   `STOP`：明確提問或插話 -> 立即發送 `STOP_AUDIO` 給前端，並殺掉當前的 Brain 請求。
 *   **TTS Pipeline**：
     *   **Chunking**：接收 Brain 吐出的 Token Stream，遇到標點符號 (`，。？！；`) 立即切分。
-    *   **Synthesis**：異步呼叫 `IndexTTS` (或其他 Provider)，獲取音訊。
+    *   **Synthesis**：異步呼叫 `VibeVoice` (或其他 Provider)，獲取音訊。
     *   **Push**：將音訊封裝為 `server_stream_chunk` 推播給前端。
 
 #### 2.3 Brain (認知認知層 - Cognitive Core)

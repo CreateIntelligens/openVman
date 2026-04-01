@@ -1,4 +1,9 @@
-# TTS Provider / Voice Selector
+# TTS Provider Voice Selector
+
+> [!CAUTION]
+> **DEPRECATED**: This plan has been superceded by the [VibeVoice transition](../../openspec/changes/replace-indextts-with-vibevoice/proposal.md).
+> Voice selection logic has been updated to support VibeVoice reference-id based zero-shot cloning.
+
 
 > 2026-03-24 — feature/brain
 

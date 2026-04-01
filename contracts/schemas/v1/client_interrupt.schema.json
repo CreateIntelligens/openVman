@@ -13,6 +13,10 @@
     "timestamp": {
       "type": "integer",
       "minimum": 0
+    },
+    "partial_asr": {
+      "type": "string",
+      "description": "Interim transcript text that triggered the interruption."
     }
   },
   "required": [

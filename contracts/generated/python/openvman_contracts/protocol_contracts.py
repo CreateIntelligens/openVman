@@ -34,13 +34,20 @@ class UserSpeakEvent(GeneratedProtocolModel):
 class ClientInterruptEvent(GeneratedProtocolModel):
     event: Literal['client_interrupt']
     timestamp: int = Field(ge=0)
+    partial_asr: str | None = Field(default=None)
+
+class SetLipSyncModeEvent(GeneratedProtocolModel):
+    event: Literal['set_lip_sync_mode']
+    session_id: str
+    mode: Literal['dinet', 'wav2lip', 'webgl']
+    timestamp: int
 
 class ServerStreamChunkEvent(GeneratedProtocolModel):
     event: Literal['server_stream_chunk']
     chunk_id: str = Field(min_length=1)
     text: str = Field(min_length=1)
     audio_base64: str = Field(min_length=1)
-    visemes: list[VisemeFrame]
+    visemes: list[VisemeFrame] | None = Field(default=None)
     emotion: str | None = Field(default=None, min_length=1)
     is_final: bool
 
@@ -59,8 +66,14 @@ class ServerInitAckEvent(GeneratedProtocolModel):
     message: str | None = Field(default=None)
     timestamp: int = Field(ge=0)
 
-ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent, Field(discriminator='event')]
-ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent, Field(discriminator='event')]
+class ServerStopAudioEvent(GeneratedProtocolModel):
+    event: Literal['server_stop_audio']
+    session_id: str
+    timestamp: int
+    reason: str | None = Field(default=None)
+
+ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | SetLipSyncModeEvent, Field(discriminator='event')]
+ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent, Field(discriminator='event')]
 ProtocolEvent = ClientEvent | ServerEvent
 
 CLIENT_EVENT_ADAPTER = TypeAdapter(ClientEvent)
@@ -80,7 +93,9 @@ __all__ = [
     "ServerErrorEvent",
     "ServerEvent",
     "ServerInitAckEvent",
+    "ServerStopAudioEvent",
     "ServerStreamChunkEvent",
+    "SetLipSyncModeEvent",
     "UserSpeakEvent",
     "VisemeFrame",
 ]

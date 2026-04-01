@@ -37,6 +37,25 @@ services:
     ports:
       - "5001:5001"
 
+  vibevoice-serve:
+    <<: *shared
+    build:
+      context: ./backend/vibevoice-serve
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend/vibevoice-serve/app:/app/app
+      - ./backend/app/assets/tts_references:/app/app/assets/tts_references:ro
+      - hf-cache:/root/.cache/huggingface
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   admin:
     <<: *shared
     build:
@@ -53,6 +72,15 @@ services:
       - api
       - backend
       - docling-serve
+      - vibevoice-serve
+
+  redis:
+    <<: *shared
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
 
   backend:
     <<: *shared
@@ -61,29 +89,22 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./backend/app:/app/app
-      - ./backend/index-tts-vllm:/app/index-tts-vllm
       - ./backend/logs:/app/logs
-      - hf-cache:/root/.cache/huggingface
-      - modelscope-cache:/root/.cache/modelscope
     env_file:
       - ./backend/.env
     environment:
-      - TORCH_CUDA_ARCH_LIST=8.6;8.9
+      - REDIS_URL=redis://redis:6379
+      - TTS_VIBEVOICE_URL=http://vibevoice-serve:3000
     ports:
       - "${BACKEND_PORT:-8200}:8200"
     depends_on:
       - api
       - docling-serve
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      - vibevoice-serve
 
 volumes:
   brain-data:
   hf-cache:
   modelscope-cache:
   admin-node-modules:
+  redis-data:

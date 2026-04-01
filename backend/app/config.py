@@ -39,9 +39,16 @@ class TTSRouterConfig(BaseSettings):
     env: str = "prod"
     backend_port: int = Field(default=8200, validation_alias="BACKEND_PORT")
 
-    # --- Index TTS ---
-    tts_index_url: str = ""
-    tts_index_character: str = "hayley"
+    # --- VibeVoice TTS ---
+    tts_vibevoice_url: str = Field(default="", validation_alias="TTS_VIBEVOICE_URL")
+    tts_vibevoice_default_model: str = Field(
+        default="0.5b",
+        validation_alias="TTS_VIBEVOICE_DEFAULT_MODEL",
+    )
+    tts_vibevoice_ref_voice: str = Field(
+        default="taiwanese_female_friendly.wav",
+        validation_alias="TTS_VIBEVOICE_REF_VOICE",
+    )
 
     # --- AWS Polly ---
     tts_aws_enabled: bool = False

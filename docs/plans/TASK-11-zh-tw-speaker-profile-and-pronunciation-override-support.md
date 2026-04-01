@@ -1,6 +1,11 @@
 # TASK-11: zh-TW Speaker Profile and Pronunciation Override Support
 
-> Issue: #21 — zh-TW speaker profile and pronunciation override support
+> [!CAUTION]
+> **DEPRECATED**: This plan has been superceded by the [VibeVoice transition](../../openspec/changes/replace-indextts-with-vibevoice/proposal.md).
+> Custom IndexTTS profiles are no longer used; Zero-shot cloning via Taiwanese reference prompts is the new standard.
+
+> Issue: #21 — zh-TW Speaker Profile and Pronunciation Override Support
+
 > Epic: #4
 > Branch: `feature/backend`
 > Status: **Draft**

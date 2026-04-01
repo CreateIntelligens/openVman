@@ -116,3 +116,25 @@ def record_chain_exhausted(*, final_reason: str, hops: int) -> None:
 def record_provider_request(*, provider: str, result: str) -> None:
     """Record a provider-level request."""
     increment_counter(f"tts_provider_requests_total|provider={provider}|result={result}")
+
+
+# ---------------------------------------------------------------------------
+# Live pipeline metrics helpers
+# ---------------------------------------------------------------------------
+
+def set_active_sessions(count: int) -> None:
+    """Set the current number of active websocket sessions."""
+    with _metrics_lock:
+        _counters["live_active_sessions"] = count
+
+
+def record_interruption(reason: str = "user") -> None:
+    """Record a successful interruption event."""
+    increment_counter(f"live_interruptions_total|reason={reason}")
+    log_event("live_interruption", reason=reason)
+
+
+def record_voice_latency(latency_ms: float) -> None:
+    """Record user_speak to first-audio latency."""
+    record_timing("live_voice_latency_ms", latency_ms)
+    log_event("live_voice_latency", latency_ms=round(latency_ms, 2))

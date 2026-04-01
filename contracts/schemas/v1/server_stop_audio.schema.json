@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openvman.com/schemas/v1/server_stop_audio.schema.json",
+  "title": "ServerStopAudio",
+  "description": "Sent by the server to immediately stop and clear the client audio playback queue (usually triggered by interruption).",
+  "type": "object",
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["server_stop_audio"]
+    },
+    "session_id": {
+      "type": "string",
+      "description": "The active session ID."
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp in milliseconds."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional reason for the stop (e.g., 'user_interruption')."
+    }
+  },
+  "required": ["event", "session_id", "timestamp"],
+  "additionalProperties": false
+}

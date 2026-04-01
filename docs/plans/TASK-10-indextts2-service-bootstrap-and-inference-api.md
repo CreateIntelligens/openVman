@@ -1,5 +1,9 @@
 # TASK-10: IndexTTS2 Service Bootstrap and Inference API
 
+> [!CAUTION]
+> **DEPRECATED**: This plan has been superceded by the [VibeVoice transition](../../openspec/changes/replace-indextts-with-vibevoice/proposal.md).
+> The IndexTTS (vLLM) architecture has been removed in favor of a standalone VibeVoice service.
+
 > Issue: #20 — IndexTTS2 service bootstrap and inference API
 > Epic: #4
 > Branch: `feature/backend`

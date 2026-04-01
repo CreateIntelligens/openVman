@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://openvman.com/schemas/v1/set_lip_sync_mode.schema.json",
+  "title": "SetLipSyncMode",
+  "description": "Sent by the client to switch the lip-sync rendering mode (e.g., DINet, Wav2Lip, or WebGL).",
+  "type": "object",
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["set_lip_sync_mode"]
+    },
+    "session_id": {
+      "type": "string",
+      "description": "The active session ID."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["dinet", "wav2lip", "webgl"],
+      "description": "The target lip-sync rendering mode."
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Unix timestamp in milliseconds."
+    }
+  },
+  "required": ["event", "session_id", "mode", "timestamp"],
+  "additionalProperties": false
+}

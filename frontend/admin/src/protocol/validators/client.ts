@@ -12,6 +12,7 @@ import {
   assertShape,
   expectNonEmptyString,
   expectNonNegativeInteger,
+  expectOptionalNonEmptyString,
   expectOptionalStringMap,
   expectSemver,
 } from "./shared";
@@ -43,5 +44,6 @@ export function validateClientInterrupt(record: Record<string, unknown>, version
   return {
     event: "client_interrupt",
     timestamp: expectNonNegativeInteger(record.timestamp, version, "client_interrupt", "timestamp"),
+    partial_asr: expectOptionalNonEmptyString(record.partial_asr, version, "partial_asr", "client_interrupt"),
   };
 }

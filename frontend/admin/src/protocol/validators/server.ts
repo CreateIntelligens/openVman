@@ -1,16 +1,21 @@
 import type {
   ServerErrorEvent,
   ServerInitAckEvent,
+  ServerStopAudioEvent,
   ServerStreamChunkEvent,
+  SetLipSyncModeEvent,
   VisemeFrame,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
   allowedInitAckStatuses,
+  allowedLipSyncModes,
   allowedServerErrorCodes,
   allowedVisemeValues,
   serverErrorSchema,
   serverInitAckSchema,
+  serverStopAudioSchema,
   serverStreamChunkSchema,
+  setLipSyncModeSchema,
 } from "./schema";
 import {
   assertShape,
@@ -33,9 +38,40 @@ export function validateServerStreamChunk(record: Record<string, unknown>, versi
     chunk_id: expectNonEmptyString(record.chunk_id, version, "chunk_id", "server_stream_chunk"),
     text: expectNonEmptyString(record.text, version, "text", "server_stream_chunk"),
     audio_base64: expectNonEmptyString(record.audio_base64, version, "audio_base64", "server_stream_chunk"),
-    visemes: expectVisemeFrames(record.visemes, version),
+    visemes: expectOptionalVisemeFrames(record.visemes, version),
     emotion: expectOptionalNonEmptyString(record.emotion, version, "emotion", "server_stream_chunk"),
     is_final: expectBoolean(record.is_final, version, "server_stream_chunk", "is_final"),
+  };
+}
+
+export function validateSetLipSyncMode(record: Record<string, unknown>, version: string): SetLipSyncModeEvent {
+  const eventName = "set_lip_sync_mode";
+  assertShape(record, setLipSyncModeSchema, version, eventName);
+  const mode = expectEnumValue(
+    record.mode,
+    allowedLipSyncModes,
+    version,
+    eventName,
+    "mode",
+  );
+
+  return {
+    event: eventName,
+    session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
+    mode,
+    timestamp: expectNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
+  };
+}
+
+export function validateServerStopAudio(record: Record<string, unknown>, version: string): ServerStopAudioEvent {
+  const eventName = "server_stop_audio";
+  assertShape(record, serverStopAudioSchema, version, eventName);
+
+  return {
+    event: eventName,
+    session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
+    timestamp: expectNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
+    reason: expectOptionalNonEmptyString(record.reason, version, "reason", eventName),
   };
 }
 
@@ -84,7 +120,10 @@ export function validateServerInitAck(record: Record<string, unknown>, version: 
   };
 }
 
-function expectVisemeFrames(value: unknown, version: string): VisemeFrame[] {
+function expectOptionalVisemeFrames(value: unknown, version: string): VisemeFrame[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
   if (!Array.isArray(value)) {
     throwInvalidField(version, "server_stream_chunk", "visemes", "must be an array");
   }

@@ -19,7 +19,9 @@ import {
 import {
   validateServerError,
   validateServerInitAck,
+  validateServerStopAudio,
   validateServerStreamChunk,
+  validateSetLipSyncMode,
 } from "./validators/server";
 
 export { DEFAULT_PROTOCOL_VERSION, ProtocolValidationError };
@@ -65,12 +67,16 @@ function validateEvent(
       return validateUserSpeak(record, version);
     case "client_interrupt":
       return validateClientInterrupt(record, version);
+    case "set_lip_sync_mode":
+      return validateSetLipSyncMode(record, version);
     case "server_stream_chunk":
       return validateServerStreamChunk(record, version);
     case "server_error":
       return validateServerError(record, version);
     case "server_init_ack":
       return validateServerInitAck(record, version);
+    case "server_stop_audio":
+      return validateServerStopAudio(record, version);
     default:
       throw new ProtocolValidationError(
         `Unsupported protocol event \`${eventName}\``,

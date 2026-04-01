@@ -66,8 +66,8 @@ const messageEnvelope = {
 
 每一段生成的文字，必須產生「音頻 (Audio Buffer)」。嘴型由前端 DINet AI 根據音訊即時生成，無需後端提供 viseme 資料。
 
-**推薦方案 A：自建 `IndexTTS2`-style zh-TW TTS（主方案）**
-這裡的前提不是「能說中文」而已，而是**要穩定輸出台灣口音、可客製化聲線、可控停頓與語氣**。因此正式方案應以自建的 `IndexTTS2` 類型 TTS 為核心：
+**推薦方案 A：自建 `VibeVoice`-style zh-TW TTS（主方案）**
+這裡的前提不是「能說中文」而已，而是**要穩定輸出台灣口音、可客製化聲線、可控停頓與語氣**。因此正式方案應以自建的 `VibeVoice` (0.5B/1.5B) 類型 TTS 為核心：
 
 * 以公司自己的 speaker index / voice profile 管理角色聲線。
 * 支援 zh-TW 發音詞典、數字/專有名詞讀法覆寫。
@@ -119,7 +119,7 @@ async function synthesizeWithFallback(text, session) {
   throw new Error("All TTS targets failed");
 }
 ```
-> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`。
+> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（VibeVoice → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`。
 
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
@@ -170,9 +170,8 @@ LLM_MODEL=gpt-4o             # 預設模型名稱
 LLM_STREAM=true              # 必須為 true
 
 # === TTS 設定 ===
-TTS_PROVIDER=indextts2        # indextts2 | aws | gcp
-TTS_PRIMARY_NODE=http://tts-node-a:9000
-TTS_SECONDARY_NODE=http://tts-node-b:9000
+TTS_VIBEVOICE_URL=http://vibevoice-serve:3000
+TTS_VIBEVOICE_REF_VOICE=taiwanese_female_friendly.wav
 TTS_AWS_ACCESS_KEY_ID=***
 TTS_AWS_SECRET_ACCESS_KEY=***
 TTS_AWS_REGION=ap-northeast-1

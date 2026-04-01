@@ -1,8 +1,7 @@
-FROM vllm/vllm-openai:v0.9.0
+FROM python:3.11-slim
 
 ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 ENV CUDA_LAUNCH_BLOCKING=1
-ENV TORCH_CUDA_ARCH_LIST="8.6;8.9"
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,25 +15,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-chi-tra \
     wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf /usr/bin/python3 /usr/bin/python
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
-COPY index-tts-vllm/requirements.txt /app/index-tts-vllm/requirements.txt
 
-RUN pip install --no-cache-dir --break-system-packages --upgrade \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 \
-    && pip install --no-cache-dir --break-system-packages -r /app/requirements.txt \
-    && pip install --no-cache-dir --break-system-packages -r /app/index-tts-vllm/requirements.txt \
-    && pip install --no-cache-dir --break-system-packages "modelscope>=1.22,<2"
+RUN pip install --no-cache-dir --upgrade \
+    pip setuptools wheel \
+    && pip install --no-cache-dir -r /app/requirements.txt
 
 COPY docker /app/docker
 
 RUN sed -i 's/\r$//' /app/docker/start-backend-container.sh \
     && chmod +x /app/docker/start-backend-container.sh
 
-EXPOSE 8200 8011
+EXPOSE 8200
 
 ENTRYPOINT ["/app/docker/start-backend-container.sh"]

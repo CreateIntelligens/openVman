@@ -4,9 +4,9 @@ export const PROTOCOL_NAME = "openvman-core";
 export const DEFAULT_PROTOCOL_VERSION = "1.0.0";
 
 export type ProtocolDirection = "client_to_server" | "server_to_client";
-export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "server_stream_chunk" | "server_error" | "server_init_ack";
-export type ClientEventName = "client_init" | "user_speak" | "client_interrupt";
-export type ServerEventName = "server_stream_chunk" | "server_error" | "server_init_ack";
+export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "set_lip_sync_mode" | "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio";
+export type ClientEventName = "client_init" | "user_speak" | "client_interrupt" | "set_lip_sync_mode";
+export type ServerEventName = "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio";
 
 export interface ContractEventEntry {
   direction: ProtocolDirection;
@@ -43,6 +43,14 @@ export interface UserSpeakEvent {
 export interface ClientInterruptEvent {
   event: "client_interrupt";
   timestamp: number;
+  partial_asr?: string;
+}
+
+export interface SetLipSyncModeEvent {
+  event: "set_lip_sync_mode";
+  session_id: string;
+  mode: "dinet" | "wav2lip" | "webgl";
+  timestamp: number;
 }
 
 export interface ServerStreamChunkEvent {
@@ -50,7 +58,7 @@ export interface ServerStreamChunkEvent {
   chunk_id: string;
   text: string;
   audio_base64: string;
-  visemes: VisemeFrame[];
+  visemes?: VisemeFrame[];
   emotion?: string;
   is_final: boolean;
 }
@@ -72,6 +80,13 @@ export interface ServerInitAckEvent {
   timestamp: number;
 }
 
-export type ClientEvent = ClientInitEvent | UserSpeakEvent | ClientInterruptEvent;
-export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent;
+export interface ServerStopAudioEvent {
+  event: "server_stop_audio";
+  session_id: string;
+  timestamp: number;
+  reason?: string;
+}
+
+export type ClientEvent = ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | SetLipSyncModeEvent;
+export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent;
 export type ProtocolEvent = ClientEvent | ServerEvent;

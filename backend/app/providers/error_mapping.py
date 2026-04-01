@@ -110,11 +110,11 @@ def _classify_network_error(exc: Exception) -> str | None:
     return None
 
 
-def classify_index_error(exc: Exception) -> str:
-    """Classify an error from an Index TTS node."""
-    from app.providers.index_tts_adapter import IndexTTSHTTPError
+def classify_vibevoice_error(exc: Exception) -> str:
+    """Classify an error from the VibeVoice service."""
+    from app.providers.vibevoice_adapter import VibeVoiceHTTPError
 
-    if isinstance(exc, IndexTTSHTTPError):
+    if isinstance(exc, VibeVoiceHTTPError):
         if exc.status_code == 422:
             return REASON_BAD_REQUEST
         if exc.status_code >= 500:

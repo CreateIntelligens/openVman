@@ -5,11 +5,15 @@ import clientInterruptSchemaJson from "@contracts/schemas/v1/client_interrupt.sc
 import serverStreamChunkSchemaJson from "@contracts/schemas/v1/server_stream_chunk.schema.json";
 import serverErrorSchemaJson from "@contracts/schemas/v1/server_error.schema.json";
 import serverInitAckSchemaJson from "@contracts/schemas/v1/server_init_ack.schema.json";
+import setLipSyncModeSchemaJson from "@contracts/schemas/v1/set_lip_sync_mode.schema.json";
+import serverStopAudioSchemaJson from "@contracts/schemas/v1/server_stop_audio.schema.json";
 import type {
   ContractManifest,
   ProtocolEventName,
   ServerErrorEvent,
   ServerInitAckEvent,
+  SetLipSyncModeEvent,
+  ServerStopAudioEvent,
   VisemeFrame,
 } from "@contracts/generated/typescript/protocol-contracts";
 
@@ -31,6 +35,8 @@ export const schemaRegistry = {
   server_stream_chunk: serverStreamChunkSchemaJson as EventSchema,
   server_error: serverErrorSchemaJson as EventSchema,
   server_init_ack: serverInitAckSchemaJson as EventSchema,
+  set_lip_sync_mode: setLipSyncModeSchemaJson as EventSchema,
+  server_stop_audio: serverStopAudioSchemaJson as EventSchema,
 } satisfies Record<ProtocolEventName, EventSchema>;
 
 export const clientInitSchema = schemaRegistry.client_init;
@@ -39,10 +45,13 @@ export const clientInterruptSchema = schemaRegistry.client_interrupt;
 export const serverStreamChunkSchema = schemaRegistry.server_stream_chunk;
 export const serverErrorSchema = schemaRegistry.server_error;
 export const serverInitAckSchema = schemaRegistry.server_init_ack;
+export const setLipSyncModeSchema = schemaRegistry.set_lip_sync_mode;
+export const serverStopAudioSchema = schemaRegistry.server_stop_audio;
 
 export const allowedServerErrorCodes = readEnum(serverErrorSchema, "error_code") as ServerErrorEvent["error_code"][];
 export const allowedVisemeValues = readEnum(serverStreamChunkSchema, "visemes", "value") as VisemeFrame["value"][];
 export const allowedInitAckStatuses = readEnum(serverInitAckSchema, "status") as ServerInitAckEvent["status"][];
+export const allowedLipSyncModes = readEnum(setLipSyncModeSchema, "mode") as SetLipSyncModeEvent["mode"][];
 
 export const DEFAULT_PROTOCOL_VERSION = manifest.version;
 

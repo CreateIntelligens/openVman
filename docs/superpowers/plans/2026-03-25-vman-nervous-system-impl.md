@@ -6,7 +6,7 @@
 
 **Architecture:** A decoupled three-tier system where the Backend handles real-time reflexes (WS, Guard Agent, TTS), the Brain handles deep cognition (Soul, RAG, Skills), and the Frontend handles sensory rendering (ASR, DINet).
 
-**Tech Stack:** FastAPI (Python), WebSockets, IndexTTS, LanceDB, MarkItDown, OpenAI/Anthropic (LLMs).
+**Tech Stack:** FastAPI (Python), WebSockets, VibeVoice, LanceDB, MarkItDown, OpenAI/Anthropic (LLMs).
 
 ---
 
@@ -45,7 +45,7 @@ class PunctuationChunker:
         # Implementation using regex or simple split
         pass
 ```
-- [ ] **Step 2: Implement `TTSRouter` to call IndexTTS for each chunk**
+- [x] **Step 2: Implement `TTSRouter` to call VibeVoice for each chunk**
 - [ ] **Step 3: Implement `server_stream_chunk` event broadcast via WebSocket**
 - [ ] **Step 4: Run test: `pytest backend/tests/test_tts_pipeline.py -v`**
 - [ ] **Step 5: Commit**

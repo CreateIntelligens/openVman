@@ -3,15 +3,23 @@
 ## [Unreleased]
 
 ### Added
-- **Docling Ingestion Pipeline**: Added `docling-serve` based office-document conversion for PDF, DOCX, PPTX, and XLSX ingestion.
-- **Raw Artifact Preservation**: Knowledge upload flow now preserves source artifacts under `workspace/raw/` before generating canonical Markdown in `workspace/knowledge/`.
-- **Docling Runbook**: Added [docs/05_DOCLING_RUNBOOK.md](docs/05_DOCLING_RUNBOOK.md) for service startup, health checks, and manual validation steps.
-- **OpenRAG Reference Notes**: Documented what to borrow from OpenRAG and what remains explicitly out of scope in `openspec/changes/integrate-docling-ingestion/openrag-notes.md`.
+- **Live Voice WebSocket Pipeline**: Implemented an end-to-end real-time voice interaction loop connecting frontend ASR, backend orchestration, and Brain streaming.
+- **Frontend Live Runtime**: Created a new interactive runtime in `frontend/app` with VAD (Voice Activity Detection), automatic turn detection, and audio-driven lip-sync.
+- **Smart Interruption (Barge-in)**: Added a `Guard Agent` powered interruption mechanism allowing users to interrupt the avatar mid-sentence with low-latency reflexes.
+- **Handshake & Protocol**: Formalized the live control protocol with `client_init`, `set_lip_sync_mode`, and `server_stop_audio` events.
+- **Audio Playback Queue**: Implemented a robust frontend queue for seamless decoding and playback of streamed audio chunks.
+- **Microsoft VibeVoice Integration**: Replaced `IndexTTS` with the `VibeVoice` family (0.5B Real-time and 1.5B High-quality) for low-latency, emotional, and Taiwanese-accented speech synthesis.
+- **Standalone TTS Service**: Decoupled TTS from the backend container into a dedicated `vibevoice-serve` Docker service, improving resource isolation and GPU scheduling.
+- **Standalone Redis Service**: Offloaded the internal Redis server from the backend container to a standalone `redis:7-alpine` service.
+- **Taiwanese Accent Support**: Introduced "Reference Voice" (Zero-shot) cloning logic, using 5-10s Taiwanese audio prompts to achieve authentic regional prosody.
+
+### Removed
+- **Index-TTS (vLLM)**: Excised the legacy `index-tts-vllm` directory and all related code/dependencies, significantly reducing the backend container's footprint and complexity.
 
 ### Changed
-- **Gateway Document Conversion**: Upgraded document ingestion from in-process MarkItDown-only flow to Docling-first with explicit fallback behavior.
-- **Backend Health Checks**: Aggregated `/healthz` now probes `docling-serve` alongside Brain and other dependencies.
-- **Documentation Alignment**: Updated architecture and KB-related docs to describe the `raw -> knowledge/.md -> LanceDB` ingestion model.
+- **Backend Container Slimming**: Switched the `backend` base image from `vllm/vllm-openai` to `python:3.11-slim`, focusing on business logic rather than heavy model inference.
+- **TTS Fallback Strategy**: Updated `TTSRouterService` to prioritize `VibeVoice-0.5B` -> `VibeVoice-1.5B` -> `Edge-TTS`.
+- **Infrastructure Overhaul**: Refactored `docker-compose.yml` and `start-backend-container.sh` to support the new decoupled microservice architecture.
 
 ## [0.9.0] - 2026-03-26
 

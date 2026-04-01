@@ -15,6 +15,10 @@
       "direction": "client_to_server",
       "schema": "client_interrupt.schema.json"
     },
+    "set_lip_sync_mode": {
+      "direction": "client_to_server",
+      "schema": "set_lip_sync_mode.schema.json"
+    },
     "server_stream_chunk": {
       "direction": "server_to_client",
       "schema": "server_stream_chunk.schema.json"
@@ -26,6 +30,10 @@
     "server_init_ack": {
       "direction": "server_to_client",
       "schema": "server_init_ack.schema.json"
+    },
+    "server_stop_audio": {
+      "direction": "server_to_client",
+      "schema": "server_stop_audio.schema.json"
     }
   }
 }

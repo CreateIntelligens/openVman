@@ -2,16 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
+from fastapi import WebSocket
 
 
 class Session:
     """Represents an active WebSocket session."""
-    def __init__(self, client_id: str):
+    def __init__(self, client_id: str, websocket: Optional[WebSocket] = None):
         self.session_id: str = uuid.uuid4().hex
         self.client_id: str = client_id
+        self.websocket: Optional[WebSocket] = websocket
         # To track active asyncio tasks (e.g. Brain generation or TTS synthesis)
         self.active_tasks: List[asyncio.Task] = []
+        # Session-specific state
+        self.lip_sync_mode: str = "dinet"  # Default
+        self.metadata: Dict[str, Any] = {}
+
+    def set_websocket(self, websocket: WebSocket) -> None:
+        """Update the websocket connection for this session."""
+        self.websocket = websocket
 
     def add_task(self, task: asyncio.Task) -> None:
         """Add a task to the session's active tasks."""
@@ -41,9 +50,9 @@ class SessionManager:
     def __init__(self) -> None:
         self.active_sessions: Dict[str, Session] = {}
 
-    def create_session(self, client_id: str) -> Session:
+    def create_session(self, client_id: str, websocket: Optional[WebSocket] = None) -> Session:
         """Create a new session for a client."""
-        session = Session(client_id=client_id)
+        session = Session(client_id=client_id, websocket=websocket)
         self.active_sessions[session.session_id] = session
         return session
 
