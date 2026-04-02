@@ -11,7 +11,6 @@ import logging
 import base64
 import time
 from typing import AsyncIterator, Optional
-from dataclasses import dataclass
 
 import httpx
 from app.config import get_tts_config
@@ -24,13 +23,6 @@ from app.observability import record_voice_latency
 logger = logging.getLogger("backend.live_pipeline")
 
 _SENTINEL = object()  # marks end of text/audio queues
-
-
-@dataclass
-class LivePipelineConfig:
-    brain_url: str
-    vibevoice_url: str
-    default_ref_voice: str
 
 
 class LiveVoicePipeline:
@@ -105,7 +97,8 @@ class LiveVoicePipeline:
                     text_buffer = ""
 
                     async for line in response.aiter_lines():
-                        if not line.strip() or not line.startswith("data: "):
+                        line = line.strip()
+                        if not line.startswith("data: "):
                             continue
 
                         data_str = line.removeprefix("data: ").strip()

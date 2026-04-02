@@ -44,11 +44,6 @@ class VibeVoiceAdapter:
             "top_p": 0.9,
         }
 
-        # If we have the reference locally, we could potentially send it.
-        # But the design says "or a reference to it if cached by the server".
-        # Let's stick to reference_id for now as it's cleaner, 
-        # but ensure the adapter knows where the files are if needed in future.
-
         t0 = monotonic()
         try:
             resp = self._client.post(self._url, json=payload)

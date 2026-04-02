@@ -5,11 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import uuid
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse as parse_url
 
 import httpx
 from fastapi import APIRouter, File, Form, Query, UploadFile
@@ -26,7 +24,7 @@ from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
 from app.gateway.temp_storage import get_temp_storage
 from app.gateway.worker import process_media
-from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
+from app.utils.upload import UPLOAD_CHUNK_SIZE, UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
 
 logger = logging.getLogger("gateway.routes")
 router = APIRouter()
@@ -100,9 +98,8 @@ def _build_raw_target_dir(target_dir: str) -> str:
         return "raw"
     relative = Path(cleaned)
     if relative.parts and relative.parts[0] == "knowledge":
-        relative = Path(*relative.parts[1:]) if len(relative.parts) > 1 else Path()
-    raw_dir = Path("raw") / relative
-    return raw_dir.as_posix().rstrip("/") or "raw"
+        relative = Path(*relative.parts[1:])
+    return (Path("raw") / relative).as_posix().rstrip("/") or "raw"
 
 
 def _build_markdown_target_dir(target_dir: str) -> str:
@@ -113,9 +110,8 @@ def _build_markdown_target_dir(target_dir: str) -> str:
     if relative.parts and relative.parts[0] == "knowledge":
         return relative.as_posix()
     if relative.parts and relative.parts[0] == "raw":
-        relative = Path(*relative.parts[1:]) if len(relative.parts) > 1 else Path()
-    knowledge_dir = Path("knowledge") / relative
-    return knowledge_dir.as_posix().rstrip("/") or "knowledge/ingested"
+        relative = Path(*relative.parts[1:])
+    return (Path("knowledge") / relative).as_posix().rstrip("/") or "knowledge/ingested"
 
 
 async def _upload_raw_artifact(
@@ -160,36 +156,6 @@ def _error_response(status_code: int, error: str, **extra: Any) -> JSONResponse:
     return JSONResponse(status_code=status_code, content={"error": error, **extra})
 
 
-def _build_crawl_markdown(title: str, source_url: str, content: str) -> bytes:
-    return f"# {title}\n\nSource: {source_url}\n\n{content}".encode("utf-8")
-
-
-def _build_crawl_filename(source_url: str) -> str:
-    parsed_url = parse_url(source_url)
-    slug = re.sub(r"[^a-zA-Z0-9_\-]+", "_", f"{parsed_url.netloc}{parsed_url.path}")
-    return f"{slug.strip('_')[:120]}.md"
-
-
-async def _sync_crawled_document_meta(
-    client: httpx.AsyncClient,
-    brain_url: str,
-    path: str,
-    project_id: str,
-    source_url: str,
-) -> None:
-    response = await client.patch(
-        f"{brain_url}/brain/knowledge/document/meta",
-        json={
-            "path": path,
-            "project_id": project_id,
-            "source_type": "web",
-            "source_url": source_url,
-            "enabled": True,
-        },
-    )
-    response.raise_for_status()
-
-
 @router.post(
     "/uploads",
     tags=["Uploads"],
@@ -227,10 +193,7 @@ async def upload(
     # 3. read file + size check
     chunks: list[bytes] = []
     total_size = 0
-    while True:
-        chunk = await file.read(_UPLOAD_CHUNK_SIZE)
-        if not chunk:
-            break
+    while chunk := await file.read(UPLOAD_CHUNK_SIZE):
         chunks.append(chunk)
         total_size += len(chunk)
 
@@ -349,55 +312,6 @@ async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
     except RuntimeError as exc:
         return _error_response(422, str(exc))
 
-
-@router.post(
-    "/api/knowledge/crawl",
-    tags=["Knowledge"],
-    summary="抓取網址並匯入",
-    description="抓取指定網址頁面內容，並以 Markdown 格式直接存入知識庫（/knowledge/ingested），且更新文件 metadata。\n\n**所需欄位**：\n- `url` (Body, str): 要抓取的網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
-)
-async def crawl_and_ingest(req: CrawlIngestRequest) -> JSONResponse:
-    """抓取網址內容並匯入知識庫。"""
-    result = await _safe_fetch_page(req.url)
-    if isinstance(result, JSONResponse):
-        return result
-
-    cfg = get_tts_config()
-    client = _brain_http.get()
-    file_bytes = _build_crawl_markdown(result.title, result.source_url, result.content)
-    filename = _build_crawl_filename(result.source_url)
-
-    try:
-        resp = await client.post(
-            f"{cfg.brain_url}/brain/knowledge/upload",
-            files={"files": (filename, file_bytes, "text/markdown")},
-            data={"target_dir": "knowledge/ingested", "project_id": req.project_id},
-        )
-        resp.raise_for_status()
-        upload_result = resp.json()
-    except httpx.HTTPError as exc:
-        logger.error("crawl_upload_failed url=%s err=%s", req.url, exc)
-        return _error_response(502, f"知識庫寫入失敗：{exc}", url=req.url)
-
-    uploaded_files = upload_result.get("files") or []
-    first = uploaded_files[0] if uploaded_files else None
-    path = first.get("path", "") if first else ""
-    size = first.get("size", 0) if first else len(file_bytes)
-
-    if path:
-        try:
-            await _sync_crawled_document_meta(client, cfg.brain_url, path, req.project_id, result.source_url)
-        except httpx.HTTPError as exc:
-            logger.error("crawl_meta_sync_failed path=%s err=%s", path, exc)
-            return _error_response(502, f"知識 metadata 寫入失敗：{exc}", path=path, url=req.url)
-
-    return JSONResponse(content={
-        "status": "ok",
-        "title": result.title,
-        "source_url": result.source_url,
-        "path": path,
-        "size": size,
-    })
 
 
 @router.post(
