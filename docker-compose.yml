@@ -29,14 +29,6 @@ services:
               count: 1
               capabilities: [gpu]
 
-  docling-serve:
-    <<: *shared
-    image: ghcr.io/docling-project/docling-serve-cpu:main
-    environment:
-      - HOME=/tmp
-    ports:
-      - "5001:5001"
-
   vibevoice-serve:
     <<: *shared
     build:
@@ -50,8 +42,6 @@ services:
       - ./backend/vibevoice-serve/app:/app
       - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
       - hf-cache:/root/.cache/huggingface
-    ports:
-      - "3000"
     deploy:
       resources:
         reservations:
@@ -75,14 +65,11 @@ services:
     depends_on:
       - api
       - backend
-      - docling-serve
       - vibevoice-serve
 
   redis:
     <<: *shared
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
 
@@ -99,11 +86,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TTS_VIBEVOICE_URL=http://vibevoice-serve:3000
-    ports:
-      - "${BACKEND_PORT:-8200}:8200"
     depends_on:
       - api
-      - docling-serve
       - vibevoice-serve
 
 volumes:
