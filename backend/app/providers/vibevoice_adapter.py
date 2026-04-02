@@ -11,6 +11,9 @@ from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 
 logger = logging.getLogger("provider.vibevoice")
 
+VIBEVOICE_DEFAULT_SPEAKER = "0"
+VIBEVOICE_SPEAKERS = ("0", "1", "2", "3")
+
 class VibeVoiceAdapter:
     """Synthesize speech via VibeVoice (HTTP) and return a NormalizedTTSResult."""
 
@@ -32,16 +35,9 @@ class VibeVoiceAdapter:
         if not self._url:
             raise RuntimeError("VibeVoice URL is not configured")
 
-        reference_id = request.voice_hint or self._config.tts_vibevoice_ref_voice
-        
-        # Basic payload
         payload = {
             "text": request.text,
-            "model": self._config.tts_vibevoice_default_model,
-            "reference_id": reference_id,
-            "streaming": False,
-            "temperature": 0.8, # Default for prosody variation
-            "top_p": 0.9,
+            "speaker": request.voice_hint or VIBEVOICE_DEFAULT_SPEAKER,
         }
 
         t0 = monotonic()
@@ -64,8 +60,7 @@ class VibeVoiceAdapter:
                 route_target="vibevoice",
                 latency_ms=round(latency_ms, 2),
                 raw_metadata={
-                    "model": payload["model"],
-                    "reference_id": payload["reference_id"],
+                    "speaker": payload["speaker"],
                     "status_code": resp.status_code,
                 },
             )

@@ -41,14 +41,6 @@ class TTSRouterConfig(BaseSettings):
 
     # --- VibeVoice TTS ---
     tts_vibevoice_url: str = Field(default="", validation_alias="TTS_VIBEVOICE_URL")
-    tts_vibevoice_default_model: str = Field(
-        default="0.5b",
-        validation_alias="TTS_VIBEVOICE_DEFAULT_MODEL",
-    )
-    tts_vibevoice_ref_voice: str = Field(
-        default="Hayley.wav",
-        validation_alias="TTS_VIBEVOICE_REF_VOICE",
-    )
 
     # --- AWS Polly ---
     tts_aws_enabled: bool = False

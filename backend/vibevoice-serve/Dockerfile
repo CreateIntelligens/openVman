@@ -7,9 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the official VibeVoice package
 RUN pip install --no-cache-dir \
-    vibevoice \
+    "transformers>=5.3.0" \
+    diffusers \
     fastapi \
     uvicorn \
     pydantic

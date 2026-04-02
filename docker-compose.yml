@@ -36,11 +36,10 @@ services:
       dockerfile: Dockerfile
     environment:
       - VIBEVOICE_MODEL_PATH=${VIBEVOICE_MODEL_PATH:-microsoft/VibeVoice-1.5B}
-      - VIBEVOICE_DEFAULT_SPEAKER=${VIBEVOICE_DEFAULT_SPEAKER:-}
+      - VIBEVOICE_DEFAULT_SPEAKER=${VIBEVOICE_DEFAULT_SPEAKER:-0}
       - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       - ./backend/vibevoice-serve/app:/app
-      - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
       - hf-cache:/root/.cache/huggingface
     ports:
       - "3000"

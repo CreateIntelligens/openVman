@@ -15,7 +15,7 @@ from typing import AsyncIterator, Optional
 import httpx
 from app.config import get_tts_config
 from app.utils.chunker import PunctuationChunker
-from app.providers.vibevoice_adapter import VibeVoiceAdapter
+from app.providers.vibevoice_adapter import VIBEVOICE_DEFAULT_SPEAKER, VibeVoiceAdapter
 from app.providers.base import SynthesizeRequest
 from app.session_manager import Session
 from app.observability import record_voice_latency
@@ -163,7 +163,7 @@ class LiveVoicePipeline:
         try:
             request = SynthesizeRequest(
                 text=text,
-                voice_hint=self.config.tts_vibevoice_ref_voice,
+                voice_hint=VIBEVOICE_DEFAULT_SPEAKER,
                 sample_rate=24000,
             )
 
