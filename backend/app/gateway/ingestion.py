@@ -7,8 +7,6 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
-
 from app.config import TTSRouterConfig, get_tts_config
 
 logger = logging.getLogger("gateway.ingestion")
@@ -93,7 +91,7 @@ def ingest_document(file_path: str, trace_id: str, cfg: TTSRouterConfig | None =
     try:
         markdown = _convert_with_docling(file_path, trace_id) if use_docling else _convert_with_markitdown(file_path, trace_id)
     except DoclingServiceError as exc:
-        if use_docling and cfg.docling_fallback_to_markitdown:
+        if cfg.docling_fallback_to_markitdown:
             logger.warning("docling_ingest_failed trace_id=%s err=%s fallback=markitdown", trace_id, exc)
             markdown = _convert_with_markitdown(file_path, trace_id)
         else:

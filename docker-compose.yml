@@ -42,6 +42,14 @@ services:
       - ./backend/vibevoice-serve/app:/app
       - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
       - hf-cache:/root/.cache/huggingface
+    ports:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, json, sys; res=json.loads(urllib.request.urlopen('http://localhost:3000/health').read()); sys.exit(0 if res.get('status') == 'ok' else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     deploy:
       resources:
         reservations:
@@ -87,8 +95,10 @@ services:
       - REDIS_URL=redis://redis:6379
       - TTS_VIBEVOICE_URL=http://vibevoice-serve:3000
     depends_on:
-      - api
-      - vibevoice-serve
+      api:
+        condition: service_started
+      vibevoice-serve:
+        condition: service_healthy
 
 volumes:
   brain-data:

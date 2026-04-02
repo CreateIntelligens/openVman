@@ -1,11 +1,26 @@
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Stage 2: Runner
 FROM python:3.11-slim
 
 ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 ENV CUDA_LAUNCH_BLOCKING=1
 ENV PYTHONUNBUFFERED=1
+ENV PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
     ffmpeg \
     libsndfile1 \
@@ -18,11 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt /app/requirements.txt
-
-RUN pip install --no-cache-dir --upgrade \
-    pip setuptools wheel \
-    && pip install --no-cache-dir -r /app/requirements.txt
+COPY --from=builder /opt/venv /opt/venv
 
 COPY docker /app/docker
 
