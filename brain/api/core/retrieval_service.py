@@ -5,12 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
+import logging
 
 from config import get_settings
 from infra.db import parse_record_metadata
 from memory.embedder import QueryEmbeddingRoute, encode_query_with_fallback
 from memory.retrieval import search_records
 from safety.observability import log_event
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,9 +72,18 @@ def retrieve_context(
         importance_weight=importance_weight,
     )
 
-    # Trim to final top-k
-    final_knowledge = reranked_knowledge[:knowledge_top_k]
-    final_memory = reranked_memory[:memory_top_k]
+    cutoff = cfg.rag_distance_cutoff
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "retrieval_distances knowledge=%s memory=%s",
+            [round(r["_effective_distance"], 3) for r in reranked_knowledge],
+            [round(r["_effective_distance"], 3) for r in reranked_memory],
+        )
+
+    # Trim to final top-k with cutoff filtering
+    final_knowledge = [r for r in reranked_knowledge if r["_effective_distance"] <= cutoff][:knowledge_top_k]
+    final_memory = [r for r in reranked_memory if r["_effective_distance"] <= cutoff][:memory_top_k]
 
     # Build diagnostics
     diagnostics = _build_diagnostics(
@@ -146,6 +158,7 @@ def _rerank_by_distance(
             importance = _record_importance(record)
             effective -= importance * importance_weight
 
+        record["_effective_distance"] = effective
         return effective
 
     return sorted(candidates, key=sort_key)
