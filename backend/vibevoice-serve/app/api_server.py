@@ -1,7 +1,6 @@
 """VibeVoice TTS serve — uses official microsoft/VibeVoice 1.5B package."""
 
 import asyncio
-import copy
 import io
 import logging
 import os
@@ -44,10 +43,13 @@ def _scan_voices() -> dict[str, str]:
         return voices
     for f in sorted(os.listdir(VOICES_DIR)):
         if f.lower().endswith((".wav", ".mp3")):
+            full_path = os.path.join(VOICES_DIR, f)
+            if os.path.getsize(full_path) == 0:
+                logger.warning("Skipping empty voice file: %s", f)
+                continue
             name = Path(f).stem
-            voices[f] = os.path.join(VOICES_DIR, f)
-            # Also register without extension for convenience
-            voices[name] = os.path.join(VOICES_DIR, f)
+            voices[f] = full_path
+            voices[name] = full_path
     return voices
 
 
@@ -58,7 +60,8 @@ def _load_model() -> None:
     """Load the VibeVoice 1.5B model."""
     global _model, _processor, _voice_paths, _available_speakers
 
-    from vibevoice import VibeVoiceForConditionalGenerationInference, VibeVoiceProcessor
+    from vibevoice.modular.modeling_vibevoice_inference import VibeVoiceForConditionalGenerationInference
+    from vibevoice.processor.vibevoice_processor import VibeVoiceProcessor
 
     logger.info("Loading VibeVoice model: %s", MODEL_PATH)
 
@@ -167,7 +170,7 @@ def _synthesize_sync(text: str, speaker: str) -> bytes:
     """Run TTS inference (blocking) and return WAV bytes."""
     # Build voice sample list for the processor
     voice_sample = _voice_paths.get(speaker)
-    voice_samples = [[voice_sample]] if voice_sample else None
+    voice_samples = [voice_sample] if voice_sample else None
 
     # Format as single-speaker script
     script = f"Speaker 1: {text}"
@@ -182,8 +185,7 @@ def _synthesize_sync(text: str, speaker: str) -> bytes:
     outputs = _model.generate(
         **inputs,
         cfg_scale=1.3,
-        is_prefill=bool(voice_sample),
-        generation_config={"do_sample": False},
+        tokenizer=_processor.tokenizer,
     )
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:

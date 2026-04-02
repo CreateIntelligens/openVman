@@ -41,6 +41,11 @@ node_modules/
 # Firebase
 firebase-debug.log
 
+# TTS voice references（大型音訊檔）
+backend/app/assets/tts_references/*.wav
+backend/app/assets/tts_references/*.WAV
+backend/app/assets/tts_references/*.mp3
+
 # OS
 .DS_Store
 Thumbs.db

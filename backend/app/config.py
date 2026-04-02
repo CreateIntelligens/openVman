@@ -46,7 +46,7 @@ class TTSRouterConfig(BaseSettings):
         validation_alias="TTS_VIBEVOICE_DEFAULT_MODEL",
     )
     tts_vibevoice_ref_voice: str = Field(
-        default="taiwanese_female_friendly.wav",
+        default="Hayley.wav",
         validation_alias="TTS_VIBEVOICE_REF_VOICE",
     )
 
