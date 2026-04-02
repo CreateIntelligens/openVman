@@ -19,7 +19,6 @@ import {
   addPendingExchange,
   appendStreamingToken,
   defaultPersona,
-  emptySources,
   getConversationTitle,
   getPersonaStorageKey,
   getSessionStorageKey,
@@ -43,8 +42,6 @@ export function useChatSession() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [lastContext, setLastContext] = useState({ knowledge: 0, memory: 0 });
-  const [lastSources, setLastSources] = useState(emptySources);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -63,7 +60,6 @@ export function useChatSession() {
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashIndex, setSlashIndex] = useState(0);
 
-  const [panelOpen, setPanelOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [deleteSessionTarget, setDeleteSessionTarget] = useState<SessionSummary | null>(null);
@@ -124,8 +120,8 @@ export function useChatSession() {
   const slashFilter = slashOpen ? input.slice(1).toLowerCase() : "";
   const slashMatches = slashOpen
     ? slashSkills.filter(
-        (skill) => skill.id.includes(slashFilter) || skill.name.toLowerCase().includes(slashFilter),
-      )
+      (skill) => skill.id.includes(slashFilter) || skill.name.toLowerCase().includes(slashFilter),
+    )
     : [];
   const clampedSlashIndex = Math.min(slashIndex, Math.max(slashMatches.length - 1, 0));
 
@@ -157,8 +153,6 @@ export function useChatSession() {
     setInput("");
     setSessionId("");
     setMessages([]);
-    setLastContext({ knowledge: 0, memory: 0 });
-    setLastSources(emptySources);
     setError("");
     clearTtsPrefetchState();
   }, [clearTtsPrefetchState]);
@@ -203,8 +197,6 @@ export function useChatSession() {
     }
 
     persistSessionId(payload.session_id);
-    setLastContext({ knowledge: knowledge.length, memory: memory.length });
-    setLastSources({ knowledge, memory });
 
     if (payload.reply) {
       pendingPrefetchRef.current = payload.reply;
@@ -429,9 +421,6 @@ export function useChatSession() {
               loadSessions();
             }
           },
-          onContext: ({ knowledge_count, memory_count }) => {
-            setLastContext({ knowledge: knowledge_count, memory: memory_count });
-          },
           onToken: ({ token }) => {
             setMessages((current) => appendStreamingToken(current, token));
           },
@@ -521,8 +510,6 @@ export function useChatSession() {
     loadingHistory,
     sending,
     error,
-    lastContext,
-    lastSources,
     playingIndex,
     ttsProviders,
     ttsProvider,
@@ -535,13 +522,11 @@ export function useChatSession() {
     clampedSlashIndex,
     conversationTitle,
     conversationStatus,
-    panelOpen,
     sessions,
     loadingSessions,
     deleteSessionTarget,
     chatEndRef,
     starterPrompts,
-    setPanelOpen,
     setDeleteSessionTarget,
     setSlashIndex,
     setSlashOpen,

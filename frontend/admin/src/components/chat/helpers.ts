@@ -1,9 +1,4 @@
-import { getActiveProjectId, type ChatMessage, type PersonaSummary, type RetrievalResult } from "../../api";
-
-export const emptySources: { knowledge: RetrievalResult[]; memory: RetrievalResult[] } = {
-  knowledge: [],
-  memory: [],
-};
+import { getActiveProjectId, type ChatMessage, type PersonaSummary } from "../../api";
 
 export const defaultPersona: PersonaSummary = {
   persona_id: "default",

@@ -3,7 +3,6 @@ import ChatHeader from "../components/chat/ChatHeader";
 import ChatInput from "../components/chat/ChatInput";
 import ChatMessage from "../components/chat/ChatMessage";
 import ChatSidebar from "../components/chat/ChatSidebar";
-import ContextPanel from "../components/chat/ContextPanel";
 import { useChatSession } from "../hooks/useChatSession";
 
 export default function Chat() {
@@ -17,8 +16,6 @@ export default function Chat() {
     loadingHistory,
     sending,
     error,
-    lastContext,
-    lastSources,
     playingIndex,
     ttsProviders,
     ttsProvider,
@@ -31,13 +28,11 @@ export default function Chat() {
     clampedSlashIndex,
     conversationTitle,
     conversationStatus,
-    panelOpen,
     sessions,
     loadingSessions,
     deleteSessionTarget,
     chatEndRef,
     starterPrompts,
-    setPanelOpen,
     setDeleteSessionTarget,
     setSlashIndex,
     setSlashOpen,
@@ -84,8 +79,6 @@ export default function Chat() {
             conversationTitle={conversationTitle}
             conversationStatus={conversationStatus}
             sessionId={sessionId}
-            panelOpen={panelOpen}
-            onTogglePanel={() => setPanelOpen(!panelOpen)}
           />
 
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-5 bg-gradient-to-b from-background to-slate-50 dark:to-slate-950/20">
@@ -157,12 +150,6 @@ export default function Chat() {
           />
         </div>
 
-        <ContextPanel
-          panelOpen={panelOpen}
-          lastContext={lastContext}
-          lastSources={lastSources}
-          onClose={() => setPanelOpen(false)}
-        />
       </main>
 
       <ConfirmModal
