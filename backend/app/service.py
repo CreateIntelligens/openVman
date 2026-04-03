@@ -20,9 +20,11 @@ from app.providers.error_mapping import (
     classify_aws_error,
     classify_edge_tts_error,
     classify_gcp_error,
+    classify_indextts_error,
     classify_vibevoice_error,
 )
 from app.providers.gcp_adapter import GCPTTSAdapter
+from app.providers.indextts_adapter import IndexTTSAdapter
 from app.providers.vibevoice_adapter import VibeVoiceAdapter
 
 
@@ -45,10 +47,11 @@ class SynthesisOutput:
 
 
 class TTSRouterService:
-    """Execute a bounded fallback chain: VibeVoice -> GCP -> AWS -> Edge-TTS."""
+    """Execute a bounded fallback chain: IndexTTS -> VibeVoice -> GCP -> AWS -> Edge-TTS."""
 
     def __init__(self, config: TTSRouterConfig | None = None) -> None:
         self._config = config or get_tts_config()
+        self._indextts = IndexTTSAdapter(self._config)
         self._vibevoice = VibeVoiceAdapter(self._config)
         self._aws = AWSPollyAdapter(self._config)
         self._gcp = GCPTTSAdapter(self._config)
@@ -196,6 +199,7 @@ class TTSRouterService:
         self,
     ) -> tuple[tuple[str, ProviderAdapter, Callable[[Exception], str]], ...]:
         return (
+            ("indextts", self._indextts, classify_indextts_error),
             ("vibevoice", self._vibevoice, classify_vibevoice_error),
             ("gcp-tts", self._gcp, classify_gcp_error),
             ("aws-polly", self._aws, classify_aws_error),

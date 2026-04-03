@@ -110,17 +110,24 @@ def _classify_network_error(exc: Exception) -> str | None:
     return None
 
 
-def classify_vibevoice_error(exc: Exception) -> str:
-    """Classify an error from the VibeVoice service."""
-    from app.providers.vibevoice_adapter import VibeVoiceHTTPError
-
-    if isinstance(exc, VibeVoiceHTTPError):
+def _classify_http_provider_error(exc: Exception, error_class: type) -> str:
+    """Classify an HTTP provider error by status code."""
+    if isinstance(exc, error_class):
         if exc.status_code == 422:
             return REASON_BAD_REQUEST
         if exc.status_code >= 500:
             return REASON_PROVIDER_UNAVAILABLE
-
     return _classify_network_error(exc) or REASON_UNKNOWN
+
+
+def classify_indextts_error(exc: Exception) -> str:
+    from app.providers.indextts_adapter import IndexTTSHTTPError
+    return _classify_http_provider_error(exc, IndexTTSHTTPError)
+
+
+def classify_vibevoice_error(exc: Exception) -> str:
+    from app.providers.vibevoice_adapter import VibeVoiceHTTPError
+    return _classify_http_provider_error(exc, VibeVoiceHTTPError)
 
 
 def classify_edge_tts_error(exc: Exception) -> str:

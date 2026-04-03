@@ -8,8 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir \
-    "transformers>=5.3.0" \
+    git+https://github.com/pengzhiliang/transformers.git \
     diffusers \
+    accelerate \
+    sentencepiece \
     fastapi \
     uvicorn \
     pydantic

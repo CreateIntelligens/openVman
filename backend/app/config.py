@@ -39,6 +39,10 @@ class TTSRouterConfig(BaseSettings):
     env: str = "prod"
     backend_port: int = Field(default=8200, validation_alias="BACKEND_PORT")
 
+    # --- IndexTTS (primary, voice-cloning) ---
+    tts_indextts_url: str = Field(default="", validation_alias="TTS_INDEXTTS_URL")
+    tts_indextts_default_character: str = Field(default="", validation_alias="TTS_INDEXTTS_DEFAULT_CHARACTER")
+
     # --- VibeVoice TTS ---
     tts_vibevoice_url: str = Field(default="", validation_alias="TTS_VIBEVOICE_URL")
 

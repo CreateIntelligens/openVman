@@ -2,9 +2,12 @@
 
 import asyncio
 import io
+import json
 import logging
 import os
+import re
 import tempfile
+from pathlib import Path
 from typing import Optional
 
 import diffusers
@@ -21,7 +24,7 @@ logger = logging.getLogger("vibevoice-serve")
 # Config from env
 # ---------------------------------------------------------------------------
 
-MODEL_PATH = os.getenv("VIBEVOICE_MODEL_PATH", "microsoft/VibeVoice-1.5B")
+MODEL_PATH = os.getenv("VIBEVOICE_MODEL_PATH", "bezzam/VibeVoice-1.5B-hf")
 DEFAULT_SPEAKER = os.getenv("VIBEVOICE_DEFAULT_SPEAKER", "0")
 MAX_NEW_TOKENS = int(os.getenv("VIBEVOICE_MAX_NEW_TOKENS", "300"))
 
@@ -35,8 +38,28 @@ _noise_scheduler = None
 _set_seed = None  # cached import
 
 
+def _patch_tokenizer_config(model_path: str) -> None:
+    """Fix extra_special_tokens from list to object if needed (community HF conversion issue)."""
+    try:
+        from huggingface_hub import hf_hub_download
+        local_path = hf_hub_download(model_path, "tokenizer_config.json")
+    except Exception:
+        return
+    path = Path(local_path)
+    text = path.read_text()
+    patched = re.sub(
+        r'"extra_special_tokens"\s*:\s*\[[^\]]*\],',
+        '"extra_special_tokens": {},',
+        text,
+        flags=re.S,
+    )
+    if patched != text:
+        path.write_text(patched)
+        logger.info("Patched tokenizer_config.json: extra_special_tokens list → object")
+
+
 def _load_model() -> None:
-    """Load the VibeVoice 1.5B model via transformers native class."""
+    """Load the VibeVoice 1.5B model via pengzhiliang/transformers fork."""
     global _model, _processor, _noise_scheduler, _set_seed
 
     from transformers import AutoProcessor, VibeVoiceForConditionalGeneration, set_seed
@@ -44,6 +67,8 @@ def _load_model() -> None:
     _set_seed = set_seed
 
     logger.info("Loading VibeVoice model: %s", MODEL_PATH)
+
+    _patch_tokenizer_config(MODEL_PATH)
 
     _model = VibeVoiceForConditionalGeneration.from_pretrained(
         MODEL_PATH, device_map="cuda",
