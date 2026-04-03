@@ -16,6 +16,7 @@ openai>=1.12,<2
 pytesseract>=0.3,<1
 pyyaml>=6,<7
 readability-lxml>=0.8,<1
+youtube-transcript-api>=1.0.0,<2
 Pillow>=10,<11
 pytest>=8.0.0
 pytest-asyncio>=0.23.0

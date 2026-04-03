@@ -19,6 +19,11 @@ from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
 from app.gateway.crawl_adapter import CrawlResult, fetch_page
 from app.gateway.ingestion import IngestionResult, ingest_document
+from app.gateway.ingestion_youtube import (
+    YouTubeTranscriptError,
+    fetch_transcript,
+    is_youtube_url,
+)
 from app.gateway.job_status import get_job_status, set_job_status
 from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
@@ -96,22 +101,27 @@ def _build_raw_target_dir(target_dir: str) -> str:
     cleaned = target_dir.strip().strip("/")
     if not cleaned:
         return "raw"
-    relative = Path(cleaned)
-    if relative.parts and relative.parts[0] == "knowledge":
-        relative = Path(*relative.parts[1:])
-    return (Path("raw") / relative).as_posix().rstrip("/") or "raw"
+        
+    parts = cleaned.split("/")
+    if parts[0] == "knowledge":
+        parts = parts[1:]
+        
+    return "/".join(["raw", *parts]).rstrip("/") or "raw"
 
 
 def _build_markdown_target_dir(target_dir: str) -> str:
     cleaned = target_dir.strip().strip("/")
     if not cleaned:
         return "knowledge/ingested"
-    relative = Path(cleaned)
-    if relative.parts and relative.parts[0] == "knowledge":
-        return relative.as_posix()
-    if relative.parts and relative.parts[0] == "raw":
-        relative = Path(*relative.parts[1:])
-    return (Path("knowledge") / relative).as_posix().rstrip("/") or "knowledge/ingested"
+
+    parts = cleaned.split("/")
+    if parts[0] == "knowledge":
+        return cleaned
+
+    if parts[0] == "raw":
+        parts = parts[1:]
+
+    return "/".join(["knowledge", *parts]).rstrip("/") or "knowledge/ingested"
 
 
 async def _upload_raw_artifact(
@@ -299,6 +309,35 @@ class CrawlIngestRequest(BaseModel):
     project_id: str = "default"
 
 
+class YouTubeIngestRequest(BaseModel):
+    url: str = Field(..., min_length=1)
+    project_id: str = "default"
+    save_to_knowledge: bool = False
+    target_dir: str = ""
+
+
+async def _fetch_youtube_transcript(url: str) -> dict[str, Any] | JSONResponse:
+    """Fetch YouTube transcript. Returns dict on success, JSONResponse on error."""
+    trace_id = uuid.uuid4().hex
+    try:
+        result = await asyncio.to_thread(fetch_transcript, url, trace_id)
+        return {
+            "status": "ok",
+            "title": result.title,
+            "source_url": f"https://www.youtube.com/watch?v={result.video_id}",
+            "language": result.language,
+            "video_id": result.video_id,
+            "content": result.content,
+        }
+    except ValueError as exc:
+        return _error_response(400, str(exc))
+    except YouTubeTranscriptError as exc:
+        return _error_response(422, str(exc))
+    except Exception as exc:
+        logger.error("yt_transcript_failed url=%s err=%s", url, exc)
+        return _error_response(500, f"YouTube 字幕擷取失敗: {exc}")
+
+
 async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
     """Fetch a page, returning CrawlResult on success or JSONResponse on error."""
     try:
@@ -373,10 +412,14 @@ async def upload_knowledge_documents(
     "/api/knowledge/fetch",
     tags=["Knowledge"],
     summary="即時抓取頁面內容",
-    description="抓取網址頁面內容並回傳，不存入知識庫。本端點供給 AI Tool 當作即時爬蟲功能使用。\n\n**所需欄位**：\n- `url` (Body, str): 要抓取的網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+    description="抓取網址頁面內容並回傳，不存入知識庫。本端點供給 AI Tool 當作即時爬蟲功能使用。支援一般網頁及 YouTube 連結（自動擷取字幕）。\n\n**所需欄位**：\n- `url` (Body, str): 要抓取的網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
 )
 async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
     """抓取網址內容但不存入知識庫，供 agent tool 即時查詢使用。"""
+    if is_youtube_url(req.url):
+        yt = await _fetch_youtube_transcript(req.url)
+        return yt if isinstance(yt, JSONResponse) else JSONResponse(content=yt)
+
     result = await _safe_fetch_page(req.url)
     if isinstance(result, JSONResponse):
         return result
@@ -387,3 +430,41 @@ async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
         "source_url": result.source_url,
         "content": result.content,
     })
+
+
+@router.post(
+    "/api/knowledge/youtube",
+    tags=["Knowledge"],
+    summary="擷取 YouTube 字幕",
+    description="從 YouTube 影片擷取字幕文字，可選擇存入知識庫。\n\n**所需欄位**：\n- `url` (Body, str): YouTube 影片網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID\n- `save_to_knowledge` (Body, bool, 預設 false): 是否存入知識庫\n- `target_dir` (Body, str, 預設 ''): 知識庫目標資料夾",
+)
+async def ingest_youtube_transcript(req: YouTubeIngestRequest) -> JSONResponse:
+    """擷取 YouTube 字幕，可選存入知識庫。"""
+    result = await _fetch_youtube_transcript(req.url)
+    if isinstance(result, JSONResponse):
+        return result
+
+    if not req.save_to_knowledge:
+        return JSONResponse(content=result)
+
+    filename = f"{result['title']}.md"
+    markdown_bytes = f"# {result['title']}\n\n{result['content']}".encode("utf-8")
+
+    client = _brain_http.get()
+    cfg = get_tts_config()
+    target_dir = _build_markdown_target_dir(req.target_dir)
+
+    try:
+        resp = await client.post(
+            f"{cfg.brain_url}/brain/knowledge/upload",
+            files=[("files", (filename, markdown_bytes, "text/markdown"))],
+            data={"target_dir": target_dir, "project_id": req.project_id},
+        )
+        resp.raise_for_status()
+    except Exception as exc:
+        logger.error("yt_knowledge_upload_failed url=%s err=%s", req.url, exc)
+        return _error_response(502, f"字幕擷取成功但存入知識庫失敗: {exc}")
+
+    result["saved_to_knowledge"] = True
+    result["target_dir"] = target_dir
+    return JSONResponse(content=result)
