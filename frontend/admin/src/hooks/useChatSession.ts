@@ -186,14 +186,11 @@ export function useChatSession() {
       }
       setMessages(history);
     } else if (payload.reply != null) {
-      setMessages((current) => {
-        const next = [...current];
-        const last = next[next.length - 1];
-        if (last?.role === "assistant") {
-          next[next.length - 1] = { ...last, content: payload.reply, sources };
-        }
-        return next;
-      });
+      setMessages((current) => current.map((msg, i) =>
+        i === current.length - 1 && msg.role === "assistant"
+          ? { ...msg, content: payload.reply, sources }
+          : msg
+      ));
     }
 
     persistSessionId(payload.session_id);
@@ -379,14 +376,8 @@ export function useChatSession() {
 
   const handleInputChange = useCallback((value: string) => {
     setInput(value);
-    if (value === "/") {
-      setSlashOpen(true);
-      setSlashIndex(0);
-    } else if (value.startsWith("/") && !value.includes(" ")) {
-      setSlashOpen(true);
-    } else {
-      setSlashOpen(false);
-    }
+    setSlashOpen(value.startsWith("/") && !value.includes(" "));
+    if (value === "/") setSlashIndex(0);
   }, []);
 
   const pickSlash = useCallback((skill: SkillInfo) => {

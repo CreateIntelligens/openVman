@@ -228,35 +228,18 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
 
 def _merge_tag_metadata(existing_tags: list[dict], extra_tags: list[dict]) -> list[dict]:
-    merged: list[dict] = []
-    seen: dict[str, int] = {}
-
-    for tag in existing_tags:
+    merged_dict = {}
+    for tag in existing_tags + extra_tags:
         name = str(tag.get("name", "")).strip()
-        if not name:
-            continue
-        seen[name] = len(merged)
-        merged.append(tag)
-
-    for tag in extra_tags:
-        name = str(tag.get("name", "")).strip()
-        if not name:
-            continue
-        if name in seen:
-            merged[seen[name]] = {**merged[seen[name]], **tag}
-            continue
-        seen[name] = len(merged)
-        merged.append(tag)
-
-    return merged
+        if name:
+            merged_dict[name] = {**merged_dict.get(name, {}), **tag}
+    return list(merged_dict.values())
 
 
 def _merge_component_sections(existing_components: dict, extra_components: dict) -> dict:
     merged = dict(existing_components)
     for section_name, section_values in extra_components.items():
-        current_section = dict(merged.get(section_name, {}))
-        current_section.update(section_values)
-        merged[section_name] = current_section
+        merged[section_name] = {**merged.get(section_name, {}), **section_values}
     return merged
 
 
