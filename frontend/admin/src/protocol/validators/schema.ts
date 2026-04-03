@@ -13,7 +13,6 @@ import type {
   ServerErrorEvent,
   ServerInitAckEvent,
   SetLipSyncModeEvent,
-  ServerStopAudioEvent,
   VisemeFrame,
 } from "@contracts/generated/typescript/protocol-contracts";
 

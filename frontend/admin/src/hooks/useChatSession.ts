@@ -31,6 +31,46 @@ import { useVad } from "./useVad";
 
 const TTS_PROVIDER_STORAGE_KEY = "brain-tts-provider";
 const TTS_VOICE_STORAGE_KEY = "brain-tts-voice";
+const TTS_CACHE_MAX = 50;
+
+type CachedSpeech = {
+  audio: ArrayBuffer;
+  fallback?: string;
+};
+
+type TtsSelection = {
+  provider: string;
+  voice: string;
+};
+
+function resolveTtsSelection(provider: string, voice: string): TtsSelection {
+  if (provider === "auto") {
+    return { provider: "", voice: "" };
+  }
+  return { provider, voice };
+}
+
+async function ttsCacheKey(text: string, provider: string, voice: string): Promise<string> {
+  const raw = `${text}|${provider}|${voice}`;
+  const cryptoObj = globalThis.crypto;
+  if (!cryptoObj?.subtle) {
+    return raw;
+  }
+  const buf = await cryptoObj.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function setTtsCacheEntry(cache: Map<string, CachedSpeech>, key: string, value: CachedSpeech): void {
+  if (cache.has(key)) {
+    cache.delete(key);
+  } else if (cache.size >= TTS_CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) {
+      cache.delete(oldest);
+    }
+  }
+  cache.set(key, value);
+}
 
 export function useChatSession() {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
@@ -52,7 +92,7 @@ export function useChatSession() {
   const [ttsVoice, setTtsVoice] = useState(() => localStorage.getItem(TTS_VOICE_STORAGE_KEY) || "");
   const [ttsFallbackToast, setTtsFallbackToast] = useState("");
   const [ttsPrefetching, setTtsPrefetching] = useState(false);
-  const ttsCacheRef = useRef<Map<number, { audio: ArrayBuffer; fallback?: string }>>(new Map());
+  const ttsCacheRef = useRef<Map<string, CachedSpeech>>(new Map());
   const ttsPrefetchAbortRef = useRef<AbortController | null>(null);
   const pendingPrefetchRef = useRef<string | null>(null);
 
@@ -237,31 +277,32 @@ export function useChatSession() {
     audio.play().catch(cleanup);
   }, []);
 
-  const buildTtsRequestOptions = useCallback((signal: AbortSignal) => ({
-    provider: ttsProviderRef.current === "auto" ? "" : ttsProviderRef.current,
-    voice: ttsProviderRef.current === "auto" ? "" : ttsVoiceRef.current,
-    signal,
-  }), []);
-
-  const prefetchTts = useCallback((text: string, index: number) => {
+  const prefetchTts = useCallback(async (text: string) => {
     ttsPrefetchAbortRef.current?.abort();
+    const selection = resolveTtsSelection(ttsProviderRef.current, ttsVoiceRef.current);
+    const key = await ttsCacheKey(text, selection.provider, selection.voice);
+    if (ttsCacheRef.current.has(key)) {
+      return;
+    }
+
     const controller = new AbortController();
     ttsPrefetchAbortRef.current = controller;
     setTtsPrefetching(true);
-    synthesizeSpeech(text, buildTtsRequestOptions(controller.signal))
-      .then((result) => {
-        ttsCacheRef.current.set(index, result);
-      })
-      .catch((reason) => {
-        if (!controller.signal.aborted) {
-          console.warn("TTS prefetch failed:", reason);
-        }
-      })
-      .finally(() => {
-        ttsPrefetchAbortRef.current = null;
-        setTtsPrefetching(false);
+    try {
+      const { audio, fallback } = await synthesizeSpeech(text, {
+        ...selection,
+        signal: controller.signal,
       });
-  }, [buildTtsRequestOptions]);
+      setTtsCacheEntry(ttsCacheRef.current, key, { audio, fallback });
+    } catch (reason) {
+      if (!controller.signal.aborted) {
+        console.warn("TTS prefetch failed:", reason);
+      }
+    } finally {
+      ttsPrefetchAbortRef.current = null;
+      setTtsPrefetching(false);
+    }
+  }, []);
 
   useEffect(() => {
     const text = pendingPrefetchRef.current;
@@ -269,7 +310,7 @@ export function useChatSession() {
     const index = messages.length - 1;
     if (index >= 0 && messages[index]?.role === "assistant") {
       pendingPrefetchRef.current = null;
-      prefetchTts(text, index);
+      void prefetchTts(text);
     }
   }, [messages, prefetchTts]);
 
@@ -287,9 +328,11 @@ export function useChatSession() {
 
     setPlayingIndex(index);
 
-    const cached = ttsCacheRef.current.get(index);
+    const selection = resolveTtsSelection(ttsProviderRef.current, ttsVoiceRef.current);
+    const key = await ttsCacheKey(text, selection.provider, selection.voice);
+    const cached = ttsCacheRef.current.get(key);
     if (cached) {
-      ttsCacheRef.current.delete(index);
+      setTtsCacheEntry(ttsCacheRef.current, key, cached);
       playAudioBuffer(cached.audio, cached.fallback);
       return;
     }
@@ -297,7 +340,11 @@ export function useChatSession() {
     const controller = new AbortController();
     ttsAbortRef.current = controller;
     try {
-      const { audio, fallback } = await synthesizeSpeech(text, buildTtsRequestOptions(controller.signal));
+      const { audio, fallback } = await synthesizeSpeech(text, {
+        ...selection,
+        signal: controller.signal,
+      });
+      setTtsCacheEntry(ttsCacheRef.current, key, { audio, fallback });
       playAudioBuffer(audio, fallback);
     } catch (reason) {
       if (!controller.signal.aborted) {
@@ -310,7 +357,7 @@ export function useChatSession() {
       }
       setPlayingIndex(null);
     }
-  }, [buildTtsRequestOptions, playAudioBuffer]);
+  }, [playAudioBuffer]);
 
   useEffect(() => {
     const storedPersonaId = window.localStorage.getItem(getPersonaStorageKey()) ?? "default";

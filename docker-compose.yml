@@ -47,8 +47,7 @@ services:
       - GPU_MEMORY_UTILIZATION=${INDEXTTS_GPU_MEM:-0.1}
     volumes:
       - ./backend/index-tts-vllm:/app
-    ports:
-      - "8011"
+      - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request, json, sys; res=json.loads(urllib.request.urlopen('http://localhost:8011/health').read()); sys.exit(0 if res.get('status') == 'healthy' else 1)"]
       interval: 30s

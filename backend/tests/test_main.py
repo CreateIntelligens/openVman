@@ -182,3 +182,100 @@ def test_openapi_merges_brain_request_schema(monkeypatch):
     assert operation["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ChatRequest"
     }
+
+
+def test_tts_providers_include_indextts_when_configured(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, list[str]]:
+            return {
+                "jay": ["assets/jay_promptvn.wav"],
+                "hayley": ["assets/tts_references/Hayley.wav"],
+            }
+
+    class FakeClient:
+        async def get(self, url: str, timeout=None):
+            assert url == "http://index-tts-vllm:8011/audio/voices"
+            return FakeResponse()
+
+    async def _fake_close() -> None:
+        return None
+
+    module._health_http = types.SimpleNamespace(
+        get=lambda: FakeClient(),
+        close=_fake_close,
+    )
+    module.get_tts_config = lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+        tts_indextts_url="http://index-tts-vllm:8011",
+        tts_indextts_default_character="hayley",
+        tts_vibevoice_url="",
+        tts_gcp_enabled=False,
+        tts_aws_enabled=False,
+        edge_tts_enabled=True,
+        edge_tts_voice="zh-TW-HsiaoChenNeural",
+    )
+
+    client = TestClient(module.app)
+    response = client.get("/v1/tts/providers")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
+        {
+            "id": "indextts",
+            "name": "IndexTTS",
+            "default_voice": "hayley",
+            "voices": ["jay", "hayley"],
+        },
+        {
+            "id": "edge-tts",
+            "name": "Edge TTS",
+            "default_voice": "zh-TW-HsiaoChenNeural",
+            "voices": ["zh-TW-HsiaoChenNeural"],
+        },
+    ]
+
+
+def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    module.get_tts_config = lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+        tts_cache_enabled=True,
+        tts_cache_ttl_seconds=86400,
+    )
+    module.make_cache_key = lambda text, voice_hint, provider: "tts:v1:test"
+
+    async def _fake_cache_get(key: str):
+        assert key == "tts:v1:test"
+        return types.SimpleNamespace(
+            audio_bytes=b"cached-audio",
+            content_type="audio/wav",
+            provider="indextts",
+        )
+
+    async def _fake_cache_put(*args, **kwargs):
+        raise AssertionError("cache_put should not be called on cache hit")
+
+    class BrokenService:
+        def synthesize(self, request, provider=""):
+            raise AssertionError("synthesize should not run on cache hit")
+
+    module.cache_get = _fake_cache_get
+    module.cache_put = _fake_cache_put
+    module._get_service = lambda: BrokenService()
+
+    client = TestClient(module.app)
+    response = client.post(
+        "/v1/audio/speech",
+        json={"input": "你好", "voice": "hayley", "provider": "indextts"},
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"cached-audio"
+    assert response.headers["X-TTS-Provider"] == "indextts"
+    assert response.headers["X-TTS-Cache-Hit"] == "true"

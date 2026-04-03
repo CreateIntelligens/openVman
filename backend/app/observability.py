@@ -118,6 +118,32 @@ def record_provider_request(*, provider: str, result: str) -> None:
     increment_counter(f"tts_provider_requests_total|provider={provider}|result={result}")
 
 
+def record_cache_hit(latency_ms: float) -> None:
+    """Record a successful TTS cache lookup."""
+    increment_counter("tts_cache_hit")
+    record_timing("tts_cache_get_ms", latency_ms)
+    log_event("tts_cache_hit", latency_ms=round(latency_ms, 2))
+
+
+def record_cache_miss(latency_ms: float) -> None:
+    """Record a TTS cache miss."""
+    increment_counter("tts_cache_miss")
+    record_timing("tts_cache_get_ms", latency_ms)
+    log_event("tts_cache_miss", latency_ms=round(latency_ms, 2))
+
+
+def record_cache_store(latency_ms: float) -> None:
+    """Record a successful TTS cache write."""
+    increment_counter("tts_cache_store")
+    record_timing("tts_cache_put_ms", latency_ms)
+
+
+def record_cache_error(operation: str, error: str) -> None:
+    """Record a cache operation failure."""
+    increment_counter("tts_cache_error")
+    log_event("tts_cache_error", operation=operation, error=error)
+
+
 # ---------------------------------------------------------------------------
 # Live pipeline metrics helpers
 # ---------------------------------------------------------------------------

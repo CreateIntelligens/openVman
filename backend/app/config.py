@@ -84,6 +84,10 @@ class TTSRouterConfig(BaseSettings):
         validation_alias="DOCLING_FALLBACK_TO_MARKITDOWN",
     )
 
+    # --- TTS Cache ---
+    tts_cache_enabled: bool = Field(default=True, validation_alias="TTS_CACHE_ENABLED")
+    tts_cache_ttl_seconds: int = Field(default=86400, validation_alias="TTS_CACHE_TTL_SECONDS")
+
     # --- Gateway: Temp Storage ---
     gateway_temp_dir: str = "/tmp/vman-gateway"
     gateway_temp_ttl_min: int = 30

@@ -46,7 +46,8 @@ from app.observability import (
     record_interruption,
     set_active_sessions,
 )
-from app.providers.base import SynthesizeRequest
+from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.providers.vibevoice_adapter import VIBEVOICE_DEFAULT_SPEAKER, VIBEVOICE_SPEAKERS
 from app.service import TTSRouterService
 from app.session_manager import SessionManager
@@ -60,6 +61,7 @@ _session_manager: SessionManager = SessionManager()
 _guard_agent: GuardAgent = GuardAgent()
 _health_http = SharedAsyncClient()
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
+_TTS_PROVIDER_TIMEOUT_SECONDS = 5
 
 
 def _get_service() -> TTSRouterService:
@@ -272,6 +274,56 @@ async def _fetch_brain_openapi() -> dict | None:
         return None
 
 
+async def _fetch_indextts_voices(base_url: str) -> list[str]:
+    voices_url = f"{base_url.rstrip('/')}/audio/voices"
+    try:
+        resp = await _health_http.get().get(voices_url, timeout=_TTS_PROVIDER_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        return _extract_voice_names(resp.json())
+    except Exception as exc:
+        logger.warning("failed to fetch indextts voices from %s: %s", voices_url, exc)
+    return []
+
+
+def _extract_voice_names(payload: object) -> list[str]:
+    if isinstance(payload, dict):
+        candidates = payload.keys()
+    elif isinstance(payload, list):
+        candidates = payload
+    else:
+        return []
+    return [name for name in candidates if isinstance(name, str) and name]
+
+
+def _prepend_default_voice(voices: list[str], default_voice: str) -> list[str]:
+    if not default_voice or default_voice in voices:
+        return voices
+    return [default_voice, *voices]
+
+
+def _cached_speech_response(entry: CachedTTSEntry) -> Response:
+    return Response(
+        content=entry.audio_bytes,
+        media_type=entry.content_type,
+        headers={
+            "X-TTS-Latency-Ms": "0",
+            "X-TTS-Provider": entry.provider,
+            "X-TTS-Cache-Hit": "true",
+        },
+    )
+
+
+def _to_cached_tts_entry(result: NormalizedTTSResult) -> CachedTTSEntry:
+    return CachedTTSEntry(
+        audio_bytes=result.audio_bytes,
+        content_type=result.content_type,
+        provider=result.provider,
+        route_kind=result.route_kind,
+        route_target=result.route_target,
+        sample_rate=result.sample_rate,
+    )
+
+
 _openapi_built = False
 
 
@@ -377,11 +429,20 @@ async def metrics() -> dict:
     description="將文字轉換為音訊 (TTS)。相容於 OpenAI Speech API 格式。\n\n**所需欄位**：\n- `input` (Body, str): 要轉換的文字內容\n- `voice` (Body, str, 選填): 語音音色/說話者名稱\n- `response_format` (Body, str, 預設 'wav'): 輸出音訊格式\n- `speed` (Body, float, 預設 1.0): 語速設定",
 )
 async def create_speech(body: SpeechRequest) -> Response:
+    cfg = get_tts_config()
     svc = _get_service()
+    cleaned_text = clean_for_tts(body.input)
     request = SynthesizeRequest(
-        text=clean_for_tts(body.input),
+        text=cleaned_text,
         voice_hint=body.voice,
     )
+    cache_key = ""
+
+    if cfg.tts_cache_enabled:
+        cache_key = make_cache_key(cleaned_text, body.voice, body.provider)
+        cached = await cache_get(cache_key)
+        if cached is not None:
+            return _cached_speech_response(cached)
 
     try:
         output = svc.synthesize(request, provider=body.provider)
@@ -391,10 +452,18 @@ async def create_speech(body: SpeechRequest) -> Response:
     headers = {
         "X-TTS-Latency-Ms": str(round(output.result.latency_ms, 2)),
         "X-TTS-Provider": output.result.provider,
+        "X-TTS-Cache-Hit": "false",
     }
     if output.fallback:
         headers["X-TTS-Fallback"] = "true"
         headers["X-TTS-Fallback-Reason"] = output.fallback_reason
+
+    if cfg.tts_cache_enabled:
+        await cache_put(
+            cache_key,
+            _to_cached_tts_entry(output.result),
+            cfg.tts_cache_ttl_seconds,
+        )
 
     return Response(
         content=output.result.audio_bytes,
@@ -414,6 +483,18 @@ async def get_tts_providers() -> JSONResponse:
     providers: list[dict] = [
         {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
     ]
+
+    if cfg.tts_indextts_url:
+        voices = _prepend_default_voice(
+            await _fetch_indextts_voices(cfg.tts_indextts_url),
+            cfg.tts_indextts_default_character,
+        )
+        providers.append({
+            "id": "indextts",
+            "name": "IndexTTS",
+            "default_voice": cfg.tts_indextts_default_character,
+            "voices": voices,
+        })
 
     if cfg.tts_vibevoice_url:
         providers.append({
