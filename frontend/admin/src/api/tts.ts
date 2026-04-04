@@ -10,7 +10,6 @@ export interface TtsProvider {
 export interface SpeechResult {
   audio: ArrayBuffer;
   fallback?: string;
-  cacheHit: boolean;
 }
 
 export async function fetchTtsProviders(): Promise<TtsProvider[]> {
@@ -42,6 +41,5 @@ export async function synthesizeSpeech(
   }
   const audio = await res.arrayBuffer();
   const fallbackReason = res.headers.get("X-TTS-Fallback-Reason") || undefined;
-  const cacheHit = res.headers.get("X-TTS-Cache-Hit") === "true";
-  return { audio, fallback: fallbackReason, cacheHit };
+  return { audio, fallback: fallbackReason };
 }

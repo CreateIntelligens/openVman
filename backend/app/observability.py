@@ -139,7 +139,7 @@ def record_cache_store(latency_ms: float) -> None:
 
 
 def record_cache_error(operation: str, error: str) -> None:
-    """Record a cache operation failure."""
+    """Record a cache operation failure (operation: 'get' or 'put')."""
     increment_counter("tts_cache_error")
     log_event("tts_cache_error", operation=operation, error=error)
 

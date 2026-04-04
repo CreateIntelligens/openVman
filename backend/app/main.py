@@ -314,14 +314,8 @@ def _cached_speech_response(entry: CachedTTSEntry) -> Response:
 
 
 def _to_cached_tts_entry(result: NormalizedTTSResult) -> CachedTTSEntry:
-    return CachedTTSEntry(
-        audio_bytes=result.audio_bytes,
-        content_type=result.content_type,
-        provider=result.provider,
-        route_kind=result.route_kind,
-        route_target=result.route_target,
-        sample_rate=result.sample_rate,
-    )
+    from dataclasses import fields as dc_fields
+    return CachedTTSEntry(**{f.name: getattr(result, f.name) for f in dc_fields(CachedTTSEntry)})
 
 
 _openapi_built = False
@@ -436,7 +430,7 @@ async def create_speech(body: SpeechRequest) -> Response:
         text=cleaned_text,
         voice_hint=body.voice,
     )
-    cache_key = ""
+    cache_key: str | None = None
 
     if cfg.tts_cache_enabled:
         cache_key = make_cache_key(cleaned_text, body.voice, body.provider)
@@ -458,12 +452,13 @@ async def create_speech(body: SpeechRequest) -> Response:
         headers["X-TTS-Fallback"] = "true"
         headers["X-TTS-Fallback-Reason"] = output.fallback_reason
 
-    if cfg.tts_cache_enabled:
-        await cache_put(
+    if cache_key is not None:
+        import asyncio
+        asyncio.create_task(cache_put(
             cache_key,
             _to_cached_tts_entry(output.result),
             cfg.tts_cache_ttl_seconds,
-        )
+        ))
 
     return Response(
         content=output.result.audio_bytes,

@@ -332,6 +332,7 @@ export function useChatSession() {
     const key = await ttsCacheKey(text, selection.provider, selection.voice);
     const cached = ttsCacheRef.current.get(key);
     if (cached) {
+      // Re-insert to refresh LRU position (delete + append to end of Map).
       setTtsCacheEntry(ttsCacheRef.current, key, cached);
       playAudioBuffer(cached.audio, cached.fallback);
       return;
