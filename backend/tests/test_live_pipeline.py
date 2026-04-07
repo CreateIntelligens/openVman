@@ -21,9 +21,9 @@ async def test_live_pipeline_full_flow(mock_session):
     mock_response.status_code = 200
     
     async def mock_aiter_lines():
-        yield b'data: {"token": "你好"}'
-        yield b'data: {"token": "。"}'
-        yield b'data: [DONE]'
+        yield 'data: {"token": "你好"}'
+        yield 'data: {"token": "。"}'
+        yield "data: [DONE]"
     
     mock_response.aiter_lines = mock_aiter_lines
     
