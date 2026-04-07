@@ -69,6 +69,20 @@ def search_records(
         if len(filtered) >= limit:
             break
 
+    # Non-blocking recall trace for dreaming consolidation
+    if filtered:
+        try:
+            from memory.dreaming.recall_tracker import record_trace
+            record_trace(
+                query=query_text or "",
+                persona_id=persona_id,
+                project_id=project_id,
+                table_name=table_name,
+                results=filtered,
+            )
+        except Exception as exc:
+            logger.debug("recall trace record failed: %s", exc)
+
     return filtered
 
 

@@ -40,6 +40,12 @@ def log_event(name: str, **kwargs: Any) -> None:
     _log_event(name, **kwargs)
 
 
+def _get_dreaming_scheduler():
+    from memory.dreaming import scheduler
+
+    return scheduler
+
+
 def _normalize_enriched_items(payload: InternalEnrichRequest) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for item in payload.enriched_context:
@@ -120,3 +126,62 @@ async def internal_enrich(payload: InternalEnrichRequest):
         "session_id": session.session_id,
         "stored_count": len(items),
     }
+
+
+# ---------------------------------------------------------------------------
+# Dreaming
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/brain/dreaming/status",
+    tags=["Dreaming"],
+    summary="Dreaming 狀態",
+    description="取得背景記憶整合系統的啟用狀態、上次執行結果與配置。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
+async def dreaming_status(project_id: str = "default"):
+    scheduler = _get_dreaming_scheduler()
+    return scheduler.get_dreaming_status(project_id)
+
+
+@router.post(
+    "/brain/dreaming/run",
+    tags=["Dreaming"],
+    summary="手動觸發 Dreaming",
+    description="手動執行一次完整的 Light → Deep → REM 記憶整合週期。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID\n- `force` (Query, bool, 預設 false): 強制執行（忽略今日已執行檢查）",
+)
+async def dreaming_run(project_id: str = "default", force: bool = False):
+    import asyncio
+
+    scheduler = _get_dreaming_scheduler()
+    result = await asyncio.to_thread(
+        scheduler.run_dreaming_cycle,
+        project_id,
+        force=force,
+    )
+    return result
+
+
+@router.get(
+    "/brain/dreaming/candidates",
+    tags=["Dreaming"],
+    summary="預覽候選記憶",
+    description="預覽 Light Phase 產生的候選記憶列表（不會 promote）。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
+async def dreaming_candidates(project_id: str = "default"):
+    scheduler = _get_dreaming_scheduler()
+    candidates = scheduler.get_candidates_preview(project_id)
+    return {"candidates": candidates, "count": len(candidates)}
+
+
+@router.get(
+    "/brain/dreaming/report",
+    tags=["Dreaming"],
+    summary="最近 Deep Phase 報告",
+    description="取得最近一次 Deep Phase 的執行報告。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
+)
+async def dreaming_report(project_id: str = "default"):
+    scheduler = _get_dreaming_scheduler()
+    content = scheduler.get_latest_report(project_id)
+    if not content:
+        return {"report": None, "message": "尚無報告"}
+    return {"report": content}

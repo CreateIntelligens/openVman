@@ -94,6 +94,17 @@ class BrainSettings(BaseSettings):
     errors_rotation_max_lines: int = 200
     transcript_retention_days: int = 30
 
+    # === Dreaming 設定 ===
+    dreaming_enabled: bool = False
+    dreaming_cron: str = "0 3 * * *"
+    dreaming_timezone: str = "Asia/Taipei"
+    dreaming_lookback_days: int = 7
+    dreaming_min_score: float = 0.45
+    dreaming_min_recall_count: int = 2
+    dreaming_candidate_limit: int = 100
+    dreaming_similarity_threshold: float = 0.90
+    dreaming_projects: list[str] = ["default"]
+
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6
     tool_call_timeout_seconds: int = 30

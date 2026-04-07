@@ -114,6 +114,7 @@ _OPENAPI_TAGS = [
     {"name": "Knowledge", "description": "Knowledge document management and indexing endpoints."},
     {"name": "Protocol", "description": "Protocol validation endpoints."},
     {"name": "Internal", "description": "Internal service-to-service endpoints."},
+    {"name": "Dreaming", "description": "Background memory consolidation endpoints."},
 ]
 
 _TAG_SYSTEM = ["System"]
@@ -161,8 +162,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await asyncio.to_thread(run_migration)
 
     app.state.warmup_task = asyncio.create_task(warmup_resources())
+
+    # Start dreaming scheduler (opt-in)
+    if get_settings().dreaming_enabled:
+        from memory.dreaming.scheduler import start_dreaming_scheduler
+        await start_dreaming_scheduler(app)
+
     logger.info("大腦層就緒")
     yield
+    await cancel_task(getattr(app.state, "dreaming_task", None))
     await cancel_task(getattr(app.state, "warmup_task", None))
 
 
