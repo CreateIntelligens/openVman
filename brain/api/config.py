@@ -74,7 +74,7 @@ class BrainSettings(BaseSettings):
     embedding_openai_dimensions: int = 0
     embedding_voyage_model: str = "voyage-3-large"
     embedding_voyage_dimensions: int = 0
-    lancedb_path: str = "~/.openclaw/lancedb"
+    lancedb_path: str = "/data/projects/default/lancedb"
     knowledge_index_state_path: str = "/data/knowledge_index_state.json"
     chunk_char_limit: int = 500
     chunk_overlap_ratio: float = 0.15

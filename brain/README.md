@@ -30,7 +30,7 @@ browser
     -> web (Vite frontend)
     -> api (FastAPI, internal :8100)
       -> workspace files (/data/workspace in container)
-      -> LanceDB (~/.openclaw/lancedb in container)
+      -> LanceDB (/data/projects/default/lancedb in container)
       -> embedding model
       -> Gemini / OpenAI-compatible LLM endpoint
 ```
@@ -87,7 +87,7 @@ brain/
   - Brain 的核心工作區
   - host 路徑，會掛進容器內的 `/data/workspace`
   - 這裡的 `.md / .txt / .csv` 文件是知識來源與行為設定來源
-- `~/.openclaw/lancedb`
+- `/data/projects/default/lancedb`
   - API 的 LanceDB 預設資料路徑
   - 在 Docker compose 中對應到 `brain-data` volume
 
@@ -424,7 +424,7 @@ BRAIN_LLM_MODEL=gemini-2.0-flash
 EMBEDDING_MODEL=BAAI/bge-m3
 EMBEDDING_USE_FP16=true
 EMBEDDING_DEVICE=cuda
-LANCEDB_PATH=~/.openclaw/lancedb
+LANCEDB_PATH=/data/projects/default/lancedb
 
 SHORT_TERM_MEMORY_ROUNDS=20
 RAG_TOP_K=5

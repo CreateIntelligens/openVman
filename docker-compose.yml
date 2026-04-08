@@ -15,7 +15,6 @@ services:
       - ./brain/data:/data
       - ./brain/skills:/skills
       - ./contracts:/contracts:ro
-      - brain-data:/home/appuser/.openclaw/lancedb
       - hf-cache:/home/appuser/.cache/huggingface
     env_file:
       - ./brain/.env
@@ -134,7 +133,6 @@ services:
         condition: service_healthy
 
 volumes:
-  brain-data:
   hf-cache:
   admin-node-modules:
   redis-data:

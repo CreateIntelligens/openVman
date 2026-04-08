@@ -51,7 +51,7 @@ embeddings = model.encode([
 import lancedb
 
 # 嵌入式模式：直接指向本地目錄（無需啟動服務）
-db = lancedb.connect("~/.openclaw/lancedb")
+db = lancedb.connect("/data/projects/default/lancedb")
 
 # 建立記憶表（若不存在則自動建立）
 if "memories" not in db.table_names():
@@ -333,7 +333,7 @@ BRAIN_FALLBACK_CHAIN=openai:gpt-4.1,openai:gpt-4o,claude:sonnet,vllm:qwen2.5-72b
 EMBEDDING_MODEL=BAAI/bge-m3     # 本地 Embedding 模型
 EMBEDDING_USE_FP16=true
 EMBEDDING_DEVICE=cuda            # cuda | cpu
-LANCEDB_PATH=~/.openclaw/lancedb
+LANCEDB_PATH=/data/projects/default/lancedb
 
 # === 記憶設定 ===
 SHORT_TERM_MEMORY_ROUNDS=20     # 短期記憶保留輪次
