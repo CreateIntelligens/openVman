@@ -12,6 +12,8 @@ from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 
 logger = logging.getLogger("provider.indextts")
 
+_NOT_LOADED = object()
+
 
 class IndexTTSAdapter:
     """Synthesize speech via IndexTTS (HTTP) and return a NormalizedTTSResult."""
@@ -22,6 +24,17 @@ class IndexTTSAdapter:
         self._url = f"{base}/tts" if base else ""
         self._default_character = config.tts_indextts_default_character
         self._client = httpx.Client(timeout=60.0)
+        self._opencc_t2s = _NOT_LOADED
+
+    def _get_opencc(self):
+        if self._opencc_t2s is _NOT_LOADED:
+            try:
+                import opencc
+                self._opencc_t2s = opencc.OpenCC("t2s")
+            except ImportError:
+                logger.warning("opencc-python-reimplemented not installed, skipping t2s conversion")
+                self._opencc_t2s = None
+        return self._opencc_t2s
 
     @property
     def provider_name(self) -> str:
@@ -36,8 +49,12 @@ class IndexTTSAdapter:
         if not self._url:
             raise RuntimeError("IndexTTS URL is not configured")
 
+        text = request.text
+        if converter := self._get_opencc():
+            text = converter.convert(text)
+
         payload = {
-            "text": request.text,
+            "text": text,
             "character": request.voice_hint or self._default_character,
         }
 
