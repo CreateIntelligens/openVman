@@ -77,6 +77,38 @@ def test_validate_client_event_accepts_valid_client_init_payload():
     assert type(event).__module__ == GENERATED_PROTOCOL_MODULE
 
 
+def test_validate_client_event_accepts_client_audio_chunk_payload():
+    protocol_events = _protocol_events()
+
+    event = protocol_events.validate_client_event(
+        {
+            "event": "client_audio_chunk",
+            "audio_base64": "UklGRi0AAABXQVZFZm10",
+            "sample_rate": 16000,
+            "mime_type": "audio/pcm;rate=16000",
+            "timestamp": 1710123457,
+        }
+    )
+
+    assert event.event == "client_audio_chunk"
+    assert event.sample_rate == 16000
+    assert event.mime_type == "audio/pcm;rate=16000"
+
+
+def test_validate_client_event_accepts_client_audio_end_payload():
+    protocol_events = _protocol_events()
+
+    event = protocol_events.validate_client_event(
+        {
+            "event": "client_audio_end",
+            "timestamp": 1710123458,
+        }
+    )
+
+    assert event.event == "client_audio_end"
+    assert event.timestamp == 1710123458
+
+
 def test_validate_server_event_accepts_valid_stream_chunk_payload():
     protocol_events = _protocol_events()
 

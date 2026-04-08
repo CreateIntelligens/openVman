@@ -36,6 +36,17 @@ class ClientInterruptEvent(GeneratedProtocolModel):
     timestamp: int = Field(ge=0)
     partial_asr: str | None = Field(default=None)
 
+class ClientAudioChunkEvent(GeneratedProtocolModel):
+    event: Literal['client_audio_chunk']
+    audio_base64: str = Field(min_length=1)
+    sample_rate: int = Field(ge=1)
+    mime_type: str = Field(min_length=1)
+    timestamp: int = Field(ge=0)
+
+class ClientAudioEndEvent(GeneratedProtocolModel):
+    event: Literal['client_audio_end']
+    timestamp: int = Field(ge=0)
+
 class SetLipSyncModeEvent(GeneratedProtocolModel):
     event: Literal['set_lip_sync_mode']
     session_id: str
@@ -72,7 +83,7 @@ class ServerStopAudioEvent(GeneratedProtocolModel):
     timestamp: int
     reason: str | None = Field(default=None)
 
-ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | SetLipSyncModeEvent, Field(discriminator='event')]
+ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientAudioEndEvent | SetLipSyncModeEvent, Field(discriminator='event')]
 ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent, Field(discriminator='event')]
 ProtocolEvent = ClientEvent | ServerEvent
 
@@ -82,6 +93,8 @@ SERVER_EVENT_ADAPTER = TypeAdapter(ServerEvent)
 __all__ = [
     "CLIENT_EVENT_ADAPTER",
     "ClientEvent",
+    "ClientAudioChunkEvent",
+    "ClientAudioEndEvent",
     "ClientInitEvent",
     "ClientInterruptEvent",
     "DEFAULT_PROTOCOL_VERSION",

@@ -56,7 +56,13 @@ def load_protocol_contract(version: str = DEFAULT_PROTOCOL_VERSION) -> dict[str,
 def validate_client_event(
     payload: dict[str, Any],
     version: str = DEFAULT_PROTOCOL_VERSION,
-) -> ClientInitEvent | UserSpeakEvent | ClientInterruptEvent:
+) -> (
+    ClientInitEvent
+    | UserSpeakEvent
+    | ClientInterruptEvent
+    | ClientAudioChunkEvent
+    | ClientAudioEndEvent
+):
     return _validate_event_payload(
         payload,
         version=version,
@@ -262,6 +268,8 @@ _ensure_generated_contracts_import_path()
 from openvman_contracts.protocol_contracts import (  # noqa: E402
     CLIENT_EVENT_ADAPTER,
     SERVER_EVENT_ADAPTER,
+    ClientAudioChunkEvent,
+    ClientAudioEndEvent,
     ClientInitEvent,
     ClientInterruptEvent,
     ProtocolDirection,

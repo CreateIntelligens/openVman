@@ -15,6 +15,14 @@
       "direction": "client_to_server",
       "schema": "client_interrupt.schema.json"
     },
+    "client_audio_chunk": {
+      "direction": "client_to_server",
+      "schema": "client_audio_chunk.schema.json"
+    },
+    "client_audio_end": {
+      "direction": "client_to_server",
+      "schema": "client_audio_end.schema.json"
+    },
     "set_lip_sync_mode": {
       "direction": "client_to_server",
       "schema": "set_lip_sync_mode.schema.json"

@@ -4,6 +4,8 @@ import type {
   ServerEvent,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
+  validateClientAudioChunk,
+  validateClientAudioEnd,
   validateClientInit,
   validateClientInterrupt,
   validateUserSpeak,
@@ -67,6 +69,10 @@ function validateEvent(
       return validateUserSpeak(record, version);
     case "client_interrupt":
       return validateClientInterrupt(record, version);
+    case "client_audio_chunk":
+      return validateClientAudioChunk(record, version);
+    case "client_audio_end":
+      return validateClientAudioEnd(record, version);
     case "set_lip_sync_mode":
       return validateSetLipSyncMode(record, version);
     case "server_stream_chunk":

@@ -1,9 +1,13 @@
 import type {
+  ClientAudioChunkEvent,
+  ClientAudioEndEvent,
   ClientInitEvent,
   ClientInterruptEvent,
   UserSpeakEvent,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
+  clientAudioChunkSchema,
+  clientAudioEndSchema,
   clientInitSchema,
   clientInterruptSchema,
   userSpeakSchema,
@@ -15,6 +19,7 @@ import {
   expectOptionalNonEmptyString,
   expectOptionalStringMap,
   expectSemver,
+  throwInvalidField,
 } from "./shared";
 
 export function validateClientInit(record: Record<string, unknown>, version: string): ClientInitEvent {
@@ -45,5 +50,29 @@ export function validateClientInterrupt(record: Record<string, unknown>, version
     event: "client_interrupt",
     timestamp: expectNonNegativeInteger(record.timestamp, version, "client_interrupt", "timestamp"),
     partial_asr: expectOptionalNonEmptyString(record.partial_asr, version, "partial_asr", "client_interrupt"),
+  };
+}
+
+export function validateClientAudioChunk(record: Record<string, unknown>, version: string): ClientAudioChunkEvent {
+  assertShape(record, clientAudioChunkSchema, version, "client_audio_chunk");
+  const sampleRate = expectNonNegativeInteger(record.sample_rate, version, "client_audio_chunk", "sample_rate");
+  if (sampleRate < 1) {
+    throwInvalidField(version, "client_audio_chunk", "sample_rate", "must be greater than 0");
+  }
+
+  return {
+    event: "client_audio_chunk",
+    audio_base64: expectNonEmptyString(record.audio_base64, version, "audio_base64", "client_audio_chunk"),
+    sample_rate: sampleRate,
+    mime_type: expectNonEmptyString(record.mime_type, version, "mime_type", "client_audio_chunk"),
+    timestamp: expectNonNegativeInteger(record.timestamp, version, "client_audio_chunk", "timestamp"),
+  };
+}
+
+export function validateClientAudioEnd(record: Record<string, unknown>, version: string): ClientAudioEndEvent {
+  assertShape(record, clientAudioEndSchema, version, "client_audio_end");
+  return {
+    event: "client_audio_end",
+    timestamp: expectNonNegativeInteger(record.timestamp, version, "client_audio_end", "timestamp"),
   };
 }

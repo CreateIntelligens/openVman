@@ -2,6 +2,8 @@ import manifestJson from "@contracts/schemas/v1/manifest.json";
 import clientInitSchemaJson from "@contracts/schemas/v1/client_init.schema.json";
 import userSpeakSchemaJson from "@contracts/schemas/v1/user_speak.schema.json";
 import clientInterruptSchemaJson from "@contracts/schemas/v1/client_interrupt.schema.json";
+import clientAudioChunkSchemaJson from "@contracts/schemas/v1/client_audio_chunk.schema.json";
+import clientAudioEndSchemaJson from "@contracts/schemas/v1/client_audio_end.schema.json";
 import serverStreamChunkSchemaJson from "@contracts/schemas/v1/server_stream_chunk.schema.json";
 import serverErrorSchemaJson from "@contracts/schemas/v1/server_error.schema.json";
 import serverInitAckSchemaJson from "@contracts/schemas/v1/server_init_ack.schema.json";
@@ -31,6 +33,8 @@ export const schemaRegistry = {
   client_init: clientInitSchemaJson as EventSchema,
   user_speak: userSpeakSchemaJson as EventSchema,
   client_interrupt: clientInterruptSchemaJson as EventSchema,
+  client_audio_chunk: clientAudioChunkSchemaJson as EventSchema,
+  client_audio_end: clientAudioEndSchemaJson as EventSchema,
   server_stream_chunk: serverStreamChunkSchemaJson as EventSchema,
   server_error: serverErrorSchemaJson as EventSchema,
   server_init_ack: serverInitAckSchemaJson as EventSchema,
@@ -41,6 +45,8 @@ export const schemaRegistry = {
 export const clientInitSchema = schemaRegistry.client_init;
 export const userSpeakSchema = schemaRegistry.user_speak;
 export const clientInterruptSchema = schemaRegistry.client_interrupt;
+export const clientAudioChunkSchema = schemaRegistry.client_audio_chunk;
+export const clientAudioEndSchema = schemaRegistry.client_audio_end;
 export const serverStreamChunkSchema = schemaRegistry.server_stream_chunk;
 export const serverErrorSchema = schemaRegistry.server_error;
 export const serverInitAckSchema = schemaRegistry.server_init_ack;
