@@ -8,13 +8,16 @@ import type {
   ServerEvent,
   ClientInitEvent,
   ClientInterruptEvent,
+  ClientAudioChunkEvent,
+  ClientAudioEndEvent,
   UserSpeakEvent,
-  SetLipSyncModeEvent
+  SetLipSyncModeEvent,
+  ServerStreamChunkEvent,
 } from '@contracts/generated/typescript/protocol-contracts';
 
 export class WebSocketService {
   private socket: WebSocket | null = null;
-  private onAudioChunk: (data: any) => void;
+  private onAudioChunk: (data: ServerStreamChunkEvent) => void;
   private onStopAudio: () => void;
   private sessionId: string | null = null;
   private _destroyed = false;
@@ -22,7 +25,7 @@ export class WebSocketService {
   constructor(
     private clientId: string, 
     private authToken: string,
-    onAudioChunk: (data: any) => void,
+    onAudioChunk: (data: ServerStreamChunkEvent) => void,
     onStopAudio: () => void
   ) {
     this.onAudioChunk = onAudioChunk;
@@ -31,6 +34,7 @@ export class WebSocketService {
 
   public connect(url: string) {
     this._destroyed = false;
+    this.sessionId = null;
     this.socket = new WebSocket(`${url}/ws/${this.clientId}`);
 
     this.socket.onopen = () => {
@@ -49,6 +53,7 @@ export class WebSocketService {
 
     this.socket.onclose = () => {
       console.log('Disconnected from Backend');
+      this.sessionId = null;
       avatarState.setState('IDLE');
       if (!this._destroyed) {
         setTimeout(() => this.connect(url), 3000);
@@ -114,6 +119,27 @@ export class WebSocketService {
     this.send(event);
   }
 
+  public sendAudioChunk(audioBase64: string, sampleRate: number, mimeType: string) {
+    if (!this.sessionId) return;
+    const event: ClientAudioChunkEvent = {
+      event: 'client_audio_chunk',
+      audio_base64: audioBase64,
+      sample_rate: sampleRate,
+      mime_type: mimeType,
+      timestamp: Date.now()
+    };
+    this.send(event);
+  }
+
+  public sendAudioEnd() {
+    if (!this.sessionId) return;
+    const event: ClientAudioEndEvent = {
+      event: 'client_audio_end',
+      timestamp: Date.now()
+    };
+    this.send(event);
+  }
+
   public setLipSyncMode(mode: 'dinet' | 'wav2lip' | 'webgl') {
     if (!this.sessionId) return;
     const event: SetLipSyncModeEvent = {
@@ -129,6 +155,7 @@ export class WebSocketService {
     this._destroyed = true;
     this.socket?.close();
     this.socket = null;
+    this.sessionId = null;
   }
 
   private send(event: ClientEvent) {

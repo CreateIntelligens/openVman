@@ -6,14 +6,20 @@ import { ASRService } from './asr';
 import { VADService } from './vad';
 import { WebSocketService } from './websocket';
 import { AudioPlaybackService } from './audioPlayback';
+import { AudioStreamer } from './audioStreamer';
 import type { LipSyncManager } from '../lib/lip-sync-manager';
+import type { ServerStreamChunkEvent } from '@contracts/generated/typescript/protocol-contracts';
+
+export type LiveRuntimeMode = 'brain_tts' | 'gemini_live';
 
 export interface LiveRuntimeConfig {
   clientId: string;
   authToken: string;
+  mode?: LiveRuntimeMode;
   vadThreshold?: number;
   silenceDelay?: number;
   silenceWindowMs?: number;
+  onTranscript?: (text: string, isFinal: boolean) => void;
 }
 
 export class LiveRuntime {
@@ -21,14 +27,20 @@ export class LiveRuntime {
   private vad: VADService;
   private ws: WebSocketService;
   private playback: AudioPlaybackService;
+  private audioStreamer: AudioStreamer | null;
   private lipSync: LipSyncManager | null = null;
+  private readonly mode: LiveRuntimeMode;
+  private readonly onTranscript?: (text: string, isFinal: boolean) => void;
   
   private lastPartialAsr: string = '';
   private isInterrupted: boolean = false;
   private submissionTimer: number | null = null;
   private silenceWindowMs: number;
+  private audioTurnOpen: boolean = false;
 
   constructor(config: LiveRuntimeConfig) {
+    this.mode = config.mode || 'brain_tts';
+    this.onTranscript = config.onTranscript;
     this.silenceWindowMs = config.silenceWindowMs || 1500;
     this.playback = new AudioPlaybackService();
     
@@ -38,6 +50,14 @@ export class LiveRuntime {
       (chunk) => this.handleAudioChunk(chunk),
       () => this.handleStopAudio()
     );
+
+    this.audioStreamer = this.mode === 'gemini_live'
+      ? new AudioStreamer({
+          onChunk: ({ audioBase64, sampleRate, mimeType }) => {
+            this.ws.sendAudioChunk(audioBase64, sampleRate, mimeType);
+          },
+        })
+      : null;
 
     this.asr = new ASRService((text, isFinal) => this.handleAsrResult(text, isFinal));
     
@@ -59,26 +79,55 @@ export class LiveRuntime {
     this.ws.connect(wsUrl);
     this.asr.start();
     await this.vad.start();
+    await this.audioStreamer?.start();
     
     // Sync lip-sync mode to server
     this.ws.setLipSyncMode(lipSyncManager.getMethod());
   }
 
+  private clearSubmissionTimer() {
+    if (this.submissionTimer) {
+      window.clearTimeout(this.submissionTimer);
+      this.submissionTimer = null;
+    }
+  }
+
   private handleSpeechStart() {
     console.log('Speech started - sending interrupt signal');
+    this.clearSubmissionTimer();
     this.isInterrupted = true;
     this.ws.sendInterrupt(this.lastPartialAsr);
     // Local immediate stop
     this.handleStopAudio();
+
+    if (this.mode === 'gemini_live') {
+      this.audioTurnOpen = true;
+      this.audioStreamer?.setStreamingEnabled(true);
+    }
   }
 
   private handleSpeechEnd() {
     console.log('Speech ended - starting silence timer');
+    if (this.mode === 'gemini_live') {
+      this.audioStreamer?.setStreamingEnabled(false);
+      if (this.audioTurnOpen) {
+        this.ws.sendAudioEnd();
+        this.audioTurnOpen = false;
+      }
+      this.isInterrupted = false;
+      return;
+    }
+
     this.resetSubmissionTimer();
   }
 
   private handleAsrResult(text: string, isFinal: boolean) {
     this.lastPartialAsr = text;
+    this.onTranscript?.(text, isFinal);
+
+    if (this.mode === 'gemini_live') {
+      return;
+    }
     
     if (isFinal) {
       // If we get a final result, we can wait a bit more or submit immediately.
@@ -91,9 +140,7 @@ export class LiveRuntime {
   }
 
   private resetSubmissionTimer() {
-    if (this.submissionTimer) {
-      window.clearTimeout(this.submissionTimer);
-    }
+    this.clearSubmissionTimer();
     
     this.submissionTimer = window.setTimeout(() => {
       this.submitUserSpeak();
@@ -111,7 +158,7 @@ export class LiveRuntime {
     this.submissionTimer = null;
   }
 
-  private handleAudioChunk(chunk: any) {
+  private handleAudioChunk(chunk: ServerStreamChunkEvent) {
     if (this.isInterrupted) return; // Ignore chunks if we just interrupted
     
     this.playback.queueAudio(chunk.audio_base64, chunk.text);
@@ -130,9 +177,26 @@ export class LiveRuntime {
   }
 
   public stop() {
+    this.clearSubmissionTimer();
+    this.audioStreamer?.stop();
+    this.audioTurnOpen = false;
     this.ws.disconnect();
     this.asr.stop();
     this.vad.stop();
     this.playback.stopAll();
+  }
+
+  public sendTypedText(text: string) {
+    const normalizedText = text.trim();
+    if (!normalizedText) {
+      return;
+    }
+
+    this.clearSubmissionTimer();
+    this.audioStreamer?.setStreamingEnabled(false);
+    this.audioTurnOpen = false;
+    this.lastPartialAsr = '';
+    this.isInterrupted = false;
+    this.ws.sendUserSpeak(normalizedText);
   }
 }

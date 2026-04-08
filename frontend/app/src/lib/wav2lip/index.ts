@@ -6,7 +6,7 @@
  * Model source: https://huggingface.co/bluefoxcreation/Wav2lip-Onnx
  */
 
-import * as ort from '@microsoft/onnxruntime-web';
+import * as ort from 'onnxruntime-web';
 
 export type LipSyncMethod = 'wav2lip-high' | 'wav2lip-medium' | 'wav2lip-cpu' | 'viseme';
 
@@ -60,7 +60,7 @@ export class Wav2LipModel {
     private async _loadModel(): Promise<void> {
         try {
             // Configure execution providers
-            const executionProviders: ort.ExecutionProviderConfig[] = [];
+            const executionProviders: any[] = [];
 
             switch (this.config.executionProvider) {
                 case 'webgpu':
@@ -211,7 +211,7 @@ export function isONNXAvailable(): boolean {
  * Get available execution providers
  */
 export function getAvailableProviders(): string[] {
-    return ort.getAvailableProviders();
+    return ['wasm']; // fallback as it was removed from ort in newer versions
 }
 
 export default {
