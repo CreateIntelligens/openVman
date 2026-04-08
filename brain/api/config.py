@@ -56,6 +56,11 @@ class BrainSettings(BaseSettings):
     prompt_identity_char_budget: int = 3000
     prompt_learnings_char_budget: int = 8000
     prompt_errors_char_budget: int = 5000
+    live_gemini_model: str = "gemini-3.1-flash-live-preview"
+    live_gemini_system_instruction: str = ""
+    live_gemini_output_audio_transcription: bool = True
+    live_gemini_tools_enabled: bool = True
+    live_gemini_thinking_level: str = ""
 
     # === Embedding 設定 ===
     embedding_active_version: str = "bge"

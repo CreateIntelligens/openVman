@@ -12,6 +12,7 @@ import os
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import httpx
 from fastapi import FastAPI, File, Response, UploadFile, WebSocket, WebSocketDisconnect
@@ -34,6 +35,7 @@ from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upl
 from app.gateway.redis_pool import close_redis, get_redis, redis_available
 from app.gateway.routes import router as gateway_router
 from app.gateway.temp_storage import get_temp_storage, reset_temp_storage
+from app.gateway.brain_live_relay import BrainLiveRelay
 from app.gateway.worker import (
     get_api_tool_plugin,
     get_camera_plugin,
@@ -133,20 +135,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     session = _session_manager.create_session(client_id, websocket=websocket)
     set_active_sessions(len(_session_manager.active_sessions))
     logger.info(f"WebSocket session created: {session.session_id} for client: {client_id}")
-    
-    heartbeat_task = None
-    
-    async def run_heartbeat():
-        try:
-            while True:
-                await asyncio.sleep(30)
-                if websocket.client_state.name == "DISCONNECTED":
-                    break
-                await websocket.send_json({"event": "ping", "timestamp": int(time.time() * 1000)})
-        except Exception as e:
-            logger.debug(f"Heartbeat stopped for {session.session_id}: {e}")
 
-    heartbeat_task = asyncio.create_task(run_heartbeat())
+    heartbeat_task = asyncio.create_task(_run_heartbeat(websocket, session.session_id))
     session.add_task(heartbeat_task)
 
     try:
@@ -154,79 +144,140 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             data_str = await websocket.receive_text()
             data = json.loads(data_str)
             event = data.get("event")
-            
             if event == "pong":
-                continue # Just keep connection alive
+                continue
 
-            if event == "client_init":
-                await websocket.send_json({
-                    "event": "server_init_ack",
-                    "session_id": session.session_id,
-                    "server_version": "1.0.0",
-                    "status": "success",
-                    "timestamp": int(time.time() * 1000)
-                })
-
-            elif event == "client_interrupt":
-                text = data.get("partial_asr") or ""
-                action = await _guard_agent.classify(text)
-
-                if action == "STOP":
-                    cancelled = await session.interrupt_tasks()
-                    record_interruption(reason="user")
-                    if cancelled > 0:
-                        logger.info(f"Interrupted {cancelled} tasks for session {session.session_id}")
-
-                    # Notify frontend to stop playing and clear queue
-                    await websocket.send_json({
-                        "event": "server_stop_audio",
-                        "session_id": session.session_id,
-                        "timestamp": int(time.time() * 1000),
-                        "reason": "user_interruption"
-                    })
-                else:
-                    logger.debug(f"Ignoring potential interruption: {text}")
-
-            elif event == "set_lip_sync_mode":
-                mode = data.get("mode")
-                if mode in ["dinet", "wav2lip", "webgl"]:
-                    session.lip_sync_mode = mode
-                    logger.info(f"Session {session.session_id} lip-sync mode set to {mode}")
-                else:
-                    logger.warning(f"Invalid lip-sync mode received: {mode}")
-
-            elif event == "user_speak":
-                text = data.get("text")
-                if text:
-                    pipeline = LiveVoicePipeline(session)
-                    
-                    async def run_pipeline():
-                        try:
-                            async for chunk_event in pipeline.run(text):
-                                await websocket.send_json(chunk_event)
-                        except Exception as e:
-                            logger.error(f"Pipeline task error: {e}")
-                            await websocket.send_json({
-                                "event": "server_error",
-                                "error_code": "internal_error",
-                                "message": str(e)
-                            })
-
-                    task = asyncio.create_task(run_pipeline())
-                    session.add_task(task)
-                else:
-                    logger.warning("user_speak received with no text")
+            await _handle_websocket_event(event, data, session, websocket)
 
     except WebSocketDisconnect:
-        await session.interrupt_tasks()
-        _session_manager.remove_session(session.session_id)
-        set_active_sessions(len(_session_manager.active_sessions))
-        logger.info(f"WebSocket session removed: {session.session_id}")
+        logger.info(f"WebSocket disconnected: {session.session_id}")
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        logger.error(f"WebSocket error in {session.session_id}: {e}")
+    finally:
         await session.interrupt_tasks()
+        if session.brain_live_relay is not None:
+            await session.brain_live_relay.close()
         _session_manager.remove_session(session.session_id)
         set_active_sessions(len(_session_manager.active_sessions))
+
+
+async def _run_heartbeat(websocket: WebSocket, session_id: str):
+    """Periodically send pings to keep the connection alive."""
+    try:
+        while True:
+            await asyncio.sleep(30)
+            if websocket.client_state.name == "DISCONNECTED":
+                break
+            await websocket.send_json({"event": "ping", "timestamp": int(time.time() * 1000)})
+    except Exception as e:
+        logger.debug(f"Heartbeat stopped for {session_id}: {e}")
+
+
+async def _handle_websocket_event(event: str | None, data: dict, session: Any, websocket: WebSocket):
+    """Route WebSocket events to specific handlers."""
+    if event == "client_init":
+        await _handle_client_init(data, session, websocket)
+    elif event == "client_interrupt":
+        await _handle_client_interrupt(data, session, websocket)
+    elif event == "set_lip_sync_mode":
+        _handle_set_lip_sync_mode(data, session)
+    elif event == "user_speak":
+        await _handle_user_speak(data, session, websocket)
+    elif event in ("client_audio_chunk", "client_audio_end"):
+        await _handle_client_audio_event(data, session, websocket)
+    elif event:
+        logger.warning(f"Unhandled WebSocket event: {event}")
+
+
+async def _handle_client_init(data: dict, session: Any, websocket: WebSocket):
+    await websocket.send_json({
+        "event": "server_init_ack",
+        "session_id": session.session_id,
+        "server_version": "1.0.0",
+        "status": "success",
+        "timestamp": int(time.time() * 1000)
+    })
+    session.metadata["client_id"] = data.get("client_id", session.session_id)
+
+
+async def _handle_client_interrupt(data: dict, session: Any, websocket: WebSocket):
+    text = data.get("partial_asr") or ""
+    action = await _guard_agent.classify(text)
+
+    if action != "STOP":
+        logger.debug(f"Ignoring potential interruption: {text}")
+        return
+
+    cancelled = await session.interrupt_tasks()
+    record_interruption(reason="user")
+    if cancelled > 0:
+        logger.info(f"Interrupted {cancelled} tasks for session {session.session_id}")
+
+    if session.brain_live_relay is not None:
+        await session.brain_live_relay.send_event({
+            "event": "client_interrupt",
+            "partial_asr": text,
+            "timestamp": int(time.time() * 1000),
+        })
+
+    await websocket.send_json({
+        "event": "server_stop_audio",
+        "session_id": session.session_id,
+        "timestamp": int(time.time() * 1000),
+        "reason": "user_interruption"
+    })
+
+
+def _handle_set_lip_sync_mode(data: dict, session: Any):
+    mode = data.get("mode")
+    if mode in ["dinet", "wav2lip", "webgl"]:
+        session.lip_sync_mode = mode
+        logger.info(f"Session {session.session_id} lip-sync mode set to {mode}")
+    else:
+        logger.warning(f"Invalid lip-sync mode: {mode}")
+
+
+async def _handle_user_speak(data: dict, session: Any, websocket: WebSocket):
+    text = data.get("text")
+    if not text:
+        logger.warning("user_speak received with no text")
+        return
+
+    if session.brain_live_relay is not None:
+        await session.brain_live_relay.send_event({
+            "event": "user_speak",
+            "text": text,
+            "timestamp": int(time.time() * 1000),
+        })
+    else:
+        pipeline = LiveVoicePipeline(session)
+
+        async def run_pipeline():
+            try:
+                async for chunk_event in pipeline.run(text):
+                    await websocket.send_json(chunk_event)
+            except Exception as e:
+                logger.error(f"Pipeline task error: {e}")
+                await websocket.send_json({
+                    "event": "server_error",
+                    "error_code": "internal_error",
+                    "message": str(e)
+                })
+
+        session.add_task(asyncio.create_task(run_pipeline()))
+
+
+async def _handle_client_audio_event(data: dict, session: Any, websocket: WebSocket):
+    await _ensure_brain_relay(session, websocket)
+    await session.brain_live_relay.send_event(data)
+
+
+async def _ensure_brain_relay(session: Any, websocket: WebSocket):
+    if session.brain_live_relay is None:
+        session.brain_live_relay = BrainLiveRelay(
+            session,
+            event_sink=websocket.send_json,
+        )
 
 
 def _merge_tag_metadata(existing_tags: list[dict], extra_tags: list[dict]) -> list[dict]:

@@ -17,6 +17,7 @@ class Session:
         # Session-specific state
         self.lip_sync_mode: str = "dinet"  # Default
         self.metadata: Dict[str, Any] = {}
+        self.brain_live_relay: Any = None
 
     def set_websocket(self, websocket: WebSocket) -> None:
         """Update the websocket connection for this session."""

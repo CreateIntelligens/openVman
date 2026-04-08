@@ -5,6 +5,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from time import perf_counter
+from typing import Any, NoReturn
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -545,150 +546,120 @@ async def clone_persona_route(payload: PersonaCloneRequest):
     "/brain/chat",
     tags=_TAG_CHAT,
     summary="非串流對話",
-    description="進行一回合完整的對話生成（同步等待直到產生完整回應）。\n\n**所需欄位 (JSON)**：\n- 見 `ChatRequest` 結構 (包含 message, session_id 等等)",
+    description="進行一回合完整的對話生成（同步等待直到產生完整回應）。",
 )
 async def chat(request: Request, payload: ChatRequest):
     """Generate a reply using workspace context, retrieval, and recent session history."""
     try:
-        raw = _maybe_rewrite_slash(payload)
-        envelope = build_message_envelope(request, raw, content_key="message")
-        context = prepare_generation(envelope)
+        context = _prepare_chat_context(request, payload)
         result = await asyncio.to_thread(execute_generation, context)
         response = finalize_generation(context, result.reply)
         response["tool_steps"] = result.tool_steps
-        log_event(
-            "chat_complete",
-            trace_id=context.trace_id,
-            session_id=context.session_id,
-            tool_steps=len(result.tool_steps),
-            project_id=context.project_id,
-        )
+        _log_generation_success(context, len(result.tool_steps))
         return response
-    except (ValueError, ProtocolValidationError) as exc:
-        get_metrics_store().increment("guardrail_blocks_total", action="chat")
-        record_generation_failure("chat", "validation", str(exc))
-        error_payload = build_exception_protocol_error(exc)
-        raise HTTPException(status_code=400, detail=error_payload) from exc
-    except Exception as exc:  # pragma: no cover
-        log_exception("chat_error", exc, trace_id=getattr(request.state, "trace_id", ""))
-        record_generation_failure("chat", "llm_failure", str(exc))
-        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
-        raise HTTPException(status_code=502, detail=error_payload) from exc
+    except Exception as exc:
+        _handle_generation_error(exc, "chat", request)
 
 
 @app.post(
     "/brain/chat/stream",
     tags=_TAG_CHAT,
     summary="串流對話 (SSE)",
-    description="透過 Server-Sent Events (SSE) 串流回傳對話生成過程與結果。\n\n**所需欄位 (JSON)**：\n- 見 `ChatRequest` 結構",
+    description="透過 Server-Sent Events (SSE) 串流回傳對話生成過程與結果。",
 )
 async def chat_stream(request: Request, payload: ChatRequest):
     """Stream chat generation through SSE."""
+    try:
+        context = _prepare_chat_context(request, payload)
+        return EventSourceResponse(_stream_generation_events(context))
+    except Exception as exc:
+        _handle_generation_error(exc, "chat_stream", request)
+
+
+def _prepare_chat_context(request: Request, payload: ChatRequest) -> Any:
+    """Consolidate envelope building and generation preparation."""
     raw = _maybe_rewrite_slash(payload)
-    try:
-        envelope = build_message_envelope(request, raw, content_key="message")
-        context = prepare_generation(envelope)
-    except (ValueError, ProtocolValidationError) as exc:
-        get_metrics_store().increment("guardrail_blocks_total", action="chat_stream")
-        record_generation_failure("chat_stream", "validation", str(exc))
-        error_payload = build_exception_protocol_error(exc)
-        raise HTTPException(status_code=400, detail=error_payload) from exc
-    except Exception as exc:  # pragma: no cover
-        log_exception("chat_stream_init_error", exc, trace_id=getattr(request.state, "trace_id", ""))
-        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 串流初始化失敗")
-        raise HTTPException(status_code=502, detail=error_payload) from exc
-
-    return EventSourceResponse(_stream_generation_events(context))
+    envelope = build_message_envelope(request, raw, content_key="message")
+    return prepare_generation(envelope)
 
 
-@app.get(
-    "/brain/chat/history",
-    tags=_TAG_CHAT,
-    summary="取得聊天紀錄",
-    description="取得指定 session 的歷史聊天紀錄。\n\n**所需欄位**：\n- `session_id` (Query, str): 聊天對話的 Session ID\n- `persona_id` (Query, str, 預設 'default'): 人設 ID\n- `project_id` (Query, str, 預設 'default'): 專案 ID",
-)
-async def get_chat_history(session_id: str, persona_id: str = "default", project_id: str = "default"):
-    try:
-        messages = list_session_messages(session_id, persona_id, project_id=project_id)
-        return {"session_id": session_id, "persona_id": persona_id, "history": messages}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+def _log_generation_success(context: Any, tool_steps: int):
+    log_event(
+        "chat_complete",
+        trace_id=context.trace_id,
+        session_id=context.session_id,
+        tool_steps=tool_steps,
+        project_id=context.project_id,
+    )
 
 
-# ---------------------------------------------------------------------------
-# Search & Embedding
-# ---------------------------------------------------------------------------
+def _handle_generation_error(exc: Exception, action: str, request: Request) -> NoReturn:
+    """Unified error handling for generation endpoints."""
+    if isinstance(exc, (ValueError, ProtocolValidationError)):
+        get_metrics_store().increment("guardrail_blocks_total", action=action)
+        record_generation_failure(action, "validation", str(exc))
+        raise HTTPException(status_code=400, detail=build_exception_protocol_error(exc)) from exc
 
-@app.post(
-    "/brain/embed",
-    tags=_TAG_SEARCH,
-    summary="文字向量化",
-    description="將傳入的多筆文字進行 Embedding 轉換並回傳。\n\n**所需欄位 (JSON)**：\n- `texts` (Body, list[str]): 需要被向量化的字串陣列",
-)
-async def embed(payload: EmbedRequest):
-    """向量化文字"""
-    vectors = get_embedder().encode(payload.texts)
-    return {
-        "count": len(vectors),
-        "dim": len(vectors[0]) if vectors else 0,
-        "vectors": [v[:5] for v in vectors],
-    }
+    log_exception(f"{action}_error", exc, trace_id=getattr(request.state, "trace_id", ""))
+    record_generation_failure(action, "llm_failure", str(exc))
+    error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
+    raise HTTPException(status_code=502, detail=error_payload) from exc
 
 
 @app.post(
     "/brain/search",
     tags=_TAG_SEARCH,
     summary="向量語意搜尋",
-    description="使用 Embedding 對 LanceDB 內的資料進行相近度查詢。\n\n**所需欄位 (JSON)**：\n- `query` (Body, str): 查詢字串\n- `table` (Body, str): 要查詢的資料表名稱\n- `top_k` (Body, int, 預設 5): 回傳筆數限制\n- `query_type` (Body, str, 預設 'hybrid'): 搜尋模式 (vector/fts/hybrid)\n- `session_id`, `persona_id`, `project_id` (Body, str): 其他環境參數",
+    description="使用 Embedding 對 LanceDB 內的資料進行相近度查詢。",
 )
 async def search(request: Request, payload: SearchRequest):
     """在 LanceDB 中語意搜尋"""
     envelope = build_message_envelope(request, payload.model_dump(), content_key="query")
     query = envelope.content
-    project_id = envelope.context.project_id
-
     if not query:
         raise HTTPException(status_code=400, detail="query 不可為空")
 
     try:
         enforce_guardrails("search", query, envelope.context)
+        embedding_route = encode_query_with_fallback(
+            query,
+            project_id=envelope.context.project_id,
+            table_names=(payload.table,),
+        )
+        results = search_records(
+            table_name=payload.table,
+            query_vector=embedding_route.vector,
+            top_k=payload.top_k,
+            query_text=query,
+            query_type=payload.query_type,
+            persona_id=envelope.context.persona_id,
+            project_id=envelope.context.project_id,
+            embedding_version=embedding_route.version,
+        )
+        _log_search_complete(envelope.context, payload, embedding_route, len(results))
+        return {
+            "trace_id": envelope.context.trace_id,
+            "query": query,
+            "table": payload.table,
+            "embedding_version": embedding_route.version,
+            "embedding_attempts": embedding_route.attempted_versions,
+            "results": results,
+        }
     except ValueError as exc:
         get_metrics_store().increment("guardrail_blocks_total", action="search")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    embedding_route = encode_query_with_fallback(
-        query,
-        project_id=project_id,
-        table_names=(payload.table,),
-    )
-    results = search_records(
-        table_name=payload.table,
-        query_vector=embedding_route.vector,
-        top_k=payload.top_k,
-        query_text=query,
-        query_type=payload.query_type,
-        persona_id=envelope.context.persona_id,
-        project_id=project_id,
-        embedding_version=embedding_route.version,
-    )
+
+def _log_search_complete(context: Any, payload: SearchRequest, route: Any, count: int):
     log_event(
         "search_complete",
-        trace_id=envelope.context.trace_id,
+        trace_id=context.trace_id,
         table=payload.table,
-        embedding_version=embedding_route.version,
+        embedding_version=route.version,
         top_k=payload.top_k,
-        result_count=len(results),
-        project_id=project_id,
+        result_count=count,
+        project_id=context.project_id,
     )
-
-    return {
-        "trace_id": envelope.context.trace_id,
-        "query": query,
-        "table": payload.table,
-        "embedding_version": embedding_route.version,
-        "embedding_attempts": embedding_route.attempted_versions,
-        "results": results,
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -699,60 +670,37 @@ async def search(request: Request, payload: SearchRequest):
     "/brain/memories",
     tags=_TAG_MEMORY,
     summary="新增記憶",
-    description="新增一筆短期或長期記憶到目前專案與人設中。\n\n**所需欄位 (JSON)**：\n- `text` (Body, str): 記憶內容\n- `source` (Body, str, 選填): 記憶來源 (例如 chat/tool 等)\n- `metadata` (Body, dict, 選填): 額外的結構化資料\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+    description="新增一筆短期或長期記憶到目前專案與人設中。",
 )
 async def add_memory(request: Request, payload: AddMemoryRequest):
     """新增一筆記憶。"""
     envelope = build_message_envelope(request, payload.model_dump(), content_key="text")
     text = envelope.content
-    project_id = envelope.context.project_id
-
     if not text:
         raise HTTPException(status_code=400, detail="text 不可為空")
+
     try:
         enforce_guardrails("add_memory", text, envelope.context)
+        store_memory(
+            text=text,
+            vector=encode_text(text),
+            source=payload.source,
+            metadata=payload.metadata,
+            persona_id=envelope.context.persona_id,
+            project_id=envelope.context.project_id,
+        )
+        log_event("memory_added", trace_id=envelope.context.trace_id, source=payload.source, project_id=envelope.context.project_id)
+        return {"status": "ok", "trace_id": envelope.context.trace_id, "text": text}
     except ValueError as exc:
         get_metrics_store().increment("guardrail_blocks_total", action="add_memory")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    vector = encode_text(text)
-    store_memory(
-        text=text,
-        vector=vector,
-        source=payload.source,
-        metadata=payload.metadata,
-        persona_id=envelope.context.persona_id,
-        project_id=project_id,
-    )
-    log_event(
-        "memory_added",
-        trace_id=envelope.context.trace_id,
-        source=payload.source,
-        project_id=project_id,
-    )
-
-    return {"status": "ok", "trace_id": envelope.context.trace_id, "text": text}
-
-
-@app.get(
-    "/brain/memories",
-    tags=_TAG_MEMORY,
-    summary="列出記憶清單",
-    description="分頁取得目前專案中的記憶清單。\n\n**所需欄位**：\n- `project_id` (Query, str, 預設 'default'): 專案 ID\n- `page` (Query, int, 預設 1): 頁碼\n- `page_size` (Query, int, 預設 20): 每頁筆數",
-)
-async def list_memories(project_id: str = "default", page: int = 1, page_size: int = 20):
-    try:
-        return query_memories(project_id=project_id, page=page, page_size=page_size)
-    except Exception as exc:
-        log_exception("list_memories_error", exc)
-        raise HTTPException(status_code=500, detail="無法讀取記憶列表") from exc
 
 
 @app.delete(
     "/brain/memories",
     tags=_TAG_MEMORY,
     summary="刪除特定記憶",
-    description="根據精確的文字內容刪除對應的一筆記憶。\n\n**所需欄位 (JSON)**：\n- `text` (Body, str): 要刪除的記憶內容\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
+    description="根據精確的文字內容刪除對應的一筆記憶。",
 )
 async def delete_memory(payload: AddMemoryRequest):
     if not payload.text:

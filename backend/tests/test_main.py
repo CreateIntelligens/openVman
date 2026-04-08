@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 import types
 import warnings
@@ -279,3 +280,130 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
     assert response.content == b"cached-audio"
     assert response.headers["X-TTS-Provider"] == "indextts"
     assert response.headers["X-TTS-Cache-Hit"] == "true"
+
+
+class FakeRelay:
+    instances: list["FakeRelay"] = []
+
+    def __init__(self, session, *, event_sink=None):
+        self.session = session
+        self.event_sink = event_sink
+        self.sent_events: list[dict[str, object]] = []
+        self.closed = False
+        type(self).instances.append(self)
+
+    async def send_event(self, payload: dict[str, object]) -> None:
+        self.sent_events.append(payload)
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def test_websocket_routes_user_speak_to_brain_relay_when_relay_is_active(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    FakeRelay.instances.clear()
+    module.BrainLiveRelay = FakeRelay
+    module.get_tts_config = lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+    )
+
+    client = TestClient(module.app)
+    with client.websocket_connect("/ws/client-1") as websocket:
+        websocket.send_text(json.dumps({"event": "client_init"}))
+        ack = websocket.receive_json()
+        assert ack["event"] == "server_init_ack"
+
+        # Send audio event first to establish the Brain relay
+        websocket.send_text(
+            json.dumps({
+                "event": "client_audio_chunk",
+                "audio_base64": "YWJj",
+                "sample_rate": 16000,
+                "mime_type": "audio/pcm;rate=16000",
+                "timestamp": 100,
+            })
+        )
+        # Now user_speak should route through the active relay
+        websocket.send_text(json.dumps({"event": "user_speak", "text": "你好"}))
+
+    assert len(FakeRelay.instances) == 1
+    events = [e["event"] for e in FakeRelay.instances[0].sent_events]
+    assert "client_audio_chunk" in events
+    assert "user_speak" in events
+
+
+def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    FakeRelay.instances.clear()
+    module.BrainLiveRelay = FakeRelay
+    module.get_tts_config = lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+    )
+
+    client = TestClient(module.app)
+    with client.websocket_connect("/ws/client-2") as websocket:
+        websocket.send_text(json.dumps({"event": "client_init"}))
+        ack = websocket.receive_json()
+        assert ack["event"] == "server_init_ack"
+
+        websocket.send_text(
+            json.dumps(
+                {
+                    "event": "client_audio_chunk",
+                    "audio_base64": "YWJj",
+                    "sample_rate": 16000,
+                    "mime_type": "audio/pcm;rate=16000",
+                    "timestamp": 123,
+                }
+            )
+        )
+        websocket.send_text(json.dumps({"event": "client_audio_end", "timestamp": 124}))
+
+    assert len(FakeRelay.instances) == 1
+    assert [event["event"] for event in FakeRelay.instances[0].sent_events] == [
+        "client_audio_chunk",
+        "client_audio_end",
+    ]
+    assert FakeRelay.instances[0].sent_events[0]["audio_base64"] == "YWJj"
+    assert FakeRelay.instances[0].sent_events[1]["timestamp"] == 124
+
+
+def test_websocket_routes_user_speak_to_live_pipeline_when_no_relay(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    class FakePipeline:
+        instances: list["FakePipeline"] = []
+
+        def __init__(self, session):
+            self.session = session
+            self.text_turns: list[str] = []
+            type(self).instances.append(self)
+
+        async def run(self, user_text: str):
+            self.text_turns.append(user_text)
+            yield {
+                "event": "server_stream_chunk",
+                "chunk_id": "chunk-1",
+                "text": user_text,
+                "audio_base64": "YXVkaW8=",
+                "is_final": True,
+            }
+
+    module.LiveVoicePipeline = FakePipeline
+    module.get_tts_config = lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+    )
+
+    client = TestClient(module.app)
+    with client.websocket_connect("/ws/client-3") as websocket:
+        websocket.send_text(json.dumps({"event": "client_init"}))
+        ack = websocket.receive_json()
+        assert ack["event"] == "server_init_ack"
+
+        websocket.send_text(json.dumps({"event": "user_speak", "text": "走舊路"}))
+        chunk = websocket.receive_json()
+        assert chunk["event"] == "server_stream_chunk"
+        assert chunk["text"] == "走舊路"
+
+    assert len(FakePipeline.instances) == 1
+    assert FakePipeline.instances[0].text_turns == ["走舊路"]
