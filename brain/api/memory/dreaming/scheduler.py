@@ -174,10 +174,16 @@ def get_candidates_preview(project_id: str = "default") -> list[dict[str, Any]]:
 # Scheduler loop
 # ---------------------------------------------------------------------------
 
+def _discover_project_ids() -> list[str]:
+    """Return all existing project IDs by scanning data/projects/."""
+    from infra.project_admin import list_projects
+    return [p["project_id"] for p in list_projects()]
+
+
 async def start_dreaming_scheduler(app: Any) -> None:
     """Start background scheduler loop."""
     cfg = get_settings()
-    if not (cfg.dreaming_enabled and cfg.dreaming_projects):
+    if not cfg.dreaming_enabled:
         return
 
     cron, tz = _parse_cron(cfg.dreaming_cron), _get_tz(cfg.dreaming_timezone)
@@ -191,7 +197,7 @@ async def start_dreaming_scheduler(app: Any) -> None:
             tick = now.replace(second=0, microsecond=0)
             if tick != last_tick and cron.matches(now.hour, now.minute):
                 last_tick = tick
-                for pid in cfg.dreaming_projects:
+                for pid in await asyncio.to_thread(_discover_project_ids):
                     logger.info("dreaming scheduler: triggering project=%s", pid)
                     await asyncio.to_thread(run_dreaming_cycle, pid)
 

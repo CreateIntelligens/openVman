@@ -108,7 +108,6 @@ class BrainSettings(BaseSettings):
     dreaming_min_recall_count: int = 2
     dreaming_candidate_limit: int = 100
     dreaming_similarity_threshold: float = 0.90
-    dreaming_projects: list[str] = ["default"]
 
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6

@@ -46,7 +46,6 @@ _cfg_mock.dreaming_min_score = 0.45
 _cfg_mock.dreaming_min_recall_count = 2
 _cfg_mock.dreaming_candidate_limit = 100
 _cfg_mock.dreaming_similarity_threshold = 0.90
-_cfg_mock.dreaming_projects = ["default"]
 sys.modules["config"].get_settings = lambda: _cfg_mock
 
 _ws_root = Path("/tmp/test_scheduler_ws")
