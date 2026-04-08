@@ -101,6 +101,7 @@ def _search_tool(table_name: str, query: str, top_k: int) -> dict[str, Any]:
         table_name=table_name,
         query_vector=embedding_route.vector,
         top_k=max(1, min(int(top_k), 8)),
+        query_text=query.strip(),
         persona_id=_active_persona_id.get(),
         project_id=_active_project_id.get(),
         embedding_version=embedding_route.version,

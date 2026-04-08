@@ -447,18 +447,13 @@ def _assemble_code_chunks(
         chunk_index += 1
 
     for block in blocks:
-        # If a single block exceeds limit, flush buffer first, then split the block
         if len(block) > char_limit:
             _flush()
-            buffer = []
-            buffer_len = 0
-            sub_pieces = _split_oversized_segment(block, char_limit)
-            for piece in sub_pieces:
+            for piece in _split_oversized_segment(block, char_limit):
                 buffer = [piece]
-                buffer_len = len(piece)
                 _flush()
                 buffer = []
-                buffer_len = 0
+            buffer_len = 0
             continue
 
         if buffer and buffer_len + len(block) + 2 > char_limit:
@@ -609,21 +604,7 @@ def _chunk_paragraphs(
         chunk_text = "\n\n".join(buffer)
         chunks.append(_make_chunk(chunk_text))
         chunk_index += 1
-
-        if overlap_chars <= 0:
-            return []
-
-        # Collect trailing segments that fit within overlap_chars.
-        # Always include at least the last segment for continuity.
-        overlap_segs: list[str] = []
-        overlap_len = 0
-        for seg in reversed(buffer):
-            candidate = len(seg) + (2 if overlap_segs else 0)
-            if overlap_segs and overlap_len + candidate > overlap_chars:
-                break
-            overlap_segs.insert(0, seg)
-            overlap_len += candidate
-        return overlap_segs
+        return _calculate_overlap(buffer, overlap_chars)
 
     for segment in segments:
         additional = len(segment) + (2 if buffer else 0)
@@ -725,6 +706,23 @@ def _clean_text(content: str) -> str:
 def _format_qa_chunk(title: str, question: str, answer_lines: list[str]) -> str:
     answer = "\n".join(line.strip() for line in answer_lines if line.strip())
     return f"主題：{title}\n問題：{question.strip()}\n回答：{answer}"
+
+
+def _calculate_overlap(buffer: list[str], overlap_chars: int) -> list[str]:
+    """Collect trailing segments from buffer that fit within overlap_chars."""
+    if overlap_chars <= 0 or not buffer:
+        return []
+
+    overlap_segs: list[str] = []
+    overlap_len = 0
+    for seg in reversed(buffer):
+        candidate = len(seg) + (2 if overlap_segs else 0)
+        # Always include at least the last segment for continuity
+        if overlap_segs and overlap_len + candidate > overlap_chars:
+            break
+        overlap_segs.insert(0, seg)
+        overlap_len += candidate
+    return overlap_segs
 
 
 def _pick_first(row: dict[str, Any], *keys: str) -> str:

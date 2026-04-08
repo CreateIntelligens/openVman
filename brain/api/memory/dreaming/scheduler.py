@@ -31,37 +31,26 @@ _last_run: dict[str, dict[str, Any]] = {}
 
 @dataclass(frozen=True, slots=True)
 class CronSpec:
-    """Parsed cron spec — only minute and hour fields are evaluated.
-
-    Day-of-month, month, and day-of-week fields in the cron expression
-    are accepted but silently ignored.
-    """
-    minute: int | None = None      # exact minute, or None = wildcard
-    minute_step: int | None = None  # e.g. 5 for */5
-    hour: int | None = None        # exact hour, or None = wildcard
+    """Simple cron spec — hour and minute only."""
+    minute: int | None = None
+    minute_step: int | None = None
+    hour: int | None = None
 
     def matches(self, h: int, m: int) -> bool:
-        if self.hour is not None and h != self.hour:
-            return False
-        if self.minute is not None and m != self.minute:
-            return False
-        if self.minute_step is not None and m % self.minute_step != 0:
-            return False
-        return True
+        return (
+            (self.hour is None or h == self.hour) and
+            (self.minute is None or m == self.minute) and
+            (self.minute_step is None or m % self.minute_step == 0)
+        )
 
 
 def _parse_cron(expr: str) -> CronSpec:
-    """Parse a simple cron expression into a CronSpec.
-
-    Supports: "0 3 * * *" → minute=0, hour=3
-              "*/5 * * * *" → minute_step=5
-              "30 * * * *" → minute=30, hour=None
-    """
+    """Parse minute and hour from cron string (e.g. '0 3 * * *', '*/5 * * * *')."""
     parts = expr.strip().split()
     if len(parts) < 2:
         return CronSpec()
 
-    m_str, h_str = parts[0], parts[1]
+    m_str, h_str = parts[:2]
 
     minute, minute_step = None, None
     if m_str.startswith("*/"):
@@ -186,56 +175,36 @@ def get_candidates_preview(project_id: str = "default") -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 async def start_dreaming_scheduler(app: Any) -> None:
-    """Start the background dreaming scheduler (called from lifespan)."""
+    """Start background scheduler loop."""
     cfg = get_settings()
-    if not cfg.dreaming_enabled:
-        logger.info("dreaming scheduler: disabled")
+    if not (cfg.dreaming_enabled and cfg.dreaming_projects):
         return
 
-    cron = _parse_cron(cfg.dreaming_cron)
-    tz = _get_tz(cfg.dreaming_timezone)
-    projects = cfg.dreaming_projects
-    logger.info(
-        "dreaming scheduler: starting (cron=%s, tz=%s, projects=%s)",
-        cfg.dreaming_cron, cfg.dreaming_timezone, projects,
-    )
+    cron, tz = _parse_cron(cfg.dreaming_cron), _get_tz(cfg.dreaming_timezone)
+    logger.info("dreaming scheduler: starting (cron=%s, tz=%s)", cfg.dreaming_cron, cfg.dreaming_timezone)
 
-    async def _loop() -> None:
-        last_key = ""
+    async def _loop():
+        last_tick = None
         while True:
-            await asyncio.sleep(60)
-            try:
-                now = datetime.now(tz)
-                key = f"{now.date().isoformat()}:{now.hour}:{now.minute}"
-                if key != last_key and cron.matches(now.hour, now.minute):
-                    last_key = key
-                    for pid in projects:
-                        logger.info("dreaming scheduler: triggering project=%s", pid)
-                        await asyncio.to_thread(run_dreaming_cycle, pid)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error("dreaming scheduler error: %s", e)
+            await asyncio.sleep(30)
+            now = datetime.now(tz)
+            tick = now.replace(second=0, microsecond=0)
+            if tick != last_tick and cron.matches(now.hour, now.minute):
+                last_tick = tick
+                for pid in cfg.dreaming_projects:
+                    logger.info("dreaming scheduler: triggering project=%s", pid)
+                    await asyncio.to_thread(run_dreaming_cycle, pid)
 
     app.state.dreaming_task = asyncio.create_task(_loop())
 
 
-# ---------------------------------------------------------------------------
-# Next-run computation
-# ---------------------------------------------------------------------------
-
 def _compute_next_run(cron: CronSpec, tz: ZoneInfo | timezone) -> str | None:
-    """Compute the next matching cron time as an ISO string."""
-    now = datetime.now(tz)
-    # Start from the next full minute
-    candidate = now.replace(second=0, microsecond=0) + timedelta(minutes=1)
-
-    # Scan up to 48 hours ahead
-    for _ in range(48 * 60):
+    """Compute the next matching time string."""
+    candidate = datetime.now(tz).replace(second=0, microsecond=0)
+    for _ in range(2880):  # Scan 48 hours
+        candidate += timedelta(minutes=1)
         if cron.matches(candidate.hour, candidate.minute):
             return candidate.isoformat()
-        candidate += timedelta(minutes=1)
-
     return None
 
 

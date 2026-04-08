@@ -143,44 +143,43 @@ def _rerank_by_distance(
     Decay penalizes older records; importance rewards higher-scored records.
     """
     today = date.today()
+    results = []
 
-    def sort_key(record: dict[str, Any]) -> float:
+    for record in candidates:
         raw_distance = float(record.get("_distance", 999.0))
         effective = raw_distance - distance_bonus
 
         # Time decay: older records get penalized
         if decay_rate_per_day > 0:
-            days_old = _days_since(record, today)
-            effective += days_old * decay_rate_per_day
+            effective += _days_since(record, today) * decay_rate_per_day
 
         # Importance bonus: higher importance records rank better
         if importance_weight > 0:
-            importance = _record_importance(record)
-            effective -= importance * importance_weight
+            effective -= _record_importance(record) * importance_weight
 
-        record["_effective_distance"] = effective
-        return effective
+        # Include effective distance in a copy to avoid mutating inputs
+        enriched = {**record, "_effective_distance": effective}
+        results.append(enriched)
 
-    return sorted(candidates, key=sort_key)
+    return sorted(results, key=lambda r: r["_effective_distance"])
 
 
 def _days_since(record: dict[str, Any], today: date) -> float:
     """Return the number of days between the record's date and today."""
-    raw_date = str(record.get("date", ""))
-    if not raw_date:
-        return 0.0
     try:
-        record_date = date.fromisoformat(raw_date)
-        delta = today - record_date
-        return max(delta.days, 0)
+        raw_date = record.get("date")
+        if not raw_date:
+            return 0.0
+        record_date = date.fromisoformat(str(raw_date))
+        return float(max((today - record_date).days, 0))
     except (ValueError, TypeError):
         return 0.0
 
 
 def _record_importance(record: dict[str, Any]) -> float:
     """Extract importance score from record metadata."""
-    meta = parse_record_metadata(record)
     try:
+        meta = parse_record_metadata(record)
         return float(meta.get("importance", 0.0))
     except (ValueError, TypeError):
         return 0.0

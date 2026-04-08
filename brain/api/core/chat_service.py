@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from config import get_settings
@@ -28,7 +29,7 @@ from memory.memory import (
     get_or_create_session,
     list_session_messages,
 )
-from memory.memory_governance import maybe_run_memory_maintenance
+from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
     MessageEnvelope,
@@ -107,6 +108,14 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         context.user_message,
         cleaned_reply,
         context.persona_id,
+        project_id=context.project_id,
+    )
+    write_summary_and_reindex(
+        persona_id=context.persona_id,
+        day=date.today().isoformat(),
+        summary_text=f"User: {context.user_message}\nAssistant: {cleaned_reply}",
+        source_turns=1,
+        session_id=context.session_id,
         project_id=context.project_id,
     )
 

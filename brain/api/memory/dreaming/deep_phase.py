@@ -15,6 +15,7 @@ from typing import Any
 
 from config import get_settings
 from infra.db import get_memories_table, normalize_vector
+from knowledge.workspace import get_workspace_root
 from memory.dreaming.paths import SOURCE_DREAMING, dreams_dir
 from memory.dreaming.scoring import passes_threshold
 from memory.embedder import get_embedder
@@ -46,7 +47,7 @@ def run_deep_phase(project_id: str = "default") -> dict[str, Any]:
             c,
             min_score=cfg.dreaming_min_score,
             min_recall_count=cfg.dreaming_min_recall_count,
-            min_unique_queries=1,
+            min_unique_queries=0,
         )
     ]
     logger.info(

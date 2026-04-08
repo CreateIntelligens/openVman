@@ -231,37 +231,30 @@ def _archive_old_transcripts(project_id: str = "default") -> int:
     """Move transcript files older than retention_days to archive/memory/."""
     cfg = get_settings()
     cutoff = date.today() - timedelta(days=cfg.transcript_retention_days)
-
     ws = get_workspace_root(project_id)
     memory_dir = ws / "memory"
-    archive_paths = get_archive_paths(project_id)
-    archive_memory_dir = archive_paths["memory_dir"]
+    archive_memory_dir = get_archive_paths(project_id)["memory_dir"]
 
     archived = 0
     for path in sorted(memory_dir.rglob("*.md")):
         if not _DATE_STEM_RE.match(path.stem):
             continue
         try:
-            file_date = date.fromisoformat(path.stem)
+            if date.fromisoformat(path.stem) >= cutoff:
+                continue
         except ValueError:
             continue
-        if file_date >= cutoff:
-            continue
 
-        # Compute relative persona subpath
-        rel = path.relative_to(memory_dir)
-        dest = archive_memory_dir / rel
+        dest = archive_memory_dir / path.relative_to(memory_dir)
         dest.parent.mkdir(parents=True, exist_ok=True)
 
         if dest.exists():
             # Merge: append source content to existing archive
-            existing = dest.read_text(encoding="utf-8-sig")
-            incoming = path.read_text(encoding="utf-8-sig")
-            dest.write_text(existing.rstrip() + "\n\n" + incoming, encoding="utf-8")
+            with dest.open("a", encoding="utf-8") as f:
+                f.write("\n\n" + path.read_text(encoding="utf-8-sig"))
             path.unlink()
         else:
             shutil.move(str(path), str(dest))
-
         archived += 1
 
     return archived
@@ -295,49 +288,27 @@ def _summarize_daily_file(path: Path, memory_dir: Path) -> DailyMemorySummary | 
     user_topics = _collect_unique([t["user"] for t in turns], 6, 80)
     assistant_notes = _collect_unique([t["assistant"] for t in turns], 6, 100)
 
-    summary_text = "\n".join([
-        f"Persona：{persona_id}",
-        f"日期：{day}",
-        f"對話輪次：{len(turns)}",
-        "使用者主題：",
-        *[f"- {topic}" for topic in user_topics],
-        "回覆重點：",
-        *[f"- {note}" for note in assistant_notes],
-    ])
-    markdown = "\n".join([
-        f"## [{persona_id}] {day}",
-        "",
-        f"- 指紋：`{fingerprint[:12]}`",
-        f"- 對話輪次：{len(turns)}",
-        "",
-        "### 使用者主題",
-        *[f"- {topic}" for topic in user_topics],
-        "",
-        "### 回覆重點",
-        *[f"- {note}" for note in assistant_notes],
-        "",
-    ]).strip()
-
-    return DailyMemorySummary(
-        persona_id=persona_id,
-        day=day,
-        fingerprint=fingerprint,
-        summary_text=summary_text,
-        markdown=markdown,
+    summary_text = (
+        f"Persona：{persona_id}\n日期：{day}\n對話輪次：{len(turns)}\n"
+        f"使用者主題：\n" + "\n".join(f"- {t}" for t in user_topics) +
+        f"\n回覆重點：\n" + "\n".join(f"- {n}" for n in assistant_notes)
     )
+    markdown = (
+        f"## [{persona_id}] {day}\n\n"
+        f"- 指紋：`{fingerprint[:12]}`\n- 對話輪次：{len(turns)}\n\n"
+        f"### 使用者主題\n" + "\n".join(f"- {t}" for t in user_topics) +
+        f"\n\n### 回覆重點\n" + "\n".join(f"- {n}" for n in assistant_notes)
+    ).strip()
+
+    return DailyMemorySummary(persona_id, day, fingerprint, summary_text, markdown)
 
 
 def _write_summary_document(summaries: list[DailyMemorySummary], project_id: str = "default") -> None:
     core_docs = get_core_documents(project_id)
     path = core_docs["memory_summaries"]
-    lines = ["# 記憶摘要 (MEMORY_SUMMARIES)", ""]
-    if not summaries:
-        lines.append("- 尚未有可整理的每日對話。")
-    else:
-        for summary in summaries:
-            lines.append(summary.markdown)
-            lines.append("")
-    path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+    header = ["# 記憶摘要 (MEMORY_SUMMARIES)", ""]
+    body = [s.markdown + "\n" for s in summaries] if summaries else ["- 尚未有可整理的每日對話。"]
+    path.write_text("\n".join(header + body).strip() + "\n", encoding="utf-8")
 
 
 def _extract_turns(content: str) -> list[dict[str, str]]:
@@ -350,8 +321,8 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
         if current_user or current_assistant:
             turns.append({"user": " ".join(current_user), "assistant": " ".join(current_assistant)})
 
-    for raw_line in content.splitlines():
-        line = raw_line.strip()
+    for line in content.splitlines():
+        line = line.strip()
         if line.startswith("## "):
             _flush_turn()
             current_user.clear()
@@ -361,10 +332,11 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
             section = "user"
         elif line == "### Assistant":
             section = "assistant"
-        elif line and section == "user":
-            current_user.append(line)
-        elif line and section == "assistant":
-            current_assistant.append(line)
+        elif line:
+            if section == "user":
+                current_user.append(line)
+            elif section == "assistant":
+                current_assistant.append(line)
 
     _flush_turn()
     return turns
@@ -373,15 +345,11 @@ def _extract_turns(content: str) -> list[dict[str, str]]:
 def _collect_unique(items: list[str], limit: int, max_chars: int) -> list[str]:
     unique: list[str] = []
     for item in items:
-        normalized = " ".join(item.split())
-        if not normalized:
-            continue
-        normalized = normalized[:max_chars]
-        if normalized in unique:
-            continue
-        unique.append(normalized)
-        if len(unique) >= limit:
-            break
+        normalized = " ".join(item.split())[:max_chars]
+        if normalized and normalized not in unique:
+            unique.append(normalized)
+            if len(unique) >= limit:
+                break
     return unique
 
 
@@ -389,49 +357,45 @@ def _build_summary_records(summaries: list[DailyMemorySummary]) -> list[dict[str
     if not summaries:
         return []
 
-    vectors = get_embedder().encode([summary.summary_text for summary in summaries])
+    vectors = get_embedder().encode([s.summary_text for s in summaries])
     records: list[dict[str, Any]] = []
     for summary, vector in zip(summaries, vectors):
         importance = score_importance(summary.summary_text)
-        records.append(
-            {
-                "text": summary.summary_text,
-                "vector": normalize_vector(vector),
-                "source": "memory_summary",
-                "date": summary.day,
-                "metadata": json.dumps(
-                    {
-                        "kind": "daily_summary",
-                        "persona_id": summary.persona_id,
-                        "day": summary.day,
-                        "fingerprint": summary.fingerprint,
-                        "importance": importance.score,
-                        "importance_level": importance.level,
-                    },
-                    ensure_ascii=False,
-                ),
-            }
-        )
+        records.append({
+            "text": summary.summary_text,
+            "vector": normalize_vector(vector),
+            "source": "memory_summary",
+            "date": summary.day,
+            "metadata": json.dumps({
+                "kind": "daily_summary",
+                "persona_id": summary.persona_id,
+                "day": summary.day,
+                "fingerprint": summary.fingerprint,
+                "importance": importance.score,
+                "importance_level": importance.level,
+            }, ensure_ascii=False),
+        })
     return records
 
 
 def _dedupe_memory_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen_texts: set[tuple[str, str]] = set()
+    seen_keys: set[tuple[str, str]] = set()
     deduped: list[dict[str, Any]] = []
 
     for record in records:
+        if _is_placeholder_record(record):
+            deduped.append(record)
+            continue
+
         normalized = _normalize_memory_text(str(record.get("text", "")))
         persona_id = _memory_persona_id(record)
         if not normalized:
             continue
-        if _is_placeholder_record(record):
-            deduped.append(record)
-            continue
+
         key = (normalized, persona_id)
-        if key in seen_texts:
-            continue
-        seen_texts.add(key)
-        deduped.append(record)
+        if key not in seen_keys:
+            seen_keys.add(key)
+            deduped.append(record)
 
     return deduped
 
@@ -453,16 +417,12 @@ def _memory_kind(record: dict[str, Any]) -> str:
 def _memory_persona_id(record: dict[str, Any]) -> str:
     metadata = parse_record_metadata(record)
     raw = str(metadata.get("persona_id", "")).strip()
-    if not raw:
-        return "global"
-    return normalize_persona_id(raw)
+    return normalize_persona_id(raw) if raw else "global"
 
 
 def _persona_id_from_memory_path(path: Path, memory_dir: Path) -> str:
     relative = path.relative_to(memory_dir)
-    if len(relative.parts) == 1:
-        return "default"
-    return normalize_persona_id(relative.parts[0])
+    return normalize_persona_id(relative.parts[0]) if len(relative.parts) > 1 else "default"
 
 
 # ---------------------------------------------------------------------------
@@ -477,25 +437,16 @@ def _semantic_dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, An
 
     groups: dict[str, list[tuple[int, dict[str, Any]]]] = {}
     for idx, record in enumerate(records):
-        persona = _memory_persona_id(record)
-        groups.setdefault(persona, []).append((idx, record))
+        groups.setdefault(_memory_persona_id(record), []).append((idx, record))
 
     drop_indices: set[int] = set()
-    merge_count = 0
-
     for group in groups.values():
-        vectors_with_idx = [
-            (idx, vec)
-            for idx, record in group
-            if (vec := record.get("vector")) is not None
-        ]
-        merged = _find_merge_drops(vectors_with_idx, records, threshold, drop_indices)
-        drop_indices.update(merged)
-        merge_count += len(merged)
+        vectors_with_idx = [(i, r.get("vector")) for i, r in group if r.get("vector") is not None]
+        drop_indices.update(_find_merge_drops(vectors_with_idx, records, threshold, drop_indices))
 
-    if merge_count > 0:
-        logger.info("semantic dedup: merged %d pairs (threshold=%.2f)", merge_count, threshold)
-        log_event("memory_semantic_dedup", merged_pairs=merge_count, threshold=threshold)
+    if drop_indices:
+        logger.info("semantic dedup: merged %d pairs (threshold=%.2f)", len(drop_indices), threshold)
+        log_event("memory_semantic_dedup", merged_pairs=len(drop_indices), threshold=threshold)
 
     return [r for idx, r in enumerate(records) if idx not in drop_indices]
 
@@ -508,23 +459,18 @@ def _find_merge_drops(
 ) -> set[int]:
     """Compare all pairs in a persona group and return indices to drop."""
     drops: set[int] = set()
-    if len(vectors_with_idx) < 2:
-        return drops
-
-    for i in range(len(vectors_with_idx)):
+    count = len(vectors_with_idx)
+    for i in range(count):
         idx_a, vec_a = vectors_with_idx[i]
         if idx_a in already_dropped or idx_a in drops:
             continue
-        for j in range(i + 1, len(vectors_with_idx)):
+        for j in range(i + 1, count):
             idx_b, vec_b = vectors_with_idx[j]
             if idx_b in already_dropped or idx_b in drops:
                 continue
             if _cosine_similarity(vec_a, vec_b) >= threshold:
-                older_idx, _ = _merge_memory_pair(
-                    idx_a, records[idx_a], idx_b, records[idx_b],
-                )
+                older_idx, _ = _merge_memory_pair(idx_a, records[idx_a], idx_b, records[idx_b])
                 drops.add(older_idx)
-
     return drops
 
 
