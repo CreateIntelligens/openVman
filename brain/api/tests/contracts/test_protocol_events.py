@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-API_ROOT = Path(__file__).resolve().parents[1]
+API_ROOT = Path(__file__).resolve().parents[2]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
-GENERATED_PYTHON_ROOT = Path(__file__).resolve().parents[3] / "contracts" / "generated" / "python"
+GENERATED_PYTHON_ROOT = Path(__file__).resolve().parents[4] / "contracts" / "generated" / "python"
 if str(GENERATED_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(GENERATED_PYTHON_ROOT))
 PROTOCOL_EVENTS_MODULE = "protocol.protocol_events"
