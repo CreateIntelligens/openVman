@@ -561,6 +561,17 @@ async def chat(request: Request, payload: ChatRequest):
         _handle_generation_error(exc, "chat", request)
 
 
+@app.get(
+    "/brain/chat/history",
+    tags=_TAG_CHAT,
+    summary="對話歷史",
+    description="取得指定 session 的對話歷史訊息。",
+)
+async def chat_history(session_id: str, project_id: str = "default", persona_id: str = "default"):
+    messages = list_session_messages(session_id=session_id, persona_id=persona_id, project_id=project_id)
+    return {"session_id": session_id, "persona_id": persona_id, "history": messages}
+
+
 @app.post(
     "/brain/chat/stream",
     tags=_TAG_CHAT,
@@ -665,6 +676,16 @@ def _log_search_complete(context: Any, payload: SearchRequest, route: Any, count
 # ---------------------------------------------------------------------------
 # Memory & Sessions
 # ---------------------------------------------------------------------------
+
+@app.get(
+    "/brain/memories",
+    tags=_TAG_MEMORY,
+    summary="列出記憶",
+    description="分頁列出指定專案的記憶，不含向量資料。",
+)
+async def list_memories_route(project_id: str = "default", page: int = 1, page_size: int = 20):
+    return query_memories(project_id=project_id, page=page, page_size=page_size)
+
 
 @app.post(
     "/brain/memories",

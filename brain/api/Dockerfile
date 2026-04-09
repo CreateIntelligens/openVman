@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir "torch>=2.6" --index-url https://download.pytorch
 
 # Create non-root user so volume mounts work with user: UID:GID
 RUN groupadd -g 1000 appuser && useradd -u 1000 -g 1000 -m appuser \
-    && mkdir -p /home/appuser/.cache/huggingface /home/appuser/.openclaw/lancedb \
+    && mkdir -p /home/appuser/.cache/huggingface \
     && chown -R 1000:1000 /home/appuser
 
 ENV PYTHONPATH=/app
