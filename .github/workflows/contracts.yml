@@ -5,7 +5,7 @@ on:
     paths:
       - "contracts/**"
       - "brain/api/protocol/**"
-      - "brain/api/tests/test_protocol_events.py"
+      - "brain/api/tests/contracts/**"
       - ".github/workflows/contracts.yml"
   push:
     branches:
@@ -32,4 +32,4 @@ jobs:
         run: python3 -m pip install pytest "pydantic>=2.0.0,<3"
 
       - name: Run backend protocol tests
-        run: python3 -m pytest brain/api/tests/test_protocol_events.py -v
+        run: python3 -m pytest brain/api/tests/contracts/test_protocol_events.py -v
