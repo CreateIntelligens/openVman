@@ -1,4 +1,5 @@
 import type { SkillInfo, TtsProvider } from "../../api";
+import Select from "../Select";
 
 export default function ChatInput({
   input,
@@ -72,28 +73,22 @@ export default function ChatInput({
           <div className="flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[14px] text-slate-500">graphic_eq</span>
-              <select
+              <Select
                 value={ttsProvider}
-                onChange={(e) => onTtsProviderChange(e.target.value)}
-                className="select-adaptive text-xs py-1 px-2 min-w-[100px]"
-              >
-                {ttsProviders.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                onChange={onTtsProviderChange}
+                options={ttsProviders.map((p) => ({ value: p.id, label: p.name }))}
+                className="min-w-[100px] text-xs"
+              />
             </div>
             {ttsProvider !== "auto" && activeTtsProvider && activeTtsProvider.voices.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[14px] text-slate-500">record_voice_over</span>
-                <select
+                <Select
                   value={ttsVoice || activeTtsProvider.default_voice}
-                  onChange={(e) => onTtsVoiceChange(e.target.value)}
-                  className="select-adaptive text-xs py-1 px-2 min-w-[120px]"
-                >
-                  {activeTtsProvider.voices.map((v) => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
+                  onChange={onTtsVoiceChange}
+                  options={activeTtsProvider.voices.map((v) => ({ value: v, label: v }))}
+                  className="min-w-[120px] text-xs"
+                />
               </div>
             )}
           </div>

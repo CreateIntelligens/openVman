@@ -1,4 +1,5 @@
 import StatusAlert from "../components/StatusAlert";
+import Select from "../components/Select";
 import { useSemanticSearch } from "../hooks/useSemanticSearch";
 
 const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
@@ -67,27 +68,25 @@ export default function Search() {
           </div>
           <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
           <div className="flex items-center px-4">
-            <select
-              className="select-adaptive text-sm py-2.5"
+            <Select
               value={table}
-              onChange={(e) => setTable(e.target.value)}
-            >
-              <option value="memories">個人記憶</option>
-              <option value="knowledge">知識庫</option>
-            </select>
+              onChange={setTable}
+              options={[
+                { value: "memories", label: "個人記憶" },
+                { value: "knowledge", label: "知識庫" },
+              ]}
+              className="text-sm min-w-[100px]"
+            />
           </div>
           <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
           <div className="flex items-center gap-2 px-4">
             <label className="text-xs text-slate-400 dark:text-slate-500 font-bold whitespace-nowrap">Top K</label>
-            <select
-              className="select-adaptive text-sm py-2.5"
-              value={topK}
-              onChange={(e) => setTopK(Number(e.target.value))}
-            >
-              {TOP_K_OPTIONS.map((k) => (
-                <option key={k} value={k}>{k}</option>
-              ))}
-            </select>
+            <Select
+              value={String(topK)}
+              onChange={(v) => setTopK(Number(v))}
+              options={TOP_K_OPTIONS.map((k) => ({ value: String(k), label: String(k) }))}
+              className="text-sm min-w-[60px]"
+            />
           </div>
           <button
             onClick={() => void submit()}

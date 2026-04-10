@@ -1,4 +1,5 @@
 import { allTabs, type ProjectSummary, type Tab } from "./navigation";
+import Select from "../Select";
 
 interface MobileTopBarProps {
   active: Tab;
@@ -21,21 +22,20 @@ export default function MobileTopBar({
     <div className="sticky top-0 z-20 border-b border-primary/10 bg-white/90 dark:bg-background-dark/90 px-4 py-3 backdrop-blur md:hidden flex flex-col gap-3">
       <div className="flex items-center gap-2 w-full rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
         <span className="material-symbols-outlined text-sm text-primary">dataset</span>
-        <select
+        <Select
           value={projectId}
-          onChange={(e) => onSelectProject(e.target.value)}
+          onChange={onSelectProject}
           disabled={loadingProjects}
-          className="select-adaptive flex-1 text-xs font-bold min-w-0"
-        >
-          {projects.map((project) => (
-            <option key={project.project_id} value={project.project_id} className="bg-white dark:bg-slate-900 font-normal">
-              {project.label || project.project_id}
-            </option>
-          ))}
-          {!projects.length && (
-            <option value="default" className="bg-white dark:bg-slate-900 font-normal">default</option>
-          )}
-        </select>
+          options={
+            projects.length
+              ? projects.map((project) => ({
+                  value: project.project_id,
+                  label: project.label || project.project_id,
+                }))
+              : [{ value: "default", label: "default" }]
+          }
+          className="flex-1 text-xs min-w-0"
+        />
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {allTabs.map((tab) => (

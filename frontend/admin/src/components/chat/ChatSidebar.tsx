@@ -1,5 +1,6 @@
 import type { PersonaSummary, SessionSummary } from "../../api";
 import { formatRelativeTime } from "./helpers";
+import Select from "../Select";
 
 export default function ChatSidebar({
   personas,
@@ -45,18 +46,18 @@ export default function ChatSidebar({
         {/* Persona Selector */}
         <div className="space-y-2 shrink-0">
           <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-1">使用中角色</h3>
-          <select
+          <Select
             value={selectedPersonaId}
-            onChange={(event) => onPersonaChange(event.target.value)}
+            onChange={onPersonaChange}
             disabled={sending || loadingPersonas}
-            className="select-adaptive w-full"
-          >
-            {personas.map((persona) => (
-              <option key={persona.persona_id} value={persona.persona_id}>
-                {persona.label && persona.label !== persona.persona_id ? `${persona.label} (${persona.persona_id})` : persona.persona_id}
-              </option>
-            ))}
-          </select>
+            options={personas.map((persona) => ({
+              value: persona.persona_id,
+              label: persona.label && persona.label !== persona.persona_id
+                ? `${persona.label} (${persona.persona_id})`
+                : persona.persona_id,
+            }))}
+            className="w-full"
+          />
         </div>
 
         <hr className="border-slate-200 dark:border-slate-800/60 shrink-0" />

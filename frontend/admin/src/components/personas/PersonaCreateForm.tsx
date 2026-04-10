@@ -1,4 +1,5 @@
 import type { PersonaSummary } from "../../api";
+import Select from "../Select";
 
 interface PersonaCreateFormProps {
   personas: PersonaSummary[];
@@ -43,22 +44,19 @@ export default function PersonaCreateForm({
           className="w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 px-3 py-2 text-[13px] text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:border-primary/50 focus:outline-none transition-colors"
           title="顯示名稱（僅套用於空白範本）"
         />
-        <div className="relative">
-          <select
-            value={templateSourceId}
-            onChange={(event) => onTemplateSourceIdChange(event.target.value)}
-            className="select-adaptive w-full text-[13px]"
-            title="選擇範本或現有角色複製設定"
-          >
-            <option value="">── 空白範本 ──</option>
-            {personas.map((persona) => (
-              <option key={persona.persona_id} value={persona.persona_id}>
-                複製自 {persona.persona_id}
-              </option>
-            ))}
-          </select>
-          <span className="material-symbols-outlined text-[14px] text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">expand_more</span>
-        </div>
+        <Select
+          value={templateSourceId}
+          onChange={onTemplateSourceIdChange}
+          title="選擇範本或現有角色複製設定"
+          options={[
+            { value: "", label: "── 空白範本 ──" },
+            ...personas.map((persona) => ({
+              value: persona.persona_id,
+              label: `複製自 ${persona.persona_id}`,
+            })),
+          ]}
+          className="w-full text-[13px]"
+        />
       </div>
       <button
         onClick={onSubmit}
