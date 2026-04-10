@@ -43,9 +43,9 @@ def score_candidate(candidate: dict[str, Any]) -> float:
 def passes_threshold(
     candidate: dict[str, Any],
     *,
-    min_score: float = 0.45,
-    min_recall_count: int = 2,
-    min_unique_queries: int = 1,
+    min_score: float = 0.80,
+    min_recall_count: int = 3,
+    min_unique_queries: int = 3,
 ) -> bool:
     """Check whether a candidate meets the promotion thresholds."""
     signals = candidate.get("signals", {})

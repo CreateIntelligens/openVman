@@ -133,6 +133,7 @@ def run_dreaming_cycle(
 
     _last_run[project_id] = results
     _write_run_state(project_id, results)
+    _append_dreams_diary(project_id, results)
     return results
 
 
@@ -278,6 +279,41 @@ def _read_run_state(project_id: str) -> dict[str, Any] | None:
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
     except (json.JSONDecodeError, OSError):
         return None
+
+
+def _append_dreams_diary(project_id: str, results: dict[str, Any]) -> None:
+    """Append a narrative entry to DREAMS.md after each cycle."""
+    ws = get_workspace_root(project_id)
+    diary_path = ws / "DREAMS.md"
+
+    light = results.get("light", {})
+    deep = results.get("deep", {})
+    rem = results.get("rem", {})
+    status = results.get("status", "unknown")
+    completed = results.get("completed_at", "")[:16].replace("T", " ")
+    duration = results.get("duration_seconds", 0)
+
+    lines = [
+        f"## {completed} (project: {project_id})",
+        f"**狀態**: {status} | **耗時**: {duration}s",
+        "### 💤 Light Sleep",
+        f"- 掃描碎片：{light.get('fragment_count', 0)}，候選：{light.get('candidate_count', 0)}",
+        "",
+        "### 🌀 REM Sleep",
+        f"- 查詢數：{rem.get('query_count', 0)}，主題：{rem.get('theme_count', 0)}",
+        "",
+        "### 😴 Deep Sleep",
+        f"- 通過閾值：{deep.get('qualified_count', 0)} / {deep.get('total_candidates', 0)}，促進長期記憶：{deep.get('promoted_count', 0)}",
+        "",
+    ]
+
+    try:
+        with diary_path.open("a", encoding="utf-8") as f:
+            if f.tell() == 0:
+                f.write("# Dreams Diary\n")
+            f.write("\n" + "\n".join(lines))
+    except OSError as exc:
+        logger.debug("dreams diary write failed: %s", exc)
 
 
 def _dreams_dir(project_id: str) -> Path:

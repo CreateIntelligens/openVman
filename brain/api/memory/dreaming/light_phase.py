@@ -11,13 +11,13 @@ import json
 import logging
 import re
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from config import get_settings
 from knowledge.workspace import get_workspace_root
-from memory.dreaming.paths import DATE_STEM_RE, dreams_dir
+from memory.dreaming.paths import DATE_STEM_RE, TABLE_MEMORIES, dreams_dir, write_dreaming_report
 from memory.dreaming.recall_tracker import read_traces
 from memory.dreaming.scoring import build_signals, score_candidate
 from memory.importance import score_importance
@@ -72,6 +72,7 @@ def run_light_phase(project_id: str = "default") -> dict[str, Any]:
 
     # 9. Write candidates.json
     _write_candidates(project_id, candidates)
+    _write_light_report(project_id, candidates, len(fragments), len(trace_stats))
 
     return {
         "status": "ok",
@@ -151,33 +152,44 @@ def _persona_from_path(path: Path, memory_dir: Path) -> str:
 # ---------------------------------------------------------------------------
 
 def _build_trace_stats(traces: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Build per-text statistics from recall traces."""
+    """Build per-text statistics from recall traces.
+
+    Only memory-table hits are eligible as candidates; knowledge-table hits
+    contribute signal scores (frequency, recency) but their text is never
+    promoted as a candidate on its own.
+    """
     stats: dict[str, dict[str, Any]] = defaultdict(lambda: {
         "recall_count": 0, "queries": set(), "relevance_scores": [],
-        "last_seen": "", "days_seen": set()
+        "last_seen": "", "days_seen": set(), "from_memory": False,
     })
 
     for trace in traces:
         query, ts = trace.get("query", ""), trace.get("ts", "")
         day = ts[:10] if len(ts) >= 10 else ""
+        is_memory_table = trace.get("table", "") == TABLE_MEMORIES
 
         for result in trace.get("results", []):
             text = str(result.get("text", ""))[:200].strip()
-            if not text: continue
+            if not text:
+                continue
 
             entry = stats[text]
             entry["recall_count"] += 1
-            if query: entry["queries"].add(query[:100])
+            if is_memory_table:
+                entry["from_memory"] = True
+            if query:
+                entry["queries"].add(query[:100])
             if (score := float(result.get("score", 0.0))) > 0:
                 entry["relevance_scores"].append(score)
             entry["last_seen"] = max(entry["last_seen"], ts)
-            if day: entry["days_seen"].add(day)
+            if day:
+                entry["days_seen"].add(day)
 
     return {
         text: {
             **s,
             "unique_queries": len(s.pop("queries")),
-            "cross_day_count": len(s.pop("days_seen"))
+            "cross_day_count": len(s.pop("days_seen")),
         }
         for text, s in stats.items()
     }
@@ -220,23 +232,56 @@ def _merge_candidates(
 
     for f in fragments:
         add_candidate(f["text"], f["persona_id"], f["day"], f["source_file"])
+    # Only promote trace texts that originated from the memories table;
+    # knowledge-table hits provide signal scores but must not become candidates.
     for text, ts in trace_stats.items():
-        add_candidate(text, "default", "", "")
+        if ts.get("from_memory"):
+            add_candidate(text, "default", "", "")
 
     return candidates
 
 
+_JACCARD_THRESHOLD = 0.90
+
+
 def _dedup_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Remove candidates with duplicate fingerprints."""
-    seen: set[str] = set()
+    """Remove duplicates: first by exact fingerprint, then by Jaccard similarity."""
+    seen_fps: set[str] = set()
+    kept_tokens: list[set[str]] = []
     result: list[dict[str, Any]] = []
+
     for c in candidates:
         fp = c.get("fingerprint")
-        if not fp or fp not in seen:
-            if fp:
-                seen.add(fp)
-            result.append(c)
+        if fp and fp in seen_fps:
+            continue
+        tokens = _tokenize(c.get("text", ""))
+        if _jaccard_near_duplicate(tokens, kept_tokens, _JACCARD_THRESHOLD):
+            continue
+        if fp:
+            seen_fps.add(fp)
+        kept_tokens.append(tokens)
+        result.append(c)
+
     return result
+
+
+def _tokenize(text: str) -> set[str]:
+    """Split text into a character-bigram set for Jaccard comparison."""
+    t = text.lower().strip()
+    return {t[i:i + 2] for i in range(len(t) - 1)} if len(t) > 1 else set(t)
+
+
+def _jaccard_near_duplicate(tokens: set[str], kept: list[set[str]], threshold: float) -> bool:
+    """Return True if tokens is sufficiently similar to any already-kept set."""
+    if not tokens:
+        return False
+    for other in kept:
+        union = len(tokens | other)
+        if union == 0:
+            continue
+        if len(tokens & other) / union >= threshold:
+            return True
+    return False
 
 
 def _fingerprint(text: str) -> str:
@@ -269,6 +314,29 @@ def _write_candidates(
         json.dumps(candidates, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+def _write_light_report(
+    project_id: str,
+    candidates: list[dict[str, Any]],
+    fragment_count: int,
+    trace_unique: int,
+) -> None:
+    today = date.today().isoformat()
+    now = datetime.now().strftime("%H:%M:%S")
+    lines = [
+        f"# Light Sleep — {today} {now}", "",
+        "## Light Sleep", "",
+        f"- 掃描碎片（daily logs）：{fragment_count}",
+        f"- 召回追蹤唯一文字：{trace_unique}",
+        f"- 暫存候選數量：{len(candidates)}", "",
+    ]
+    if candidates:
+        lines += ["### 候選預覽（前 10 筆）", ""]
+        for i, c in enumerate(candidates[:10], 1):
+            lines.append(f"{i}. [{c.get('score', 0.0):.3f}] {c['text'][:80]}")
+        lines.append("")
+    write_dreaming_report(project_id, "light", lines)
 
 
 def _dreams_dir(project_id: str) -> Path:

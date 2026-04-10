@@ -104,8 +104,9 @@ class BrainSettings(BaseSettings):
     dreaming_cron: str = "0 3 * * *"
     dreaming_timezone: str = "Asia/Taipei"
     dreaming_lookback_days: int = 7
-    dreaming_min_score: float = 0.45
-    dreaming_min_recall_count: int = 2
+    dreaming_min_score: float = 0.80
+    dreaming_min_recall_count: int = 3
+    dreaming_min_unique_queries: int = 3
     dreaming_candidate_limit: int = 100
     dreaming_similarity_threshold: float = 0.90
 

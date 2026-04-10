@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 from config import get_settings
 from infra.db import get_memories_table, normalize_vector
-from knowledge.workspace import get_workspace_root
-from memory.dreaming.paths import SOURCE_DREAMING, dreams_dir
+from memory.dreaming.paths import SOURCE_DREAMING, dreams_dir, write_dreaming_report
 from memory.dreaming.scoring import passes_threshold
 from memory.embedder import get_embedder
 
@@ -47,7 +46,7 @@ def run_deep_phase(project_id: str = "default") -> dict[str, Any]:
             c,
             min_score=cfg.dreaming_min_score,
             min_recall_count=cfg.dreaming_min_recall_count,
-            min_unique_queries=0,
+            min_unique_queries=cfg.dreaming_min_unique_queries,
         )
     ]
     logger.info(
@@ -164,22 +163,16 @@ def _write_report(
     total: int,
     qualified: int,
 ) -> Path:
-    """Write a markdown report of the Deep phase results."""
-    ws = get_workspace_root(project_id)
-    report_path = ws / "dreaming" / "deep" / f"{date.today().isoformat()}.md"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-
+    today = date.today().isoformat()
     lines = [
-        f"# Deep Phase Report — {date.today().isoformat()}", "",
+        f"# Deep Phase Report — {today}", "",
         f"- Total candidates: {total}",
         f"- Qualified: {qualified}",
         f"- Promoted: {len(promoted)}", "",
     ]
     if promoted:
         lines += ["## Promoted Memories", ""] + [f"{i}. {r['text'][:100]}" for i, r in enumerate(promoted, 1)] + [""]
-
-    report_path.write_text("\n".join(lines), encoding="utf-8")
-    return report_path
+    return write_dreaming_report(project_id, "deep", lines)
 
 
 def _dreams_dir(project_id: str) -> Path:

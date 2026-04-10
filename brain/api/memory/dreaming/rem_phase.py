@@ -10,14 +10,14 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from config import get_settings
-from memory.dreaming.paths import dreams_dir
+from memory.dreaming.paths import dreams_dir, write_dreaming_report
 from memory.dreaming.recall_tracker import read_traces
 from memory.embedder import get_embedder
 
@@ -66,6 +66,8 @@ def run_rem_phase(project_id: str = "default") -> dict[str, Any]:
         "themes": themes,
     }
     signal_path = _write_phase_signals(project_id, signals)
+
+    _write_rem_report(project_id, themes, len(queries))
 
     return {
         "status": "ok",
@@ -178,6 +180,30 @@ def _write_phase_signals(
         encoding="utf-8",
     )
     return path
+
+
+def _write_rem_report(
+    project_id: str,
+    themes: list[dict[str, Any]],
+    query_count: int,
+) -> None:
+    today = date.today().isoformat()
+    now = datetime.now().strftime("%H:%M:%S")
+    lines = [
+        f"# REM Sleep — {today} {now}", "",
+        "## REM Sleep", "",
+        f"- 分析查詢數量：{query_count}",
+        f"- 提取主題數量：{len(themes)}", "",
+    ]
+    if themes:
+        lines += ["### 識別主題", ""]
+        for t in themes:
+            lines.append(f"- **主題 {t['cluster_id']}**（{t['query_count']} 個查詢）：{t['description']}")
+            if t.get("sample_queries"):
+                for q in t["sample_queries"][:3]:
+                    lines.append(f"  - `{q}`")
+        lines.append("")
+    write_dreaming_report(project_id, "rem", lines)
 
 
 def _dreams_dir(project_id: str) -> Path:
