@@ -12,6 +12,10 @@
 - **Standalone TTS Service**: Decoupled TTS from the backend container into a dedicated `vibevoice-serve` Docker service, improving resource isolation and GPU scheduling.
 - **Standalone Redis Service**: Offloaded the internal Redis server from the backend container to a standalone `redis:7-alpine` service.
 - **Taiwanese Accent Support**: Introduced "Reference Voice" (Zero-shot) cloning logic, using 5-10s Taiwanese audio prompts to achieve authentic regional prosody.
+- **Gemini Live Full-Duplex**: Brain-owned `GeminiLiveSession` with persistent Gemini WebSocket, audio relay, tool calling, auto-reconnect with exponential backoff, and keepalive. Backend acts as a stateless relay between frontend and Brain.
+- **Admin Chat Live Mode**: Text/Live mode toggle in admin Chat page. Live mode connects via WebSocket to backend `/ws/{client_id}`, supports microphone audio capture (MediaRecorder → PCM16 → `client_audio_chunk`), real-time audio playback queue, live transcript with chat bubbles, and `user_speak` text input.
+- **Admin Custom Select Component**: Replaced native `<select>` dropdowns with a custom `Select` component featuring keyboard navigation, dropUp detection, and click-outside close.
+- **Admin Unified Scrollbar Styling**: Global thin scrollbar CSS for all scrollable areas.
 
 ### Removed
 - **Index-TTS (vLLM)**: Excised the legacy `index-tts-vllm` directory and all related code/dependencies, significantly reducing the backend container's footprint and complexity.
@@ -20,6 +24,11 @@
 - **Backend Container Slimming**: Switched the `backend` base image from `vllm/vllm-openai` to `python:3.11-slim`, focusing on business logic rather than heavy model inference.
 - **TTS Fallback Strategy**: Updated `TTSRouterService` to prioritize `VibeVoice-0.5B` -> `VibeVoice-1.5B` -> `Edge-TTS`.
 - **Infrastructure Overhaul**: Refactored `docker-compose.yml` and `start-backend-container.sh` to support the new decoupled microservice architecture.
+- **LiveVoicePipeline TTS Router**: Switched from `VibeVoiceAdapter` to `TTSRouterService` for TTS synthesis in the live voice pipeline.
+- **Gemini Live API Format**: Updated `realtimeInput` from `mediaChunks[]` array to `audio` object; `clientContent.turnComplete` changed to `realtimeInput.audioStreamEnd`.
+
+### Fixed
+- **Brain Timezone**: Added `tzdata` to Brain container requirements to fix `ZoneInfo("Asia/Taipei")` failure in Docker.
 
 ## [0.9.0] - 2026-03-26
 
