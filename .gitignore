@@ -46,6 +46,9 @@ backend/app/assets/tts_references/*.wav
 backend/app/assets/tts_references/*.WAV
 backend/app/assets/tts_references/*.mp3
 
+# Graphify cache（LLM 分析快取，可重建）
+graphify-out/cache/
+
 # OS
 .DS_Store
 Thumbs.db

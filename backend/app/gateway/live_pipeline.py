@@ -15,8 +15,8 @@ from typing import AsyncIterator, Optional
 import httpx
 from app.config import get_tts_config
 from app.utils.chunker import PunctuationChunker
-from app.providers.vibevoice_adapter import VIBEVOICE_DEFAULT_SPEAKER, VibeVoiceAdapter
 from app.providers.base import SynthesizeRequest
+from app.service import TTSRouterService
 from app.session_manager import Session
 from app.observability import record_voice_latency
 
@@ -32,7 +32,7 @@ class LiveVoicePipeline:
         self.session = session
         self.config = get_tts_config()
         self.chunker = PunctuationChunker()
-        self.vibevoice = VibeVoiceAdapter(self.config)
+        self.tts_router = TTSRouterService(self.config)
 
     async def run(self, user_text: str) -> AsyncIterator[dict]:
         """Run the end-to-end pipeline with concurrent Brain reading and TTS synthesis."""
@@ -163,12 +163,11 @@ class LiveVoicePipeline:
         try:
             request = SynthesizeRequest(
                 text=text,
-                voice_hint=VIBEVOICE_DEFAULT_SPEAKER,
                 sample_rate=24000,
             )
 
-            result = await loop.run_in_executor(None, self.vibevoice.synthesize, request)
-            audio_b64 = base64.b64encode(result.audio_bytes).decode("utf-8")
+            output = await loop.run_in_executor(None, self.tts_router.synthesize, request)
+            audio_b64 = base64.b64encode(output.result.audio_bytes).decode("utf-8")
 
             return {
                 "event": "server_stream_chunk",

@@ -125,15 +125,13 @@ async def test_gemini_live_session_sends_realtime_input_and_turn_complete():
     assert transport.connect_calls == 1
     assert transport.sent_messages[1] == {
         "realtimeInput": {
-            "mediaChunks": [
-                {
-                    "mimeType": "audio/pcm;rate=16000",
-                    "data": "YWJj",
-                }
-            ]
+            "audio": {
+                "mimeType": "audio/pcm;rate=16000",
+                "data": "YWJj",
+            }
         }
     }
-    assert transport.sent_messages[2] == {"clientContent": {"turnComplete": True}}
+    assert transport.sent_messages[2] == {"realtimeInput": {"audioStreamEnd": True}}
 
 
 @pytest.mark.asyncio

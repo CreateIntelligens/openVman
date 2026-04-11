@@ -156,12 +156,10 @@ class GeminiLiveSession:
         await self._transport.send_json(
             {
                 "realtimeInput": {
-                    "mediaChunks": [
-                        {
-                            "mimeType": mime_type,
-                            "data": audio_b64,
-                        }
-                    ]
+                    "audio": {
+                        "mimeType": mime_type,
+                        "data": audio_b64,
+                    }
                 }
             }
         )
@@ -169,7 +167,7 @@ class GeminiLiveSession:
     async def send_turn_complete(self) -> None:
         await self.ensure_connected()
         self._response_in_progress = True
-        await self._transport.send_json({"clientContent": {"turnComplete": True}})
+        await self._transport.send_json({"realtimeInput": {"audioStreamEnd": True}})
 
     async def request_stop(self) -> None:
         if not self._response_in_progress:
