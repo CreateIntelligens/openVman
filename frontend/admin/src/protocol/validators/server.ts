@@ -37,6 +37,7 @@ export function validateServerStreamChunk(record: Record<string, unknown>, versi
   return {
     event: "server_stream_chunk",
     chunk_id: expectNonEmptyString(record.chunk_id, version, "chunk_id", "server_stream_chunk"),
+    session_id: expectNonEmptyString(record.session_id, version, "session_id", "server_stream_chunk"),
     text: expectString(record.text, version, "text", "server_stream_chunk"),
     audio_base64: expectString(record.audio_base64, version, "audio_base64", "server_stream_chunk"),
     visemes: expectOptionalVisemeFrames(record.visemes, version),

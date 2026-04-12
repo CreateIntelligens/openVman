@@ -50,6 +50,7 @@ async def test_live_pipeline_full_flow(mock_session):
             
             assert len(events) > 0
             assert events[0]["event"] == "server_stream_chunk"
+            assert events[0]["session_id"] == mock_session.session_id
             assert events[0]["text"] == "你好。"
             assert events[0]["audio_base64"] == base64.b64encode(b"fake-audio").decode("utf-8")
 
@@ -95,5 +96,6 @@ async def test_live_pipeline_uses_tts_router_when_vibevoice_is_unavailable(mock_
             synthesize.assert_called()
             assert len(events) > 0
             assert events[0]["event"] == "server_stream_chunk"
+            assert events[0]["session_id"] == mock_session.session_id
             assert events[0]["text"] == "測試。"
             assert events[0]["audio_base64"] == base64.b64encode(b"router-audio").decode("utf-8")

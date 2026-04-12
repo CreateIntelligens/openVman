@@ -28,6 +28,18 @@ class FakeWebSocket:
         self._relay._ws = None
 
 
+class ConnectableFakeWebSocket:
+    def __init__(self) -> None:
+        self.sent_messages: list[dict[str, object]] = []
+        self.closed = False
+
+    async def send(self, payload: str) -> None:
+        self.sent_messages.append(json.loads(payload))
+
+    async def close(self) -> None:
+        self.closed = True
+
+
 @pytest.mark.asyncio
 async def test_brain_live_relay_passthrough_when_voice_source_is_gemini():
     session = Session(client_id="client-1")
@@ -49,6 +61,7 @@ async def test_brain_live_relay_passthrough_when_voice_source_is_gemini():
     payload = {
         "event": "server_stream_chunk",
         "chunk_id": "chunk-1",
+        "session_id": session.session_id,
         "text": "保留 Gemini 音訊",
         "audio_base64": "Z2VtaW5pLWF1ZGlv",
         "is_final": False,
@@ -99,6 +112,7 @@ async def test_brain_live_relay_replaces_gemini_audio_when_voice_source_is_custo
     payload = {
         "event": "server_stream_chunk",
         "chunk_id": "chunk-2",
+        "session_id": session.session_id,
         "text": "改用自訂語音",
         "audio_base64": "b3JpZ2luYWwtZ2VtaW5pLWF1ZGlv",
         "is_final": True,
@@ -141,6 +155,7 @@ async def test_brain_live_relay_emits_empty_audio_when_custom_tts_fails():
     payload = {
         "event": "server_stream_chunk",
         "chunk_id": "chunk-3",
+        "session_id": session.session_id,
         "text": "只有文字",
         "audio_base64": "c2hvdWxkLWJlLWRyb3BwZWQ=",
         "is_final": True,
@@ -157,3 +172,80 @@ async def test_brain_live_relay_emits_empty_audio_when_custom_tts_fails():
             "audio_base64": "",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send():
+    session = Session(client_id="client-concurrent")
+    websocket = ConnectableFakeWebSocket()
+    connect_calls = 0
+
+    async def websocket_factory(*_args, **_kwargs):
+        nonlocal connect_calls
+        connect_calls += 1
+        await asyncio.sleep(0)
+        return websocket
+
+    relay = BrainLiveRelay(
+        session,
+        websocket_factory=websocket_factory,
+    )
+
+    await asyncio.gather(
+        relay.send_event({"event": "client_audio_chunk", "audio_base64": "YQ=="}),
+        relay.send_event({"event": "client_audio_end"}),
+    )
+    await relay.close()
+
+    assert connect_calls == 1
+    assert [payload["event"] for payload in websocket.sent_messages] == [
+        "relay_init",
+        "client_audio_chunk",
+        "client_audio_end",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_brain_live_relay_resets_tts_worker_reference_after_worker_crash():
+    session = Session(client_id="client-tts-crash")
+
+    class FakeTTSService:
+        def synthesize(self, request):
+            return SynthesisOutput(
+                result=NormalizedTTSResult(
+                    audio_bytes=b"custom-audio",
+                    content_type="audio/wav",
+                    sample_rate=24000,
+                    provider="indextts",
+                    route_kind="provider",
+                    route_target="indextts",
+                    latency_ms=3.2,
+                )
+            )
+
+    async def failing_sink(_payload: dict[str, object]) -> None:
+        raise RuntimeError("sink boom")
+
+    relay = BrainLiveRelay(
+        session,
+        voice_source="custom",
+        tts_service=FakeTTSService(),
+        event_sink=failing_sink,
+    )
+
+    await relay._enqueue_tts_chunk(
+        {
+            "event": "server_stream_chunk",
+            "chunk_id": "chunk-crash",
+            "session_id": session.session_id,
+            "text": "測試",
+            "audio_base64": "ignored",
+            "is_final": True,
+        }
+    )
+    worker = relay._tts_worker_task
+    assert worker is not None
+    await asyncio.gather(worker, return_exceptions=True)
+    await asyncio.sleep(0)
+
+    assert relay._tts_worker_task is None

@@ -370,6 +370,61 @@ def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
     assert FakeRelay.instances[0].sent_events[1]["timestamp"] == 124
 
 
+def test_websocket_drops_audio_before_client_init_and_uses_initialized_voice_source(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    FakeRelay.instances.clear()
+    module.BrainLiveRelay = FakeRelay
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+    ))
+
+    client = TestClient(module.app)
+    with client.websocket_connect("/ws/client-preinit") as websocket:
+        websocket.send_text(
+            json.dumps(
+                {
+                    "event": "client_audio_chunk",
+                    "audio_base64": "YWJj",
+                    "sample_rate": 16000,
+                    "mime_type": "audio/pcm;rate=16000",
+                    "timestamp": 99,
+                }
+            )
+        )
+        websocket.send_text(
+            json.dumps(
+                {
+                    "event": "client_init",
+                    "client_id": "client-preinit",
+                    "capabilities": {
+                        "voice_source": "custom",
+                        "session_id": "chat-123",
+                    },
+                }
+            )
+        )
+        ack = websocket.receive_json()
+        assert ack["event"] == "server_init_ack"
+        websocket.send_text(
+            json.dumps(
+                {
+                    "event": "client_audio_chunk",
+                    "audio_base64": "ZGVm",
+                    "sample_rate": 16000,
+                    "mime_type": "audio/pcm;rate=16000",
+                    "timestamp": 100,
+                }
+            )
+        )
+
+    assert len(FakeRelay.instances) == 1
+    relay = FakeRelay.instances[0]
+    assert relay.voice_source == "custom"
+    assert relay.session.metadata["chat_session_id"] == "chat-123"
+    assert [event["event"] for event in relay.sent_events] == ["client_audio_chunk"]
+    assert relay.sent_events[0]["audio_base64"] == "ZGVm"
+
+
 def test_handle_client_init_stores_voice_source_from_capabilities(monkeypatch):
     import asyncio
 
@@ -417,6 +472,7 @@ def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(mon
             yield {
                 "event": "server_stream_chunk",
                 "chunk_id": "chunk-1",
+                "session_id": self.session.session_id,
                 "text": user_text,
                 "audio_base64": "YXVkaW8=",
                 "is_final": True,

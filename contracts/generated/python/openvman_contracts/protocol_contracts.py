@@ -56,6 +56,7 @@ class SetLipSyncModeEvent(GeneratedProtocolModel):
 class ServerStreamChunkEvent(GeneratedProtocolModel):
     event: Literal['server_stream_chunk']
     chunk_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
     text: str
     audio_base64: str
     visemes: list[VisemeFrame] | None = Field(default=None)

@@ -62,34 +62,38 @@ class BrainLiveRelay:
         self._tts_queue: asyncio.Queue[dict[str, Any]] | None = None
         self._tts_worker_task: asyncio.Task[None] | None = None
         self._closed = False
+        self._connect_lock = asyncio.Lock()
 
     async def ensure_connected(self) -> None:
         if self._ws is not None:
             return
+        async with self._connect_lock:
+            if self._ws is not None:
+                return
 
-        url = _build_brain_live_ws_url(
-            self.config.brain_url,
-            self.session.session_id,
-        )
-        self._ws = await self._websocket_factory(
-            url,
-            open_timeout=10,
-            max_size=4 * 1024 * 1024,
-        )
-        relay_init: dict[str, Any] = {
-            "event": "relay_init",
-            "session_id": self.session.session_id,
-            "client_id": self.session.client_id,
-            "persona_id": str(self.session.metadata.get("persona_id", "default")),
-            "project_id": str(self.session.metadata.get("project_id", "default")),
-        }
-        chat_session_id = str(self.session.metadata.get("chat_session_id", "")).strip()
-        if chat_session_id:
-            relay_init["chat_session_id"] = chat_session_id
-        await self._send_json(relay_init)
+            url = _build_brain_live_ws_url(
+                self.config.brain_url,
+                self.session.session_id,
+            )
+            self._ws = await self._websocket_factory(
+                url,
+                open_timeout=10,
+                max_size=4 * 1024 * 1024,
+            )
+            relay_init: dict[str, Any] = {
+                "event": "relay_init",
+                "session_id": self.session.session_id,
+                "client_id": self.session.client_id,
+                "persona_id": str(self.session.metadata.get("persona_id", "default")),
+                "project_id": str(self.session.metadata.get("project_id", "default")),
+            }
+            chat_session_id = str(self.session.metadata.get("chat_session_id", "")).strip()
+            if chat_session_id:
+                relay_init["chat_session_id"] = chat_session_id
+            await self._send_json(relay_init)
 
-        if self._event_sink is not None and self._listener_task is None:
-            self._listener_task = asyncio.create_task(self._listen())
+            if self._event_sink is not None and self._listener_task is None:
+                self._listener_task = asyncio.create_task(self._listen())
 
     async def send_event(self, payload: dict[str, Any]) -> None:
         await self.ensure_connected()
@@ -156,6 +160,15 @@ class BrainLiveRelay:
             finally:
                 self._tts_queue.task_done()
 
+    def _handle_tts_worker_done(self, task: asyncio.Task[None]) -> None:
+        if self._tts_worker_task is task:
+            self._tts_worker_task = None
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.error("TTS worker crashed for session=%s: %s", self.session.session_id, exc)
+
     async def _emit_tts_chunk(self, payload: dict[str, Any]) -> None:
         if self._event_sink is None:
             return
@@ -198,11 +211,8 @@ class BrainLiveRelay:
         if self._tts_queue is None:
             self._tts_queue = asyncio.Queue()
         if self._tts_worker_task is None or self._tts_worker_task.done():
-            if self._tts_worker_task is not None and self._tts_worker_task.done():
-                exc = self._tts_worker_task.exception() if not self._tts_worker_task.cancelled() else None
-                if exc is not None:
-                    logger.error("TTS worker crashed for session=%s: %s", self.session.session_id, exc)
             self._tts_worker_task = asyncio.create_task(self._tts_worker())
+            self._tts_worker_task.add_done_callback(self._handle_tts_worker_done)
         return self._tts_queue
 
     def _get_tts_service(self) -> TTSRouterService:

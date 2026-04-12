@@ -143,7 +143,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     logger.info(f"WebSocket session created: {session.session_id} for client: {client_id}")
 
     heartbeat_task = asyncio.create_task(_run_heartbeat(websocket, session.session_id))
-    session.add_task(heartbeat_task)
+    session.add_task(heartbeat_task, interruptible=False)
 
     try:
         while True:
@@ -160,7 +160,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     except Exception as e:
         logger.error(f"WebSocket error in {session.session_id}: {e}")
     finally:
-        await session.interrupt_tasks()
+        await session.cancel_all_tasks()
         if session.brain_live_relay is not None:
             await session.brain_live_relay.close()
         _session_manager.remove_session(session.session_id)
@@ -196,6 +196,9 @@ async def _handle_websocket_event(event: str | None, data: dict, session: Any, w
 
 
 async def _handle_client_init(data: dict, session: Any, websocket: WebSocket):
+    previous_voice_source = session.metadata.get("voice_source", DEFAULT_VOICE_SOURCE)
+    previous_chat_session_id = str(session.metadata.get("chat_session_id", "")).strip()
+
     await websocket.send_json({
         "event": "server_init_ack",
         "session_id": session.session_id,
@@ -205,10 +208,23 @@ async def _handle_client_init(data: dict, session: Any, websocket: WebSocket):
     })
     session.metadata["client_id"] = data.get("client_id", session.session_id)
     session.metadata["voice_source"] = _get_requested_voice_source(data)
+    session.metadata["client_initialized"] = True
     capabilities = data.get("capabilities") or {}
     chat_session_id = str(capabilities.get("session_id", "")).strip()
     if chat_session_id:
         session.metadata["chat_session_id"] = chat_session_id
+
+    existing_relay = getattr(session, "brain_live_relay", None)
+    relay_needs_refresh = (
+        existing_relay is not None
+        and (
+            session.metadata["voice_source"] != previous_voice_source
+            or chat_session_id != previous_chat_session_id
+        )
+    )
+    if relay_needs_refresh:
+        await existing_relay.close()
+        session.brain_live_relay = None
 
 
 async def _handle_client_interrupt(data: dict, session: Any, websocket: WebSocket):
@@ -263,6 +279,9 @@ async def _handle_user_speak(data: dict, session: Any, websocket: WebSocket):
 
 
 async def _handle_client_audio_event(data: dict, session: Any, websocket: WebSocket):
+    if session.brain_live_relay is None and not session.metadata.get("client_initialized"):
+        logger.debug("Dropping %s before client_init for session %s", data.get("event"), session.session_id)
+        return
     await _ensure_brain_relay(session, websocket)
     await session.brain_live_relay.send_event(data)
 

@@ -204,9 +204,12 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
         "args": {"client_id": relay_session_id, "persona_id": "default", "project_id": "default"},
         "session_id": relay_session_id,
         "assistant_text_buf": [],
+        "client_disconnected": False,
     }
 
     async def _persisting_event_sink(event: dict) -> None:
+        if state["client_disconnected"]:
+            return
         evt = event.get("event")
         if evt == "server_stream_chunk":
             text = str(event.get("text") or "").strip()
@@ -214,7 +217,10 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
                 state["assistant_text_buf"].append(text)
             if event.get("is_final"):
                 _flush_assistant_turn(state)
-        await websocket.send_json(event)
+        try:
+            await websocket.send_json(event)
+        except (WebSocketDisconnect, RuntimeError):
+            state["client_disconnected"] = True
 
     async def _handle_event(event: str, payload: dict) -> None:
         if event == "relay_init":

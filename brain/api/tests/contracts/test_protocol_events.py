@@ -116,6 +116,7 @@ def test_validate_server_event_accepts_valid_stream_chunk_payload():
         {
             "event": "server_stream_chunk",
             "chunk_id": "msg_001_chunk_01",
+            "session_id": "sess_001",
             "text": "這套架構最大的優勢，",
             "audio_base64": "UklGRi0AAABXQVZFZm10",
             "visemes": [
@@ -129,6 +130,7 @@ def test_validate_server_event_accepts_valid_stream_chunk_payload():
 
     assert event.event == "server_stream_chunk"
     assert event.chunk_id == "msg_001_chunk_01"
+    assert event.session_id == "sess_001"
     assert event.visemes[1].value == "A"
 
 

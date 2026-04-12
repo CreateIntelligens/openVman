@@ -14,6 +14,7 @@ class Session:
         self.websocket: Optional[WebSocket] = websocket
         # To track active asyncio tasks (e.g. Brain generation or TTS synthesis)
         self.active_tasks: List[asyncio.Task] = []
+        self.background_tasks: List[asyncio.Task] = []
         # Session-specific state
         self.lip_sync_mode: str = "dinet"  # Default
         self.metadata: Dict[str, Any] = {}
@@ -23,26 +24,32 @@ class Session:
         """Update the websocket connection for this session."""
         self.websocket = websocket
 
-    def add_task(self, task: asyncio.Task) -> None:
-        """Add a task to the session's active tasks."""
-        self.active_tasks.append(task)
-        # Automatically remove task from list when it's done
-        task.add_done_callback(lambda t: self.active_tasks.remove(t) if t in self.active_tasks else None)
+    def add_task(self, task: asyncio.Task, *, interruptible: bool = True) -> None:
+        """Track a task for session lifecycle cleanup."""
+        target = self.active_tasks if interruptible else self.background_tasks
+        target.append(task)
+        task.add_done_callback(lambda t, tasks=target: tasks.remove(t) if t in tasks else None)
 
     async def interrupt_tasks(self) -> int:
-        """Cancel all active tasks for this session."""
-        cancelled_count = 0
-        for task in self.active_tasks:
-            if not task.done():
-                task.cancel()
-                cancelled_count += 1
-        
-        # Optionally wait for all tasks to acknowledge cancellation
-        if cancelled_count > 0:
-            await asyncio.gather(*self.active_tasks, return_exceptions=True)
-            self.active_tasks.clear()
-            
+        """Cancel interruptible tasks for this session."""
+        return await self._cancel_task_collection(self.active_tasks)
+
+    async def cancel_all_tasks(self) -> int:
+        """Cancel both interruptible and background tasks."""
+        cancelled_count = await self._cancel_task_collection(self.active_tasks)
+        cancelled_count += await self._cancel_task_collection(self.background_tasks)
         return cancelled_count
+
+    async def _cancel_task_collection(self, tasks: List[asyncio.Task]) -> int:
+        pending = [task for task in list(tasks) if not task.done()]
+        for task in pending:
+            task.cancel()
+
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+        tasks[:] = [task for task in tasks if not task.done()]
+        return len(pending)
 
 
 class SessionManager:

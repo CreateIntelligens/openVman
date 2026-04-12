@@ -26,6 +26,7 @@ _GEMINI_LIVE_WS_URL = (
 _PCM_RATE_RE = re.compile(r"rate=(\d+)")
 _RECONNECT_DELAYS = (1, 2, 4, 8, 16)
 _KEEPALIVE_INTERVAL_SECONDS = 600
+_SETUP_COMPLETE_TIMEOUT_SECONDS = 10
 
 EventSink = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -205,6 +206,7 @@ class GeminiLiveSession:
             self._transport = None
 
     async def _listen(self) -> None:
+        transport: JsonTransport | None = None
         try:
             while self._transport is not None:
                 transport = self._transport
@@ -254,6 +256,7 @@ class GeminiLiveSession:
                             {
                                 "event": "server_stream_chunk",
                                 "chunk_id": f"gemini-live-{self.relay_session_id}-{self._chunk_counter}",
+                                "session_id": self.relay_session_id,
                                 "text": "",
                                 "audio_base64": "",
                                 "is_final": True,
@@ -262,9 +265,10 @@ class GeminiLiveSession:
         except asyncio.CancelledError:
             raise
         finally:
-            transport = self._transport
-            self._transport = None
-            if transport is not None:
+            if self._listener_task is asyncio.current_task():
+                self._listener_task = None
+            if transport is not None and self._transport is transport:
+                self._transport = None
                 await transport.close()
 
     async def _handle_tool_call(self, tool_call: dict[str, Any]) -> None:
@@ -290,9 +294,9 @@ class GeminiLiveSession:
 
         try:
             if name == "search_knowledge":
-                response = self._search("knowledge", args)
+                response = await self._search("knowledge", args)
             elif name == "search_memory":
-                response = self._search("memories", args)
+                response = await self._search("memories", args)
             elif name == "get_chat_history":
                 response = self._get_chat_history(args)
             elif name == "save_memory":
@@ -336,7 +340,10 @@ class GeminiLiveSession:
         recent = messages[-max_messages:]
         return {"session_id": session_id, "messages": recent}
 
-    def _search(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
+    async def _search(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(self._search_sync, table, args)
+
+    def _search_sync(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
         query = str(args.get("query", "")).strip()
         if not query:
             raise ValueError("query is required")
@@ -412,7 +419,7 @@ class GeminiLiveSession:
         await self._emit(
             {
                 "event": "server_error",
-                "error_code": "internal_error",
+                "error_code": "INTERNAL_ERROR",
                 "message": "Gemini Live transport unavailable after reconnect retries",
             }
         )
@@ -460,12 +467,16 @@ class GeminiLiveSession:
         }
 
     async def _wait_for_setup_complete(self, transport: JsonTransport) -> None:
-        while True:
-            message = await transport.recv_json()
-            if message is None:
-                raise RuntimeError("Gemini Live closed before setup completed")
-            if "setupComplete" in message:
-                return
+        try:
+            async with asyncio.timeout(_SETUP_COMPLETE_TIMEOUT_SECONDS):
+                while True:
+                    message = await transport.recv_json()
+                    if message is None:
+                        raise RuntimeError("Gemini Live closed before setup completed")
+                    if "setupComplete" in message:
+                        return
+        except TimeoutError as exc:
+            raise RuntimeError("Gemini Live setup complete timed out") from exc
 
     def _events_from_server_content(self, server_content: dict[str, Any]) -> list[dict[str, Any]]:
         model_turn = server_content.get("modelTurn") or {}
@@ -491,6 +502,7 @@ class GeminiLiveSession:
                 {
                     "event": "server_stream_chunk",
                     "chunk_id": f"gemini-live-{self.relay_session_id}-{self._chunk_counter}",
+                    "session_id": self.relay_session_id,
                     "text": text,
                     "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
                     "is_final": False,

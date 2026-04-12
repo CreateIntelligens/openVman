@@ -172,6 +172,7 @@ class LiveVoicePipeline:
             return {
                 "event": "server_stream_chunk",
                 "chunk_id": f"chunk-{id(text)}",
+                "session_id": self.session.session_id,
                 "text": text,
                 "audio_base64": audio_b64,
                 "is_final": False,

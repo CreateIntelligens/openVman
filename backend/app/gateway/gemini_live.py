@@ -200,6 +200,7 @@ class GeminiLivePipeline:
                 {
                     "event": "server_stream_chunk",
                     "chunk_id": f"gemini-live-{self.session.session_id}-{self._chunk_counter}",
+                    "session_id": self.session.session_id,
                     "text": text,
                     "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
                     "is_final": False,

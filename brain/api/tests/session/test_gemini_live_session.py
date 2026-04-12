@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import importlib
 import sys
 import types
@@ -68,6 +69,17 @@ class FakeTransport:
     async def close(self) -> None:
         self.close_calls += 1
         return None
+
+
+class HangingSetupTransport(FakeTransport):
+    def __init__(self) -> None:
+        self.connect_calls = 0
+        self.ping_calls = 0
+        self.close_calls = 0
+        self.sent_messages: list[dict] = []
+
+    async def recv_json(self) -> dict | None:
+        await asyncio.Future()
 
 
 @pytest.mark.asyncio
@@ -169,6 +181,7 @@ async def test_gemini_live_session_reconnects_after_listener_failure(monkeypatch
     assert first.connect_calls == 1
     assert second.connect_calls == 1
     assert emitted[0]["event"] == "server_stop_audio"
+    assert emitted[0]["session_id"] == "relay-2"
     assert emitted[0]["reason"] == "provider_reconnect"
 
 
@@ -210,6 +223,7 @@ async def test_gemini_live_session_marks_transport_unavailable_after_max_retries
     assert retry_delays == [1, 2, 4, 8, 16]
     assert session._unavailable is True
     assert emitted[-1]["event"] == "server_error"
+    assert emitted[-1]["error_code"] == "INTERNAL_ERROR"
     assert "unavailable after reconnect retries" in emitted[-1]["message"]
 
 
@@ -269,3 +283,172 @@ async def test_gemini_live_session_keepalive_pings_transport(monkeypatch):
 
     assert sleep_calls == 1
     assert transport.ping_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_session_emits_stream_chunks_with_session_id():
+    module, fake_config = _load_module()
+    pcm_audio = base64.b64encode(b"\x00\x00\x00\x00").decode("ascii")
+    transport = FakeTransport()
+    transport._messages = asyncio.Queue()
+    transport._messages.put_nowait(
+        {
+            "serverContent": {
+                "modelTurn": {
+                    "parts": [
+                        {"text": "哈囉"},
+                        {
+                            "inlineData": {
+                                "mimeType": "audio/pcm;rate=24000",
+                                "data": pcm_audio,
+                            }
+                        },
+                    ]
+                }
+            }
+        }
+    )
+    transport._messages.put_nowait(None)
+    emitted: list[dict] = []
+
+    async def _sink(event: dict) -> None:
+        emitted.append(event)
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-stream",
+        client_id="client-stream",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=_sink,
+    )
+
+    session._transport = transport
+    session._reconnect = lambda _reason: asyncio.sleep(0, result=False)  # type: ignore[method-assign]
+    await session._listen()
+
+    assert emitted[0]["event"] == "server_stream_chunk"
+    assert emitted[0]["session_id"] == "relay-stream"
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_session_emits_final_empty_chunk_with_session_id():
+    module, fake_config = _load_module()
+    transport = FakeTransport()
+    transport._messages = asyncio.Queue()
+    transport._messages.put_nowait({"serverContent": {"turnComplete": True}})
+    transport._messages.put_nowait(None)
+    emitted: list[dict] = []
+
+    async def _sink(event: dict) -> None:
+        emitted.append(event)
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-final",
+        client_id="client-final",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=_sink,
+    )
+
+    session._transport = transport
+    session._response_in_progress = True
+    session._reconnect = lambda _reason: asyncio.sleep(0, result=False)  # type: ignore[method-assign]
+    await session._listen()
+
+    assert emitted == [
+        {
+            "event": "server_stream_chunk",
+            "chunk_id": "gemini-live-relay-final-1",
+            "session_id": "relay-final",
+            "text": "",
+            "audio_base64": "",
+            "is_final": True,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_session_setup_timeout_raises_runtime_error(monkeypatch):
+    module, fake_config = _load_module()
+    monkeypatch.setattr(module, "_SETUP_COMPLETE_TIMEOUT_SECONDS", 0.01, raising=False)
+    transport = HangingSetupTransport()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-timeout",
+        client_id="client-timeout",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=None,
+    )
+
+    with pytest.raises(RuntimeError, match="setup complete"):
+        await asyncio.wait_for(session.send_text_turn("你好"), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_session_search_tool_runs_in_thread(monkeypatch):
+    module, fake_config = _load_module()
+    to_thread_calls: list[tuple[object, tuple[object, ...], dict[str, object]]] = []
+
+    async def _fake_to_thread(func, *args, **kwargs):
+        to_thread_calls.append((func, args, kwargs))
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(module.asyncio, "to_thread", _fake_to_thread)
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-search",
+        client_id="client-search",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=None,
+    )
+
+    response = await session._execute_function_call(
+        {
+            "id": "call-1",
+            "name": "search_knowledge",
+            "args": {"query": "退款政策", "top_k": 2},
+        }
+    )
+
+    assert len(to_thread_calls) == 1
+    assert response == {
+        "id": "call-1",
+        "name": "search_knowledge",
+        "response": {"results": [{"text": "result"}]},
+    }
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_session_listener_cleanup_preserves_newer_transport():
+    module, fake_config = _load_module()
+    first = FakeTransport()
+    first._messages = asyncio.Queue()
+    first._messages.put_nowait(RuntimeError("socket dropped"))
+    second = FakeTransport()
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-reconnect-cancel",
+        client_id="client-reconnect-cancel",
+        config=fake_config,
+        transport_factory=lambda _cfg: first,
+        event_sink=None,
+    )
+    session._transport = first
+    replacement_listener = asyncio.create_task(asyncio.sleep(10))
+
+    async def _fake_reconnect(_reason: str) -> bool:
+        session._transport = second
+        session._listener_task = replacement_listener
+        return False
+
+    session._reconnect = _fake_reconnect  # type: ignore[method-assign]
+
+    task = asyncio.create_task(session._listen())
+    session._listener_task = task
+
+    await task
+
+    assert session._transport is second
+    assert second.close_calls == 0
+    replacement_listener.cancel()
+    await asyncio.gather(replacement_listener, return_exceptions=True)

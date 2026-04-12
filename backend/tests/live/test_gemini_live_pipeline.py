@@ -87,6 +87,7 @@ async def test_gemini_live_pipeline_emits_audio_chunks_from_server_content():
 
     assert len(events) == 1
     assert events[0]["event"] == "server_stream_chunk"
+    assert events[0]["session_id"] == session.session_id
     assert events[0]["text"] == "哈囉"
     decoded = base64.b64decode(events[0]["audio_base64"])
     assert decoded.startswith(b"RIFF")

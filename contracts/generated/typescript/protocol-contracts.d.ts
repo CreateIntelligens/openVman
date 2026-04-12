@@ -69,6 +69,7 @@ export interface SetLipSyncModeEvent {
 export interface ServerStreamChunkEvent {
   event: "server_stream_chunk";
   chunk_id: string;
+  session_id: string;
   text: string;
   audio_base64: string;
   visemes?: VisemeFrame[];
