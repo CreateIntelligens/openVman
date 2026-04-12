@@ -16,6 +16,12 @@
 - **Admin Chat Live Mode**: Text/Live mode toggle in admin Chat page. Live mode connects via WebSocket to backend `/ws/{client_id}`, supports microphone audio capture (MediaRecorder → PCM16 → `client_audio_chunk`), real-time audio playback queue, live transcript with chat bubbles, and `user_speak` text input.
 - **Admin Custom Select Component**: Replaced native `<select>` dropdowns with a custom `Select` component featuring keyboard navigation, dropUp detection, and click-outside close.
 - **Admin Unified Scrollbar Styling**: Global thin scrollbar CSS for all scrollable areas.
+- **Live Voice Source Toggle**: Admin Chat Live mode voice source selector (Gemini 語音 / 自訂語音). Frontend sends `voice_source` in `client_init` capabilities; backend `BrainLiveRelay` either passes through Gemini native audio or intercepts text to synthesize via `TTSRouterService`.
+- **Live Session Continuity**: Text-mode chat history carries over to Live mode — frontend passes `chatSessionId` through `client_init → relay_init`, Brain loads the last 20 messages into Gemini system instruction on connect.
+- **Live System Instruction Injection**: Brain composes IDENTITY + SOUL + chat history + top-5 memory records into `system_instruction` for Gemini Live sessions, enabling persona-aware real-time conversations.
+- **Live Conversation Persistence**: Brain `internal_live_bridge` persists user and assistant turns to `SessionStore` via `_persisting_event_sink`, so Live conversations appear in session history.
+- **Gemini Live Tool Calling**: `save_memory` and `get_chat_history` tools available during Live sessions for on-the-fly memory writes and history retrieval.
+- **Docling Integration Config**: Added `docling_serve_url`, `docling_timeout_ms`, `docling_api_key`, and `docling_fallback_to_markitdown` settings to `TTSRouterConfig`.
 
 ### Removed
 - **Index-TTS (vLLM)**: Excised the legacy `index-tts-vllm` directory and all related code/dependencies, significantly reducing the backend container's footprint and complexity.
@@ -26,9 +32,17 @@
 - **Infrastructure Overhaul**: Refactored `docker-compose.yml` and `start-backend-container.sh` to support the new decoupled microservice architecture.
 - **LiveVoicePipeline TTS Router**: Switched from `VibeVoiceAdapter` to `TTSRouterService` for TTS synthesis in the live voice pipeline.
 - **Gemini Live API Format**: Updated `realtimeInput` from `mediaChunks[]` array to `audio` object; `clientContent.turnComplete` changed to `realtimeInput.audioStreamEnd`.
+- **Protocol Schema Alignment**: `server_stream_chunk` now allows empty `text`/`audio_base64` fields. `server_init_ack` status normalized to `"ok"`. `server_error` requires `timestamp` and uppercase `error_code` values.
+- **Live Status Bar UI**: Moved Live mode connection status panel to a sticky position above the scroll area, no longer scrolls with messages.
+- **Admin Auth Token Removed**: Removed hardcoded `ADMIN_AUTH_TOKEN` from frontend; auth flow simplified.
 
 ### Fixed
 - **Brain Timezone**: Added `tzdata` to Brain container requirements to fix `ZoneInfo("Asia/Taipei")` failure in Docker.
+- **Brain Module Imports**: Fixed `_build_memory_context` and `_save_memory` to use correct module paths (`memory.retrieval`, `memory.embedder`) instead of non-existent `embedding.*` package.
+- **Live `server_error` Protocol**: Added missing `timestamp` field and fixed lowercase `"internal_error"` to uppercase `"INTERNAL_ERROR"` in backend relay error events.
+- **Live Mode Scroll**: Fixed Live mode not scrolling to bottom on mode switch; uses instant scroll on first enter, smooth scroll for subsequent messages.
+- **Voice Source Switch Stability**: Fixed `voiceSource` toggle clearing live messages by using a one-shot seed gate (`seededRef`) and reconnect generation counter to distinguish intentional vs unexpected disconnects.
+- **Gemini Live Timeout Logging**: Downgraded expected 1008 policy violation (session timeout) from ERROR to WARNING level.
 
 ## [0.9.0] - 2026-03-26
 

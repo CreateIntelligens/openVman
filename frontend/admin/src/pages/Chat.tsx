@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ConfirmModal from "../components/ConfirmModal";
 import ChatHeader from "../components/chat/ChatHeader";
 import ChatInput from "../components/chat/ChatInput";
@@ -6,7 +6,13 @@ import ChatMessage from "../components/chat/ChatMessage";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import { useProject } from "../context/ProjectContext";
 import { useChatSession } from "../hooks/useChatSession";
-import { useLiveSession } from "../hooks/useLiveSession";
+import { useLiveSession, type LiveMessage } from "../hooks/useLiveSession";
+import { DEFAULT_VOICE_SOURCE, type VoiceSource } from "../hooks/liveSessionProtocol";
+
+const VOICE_SOURCE_OPTIONS: ReadonlyArray<{ value: VoiceSource; label: string }> = [
+  { value: "gemini", label: "Gemini 語音" },
+  { value: "custom", label: "自訂語音" },
+];
 
 function createLiveClientId(projectId: string): string {
   const suffix = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
@@ -15,6 +21,7 @@ function createLiveClientId(projectId: string): string {
 
 export default function Chat() {
   const [mode, setMode] = useState<"text" | "live">("text");
+  const [voiceSource, setVoiceSource] = useState<VoiceSource>(DEFAULT_VOICE_SOURCE);
   const { projectId } = useProject();
   const {
     messages,
@@ -66,10 +73,19 @@ export default function Chat() {
     vadSpeaking,
   } = useChatSession();
   const liveClientIdRef = useRef(createLiveClientId(projectId));
+  const liveInitialMessages = useMemo<LiveMessage[]>(() => {
+    if (mode !== "text") return [];
+    return messages
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .map((m) => ({ role: m.role as "user" | "assistant", text: m.content, timestamp: m.created_at ? new Date(m.created_at).getTime() : 0 }));
+  }, [messages, mode]);
   const liveSession = useLiveSession({
     enabled: mode === "live",
     clientId: liveClientIdRef.current,
     projectId,
+    voiceSource,
+    chatSessionId: sessionId,
+    initialMessages: liveInitialMessages,
   });
   const { clearError: liveClearError, sendText: liveSendText, toggleMicrophone: liveToggleMic } = liveSession;
 
@@ -127,9 +143,15 @@ export default function Chat() {
     setError("");
   }, [liveClearError, mode, setError]);
 
+  const prevModeRef = useRef(mode);
   useEffect(() => {
     if (mode === "live" && liveSession.liveMessages.length > 0) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      const justSwitched = prevModeRef.current !== "live";
+      prevModeRef.current = mode;
+      // Instant jump when first entering live mode; smooth scroll for new messages.
+      chatEndRef.current?.scrollIntoView({ behavior: justSwitched ? "instant" : "smooth" });
+    } else {
+      prevModeRef.current = mode;
     }
   }, [mode, liveSession.liveMessages, chatEndRef]);
 
@@ -159,6 +181,51 @@ export default function Chat() {
             mode={mode}
             onModeChange={handleModeChange}
           />
+
+          {mode === "live" && (
+            <div className="shrink-0 px-6 pt-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/60 bg-slate-50 dark:bg-background-dark">
+              <div className="max-w-3xl mx-auto w-full">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${liveStatusTone} ${liveSession.wsState === "connecting" ? "animate-pulse" : ""}`} />
+                    <span className="text-sm font-semibold text-slate-900 dark:text-white">{liveStatusLabel}</span>
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span className="flex items-center gap-1.5">
+                        <span className={`h-2 w-2 rounded-full ${liveSession.micActive ? "bg-red-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
+                        {liveSession.micActive ? "聆聽中" : "待命"}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className={`h-2 w-2 rounded-full ${liveSession.isPlaying ? "bg-primary animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
+                        {liveSession.isPlaying ? "回覆中" : "靜音"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-slate-400">Voice</span>
+                    <div className="inline-flex rounded-full border border-slate-200 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-900/70">
+                      {VOICE_SOURCE_OPTIONS.map((option) => {
+                        const selected = voiceSource === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setVoiceSource(option.value)}
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                              selected
+                                ? "bg-primary text-white shadow-sm"
+                                : "text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-5 bg-gradient-to-b from-background to-slate-50 dark:to-slate-950/20">
             {mode === "text" && !messages.length && !loadingHistory && (
@@ -200,29 +267,7 @@ export default function Chat() {
 
             {mode === "live" && (
               <>
-                <div className="max-w-3xl mx-auto w-full">
-                  <div className="rounded-2xl border border-primary/15 bg-white/90 dark:bg-slate-950/60 shadow-sm backdrop-blur-xl p-5">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${liveStatusTone} ${liveSession.wsState === "connecting" ? "animate-pulse" : ""}`} />
-                        <span className="text-sm font-semibold text-slate-900 dark:text-white">{liveStatusLabel}</span>
-                        <span className="text-xs text-slate-400 hidden sm:inline">{liveClientIdRef.current}</span>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-slate-500">
-                        <span className="flex items-center gap-1.5">
-                          <span className={`h-2 w-2 rounded-full ${liveSession.micActive ? "bg-red-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
-                          {liveSession.micActive ? "聆聽中" : "待命"}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <span className={`h-2 w-2 rounded-full ${liveSession.isPlaying ? "bg-primary animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
-                          {liveSession.isPlaying ? "回覆中" : "靜音"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="max-w-3xl mx-auto w-full flex flex-col gap-4 mt-4">
+                <div className="max-w-3xl mx-auto w-full flex flex-col gap-4">
                   {liveSession.liveMessages.length === 0 && (
                     <div className="text-center py-12">
                       <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600">forum</span>

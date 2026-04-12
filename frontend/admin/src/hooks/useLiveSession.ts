@@ -13,6 +13,7 @@ import type {
   UserSpeakEvent,
 } from "@contracts/generated/typescript/protocol-contracts";
 import { validateClientEvent, validateServerEvent } from "../protocol/validators";
+import { buildClientInitPayload, DEFAULT_VOICE_SOURCE, type VoiceSource } from "./liveSessionProtocol";
 import {
   blobToPcm16Chunks,
   decodeBase64ToArrayBuffer,
@@ -26,6 +27,11 @@ type LiveSessionOptions = {
   enabled: boolean;
   clientId: string;
   projectId: string;
+  voiceSource?: VoiceSource;
+  /** Text-mode session ID — when provided, Live mode continues this conversation. */
+  chatSessionId?: string;
+  /** Seed messages shown when Live mode opens (e.g. text-mode history). */
+  initialMessages?: LiveMessage[];
 };
 
 export type LiveMessage = {
@@ -51,20 +57,27 @@ type LiveSessionResult = {
   clearError: () => void;
 };
 
-const ADMIN_AUTH_TOKEN = "openvman-admin";
 const RECONNECT_DELAY_MS = 3000;
 const RECORDER_SLICE_MS = 250;
 const INTERRUPT_PHRASE = "等一下";
 const GEMINI_PCM_SAMPLE_RATE = 16000;
 const PCM_BYTES_PER_SAMPLE = 2;
 const PCM_CHUNK_BYTES = (GEMINI_PCM_SAMPLE_RATE * PCM_BYTES_PER_SAMPLE) / 4;
+const MAX_LIVE_MESSAGES = 200;
 
 function buildWebSocketUrl(clientId: string): string {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/ws/${encodeURIComponent(clientId)}`;
 }
 
-export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOptions): LiveSessionResult {
+export function useLiveSession({
+  enabled,
+  clientId,
+  projectId,
+  voiceSource = DEFAULT_VOICE_SOURCE,
+  chatSessionId,
+  initialMessages,
+}: LiveSessionOptions): LiveSessionResult {
   const [wsState, setWsState] = useState<LiveWsState>("disconnected");
   const [micActive, setMicActive] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -86,7 +99,14 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
   const websocketRef = useRef<WebSocket | null>(null);
   const connectRef = useRef<() => Promise<void> | void>(() => undefined);
   const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectGenerationRef = useRef(0);
   const manualDisconnectRef = useRef(false);
+  const initialVoiceSourceRef = useRef(voiceSource);
+  const initialMessagesRef = useRef(initialMessages);
+  initialMessagesRef.current = initialMessages;
+  // One-shot gate: seed liveMessages from text-mode history only on the first connect.
+  // Reset in disconnect() so re-entering Live mode seeds again.
+  const seededRef = useRef(false);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
 
@@ -215,7 +235,6 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
     }, RECONNECT_DELAY_MS);
   }, [clearReconnectTimer]);
 
-  const MAX_LIVE_MESSAGES = 200;
   const pendingTextRef = useRef("");
   const flushRafRef = useRef(0);
 
@@ -243,14 +262,17 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
   }, [flushPendingText]);
 
   const handleStreamChunk = useCallback(async (chunk: ServerStreamChunkEvent) => {
+    appendAssistantText(chunk.text);
+    if (!chunk.audio_base64) {
+      return;
+    }
+
     const generation = playbackGenerationRef.current;
     playbackUnitsRef.current += 1;
 
     if (!isPlayingRef.current) {
       setIsPlaying(true);
     }
-
-    appendAssistantText(chunk.text);
 
     playbackQueueRef.current = playbackQueueRef.current
       .then(async () => {
@@ -344,22 +366,21 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
     setWsState("connecting");
     setError("");
 
+    if (!seededRef.current && initialMessagesRef.current && initialMessagesRef.current.length > 0) {
+      setLiveMessages(initialMessagesRef.current.slice(-MAX_LIVE_MESSAGES));
+      seededRef.current = true;
+    }
+
     const socket = new WebSocket(buildWebSocketUrl(clientId));
     websocketRef.current = socket;
 
     socket.onopen = () => {
-      const initEvent: ClientInitEvent = {
-        event: "client_init",
-        client_id: clientId,
-        protocol_version: "1.0.0",
-        auth_token: ADMIN_AUTH_TOKEN,
-        capabilities: {
-          mode: "gemini_live",
-          project_id: projectId,
-          surface: "admin",
-        },
-        timestamp: Date.now(),
-      };
+      const initEvent: ClientInitEvent = buildClientInitPayload({
+        clientId,
+        projectId,
+        voiceSource,
+        sessionId: chatSessionId,
+      });
       sendClientEvent(initEvent);
     };
 
@@ -371,10 +392,7 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
           return;
         }
 
-        const normalizedPayload = payload.event === "server_init_ack" && payload.status === "success"
-          ? { ...payload, status: "ok" }
-          : payload;
-        const validated = validateServerEvent(normalizedPayload);
+        const validated = validateServerEvent(payload);
         handleServerEvent(validated);
       } catch (reason) {
         console.error("Failed to handle live WebSocket event:", reason);
@@ -386,15 +404,22 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
       setError("Live WebSocket 發生錯誤");
     };
 
+    const openGeneration = reconnectGenerationRef.current;
     socket.onclose = () => {
       websocketRef.current = null;
       setSessionId("");
       setWsState("disconnected");
       stopMicrophone(false);
       stopPlayback();
+      if (openGeneration !== reconnectGenerationRef.current && enabledRef.current && !manualDisconnectRef.current) {
+        // generation was bumped after this socket opened: reconnect immediately (voiceSource change)
+        void connectRef.current();
+        return;
+      }
       scheduleReconnect();
     };
   }, [
+    chatSessionId,
     clearReconnectTimer,
     clientId,
     handleServerEvent,
@@ -403,6 +428,7 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
     sendClientEvent,
     stopMicrophone,
     stopPlayback,
+    voiceSource,
   ]);
   connectRef.current = connect;
 
@@ -420,6 +446,7 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
     setSessionId("");
     setWsState("disconnected");
     setLiveMessages([]);
+    seededRef.current = false;
 
     const socket = websocketRef.current;
     websocketRef.current = null;
@@ -594,6 +621,33 @@ export function useLiveSession({ enabled, clientId, projectId }: LiveSessionOpti
     disconnect();
     return undefined;
   }, [connect, disconnect, enabled]);
+
+  useEffect(() => {
+    // Skip first render (initial voiceSource value handled by the connect effect above).
+    if (voiceSource === initialVoiceSourceRef.current) {
+      initialVoiceSourceRef.current = voiceSource;
+      return;
+    }
+    initialVoiceSourceRef.current = voiceSource;
+
+    if (!enabled) {
+      return;
+    }
+
+    setError("");
+    stopMicrophone(false);
+    stopPlayback();
+
+    const socket = websocketRef.current;
+    if (!socket || socket.readyState === WebSocket.CLOSED) {
+      void connectRef.current();
+      return;
+    }
+
+    // Bump generation so onclose knows this close is intentional (voiceSource change).
+    reconnectGenerationRef.current += 1;
+    socket.close();
+  }, [enabled, stopMicrophone, stopPlayback, voiceSource]);
 
   useEffect(() => () => {
     disconnect();
