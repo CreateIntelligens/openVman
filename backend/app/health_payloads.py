@@ -57,8 +57,8 @@ async def _probe_downstream_services(
     }
     if cfg.docling_serve_url:
         targets["docling-serve"] = f"{cfg.docling_serve_url.rstrip('/')}/health"
-    if cfg.tts_index_url:
-        targets["index-tts"] = f"{cfg.tts_index_url}/health"
+    if cfg.tts_indextts_url:
+        targets["index-tts"] = f"{cfg.tts_indextts_url}/health"
 
     results = await asyncio.gather(
         *(

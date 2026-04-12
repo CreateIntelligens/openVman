@@ -27,6 +27,8 @@ def client(tmp_path):
     env = {
         "GATEWAY_TEMP_DIR": str(tmp_path),
         "GATEWAY_TEMP_DIR_MAX_MB": "100",
+        "DOCLING_SERVE_URL": "http://docling-serve:5001",
+        "TTS_INDEXTTS_URL": "http://index-tts:8080",
     }
     with patch.dict(os.environ, env, clear=False):
         from app.config import get_tts_config
@@ -55,7 +57,13 @@ def _mock_health_client(responses: dict[str, dict] | None = None):
 
     mock_client = MagicMock(spec=httpx.AsyncClient)
     mock_client.get = AsyncMock(side_effect=_fake_get)
-    return patch("app.main._health_http", MagicMock(get=lambda: mock_client))
+    return patch(
+        "app.main._health_http",
+        MagicMock(
+            get=lambda: mock_client,
+            close=AsyncMock(return_value=None),
+        ),
+    )
 
 
 class TestHealthzOk:
@@ -107,7 +115,13 @@ class TestHealthzDegraded:
         mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
         with (
             patch("app.main.redis_available", new_callable=AsyncMock, return_value=True),
-            patch("app.main._health_http", MagicMock(get=lambda: mock_client)),
+            patch(
+                "app.main._health_http",
+                MagicMock(
+                    get=lambda: mock_client,
+                    close=AsyncMock(return_value=None),
+                ),
+            ),
         ):
             resp = client.get("/healthz")
 
