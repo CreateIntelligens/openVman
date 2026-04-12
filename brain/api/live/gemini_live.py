@@ -99,6 +99,7 @@ class GeminiLiveSession:
         client_id: str,
         persona_id: str = "default",
         project_id: str = "default",
+        system_instruction: str = "",
         config: BrainSettings | None = None,
         transport_factory: Any | None = None,
         event_sink: EventSink | None = None,
@@ -107,6 +108,7 @@ class GeminiLiveSession:
         self.client_id = client_id
         self.persona_id = persona_id
         self.project_id = project_id
+        self._system_instruction = system_instruction
         self.config = config or get_settings()
         self._transport_factory = transport_factory or (lambda cfg: GeminiLiveWebSocketTransport(cfg))
         self._event_sink = event_sink
@@ -211,7 +213,7 @@ class GeminiLiveSession:
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
-                    logger.error("Gemini Live listener failed: %s", exc, exc_info=True)
+                    logger.warning("Gemini Live listener interrupted: %s", exc)
                     if await self._reconnect(str(exc)):
                         continue
                     break
@@ -240,11 +242,23 @@ class GeminiLiveSession:
                         }
                     )
 
-                for event in self._events_from_server_content(server_content):
+                events = self._events_from_server_content(server_content)
+                for event in events:
                     await self._emit(event)
 
                 if server_content.get("turnComplete"):
                     self._response_in_progress = False
+                    if not events or not events[-1].get("is_final"):
+                        self._chunk_counter += 1
+                        await self._emit(
+                            {
+                                "event": "server_stream_chunk",
+                                "chunk_id": f"gemini-live-{self.relay_session_id}-{self._chunk_counter}",
+                                "text": "",
+                                "audio_base64": "",
+                                "is_final": True,
+                            }
+                        )
         except asyncio.CancelledError:
             raise
         finally:
@@ -279,6 +293,10 @@ class GeminiLiveSession:
                 response = self._search("knowledge", args)
             elif name == "search_memory":
                 response = self._search("memories", args)
+            elif name == "get_chat_history":
+                response = self._get_chat_history(args)
+            elif name == "save_memory":
+                response = self._save_memory(args)
             else:
                 raise ValueError(f"Unsupported Gemini Live tool: {name}")
         except Exception as exc:
@@ -286,6 +304,37 @@ class GeminiLiveSession:
             response = {"error": str(exc)}
 
         return {"id": call_id, "name": name, "response": response}
+
+    def _save_memory(self, args: dict[str, Any]) -> dict[str, Any]:
+        from memory.embedder import encode_text
+        from memory.memory import add_memory
+
+        content = str(args.get("content", "")).strip()
+        if not content:
+            raise ValueError("content 不可為空")
+        vector = encode_text(content)
+        add_memory(
+            text=content,
+            vector=vector,
+            source="agent",
+            persona_id=self.persona_id,
+            project_id=self.project_id,
+        )
+        return {"saved": True, "content": content}
+
+    def _get_chat_history(self, args: dict[str, Any]) -> dict[str, Any]:
+        from memory.memory import list_session_messages
+
+        session_id = str(args.get("session_id", "")).strip()
+        if not session_id:
+            session_id = self.relay_session_id
+        try:
+            max_messages = max(1, min(int(args.get("max_messages", 20)), 50))
+        except (ValueError, TypeError):
+            max_messages = 20
+        messages = list_session_messages(session_id, project_id=self.project_id)
+        recent = messages[-max_messages:]
+        return {"session_id": session_id, "messages": recent}
 
     def _search(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
         query = str(args.get("query", "")).strip()
@@ -392,9 +441,10 @@ class GeminiLiveSession:
             setup["generationConfig"]["thinkingConfig"] = {
                 "thinkingLevel": thinking_level,
             }
-        if self.config.live_gemini_system_instruction.strip():
+        instruction = self._system_instruction.strip() or self.config.live_gemini_system_instruction.strip()
+        if instruction:
             setup["systemInstruction"] = {
-                "parts": [{"text": self.config.live_gemini_system_instruction.strip()}]
+                "parts": [{"text": instruction}]
             }
         if self.config.live_gemini_output_audio_transcription:
             setup["outputAudioTranscription"] = {}
@@ -404,9 +454,8 @@ class GeminiLiveSession:
 
     def _build_user_turn_message(self, user_text: str) -> dict[str, Any]:
         return {
-            "clientContent": {
-                "turns": [{"role": "user", "parts": [{"text": user_text}]}],
-                "turnComplete": True,
+            "realtimeInput": {
+                "text": user_text,
             }
         }
 
@@ -490,6 +539,28 @@ class GeminiLiveSession:
                         "top_k": {"type": "integer", "description": "Maximum results to return."},
                     },
                     "required": ["query"],
+                },
+            },
+            {
+                "name": "save_memory",
+                "description": "Save a durable memory record. Use when the user asks you to remember something, or when the conversation reveals a long-term preference, fact, or instruction worth retaining.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "string", "description": "The memory content to save as a concise statement."},
+                    },
+                    "required": ["content"],
+                },
+            },
+            {
+                "name": "get_chat_history",
+                "description": "Retrieve recent chat history from a session. Use when the user refers to a previous conversation or asks to recall what was discussed.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session_id": {"type": "string", "description": "Session ID to retrieve history from. Omit to use current session."},
+                        "max_messages": {"type": "integer", "description": "Maximum messages to return (default 20, max 50)."},
+                    },
                 },
             },
         ]

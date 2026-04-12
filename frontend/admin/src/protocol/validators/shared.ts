@@ -110,6 +110,18 @@ export function expectNonEmptyString(
   return value.trim();
 }
 
+export function expectString(
+  value: unknown,
+  version: string,
+  fieldName: string,
+  eventName = "",
+) {
+  if (typeof value !== "string") {
+    throwInvalidField(version, eventName, fieldName, "must be a string");
+  }
+  return value;
+}
+
 export function expectEventName(value: unknown, version: string): ProtocolEventName {
   const eventName = expectNonEmptyString(value, version, "event");
   if (eventName in manifest.events) {

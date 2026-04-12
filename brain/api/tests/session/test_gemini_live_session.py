@@ -96,8 +96,8 @@ async def test_gemini_live_session_reuses_transport_across_text_turns():
     assert transport.connect_calls == 1
     assert transport.close_calls == 1
     assert transport.sent_messages[0]["setup"]["model"] == "models/gemini-3.1-flash-live-preview"
-    assert transport.sent_messages[1]["clientContent"]["turns"][0]["parts"][0]["text"] == "你好"
-    assert transport.sent_messages[2]["clientContent"]["turns"][0]["parts"][0]["text"] == "再說一次"
+    assert transport.sent_messages[1]["realtimeInput"]["text"] == "你好"
+    assert transport.sent_messages[2]["realtimeInput"]["text"] == "再說一次"
 
 
 @pytest.mark.asyncio

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
+
+logger = logging.getLogger("brain.internal_routes")
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
@@ -52,6 +55,7 @@ def _build_live_session(
     client_id: str,
     persona_id: str,
     project_id: str,
+    session_id: str = "",
     event_sink,
 ):
     from live.gemini_live import GeminiLiveSession
@@ -61,8 +65,90 @@ def _build_live_session(
         client_id=client_id,
         persona_id=persona_id,
         project_id=project_id,
+        system_instruction=_build_live_system_instruction(persona_id, project_id, session_id=session_id),
         event_sink=event_sink,
     )
+
+
+def _build_live_system_instruction(persona_id: str, project_id: str, session_id: str = "") -> str:
+    from knowledge.workspace import load_core_workspace_context
+
+    blocks: list[str] = []
+
+    try:
+        workspace = load_core_workspace_context(persona_id, project_id=project_id)
+        identity = workspace.get("identity", "").strip()
+        soul = workspace.get("soul", "").strip()
+        if identity:
+            blocks.append(identity)
+        if soul:
+            blocks.append(soul)
+    except Exception:
+        logger.warning("Failed to load workspace context for live system instruction", exc_info=True)
+
+    history_block = _build_history_context(session_id, persona_id, project_id)
+    if history_block:
+        blocks.append(history_block)
+
+    memory_block = _build_memory_context(persona_id, project_id)
+    if memory_block:
+        blocks.append(memory_block)
+
+    if not blocks:
+        return ""
+    return (
+        "你是 openVman Brain 的對話核心。以下是你的角色設定和上下文，請在即時語音對話中遵守。\n\n"
+        + "\n\n".join(blocks)
+    )
+
+
+def _build_history_context(session_id: str, persona_id: str, project_id: str) -> str:
+    if not session_id:
+        return ""
+    from memory.memory import list_session_messages
+
+    try:
+        messages = list_session_messages(session_id, persona_id=persona_id, project_id=project_id)
+    except Exception:
+        return ""
+    if not messages:
+        return ""
+
+    recent = messages[-20:]
+    lines = [f"{'使用者' if m['role'] == 'user' else '助手'}: {m['content']}" for m in recent]
+    return "以下是之前的對話紀錄，請基於此上下文繼續對話：\n" + "\n".join(lines)
+
+
+def _build_memory_context(persona_id: str, project_id: str) -> str:
+    from memory.retrieval import search_records
+    from memory.embedder import encode_query_with_fallback
+
+    try:
+        embedding_route = encode_query_with_fallback(
+            "使用者偏好與重要記憶",
+            project_id=project_id,
+            table_names=("memories",),
+        )
+        results = search_records(
+            "memories",
+            embedding_route.vector,
+            top_k=5,
+            query_text="使用者偏好與重要記憶",
+            query_type="vector",
+            persona_id=persona_id,
+            project_id=project_id,
+            embedding_version=embedding_route.version,
+        )
+    except Exception:
+        return ""
+
+    if not results:
+        return ""
+
+    lines = [str(r.get("text", "")).strip() for r in results if r.get("text")]
+    if not lines:
+        return ""
+    return "以下是與使用者相關的記憶：\n" + "\n".join(f"- {line}" for line in lines)
 
 
 def _normalize_enriched_items(payload: InternalEnrichRequest) -> list[dict[str, Any]]:
@@ -113,24 +199,45 @@ async def internal_enrich(payload: InternalEnrichRequest):
 @router.websocket("/brain/internal/live/{relay_session_id}")
 async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
     await websocket.accept()
-    state = {"live_session": None, "args": {"client_id": relay_session_id, "persona_id": "default", "project_id": "default"}}
+    state: dict[str, Any] = {
+        "live_session": None,
+        "args": {"client_id": relay_session_id, "persona_id": "default", "project_id": "default"},
+        "session_id": relay_session_id,
+        "assistant_text_buf": [],
+    }
 
-    async def _handle_event(event: str, payload: dict):
+    async def _persisting_event_sink(event: dict) -> None:
+        evt = event.get("event")
+        if evt == "server_stream_chunk":
+            text = str(event.get("text") or "").strip()
+            if text:
+                state["assistant_text_buf"].append(text)
+            if event.get("is_final"):
+                _flush_assistant_turn(state)
+        await websocket.send_json(event)
+
+    async def _handle_event(event: str, payload: dict) -> None:
         if event == "relay_init":
             state["args"].update({
                 "client_id": str(payload.get("client_id", relay_session_id)) or relay_session_id,
                 "persona_id": str(payload.get("persona_id", "default")) or "default",
                 "project_id": str(payload.get("project_id", "default")) or "default",
             })
+            chat_session_id = str(payload.get("chat_session_id", "")).strip()
+            if chat_session_id:
+                state["session_id"] = chat_session_id
+            _ensure_session(state)
             if not state["live_session"]:
-                state["live_session"] = _build_live_session(relay_session_id, event_sink=websocket.send_json, **state["args"])
+                state["live_session"] = _build_live_session(relay_session_id, event_sink=_persisting_event_sink, session_id=state["session_id"], **state["args"])
             return
 
         if not state["live_session"]:
-            state["live_session"] = _build_live_session(relay_session_id, event_sink=websocket.send_json, **state["args"])
+            _ensure_session(state)
+            state["live_session"] = _build_live_session(relay_session_id, event_sink=_persisting_event_sink, session_id=state["session_id"], **state["args"])
 
         if event == "user_speak":
             if text := str(payload.get("text", "")).strip():
+                _save_user_message(state, text)
                 await state["live_session"].send_text_turn(text)
         elif event == "client_interrupt":
             await state["live_session"].request_stop()
@@ -149,8 +256,33 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
     except WebSocketDisconnect:
         pass
     finally:
+        _flush_assistant_turn(state)
         if state["live_session"]:
             await state["live_session"].close()
+
+
+def _ensure_session(state: dict[str, Any]) -> None:
+    args = state["args"]
+    session = get_or_create_session(state["session_id"], args["persona_id"], project_id=args["project_id"])
+    state["session_id"] = session.session_id
+
+
+def _save_user_message(state: dict[str, Any], text: str) -> None:
+    _flush_assistant_turn(state)
+    args = state["args"]
+    append_session_message(state["session_id"], args["persona_id"], "user", text, project_id=args["project_id"])
+
+
+def _flush_assistant_turn(state: dict[str, Any]) -> None:
+    buf = state["assistant_text_buf"]
+    if not buf:
+        return
+    full_text = "".join(buf).strip()
+    state["assistant_text_buf"] = []
+    if not full_text:
+        return
+    args = state["args"]
+    append_session_message(state["session_id"], args["persona_id"], "assistant", full_text, project_id=args["project_id"])
 
 
 # ---------------------------------------------------------------------------

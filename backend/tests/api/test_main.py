@@ -8,6 +8,7 @@ import sys
 import types
 import warnings
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
@@ -35,10 +36,10 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
 
     sys.modules.pop("app.main", None)
     module = importlib.import_module("app.main")
-    module._md_converter = None
-    module.get_tts_config = lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "_md_converter", None)
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=max_upload_bytes,
-    )
+    ))
     return module, FakeMarkItDown
 
 
@@ -66,7 +67,7 @@ def test_run_server_uses_configured_dev_mode(monkeypatch):
         captured["kwargs"] = kwargs
 
     monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=_fake_run))
-    module.get_tts_config = lambda: fake_cfg
+    monkeypatch.setattr(module, "get_tts_config", lambda: fake_cfg)
 
     module.run_server()
 
@@ -210,7 +211,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         get=lambda: FakeClient(),
         close=_fake_close,
     )
-    module.get_tts_config = lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
@@ -219,7 +220,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         tts_aws_enabled=False,
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
-    )
+    ))
 
     client = TestClient(module.app)
     response = client.get("/v1/tts/providers")
@@ -244,11 +245,11 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
 
 def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
-    module.get_tts_config = lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
         tts_cache_enabled=True,
         tts_cache_ttl_seconds=86400,
-    )
+    ))
     module.make_cache_key = lambda text, voice_hint, provider: "tts:v1:test"
 
     async def _fake_cache_get(key: str):
@@ -285,9 +286,10 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
 class FakeRelay:
     instances: list["FakeRelay"] = []
 
-    def __init__(self, session, *, event_sink=None):
+    def __init__(self, session, *, event_sink=None, voice_source="gemini", **_kwargs):
         self.session = session
         self.event_sink = event_sink
+        self.voice_source = voice_source
         self.sent_events: list[dict[str, object]] = []
         self.closed = False
         type(self).instances.append(self)
@@ -303,9 +305,9 @@ def test_websocket_routes_user_speak_to_brain_relay_when_relay_is_active(monkeyp
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
     module.BrainLiveRelay = FakeRelay
-    module.get_tts_config = lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
-    )
+    ))
 
     client = TestClient(module.app)
     with client.websocket_connect("/ws/client-1") as websocket:
@@ -336,9 +338,9 @@ def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
     module.BrainLiveRelay = FakeRelay
-    module.get_tts_config = lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
-    )
+    ))
 
     client = TestClient(module.app)
     with client.websocket_connect("/ws/client-2") as websocket:
@@ -368,8 +370,39 @@ def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
     assert FakeRelay.instances[0].sent_events[1]["timestamp"] == 124
 
 
-def test_websocket_routes_user_speak_to_live_pipeline_when_no_relay(monkeypatch):
+def test_handle_client_init_stores_voice_source_from_capabilities(monkeypatch):
+    import asyncio
+
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    session = types.SimpleNamespace(
+        session_id="session-1",
+        metadata={},
+    )
+    websocket = types.SimpleNamespace(send_json=AsyncMock())
+
+    asyncio.run(
+        module._handle_client_init(
+            {
+                "event": "client_init",
+                "client_id": "client-voice",
+                "capabilities": {
+                    "voice_source": "custom",
+                },
+            },
+            session,
+            websocket,
+        )
+    )
+
+    websocket.send_json.assert_awaited_once()
+    assert session.metadata["client_id"] == "client-voice"
+    assert session.metadata["voice_source"] == "custom"
+
+
+def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    FakeRelay.instances.clear()
+    module.BrainLiveRelay = FakeRelay
 
     class FakePipeline:
         instances: list["FakePipeline"] = []
@@ -390,9 +423,9 @@ def test_websocket_routes_user_speak_to_live_pipeline_when_no_relay(monkeypatch)
             }
 
     module.LiveVoicePipeline = FakePipeline
-    module.get_tts_config = lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
-    )
+    ))
 
     client = TestClient(module.app)
     with client.websocket_connect("/ws/client-3") as websocket:
@@ -400,10 +433,9 @@ def test_websocket_routes_user_speak_to_live_pipeline_when_no_relay(monkeypatch)
         ack = websocket.receive_json()
         assert ack["event"] == "server_init_ack"
 
-        websocket.send_text(json.dumps({"event": "user_speak", "text": "走舊路"}))
-        chunk = websocket.receive_json()
-        assert chunk["event"] == "server_stream_chunk"
-        assert chunk["text"] == "走舊路"
+        websocket.send_text(json.dumps({"event": "user_speak", "text": "走新路"}))
 
-    assert len(FakePipeline.instances) == 1
-    assert FakePipeline.instances[0].text_turns == ["走舊路"]
+    assert len(FakeRelay.instances) == 1
+    assert [event["event"] for event in FakeRelay.instances[0].sent_events] == ["user_speak"]
+    assert FakeRelay.instances[0].sent_events[0]["text"] == "走新路"
+    assert FakePipeline.instances == []

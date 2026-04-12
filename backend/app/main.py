@@ -35,7 +35,7 @@ from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upl
 from app.gateway.redis_pool import close_redis, get_redis, redis_available
 from app.gateway.routes import router as gateway_router
 from app.gateway.temp_storage import get_temp_storage, reset_temp_storage
-from app.gateway.brain_live_relay import BrainLiveRelay
+from app.gateway.brain_live_relay import BrainLiveRelay, DEFAULT_VOICE_SOURCE, _normalize_voice_source
 from app.gateway.worker import (
     get_api_tool_plugin,
     get_camera_plugin,
@@ -54,7 +54,6 @@ from app.providers.vibevoice_adapter import VIBEVOICE_DEFAULT_SPEAKER, VIBEVOICE
 from app.service import TTSRouterService
 from app.session_manager import SessionManager
 from app.guard_agent import GuardAgent
-from app.gateway.live_pipeline import LiveVoicePipeline
 
 logger = logging.getLogger("backend")
 _service: TTSRouterService | None = None
@@ -78,6 +77,13 @@ def _get_md_converter() -> MarkItDown:
     if _md_converter is None:
         _md_converter = MarkItDown()
     return _md_converter
+
+
+def _get_requested_voice_source(data: dict[str, Any]) -> str:
+    capabilities = data.get("capabilities")
+    if not isinstance(capabilities, dict):
+        return DEFAULT_VOICE_SOURCE
+    return _normalize_voice_source(str(capabilities.get("voice_source", "")))
 
 
 async def _startup_gateway_resources() -> None:
@@ -194,10 +200,15 @@ async def _handle_client_init(data: dict, session: Any, websocket: WebSocket):
         "event": "server_init_ack",
         "session_id": session.session_id,
         "server_version": "1.0.0",
-        "status": "success",
+        "status": "ok",
         "timestamp": int(time.time() * 1000)
     })
     session.metadata["client_id"] = data.get("client_id", session.session_id)
+    session.metadata["voice_source"] = _get_requested_voice_source(data)
+    capabilities = data.get("capabilities") or {}
+    chat_session_id = str(capabilities.get("session_id", "")).strip()
+    if chat_session_id:
+        session.metadata["chat_session_id"] = chat_session_id
 
 
 async def _handle_client_interrupt(data: dict, session: Any, websocket: WebSocket):
@@ -243,28 +254,12 @@ async def _handle_user_speak(data: dict, session: Any, websocket: WebSocket):
         logger.warning("user_speak received with no text")
         return
 
-    if session.brain_live_relay is not None:
-        await session.brain_live_relay.send_event({
-            "event": "user_speak",
-            "text": text,
-            "timestamp": int(time.time() * 1000),
-        })
-    else:
-        pipeline = LiveVoicePipeline(session)
-
-        async def run_pipeline():
-            try:
-                async for chunk_event in pipeline.run(text):
-                    await websocket.send_json(chunk_event)
-            except Exception as e:
-                logger.error(f"Pipeline task error: {e}")
-                await websocket.send_json({
-                    "event": "server_error",
-                    "error_code": "internal_error",
-                    "message": str(e)
-                })
-
-        session.add_task(asyncio.create_task(run_pipeline()))
+    await _ensure_brain_relay(session, websocket)
+    await session.brain_live_relay.send_event({
+        "event": "user_speak",
+        "text": text,
+        "timestamp": int(time.time() * 1000),
+    })
 
 
 async def _handle_client_audio_event(data: dict, session: Any, websocket: WebSocket):
@@ -276,6 +271,7 @@ async def _ensure_brain_relay(session: Any, websocket: WebSocket):
     if session.brain_live_relay is None:
         session.brain_live_relay = BrainLiveRelay(
             session,
+            voice_source=session.metadata.get("voice_source", DEFAULT_VOICE_SOURCE),
             event_sink=websocket.send_json,
         )
 

@@ -28,6 +28,7 @@ import {
   expectOptionalNonNegativeInteger,
   expectRecord,
   expectSemver,
+  expectString,
   throwInvalidField,
 } from "./shared";
 
@@ -36,8 +37,8 @@ export function validateServerStreamChunk(record: Record<string, unknown>, versi
   return {
     event: "server_stream_chunk",
     chunk_id: expectNonEmptyString(record.chunk_id, version, "chunk_id", "server_stream_chunk"),
-    text: expectNonEmptyString(record.text, version, "text", "server_stream_chunk"),
-    audio_base64: expectNonEmptyString(record.audio_base64, version, "audio_base64", "server_stream_chunk"),
+    text: expectString(record.text, version, "text", "server_stream_chunk"),
+    audio_base64: expectString(record.audio_base64, version, "audio_base64", "server_stream_chunk"),
     visemes: expectOptionalVisemeFrames(record.visemes, version),
     emotion: expectOptionalNonEmptyString(record.emotion, version, "emotion", "server_stream_chunk"),
     is_final: expectBoolean(record.is_final, version, "server_stream_chunk", "is_final"),

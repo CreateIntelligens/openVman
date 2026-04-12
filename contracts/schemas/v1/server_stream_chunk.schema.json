@@ -15,12 +15,10 @@
       "minLength": 1
     },
     "text": {
-      "type": "string",
-      "minLength": 1
+      "type": "string"
     },
     "audio_base64": {
-      "type": "string",
-      "minLength": 1
+      "type": "string"
     },
     "visemes": {
       "type": "array",
