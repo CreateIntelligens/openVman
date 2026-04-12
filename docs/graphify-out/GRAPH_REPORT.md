@@ -1,4 +1,4 @@
-# Graph Report - docs  (2026-04-09)
+# Graph Report - docs  (2026-04-12)
 
 ## Corpus Check
 - 52 files · ~34,827 words
@@ -8,6 +8,19 @@
 - 2351 nodes · 3980 edges · 11 communities detected
 - Extraction: 13% EXTRACTED · 87% INFERRED · 0% AMBIGUOUS · INFERRED: 3454 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
+
+## Community Hubs (Navigation)
+- [[_COMMUNITY_Community 0|Community 0]]
+- [[_COMMUNITY_Community 1|Community 1]]
+- [[_COMMUNITY_Community 2|Community 2]]
+- [[_COMMUNITY_Community 3|Community 3]]
+- [[_COMMUNITY_Community 4|Community 4]]
+- [[_COMMUNITY_Community 5|Community 5]]
+- [[_COMMUNITY_Community 6|Community 6]]
+- [[_COMMUNITY_Community 7|Community 7]]
+- [[_COMMUNITY_Community 8|Community 8]]
+- [[_COMMUNITY_Community 9|Community 9]]
+- [[_COMMUNITY_Community 10|Community 10]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Live API / WebSocket / Lip-Sync 現況評估` - 198 edges

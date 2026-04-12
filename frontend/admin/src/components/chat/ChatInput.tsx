@@ -1,37 +1,9 @@
 import type { SkillInfo, TtsProvider } from "../../api";
-import Select from "../Select";
+import { TtsControls } from "./TtsControls";
+import { SlashDropdown } from "./SlashDropdown";
+import { AsrButton } from "./AsrButton";
 
-export default function ChatInput({
-  mode,
-  input,
-  sending,
-  error,
-  slashOpen,
-  slashMatches,
-  clampedSlashIndex,
-  ttsProviders,
-  ttsProvider,
-  ttsVoice,
-  activeTtsProvider,
-  ttsFallbackToast,
-  asrListening,
-  asrSupported,
-  vadSpeaking,
-  onInputChange,
-  onSubmit,
-  onStopStreaming,
-  onPickSlash,
-  onSlashIndex,
-  onSlashClose,
-  onTtsProviderChange,
-  onTtsVoiceChange,
-  onDismissError,
-  onDismissFallbackToast,
-  onToggleAsr,
-  liveWsState,
-  liveMicActive,
-  onLiveToggleMic,
-}: {
+interface ChatInputProps {
   mode: "text" | "live";
   input: string;
   sending: boolean;
@@ -61,7 +33,29 @@ export default function ChatInput({
   liveWsState: "connecting" | "connected" | "disconnected";
   liveMicActive: boolean;
   onLiveToggleMic: () => void;
-}) {
+}
+
+export default function ChatInput(props: ChatInputProps) {
+  const {
+    mode,
+    input,
+    sending,
+    error,
+    slashOpen,
+    slashMatches,
+    clampedSlashIndex,
+    onInputChange,
+    onSubmit,
+    onStopStreaming,
+    onPickSlash,
+    onSlashIndex,
+    onSlashClose,
+    onDismissError,
+    liveWsState,
+    liveMicActive,
+    onLiveToggleMic,
+  } = props;
+
   const slashEnabled = mode === "text";
   const liveConnected = liveWsState === "connected";
   const inputDisabled = mode === "live" ? !liveConnected : false;
@@ -69,70 +63,35 @@ export default function ChatInput({
   return (
     <div className="shrink-0 p-5 bg-slate-50 dark:bg-background-dark border-t border-slate-200 dark:border-slate-800/80">
       <div className="max-w-4xl mx-auto flex flex-col gap-3 relative">
-        {/* TTS Fallback Toast */}
-        {mode === "text" && ttsFallbackToast && (
-          <div className="absolute bottom-full left-0 right-0 mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400 flex items-center justify-between backdrop-blur-md z-20">
-            <span>
-              <span className="material-symbols-outlined text-[14px] align-middle mr-1">warning</span>
-              TTS 已自動切換至 Edge TTS
-            </span>
-            <button onClick={onDismissFallbackToast} className="hover:text-amber-300"><span className="material-symbols-outlined text-[16px]">close</span></button>
-          </div>
-        )}
-
-        {/* TTS Provider/Voice Selector */}
-        {mode === "text" && ttsProviders.length > 1 && (
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[14px] text-slate-500">graphic_eq</span>
-              <Select
-                value={ttsProvider}
-                onChange={onTtsProviderChange}
-                options={ttsProviders.map((p) => ({ value: p.id, label: p.name }))}
-                className="min-w-[100px] text-xs"
-              />
-            </div>
-            {ttsProvider !== "auto" && activeTtsProvider && activeTtsProvider.voices.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[14px] text-slate-500">record_voice_over</span>
-                <Select
-                  value={ttsVoice || activeTtsProvider.default_voice}
-                  onChange={onTtsVoiceChange}
-                  options={activeTtsProvider.voices.map((v) => ({ value: v, label: v }))}
-                  className="min-w-[120px] text-xs"
-                />
-              </div>
-            )}
-          </div>
+        {mode === "text" && (
+          <TtsControls
+            ttsProviders={props.ttsProviders}
+            ttsProvider={props.ttsProvider}
+            ttsVoice={props.ttsVoice}
+            activeTtsProvider={props.activeTtsProvider}
+            ttsFallbackToast={props.ttsFallbackToast}
+            onTtsProviderChange={props.onTtsProviderChange}
+            onTtsVoiceChange={props.onTtsVoiceChange}
+            onDismissFallbackToast={props.onDismissFallbackToast}
+          />
         )}
 
         {error && (
           <div className="absolute bottom-full left-0 right-0 mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400 flex items-center justify-between backdrop-blur-md">
             <span>{error}</span>
-            <button onClick={onDismissError} className="hover:text-red-300"><span className="material-symbols-outlined text-[16px]">close</span></button>
+            <button onClick={onDismissError} className="hover:text-red-300">
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
           </div>
         )}
 
         <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-50 dark:focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
-          {/* Slash command autocomplete dropdown */}
-          {slashEnabled && slashOpen && slashMatches.length > 0 && (
-            <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[240px] overflow-y-auto">
-              {slashMatches.map((skill, i) => (
-                <button
-                  key={skill.id}
-                  onMouseDown={(e) => { e.preventDefault(); onPickSlash(skill); }}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                    i === clampedSlashIndex ? "bg-primary/20 text-slate-900 dark:text-white" : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-primary text-lg">extension</span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold">/{skill.id}</div>
-                    <div className="text-[11px] text-slate-500 truncate">{skill.description || skill.name}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
+          {slashEnabled && (
+            <SlashDropdown
+              matches={slashMatches}
+              selectedIndex={clampedSlashIndex}
+              onPick={onPickSlash}
+            />
           )}
 
           <textarea
@@ -172,11 +131,13 @@ export default function ChatInput({
             }}
             disabled={inputDisabled}
             rows={1}
-            placeholder={mode === "live"
-              ? liveConnected
-                ? "Live 模式：輸入文字後按 Enter，或直接使用麥克風"
-                : "Live 模式連線中，連線完成後可輸入文字或開啟麥克風"
-              : "向 Brain 發送訊息...（輸入 / 查看指令）"}
+            placeholder={
+              mode === "live"
+                ? liveConnected
+                  ? "Live 模式：輸入文字後按 Enter，或直接使用麥克風"
+                  : "Live 模式連線中，連線完成後可輸入文字或開啟麥克風"
+                : "向 Brain 發送訊息...（輸入 / 查看指令）"
+            }
             className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
           />
 
@@ -193,37 +154,24 @@ export default function ChatInput({
                   停止
                 </button>
               )}
-              {mode === "text" && asrSupported && (
-                <button
-                  onClick={onToggleAsr}
-                  className={`h-8 flex items-center justify-center rounded-lg transition-colors shadow-sm ${
-                    asrListening
-                      ? vadSpeaking
-                        ? "bg-red-500 text-white hover:bg-red-600 px-3 gap-1.5"
-                        : "bg-amber-500 text-white animate-pulse hover:bg-amber-600 px-3 gap-1.5"
-                      : "w-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700"
-                  }`}
-                  title={asrListening ? "停止語音輸入" : "語音輸入"}
-                >
-                  <span className="material-symbols-outlined text-[18px]">mic</span>
-                  {asrListening && (
-                    <span className="text-[11px] font-bold whitespace-nowrap">
-                      {vadSpeaking ? "聆聽中..." : "等待語音"}
-                    </span>
-                  )}
-                </button>
+              {mode === "text" && (
+                <AsrButton
+                  supported={props.asrSupported}
+                  listening={props.asrListening}
+                  speaking={props.vadSpeaking}
+                  onToggle={props.onToggleAsr}
+                />
               )}
               {mode === "live" && (
                 <button
                   onClick={onLiveToggleMic}
                   disabled={!liveConnected && !liveMicActive}
-                  className={`h-8 flex items-center justify-center rounded-lg px-3 gap-1.5 text-xs font-bold transition-colors shadow-sm ${
-                    liveMicActive
-                      ? "bg-red-500 text-white hover:bg-red-600"
-                      : liveConnected
-                        ? "border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                        : "border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
-                  }`}
+                  className={`h-8 flex items-center justify-center rounded-lg px-3 gap-1.5 text-xs font-bold transition-colors shadow-sm ${liveMicActive
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : liveConnected
+                      ? "border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      : "border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                    }`}
                   title={liveMicActive ? "停止錄音" : "開始語音輸入"}
                 >
                   <span className="material-symbols-outlined text-[18px]">mic</span>
