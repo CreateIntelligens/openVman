@@ -74,13 +74,16 @@ async def cancel_task(task: asyncio.Task[None] | None) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """啟動時先讓服務可用，再背景預熱重資源。"""
-    logger.info("初始化 LanceDB 連線...")
+    logger.info("初始化大腦層資源...")
+    # 確保預設工作區與資料庫連線
     ensure_workspace_scaffold("default")
     get_db("default")
 
+    # 執行資料遷移
     from scripts.migrate_to_projects import run_migration
     await asyncio.to_thread(run_migration)
 
+    # 背景預熱重資源
     app.state.warmup_task = asyncio.create_task(warmup_resources())
 
     # Start dreaming scheduler (opt-in)
@@ -90,8 +93,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("大腦層就緒")
     yield
-    await cancel_task(getattr(app.state, "dreaming_task", None))
-    await cancel_task(getattr(app.state, "warmup_task", None))
+    await asyncio.gather(
+        cancel_task(getattr(app.state, "dreaming_task", None)),
+        cancel_task(getattr(app.state, "warmup_task", None)),
+    )
 
 
 app = FastAPI(
@@ -125,32 +130,28 @@ for router in (
 async def metrics_middleware(request: Request, call_next):
     trace_id = request.headers.get("x-trace-id", "").strip() or str(uuid4())
     request.state.trace_id = trace_id
-    method = request.method
-    path = request.url.path
+    method, path = request.method, request.url.path
     store = get_metrics_store()
     start = perf_counter()
 
     try:
         response = await call_next(request)
+        status = response.status_code
+        response.headers["X-Trace-Id"] = trace_id
     except Exception as exc:
-        duration_ms = round((perf_counter() - start) * 1000, 2)
-        store.increment("http_requests_total", method=method, path=path, status=500)
-        store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
-        log_exception(
-            "http_request_error", exc,
-            trace_id=trace_id, method=method, path=path, duration_ms=duration_ms,
-        )
+        status = 500
+        log_exception("http_request_error", exc, trace_id=trace_id, method=method, path=path)
         raise
+    finally:
+        duration_ms = round((perf_counter() - start) * 1000, 2)
+        store.increment("http_requests_total", method=method, path=path, status=status)
+        store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
+        log_event(
+            "http_request",
+            trace_id=trace_id, method=method, path=path,
+            status=status, duration_ms=duration_ms,
+        )
 
-    duration_ms = round((perf_counter() - start) * 1000, 2)
-    response.headers["X-Trace-Id"] = trace_id
-    store.increment("http_requests_total", method=method, path=path, status=response.status_code)
-    store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
-    log_event(
-        "http_request",
-        trace_id=trace_id, method=method, path=path,
-        status=response.status_code, duration_ms=duration_ms,
-    )
     return response
 
 

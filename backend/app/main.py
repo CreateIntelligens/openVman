@@ -50,15 +50,13 @@ _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
 
 def _get_service() -> TTSRouterService:
     global _service
-    if _service is None:
-        _service = TTSRouterService(get_tts_config())
+    _service = _service or TTSRouterService(get_tts_config())
     return _service
 
 
 def _get_md_converter() -> MarkItDown:
     global _md_converter
-    if _md_converter is None:
-        _md_converter = MarkItDown()
+    _md_converter = _md_converter or MarkItDown()
     return _md_converter
 
 
@@ -105,17 +103,17 @@ app.include_router(admin_routes.router)
 
 
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
-    merged = {**base_schema}
+    merged = base_schema.copy()
     
-    # Merge paths
-    merged_paths = {**merged.get("paths", {})}
+    # Merge paths (remap /brain/ to /api/)
+    merged_paths = merged.get("paths", {})
     for path, path_item in brain_schema.get("paths", {}).items():
         if path.startswith("/brain/"):
             merged_paths[path.replace("/brain/", "/api/", 1)] = path_item
     merged["paths"] = merged_paths
 
-    # Merge components
-    merged_comp = {**merged.get("components", {})}
+    # Merge components (schemas, securitySchemes, etc.)
+    merged_comp = merged.get("components", {})
     for sec, vals in brain_schema.get("components", {}).items():
         merged_comp[sec] = {**merged_comp.get(sec, {}), **vals}
     merged["components"] = merged_comp

@@ -12,11 +12,9 @@ class Session:
         self.session_id: str = uuid.uuid4().hex
         self.client_id: str = client_id
         self.websocket: Optional[WebSocket] = websocket
-        # To track active asyncio tasks (e.g. Brain generation or TTS synthesis)
         self.active_tasks: List[asyncio.Task] = []
         self.background_tasks: List[asyncio.Task] = []
-        # Session-specific state
-        self.lip_sync_mode: str = "dinet"  # Default
+        self.lip_sync_mode: str = "dinet"
         self.metadata: Dict[str, Any] = {}
         self.brain_live_relay: Any = None
 
@@ -28,7 +26,7 @@ class Session:
         """Track a task for session lifecycle cleanup."""
         target = self.active_tasks if interruptible else self.background_tasks
         target.append(task)
-        task.add_done_callback(lambda t, tasks=target: tasks.remove(t) if t in tasks else None)
+        task.add_done_callback(lambda t: target.remove(t) if t in target else None)
 
     async def interrupt_tasks(self) -> int:
         """Cancel interruptible tasks for this session."""
@@ -41,14 +39,12 @@ class Session:
         return cancelled_count
 
     async def _cancel_task_collection(self, tasks: List[asyncio.Task]) -> int:
-        pending = [task for task in list(tasks) if not task.done()]
-        for task in pending:
-            task.cancel()
-
+        pending = [t for t in tasks if not t.done()]
+        for t in pending:
+            t.cancel()
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
-
-        tasks[:] = [task for task in tasks if not task.done()]
+        tasks[:] = []
         return len(pending)
 
 

@@ -152,15 +152,15 @@ def _build_memory_context(persona_id: str, project_id: str) -> str:
 
 
 def _normalize_enriched_items(payload: InternalEnrichRequest) -> list[dict[str, Any]]:
-    normalized: list[dict[str, Any]] = []
-    for item in payload.enriched_context:
-        if content := str(item.get("content", "")).strip():
-            normalized.append({
-                "type": str(item.get("type", "context")).strip() or "context",
-                "content": content,
-                "extras": {k: v for k, v in item.items() if k not in {"type", "content"} and v not in (None, "", [], {})},
-            })
-    return normalized
+    return [
+        {
+            "type": str(item.get("type", "context")).strip() or "context",
+            "content": content,
+            "extras": {k: v for k, v in item.items() if k not in {"type", "content"} and v not in (None, "", [], {})},
+        }
+        for item in payload.enriched_context
+        if (content := str(item.get("content", "")).strip())
+    ]
 
 
 def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, Any]]) -> str:
@@ -207,13 +207,11 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
         "client_disconnected": False,
     }
 
-    async def _persisting_event_sink(event: dict) -> None:
+    async def _event_sink(event: dict) -> None:
         if state["client_disconnected"]:
             return
-        evt = event.get("event")
-        if evt == "server_stream_chunk":
-            text = str(event.get("text") or "").strip()
-            if text:
+        if event.get("event") == "server_stream_chunk":
+            if text := str(event.get("text") or "").strip():
                 state["assistant_text_buf"].append(text)
             if event.get("is_final"):
                 _flush_assistant_turn(state)
@@ -222,45 +220,48 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
         except (WebSocketDisconnect, RuntimeError):
             state["client_disconnected"] = True
 
-    async def _handle_event(event: str, payload: dict) -> None:
-        if event == "relay_init":
-            state["args"].update({
-                "client_id": str(payload.get("client_id", relay_session_id)) or relay_session_id,
-                "persona_id": str(payload.get("persona_id", "default")) or "default",
-                "project_id": str(payload.get("project_id", "default")) or "default",
-            })
-            chat_session_id = str(payload.get("chat_session_id", "")).strip()
-            if chat_session_id:
-                state["session_id"] = chat_session_id
-            _ensure_live_session(state, relay_session_id, _persisting_event_sink)
-            return
-
-        _ensure_live_session(state, relay_session_id, _persisting_event_sink)
-
-        if event == "user_speak":
-            if text := str(payload.get("text", "")).strip():
-                _save_user_message(state, text)
-                await state["live_session"].send_text_turn(text)
-        elif event == "client_interrupt":
-            await state["live_session"].request_stop()
-        elif event == "client_audio_chunk":
-            audio_b64 = str(payload.get("audio_base64", "")).strip()
-            mime_type = str(payload.get("mime_type", "audio/pcm;rate=16000")).strip()
-            if audio_b64:
-                await state["live_session"].send_realtime_input(audio_b64, mime_type)
-        elif event == "client_audio_end":
-            await state["live_session"].send_turn_complete()
-
+    _IDLE_TIMEOUT = 300
     try:
         while True:
-            payload = await websocket.receive_json()
-            await _handle_event(str(payload.get("event", "")).strip(), payload)
+            try:
+                payload = await asyncio.wait_for(websocket.receive_json(), timeout=_IDLE_TIMEOUT)
+                await _dispatch_live_event(state, relay_session_id, _event_sink, payload)
+            except asyncio.TimeoutError:
+                break
     except WebSocketDisconnect:
         pass
     finally:
         _flush_assistant_turn(state)
         if state["live_session"]:
             await state["live_session"].close()
+
+
+async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) -> None:
+    event = str(payload.get("event", "")).strip()
+    if event == "relay_init":
+        state["args"].update({
+            "client_id": str(payload.get("client_id", relay_id)) or relay_id,
+            "persona_id": str(payload.get("persona_id", "default")) or "default",
+            "project_id": str(payload.get("project_id", "default")) or "default",
+        })
+        if chat_id := str(payload.get("chat_session_id", "")).strip():
+            state["session_id"] = chat_id
+        _ensure_live_session(state, relay_id, sink)
+        return
+
+    _ensure_live_session(state, relay_id, sink)
+    live = state["live_session"]
+
+    if event == "user_speak" and (text := str(payload.get("text", "")).strip()):
+        _save_user_message(state, text)
+        await live.send_text_turn(text)
+    elif event == "client_interrupt":
+        await live.request_stop()
+    elif event == "client_audio_chunk" and (audio := str(payload.get("audio_base64", "")).strip()):
+        mime = str(payload.get("mime_type", "audio/pcm;rate=16000")).strip()
+        await live.send_realtime_input(audio, mime)
+    elif event == "client_audio_end":
+        await live.send_turn_complete()
 
 
 def _ensure_session(state: dict[str, Any]) -> None:
