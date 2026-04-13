@@ -74,11 +74,10 @@ export default function Chat() {
   } = useChatSession();
   const liveClientIdRef = useRef(createLiveClientId(projectId));
   const liveInitialMessages = useMemo<LiveMessage[]>(() => {
-    if (mode !== "text") return [];
     return messages
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role as "user" | "assistant", text: m.content, timestamp: m.created_at ? new Date(m.created_at).getTime() : 0 }));
-  }, [messages, mode]);
+  }, [messages]);
   const liveSession = useLiveSession({
     enabled: mode === "live",
     clientId: liveClientIdRef.current,
@@ -143,17 +142,38 @@ export default function Chat() {
     setError("");
   }, [liveClearError, mode, setError]);
 
+  const handleSlashClose = useCallback(() => setSlashOpen(false), [setSlashOpen]);
+  const handleDismissFallbackToast = useCallback(() => setTtsFallbackToast(""), [setTtsFallbackToast]);
+  const handleLiveToggleMic = useCallback(() => { void liveToggleMic(); }, [liveToggleMic]);
+
   const prevModeRef = useRef(mode);
+  const prevTextMessageCountRef = useRef(0);
+  const prevLiveMessageCountRef = useRef(0);
   useEffect(() => {
-    if (mode === "live" && liveSession.liveMessages.length > 0) {
-      const justSwitched = prevModeRef.current !== "live";
+    const justSwitched = prevModeRef.current !== mode;
+    const isTextMode = mode === "text";
+    const activeMessageCount = isTextMode ? messages.length : liveSession.liveMessages.length;
+
+    if (activeMessageCount === 0) {
       prevModeRef.current = mode;
-      // Instant jump when first entering live mode; smooth scroll for new messages.
-      chatEndRef.current?.scrollIntoView({ behavior: justSwitched ? "instant" : "smooth" });
-    } else {
-      prevModeRef.current = mode;
+      prevTextMessageCountRef.current = messages.length;
+      prevLiveMessageCountRef.current = liveSession.liveMessages.length;
+      return;
     }
-  }, [mode, liveSession.liveMessages, chatEndRef]);
+
+    const previousCount = isTextMode ? prevTextMessageCountRef.current : prevLiveMessageCountRef.current;
+    const isStreamingUpdate = previousCount === activeMessageCount;
+    const shouldJumpToBottom = justSwitched || previousCount === 0 || isStreamingUpdate || (isTextMode && loadingHistory);
+    const frame = requestAnimationFrame(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: shouldJumpToBottom ? "instant" : "smooth" });
+    });
+
+    prevModeRef.current = mode;
+    prevTextMessageCountRef.current = messages.length;
+    prevLiveMessageCountRef.current = liveSession.liveMessages.length;
+
+    return () => cancelAnimationFrame(frame);
+  }, [chatEndRef, liveSession.liveMessages, loadingHistory, messages, mode]);
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background-dark">
@@ -253,62 +273,59 @@ export default function Chat() {
               </div>
             )}
 
-            {mode === "text" && messages.map((message, index) => (
-              <ChatMessage
-                key={`${message.role}-${index}-${message.created_at ?? ""}`}
-                message={message}
-                index={index}
-                playingIndex={playingIndex}
-                ttsPrefetching={ttsPrefetching}
-                isLastMessage={index === messages.length - 1}
-                onPlayTts={playTts}
-              />
-            ))}
+            {mode === "text" && messages.length > 0 && (
+              <div className="max-w-3xl mx-auto w-full flex flex-col gap-5">
+                {messages.map((message, index) => (
+                  <ChatMessage
+                    key={`${message.role}-${index}-${message.created_at ?? ""}`}
+                    message={message}
+                    createdAt={message.created_at}
+                    index={index}
+                    playingIndex={playingIndex}
+                    ttsPrefetching={ttsPrefetching}
+                    isLastMessage={index === messages.length - 1}
+                    onPlayTts={playTts}
+                    showAssistantActions
+                  />
+                ))}
+              </div>
+            )}
 
             {mode === "live" && (
-              <>
-                <div className="max-w-3xl mx-auto w-full flex flex-col gap-4">
-                  {liveSession.liveMessages.length === 0 && (
-                    <div className="text-center py-12">
-                      <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600">forum</span>
-                      <p className="mt-3 text-sm text-slate-400 dark:text-slate-500">
-                        {liveSession.wsState === "connected"
-                          ? "連線就緒，輸入文字或開啟麥克風開始對話。"
-                          : "等待連線中..."}
-                      </p>
+              <div className="max-w-3xl mx-auto w-full flex flex-col gap-5">
+                {liveSession.liveMessages.length === 0 && (
+                  <div className="text-center py-12">
+                    <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600">forum</span>
+                    <p className="mt-3 text-sm text-slate-400 dark:text-slate-500">
+                      {liveSession.wsState === "connected"
+                        ? "連線就緒，輸入文字或開啟麥克風開始對話。"
+                        : "等待連線中..."}
+                    </p>
+                  </div>
+                )}
+                {liveSession.liveMessages.map((message, index) => (
+                  <ChatMessage
+                    key={`${message.role}-${message.timestamp}-${index}`}
+                    message={{ role: message.role, content: message.text }}
+                    createdAt={message.timestamp}
+                    renderMarkdown={false}
+                    showAssistantActions={false}
+                  />
+                ))}
+                {liveSession.isPlaying && (
+                  <div className="flex justify-start">
+                    <div className="flex items-center gap-1.5 px-4 py-3">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className="w-2 h-2 rounded-full bg-primary/60 animate-pulse"
+                          style={{ animationDelay: `${i * 200}ms` }}
+                        />
+                      ))}
                     </div>
-                  )}
-                  {liveSession.liveMessages.map((msg, idx) => (
-                    <div
-                      key={`${msg.role}-${msg.timestamp}-${idx}`}
-                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                          msg.role === "user"
-                            ? "bg-primary text-white rounded-br-md"
-                            : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-bl-md"
-                        }`}
-                      >
-                        {msg.text}
-                      </div>
-                    </div>
-                  ))}
-                  {liveSession.isPlaying && (
-                    <div className="flex justify-start">
-                      <div className="flex items-center gap-1.5 px-4 py-3">
-                        {[0, 1, 2].map((i) => (
-                          <span
-                            key={i}
-                            className="w-2 h-2 rounded-full bg-primary/60 animate-pulse"
-                            style={{ animationDelay: `${i * 200}ms` }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
+                  </div>
+                )}
+              </div>
             )}
             <div ref={chatEndRef} />
           </div>
@@ -334,17 +351,15 @@ export default function Chat() {
             onStopStreaming={stopStreaming}
             onPickSlash={pickSlash}
             onSlashIndex={setSlashIndex}
-            onSlashClose={() => setSlashOpen(false)}
+            onSlashClose={handleSlashClose}
             onTtsProviderChange={handleTtsProviderChange}
             onTtsVoiceChange={handleTtsVoiceChange}
             onDismissError={handleDismissError}
-            onDismissFallbackToast={() => setTtsFallbackToast("")}
+            onDismissFallbackToast={handleDismissFallbackToast}
             onToggleAsr={toggleAsr}
             liveWsState={liveSession.wsState}
             liveMicActive={liveSession.micActive}
-            onLiveToggleMic={() => {
-              void liveToggleMic();
-            }}
+            onLiveToggleMic={handleLiveToggleMic}
           />
         </div>
 

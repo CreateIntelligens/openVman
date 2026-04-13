@@ -101,9 +101,9 @@ class BrainLiveRelay:
 
     async def close(self) -> None:
         self._closed = True
-        await self._cancel_task(self._listener_task)
+        for task in (self._listener_task, self._tts_worker_task):
+            await self._cancel_task(task)
         self._listener_task = None
-        await self._cancel_task(self._tts_worker_task)
         self._tts_worker_task = None
         if self._ws is not None:
             await self._ws.close()

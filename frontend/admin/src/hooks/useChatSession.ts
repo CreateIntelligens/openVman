@@ -207,12 +207,6 @@ export function useChatSession() {
 
   submitRef.current = submit;
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
   const resetConversation = useCallback(() => {
     abortControllerRef.current?.abort();
     stopAudio();

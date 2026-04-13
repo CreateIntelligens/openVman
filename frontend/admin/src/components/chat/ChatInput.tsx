@@ -44,13 +44,25 @@ export default function ChatInput(props: ChatInputProps) {
     slashOpen,
     slashMatches,
     clampedSlashIndex,
+    ttsProviders,
+    ttsProvider,
+    ttsVoice,
+    activeTtsProvider,
+    ttsFallbackToast,
+    asrListening,
+    asrSupported,
+    vadSpeaking,
     onInputChange,
     onSubmit,
     onStopStreaming,
     onPickSlash,
     onSlashIndex,
     onSlashClose,
+    onTtsProviderChange,
+    onTtsVoiceChange,
     onDismissError,
+    onDismissFallbackToast,
+    onToggleAsr,
     liveWsState,
     liveMicActive,
     onLiveToggleMic,
@@ -60,30 +72,58 @@ export default function ChatInput(props: ChatInputProps) {
   const liveConnected = liveWsState === "connected";
   const inputDisabled = mode === "live" ? !liveConnected : false;
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (slashEnabled && slashOpen && slashMatches.length > 0) {
+        onPickSlash(slashMatches[clampedSlashIndex]);
+      } else {
+        onSubmit();
+      }
+      return;
+    }
+
+    if (slashEnabled && slashOpen && slashMatches.length > 0) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        onSlashIndex((prev) => Math.min(prev + 1, slashMatches.length - 1));
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        onSlashIndex((prev) => Math.max(prev - 1, 0));
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        onPickSlash(slashMatches[clampedSlashIndex]);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        onSlashClose();
+      }
+    }
+  };
+
   return (
     <div className="shrink-0 p-5 bg-slate-50 dark:bg-background-dark border-t border-slate-200 dark:border-slate-800/80">
       <div className="max-w-4xl mx-auto flex flex-col gap-3 relative">
-        {mode === "text" && (
-          <TtsControls
-            ttsProviders={props.ttsProviders}
-            ttsProvider={props.ttsProvider}
-            ttsVoice={props.ttsVoice}
-            activeTtsProvider={props.activeTtsProvider}
-            ttsFallbackToast={props.ttsFallbackToast}
-            onTtsProviderChange={props.onTtsProviderChange}
-            onTtsVoiceChange={props.onTtsVoiceChange}
-            onDismissFallbackToast={props.onDismissFallbackToast}
-          />
-        )}
-
-        {error && (
-          <div className="absolute bottom-full left-0 right-0 mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400 flex items-center justify-between backdrop-blur-md">
-            <span>{error}</span>
-            <button onClick={onDismissError} className="hover:text-red-300">
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          </div>
-        )}
+        <div className="absolute bottom-full left-0 right-0 flex flex-col gap-2 mb-3">
+          {ttsFallbackToast && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400 flex items-center justify-between backdrop-blur-md z-20">
+              <span>
+                <span className="material-symbols-outlined text-[14px] align-middle mr-1">warning</span>
+                TTS 已自動切換至 Edge TTS
+              </span>
+              <button onClick={onDismissFallbackToast} className="hover:text-amber-300">
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          )}
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400 flex items-center justify-between backdrop-blur-md">
+              <span>{error}</span>
+              <button onClick={onDismissError} className="hover:text-red-300">
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-50 dark:focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
           {slashEnabled && (
@@ -102,33 +142,7 @@ export default function ChatInput(props: ChatInputProps) {
               el.style.height = "auto";
               el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
             }}
-            onKeyDown={(event) => {
-              if (slashEnabled && slashOpen && slashMatches.length > 0) {
-                if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  onSlashIndex((prev) => Math.min(prev + 1, slashMatches.length - 1));
-                  return;
-                }
-                if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  onSlashIndex((prev) => Math.max(prev - 1, 0));
-                  return;
-                }
-                if (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey)) {
-                  event.preventDefault();
-                  onPickSlash(slashMatches[clampedSlashIndex]);
-                  return;
-                }
-                if (event.key === "Escape") {
-                  onSlashClose();
-                  return;
-                }
-              }
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                onSubmit();
-              }
-            }}
+            onKeyDown={handleKeyDown}
             disabled={inputDisabled}
             rows={1}
             placeholder={
@@ -142,9 +156,20 @@ export default function ChatInput(props: ChatInputProps) {
           />
 
           <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
-            <span className="text-[11px] text-slate-500 font-medium">
-              {mode === "live" ? "Enter 送出文字，Shift + Enter 換行" : "Shift + Enter 換行"}
-            </span>
+            <div className="pointer-events-auto">
+              {mode === "text" && (
+                <TtsControls
+                  ttsProviders={ttsProviders}
+                  ttsProvider={ttsProvider}
+                  ttsVoice={ttsVoice}
+                  activeTtsProvider={activeTtsProvider}
+                  ttsFallbackToast=""
+                  onTtsProviderChange={onTtsProviderChange}
+                  onTtsVoiceChange={onTtsVoiceChange}
+                  onDismissFallbackToast={onDismissFallbackToast}
+                />
+              )}
+            </div>
             <div className="flex gap-2 pointer-events-auto">
               {mode === "text" && sending && (
                 <button
@@ -156,10 +181,10 @@ export default function ChatInput(props: ChatInputProps) {
               )}
               {mode === "text" && (
                 <AsrButton
-                  supported={props.asrSupported}
-                  listening={props.asrListening}
-                  speaking={props.vadSpeaking}
-                  onToggle={props.onToggleAsr}
+                  supported={asrSupported}
+                  listening={asrListening}
+                  speaking={vadSpeaking}
+                  onToggle={onToggleAsr}
                 />
               )}
               {mode === "live" && (

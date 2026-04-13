@@ -31,11 +31,16 @@ class CrawlResult:
 # ---------------------------------------------------------------------------
 
 
-def _extract_markdown_title(content: str) -> str:
+def _get_clean_lines(content: str) -> list[str]:
+    """Split content into lines and strip leading empty lines."""
     lines = [line.rstrip() for line in content.splitlines()]
     while lines and not lines[0].strip():
         lines.pop(0)
+    return lines
 
+
+def _extract_markdown_title(content: str) -> str:
+    lines = _get_clean_lines(content)
     if not lines:
         return ""
 
@@ -52,23 +57,17 @@ def _extract_markdown_title(content: str) -> str:
 
 
 def _strip_leading_markdown_title(content: str, title: str) -> str:
-    lines = [line.rstrip() for line in content.splitlines()]
-    while lines and not lines[0].strip():
-        lines.pop(0)
-
-    if not lines:
-        return ""
+    lines = _get_clean_lines(content)
+    if not lines or not title:
+        return "\n".join(lines).strip()
 
     first = lines[0].strip()
-    if title and first == title and len(lines) >= 2:
+    if first == title and len(lines) >= 2:
         underline = lines[1].strip()
         if underline and set(underline) <= {"=", "-"}:
             lines = lines[2:]
-    elif title and first == f"# {title}":
+    elif first == f"# {title}":
         lines = lines[1:]
-
-    while lines and not lines[0].strip():
-        lines.pop(0)
 
     return "\n".join(lines).strip()
 
@@ -111,37 +110,35 @@ def _clean_markdown(raw: str) -> str:
     """Filter navigation, ads, and noise blocks from markdown content."""
     lines = raw.split("\n")
     result: list[str] = []
-    pending_short: list[str] = []  # buffer for consecutive short lines
-    blank_count = 0
-
-    def _flush_pending() -> None:
-        """Commit pending short lines only if fewer than 3 (nav threshold)."""
-        if len(pending_short) < 3:
-            result.extend(pending_short)
-        pending_short.clear()
+    buffer: list[str] = []
+    blanks = 0
 
     for line in lines:
         stripped = line.strip()
-
         if not stripped:
-            _flush_pending()
-            blank_count += 1
-            if blank_count <= 2:
+            if buffer and len(buffer) < 3:
+                result.extend(buffer)
+            buffer.clear()
+            blanks += 1
+            if blanks <= 2:
                 result.append(line)
             continue
 
-        blank_count = 0
-
+        blanks = 0
         if _is_noise_line(stripped):
             continue
 
         if len(stripped) < 30 and not stripped.startswith("#"):
-            pending_short.append(line)
+            buffer.append(line)
         else:
-            _flush_pending()
+            if buffer and len(buffer) < 3:
+                result.extend(buffer)
+            buffer.clear()
             result.append(line)
 
-    _flush_pending()
+    if buffer and len(buffer) < 3:
+        result.extend(buffer)
+
     return "\n".join(result).strip()
 
 
@@ -188,37 +185,21 @@ def _is_junk_content(title: str, content: str) -> str | None:
 
 
 def _parse_provider_response(raw_text: str, fallback_url: str) -> tuple[str, str, str]:
-    title = ""
-    source_url = fallback_url
-    content = raw_text
-
+    title, source_url, content = "", fallback_url, raw_text
     lines = raw_text.splitlines()
-    markdown_start: int | None = None
 
     for idx, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("Title:"):
-            value = stripped.partition(":")[2].strip()
-            if value:
-                title = value
+            title = stripped.partition(":")[2].strip() or title
         elif stripped.startswith("URL Source:"):
-            value = stripped.partition(":")[2].strip()
-            if value:
-                source_url = value
+            source_url = stripped.partition(":")[2].strip() or source_url
         elif stripped == "Markdown Content:":
-            markdown_start = idx + 1
+            content = "\n".join(lines[idx + 1:]).strip()
             break
 
-    if markdown_start is not None:
-        content = "\n".join(lines[markdown_start:]).strip()
-
-    if not title:
-        title = _extract_markdown_title(content)
-
-    stripped_content = _strip_leading_markdown_title(content, title)
-    if stripped_content:
-        content = stripped_content
-
+    title = title or _extract_markdown_title(content)
+    content = _strip_leading_markdown_title(content, title) or content
     return title, content, source_url
 
 
@@ -277,19 +258,17 @@ async def fetch_page(url: str) -> CrawlResult:
             break
         except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError) as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
-            logger.warning(
-                "fetch_page attempt=%d/%d failed url=%s status=%s err=%s",
-                attempt, _MAX_FETCH_RETRIES, url, status, exc,
-            )
-            # 4xx errors are deterministic — don't retry
+            logger.warning("fetch_page attempt=%d/%d failed url=%s status=%s err=%s",
+                           attempt, _MAX_FETCH_RETRIES, url, status, exc)
+
             if isinstance(exc, httpx.HTTPStatusError) and 400 <= (status or 0) < 500:
                 raise ValueError(f"無法擷取該網址（HTTP {status}），請確認網址是否正確且可公開存取") from exc
-            if attempt < _MAX_FETCH_RETRIES:
-                await asyncio.sleep(1 * attempt)
-                continue
-            if isinstance(exc, httpx.HTTPStatusError):
-                raise ValueError(f"無法擷取該網址（HTTP {status}），請確認網址是否正確且可公開存取") from exc
-            raise
+
+            if attempt == _MAX_FETCH_RETRIES:
+                if isinstance(exc, httpx.HTTPStatusError):
+                    raise ValueError(f"無法擷取該網址（HTTP {status}），請確認網址是否正確且可公開存取") from exc
+                raise
+            await asyncio.sleep(1 * attempt)
 
     raw_text = resp.text.strip()
     if not raw_text:
@@ -300,18 +279,11 @@ async def fetch_page(url: str) -> CrawlResult:
     if not title:
         title = f"{domain}{parsed.path}"
 
-    # Run junk detection before cleaning so gate-page indicators aren't stripped
-    junk_reason = _is_junk_content(title, content)
-    if junk_reason:
-        raise ValueError(junk_reason)
+    if reason := _is_junk_content(title, content):
+        raise ValueError(reason)
 
     content = _clean_markdown(content)
     if not content:
         raise RuntimeError(f"清理後內容為空：{url}")
 
-    return CrawlResult(
-        title=title,
-        content=content,
-        source_url=source_url,
-        status_code=resp.status_code,
-    )
+    return CrawlResult(title=title, content=content, source_url=source_url, status_code=resp.status_code)
