@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def test_markitdown_pdf_extra_is_enabled():
-    requirements_path = Path(__file__).resolve().parents[1] / "requirements.txt"
+    requirements_path = Path(__file__).resolve().parents[2] / "requirements.txt"
     requirements = requirements_path.read_text(encoding="utf-8").splitlines()
     markitdown_line = next(
         line.strip()
@@ -18,7 +18,7 @@ def test_markitdown_pdf_extra_is_enabled():
 
 
 def test_chardet_is_capped_for_requests_compatibility():
-    requirements_path = Path(__file__).resolve().parents[1] / "requirements.txt"
+    requirements_path = Path(__file__).resolve().parents[2] / "requirements.txt"
     requirements = requirements_path.read_text(encoding="utf-8").splitlines()
 
     assert any(line.strip().startswith("chardet<6") for line in requirements)

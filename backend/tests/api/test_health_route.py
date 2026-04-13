@@ -58,7 +58,7 @@ def _mock_health_client(responses: dict[str, dict] | None = None):
     mock_client = MagicMock(spec=httpx.AsyncClient)
     mock_client.get = AsyncMock(side_effect=_fake_get)
     return patch(
-        "app.main._health_http",
+        "app.routes.admin._health_http",
         MagicMock(
             get=lambda: mock_client,
             close=AsyncMock(return_value=None),
@@ -69,7 +69,7 @@ def _mock_health_client(responses: dict[str, dict] | None = None):
 class TestHealthzOk:
     def test_healthz_ok_when_redis_connected(self, client: TestClient):
         with (
-            patch("app.main.redis_available", new_callable=AsyncMock, return_value=True),
+            patch("app.routes.admin.redis_available", new_callable=AsyncMock, return_value=True),
             _mock_health_client({"/brain/health": {"status": "ok"}}),
         ):
             resp = client.get("/healthz")
@@ -85,7 +85,7 @@ class TestHealthzOk:
 
     def test_healthz_includes_downstream_brain(self, client: TestClient):
         with (
-            patch("app.main.redis_available", new_callable=AsyncMock, return_value=True),
+            patch("app.routes.admin.redis_available", new_callable=AsyncMock, return_value=True),
             _mock_health_client({"/brain/health": {"status": "ok"}}),
         ):
             resp = client.get("/healthz")
@@ -99,7 +99,7 @@ class TestHealthzOk:
 class TestHealthzDegraded:
     def test_healthz_degraded_when_redis_down(self, client: TestClient):
         with (
-            patch("app.main.redis_available", new_callable=AsyncMock, return_value=False),
+            patch("app.routes.admin.redis_available", new_callable=AsyncMock, return_value=False),
             _mock_health_client({"/brain/health": {"status": "ok"}}),
         ):
             resp = client.get("/healthz")
@@ -114,9 +114,9 @@ class TestHealthzDegraded:
         mock_client = MagicMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(side_effect=httpx.ConnectError("refused"))
         with (
-            patch("app.main.redis_available", new_callable=AsyncMock, return_value=True),
+            patch("app.routes.admin.redis_available", new_callable=AsyncMock, return_value=True),
             patch(
-                "app.main._health_http",
+                "app.routes.admin._health_http",
                 MagicMock(
                     get=lambda: mock_client,
                     close=AsyncMock(return_value=None),

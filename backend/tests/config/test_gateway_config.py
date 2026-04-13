@@ -16,7 +16,7 @@ def test_gateway_defaults():
     assert cfg.gateway_temp_dir_max_mb == 2048
     assert cfg.gateway_max_file_size_mb == 100
     assert cfg.media_processing_timeout_ms == 5000
-    assert cfg.redis_url == "redis://127.0.0.1:6379"
+    assert cfg.redis_url == "redis://redis:6379"
     assert cfg.queue_job_timeout_ms == 30000
 
 

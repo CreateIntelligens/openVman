@@ -105,7 +105,15 @@ def test_is_indexable_document_skips_persona_core_docs(
     assert workspace.is_indexable_document(persona_soul) is False
 
 
-def test_session_store_rejects_persona_mismatch(tmp_path: Path):
+def test_session_store_rejects_persona_mismatch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from unittest.mock import MagicMock
+
+    fake_cfg = MagicMock()
+    fake_cfg.max_session_ttl_minutes = 30 * 24 * 60
+
+    import memory.session_store as _ss_mod
+    monkeypatch.setattr(_ss_mod, "get_settings", lambda: fake_cfg)
+
     session_store = _import("memory.session_store")
     store = session_store.SessionStore(str(tmp_path / "sessions.db"))
 

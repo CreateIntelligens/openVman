@@ -97,30 +97,23 @@ async def _prepare_document_upload(
         cleanup_temp_path(tmp_path)
 
 
-def _build_raw_target_dir(target_dir: str) -> str:
+def _clean_target_dir(target_dir: str) -> list[str]:
     cleaned = target_dir.strip().strip("/")
     if not cleaned:
-        return "raw"
-        
+        return []
     parts = cleaned.split("/")
-    if parts[0] == "knowledge":
-        parts = parts[1:]
-        
+    if parts[0] in ("knowledge", "raw"):
+        return parts[1:]
+    return parts
+
+
+def _build_raw_target_dir(target_dir: str) -> str:
+    parts = _clean_target_dir(target_dir)
     return "/".join(["raw", *parts]).rstrip("/") or "raw"
 
 
 def _build_markdown_target_dir(target_dir: str) -> str:
-    cleaned = target_dir.strip().strip("/")
-    if not cleaned:
-        return "knowledge/ingested"
-
-    parts = cleaned.split("/")
-    if parts[0] == "knowledge":
-        return cleaned
-
-    if parts[0] == "raw":
-        parts = parts[1:]
-
+    parts = _clean_target_dir(target_dir)
     return "/".join(["knowledge", *parts]).rstrip("/") or "knowledge/ingested"
 
 
@@ -181,41 +174,18 @@ async def upload(
     job_id = uuid.uuid4().hex
     trace_id = uuid.uuid4().hex
 
-    # 1. quota check
+    # 1-3. Quota, MIME, and Size checks
     quota = storage.check_quota()
-    if not quota.ok:
-        return upload_failed_response(
-            status_code=413,
-            error="storage_quota_exceeded",
-            usage_mb=quota.usage_mb,
-            limit_mb=quota.limit_mb,
-        )
-
-    # 2. MIME check
     mime_type = file.content_type or "application/octet-stream"
+    
+    if not quota.ok:
+        return upload_failed_response(status_code=413, error="storage_quota_exceeded", usage_mb=quota.usage_mb, limit_mb=quota.limit_mb)
     if mime_type not in cfg.supported_mime_types:
-        return upload_failed_response(
-            status_code=400,
-            error="unsupported_mime_type",
-            mime_type=mime_type,
-        )
+        return upload_failed_response(status_code=400, error="unsupported_mime_type", mime_type=mime_type)
 
-    # 3. read file + size check
-    chunks: list[bytes] = []
-    total_size = 0
-    while chunk := await file.read(UPLOAD_CHUNK_SIZE):
-        chunks.append(chunk)
-        total_size += len(chunk)
-
-    if not storage.validate_file_size(total_size):
-        return upload_failed_response(
-            status_code=413,
-            error="file_too_large",
-            size_bytes=total_size,
-        )
-
-    # 4. write to temp storage
-    data = b"".join(chunks)
+    data = await file.read()
+    if not storage.validate_file_size(len(data)):
+        return upload_failed_response(status_code=413, error="file_too_large", size_bytes=len(data))
     try:
         file_path = storage.write_file(session_id, data, mime_type)
     except ValueError as exc:

@@ -232,14 +232,10 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
             chat_session_id = str(payload.get("chat_session_id", "")).strip()
             if chat_session_id:
                 state["session_id"] = chat_session_id
-            _ensure_session(state)
-            if not state["live_session"]:
-                state["live_session"] = _build_live_session(relay_session_id, event_sink=_persisting_event_sink, session_id=state["session_id"], **state["args"])
+            _ensure_live_session(state, relay_session_id, _persisting_event_sink)
             return
 
-        if not state["live_session"]:
-            _ensure_session(state)
-            state["live_session"] = _build_live_session(relay_session_id, event_sink=_persisting_event_sink, session_id=state["session_id"], **state["args"])
+        _ensure_live_session(state, relay_session_id, _persisting_event_sink)
 
         if event == "user_speak":
             if text := str(payload.get("text", "")).strip():
@@ -271,6 +267,18 @@ def _ensure_session(state: dict[str, Any]) -> None:
     args = state["args"]
     session = get_or_create_session(state["session_id"], args["persona_id"], project_id=args["project_id"])
     state["session_id"] = session.session_id
+
+
+def _ensure_live_session(state: dict[str, Any], relay_session_id: str, event_sink) -> None:
+    if state["live_session"]:
+        return
+    _ensure_session(state)
+    state["live_session"] = _build_live_session(
+        relay_session_id,
+        event_sink=event_sink,
+        session_id=state["session_id"],
+        **state["args"],
+    )
 
 
 def _save_user_message(state: dict[str, Any], text: str) -> None:

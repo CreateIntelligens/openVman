@@ -12,10 +12,10 @@ from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.service import TTSRouterService
 
 
-def _make_config(index_url: str = "http://index", aws_enabled: bool = True, gcp_enabled: bool = True, edge_enabled: bool = False) -> TTSRouterConfig:
+def _make_config(indextts_url: str = "http://index", aws_enabled: bool = True, gcp_enabled: bool = True, edge_enabled: bool = False) -> TTSRouterConfig:
     return TTSRouterConfig(
-        tts_index_url=index_url,
-        tts_index_character="hayley",
+        tts_indextts_url=indextts_url,
+        tts_indextts_default_character="hayley",
         tts_aws_enabled=aws_enabled,
         tts_aws_region="ap-northeast-1",
         tts_aws_access_key_id="key",
@@ -53,10 +53,10 @@ class TestRouterFallback:
     def setup_method(self):
         reset_metrics()
 
-    def test_index_success_returns_immediately(self):
-        """Index succeeds -> no GCP/AWS hop."""
+    def test_indextts_success_returns_immediately(self):
+        """IndexTTS succeeds -> no GCP/AWS hop."""
         svc = TTSRouterService(_make_config())
-        svc._index.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
+        svc._indextts.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
         svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
         svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
@@ -65,10 +65,11 @@ class TestRouterFallback:
         svc._aws.synthesize.assert_not_called()
         svc._gcp.synthesize.assert_not_called()
 
-    def test_index_fails_falls_back_to_gcp(self):
-        """Index fails -> GCP succeeds."""
+    def test_indextts_fails_falls_back_to_gcp(self):
+        """IndexTTS fails -> GCP succeeds."""
         svc = TTSRouterService(_make_config())
-        svc._index.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._indextts.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._vibevoice.synthesize = MagicMock(side_effect=RuntimeError("vibevoice down"))  # type: ignore[method-assign]
         svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
         svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
@@ -76,10 +77,11 @@ class TestRouterFallback:
         assert result.result.provider == "gcp"
         svc._aws.synthesize.assert_not_called()
 
-    def test_index_gcp_fail_falls_back_to_aws(self):
-        """Index, GCP fail -> AWS succeeds."""
+    def test_indextts_gcp_fail_falls_back_to_aws(self):
+        """IndexTTS, GCP fail -> AWS succeeds."""
         svc = TTSRouterService(_make_config())
-        svc._index.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._indextts.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._vibevoice.synthesize = MagicMock(side_effect=RuntimeError("vibevoice down"))  # type: ignore[method-assign]
         svc._gcp.synthesize = MagicMock(side_effect=RuntimeError("gcp down"))  # type: ignore[method-assign]
         svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
@@ -87,9 +89,10 @@ class TestRouterFallback:
         assert result.result.provider == "aws"
 
     def test_all_providers_fail_raises(self):
-        """Index, GCP and AWS fail -> RuntimeError."""
+        """All providers fail -> RuntimeError."""
         svc = TTSRouterService(_make_config())
-        svc._index.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._indextts.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._vibevoice.synthesize = MagicMock(side_effect=RuntimeError("vibevoice down"))  # type: ignore[method-assign]
         svc._aws.synthesize = MagicMock(side_effect=RuntimeError("aws down"))  # type: ignore[method-assign]
         svc._gcp.synthesize = MagicMock(side_effect=RuntimeError("gcp down"))  # type: ignore[method-assign]
 
@@ -99,16 +102,17 @@ class TestRouterFallback:
     def test_router_returns_normalized_payload(self):
         """Router result has correct NormalizedTTSResult shape."""
         svc = TTSRouterService(_make_config())
-        svc._index.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
+        svc._indextts.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
 
         result = svc.synthesize(SynthesizeRequest(text="test"))
         assert isinstance(result.result, NormalizedTTSResult)
         assert result.result.audio_bytes == b"\x00\x01"
         assert result.result.route_kind == "provider"
 
-    def test_disabled_index_skips_to_gcp(self):
-        """Index disabled -> chain starts with GCP."""
-        svc = TTSRouterService(_make_config(index_url=""))
+    def test_disabled_indextts_skips_to_next(self):
+        """IndexTTS disabled -> chain starts with vibevoice/gcp."""
+        svc = TTSRouterService(_make_config(indextts_url=""))
+        svc._vibevoice.synthesize = MagicMock(side_effect=RuntimeError("down"))  # type: ignore[method-assign]
         svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
         result = svc.synthesize(SynthesizeRequest(text="test"))
@@ -116,36 +120,36 @@ class TestRouterFallback:
 
     def test_disabled_all_raises_empty_chain(self):
         """All disabled -> empty chain error."""
-        svc = TTSRouterService(_make_config(index_url="", aws_enabled=False, gcp_enabled=False, edge_enabled=False))
+        svc = TTSRouterService(_make_config(indextts_url="", aws_enabled=False, gcp_enabled=False, edge_enabled=False))
         with pytest.raises(RuntimeError, match="chain 為空"):
             svc.synthesize(SynthesizeRequest(text="test"))
 
-    def test_chain_order_is_index_then_gcp_then_aws(self):
-        """Verify the chain order: Index first, then GCP, then AWS."""
+    def test_chain_order_is_indextts_then_gcp_then_aws(self):
+        """Verify the chain order: IndexTTS, GCP, AWS (vibevoice disabled when URL empty)."""
         svc = TTSRouterService(_make_config())
         chain = svc.build_chain()
         targets = [t.target for t in chain]
-        assert targets == ["index-tts", "gcp-tts", "aws-polly"]
+        assert targets == ["indextts", "gcp-tts", "aws-polly"]
 
-    def test_index_success_stops_without_extra_hops(self):
-        """After Index success, no more hops are attempted."""
+    def test_indextts_success_stops_without_extra_hops(self):
+        """After IndexTTS success, no more hops are attempted."""
         svc = TTSRouterService(_make_config())
-        svc._index.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
+        svc._indextts.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
         svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
 
         svc.synthesize(SynthesizeRequest(text="test"))
 
         snap = get_metrics_snapshot()
         success_keys = [k for k in snap["counters"] if "result=success" in k]
-        # route_attempt + provider_request for index only
         assert len(success_keys) == 2
-        index_success = [k for k in success_keys if "index" in k]
-        assert len(index_success) == 2
+        indextts_success = [k for k in success_keys if "indextts" in k or "index" in k]
+        assert len(indextts_success) == 2
 
     def test_aws_success_stops_without_extra_hops(self):
-        """After AWS success, no more hops are attempted (requires Index and GCP to fail)."""
+        """After AWS success, no more hops are attempted."""
         svc = TTSRouterService(_make_config())
-        svc._index.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._indextts.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._vibevoice.synthesize = MagicMock(side_effect=RuntimeError("vibevoice down"))  # type: ignore[method-assign]
         svc._gcp.synthesize = MagicMock(side_effect=RuntimeError("gcp down"))  # type: ignore[method-assign]
         svc._aws.synthesize = MagicMock(return_value=_ok_result("aws"))  # type: ignore[method-assign]
 
@@ -153,7 +157,6 @@ class TestRouterFallback:
 
         snap = get_metrics_snapshot()
         success_keys = [k for k in snap["counters"] if "result=success" in k]
-        # route_attempt + provider_request for aws only (index and gcp failed)
         assert len(success_keys) == 2
         aws_success = [k for k in success_keys if "aws" in k]
         assert len(aws_success) == 2

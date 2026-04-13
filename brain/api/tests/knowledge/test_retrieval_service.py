@@ -79,6 +79,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, *, knowledge=None, memories=None
     fake_cfg.rag_knowledge_top_k = 3
     fake_cfg.rag_memory_top_k = 2
     fake_cfg.rag_rerank_candidate_multiplier = 4
+    fake_cfg.rag_distance_cutoff = 1.2
     fake_cfg.rag_memory_distance_bonus = 0.02
     fake_cfg.memory_decay_rate_per_day = 0.005
     fake_cfg.memory_importance_weight = 0.03

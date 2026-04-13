@@ -16,6 +16,9 @@ if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
 
+_saved_modules: dict[str, object] = {}
+
+
 def _load_module():
     fake_config = types.SimpleNamespace(
         gemini_api_key="test-key",
@@ -25,6 +28,8 @@ def _load_module():
         live_gemini_tools_enabled=True,
         live_gemini_thinking_level="",
     )
+    for mod_name in ("config", "memory.embedder", "memory.retrieval"):
+        _saved_modules.setdefault(mod_name, sys.modules.get(mod_name))
     sys.modules["config"] = types.SimpleNamespace(
         BrainSettings=object,
         get_settings=lambda: fake_config,
@@ -40,6 +45,18 @@ def _load_module():
     )
     sys.modules.pop("live.gemini_live", None)
     return importlib.import_module("live.gemini_live"), fake_config
+
+
+@pytest.fixture(autouse=True)
+def _restore_modules():
+    """Restore sys.modules after each test to prevent leaking stubs."""
+    yield
+    for mod_name, orig in _saved_modules.items():
+        if orig is None:
+            sys.modules.pop(mod_name, None)
+        else:
+            sys.modules[mod_name] = orig
+    _saved_modules.clear()
 
 
 class FakeTransport:

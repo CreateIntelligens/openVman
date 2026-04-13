@@ -15,28 +15,35 @@ import pytest
 # Module stubs — prevent heavy imports during testing
 # ---------------------------------------------------------------------------
 
+_fake_embedder = ModuleType("memory.embedder")
+_fake_embedder.get_embedder = lambda embedding_version=None: MagicMock(encode=lambda texts: [[0.1] for _ in texts])  # type: ignore[attr-defined]
+_fake_embedder.encode_text = lambda text, embedding_version=None: [0.1]  # type: ignore[attr-defined]
+_fake_embedder.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): MagicMock(version="bge", vector=[0.1], attempted_versions=[])  # type: ignore[attr-defined]
+
+_fake_importance = ModuleType("memory.importance")
+_fake_importance.score_importance = lambda text: MagicMock(score=0.5, level="medium", signals=())  # type: ignore[attr-defined]
+_fake_importance.ImportanceResult = type("ImportanceResult", (), {})  # type: ignore[attr-defined]
+
+_fake_infra_db = ModuleType("infra.db")
+_fake_infra_db.normalize_vector = lambda v: list(v) if hasattr(v, "__iter__") else [v]  # type: ignore[attr-defined]
+_fake_infra_db.get_memories_table = lambda project_id="default", embedding_version=None: MagicMock()  # type: ignore[attr-defined]
+_fake_infra_db.get_db = MagicMock()  # type: ignore[attr-defined]
+_fake_infra_db.resolve_vector_table_name = lambda name, ev=None: name  # type: ignore[attr-defined]
+
 _STUBS = {
     "lancedb": MagicMock(),
-    "numpy": MagicMock(),
     "sentence_transformers": MagicMock(),
     "FlagEmbedding": MagicMock(),
     "infra": ModuleType("infra"),
-    "infra.db": MagicMock(),
-    "memory.embedder": MagicMock(),
-    "memory.importance": MagicMock(),
-    "config": MagicMock(),
+    "infra.db": _fake_infra_db,
+    "memory.embedder": _fake_embedder,
+    "memory.importance": _fake_importance,
+    "config": ModuleType("config"),
     "knowledge": ModuleType("knowledge"),
-    "knowledge.workspace": MagicMock(),
+    "knowledge.workspace": ModuleType("knowledge.workspace"),
 }
 
-for mod_name, stub in _STUBS.items():
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = stub
-
-# Configure specific stub behaviors
-sys.modules["infra.db"].normalize_vector = lambda v: v
-sys.modules["memory.importance"].score_importance.return_value = MagicMock(score=0.5, level="medium", signals=())
-
+# Build config mock with all needed attributes
 _cfg_mock = MagicMock()
 _cfg_mock.dreaming_enabled = True
 _cfg_mock.dreaming_cron = "0 3 * * *"
@@ -44,12 +51,21 @@ _cfg_mock.dreaming_timezone = "Asia/Taipei"
 _cfg_mock.dreaming_lookback_days = 7
 _cfg_mock.dreaming_min_score = 0.45
 _cfg_mock.dreaming_min_recall_count = 2
+_cfg_mock.dreaming_min_unique_queries = 2
 _cfg_mock.dreaming_candidate_limit = 100
 _cfg_mock.dreaming_similarity_threshold = 0.90
-sys.modules["config"].get_settings = lambda: _cfg_mock
+_cfg_mock.max_session_ttl_minutes = 30 * 24 * 60
+_cfg_mock.rag_distance_cutoff = 1.2
 
 _ws_root = Path("/tmp/test_scheduler_ws")
-sys.modules["knowledge.workspace"].get_workspace_root = lambda pid="default": _ws_root
+
+# Temporarily apply stubs to import the scheduler module, then restore originals
+_saved_modules = {}
+for mod_name, stub in _STUBS.items():
+    _saved_modules[mod_name] = sys.modules.get(mod_name)
+    sys.modules[mod_name] = stub
+sys.modules["config"].get_settings = lambda: _cfg_mock  # type: ignore[attr-defined]
+sys.modules["knowledge.workspace"].get_workspace_root = lambda pid="default": _ws_root  # type: ignore[attr-defined]
 
 # Now import the module under test
 from memory.dreaming.scheduler import (
@@ -62,6 +78,38 @@ from memory.dreaming.scheduler import (
     run_dreaming_cycle,
     get_dreaming_status,
 )
+
+# Restore originals so other test files in the same session see real modules
+for mod_name, orig in _saved_modules.items():
+    if orig is None:
+        sys.modules.pop(mod_name, None)
+    else:
+        sys.modules[mod_name] = orig
+
+
+@pytest.fixture(autouse=True)
+def _ensure_stubs():
+    """Re-apply module stubs before each test, restore originals after."""
+    # Save originals
+    originals = {mod_name: sys.modules.get(mod_name) for mod_name in _STUBS}
+
+    for mod_name, stub in _STUBS.items():
+        sys.modules[mod_name] = stub
+    sys.modules["config"].get_settings = lambda: _cfg_mock  # type: ignore[attr-defined]
+    sys.modules["knowledge.workspace"].get_workspace_root = lambda pid="default": _ws_root  # type: ignore[attr-defined]
+    # Clear cached dreaming submodules so they reimport with fresh stubs
+    for mod_name in list(sys.modules):
+        if mod_name.startswith("memory.dreaming.") and mod_name != "memory.dreaming.scheduler":
+            sys.modules.pop(mod_name, None)
+
+    yield
+
+    # Restore originals so subsequent test files aren't poisoned
+    for mod_name, orig in originals.items():
+        if orig is None:
+            sys.modules.pop(mod_name, None)
+        else:
+            sys.modules[mod_name] = orig
 
 
 # ===== CronSpec Tests =====

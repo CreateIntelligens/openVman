@@ -15,6 +15,13 @@ if str(API_ROOT) not in sys.path:
 @pytest.fixture(autouse=True)
 def _isolate_data_root(tmp_path, monkeypatch):
     """Redirect project data root to a temp directory for all tests."""
+    # Ensure encode_text stub has correct signature for infra.db seed records
+    import memory.embedder as _emb_mod
+    monkeypatch.setattr(_emb_mod, "encode_text", lambda text, embedding_version=None: [0.1])
+    # Also patch the already-imported reference in infra.db
+    import infra.db as _db_mod
+    monkeypatch.setattr(_db_mod, "encode_text", lambda text, embedding_version=None: [0.1])
+
     monkeypatch.setattr("infra.project_context._DATA_ROOT", tmp_path / "projects")
     monkeypatch.setattr("infra.project_admin.get_data_root", lambda: tmp_path / "projects")
 

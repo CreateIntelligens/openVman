@@ -52,7 +52,7 @@ def _stub_heavy_modules(monkeypatch: pytest.MonkeyPatch):
 
 def _load_agent_loop(monkeypatch: pytest.MonkeyPatch):
     fake_embedder = types.ModuleType("memory.embedder")
-    fake_embedder.encode_text = lambda text: [0.1]
+    fake_embedder.encode_text = lambda text, embedding_version=None: [0.1]
     fake_embedder.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): types.SimpleNamespace(
         version="bge",
         vector=[0.1],

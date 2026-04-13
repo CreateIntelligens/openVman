@@ -28,10 +28,14 @@ _fake_markitdown = types.ModuleType("markitdown")
 _fake_markitdown.MarkItDown = MagicMock  # type: ignore[attr-defined]
 sys.modules.setdefault("markitdown", _fake_markitdown)
 
-# Stub openai (may not be installed in test env)
-_fake_openai = types.ModuleType("openai")
-_fake_openai.AsyncOpenAI = MagicMock  # type: ignore[attr-defined]
-sys.modules.setdefault("openai", _fake_openai)
+# Stub openai if not installed
+try:
+    import openai
+except ImportError:
+    _fake_openai = types.ModuleType("openai")
+    _fake_openai.AsyncOpenAI = MagicMock  # type: ignore[attr-defined]
+    _fake_openai.OpenAI = MagicMock  # type: ignore[attr-defined]
+    sys.modules.setdefault("openai", _fake_openai)
 
 # Stub pytesseract (may not be installed in test env)
 _fake_pytesseract = types.ModuleType("pytesseract")

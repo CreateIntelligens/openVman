@@ -20,7 +20,7 @@ def _load_db(monkeypatch, *, active_version: str):
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)
 
     fake_embedder_mod = types.ModuleType("memory.embedder")
-    fake_embedder_mod.encode_text = lambda text: [0.1]
+    fake_embedder_mod.encode_text = lambda text, embedding_version=None: [0.1]
     monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder_mod)
 
     sys.modules.pop("infra.db", None)

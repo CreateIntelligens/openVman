@@ -9,8 +9,8 @@ from app.service import TTSRouterService
 
 def _make_config() -> TTSRouterConfig:
     return TTSRouterConfig(
-        tts_index_url="http://index",
-        tts_index_character="hayley",
+        tts_indextts_url="http://index",
+        tts_indextts_default_character="hayley",
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
     )
@@ -30,12 +30,12 @@ def _ok_result(provider: str) -> NormalizedTTSResult:
 
 def test_targeted_provider_fallback_resets_voice_for_edge() -> None:
     svc = TTSRouterService(_make_config())
-    svc._index.synthesize = MagicMock(side_effect=RuntimeError("index timeout"))  # type: ignore[method-assign]
+    svc._indextts.synthesize = MagicMock(side_effect=RuntimeError("index timeout"))  # type: ignore[method-assign]
     svc._edge.synthesize = MagicMock(return_value=_ok_result("edge-tts"))  # type: ignore[method-assign]
 
     output = svc.synthesize(
         SynthesizeRequest(text="hello", voice_hint="jinping"),
-        provider="index",
+        provider="indextts",
     )
 
     assert output.result.provider == "edge-tts"

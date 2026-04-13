@@ -40,8 +40,9 @@ def _stub_deps(monkeypatch, tmp_path):
     fake_ws_mod.get_workspace_root = lambda project_id="default": tmp_path / "workspace"
     monkeypatch.setitem(sys.modules, "knowledge.workspace", fake_ws_mod)
 
-    # Force re-import of recall_tracker with fresh stubs
+    # Force re-import of recall_tracker (and paths) with fresh stubs
     sys.modules.pop("memory.dreaming.recall_tracker", None)
+    sys.modules.pop("memory.dreaming.paths", None)
     sys.modules.pop("memory.dreaming", None)
 
 

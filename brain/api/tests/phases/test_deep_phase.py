@@ -23,6 +23,7 @@ def _stub_deps(monkeypatch, tmp_path):
         dreaming_lookback_days = 7
         dreaming_min_score = 0.3
         dreaming_min_recall_count = 1
+        dreaming_min_unique_queries = 1
         dreaming_candidate_limit = 100
         dreaming_similarity_threshold = 0.90
 

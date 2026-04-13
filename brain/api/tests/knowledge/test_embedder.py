@@ -41,10 +41,6 @@ def _load_embedder(monkeypatch, backend, *, settings=None):
     fake_flag_mod.BGEM3FlagModel = FakeBGEM3FlagModel
     monkeypatch.setitem(sys.modules, "FlagEmbedding", fake_flag_mod)
 
-    fake_openai_mod = types.ModuleType("openai")
-    fake_openai_mod.OpenAI = object
-    monkeypatch.setitem(sys.modules, "openai", fake_openai_mod)
-
     sys.modules.pop("memory.embedder", None)
     module = importlib.import_module("memory.embedder")
     return module, FakeBGEM3FlagModel

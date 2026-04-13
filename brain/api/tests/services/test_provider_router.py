@@ -237,7 +237,9 @@ def _stub_config(
     fake_cfg.llm_key_long_cooldown_seconds = 300
 
     import config
+    import core.provider_router as _pr_mod
     monkeypatch.setattr(config, "get_settings", lambda: fake_cfg)
+    monkeypatch.setattr(_pr_mod, "get_settings", lambda: fake_cfg)
 
 
 def _make_api_status_error(status_code: int):

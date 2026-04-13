@@ -25,35 +25,35 @@ class TestIngestDocument:
         test_file.write_bytes(b"fake pdf content")
 
         with patch(
-            "app.gateway.ingestion._convert_with_docling",
+            "app.gateway.ingestion._convert",
             return_value="# Hello World\n\nThis is a test.",
-        ) as mock_docling:
+        ) as mock_convert:
             result = ingest_document(str(test_file), trace_id="test-trace", cfg=_cfg())
 
         assert result.content_type == "document_content"
         assert result.content == "# Hello World\n\nThis is a test."
         assert result.page_count is None
-        mock_docling.assert_called_once()
+        mock_convert.assert_called_once_with(str(test_file), "test-trace", "docling")
 
     def test_markitdown_non_docling_suffix_returns_markdown(self, tmp_path):
         test_file = tmp_path / "page.txt"
         test_file.write_bytes(b"hello")
 
         with patch(
-            "app.gateway.ingestion._convert_with_markitdown",
+            "app.gateway.ingestion._convert",
             return_value="# Converted\n",
-        ) as mock_markitdown:
+        ) as mock_convert:
             result = ingest_document(str(test_file), trace_id="test-trace", cfg=_cfg())
 
         assert result.content == "# Converted\n"
-        mock_markitdown.assert_called_once()
+        mock_convert.assert_called_once_with(str(test_file), "test-trace", "markitdown")
 
     def test_empty_content_returns_empty_string(self, tmp_path):
         test_file = tmp_path / "empty.pdf"
         test_file.write_bytes(b"")
 
         with patch(
-            "app.gateway.ingestion._convert_with_docling",
+            "app.gateway.ingestion._convert",
             return_value="",
         ):
             result = ingest_document(str(test_file), trace_id="test-trace", cfg=_cfg())
@@ -64,27 +64,23 @@ class TestIngestDocument:
         test_file = tmp_path / "fallback.docx"
         test_file.write_bytes(b"docx")
 
-        with (
-            patch(
-                "app.gateway.ingestion._convert_with_docling",
-                side_effect=DoclingServiceError("boom"),
-            ),
-            patch(
-                "app.gateway.ingestion._convert_with_markitdown",
-                return_value="# Fallback\n",
-            ) as mock_markitdown,
-        ):
+        def side_effect(path, tid, provider):
+            if provider == "docling":
+                raise DoclingServiceError("boom")
+            return "# Fallback\n"
+
+        with patch("app.gateway.ingestion._convert", side_effect=side_effect) as mock_convert:
             result = ingest_document(str(test_file), trace_id="test-trace", cfg=_cfg(fallback=True))
 
         assert result.content == "# Fallback\n"
-        mock_markitdown.assert_called_once()
+        assert mock_convert.call_count == 2
 
     def test_docling_failure_raises_without_fallback(self, tmp_path):
         test_file = tmp_path / "broken.pptx"
         test_file.write_bytes(b"pptx")
 
         with patch(
-            "app.gateway.ingestion._convert_with_docling",
+            "app.gateway.ingestion._convert",
             side_effect=DoclingServiceError("boom"),
         ):
             with pytest.raises(DoclingServiceError):

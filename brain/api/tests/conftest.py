@@ -16,6 +16,11 @@ API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
+# Stub heavy native dependencies not available in test environment
+for _mod_name in ("lancedb", "sentence_transformers", "FlagEmbedding"):
+    if _mod_name not in sys.modules:
+        sys.modules[_mod_name] = MagicMock()
+
 
 _MOCK_TOOL_MODULES = ("tools.tool_executor", "tools.tool_registry", "tools.mock_data")
 
@@ -98,6 +103,8 @@ def _empty_bundle_with_project(*, query: str = "", persona_id: str = "default", 
 def _make_fake_embedder() -> types.ModuleType:
     mod = types.ModuleType("memory.embedder")
     mod.encode_text = lambda text, embedding_version=None: [0.1]
+    _mock_enc = MagicMock(encode=lambda texts: [[0.1] for _ in texts])
+    mod.get_embedder = lambda embedding_version=None: _mock_enc
     mod.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): types.SimpleNamespace(
         version="bge",
         vector=[0.1],

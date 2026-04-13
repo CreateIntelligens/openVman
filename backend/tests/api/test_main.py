@@ -34,6 +34,8 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
     fake_markitdown_mod.MarkItDown = FakeMarkItDown
     monkeypatch.setitem(sys.modules, "markitdown", fake_markitdown_mod)
 
+    sys.modules.pop("app.gateway.websocket", None)
+    sys.modules.pop("app.routes.admin", None)
     sys.modules.pop("app.main", None)
     module = importlib.import_module("app.main")
     monkeypatch.setattr(module, "_md_converter", None)
@@ -207,11 +209,11 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
     async def _fake_close() -> None:
         return None
 
-    module._health_http = types.SimpleNamespace(
+    module.admin_routes._health_http = types.SimpleNamespace(
         get=lambda: FakeClient(),
         close=_fake_close,
     )
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
@@ -304,7 +306,7 @@ class FakeRelay:
 def test_websocket_routes_user_speak_to_brain_relay_when_relay_is_active(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
-    module.BrainLiveRelay = FakeRelay
+    module.websocket_routes.BrainLiveRelay = FakeRelay
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
     ))
@@ -337,7 +339,7 @@ def test_websocket_routes_user_speak_to_brain_relay_when_relay_is_active(monkeyp
 def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
-    module.BrainLiveRelay = FakeRelay
+    module.websocket_routes.BrainLiveRelay = FakeRelay
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
     ))
@@ -373,7 +375,7 @@ def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
 def test_websocket_drops_audio_before_client_init_and_uses_initialized_voice_source(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
-    module.BrainLiveRelay = FakeRelay
+    module.websocket_routes.BrainLiveRelay = FakeRelay
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
     ))
@@ -436,7 +438,7 @@ def test_handle_client_init_stores_voice_source_from_capabilities(monkeypatch):
     websocket = types.SimpleNamespace(send_json=AsyncMock())
 
     asyncio.run(
-        module._handle_client_init(
+        module.websocket_routes._handle_client_init(
             {
                 "event": "client_init",
                 "client_id": "client-voice",
@@ -457,7 +459,7 @@ def test_handle_client_init_stores_voice_source_from_capabilities(monkeypatch):
 def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
-    module.BrainLiveRelay = FakeRelay
+    module.websocket_routes.BrainLiveRelay = FakeRelay
 
     class FakePipeline:
         instances: list["FakePipeline"] = []
@@ -478,7 +480,6 @@ def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(mon
                 "is_final": True,
             }
 
-    module.LiveVoicePipeline = FakePipeline
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
         markitdown_max_upload_bytes=1024,
     ))
