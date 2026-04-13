@@ -50,6 +50,8 @@ const INTERRUPT_PHRASE = "等一下";
 const GEMINI_PCM_SAMPLE_RATE = 16000;
 const PCM_CHUNK_BYTES = (GEMINI_PCM_SAMPLE_RATE * 2) / 4;
 const MAX_LIVE_MESSAGES = 200;
+const IDLE_TIMEOUT_MS = 3 * 60 * 1000;      // 3 min: no user activity while in live mode
+const DISABLED_TIMEOUT_MS = 1 * 60 * 1000;  // 1 min: mode switched away, grace period before disconnect
 const trimLiveMessages = (messages: LiveMessage[]) => messages.length > MAX_LIVE_MESSAGES ? messages.slice(-MAX_LIVE_MESSAGES) : messages;
 
 export function useLiveSession({
@@ -79,6 +81,10 @@ export function useLiveSession({
   const initialMessagesRef = useRef(initialMessages);
   const seededRef = useRef(false);
   initialMessagesRef.current = initialMessages;
+
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disabledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetIdleTimerRef = useRef<() => void>(() => {});
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -164,6 +170,7 @@ export function useLiveSession({
     );
   }, [appendAssistantText]);
   const handleServerEvent = useCallback((event: ServerEvent) => {
+    resetIdleTimerRef.current();
     if (event.event === "server_stream_chunk") {
       handleStreamChunk(event as ServerStreamChunkEvent);
       return;
@@ -193,14 +200,13 @@ export function useLiveSession({
     managerRef.current?.updateConfig({ clientId, projectId, voiceSource, chatSessionId });
   }, [chatSessionId, clientId, handleServerEvent, projectId, stopMicrophone, stopPlayback, voiceSource]);
 
-  const connect = useCallback(() => {
-    if (!seededRef.current && initialMessagesRef.current?.length) {
-      setLiveMessages(trimLiveMessages(initialMessagesRef.current));
-      seededRef.current = true;
-    }
-    managerRef.current?.connect();
+  const clearTimers = useCallback(() => {
+    if (idleTimerRef.current !== null) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+    if (disabledTimerRef.current !== null) { clearTimeout(disabledTimerRef.current); disabledTimerRef.current = null; }
   }, []);
-  const disconnect = useCallback(() => {
+
+  const doDisconnect = useCallback(() => {
+    clearTimers();
     managerRef.current?.disconnect();
     stopMicrophone(false);
     stopPlayback();
@@ -214,7 +220,27 @@ export function useLiveSession({
     setWsState("disconnected");
     setLiveMessages([]);
     seededRef.current = false;
-  }, [stopMicrophone, stopPlayback]);
+  }, [clearTimers, stopMicrophone, stopPlayback]);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(doDisconnect, IDLE_TIMEOUT_MS);
+  }, [doDisconnect]);
+  resetIdleTimerRef.current = resetIdleTimer;
+
+  const connect = useCallback(() => {
+    if (disabledTimerRef.current !== null) { clearTimeout(disabledTimerRef.current); disabledTimerRef.current = null; }
+    if (!seededRef.current && initialMessagesRef.current?.length) {
+      setLiveMessages(trimLiveMessages(initialMessagesRef.current));
+      seededRef.current = true;
+    }
+    managerRef.current?.connect();
+    resetIdleTimer();
+  }, [resetIdleTimer]);
+
+  const disconnect = useCallback(() => {
+    doDisconnect();
+  }, [doDisconnect]);
   const requestMicPermission = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("目前瀏覽器不支援麥克風存取");
     return navigator.mediaDevices.getUserMedia({ audio: true });
@@ -227,6 +253,7 @@ export function useLiveSession({
     }
     if (micActiveRef.current) return;
 
+    resetIdleTimer();
     const stream = await requestMicPermission();
     mediaStreamRef.current = stream;
     await ensureAudioContext();
@@ -292,7 +319,7 @@ export function useLiveSession({
     recorder.start(RECORDER_SLICE_MS);
     setMicActive(true);
     setError("");
-  }, [ensureAudioContext, requestMicPermission, sendClientEvent, stopMicrophone, stopPlayback]);
+  }, [ensureAudioContext, requestMicPermission, resetIdleTimer, sendClientEvent, stopMicrophone, stopPlayback]);
 
   const toggleMicrophone = useCallback(async () => {
     if (micActiveRef.current) {
@@ -315,6 +342,7 @@ export function useLiveSession({
       return false;
     }
 
+    resetIdleTimer();
     setError("");
     const sent = sendClientEvent({ event: "user_speak", text: trimmed, timestamp: Date.now() });
     if (!sent) return false;
@@ -327,9 +355,14 @@ export function useLiveSession({
   }, [flushPendingText, sendClientEvent]);
 
   useEffect(() => {
-    if (enabled) connect();
-    else disconnect();
-  }, [connect, disconnect, enabled]);
+    if (enabled) {
+      if (disabledTimerRef.current !== null) { clearTimeout(disabledTimerRef.current); disabledTimerRef.current = null; }
+      connect();
+    } else {
+      if (idleTimerRef.current !== null) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+      disabledTimerRef.current = setTimeout(doDisconnect, DISABLED_TIMEOUT_MS);
+    }
+  }, [connect, doDisconnect, enabled]);
   useEffect(() => {
     const changed = voiceSource !== initialVoiceSourceRef.current;
     initialVoiceSourceRef.current = voiceSource;

@@ -1,0 +1,22 @@
+{
+       "executionEnvironments": [
+              {
+                     "root": "brain/api",
+                     "pythonPath": "."
+              },
+              {
+                     "root": "backend",
+                     "pythonPath": "."
+              }
+       ],
+       "include": [
+              "brain/api",
+              "backend"
+       ],
+       "exclude": [
+              "**/node_modules",
+              "**/__pycache__",
+              ".git"
+       ],
+       "reportMissingImports": "warning"
+}

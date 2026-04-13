@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { nanoid } from "nanoid";
 import ConfirmModal from "../components/ConfirmModal";
 import ChatHeader from "../components/chat/ChatHeader";
 import ChatInput from "../components/chat/ChatInput";
@@ -15,8 +16,7 @@ const VOICE_SOURCE_OPTIONS: ReadonlyArray<{ value: VoiceSource; label: string }>
 ];
 
 function createLiveClientId(projectId: string): string {
-  const suffix = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 10);
-  return `admin-${projectId}-${suffix}`;
+  return `admin-${projectId}-${nanoid()}`;
 }
 
 export default function Chat() {
