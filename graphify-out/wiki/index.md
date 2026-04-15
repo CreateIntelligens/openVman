@@ -1,0 +1,291 @@
+# openVman Knowledge Graph
+Communities: 288
+
+- [Community 0](community_0.md) — TTSRouterConfig, Immutable backend settings loaded from environment., Backend-to-brain live relay for gemini_live sessions., Persistent internal websocket relay to the Brain live bridge., Brain-owned Gemini Live session manager.
+- [Community 1](community_1.md) — ECAPA_TDNN.py, length_to_mask(), Conv1d, .__init__(), BatchNorm1d
+- [Community 2](community_2.md) — attention.py, MultiHeadedAttention, .__init__(), .forward_qkv(), .forward_attention()
+- [Community 3](community_3.md) — RuntimeError, project_context.py, ProjectContext, normalize_project_id(), resolve_project_context()
+- [Community 4](community_4.md) — ToolPhaseError, .__init__(), AgentLoopResult, chat_service.py, GenerationContext
+- [Community 5](community_5.md) — CrawlResult, dispatcher.py, _route_mime(), _process(), _build_result()
+- [Community 6](community_6.md) — config.py, _split_csv_values(), BaseSettings, supported_mime_types(), is_dev()
+- [Community 7](community_7.md) — arch_util.py, zero_module(), GroupNorm32, .forward(), normalization()
+- [Community 8](community_8.md) — api_tool.py, _resolve_env_vars(), ApiToolPlugin, .__init__(), ._load_registry()
+- [Community 9](community_9.md) — api_server.py, convert_audio_with_ffmpeg(), lifespan(), make_wav_header(), wav_to_bytes()
+- [Community 10](community_10.md) — agent_loop.py, PreparedAgentReply, run_agent_loop(), prepare_agent_reply(), _run_tool_phase()
+- [Community 11](community_11.md) — brain_proxy.py, _filter_headers(), _target_url(), _stream_upstream_bytes(), _proxy_to_brain()
+- [Community 12](community_12.md) — scheduler.py, CronSpec, .matches(), _parse_cron(), _get_tz()
+- [Community 13](community_13.md) — mock_data.py, Mock business data for FAQ and order tools.  This module contains hardcoded data, skill.py, SkillToolDefinition, SkillManifest
+- [Community 14](community_14.md) — index_tts_gpt2.py, TTSProcessingInfo, BaseProcessingInfo, .get_supported_mm_limits(), .get_mm_max_tokens_per_item()
+- [Community 15](community_15.md) — Protocol, __init__.py, IPlugin, .execute(), .health_check()
+- [Community 16](community_16.md) — test_indexer.py, _load_indexer(), TestHeadingAwareChunking, .test_markdown_is_chunked_by_heading_boundaries(), .test_long_heading_block_is_split_by_paragraphs()
+- [Community 17](community_17.md) — temp_storage.py, QuotaStatus, TempStorageService, .__init__(), .check_quota()
+- [Community 18](community_18.md) — indexer.py, ChunkSpec, load_index_state(), fingerprint_document(), rebuild_knowledge_index()
+- [Community 19](community_19.md) — observability.py, log_event(), increment_counter(), record_timing(), get_metrics_snapshot()
+- [Community 20](community_20.md) — protocol_events.py, _ensure_generated_contracts_import_path(), ProtocolValidationError, ValueError, .__init__()
+- [Community 21](community_21.md) — normalization.py, .__init__(), BatchNorm2d, .__init__(), .forward()
+- [Community 22](community_22.md) — memory_governance.py, DailyMemorySummary, maybe_run_memory_maintenance(), run_memory_maintenance(), write_summary_and_reindex()
+- [Community 23](community_23.md) — test_memory_governance.py, _stub_deps(), TestDailySummaryWriteback, .test_summary_written_to_daily_file(), .test_duplicate_fingerprint_is_skipped()
+- [Community 24](community_24.md) — test_provider_router.py, _stub_deps(), TestKeyPoolManager, .test_healthy_keys_are_selected_predictably(), .test_exhausted_key_is_skipped_automatically()
+- [Community 25](community_25.md) — brain_live_relay.py, _normalize_voice_source(), _build_brain_live_ws_url(), BrainLiveRelay, .__init__()
+- [Community 26](community_26.md) — test_retrieval_service.py, _stub_deps(), _make_record(), TestRetrievalService, .test_returns_knowledge_and_memory_results()
+- [Community 27](community_27.md) — importance.py, ImportanceResult, score_importance(), _match_patterns(), Heuristic importance scoring for memory records.
+- [Community 28](community_28.md) — knowledge_admin.py, list_knowledge_base_directories(), list_knowledge_base_documents(), list_workspace_documents(), read_workspace_document()
+- [Community 29](community_29.md) — workspace.py, get_workspace_root(), get_core_documents(), ensure_workspace_scaffold(), _migrate_learnings_layout()
+- [Community 30](community_30.md) — test_routing_observability.py, _stub_deps(), _stub_config(), TestRoutingMetrics, .test_route_attempt_increments_counter()
+- [Community 31](community_31.md) — generate_protocol_contracts.py, NestedType, EventDefinition, main(), _read_json()
+- [Community 32](community_32.md) — xtts_dvae.py, default(), eval_decorator(), dvae_wav_to_mel(), Quantize
+- [Community 33](community_33.md) — ingestion.py, DocumentIngestionError, DoclingServiceError, _get_converter(), _convert()
+- [Community 34](community_34.md) — test_gemini_live_session.py, _load_module(), _restore_modules(), FakeTransport, .__init__()
+- [Community 35](community_35.md) — guard_agent.py, GuardAgent, .__init__(), .classify(), Classifies user input to decide if it should interrupt the current stream.
+- [Community 36](community_36.md) — tts_cache.py, CachedTTSEntry, make_cache_key(), _record_error(), _decode_cache_payload()
+- [Community 37](community_37.md) — test_protocol_events.py, _import(), _protocol_events(), _generated_protocol_contracts(), test_generated_python_contracts_module_is_available()
+- [Community 38](community_38.md) — test_scoring.py, TestNormalisers, .test_frequency_zero(), .test_frequency_positive(), .test_frequency_capped()
+- [Community 39](community_39.md) — index.ts, LipSyncManager, .constructor(), .initialize(), .fallbackToMinimal()
+- [Community 40](community_40.md) — perceiver.py, exists(), once(), Attend, .__init__()
+- [Community 41](community_41.md) — queue.py, EnqueueResult, _get_arq_pool(), enqueue_job(), push_to_dlq()
+- [Community 42](community_42.md) — light_phase.py, run_light_phase(), _collect_daily_fragments(), _extract_summary_blocks(), _persona_from_path()
+- [Community 43](community_43.md) — tool_executor.py, ToolResult, ok(), fail(), .serialize()
+- [Community 44](community_44.md) — main.py, _get_service(), _get_md_converter(), _startup_gateway_resources(), _shutdown_gateway_resources()
+- [Community 45](community_45.md) — test_llm_fallback_chain.py, _stub_deps(), _stub_config(), TestBuildFallbackChain, .test_chain_built_from_config()
+- [Community 46](community_46.md) — shared.ts, ProtocolValidationError, .constructor(), buildContractEvents(), assertSupportedVersion()
+- [Community 47](community_47.md) — test_main.py, _load_main(), test_app_import_avoids_on_event_deprecation(), test_run_server_uses_configured_dev_mode(), test_convert_rejects_oversized_upload()
+- [Community 48](community_48.md) — scoring.py, score_candidate(), passes_threshold(), normalise_frequency(), normalise_relevance()
+- [Community 49](community_49.md) — personas.py, normalize_persona_id(), get_persona_directory(), resolve_core_document_paths(), list_personas()
+- [Community 50](community_50.md) — db.py, get_db(), ensure_tables(), _create_missing_tables(), _build_seed_record()
+- [Community 51](community_51.md) — common.ts, getActiveProjectId(), setActiveProjectId(), getApiErrorMessage(), parseJson()
+- [Community 52](community_52.md) — test_light_phase.py, _stub_deps(), _import_light(), _write_daily_file(), TestCollectDailyFragments
+- [Community 53](community_53.md) — test_message_envelope.py, _module(), _fake_request(), test_build_envelope_from_flat_body(), test_build_envelope_from_structured_message()
+- [Community 54](community_54.md) — test_pipeline.py, _make_brain_message(), _make_request_context(), _make_envelope(), _load_chat_service()
+- [Community 55](community_55.md) — test_tools.py, _make_tool(), _decode_result(), test_registry_register_and_get(), test_registry_get_unknown_tool()
+- [Community 56](community_56.md) — test_worker.py, _clean_plugins(), TestPluginSingletons, .test_camera_singleton(), .test_api_tool_singleton()
+- [Community 57](community_57.md) — test_personas.py, _import(), _parse_record_metadata(), _normalize_vector(), _stub_db_module()
+- [Community 58](community_58.md) — project_admin.py, list_projects(), create_project(), delete_project(), get_project_info()
+- [Community 59](community_59.md) — knowledge.py, _background_reindex(), _background_rename_document(), list_knowledge_documents_route(), list_knowledge_base_documents_route()
+- [Community 60](community_60.md) — test_recall_tracker.py, _make_fake_config(), _stub_deps(), _import_tracker(), TestRecordTrace
+- [Community 61](community_61.md) — audioStreamer.ts, AudioStreamer, .constructor(), .start(), .setStreamingEnabled()
+- [Community 62](community_62.md) — test_ingestion_image.py, _fake_image(), _make_mock_openai_client(), _vision_cfg(), TestDescribeWithVision
+- [Community 63](community_63.md) — test_fallback_metrics.py, _make_config(), _ok_result(), TestFallbackMetrics, .setup_method()
+- [Community 64](community_64.md) — rem_phase.py, run_rem_phase(), _extract_unique_queries(), _kmeans(), _build_themes()
+- [Community 65](community_65.md) — test_rem_phase.py, _stub_deps(), _import_rem(), _write_traces(), TestKmeans
+- [Community 66](community_66.md) — test_error_rotation.py, _stub_deps(), TestErrorRotation, .test_no_rotation_when_under_limit(), .test_rotation_triggers_at_limit()
+- [Community 67](community_67.md) — doc_meta.py, get_doc_meta_path(), load_doc_meta(), save_doc_meta(), get_document_meta()
+- [Community 68](community_68.md) — recall_tracker.py, _ensure_writer(), _writer_loop(), record_trace(), read_traces()
+- [Community 69](community_69.md) — retrieval.py, get_search_table(), search_records(), _safe_search(), _hybrid_search()
+- [Community 70](community_70.md) — conftest.py, Shared test fixtures for brain API tests., conftest.py, make_fake_agent_loop(), FakeRetrievalBundle
+- [Community 71](community_71.md) — test_sse_interface.py, _load_chat_service(), _stub_finalize_dependencies(), _make_generation_context(), test_sse_event_types_are_frozen_and_slotted()
+- [Community 72](community_72.md) — knowledge.ts, fetchKnowledgeDocuments(), fetchKnowledgeBaseDocuments(), fetchKnowledgeDocument(), saveKnowledgeDocument()
+- [Community 73](community_73.md) — live-websocket-manager.ts, buildWebSocketUrl(), LiveWebSocketManager, .constructor(), .setCallbacks()
+- [Community 74](community_74.md) — liveRuntime.ts, LiveRuntime, .constructor(), .start(), .clearSubmissionTimer()
+- [Community 75](community_75.md) — activations.py, Snake, .__init__(), .forward(), SnakeBeta
+- [Community 76](community_76.md) — test_identity.py, workspace_tmp(), _write_identity(), _mock_paths(), test_parse_identity_returns_defaults_when_file_missing()
+- [Community 77](community_77.md) — websocket.ts, WebSocketService, .constructor(), .connect(), .handleEvent()
+- [Community 78](community_78.md) — test_health_route.py, _reset_singletons(), client(), _mock_health_client(), TestHealthzOk
+- [Community 79](community_79.md) — test_ingestion_audio.py, fake_audio(), _openai_cfg(), _local_cfg(), TestOpenAITranscription
+- [Community 80](community_80.md) — learnings.py, record_error_event(), _read_all_lines(), _rotate_if_needed(), _archive_error_lines()
+- [Community 81](community_81.md) — migrate_to_projects.py, run_migration(), _migrate_workspace(), _migrate_lancedb(), _migrate_sessions_db()
+- [Community 82](community_82.md) — index.ts, detectWebGPU(), detectCPUCores(), detectMemory(), detectMobile()
+- [Community 83](community_83.md) — index.ts, Wav2LipModel, .constructor(), .load(), ._loadModel()
+- [Community 84](community_84.md) — websocket.py, _get_requested_voice_source(), websocket_endpoint(), _run_heartbeat(), _handle_websocket_event()
+- [Community 85](community_85.md) — test_knowledge_upload_route.py, _mock_cfg(), _mock_brain_response(), client(), test_text_knowledge_upload_passthroughs_utf8_files_to_brain()
+- [Community 86](community_86.md) — health_payload.py, get_settings(), get_db(), list_workspace_documents(), list_personas()
+- [Community 87](community_87.md) — deep_phase.py, run_deep_phase(), _load_candidates(), _dedup_against_memories(), _promote_to_memories()
+- [Community 88](community_88.md) — test_deep_phase.py, _stub_deps(), _import_deep(), _write_candidates(), TestRunDeepPhase
+- [Community 89](community_89.md) — test_internal_live_bridge.py, _client(), FakeLiveSession, .__init__(), .send_text_turn()
+- [Community 90](community_90.md) — helpers.ts, formatSize(), formatDate(), isUploadDerivedKnowledgeFile(), getSourceMeta()
+- [Community 91](community_91.md) — dinet-strategy.ts, DinetStrategy, .setCanvas(), .initialize(), .processAudio()
+- [Community 92](community_92.md) — wav2lip-strategy.ts, Wav2LipStrategy, .setCanvas(), .initialize(), .processAudio()
+- [Community 93](community_93.md) — index.ts, createFeatheredMask(), extractROI(), applyROIWithBlend(), applyROISimple()
+- [Community 94](community_94.md) — utils.py, plot_spectrogram(), plot_spectrogram_clipped(), init_weights(), apply_weight_norm()
+- [Community 95](community_95.md) — common.py, load_audio(), tokenize_by_CJK_char(), de_tokenized_by_CJK_char(), make_pad_mask()
+- [Community 96](community_96.md) — test_brain_proxy.py, _mock_cfg(), _make_response(), client(), test_gateway_brain_proxy_forwards_to_brain_api()
+- [Community 97](community_97.md) — test_knowledge_doc_meta.py, _import(), _configure_workspace(), _stub_knowledge_admin_deps(), test_uploaded_document_writes_default_meta()
+- [Community 98](community_98.md) — helpers.ts, getConversationTitle(), addPendingExchange(), appendStreamingToken(), removeEmptyAssistantDraft()
+- [Community 99](community_99.md) — index.ts, VideoSyncManager, .constructor(), .setVideoElement(), .setAudioContext()
+- [Community 100](community_100.md) — chat.py, _maybe_rewrite_slash(), _prepare_chat_context(), _log_generation_success(), _handle_generation_error()
+- [Community 101](community_101.md) — tools.py, _skill_deps(), list_tools(), toggle_skill(), create_skill()
+- [Community 102](community_102.md) — test_embedder.py, _load_embedder(), test_bge_embedder_builds_local_model(), test_openai_embedder_uses_embeddings_client(), test_gemini_embedder_uses_batch_embed_request()
+- [Community 103](community_103.md) — vad.worklet.bundle.min.js, s(), constructor(), stream(), hasEnoughDataForFrame()
+- [Community 104](community_104.md) — liveAudioUtils.ts, encodeArrayBufferToBase64(), decodeBase64ToArrayBuffer(), preferredRecorderMimeType(), downmixToMono()
+- [Community 105](community_105.md) — webgl-strategy.ts, WebGLStrategy, .setCanvas(), .initialize(), .processAudio()
+- [Community 106](community_106.md) — audioPlayback.ts, AudioPlaybackService, .constructor(), .queueAudio(), .stopAll()
+- [Community 107](community_107.md) — job_status.py, _job_key(), _read_from_redis(), get_job_status(), set_job_status()
+- [Community 108](community_108.md) — admin.py, close_http(), _fetch_indextts_voices(), _extract_voice_names(), _prepend_default_voice()
+- [Community 109](community_109.md) — simple_test.py, TTSStressTester, .__init__(), ._get_next_url(), ._send_request()
+- [Community 110](community_110.md) — test_forward.py, _mock_cfg(), _ok_response(), TestForwardToBrain, test_successful_forward()
+- [Community 111](community_111.md) — datetime_utils.py, utc_now_iso(), ensure_utc(), normalize_iso_timestamp(), Shared UTC datetime utilities for consistent timestamp handling.
+- [Community 112](community_112.md) — reflection.py, select_recent_messages(), summarize_message_history(), compress_text(), Helpers for curating recent session context before generation.
+- [Community 113](community_113.md) — tools.ts, fetchTools(), toggleSkill(), createSkill(), fetchSkillFiles()
+- [Community 114](community_114.md) — i18n.py, load_language_list(), scan_language_list(), I18nAuto, .__init__()
+- [Community 115](community_115.md) — test_single_container_stack.py, _read_text(), test_backend_env_example_uses_dev_mode(), test_root_compose_has_separate_redis_service(), test_backend_image_uses_slim_base()
+- [Community 116](community_116.md) — test_markitdown.py, _markitdown_is_real(), TestMarkItDown, .test_basic_conversion(), .test_markdown_output_format()
+- [Community 117](community_117.md) — server.ts, validateServerStreamChunk(), validateSetLipSyncMode(), validateServerStopAudio(), validateServerError()
+- [Community 118](community_118.md) — validators.ts, loadProtocolContract(), validateClientEvent(), validateServerEvent(), validateEvent()
+- [Community 119](community_119.md) — audioStreamer.test.ts, createMockMediaStream(), FakeGainNode, FakeMediaStreamSourceNode, FakeScriptProcessorNode
+- [Community 120](community_120.md) — vad.ts, VADService, .constructor(), .start(), .handleSpeech()
+- [Community 121](community_121.md) — webui_utils.py, html_center(), html_left(), next_page(), prev_page()
+- [Community 122](community_122.md) — test_dlq.py, TestPushToDlq, test_push_success(), test_push_no_redis(), test_push_redis_error()
+- [Community 123](community_123.md) — prompt_builder.py, build_chat_messages(), _format_workspace_block(), _format_request_context(), Prompt assembly for the chat generation flow.
+- [Community 124](community_124.md) — slash_command.py, SlashRewrite, try_rewrite_slash(), Slash command resolver — rewrites /command messages into LLM-friendly instructio, A rewritten user message that instructs the LLM to call a specific tool.
+- [Community 125](community_125.md) — paths.py, dreams_dir(), write_dreaming_report(), Shared path helpers and constants for the dreaming subsystem., Return the .dreams state directory for a project.
+- [Community 126](community_126.md) — test_vector_store_routing.py, _load_db(), TestVectorTableNaming, .test_bge_uses_legacy_table_names(), .test_non_bge_versions_use_namespaced_tables()
+- [Community 127](community_127.md) — chat.ts, streamChat(), fetchChatHistory(), processSseBuffer(), parseSsePayload()
+- [Community 128](community_128.md) — ProjectDropdown.tsx, setOpen(), handleClick(), handleLeave(), handleMenuLeave()
+- [Community 129](community_129.md) — Memory.tsx, loadMemories(), handlePageChange(), confirmDeleteMemory(), submit()
+- [Community 130](community_130.md) — Personas.tsx, loadPersonas(), openDocument(), saveDocument(), handleCreateOrClone()
+- [Community 131](community_131.md) — client.ts, validateClientInit(), validateUserSpeak(), validateClientInterrupt(), validateClientAudioChunk()
+- [Community 132](community_132.md) — live-session-audio.ts, ensureLiveAudioContext(), closeLiveAudioContext(), stopLivePlayback(), queueLiveAudioChunk()
+- [Community 133](community_133.md) — DinetRenderer.ts, DinetRenderer, .constructor(), .initialize(), .setCanvas()
+- [Community 134](community_134.md) — avatarState.ts, AvatarStateManager, .getState(), .setState(), .subscribe()
+- [Community 135](community_135.md) — error_payloads.py, build_http_error(), build_error_response(), upload_failed_response(), Shared HTTP error payload helpers for backend routes.
+- [Community 136](community_136.md) — redis_pool.py, get_redis(), redis_available(), close_redis(), Redis connection singleton for the gateway.
+- [Community 137](community_137.md) — load.py, chinese_path_compile_support(), load(), _get_cuda_bare_metal_version(), _create_build_dir()
+- [Community 138](community_138.md) — scan_i18n.py, extract_i18n_strings(), scan_i18n_strings(), update_i18n_json(), scan the directory for all .py files (recursively)     for each file, parse the
+- [Community 139](community_139.md) — test_live_pipeline.py, mock_session(), test_live_pipeline_full_flow(), test_live_pipeline_interruption_cleanup(), test_live_pipeline_uses_tts_router_when_vibevoice_is_unavailable()
+- [Community 140](community_140.md) — personas.py, list_personas_route(), create_persona_route(), delete_persona_route(), clone_persona_route()
+- [Community 141](community_141.md) — projects.py, list_projects_route(), create_project_route(), delete_project_route(), get_project_route()
+- [Community 142](community_142.md) — test_internal_enrich.py, _client(), test_internal_enrich_accepts_forward_payload_and_stores_system_message(), test_internal_enrich_accepts_gateway_spec_payload_shape(), test_internal_enrich_rejects_empty_context_payload()
+- [Community 143](community_143.md) — memory.ts, fetchMemories(), deleteMemory(), postAddMemory(), runMemoryMaintenance()
+- [Community 144](community_144.md) — metrics.ts, fetchHealth(), postEmbed(), postSearch(), fetchMetrics()
+- [Community 145](community_145.md) — personas.ts, fetchPersonas(), createPersona(), deletePersona(), clonePersona()
+- [Community 146](community_146.md) — projects.ts, fetchProjects(), fetchProjectInfo(), createProject(), deleteProject()
+- [Community 147](community_147.md) — useTts.ts, resolveTtsSelection(), ttsCacheKey(), setTtsCacheEntry(), useTts()
+- [Community 148](community_148.md) — useWorkspaceManager.ts, useWorkspaceManager(), getPreferredDocumentPath(), toDocumentSummary(), buildSaveStatusMessage()
+- [Community 149](community_149.md) — asr.ts, ASRService, .constructor(), .start(), .stop()
+- [Community 150](community_150.md) — tts_text_cleaner.py, clean_for_tts(), Strip markdown and other non-speech artifacts from text before TTS synthesis., Remove markdown formatting, keeping readable spoken text.
+- [Community 151](community_151.md) — test_requirements.py, test_markitdown_pdf_extra_is_enabled(), test_chardet_is_capped_for_requests_compatibility(), Tests for backend dependency expectations.
+- [Community 152](community_152.md) — test_tts_targeted_fallback_voice.py, _make_config(), _ok_result(), test_targeted_provider_fallback_resets_voice_for_edge()
+- [Community 153](community_153.md) — health.py, health(), metrics(), get_identity()
+- [Community 154](community_154.md) — test_knowledge_save_route.py, _stub_module(), _load_knowledge_routes_module(), test_save_knowledge_document_route_schedules_background_reindex()
+- [Community 155](community_155.md) — helpers.ts, filesChanged(), getSkillIdFromToolName(), nameToId()
+- [Community 156](community_156.md) — Tools.tsx, handleToggle(), handleReloadAll(), handleDelete()
+- [Community 157](community_157.md) — rebuild_graphify.py, _resolve_graphify_python(), _run(), main()
+- [Community 158](community_158.md) — webui.py, gen_single(), update_prompt_audio()
+- [Community 159](community_159.md) — search.py, _log_search_complete(), search()
+- [Community 160](community_160.md) — sessions.py, list_sessions(), delete_session()
+- [Community 161](community_161.md) — reindex_knowledge.py, main(), CLI entrypoint: rebuild the knowledge vector index from workspace documents.  Us
+- [Community 162](community_162.md) — test_health_payload.py, test_build_health_payload_reports_dependency_checks_and_session_runtime(), test_build_health_payload_degrades_when_dependency_probe_fails()
+- [Community 163](community_163.md) — sessions.ts, fetchSessions(), deleteSession()
+- [Community 164](community_164.md) — tts.ts, fetchTtsProviders(), synthesizeSpeech()
+- [Community 165](community_165.md) — helpers.ts, getVisiblePageNumber(), parseMetadataJson()
+- [Community 166](community_166.md) — CreateSkillForm.tsx, reset(), handleCreate()
+- [Community 167](community_167.md) — SkillEditor.tsx, handleChange(), handleSave()
+- [Community 168](community_168.md) — FileTree.tsx, sortNodes(), toggleFolder()
+- [Community 169](community_169.md) — ProjectContext.tsx, ProjectProvider(), useProject()
+- [Community 170](community_170.md) — ThemeContext.tsx, ThemeProvider(), useTheme()
+- [Community 171](community_171.md) — useLiveSession.ts, trimLiveMessages(), useLiveSession()
+- [Community 172](community_172.md) — Embed.tsx, submit(), copyJson()
+- [Community 173](community_173.md) — Search.tsx, getSimilarityPercentage(), getPersonaId()
+- [Community 174](community_174.md) — schema.ts, readEnum(), filterStringEnum()
+- [Community 175](community_175.md) — index.ts, createLipSyncStrategy(), getStrategyByTier()
+- [Community 176](community_176.md) — rebuild_graphify_docs.py, _resolve_graphify_python(), main()
+- [Community 177](community_177.md) — anti_alias_activation.cpp, PYBIND11_MODULE()
+- [Community 178](community_178.md) — cli.py, main()
+- [Community 179](community_179.md) — checkpoint.py, load_checkpoint()
+- [Community 180](community_180.md) — test_session_interrupts.py, test_session_interrupt_tasks_skips_non_interruptible_tasks()
+- [Community 181](community_181.md) — protocol.py, protocol_validate()
+- [Community 182](community_182.md) — App.tsx, switchTab()
+- [Community 183](community_183.md) — ConfirmModal.tsx, handleKeyDown()
+- [Community 184](community_184.md) — Select.tsx, Select()
+- [Community 185](community_185.md) — AppSidebar.tsx, AppSidebar()
+- [Community 186](community_186.md) — TabGroup.tsx, TabGroup()
+- [Community 187](community_187.md) — AsrButton.tsx, getButtonStyles()
+- [Community 188](community_188.md) — ChatInput.tsx, handleKeyDown()
+- [Community 189](community_189.md) — ChatMessage.tsx, formatMessageTime()
+- [Community 190](community_190.md) — NoteModal.tsx, NoteModal()
+- [Community 191](community_191.md) — SourceBadge.tsx, SourceBadge()
+- [Community 192](community_192.md) — SourcePanel.tsx, SourcePanel()
+- [Community 193](community_193.md) — StatusDot.tsx, StatusDot()
+- [Community 194](community_194.md) — MemoryAddForm.tsx, MemoryAddForm()
+- [Community 195](community_195.md) — MemoryFilters.tsx, MemoryFilters()
+- [Community 196](community_196.md) — MemoryGuidelinesPanel.tsx, MemoryGuidelinesPanel()
+- [Community 197](community_197.md) — MemoryRecordCard.tsx, MemoryRecordCard()
+- [Community 198](community_198.md) — PersonaCard.tsx, PersonaCard()
+- [Community 199](community_199.md) — PersonaCreateForm.tsx, PersonaCreateForm()
+- [Community 200](community_200.md) — PersonaEmptyState.tsx, PersonaEmptyState()
+- [Community 201](community_201.md) — WorkspaceDesktopSidebar.tsx, WorkspaceDesktopSidebar()
+- [Community 202](community_202.md) — WorkspaceMobileSidebar.tsx, WorkspaceMobileSidebar()
+- [Community 203](community_203.md) — liveSessionProtocol.ts, buildClientInitPayload()
+- [Community 204](community_204.md) — useChatHistory.ts, useChatHistory()
+- [Community 205](community_205.md) — useChatSession.ts, useChatSession()
+- [Community 206](community_206.md) — useHealthDashboard.ts, useHealthDashboard()
+- [Community 207](community_207.md) — useKnowledgeBase.ts, useKnowledgeBase()
+- [Community 208](community_208.md) — useProjectsAdmin.ts, useProjectsAdmin()
+- [Community 209](community_209.md) — useSemanticSearch.ts, useSemanticSearch()
+- [Community 210](community_210.md) — useSlashAutocomplete.ts, useSlashAutocomplete()
+- [Community 211](community_211.md) — useSpeechRecognition.ts, useSpeechRecognition()
+- [Community 212](community_212.md) — useStatusState.ts, useStatusState()
+- [Community 213](community_213.md) — useVad.ts, useVad()
+- [Community 214](community_214.md) — Chat.tsx, createLiveClientId()
+- [Community 215](community_215.md) — App.tsx, main.tsx
+- [Community 216](community_216.md) — liveRuntime.test.ts, createGeminiRuntime()
+- [Community 217](community_217.md) — __init__.py
+- [Community 218](community_218.md) — __init__.py
+- [Community 219](community_219.md) — convert_hf_format.py
+- [Community 220](community_220.md) — __init__.py
+- [Community 221](community_221.md) — __init__.py
+- [Community 222](community_222.md) — compat.h
+- [Community 223](community_223.md) — type_shim.h
+- [Community 224](community_224.md) — __init__.py
+- [Community 225](community_225.md) — __init__.py
+- [Community 226](community_226.md) — __init__.py
+- [Community 227](community_227.md) — __init__.py
+- [Community 228](community_228.md) — __init__.py
+- [Community 229](community_229.md) — 将tokenize后的结果按特定token进一步分割
+- [Community 230](community_230.md) — __init__.py
+- [Community 231](community_231.md) — __init__.py
+- [Community 232](community_232.md) — When Redis is unavailable, DLQ push is skipped without raising.
+- [Community 233](community_233.md) — When Redis lpush fails, error is logged but not raised.
+- [Community 234](community_234.md) — Fire-and-forget: errors are logged but not raised.
+- [Community 235](community_235.md) — __init__.py
+- [Community 236](community_236.md) — Combine the legacy single key and the new key-pool env into one list.         If
+- [Community 237](community_237.md) — Return the primary and fallback models without duplicates.
+- [Community 238](community_238.md) — Parse LLM_FALLBACK_CHAIN into (provider, model) pairs.          Format: ``provid
+- [Community 239](community_239.md) — Provide a sane default base URL per provider.
+- [Community 240](community_240.md) — __init__.py
+- [Community 241](community_241.md) — Return a snapshot of all key states (for diagnostics).
+- [Community 242](community_242.md) — __init__.py
+- [Community 243](community_243.md) — __init__.py
+- [Community 244](community_244.md) — __init__.py
+- [Community 245](community_245.md) — __init__.py
+- [Community 246](community_246.md) — __init__.py
+- [Community 247](community_247.md) — workspace.py
+- [Community 248](community_248.md) — __init__.py
+- [Community 249](community_249.md) — __init__.py
+- [Community 250](community_250.md) — __init__.py
+- [Community 251](community_251.md) — Create a successful tool result.
+- [Community 252](community_252.md) — Create a failed tool result.
+- [Community 253](community_253.md) — protocol-contracts.d.ts
+- [Community 254](community_254.md) — postcss.config.js
+- [Community 255](community_255.md) — index.ts
+- [Community 256](community_256.md) — MarkdownPreview.tsx
+- [Community 257](community_257.md) — StatusAlert.tsx
+- [Community 258](community_258.md) — MobileTopBar.tsx
+- [Community 259](community_259.md) — navigation.ts
+- [Community 260](community_260.md) — ChatHeader.tsx
+- [Community 261](community_261.md) — ChatSidebar.tsx
+- [Community 262](community_262.md) — SlashDropdown.tsx
+- [Community 263](community_263.md) — SourceChips.tsx
+- [Community 264](community_264.md) — TtsControls.tsx
+- [Community 265](community_265.md) — FileView.tsx
+- [Community 266](community_266.md) — MoveModal.tsx
+- [Community 267](community_267.md) — TreeView.tsx
+- [Community 268](community_268.md) — MaintenancePanel.tsx
+- [Community 269](community_269.md) — MemoryMetaBadges.tsx
+- [Community 270](community_270.md) — MemoryPagination.tsx
+- [Community 271](community_271.md) — PersonaEditor.tsx
+- [Community 272](community_272.md) — PersonaList.tsx
+- [Community 273](community_273.md) — SkillCard.tsx
+- [Community 274](community_274.md) — ToolTable.tsx
+- [Community 275](community_275.md) — WorkspaceEditor.tsx
+- [Community 276](community_276.md) — WorkspaceTreePanel.tsx
+- [Community 277](community_277.md) — json.d.ts
+- [Community 278](community_278.md) — main.tsx
+- [Community 279](community_279.md) — Health.tsx
+- [Community 280](community_280.md) — KnowledgeBase.tsx
+- [Community 281](community_281.md) — Projects.tsx
+- [Community 282](community_282.md) — Workspace.tsx
+- [Community 283](community_283.md) — validators.smoke.ts
+- [Community 284](community_284.md) — speech-recognition.d.ts
+- [Community 285](community_285.md) — tailwind.config.js
+- [Community 286](community_286.md) — vite.config.ts
+- [Community 287](community_287.md) — vite.config.ts

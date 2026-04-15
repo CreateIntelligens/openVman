@@ -1,0 +1,42 @@
+# Community 23
+
+Nodes: 35
+
+## Members
+- **test_memory_governance.py** (`brain/api/tests/memory/test_memory_governance.py`)
+- **_stub_deps()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **TestDailySummaryWriteback** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_summary_written_to_daily_file()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_duplicate_fingerprint_is_skipped()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_raw_transcript_and_summary_coexist()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_reindex_hook_runs_after_writeback()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_writeback_logs_event()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_summary_block_format_is_stable()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **TestSemanticDedup** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_identical_vectors_are_merged()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_different_vectors_are_kept()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_different_personas_not_merged()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_records_without_vectors_are_preserved()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_merge_logs_event()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **TestTranscriptArchival** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_old_transcripts_are_moved_to_archive()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_recent_transcripts_are_not_archived()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **.test_maintenance_result_includes_archived_count()** (`brain/api/tests/memory/test_memory_governance.py`)
+- **TASK-21: Tests for daily memory writeback and re-index hooks.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Stub all heavy deps for memory_governance testing.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Summary block is appended to memory/YYYY-MM-DD.md.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Same summary text written twice should be deduplicated.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Existing transcript content should not be destroyed.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Writeback should trigger run_memory_maintenance.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Writeback should log memory_writeback_completed event.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Summary block format should contain required fields.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Records with identical vectors should be merged (newer wins).** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Records with very different vectors should both be kept.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Records from different personas should not be merged even if identical vectors.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Records without vector field should not be dropped.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Semantic dedup should log an event when merges occur.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Transcripts older than retention_days should be archived.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **Transcripts within retention_days should stay in place.** (`brain/api/tests/memory/test_memory_governance.py`)
+- **run_memory_maintenance result should include transcripts_archived.** (`brain/api/tests/memory/test_memory_governance.py`)
+
+## Connections to other communities
