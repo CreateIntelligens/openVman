@@ -232,6 +232,38 @@ def _save_memory(args: dict[str, Any]) -> dict[str, Any]:
     return {"saved": True, "content": content}
 
 
+def _graph_query(arguments: dict[str, Any]) -> dict[str, Any]:
+    from knowledge.graph import query_project_graph
+
+    question = str(arguments.get("question", "")).strip()
+    if not question:
+        return {"error": "question 不可為空"}
+    depth = int(arguments.get("depth", 2))
+    try:
+        return query_project_graph(
+            project_id=_active_project_id.get(),
+            question=question,
+            depth=max(1, min(depth, 3)),
+        )
+    except FileNotFoundError as exc:
+        return {"error": str(exc)}
+
+
+def _graph_explain(arguments: dict[str, Any]) -> dict[str, Any]:
+    from knowledge.graph import explain_project_node
+
+    label = str(arguments.get("label", "")).strip()
+    if not label:
+        return {"error": "label 不可為空"}
+    try:
+        return explain_project_node(
+            project_id=_active_project_id.get(),
+            node_label=label,
+        )
+    except FileNotFoundError as exc:
+        return {"error": str(exc)}
+
+
 _registry: ToolRegistry | None = None
 
 
@@ -354,7 +386,53 @@ def get_tool_registry() -> ToolRegistry:
                 handler=_save_memory,
             )
         )
-        
+        registry.register(
+            Tool(
+                name="graph_query",
+                description=(
+                    "在專案知識圖譜中以 BFS 方式查詢與問題相關的概念與關係。"
+                    "適合用於「X 跟什麼有關」「X 會導致什麼」這類跨文件關聯問題。"
+                    "若圖譜尚未建立會回傳錯誤，此時請改用 search_knowledge。"
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                            "description": "要在圖譜中查詢的問題或概念關鍵字",
+                        },
+                        "depth": {
+                            "type": "integer",
+                            "description": "BFS 深度，預設 2 (範圍 1-3)",
+                            "default": 2,
+                        },
+                    },
+                    "required": ["question"],
+                },
+                handler=_graph_query,
+            )
+        )
+        registry.register(
+            Tool(
+                name="graph_explain",
+                description=(
+                    "查詢專案知識圖譜中某個節點的直接連接關係，回傳此概念連向哪些其他概念、"
+                    "以及每條連接的 relation 與 confidence。"
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                            "description": "要解釋的節點名稱，例如「糖尿病」",
+                        },
+                    },
+                    "required": ["label"],
+                },
+                handler=_graph_explain,
+            )
+        )
+
         # Load and register skills
         try:
             from .skill_manager import get_skill_manager

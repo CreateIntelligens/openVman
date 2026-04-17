@@ -3,8 +3,18 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from core.chat_service import record_generation_failure
+from knowledge.graph import (
+    GRAPH_SUBDIR,
+    EmptyGraphError,
+    load_project_graph,
+    load_project_status,
+    load_project_summary,
+    rebuild_project_graph,
+)
+from knowledge.workspace import get_workspace_root
 from knowledge.indexer import rebuild_knowledge_index, rename_document_records
 from knowledge.knowledge_admin import (
     create_workspace_directory,
@@ -219,4 +229,89 @@ async def reindex_knowledge_route(payload: AdminActionRequest):
         raise HTTPException(status_code=500, detail="知識重建失敗") from exc
     log_event("knowledge_reindex", project_id=payload.project_id, **result)
     return result
+
+
+_graph_inflight: dict[str, asyncio.Task] = {}
+
+
+async def _run_graph_rebuild(project_id: str) -> None:
+    from datetime import datetime, timezone
+
+    from knowledge.graph import _write_status  # re-export internal helper
+
+    started_at = datetime.now(timezone.utc).isoformat()
+    _write_status(project_id, {"state": "building", "project_id": project_id, "started_at": started_at})
+    try:
+        summary = await asyncio.to_thread(rebuild_project_graph, project_id)
+    except FileNotFoundError as exc:
+        _write_status(project_id, {"state": "failed", "project_id": project_id, "error": str(exc), "started_at": started_at})
+        log_exception("knowledge_graph_rebuild_error", exc, project_id=project_id)
+        return
+    except EmptyGraphError as exc:
+        _write_status(project_id, {"state": "failed", "project_id": project_id, "error": str(exc), "started_at": started_at})
+        log_exception("knowledge_graph_rebuild_empty", exc, project_id=project_id)
+        return
+    except Exception as exc:  # pragma: no cover
+        _write_status(project_id, {"state": "failed", "project_id": project_id, "error": repr(exc), "started_at": started_at})
+        log_exception("knowledge_graph_rebuild_error", exc, project_id=project_id)
+        return
+    _write_status(
+        project_id,
+        {
+            "state": "ready",
+            "project_id": project_id,
+            "started_at": started_at,
+            "finished_at": summary.get("built_at"),
+            "nodes": summary["nodes"],
+            "edges": summary["edges"],
+            "communities": summary["communities"],
+        },
+    )
+    log_event(
+        "knowledge_graph_rebuild",
+        project_id=project_id,
+        nodes=summary["nodes"],
+        edges=summary["edges"],
+        communities=summary["communities"],
+    )
+
+
+@router.post("/knowledge/graph/rebuild", summary="在背景重建專案知識圖譜", status_code=202)
+async def rebuild_knowledge_graph_route(payload: AdminActionRequest):
+    pid = payload.project_id
+    existing = _graph_inflight.get(pid)
+    if existing and not existing.done():
+        return {"status": "already_building", "project_id": pid}
+    task = asyncio.create_task(_run_graph_rebuild(pid))
+    _graph_inflight[pid] = task
+    return {"status": "building", "project_id": pid}
+
+
+@router.get("/knowledge/graph/status", summary="查詢圖譜建置狀態")
+async def graph_status_route(project_id: str = "default"):
+    return load_project_status(project_id)
+
+
+@router.get("/knowledge/graph/summary", summary="取得專案圖譜摘要")
+async def graph_summary_route(project_id: str = "default"):
+    try:
+        return load_project_summary(project_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/knowledge/graph", summary="取得專案圖譜原始 JSON")
+async def graph_json_route(project_id: str = "default"):
+    try:
+        return load_project_graph(project_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/knowledge/graph/html", summary="取得專案圖譜 HTML 視覺化頁面")
+async def graph_html_route(project_id: str = "default"):
+    path = get_workspace_root(project_id) / GRAPH_SUBDIR / "graph.html"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="graph 尚未建立，請先呼叫 rebuild")
+    return FileResponse(path, media_type="text/html")
 

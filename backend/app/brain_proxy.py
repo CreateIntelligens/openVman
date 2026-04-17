@@ -70,6 +70,11 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/directory", "methods": ["DELETE"], "tags": _TAG_KNOWLEDGE, "summary": "Delete Knowledge Directory"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/note", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Create Knowledge Note"},
     {"path": f"{_PUBLIC_API_PREFIX}/knowledge/reindex", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Reindex Knowledge"},
+    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/rebuild", "methods": ["POST"], "tags": _TAG_KNOWLEDGE, "summary": "Rebuild Knowledge Graph"},
+    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/status", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph Status"},
+    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/summary", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph Summary"},
+    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph JSON"},
+    {"path": f"{_PUBLIC_API_PREFIX}/knowledge/graph/html", "methods": ["GET"], "tags": _TAG_KNOWLEDGE, "summary": "Get Knowledge Graph HTML"},
     {"path": f"{_PUBLIC_API_PREFIX}/protocol/validate", "methods": ["POST"], "tags": _TAG_PROTOCOL, "summary": "Validate Protocol Event"},
 ]
 
