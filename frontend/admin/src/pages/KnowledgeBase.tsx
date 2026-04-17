@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
 import FileView from "../components/kb/FileView";
+import GraphView from "../components/kb/GraphView";
 import MoveModal from "../components/kb/MoveModal";
 import NoteModal from "../components/kb/NoteModal";
 import SourcePanel from "../components/kb/SourcePanel";
@@ -79,6 +80,7 @@ export default function KnowledgeBase() {
   } = useKnowledgeBase();
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"documents" | "graph">("documents");
 
   const sourceDragDir = useMemo(
     () => draggingPath ? draggingPath.split("/").slice(0, -1).join("/") : "",
@@ -140,24 +142,48 @@ export default function KnowledgeBase() {
           <span className="material-symbols-outlined text-primary text-[24px]">school</span>
           <h1 className="text-lg font-bold text-slate-900 dark:text-white">知識庫</h1>
           <span className="text-xs text-slate-500">{documents.length} 文件 · {indexedCount} 已索引</span>
+          <div className="ml-3 flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/40 p-0.5">
+            <button
+              onClick={() => setActiveTab("documents")}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                activeTab === "documents"
+                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+            >
+              文件
+            </button>
+            <button
+              onClick={() => setActiveTab("graph")}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                activeTab === "graph"
+                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+            >
+              圖譜
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowSourcePanel(!showSourcePanel)}
-            className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">add</span>
-            新增來源
-          </button>
-          <button
-            onClick={handleReindex}
-            disabled={reindexing}
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50"
-          >
-            <span className={`material-symbols-outlined text-[16px] ${reindexing ? "animate-spin" : ""}`}>sync</span>
-            {reindexing ? "索引中..." : "重新索引"}
-          </button>
-        </div>
+        {activeTab === "documents" && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSourcePanel(!showSourcePanel)}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              新增來源
+            </button>
+            <button
+              onClick={handleReindex}
+              disabled={reindexing}
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50"
+            >
+              <span className={`material-symbols-outlined text-[16px] ${reindexing ? "animate-spin" : ""}`}>sync</span>
+              {reindexing ? "索引中..." : "重新索引"}
+            </button>
+          </div>
+        )}
       </div>
 
       {status && (
@@ -166,6 +192,10 @@ export default function KnowledgeBase() {
         </div>
       )}
 
+      {activeTab === "graph" ? (
+        <GraphView />
+      ) : (
+      <>
       {showSourcePanel && (
         <SourcePanel
           activeMode={activeSourceMode}
@@ -297,6 +327,8 @@ export default function KnowledgeBase() {
           ) : null}
         </div>
       </div>
+      </>
+      )}
 
       {movingPath && (
         <MoveModal

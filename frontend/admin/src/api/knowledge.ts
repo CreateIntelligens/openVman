@@ -159,3 +159,44 @@ export function createKnowledgeNote(title: string, content: string) {
     project_id: getActiveProjectId(),
   });
 }
+
+export interface GraphStatus {
+  state: "absent" | "building" | "ready" | "failed";
+  project_id: string;
+  started_at?: string;
+  finished_at?: string;
+  nodes?: number;
+  edges?: number;
+  communities?: number;
+  error?: string;
+}
+
+export interface GraphSummary {
+  project_id: string;
+  built_at: string;
+  nodes: number;
+  edges: number;
+  communities: number;
+  god_nodes: string[];
+  surprising_bridges: number;
+  ast_nodes: number;
+  semantic_nodes: number;
+}
+
+export function fetchGraphStatus() {
+  return fetchJson<GraphStatus>(projectUrl(knowledgePath("/graph/status")));
+}
+
+export function fetchGraphSummary() {
+  return fetchJson<GraphSummary>(projectUrl(knowledgePath("/graph/summary")));
+}
+
+export function rebuildGraph() {
+  return post<{ status: string; project_id: string }>(knowledgePath("/graph/rebuild"), {
+    project_id: getActiveProjectId(),
+  });
+}
+
+export function graphHtmlUrl(): string {
+  return projectUrl(knowledgePath("/graph/html"));
+}
