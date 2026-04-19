@@ -81,7 +81,7 @@ export default function TreeView({
         <div className="w-4 h-4 flex items-center justify-center shrink-0">
           {node.type === "folder" ? (
             <span
-              className={`material-symbols-outlined text-[14px] text-slate-500 transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
+              className={`material-symbols-outlined text-[1rem] text-slate-500 transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
               onClick={(e) => { e.stopPropagation(); onToggle(node.path); }}
             >
               chevron_right
@@ -92,11 +92,11 @@ export default function TreeView({
         {/* Icon */}
         <div className="w-5 h-5 flex items-center justify-center shrink-0 ml-0.5">
           {node.type === "folder" ? (
-            <span className="material-symbols-outlined text-[16px] text-amber-500/80">
+            <span className="material-symbols-outlined text-[1.125rem] text-amber-500/80">
               {isExpanded ? "folder_open" : "folder"}
             </span>
           ) : (
-            <span className={`material-symbols-outlined text-[16px] ${
+            <span className={`material-symbols-outlined text-[1.125rem] ${
               node.name.endsWith(".md") ? "text-sky-400" : "text-slate-400"
             }`}>
               {node.name.endsWith(".md") ? "markdown" : "description"}
@@ -105,7 +105,7 @@ export default function TreeView({
         </div>
 
         {/* Name */}
-        <span className={`ml-1.5 text-xs truncate flex-1 ${isSelected ? "font-semibold" : ""}`}>
+        <span className={`ml-1.5 text-sm truncate flex-1 ${isSelected ? "font-semibold" : ""}`}>
           {node.name}
         </span>
 

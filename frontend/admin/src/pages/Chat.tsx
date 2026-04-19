@@ -22,6 +22,7 @@ function createLiveClientId(projectId: string): string {
 export default function Chat() {
   const [mode, setMode] = useState<"text" | "live">("text");
   const [voiceSource, setVoiceSource] = useState<VoiceSource>(DEFAULT_VOICE_SOURCE);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const { projectId } = useProject();
   const {
     messages,
@@ -72,7 +73,10 @@ export default function Chat() {
     toggleAsr,
     vadSpeaking,
   } = useChatSession();
-  const liveClientIdRef = useRef(createLiveClientId(projectId));
+  const liveClientIdRef = useRef<string>("");
+  if (!liveClientIdRef.current) {
+    liveClientIdRef.current = createLiveClientId(projectId);
+  }
   const liveInitialMessages = useMemo<LiveMessage[]>(() => {
     return messages
       .filter((m) => m.role === "user" || m.role === "assistant")
@@ -94,10 +98,10 @@ export default function Chat() {
       ? "已連線"
       : "已斷線";
   const liveStatusTone = liveSession.wsState === "connected"
-    ? "bg-emerald-500"
+    ? "bg-success"
     : liveSession.wsState === "connecting"
-      ? "bg-amber-500"
-      : "bg-slate-400";
+      ? "bg-warn"
+      : "bg-content-subtle";
   const activeError = mode === "live" ? liveSession.error : error;
   const activeSessionId = mode === "live" ? liveSession.sessionId : sessionId;
   const headerTitle = mode === "live" ? "Gemini Live 語音測試" : conversationTitle;
@@ -176,8 +180,10 @@ export default function Chat() {
   }, [chatEndRef, liveSession.liveMessages, loadingHistory, messages, mode]);
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-slate-50 dark:bg-background-dark">
+    <div className="flex h-full w-full overflow-hidden bg-surface">
       <ChatSidebar
+        open={sessionsOpen}
+        onClose={() => setSessionsOpen(false)}
         personas={personas}
         selectedPersonaId={selectedPersonaId}
         sending={sending}
@@ -192,37 +198,40 @@ export default function Chat() {
         onDeleteSession={setDeleteSessionTarget}
       />
 
-      <main className="flex-1 flex min-w-0 bg-slate-50 dark:bg-background-dark relative">
-        <div className="flex-1 flex flex-col min-w-0">
+      <main className="relative flex min-w-0 flex-1 bg-surface">
+        <div className="flex min-w-0 flex-1 flex-col">
           <ChatHeader
             conversationTitle={headerTitle}
             conversationStatus={headerStatus}
             sessionId={activeSessionId}
             mode={mode}
             onModeChange={handleModeChange}
+            onOpenSessions={() => setSessionsOpen(true)}
           />
 
           {mode === "live" && (
-            <div className="shrink-0 px-6 pt-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/60 bg-slate-50 dark:bg-background-dark">
-              <div className="max-w-3xl mx-auto w-full">
+            <div className="shrink-0 border-b border-border bg-surface-sunken px-4 py-3">
+              <div className="mx-auto w-full max-w-3xl">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
-                    <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${liveStatusTone} ${liveSession.wsState === "connecting" ? "animate-pulse" : ""}`} />
-                    <span className="text-sm font-semibold text-slate-900 dark:text-white">{liveStatusLabel}</span>
-                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${liveStatusTone} ${liveSession.wsState === "connecting" ? "animate-pulse" : ""}`} />
+                    <span className="text-sm font-medium text-content">{liveStatusLabel}</span>
+                    <div className="flex items-center gap-4 text-xs text-content-muted">
                       <span className="flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${liveSession.micActive ? "bg-red-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
+                        <span className={`h-1.5 w-1.5 rounded-full ${liveSession.micActive ? "bg-danger animate-pulse" : "bg-border-strong"}`} />
                         {liveSession.micActive ? "聆聽中" : "待命"}
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <span className={`h-2 w-2 rounded-full ${liveSession.isPlaying ? "bg-primary animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
+                        <span className={`h-1.5 w-1.5 rounded-full ${liveSession.isPlaying ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
                         {liveSession.isPlaying ? "回覆中" : "靜音"}
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-slate-400">Voice</span>
-                    <div className="inline-flex rounded-full border border-slate-200 bg-slate-100/80 p-0.5 dark:border-slate-700 dark:bg-slate-900/70">
+                    <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-content-subtle">
+                      Voice
+                    </span>
+                    <div className="inline-flex rounded-md border border-border bg-surface-raised p-0.5">
                       {VOICE_SOURCE_OPTIONS.map((option) => {
                         const selected = voiceSource === option.value;
                         return (
@@ -230,10 +239,10 @@ export default function Chat() {
                             key={option.value}
                             type="button"
                             onClick={() => setVoiceSource(option.value)}
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                            className={`rounded-sm px-2.5 py-1 text-xs font-medium transition ${
                               selected
-                                ? "bg-primary text-white shadow-sm"
-                                : "text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                                ? "bg-primary text-content-inverse"
+                                : "text-content-muted hover:text-content"
                             }`}
                           >
                             {option.label}
@@ -247,24 +256,28 @@ export default function Chat() {
             </div>
           )}
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-5 bg-gradient-to-b from-background to-slate-50 dark:to-slate-950/20">
+          <div className="flex-1 min-h-0 space-y-5 overflow-y-auto px-4 py-6 md:px-6">
             {mode === "text" && !messages.length && !loadingHistory && (
-              <div className="max-w-2xl mx-auto mt-6 space-y-6">
+              <div className="mx-auto mt-8 max-w-2xl space-y-6">
                 <div className="text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center text-primary border border-primary/30 mx-auto mb-4 shadow-lg shadow-primary/10">
-                    <span className="material-symbols-outlined text-[32px]">psychology</span>
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                    <span className="material-symbols-outlined text-[1.75rem]">psychology</span>
                   </div>
-                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">今天我能幫你什麼？</h1>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                    我是你的智慧助手，基於 <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">workspace/</code> 上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
+                  <h1 className="mb-2 text-2xl font-semibold text-content">今天我能幫你什麼？</h1>
+                  <p className="text-sm leading-relaxed text-content-muted">
+                    我是你的智慧助手,基於{" "}
+                    <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.8125rem] text-content">
+                      workspace/
+                    </code>{" "}
+                    上下文運作。我會使用你的角色設定、知識庫和長期記憶來提供準確的回答。
                   </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {starterPrompts.map((prompt) => (
                     <button
                       key={prompt}
                       onClick={() => submit(prompt)}
-                      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-4 text-left text-sm text-slate-700 dark:text-slate-300 hover:border-primary/40 hover:bg-primary/5 hover:text-primary-light transition-all shadow-sm"
+                      className="rounded-lg border border-border bg-surface-raised p-4 text-left text-sm leading-relaxed text-content-muted transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-content"
                     >
                       {prompt}
                     </button>
@@ -274,7 +287,7 @@ export default function Chat() {
             )}
 
             {mode === "text" && messages.length > 0 && (
-              <div className="max-w-3xl mx-auto w-full flex flex-col gap-5">
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
                 {messages.map((message, index) => (
                   <ChatMessage
                     key={`${message.role}-${index}-${message.created_at ?? ""}`}
@@ -292,11 +305,11 @@ export default function Chat() {
             )}
 
             {mode === "live" && (
-              <div className="max-w-3xl mx-auto w-full flex flex-col gap-5">
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
                 {liveSession.liveMessages.length === 0 && (
-                  <div className="text-center py-12">
-                    <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600">forum</span>
-                    <p className="mt-3 text-sm text-slate-400 dark:text-slate-500">
+                  <div className="py-12 text-center">
+                    <span className="material-symbols-outlined text-[3rem] text-content-subtle">forum</span>
+                    <p className="mt-3 text-sm text-content-subtle">
                       {liveSession.wsState === "connected"
                         ? "連線就緒，輸入文字或開啟麥克風開始對話。"
                         : "等待連線中..."}

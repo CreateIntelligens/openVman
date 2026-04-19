@@ -101,31 +101,31 @@ export default function ChatInput(props: ChatInputProps) {
   };
 
   return (
-    <div className="shrink-0 p-5 bg-slate-50 dark:bg-background-dark border-t border-slate-200 dark:border-slate-800/80">
-      <div className="max-w-4xl mx-auto flex flex-col gap-3 relative">
-        <div className="absolute bottom-full left-0 right-0 flex flex-col gap-2 mb-3">
+    <div className="shrink-0 border-t border-border bg-surface px-4 py-4">
+      <div className="relative mx-auto flex max-w-3xl flex-col gap-3">
+        <div className="absolute bottom-full left-0 right-0 mb-3 flex flex-col gap-2">
           {ttsFallbackToast && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-400 flex items-center justify-between backdrop-blur-md z-20">
-              <span>
-                <span className="material-symbols-outlined text-[14px] align-middle mr-1">warning</span>
+            <div className="flex items-center justify-between rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn backdrop-blur-md">
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[1rem]">warning</span>
                 TTS 已自動切換至 Edge TTS
               </span>
-              <button onClick={onDismissFallbackToast} className="hover:text-amber-300">
-                <span className="material-symbols-outlined text-[16px]">close</span>
+              <button onClick={onDismissFallbackToast} className="hover:opacity-80">
+                <span className="material-symbols-outlined text-[1rem]">close</span>
               </button>
             </div>
           )}
           {error && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400 flex items-center justify-between backdrop-blur-md">
+            <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger backdrop-blur-md">
               <span>{error}</span>
-              <button onClick={onDismissError} className="hover:text-red-300">
-                <span className="material-symbols-outlined text-[16px]">close</span>
+              <button onClick={onDismissError} className="hover:opacity-80">
+                <span className="material-symbols-outlined text-[1rem]">close</span>
               </button>
             </div>
           )}
         </div>
 
-        <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 focus-within:bg-slate-50 dark:focus-within:bg-slate-900/80 transition-all shadow-sm flex flex-col">
+        <div className="relative flex flex-col rounded-xl border border-border bg-surface-raised shadow-xs transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
           {slashEnabled && (
             <SlashDropdown
               matches={slashMatches}
@@ -152,7 +152,7 @@ export default function ChatInput(props: ChatInputProps) {
                   : "Live 模式連線中，連線完成後可輸入文字或開啟麥克風"
                 : "向 Brain 發送訊息...（輸入 / 查看指令）"
             }
-            className="w-full bg-transparent p-4 pb-12 text-[15px] leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none resize-none min-h-[56px]"
+            className="min-h-[3.5rem] w-full resize-none bg-transparent p-4 pb-12 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-subtle focus:outline-none"
           />
 
           <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
@@ -163,10 +163,8 @@ export default function ChatInput(props: ChatInputProps) {
                   ttsProvider={ttsProvider}
                   ttsVoice={ttsVoice}
                   activeTtsProvider={activeTtsProvider}
-                  ttsFallbackToast=""
                   onTtsProviderChange={onTtsProviderChange}
                   onTtsVoiceChange={onTtsVoiceChange}
-                  onDismissFallbackToast={onDismissFallbackToast}
                 />
               )}
             </div>
@@ -174,7 +172,7 @@ export default function ChatInput(props: ChatInputProps) {
               {mode === "text" && sending && (
                 <button
                   onClick={onStopStreaming}
-                  className="h-8 px-4 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors shadow-sm"
+                  className="h-8 rounded-md border border-border bg-surface-raised px-3 text-xs font-medium text-content transition-colors hover:bg-surface-sunken"
                 >
                   停止
                 </button>
@@ -191,24 +189,25 @@ export default function ChatInput(props: ChatInputProps) {
                 <button
                   onClick={onLiveToggleMic}
                   disabled={!liveConnected && !liveMicActive}
-                  className={`h-8 flex items-center justify-center rounded-lg px-3 gap-1.5 text-xs font-bold transition-colors shadow-sm ${liveMicActive
-                    ? "bg-red-500 text-white hover:bg-red-600"
-                    : liveConnected
-                      ? "border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                      : "border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
-                    }`}
+                  className={`flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
+                    liveMicActive
+                      ? "bg-danger text-content-inverse hover:opacity-90"
+                      : liveConnected
+                        ? "border border-border bg-surface-raised text-content hover:bg-surface-sunken"
+                        : "cursor-not-allowed border border-border bg-surface-sunken text-content-subtle"
+                  }`}
                   title={liveMicActive ? "停止錄音" : "開始語音輸入"}
                 >
-                  <span className="material-symbols-outlined text-[18px]">mic</span>
+                  <span className="material-symbols-outlined text-[1.125rem]">mic</span>
                   <span className="whitespace-nowrap">{liveMicActive ? "錄音中" : "麥克風"}</span>
                 </button>
               )}
               <button
                 onClick={onSubmit}
                 disabled={mode === "text" ? sending || !input.trim() : !liveConnected || !input.trim()}
-                className="h-8 w-10 flex items-center justify-center rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-30 disabled:grayscale shadow-sm"
+                className="flex h-8 w-10 items-center justify-center rounded-md bg-primary text-content-inverse transition-colors hover:opacity-90 disabled:opacity-30"
               >
-                <span className="material-symbols-outlined text-[18px]">send</span>
+                <span className="material-symbols-outlined text-[1.125rem]">send</span>
               </button>
             </div>
           </div>

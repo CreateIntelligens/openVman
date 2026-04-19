@@ -216,7 +216,7 @@ export default function KnowledgeBase() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <aside className="w-64 xl:w-72 shrink-0 border-r border-slate-200 dark:border-slate-800/60 flex flex-col bg-white dark:bg-slate-950/30 overflow-hidden">
           <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800/40 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">檔案樹</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">檔案樹</span>
             <button
               onClick={() => {
                 setShowNewFolder(true);
@@ -238,11 +238,11 @@ export default function KnowledgeBase() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="搜尋檔案樹..."
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 py-1.5 pl-8 pr-3 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-primary/50"
+                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 py-1.5 pl-8 pr-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-primary/50"
               />
             </div>
             {hasActiveSearch && (
-              <p className="mt-2 text-[11px] text-slate-500">搜尋命中 {matchingDocumentCount} 筆</p>
+              <p className="mt-2 text-xs text-slate-500">搜尋命中 {matchingDocumentCount} 筆</p>
             )}
           </div>
 
