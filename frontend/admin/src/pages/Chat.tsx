@@ -72,6 +72,8 @@ export default function Chat() {
     asrSupported,
     toggleAsr,
     vadSpeaking,
+    handleActionConfirmed,
+    handleActionCancelled,
   } = useChatSession();
   const liveClientIdRef = useRef<string>("");
   if (!liveClientIdRef.current) {
@@ -149,6 +151,18 @@ export default function Chat() {
   const handleSlashClose = useCallback(() => setSlashOpen(false), [setSlashOpen]);
   const handleDismissFallbackToast = useCallback(() => setTtsFallbackToast(""), [setTtsFallbackToast]);
   const handleLiveToggleMic = useCallback(() => { void liveToggleMic(); }, [liveToggleMic]);
+
+  useEffect(() => {
+    if (!sending) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        stopStreaming();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sending, stopStreaming]);
 
   const prevModeRef = useRef(mode);
   const prevTextMessageCountRef = useRef(0);
@@ -299,6 +313,8 @@ export default function Chat() {
                     isLastMessage={index === messages.length - 1}
                     onPlayTts={playTts}
                     showAssistantActions
+                    onActionConfirmed={handleActionConfirmed}
+                    onActionCancelled={handleActionCancelled}
                   />
                 ))}
               </div>

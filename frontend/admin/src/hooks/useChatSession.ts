@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   streamChat,
+  type ActionRequest,
   type ChatMessage as ChatMessageType,
   type RetrievalResult,
 } from "../api";
@@ -17,11 +18,104 @@ import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
 
+const STOP_REPLY_NOTICE = "已停止回覆";
+const STOP_REPLY_NOTICE_MS = 2500;
+
+type ChatResultPayload = {
+  session_id: string;
+  reply: string;
+  knowledge_results: RetrievalResult[];
+  memory_results: RetrievalResult[];
+  history?: ChatMessageType[];
+};
+
+function getLastAssistantActions(messages: ChatMessageType[]): ActionRequest[] | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === "assistant") {
+      return message.action_requests;
+    }
+  }
+  return undefined;
+}
+
+function applyChatResultToMessages(
+  current: ChatMessageType[],
+  payload: ChatResultPayload,
+  sources: { knowledge: RetrievalResult[]; memory: RetrievalResult[] },
+): ChatMessageType[] {
+  const pendingActions = getLastAssistantActions(current);
+
+  if (payload.history) {
+    const history = [...payload.history];
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+      const message = history[index];
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      history[index] = pendingActions
+        ? { ...message, sources, action_requests: pendingActions }
+        : { ...message, sources };
+      break;
+    }
+    return history;
+  }
+
+  if (payload.reply == null) {
+    return current;
+  }
+
+  return current.map((message, index) => (
+    index === current.length - 1 && message.role === "assistant"
+      ? { ...message, content: payload.reply, sources }
+      : message
+  ));
+}
+
+function parseActionRequestResult(name: string, result: string): ActionRequest | null {
+  if (name !== "request_action") {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result);
+  } catch {
+    return null;
+  }
+
+  if (
+    !parsed
+    || typeof parsed !== "object"
+    || (parsed as { type?: string }).type !== "action_request"
+  ) {
+    return null;
+  }
+
+  return parsed as ActionRequest;
+}
+
+function appendActionRequestToLastAssistant(
+  messages: ChatMessageType[],
+  request: ActionRequest,
+): ChatMessageType[] {
+  return messages.map((message, index) => {
+    if (index !== messages.length - 1 || message.role !== "assistant") {
+      return message;
+    }
+
+    const actionRequests = message.action_requests ?? [];
+    return { ...message, action_requests: [...actionRequests, request] };
+  });
+}
+
 export function useChatSession() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const stopReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Extracted Hooks ---
   const {
@@ -111,33 +205,32 @@ export function useChatSession() {
     ? `streaming · ${selectedPersonaId}`
     : `${messages.length} messages · ${selectedPersonaId}`;
 
-  const applyChatResult = useCallback((payload: {
-    session_id: string;
-    reply: string;
-    knowledge_results: RetrievalResult[];
-    memory_results: RetrievalResult[];
-    history?: ChatMessageType[];
-  }) => {
+  const clearStopReplyTimer = useCallback(() => {
+    if (stopReplyTimerRef.current) {
+      clearTimeout(stopReplyTimerRef.current);
+      stopReplyTimerRef.current = null;
+    }
+  }, []);
+
+  const showStoppedReplyNotice = useCallback(() => {
+    clearStopReplyTimer();
+    setError(STOP_REPLY_NOTICE);
+    stopReplyTimerRef.current = setTimeout(() => {
+      setError((current) => (current === STOP_REPLY_NOTICE ? "" : current));
+      stopReplyTimerRef.current = null;
+    }, STOP_REPLY_NOTICE_MS);
+  }, [clearStopReplyTimer, setError]);
+
+  useEffect(() => () => {
+    clearStopReplyTimer();
+  }, [clearStopReplyTimer]);
+
+  const applyChatResult = useCallback((payload: ChatResultPayload) => {
     const knowledge = payload.knowledge_results ?? [];
     const memory = payload.memory_results ?? [];
     const sources = { knowledge, memory };
 
-    if (payload.history) {
-      const history = [...payload.history];
-      for (let index = history.length - 1; index >= 0; index -= 1) {
-        if (history[index].role === "assistant") {
-          history[index] = { ...history[index], sources };
-          break;
-        }
-      }
-      setMessages(history);
-    } else if (payload.reply != null) {
-      setMessages((current) => current.map((msg, i) =>
-        i === current.length - 1 && msg.role === "assistant"
-          ? { ...msg, content: payload.reply, sources }
-          : msg
-      ));
-    }
+    setMessages((current) => applyChatResultToMessages(current, payload, sources));
 
     persistSessionId(payload.session_id);
 
@@ -152,6 +245,7 @@ export function useChatSession() {
       return;
     }
 
+    clearStopReplyTimer();
     setSending(true);
     setError("");
     const controller = new AbortController();
@@ -176,15 +270,29 @@ export function useChatSession() {
           onToken: ({ token }) => {
             setMessages((current) => appendStreamingToken(current, token));
           },
-          onDone: applyChatResult,
-          onError: ({ message }) => setError(message),
+          onTool: ({ name, result }) => {
+            const request = parseActionRequestResult(name, result);
+            if (!request) {
+              return;
+            }
+            setMessages((current) => appendActionRequestToLastAssistant(current, request));
+          },
+          onDone: (payload) => {
+            applyChatResult(payload);
+            setSending(false);
+          },
+          onError: ({ message }) => {
+            clearStopReplyTimer();
+            setError(message);
+          },
         },
         controller.signal,
       );
     } catch (reason) {
       if (controller.signal.aborted) {
-        setError("已停止回覆");
+        showStoppedReplyNotice();
       } else {
+        clearStopReplyTimer();
         setError(String(reason));
       }
       setMessages(removeEmptyAssistantDraft);
@@ -192,9 +300,23 @@ export function useChatSession() {
       abortControllerRef.current = null;
       setSending(false);
     }
-  }, [applyChatResult, input, loadSessions, loadingPersonas, persistSessionId, selectedPersonaId, sending, sessionId, setError, setMessages]);
+  }, [applyChatResult, clearStopReplyTimer, input, loadSessions, loadingPersonas, persistSessionId, selectedPersonaId, sending, sessionId, setError, setMessages, showStoppedReplyNotice]);
 
   submitRef.current = submit;
+
+  const notifyActionOutcome = useCallback((req: ActionRequest, outcome: "confirmed" | "cancelled") => {
+    const verb = outcome === "confirmed" ? "已確認並觸發" : "拒絕了";
+    void submit(`[系統] 使用者${verb}動作：${req.action}`);
+  }, [submit]);
+
+  const handleActionConfirmed = useCallback(
+    (req: ActionRequest) => notifyActionOutcome(req, "confirmed"),
+    [notifyActionOutcome],
+  );
+  const handleActionCancelled = useCallback(
+    (req: ActionRequest) => notifyActionOutcome(req, "cancelled"),
+    [notifyActionOutcome],
+  );
 
   const resetConversation = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -254,5 +376,7 @@ export function useChatSession() {
     asrSupported,
     toggleAsr,
     vadSpeaking,
+    handleActionConfirmed,
+    handleActionCancelled,
   };
 }

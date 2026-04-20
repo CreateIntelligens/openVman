@@ -8,11 +8,31 @@ export interface RetrievalResult {
   _distance?: number;
 }
 
+export interface ActionRequest {
+  type: "action_request";
+  action: string;
+  label: string;
+  description: string;
+  risk: string;
+  endpoint: string;
+  method: string;
+  params: Record<string, unknown>;
+  confirm_required: boolean;
+  reason?: string;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
   created_at?: string;
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
+  action_requests?: ActionRequest[];
+}
+
+export interface ToolStep {
+  name: string;
+  arguments?: string;
+  result?: string;
 }
 
 export interface ChatResponse {
@@ -23,6 +43,7 @@ export interface ChatResponse {
   knowledge_results: RetrievalResult[];
   memory_results: RetrievalResult[];
   history: ChatMessage[];
+  tool_steps?: ToolStep[];
 }
 
 export interface ChatContextEvent {
@@ -32,10 +53,18 @@ export interface ChatContextEvent {
 
 export type ChatDoneEvent = ChatResponse;
 
+export interface ChatToolEvent {
+  tool_call_id: string;
+  name: string;
+  arguments: string;
+  result: string;
+}
+
 export interface ChatStreamHandlers {
   onSession?: (payload: { session_id: string }) => void;
   onContext?: (payload: ChatContextEvent) => void;
   onToken?: (payload: { token: string }) => void;
+  onTool?: (payload: ChatToolEvent) => void;
   onDone?: (payload: ChatDoneEvent) => void;
   onError?: (payload: { message: string }) => void;
 }
@@ -66,12 +95,25 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  let done = false;
-  while (!done) {
-    const result = await reader.read();
-    done = result.done;
-    buffer += decoder.decode(result.value ?? new Uint8Array(), { stream: !done });
-    buffer = processSseBuffer(buffer, handlers);
+  try {
+    let done = false;
+    while (!done) {
+      const result = await reader.read();
+      done = result.done;
+      buffer += decoder.decode(result.value ?? new Uint8Array(), { stream: !done });
+      buffer = processSseBuffer(buffer, handlers);
+    }
+  } catch (err) {
+    if (signal?.aborted) {
+      throw err;
+    }
+    console.warn("[streamChat] reader error, flushing buffer:", err);
+  } finally {
+    buffer += decoder.decode();
+    if (buffer && !buffer.endsWith("\n\n")) {
+      buffer += "\n\n";
+    }
+    processSseBuffer(buffer, handlers);
   }
 }
 
@@ -129,6 +171,7 @@ function dispatchSseEvent(eventName: string, payload: unknown, handlers: ChatStr
     session: handlers.onSession,
     context: handlers.onContext,
     token: handlers.onToken,
+    tool: handlers.onTool,
     done: handlers.onDone,
     error: handlers.onError,
   };

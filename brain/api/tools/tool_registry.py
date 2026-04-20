@@ -16,6 +16,7 @@ from knowledge.workspace import get_workspace_root, resolve_workspace_document
 from memory.embedder import encode_query_with_fallback, encode_text
 from memory.retrieval import search_records
 from safety.observability import log_exception
+from .actions import build_action_request, list_actions
 from .mock_data import FAQ_ENTRIES, ORDER_RECORDS
 
 logger = logging.getLogger("brain.tools")
@@ -232,6 +233,12 @@ def _save_memory(args: dict[str, Any]) -> dict[str, Any]:
     return {"saved": True, "content": content}
 
 
+_GRAPH_NOT_BUILT_HINT = (
+    "專案知識圖譜尚未建立。請引導使用者前往 workspace → 知識庫 → Graph 頁面點擊「重建圖譜」。"
+    "你不可自行觸發 rebuild。在此之前可改用 search_knowledge 回答問題。"
+)
+
+
 def _graph_query(arguments: dict[str, Any]) -> dict[str, Any]:
     from knowledge.graph import query_project_graph
 
@@ -245,8 +252,8 @@ def _graph_query(arguments: dict[str, Any]) -> dict[str, Any]:
             question=question,
             depth=max(1, min(depth, 3)),
         )
-    except FileNotFoundError as exc:
-        return {"error": str(exc)}
+    except FileNotFoundError:
+        return {"error": _GRAPH_NOT_BUILT_HINT, "graph_built": False}
 
 
 def _graph_explain(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -260,8 +267,64 @@ def _graph_explain(arguments: dict[str, Any]) -> dict[str, Any]:
             project_id=_active_project_id.get(),
             node_label=label,
         )
-    except FileNotFoundError as exc:
-        return {"error": str(exc)}
+    except FileNotFoundError:
+        return {"error": _GRAPH_NOT_BUILT_HINT, "graph_built": False}
+
+
+def _graph_status(arguments: dict[str, Any]) -> dict[str, Any]:
+    del arguments
+    from knowledge.graph import load_project_status, load_project_summary
+
+    project_id = _active_project_id.get()
+    status = load_project_status(project_id)
+    result: dict[str, Any] = {
+        "project_id": project_id,
+        "state": status.get("state", "absent"),
+        "graph_built": False,
+    }
+    for key in ("started_at", "finished_at", "error", "message"):
+        if key in status:
+            result[key] = status[key]
+    try:
+        summary = load_project_summary(project_id)
+        result["graph_built"] = True
+        result["summary"] = {
+            "built_at": summary.get("built_at"),
+            "nodes": summary.get("nodes"),
+            "edges": summary.get("edges"),
+            "communities": summary.get("communities"),
+            "god_nodes": summary.get("god_nodes", [])[:5],
+        }
+    except FileNotFoundError:
+        result["hint"] = _GRAPH_NOT_BUILT_HINT
+    return result
+
+
+def _request_action(arguments: dict[str, Any]) -> dict[str, Any]:
+    action = str(arguments.get("action", "")).strip()
+    if not action:
+        return {
+            "error": "action 不可為空。可用 action 清單：",
+            "available": list_actions(),
+        }
+    params = arguments.get("params") or {}
+    if not isinstance(params, dict):
+        return {"error": "params 必須是物件"}
+    reason = arguments.get("reason")
+    try:
+        payload = build_action_request(
+            action=action,
+            params=params,
+            reason=str(reason).strip() if reason else None,
+        )
+    except KeyError:
+        return {
+            "error": f"未知的 action: {action}",
+            "available": list_actions(),
+        }
+    project_id = _active_project_id.get()
+    payload["params"].setdefault("project_id", project_id)
+    return payload
 
 
 _registry: ToolRegistry | None = None
@@ -430,6 +493,54 @@ def get_tool_registry() -> ToolRegistry:
                     "required": ["label"],
                 },
                 handler=_graph_explain,
+            )
+        )
+        registry.register(
+            Tool(
+                name="graph_status",
+                description=(
+                    "查詢專案知識圖譜目前的建置狀態。回傳圖譜是否已建立、節點/邊數量、最後建置時間、"
+                    "以及是否有進行中的 rebuild。此工具為唯讀，你不可自行觸發 rebuild；"
+                    "若圖譜尚未建立，請引導使用者前往 workspace → 知識庫 → Graph 頁面點擊「重建圖譜」。"
+                    "在打算使用 graph_query 或 graph_explain 前可先呼叫此工具確認。"
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                },
+                handler=_graph_status,
+            )
+        )
+        registry.register(
+            Tool(
+                name="request_action",
+                description=(
+                    "向使用者提議執行一個需要明確同意的後端動作（例如重建知識圖譜）。"
+                    "此工具不會執行任何實際動作，只會產生一張確認卡片顯示在對話中，"
+                    "由使用者點擊確認後，前端才會實際呼叫對應的 API。"
+                    "你必須在使用者以自然語言表達意願、或你判斷有必要時才提議，"
+                    "不可在未被詢問的情況下頻繁提議。"
+                    "目前可用 action：rebuild_graph（重建知識圖譜）。"
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "description": "要提議的 action 名稱，例如 rebuild_graph",
+                        },
+                        "params": {
+                            "type": "object",
+                            "description": "傳給該 action 的參數（可選）",
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "向使用者解釋為何建議執行此動作的簡短理由",
+                        },
+                    },
+                    "required": ["action"],
+                },
+                handler=_request_action,
             )
         )
 
