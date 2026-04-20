@@ -82,6 +82,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         user_message=cleaned_message,
         request_context=request_ctx,
         session_messages=prior_messages,
+        allow_tools=not route.skip_tools,
     )
 
     return GenerationContext(

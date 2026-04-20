@@ -19,6 +19,69 @@ class RouteDecision:
 
 
 _DIRECT_ROLES = frozenset({"system", "assistant", "control"})
+_TOOL_QUERY_VERBS = (
+    "查",
+    "查詢",
+    "查一下",
+    "搜尋",
+    "搜索",
+    "找出",
+    "找一下",
+    "看看",
+    "看一下",
+    "列出",
+    "讀取",
+    "read",
+    "search",
+    "find",
+    "list",
+    "show",
+    "open",
+    "look up",
+)
+_TOOL_QUERY_TARGETS = (
+    "知識庫",
+    "文件",
+    "文檔",
+    "檔案",
+    "docs",
+    "doc",
+    "readme",
+    "repo",
+    "repository",
+    "專案",
+    "project",
+    "程式碼",
+    "代碼",
+    "代码",
+    "code",
+    "codebase",
+    "圖譜",
+    "graph",
+    "工具",
+    "tool",
+    "tools",
+    "skill",
+    "skills",
+)
+_TOOL_MEMORY_HINTS = (
+    "記住",
+    "記下",
+    "請記得",
+    "remember",
+    "save memory",
+)
+_TOOL_ACTION_HINTS = (
+    "重建圖譜",
+    "rebuild graph",
+    "rebuild_graph",
+    "graph status",
+    "圖譜狀態",
+)
+_TOOL_QUERY_VERBS_CASEFOLDED = tuple(verb.casefold() for verb in _TOOL_QUERY_VERBS)
+_TOOL_QUERY_TARGETS_CASEFOLDED = tuple(target.casefold() for target in _TOOL_QUERY_TARGETS)
+_TOOL_MEMORY_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in _TOOL_MEMORY_HINTS)
+_TOOL_ACTION_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in _TOOL_ACTION_HINTS)
 
 
 def route_message(brain_message: BrainMessage) -> RouteDecision:
@@ -27,7 +90,27 @@ def route_message(brain_message: BrainMessage) -> RouteDecision:
         return RouteDecision(path="direct", skip_rag=True, skip_tools=True)
     if brain_message.role == "tool":
         return RouteDecision(path="tool", skip_rag=True, skip_tools=False)
-    return RouteDecision(path="rag", skip_rag=False, skip_tools=False)
+
+    content = brain_message.content.strip().casefold()
+    if _needs_tooling(content):
+        return RouteDecision(path="tool", skip_rag=False, skip_tools=False)
+    return RouteDecision(path="direct", skip_rag=True, skip_tools=True)
+
+
+def _needs_tooling(content: str) -> bool:
+    if not content:
+        return False
+    if _contains_any(content, _TOOL_MEMORY_HINTS_CASEFOLDED):
+        return True
+    if _contains_any(content, _TOOL_ACTION_HINTS_CASEFOLDED):
+        return True
+    has_query_verb = _contains_any(content, _TOOL_QUERY_VERBS_CASEFOLDED)
+    has_query_target = _contains_any(content, _TOOL_QUERY_TARGETS_CASEFOLDED)
+    return has_query_verb and has_query_target
+
+
+def _contains_any(content: str, hints: tuple[str, ...]) -> bool:
+    return any(hint in content for hint in hints)
 
 
 def enforce_context_budget(
@@ -52,7 +135,11 @@ def enforce_context_budget(
 
 
 def _total_chars(messages: list[dict[str, Any]]) -> int:
-    return sum(len(str(m.get("content", ""))) for m in messages)
+    return sum(_message_chars(message) for message in messages)
+
+
+def _message_chars(message: dict[str, Any]) -> int:
+    return len(str(message.get("content", "")))
 
 
 def _trim_history(
@@ -68,13 +155,13 @@ def _trim_history(
     history = messages[1:-1] if system else messages[:-1]
 
     kept: list[dict[str, Any]] = []
-    base_cost = len(str(last_user.get("content", "")))
+    base_cost = _message_chars(last_user)
     if system:
-        base_cost += len(str(system.get("content", "")))
+        base_cost += _message_chars(system)
 
     remaining = budget - base_cost
     for msg in reversed(history):
-        cost = len(str(msg.get("content", "")))
+        cost = _message_chars(msg)
         if remaining - cost < 0:
             break
         kept.append(msg)
@@ -97,10 +184,7 @@ def _compress_system(
     if not messages or messages[0].get("role") != "system":
         return list(messages)
 
-    non_system_cost = sum(
-        len(str(m.get("content", "")))
-        for m in messages[1:]
-    )
+    non_system_cost = sum(_message_chars(message) for message in messages[1:])
     system_budget = max(budget - non_system_cost, 0)
     compressed_content = compress_text(
         str(messages[0].get("content", "")),

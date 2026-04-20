@@ -30,6 +30,8 @@ def build_chat_messages(
     user_message: str,
     request_context: dict[str, Any],
     session_messages: list[dict[str, Any]],
+    *,
+    allow_tools: bool = True,
 ) -> list[dict[str, str]]:
     """Build the system and conversation messages for the LLM call.
 
@@ -47,17 +49,28 @@ def build_chat_messages(
         for label, budget_attr in _WORKSPACE_BLOCK_CONFIG
     ]
 
+    tool_instructions = (
+        "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。"
+        "當使用者要求你記住某事、或對話中出現值得長期保留的偏好/事實/指令時，使用 save_memory 工具儲存。"
+        "儲存時用簡潔的陳述句（如「使用者是男生」），不要儲存閒聊或普通問題。"
+        if allow_tools
+        else ""
+    )
+    answer_rules = (
+        "回答規則：如果資訊不足，先嘗試使用工具搜尋；若仍不足，直接說明缺少什麼；若問題涉及流程，給出清楚下一步；除非使用者要求，否則用繁體中文。"
+        if allow_tools
+        else "回答規則：直接根據目前對話回答；如果資訊不足，直接說明缺少什麼；若問題涉及流程，給出清楚下一步；除非使用者要求，否則用繁體中文。"
+    )
+
     system_prompt = "\n\n".join(
         block
         for block in [
-            "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。"
-            "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。"
-            "當使用者要求你記住某事、或對話中出現值得長期保留的偏好/事實/指令時，使用 save_memory 工具儲存。"
-            "儲存時用簡潔的陳述句（如「使用者是男生」），不要儲存閒聊或普通問題。",
+            "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。",
+            tool_instructions,
             *workspace_blocks,
             _format_request_context(request_context),
             history_summary,
-            "回答規則：如果資訊不足，先嘗試使用工具搜尋；若仍不足，直接說明缺少什麼；若問題涉及流程，給出清楚下一步；除非使用者要求，否則用繁體中文。",
+            answer_rules,
         ]
         if block
     )

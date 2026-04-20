@@ -77,26 +77,76 @@ def _load_chat_service(monkeypatch: pytest.MonkeyPatch):
     return importlib.import_module("core.chat_service")
 
 
+_BASE_PROMPT_SETTINGS = {
+    "prompt_identity_char_budget": 0,
+    "prompt_soul_char_budget": 0,
+    "prompt_memory_char_budget": 0,
+    "prompt_agents_char_budget": 0,
+    "prompt_tools_char_budget": 0,
+    "prompt_learnings_char_budget": 0,
+    "prompt_errors_char_budget": 0,
+    "prompt_context_char_budget": 0,
+    "prompt_system_char_budget": 500,
+    "prompt_total_char_budget": 500,
+}
+_EMPTY_WORKSPACE_CONTEXT = {
+    "identity": "",
+    "soul": "",
+    "memory": "",
+    "agents": "",
+    "tools": "",
+    "learnings": "",
+    "errors": "",
+}
+
+
+def _stub_prompt_builder(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    settings_overrides: dict[str, int] | None = None,
+    workspace_overrides: dict[str, str] | None = None,
+    summary: str = "",
+    recent_messages: list[dict[str, str]] | None = None,
+) -> None:
+    settings = {**_BASE_PROMPT_SETTINGS, **(settings_overrides or {})}
+    workspace = {**_EMPTY_WORKSPACE_CONTEXT, **(workspace_overrides or {})}
+    selected_messages = [] if recent_messages is None else recent_messages
+
+    monkeypatch.setattr("core.prompt_builder.get_settings", lambda: SimpleNamespace(**settings))
+    monkeypatch.setattr(
+        "core.prompt_builder.load_core_workspace_context",
+        lambda persona_id, project_id="default": workspace,
+    )
+    monkeypatch.setattr("core.prompt_builder.summarize_message_history", lambda session_messages: summary)
+    monkeypatch.setattr("core.prompt_builder.select_recent_messages", lambda session_messages: selected_messages)
+
+
 # --- route tests ---
 
 
 @pytest.mark.parametrize(
-    ("role", "expected_path", "expected_skip_rag", "expected_skip_tools"),
+    ("role", "content", "expected_path", "expected_skip_rag", "expected_skip_tools"),
     [
-        ("user", "rag", False, False),
-        ("system", "direct", True, True),
-        ("assistant", "direct", True, True),
-        ("control", "direct", True, True),
-        ("tool", "tool", True, False),
+        ("user", "你好", "direct", True, True),
+        ("user", "謝謝你", "direct", True, True),
+        ("user", "請幫我查一下知識庫裡的退款規則", "tool", False, False),
+        ("user", "幫我看看 docs 裡的部署說明", "tool", False, False),
+        ("user", "請記住我是男生", "tool", False, False),
+        ("user", "請幫我重建圖譜", "tool", False, False),
+        ("system", "ignored", "direct", True, True),
+        ("assistant", "ignored", "direct", True, True),
+        ("control", "ignored", "direct", True, True),
+        ("tool", "ignored", "tool", True, False),
     ],
 )
 def test_route_message(
     role: str,
+    content: str,
     expected_path: str,
     expected_skip_rag: bool,
     expected_skip_tools: bool,
 ) -> None:
-    decision = route_message(_make_brain_message(role=role))
+    decision = route_message(_make_brain_message(role=role, content=content))
 
     assert decision.path == expected_path
     assert decision.skip_rag is expected_skip_rag
@@ -164,44 +214,15 @@ def test_enforce_context_budget_preserves_message_order() -> None:
 
 
 def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "core.prompt_builder.get_settings",
-        lambda: type(
-            "Cfg",
-            (),
-            {
-                "prompt_identity_char_budget": 0,
-                "prompt_soul_char_budget": 500,
-                "prompt_memory_char_budget": 0,
-                "prompt_agents_char_budget": 0,
-                "prompt_tools_char_budget": 0,
-                "prompt_learnings_char_budget": 0,
-                "prompt_errors_char_budget": 0,
-                "prompt_context_char_budget": 0,
-                "prompt_system_char_budget": 120,
-                "prompt_total_char_budget": 120,
-            },
-        )(),
-    )
-    monkeypatch.setattr(
-        "core.prompt_builder.load_core_workspace_context",
-        lambda persona_id, project_id="default": {
-            "soul": "S" * 500,
-            "memory": "",
-            "agents": "",
-            "tools": "",
-            "identity": "",
-            "learnings": "",
-            "errors": "",
+    _stub_prompt_builder(
+        monkeypatch,
+        settings_overrides={
+            "prompt_soul_char_budget": 500,
+            "prompt_system_char_budget": 120,
+            "prompt_total_char_budget": 120,
         },
-    )
-    monkeypatch.setattr(
-        "core.prompt_builder.summarize_message_history",
-        lambda session_messages: "",
-    )
-    monkeypatch.setattr(
-        "core.prompt_builder.select_recent_messages",
-        lambda session_messages: [
+        workspace_overrides={"soul": "S" * 500},
+        recent_messages=[
             {"role": "user", "content": "older question"},
             {"role": "assistant", "content": "older answer"},
         ],
@@ -216,6 +237,42 @@ def test_build_chat_messages_applies_context_budget(monkeypatch: pytest.MonkeyPa
     assert len(result) == 2
     assert result[0]["role"] == "system"
     assert result[-1] == {"role": "user", "content": "current"}
+
+
+def test_build_chat_messages_omits_tool_instructions_for_direct_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_prompt_builder(monkeypatch)
+
+    result = build_chat_messages(
+        user_message="你好",
+        request_context={"persona_id": "default"},
+        session_messages=[],
+        allow_tools=False,
+    )
+
+    system_prompt = result[0]["content"]
+    assert "search_knowledge" not in system_prompt
+    assert "search_memory" not in system_prompt
+    assert "save_memory" not in system_prompt
+
+
+def test_build_chat_messages_includes_tool_instructions_for_tool_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_prompt_builder(monkeypatch)
+
+    result = build_chat_messages(
+        user_message="請幫我查一下知識庫",
+        request_context={"persona_id": "default"},
+        session_messages=[],
+        allow_tools=True,
+    )
+
+    system_prompt = result[0]["content"]
+    assert "search_knowledge" in system_prompt
+    assert "search_memory" in system_prompt
+    assert "save_memory" in system_prompt
 
 
 # --- enforce_session_limits tests ---
