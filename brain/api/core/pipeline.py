@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from infra.reflection import compress_text
-from protocol.message_envelope import BrainMessage
+from protocol.message_envelope import BrainMessage, METADATA_ORIGINAL_USER_MESSAGE
 
 
 @dataclass(slots=True, frozen=True)
@@ -82,6 +82,7 @@ _TOOL_QUERY_VERBS_CASEFOLDED = tuple(verb.casefold() for verb in _TOOL_QUERY_VER
 _TOOL_QUERY_TARGETS_CASEFOLDED = tuple(target.casefold() for target in _TOOL_QUERY_TARGETS)
 _TOOL_MEMORY_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in _TOOL_MEMORY_HINTS)
 _TOOL_ACTION_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in _TOOL_ACTION_HINTS)
+_SLASH_TOOL_REWRITE_PREFIX = "[系統指令] 請立即呼叫工具 `"
 
 
 def route_message(brain_message: BrainMessage) -> RouteDecision:
@@ -90,6 +91,8 @@ def route_message(brain_message: BrainMessage) -> RouteDecision:
         return RouteDecision(path="direct", skip_rag=True, skip_tools=True)
     if brain_message.role == "tool":
         return RouteDecision(path="tool", skip_rag=True, skip_tools=False)
+    if _is_forced_tool_call(brain_message):
+        return RouteDecision(path="tool", skip_rag=False, skip_tools=False)
 
     content = brain_message.content.strip().casefold()
     if _needs_tooling(content):
@@ -111,6 +114,11 @@ def _needs_tooling(content: str) -> bool:
 
 def _contains_any(content: str, hints: tuple[str, ...]) -> bool:
     return any(hint in content for hint in hints)
+
+
+def _is_forced_tool_call(brain_message: BrainMessage) -> bool:
+    original_user_message = brain_message.metadata.get(METADATA_ORIGINAL_USER_MESSAGE)
+    return bool(original_user_message) and brain_message.content.startswith(_SLASH_TOOL_REWRITE_PREFIX)
 
 
 def enforce_context_budget(

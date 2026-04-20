@@ -330,6 +330,27 @@ def _request_action(arguments: dict[str, Any]) -> dict[str, Any]:
 _registry: ToolRegistry | None = None
 
 
+def _sync_skill_tools(registry: ToolRegistry, manager: Any) -> None:
+    skills = manager.list_skills()
+    enabled_prefixes = {
+        f"{skill.manifest.id}:"
+        for skill in skills
+        if skill.enabled
+    }
+
+    stale_skill_tools = [
+        name
+        for name in registry._tools
+        if ":" in name and not any(name.startswith(prefix) for prefix in enabled_prefixes)
+    ]
+    for name in stale_skill_tools:
+        del registry._tools[name]
+
+    for skill in skills:
+        if skill.enabled:
+            registry.register_skill_tools(skill)
+
+
 def get_tool_registry() -> ToolRegistry:
     global _registry
     if _registry is None:
@@ -548,13 +569,17 @@ def get_tool_registry() -> ToolRegistry:
         try:
             from .skill_manager import get_skill_manager
             manager = get_skill_manager()
-            manager.scan_and_load_skills()
-            for skill in manager.list_skills():
-                registry.register_skill_tools(skill)
+            _sync_skill_tools(registry, manager)
         except Exception as exc:
             log_exception("skill_registry_init_failed", exc)
 
         _registry = registry
+    else:
+        try:
+            from .skill_manager import get_skill_manager
+            _sync_skill_tools(_registry, get_skill_manager())
+        except Exception as exc:
+            log_exception("skill_registry_sync_failed", exc)
     return _registry
 
 

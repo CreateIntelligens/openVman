@@ -289,10 +289,20 @@ class SkillManager:
 
 _instance: SkillManager | None = None
 
+
+def _default_skills_path() -> str:
+    """Prefer the mounted `/skills` dir, but fall back to the repo copy in local dev."""
+    mounted_path = Path("/skills")
+    if mounted_path.exists():
+        return str(mounted_path)
+    return str(Path(__file__).resolve().parents[2] / "skills")
+
+
 def get_skill_manager() -> SkillManager:
     """Singleton accessor for SkillManager."""
     global _instance
     if _instance is None:
-        skills_path = os.environ.get("BRAIN_SKILLS_DIR", "/skills")
+        skills_path = os.environ.get("BRAIN_SKILLS_DIR") or _default_skills_path()
         _instance = SkillManager(skills_path)
+        _instance.scan_and_load_skills()
     return _instance

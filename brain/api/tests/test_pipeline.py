@@ -17,14 +17,19 @@ if str(API_ROOT) not in sys.path:
 
 from core.pipeline import RouteDecision, enforce_context_budget, route_message
 from core.prompt_builder import build_chat_messages
-from protocol.message_envelope import BrainMessage, MessageEnvelope, RequestContext
+from protocol.message_envelope import BrainMessage, MessageEnvelope, RequestContext, METADATA_ORIGINAL_USER_MESSAGE
 from safety import guardrails
 
 
 # --- helpers ---
 
 
-def _make_brain_message(*, role: str = "user", content: str = "你好") -> BrainMessage:
+def _make_brain_message(
+    *,
+    role: str = "user",
+    content: str = "你好",
+    metadata: dict[str, str] | None = None,
+) -> BrainMessage:
     return BrainMessage(
         role=role,
         content=content,
@@ -34,7 +39,7 @@ def _make_brain_message(*, role: str = "user", content: str = "你好") -> Brain
         project_id="default",
         locale="zh-TW",
         channel="web",
-        metadata={},
+        metadata={} if metadata is None else metadata,
     )
 
 
@@ -151,6 +156,19 @@ def test_route_message(
     assert decision.path == expected_path
     assert decision.skip_rag is expected_skip_rag
     assert decision.skip_tools is expected_skip_tools
+
+
+def test_route_message_forces_tool_path_for_rewritten_slash_command() -> None:
+    decision = route_message(
+        _make_brain_message(
+            content="[系統指令] 請立即呼叫工具 `joke:get_joke`，不需要額外參數。",
+            metadata={METADATA_ORIGINAL_USER_MESSAGE: "/joke"},
+        )
+    )
+
+    assert decision.path == "tool"
+    assert decision.skip_rag is False
+    assert decision.skip_tools is False
 
 
 # --- enforce_context_budget tests ---

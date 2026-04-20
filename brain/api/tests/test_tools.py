@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -66,6 +67,44 @@ def test_registry_build_openai_tools_format(monkeypatch: pytest.MonkeyPatch):
             },
         }
     ]
+
+
+def test_get_tool_registry_syncs_skill_tools_after_initialization(monkeypatch: pytest.MonkeyPatch):
+    tool_registry, _ = load_tool_modules(monkeypatch)
+    import tools.skill_manager as skill_manager_module
+
+    manager = SimpleNamespace(skills=[])
+    manager.list_skills = lambda: list(manager.skills)
+
+    def make_skill() -> SimpleNamespace:
+        return SimpleNamespace(
+            manifest=SimpleNamespace(
+                id="demo",
+                name="Demo",
+                tools=[
+                    SimpleNamespace(
+                        name="run",
+                        description="demo tool",
+                        parameters={"type": "object", "properties": {}},
+                    )
+                ],
+            ),
+            handlers={"run": lambda args: {"ok": True}},
+            enabled=True,
+        )
+
+    monkeypatch.setattr(skill_manager_module, "get_skill_manager", lambda: manager)
+    tool_registry._registry = None
+
+    registry = tool_registry.get_tool_registry()
+    with pytest.raises(ValueError, match="未知工具：demo:run"):
+        registry.get("demo:run")
+
+    manager.skills = [make_skill()]
+
+    registry = tool_registry.get_tool_registry()
+
+    assert registry.get("demo:run").handler({}) == {"ok": True}
 
 
 def test_validate_tool_arguments_accepts_valid_args(monkeypatch: pytest.MonkeyPatch):
