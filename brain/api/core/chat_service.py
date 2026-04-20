@@ -134,6 +134,18 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
     }
 
 
+async def _finalize_generation_async(context: GenerationContext, reply: str) -> None:
+    """Persist a streamed reply without delaying the final SSE done event."""
+    try:
+        await asyncio.to_thread(finalize_generation, context, reply)
+    except Exception as exc:  # pragma: no cover - best effort after done
+        record_error_event(
+            area="chat_stream_finalize",
+            summary="failed to persist streamed reply",
+            detail=str(exc),
+        )
+
+
 _TOOL_FALLBACK_HINT = (
     "[系統提示] 工具流程部分失敗。請優先使用已成功取得的工具資訊回答使用者，"
     "若資訊不足，請誠實說明限制並提供安全的下一步建議。"
@@ -253,7 +265,7 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
         yield TokenEvent(trace_id=context.trace_id, token=token)
 
     full_reply = "".join(reply_parts)
-    finalize_generation(context, full_reply)
+    finalize_task = asyncio.create_task(_finalize_generation_async(context, full_reply))
     yield DoneEvent(
         trace_id=context.trace_id,
         session_id=context.session_id,
@@ -262,6 +274,7 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
         memory_results=[],
         tool_steps=tool_steps,
     )
+    await asyncio.shield(finalize_task)
 
 
 def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[int, int]:

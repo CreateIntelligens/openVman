@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
 import sys
@@ -284,6 +285,52 @@ async def test_stream_generation_with_tools_uses_native_stream_after_tool_phase(
             "result": "Sunny",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_stream_generation_emits_done_before_finalize_completes(monkeypatch: pytest.MonkeyPatch):
+    chat_service = _load_chat_service(monkeypatch)
+
+    async def fake_stream(messages):
+        for token in ("Hello", " world"):
+            yield token
+
+    finalize_started = asyncio.Event()
+    finalize_release = asyncio.Event()
+
+    async def fake_finalize(context, reply):
+        finalize_started.set()
+        await finalize_release.wait()
+
+    monkeypatch.setattr(chat_service, "stream_chat_reply", fake_stream)
+    monkeypatch.setattr(chat_service, "_finalize_generation_async", fake_finalize)
+
+    context = _make_generation_context(
+        chat_service,
+        trace_id="trace_finalize",
+        session_id="sess_finalize",
+        route=RouteDecision(path="direct", skip_rag=True, skip_tools=True),
+        user_message="hi",
+        prompt_messages=[{"role": "user", "content": "hi"}],
+    )
+
+    stream = chat_service.stream_generation(context)
+    seen_events: list[str] = []
+
+    while True:
+        event = await anext(stream)
+        seen_events.append(event.event)
+        if event.event == "done":
+            assert event.reply == "Hello world"
+            break
+
+    assert seen_events == ["session", "context", "token", "token", "done"]
+    await asyncio.sleep(0)
+    assert finalize_started.is_set()
+
+    finalize_release.set()
+    with pytest.raises(StopAsyncIteration):
+        await anext(stream)
 
 
 @pytest.mark.asyncio
