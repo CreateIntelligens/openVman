@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import type { PersonaSummary, SessionSummary } from "../../api";
 import { formatRelativeTime } from "./helpers";
 import Select from "../Select";
@@ -37,12 +38,13 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-40" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <aside
         onClick={(e) => e.stopPropagation()}
-        className="absolute left-0 top-0 flex h-full w-[20rem] flex-col border-r border-border bg-surface-sunken shadow-lg"
+        style={{ background: "var(--color-surface-sunken)" }}
+        className="absolute left-0 top-0 flex h-full w-[20rem] flex-col border-r border-border shadow-lg"
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
           <h2 className="text-sm font-semibold text-content">對話</h2>
@@ -163,6 +165,7 @@ export default function ChatSidebar({
           </div>
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

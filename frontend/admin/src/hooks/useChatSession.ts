@@ -21,7 +21,6 @@ export function useChatSession() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pendingPrefetchRef = useRef<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // --- Extracted Hooks ---
@@ -143,19 +142,9 @@ export function useChatSession() {
     persistSessionId(payload.session_id);
 
     if (payload.reply) {
-      pendingPrefetchRef.current = payload.reply;
+      void prefetchTts(payload.reply);
     }
-  }, [persistSessionId, setMessages]);
-
-  useEffect(() => {
-    const text = pendingPrefetchRef.current;
-    if (!text) return;
-    const index = messages.length - 1;
-    if (index >= 0 && messages[index]?.role === "assistant") {
-      pendingPrefetchRef.current = null;
-      void prefetchTts(text);
-    }
-  }, [messages, prefetchTts]);
+  }, [persistSessionId, prefetchTts, setMessages]);
 
   const submit = useCallback(async (value = input) => {
     const nextMessage = value.trim();

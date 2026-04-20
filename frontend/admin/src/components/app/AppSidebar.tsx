@@ -1,3 +1,4 @@
+import { useState } from "react";
 import TabGroup from "./TabGroup";
 import { tabGroups, type Tab } from "./navigation";
 
@@ -9,8 +10,13 @@ interface AppSidebarProps {
 }
 
 export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin }: AppSidebarProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const isExpanded = isPinned || isHovered;
+
   return (
     <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={`group/sidebar relative z-20 hidden h-full flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out md:block ${
         isPinned ? "w-60" : "w-[4.5rem] hover:w-60"
       }`}
@@ -21,8 +27,8 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
             <span className="material-symbols-outlined text-[1.125rem]">neurology</span>
           </div>
           <span
-            className={`truncate font-semibold text-content transition-all duration-200 group-hover/sidebar:opacity-100 ${
-              isPinned ? "opacity-100" : "opacity-0"
+            className={`truncate font-semibold text-content transition-all duration-200 ${
+              isExpanded ? "opacity-100" : "opacity-0"
             }`}
           >
             openVman
@@ -37,7 +43,7 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
               tabs={group.tabs}
               active={active}
               onSelect={onSelectTab}
-              isExpanded={isPinned}
+              isExpanded={isExpanded}
             />
           ))}
         </div>
@@ -47,7 +53,7 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
             onClick={onTogglePin}
             title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
             className={`flex h-9 w-full items-center gap-2 rounded-md px-3 text-sm text-content-muted transition-colors hover:bg-surface hover:text-content ${
-              isPinned ? "justify-start" : "justify-center"
+              isExpanded ? "justify-start" : "justify-center"
             }`}
           >
             <span
@@ -59,7 +65,7 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
             </span>
             <span
               className={`transition-all duration-200 ${
-                isPinned ? "opacity-100 max-w-full" : "opacity-0 max-w-0 overflow-hidden"
+                isExpanded ? "opacity-100 max-w-full" : "opacity-0 max-w-0 overflow-hidden"
               }`}
             >
               {isPinned ? "Unpin" : "Pin"}

@@ -252,7 +252,6 @@ _PERSONA_TEMPLATES: dict[str, callable] = {
 
 ## 基本資訊
 - name: {label}
-- emoji: 🤖
 - theme: default
 
 ## 說明
