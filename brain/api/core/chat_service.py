@@ -275,7 +275,6 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
         memory_results=[],
         tool_steps=tool_steps,
     )
-    await asyncio.shield(finalize_task)
 
 
 def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[int, int]:

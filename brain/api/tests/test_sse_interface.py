@@ -328,9 +328,11 @@ async def test_stream_generation_emits_done_before_finalize_completes(monkeypatc
     await asyncio.sleep(0)
     assert finalize_started.is_set()
 
-    finalize_release.set()
     with pytest.raises(StopAsyncIteration):
         await anext(stream)
+
+    finalize_release.set()
+    await asyncio.sleep(0)
 
 
 @pytest.mark.asyncio
