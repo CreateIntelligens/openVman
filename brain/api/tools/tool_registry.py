@@ -46,25 +46,26 @@ class ToolRegistry:
 
     def register_skill_tools(self, skill: Skill) -> None:
         """Register all tools provided by a skill, with namespacing."""
+        scope_label = (
+            f"[{skill.manifest.name} · project:{skill.project_id}]"
+            if skill.scope == "project"
+            else f"[{skill.manifest.name}]"
+        )
         for tool_def in skill.manifest.tools:
             handler = skill.handlers.get(tool_def.name)
             if not handler:
                 continue
-
-            namespaced_name = f"{skill.manifest.id}:{tool_def.name}"
-            tool = Tool(
-                name=namespaced_name,
-                description=f"[{skill.manifest.name}] {tool_def.description}",
+            self.register(Tool(
+                name=f"{skill.tool_prefix}{tool_def.name}",
+                description=f"{scope_label} {tool_def.description}",
                 parameters=tool_def.parameters,
-                handler=handler
-            )
-            self.register(tool)
+                handler=handler,
+            ))
 
     def unregister_skill_tools(self, skill: Skill) -> None:
         """Remove all tools registered by a skill."""
-        prefix = f"{skill.manifest.id}:"
-        to_remove = [name for name in self._tools if name.startswith(prefix)]
-        for name in to_remove:
+        prefix = skill.tool_prefix
+        for name in [n for n in self._tools if n.startswith(prefix)]:
             del self._tools[name]
 
     def get(self, name: str) -> Tool:
@@ -328,31 +329,69 @@ def _request_action(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 _registry: ToolRegistry | None = None
+_last_synced_project: str | None = None
+_sync_invalidated: bool = True
+
+
+def activate_project_sync(project_id: str) -> ToolRegistry:
+    """Set the active project context and return a synced registry.
+
+    Convenience for route handlers that list tools for a given project.
+    """
+    token = _active_project_id.set(project_id or "default")
+    try:
+        return get_tool_registry()
+    finally:
+        _active_project_id.reset(token)
+
+
+def invalidate_skill_tools_sync() -> None:
+    """Force the next ``get_tool_registry()`` call to re-sync skill tools.
+
+    Call after skill CRUD (create / reload / enable / disable) so the registry
+    picks up changes without paying for a full rescan on every tool call.
+    """
+    global _sync_invalidated
+    _sync_invalidated = True
 
 
 def _sync_skill_tools(registry: ToolRegistry, manager: Any) -> None:
-    skills = manager.list_skills()
-    enabled_prefixes = {
-        f"{skill.manifest.id}:"
-        for skill in skills
-        if skill.enabled
-    }
+    """Sync tool registry with skills visible to the active project.
 
-    stale_skill_tools = [
+    Reloads project-scoped skills for the current ``_active_project_id`` so
+    that switching project causes the correct set of project skills to become
+    available. Shared skills are always visible.
+    """
+    active_project = _active_project_id.get()
+    if hasattr(manager, "reload_project_skills"):
+        try:
+            manager.reload_project_skills(active_project)
+        except Exception as exc:  # noqa: BLE001 — sync must not crash the agent loop
+            log_exception("skill_project_reload_failed", exc, project_id=active_project)
+
+    visible = [
+        skill
+        for skill in manager.list_skills()
+        if skill.scope == "shared" or skill.project_id == active_project
+    ]
+    enabled_prefixes = {skill.tool_prefix for skill in visible if skill.enabled}
+
+    stale = [
         name
         for name in registry._tools
-        if ":" in name and not any(name.startswith(prefix) for prefix in enabled_prefixes)
+        if ":" in name
+        and not any(name.startswith(prefix) for prefix in enabled_prefixes)
     ]
-    for name in stale_skill_tools:
+    for name in stale:
         del registry._tools[name]
 
-    for skill in skills:
+    for skill in visible:
         if skill.enabled:
             registry.register_skill_tools(skill)
 
 
 def get_tool_registry() -> ToolRegistry:
-    global _registry
+    global _registry, _last_synced_project, _sync_invalidated
     if _registry is None:
         registry = ToolRegistry()
         registry.register(
@@ -536,12 +575,13 @@ def get_tool_registry() -> ToolRegistry:
             Tool(
                 name="request_action",
                 description=(
-                    "向使用者提議執行一個需要明確同意的後端動作（例如重建知識圖譜）。"
-                    "此工具不會執行任何實際動作，只會產生一張確認卡片顯示在對話中，"
-                    "由使用者點擊確認後，前端才會實際呼叫對應的 API。"
-                    "你必須在使用者以自然語言表達意願、或你判斷有必要時才提議，"
-                    "不可在未被詢問的情況下頻繁提議。"
-                    "目前可用 action：rebuild_graph（重建知識圖譜）。"
+                    "向使用者提議一個動作，由前端顯示卡片處理。"
+                    "此工具本身不會執行，實際執行取決於 action 的 kind："
+                    "kind=mutate 會產生確認卡（例如 rebuild_graph），使用者點擊確認後前端才呼叫 API；"
+                    "kind=navigate 只是切換介面到指定分頁（例如 open_graph_view 切到知識圖譜），不需確認。"
+                    "使用時機：使用者以自然語言表達相關意圖時才提議，不可未被詢問就頻繁提議。"
+                    "目前可用 action：rebuild_graph（重建知識圖譜，mutate）、"
+                    "open_graph_view（切換到知識圖譜視覺化頁，navigate — 使用者想「看」「顯示」「打開」圖譜時用這個，而不是重建）。"
                 ),
                 parameters={
                     "type": "object",
@@ -565,21 +605,26 @@ def get_tool_registry() -> ToolRegistry:
             )
         )
 
-        # Load and register skills
         try:
             from .skill_manager import get_skill_manager
             manager = get_skill_manager()
             _sync_skill_tools(registry, manager)
+            _last_synced_project = _active_project_id.get()
+            _sync_invalidated = False
         except Exception as exc:
             log_exception("skill_registry_init_failed", exc)
 
         _registry = registry
     else:
-        try:
-            from .skill_manager import get_skill_manager
-            _sync_skill_tools(_registry, get_skill_manager())
-        except Exception as exc:
-            log_exception("skill_registry_sync_failed", exc)
+        active_project = _active_project_id.get()
+        if _sync_invalidated or active_project != _last_synced_project:
+            try:
+                from .skill_manager import get_skill_manager
+                _sync_skill_tools(_registry, get_skill_manager())
+                _last_synced_project = active_project
+                _sync_invalidated = False
+            except Exception as exc:
+                log_exception("skill_registry_sync_failed", exc)
     return _registry
 
 

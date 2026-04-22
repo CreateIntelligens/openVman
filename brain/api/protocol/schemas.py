@@ -122,6 +122,8 @@ class SkillCreateRequest(BaseModel):
     skill_id: str = Field(..., min_length=1, description="Unique skill identifier")
     name: str = Field(..., min_length=1, description="Display name")
     description: str = Field("", description="Skill description")
+    scope: str = Field("shared", description="'shared' or 'project'")
+    project_id: str | None = Field(None, description="Required when scope='project'")
 
 
 class SkillFilesUpdateRequest(BaseModel):

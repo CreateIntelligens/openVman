@@ -181,16 +181,35 @@ def resolve_workspace_artifact(relative_path: str, project_id: str = "default") 
     return resolved
 
 
+_CORE_CONTEXT_CACHE: dict[tuple[str, str], tuple[tuple[tuple[str, float], ...], dict[str, str]]] = {}
+
+
 def load_core_workspace_context(persona_id: str = "default", project_id: str = "default") -> dict[str, str]:
-    """Load the core markdown files used to steer chat generation."""
+    """Load the core markdown files used to steer chat generation.
+
+    Cached per (persona_id, project_id) and invalidated when any underlying
+    file's mtime changes — workspace files rarely change but this loader is on
+    the per-chat-request hot path.
+    """
     from personas.personas import resolve_core_document_paths
 
     ensure_workspace_scaffold(project_id)
     document_paths = resolve_core_document_paths(persona_id, project_id=project_id)
-    return {
-        key: path.read_text(encoding="utf-8-sig").strip()
+    signature = tuple(
+        (key, path.stat().st_mtime if path.exists() else 0.0)
+        for key, path in document_paths.items()
+    )
+    cache_key = (persona_id, project_id)
+    cached = _CORE_CONTEXT_CACHE.get(cache_key)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+
+    content = {
+        key: path.read_text(encoding="utf-8-sig").strip() if path.exists() else ""
         for key, path in document_paths.items()
     }
+    _CORE_CONTEXT_CACHE[cache_key] = (signature, content)
+    return content
 
 
 def is_indexable_document(path: Path, project_id: str = "default") -> bool:

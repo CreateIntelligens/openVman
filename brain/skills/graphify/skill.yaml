@@ -1,0 +1,25 @@
+id: graphify
+name: Graphify
+description: 將任意資料夾轉成可導航的知識圖譜。支援 query / path / explain / add 子命令。
+version: "1.0.0"
+tools:
+  - name: run
+    description: |
+      執行 graphify CLI。常用子命令：
+      - query "問題": BFS 問答
+      - path "A" "B": 兩個概念間的最短路徑
+      - explain "節點": 白話解釋某節點
+      - add <url>: 抓取 URL 加入 ./raw
+      - (省略子命令): 對指定路徑跑完整 pipeline
+      回傳 stdout/stderr 與 exit code。
+    parameters:
+      type: object
+      properties:
+        args:
+          type: string
+          description: 傳給 graphify 的完整參數字串，例如 'query "SwinTransformer 是什麼?"' 或 '/data/corpus --mode deep'
+        cwd:
+          type: string
+          description: 執行目錄，預設為 /data
+      required:
+        - args
