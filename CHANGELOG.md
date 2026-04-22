@@ -3,6 +3,23 @@
 ## [Unreleased]
 
 ### Added
+- **Forced Tool Call Routing**: Brain pipeline can now force a specific skill invocation per request, with dynamic skill registry sync so newly registered skills become callable without restart (`pipeline.py`, `tool_registry.py`, `skill_manager.py`).
+- **Direct Chat Route**: Pure conversational messages bypass tool-instruction assembly, reducing prompt size and latency when no skills are needed (`pipeline.py`, `prompt_builder.py`).
+- **Chat Action Request Flow**: New end-to-end "action request" flow — Brain emits structured action proposals via `tools/actions.py`; admin UI renders an `ActionRequestCard` so the operator can approve/deny tool calls inline (`chat.ts`, `ChatInput.tsx`, `useChatSession.ts`).
+- **Knowledge Graph (graphify)**: New `graphify` skill + graph HTTP endpoints; admin knowledge base gains a "Graph" tab for graph visualisation alongside files/records (`brain/skills/graphify/`, `routes/knowledge.py`, `pages/KnowledgeBase.tsx`).
+- **Admin Slash Autocomplete**: `/skill` dropdown in chat input with live skill filtering and keyboard navigation (`ChatInput.tsx`, `SlashDropdown.tsx`, `useSlashAutocomplete.ts`).
+- **Chat Input History**: Up/Down arrow keys cycle through previous user messages (seeded from the current session), with history taking priority even when a slash command is visible in the field (`useInputHistory.ts`, `ChatInput.tsx`).
+- **Unified Admin Navigation**: New `NavigationContext` centralising route state across `AppSidebar` / `ChatSidebar` / pages, plus redesigned design-token palette.
+- **Idle Timeout Management**: Backend introduces idle-timeout handling for live sessions; frontend upgraded to `nanoid` v5.
+- **Brain Route Modularisation**: Brain HTTP surface split into dedicated modules under `brain/api/routes/` (chat / knowledge / tools / internal routes), replacing the previous monolithic router.
+
+### Changed
+- **Admin Frontend Redesign**: Overhauled design tokens in `tailwind.config.js` + `index.css`; all semantic colours now expose RGB channels so Tailwind opacity modifiers (`bg-primary/20`, etc.) render correctly. Sidebar, TTS controls, and skill management views updated to the new tokens.
+- **TTS Controls Relocation**: Moved TTS provider/voice controls into the chat input bar; `identity.emoji` field removed from persona schema.
+- **Brain API Dockerfile**: Rewritten as multi-stage `builder → runner` with `uv` dependency caching, significantly reducing image size and rebuild time.
+- **SSE Finalisation Ordering**: `server.done` SSE event is now emitted before `finalize()` completes, preventing client races that blocked the live relay.
+
+### Added (earlier)
 - **Live Voice WebSocket Pipeline**: Implemented an end-to-end real-time voice interaction loop connecting frontend ASR, backend orchestration, and Brain streaming.
 - **Frontend Live Runtime**: Created a new interactive runtime in `frontend/app` with VAD (Voice Activity Detection), automatic turn detection, and audio-driven lip-sync.
 - **Smart Interruption (Barge-in)**: Added a `Guard Agent` powered interruption mechanism allowing users to interrupt the avatar mid-sentence with low-latency reflexes.

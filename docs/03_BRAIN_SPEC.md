@@ -241,6 +241,28 @@ Total Context Budget = 8192 tokens（依實際 LLM 模型調整）
 * 大腦層必須支援 LLM 的 Native Function Calling 特性。
 * 當 LLM 決定調用工具時，暫停文字串流輸出，透過定義好的 RESTful API (如 CRM API) 獲取結果後，將結果作為 `tool_message` 再次餵給 LLM 繼續生成。
 
+#### 9.1 路由模式 (Routing Modes)
+
+`pipeline.py` 依請求種類分為三條路徑，目的是最小化每次呼叫的 prompt 體積與工具搜尋成本：
+
+1. **Direct Chat Route**：純對話訊息（未帶 forced skill、且 LLM 判定不需調用工具）直接進入 prompt assembly 而不組裝 tool-instruction/schema 段落，降低體積與延遲。
+2. **Tool-Enabled Route**：一般訊息保留完整的 tool schema 讓 LLM 自行決定是否 function-call。
+3. **Forced Tool Call Route**：呼叫端可在請求中指定 `skill_id` (或 `tool_name`)，pipeline 會強制將該 skill 注入為唯一可用工具並要求立即調用；配合 `skill_manager` 的動態註冊，使新上線或修改過的技能毋需重啟服務即可立即使用。Admin Chat 的 `/skill` slash command 即走此路徑。
+
+#### 9.2 Action Request Flow（操作者審批型工具調用）
+
+對於具備副作用或需人為確認的工具調用，Brain 透過 `tools/actions.py` 回傳結構化的 **action request** 而非直接執行：
+
+* Brain 將工具調用包成 `action_request` 事件（含名稱、參數、摘要）經 SSE/WS 下發。
+* Admin UI 的 `ActionRequestCard` 呈現提案並由操作者核可/拒絕。
+* 核可後由前端回呼執行端點，Brain 才真正執行工具並把結果作為 `tool_message` 續推。
+
+此流程適用於 CRM 寫入、寄信、下單等高風險動作，讓人類可在迴圈中把關。
+
+#### 9.3 SSE Finalisation Ordering
+
+串流關閉時，`server.done` 事件必須在 `finalize()` 完整結束**之前**發出，避免前端 live relay 在 finalize 阻塞期間誤判連線中斷。pipeline 保證 `done` 優先送出，`finalize()` 的後續寫檔 / 記憶寫入則於背景完成。
+
 ```python
 # 概念範例：Tool Calling 流程
 async def handle_tool_call(tool_name: str, arguments: dict):
@@ -268,6 +290,14 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 2. 撰寫 `skill.yaml` (包含 id, name, tools[])。
 3. 撰寫 `main.py` (實作與 tools[] 對應的函式)。
 4. 技能工具會自動整合進 `ToolRegistry` 並供 LLM 調用。
+
+#### 10.2 動態註冊同步 (Dynamic Registry Sync)
+
+`skill_manager` 與 `tool_registry` 於執行期保持同步：透過 Admin API 新增 / 修改 / 停用的技能會立即反映至 ToolRegistry，下一次請求即可使用，無需重啟 Brain 服務。此機制是 §9.1 Forced Tool Call Route 的基礎。
+
+#### 10.3 內建技能：graphify（知識圖譜）
+
+`brain/skills/graphify/` 為內建技能，將輸入內容（程式碼、文件、論文、圖片等）抽取為 **節點 + 邊** 的知識圖譜，並對外提供 `/graph` HTTP endpoint 供 Admin UI 的 Graph 分頁（見 `02_FRONTEND_SPEC` §12.4）呼叫。非結構化知識於此以視覺化方式檢索，補強純 RAG 對實體關聯較弱的短板。
 
 ### 11. 睡眠與反思機制 (Sleep & Reflection)
 
@@ -378,6 +408,8 @@ async def generate_response_stream(
     """
     pass
 ```
+
+**路由模組化 (Route Modularisation)**：HTTP surface 已從單一 router 拆分為 `brain/api/routes/` 下的獨立模組（`chat` / `knowledge` / `tools` / 內部路由等），各自負責對應資源的 CRUD 與 streaming，降低耦合並讓新增端點（如 graphify `/graph`）不再牽動整個路由樹。
 
 **HTTP 介面（供後端通過 HTTP 呼叫時使用）**：
 ```

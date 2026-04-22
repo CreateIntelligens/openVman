@@ -1,7 +1,7 @@
 # openVman — 虛擬人系統架構總覽 (Architecture Index)
 
-> **版本**：v0.9.0  
-> **最後更新**：2026-03-26  
+> **版本**：v0.9.1  
+> **最後更新**：2026-04-21  
 > **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
 
 ---
@@ -235,7 +235,12 @@
 - ✅ **Knowledge Base Admin Panel**：整合遞迴式檔案探索器與雙視窗 Markdown 編輯器，支援 LanceDB 同步狀態展示。
 - ✅ **Admin Web Light Mode**：整合專屬風格系統，支援深淺色模式切換與持久化儲存。
 - ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + Docling/Markdown 文件 ingestion 管線
-- ✅ **Brain Skills 模組化擴充系統**：支援動態載載入外部技能工具
+- ✅ **Brain Skills 模組化擴充系統**：支援動態載入外部技能工具，技能註冊表在執行期同步（無須重啟）
+- ✅ **Forced Tool Call Routing**：可針對單次請求強制指定技能調用路徑，結合動態 skill registry 讓新註冊的技能立即可用
+- ✅ **Direct Chat Route**：純對話訊息跳過 tool-instruction 組裝，降低 prompt 體積與延遲
+- ✅ **Chat Action Request Flow**：Brain 以結構化 action proposal 形式回傳工具調用請求，Admin UI 以 ActionRequestCard 讓操作者逐項審批
+- ✅ **Knowledge Graph (graphify)**：內建 graphify 技能與 graph HTTP endpoints，Admin 知識庫新增 Graph 視覺化分頁
+- ✅ **Unified Admin Navigation**：以 NavigationContext 集中管理路由/分頁狀態，整合 AppSidebar、ChatSidebar 與各頁面；設計 token 改以 RGB channel 暴露，完整支援 Tailwind opacity modifier
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
 - ✅ 完整的錯誤處理、斷線重連、優雅關機機制
 - ✅ Token 預算管理 + 安全防護 (Guardrails)

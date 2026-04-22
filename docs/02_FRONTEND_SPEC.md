@@ -242,6 +242,20 @@ ws.onclose = () => { reconnect(); };
 #### 12.3 狀態反饋
 檔案右側會顯示「已索引 (Indexed)」或「處理中 (Processing)」的燈號，數據來源於 WebSocket 的 `gateway_status`。
 
+#### 12.4 知識圖譜視圖 (Graph View)
+知識庫頁面新增 **Graph** 分頁，呼叫 Brain `/graph` endpoint 取得由 `graphify` skill 產出的節點/關係資料，在 Admin UI 中以互動式圖形呈現實體與關聯。此視圖與檔案/紀錄分頁並列，作為非結構化知識的視覺化檢索入口。
+
+### 12.5 Admin 對話控制台 (Admin Chat Console)
+
+`/admin/chat` 提供與 Brain 互動的對話控制台，與知識庫面板共用同一套 `NavigationContext` 路由/分頁狀態。控制台包含下列能力：
+
+* **Slash Autocomplete (`/skill`)**：在輸入框輸入 `/` 時彈出 `SlashDropdown`，從 `skill_manager` 動態取得的技能清單即時過濾。支援 ↑/↓ 選擇、Enter / Tab 確認、Esc 關閉。選定技能後會被組裝為 forced tool call，Brain 端直接路由到該技能。
+* **Input History (↑/↓)**：以 `useInputHistory` 保存當前 session 的使用者訊息，當游標位於輸入起點或輸入框為空時，↑/↓ 循環帶入歷史訊息；輸入框仍有文字且 slash dropdown 顯示中時，歷史捕獲優先讓位給 slash autocomplete。
+* **Action Request Card**：當 Brain 回傳 `action_request` 事件時，前端以 `ActionRequestCard` 呈現工具調用提案（名稱、參數、說明）；操作者可逐案核可/拒絕，核可後才真正執行工具。
+* **TTS / ASR 控制集中化**：TTS provider / voice、ASR 開關、Live 麥克風鍵皆整併至輸入列，降低視覺雜訊。TTS fallback 會以 toast 提示。
+* **統一導覽 (`NavigationContext`)**：`AppSidebar`、`ChatSidebar`、各頁面共享單一導覽狀態，切換角色 (persona)、載入歷史 session、建立新對話都透過同一份 context 管理。
+* **設計 Token (RGB channels)**：`tailwind.config.js` 與 `index.css` 將語意色 (`primary`、`surface`、`danger` 等) 以 `R G B` 三通道形式暴露，讓 Tailwind 透明度修飾符 (`bg-primary/20` 等) 能夠正確運算。
+
 ### 13. 媒體上傳工作流 (Media Upload Workflow)
 
 當使用者選取檔案（圖片/影片/文件）時，前端不透過 WebSocket 發送二進位資料，而是透過標準 HTTP POST 上傳至 Gateway：
