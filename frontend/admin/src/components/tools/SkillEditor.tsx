@@ -5,11 +5,13 @@ import { filesChanged, SKILL_EDITOR_TABS, type SkillEditorTab } from "./helpers"
 
 interface SkillEditorProps {
   skillId: string;
+  scope?: "shared" | "project";
+  projectId?: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export default function SkillEditor({ skillId, onClose, onSaved }: SkillEditorProps) {
+export default function SkillEditor({ skillId, scope, projectId, onClose, onSaved }: SkillEditorProps) {
   const [files, setFiles] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<SkillEditorTab>("skill.yaml");
   const [loading, setLoading] = useState(true);
@@ -21,7 +23,7 @@ export default function SkillEditor({ skillId, onClose, onSaved }: SkillEditorPr
   useEffect(() => {
     setLoading(true);
     setError("");
-    fetchSkillFiles(skillId)
+    fetchSkillFiles(skillId, { scope, project_id: projectId })
       .then((data) => {
         setFiles(data.files);
         setOriginalFiles(data.files);
@@ -29,7 +31,7 @@ export default function SkillEditor({ skillId, onClose, onSaved }: SkillEditorPr
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [skillId]);
+  }, [skillId, scope, projectId]);
 
   const handleChange = (content: string) => {
     const nextFiles = { ...files, [activeTab]: content };
@@ -40,7 +42,7 @@ export default function SkillEditor({ skillId, onClose, onSaved }: SkillEditorPr
   const handleSave = () => {
     setSaving(true);
     setError("");
-    updateSkillFiles(skillId, files)
+    updateSkillFiles(skillId, files, { scope, project_id: projectId })
       .then(() => {
         setOriginalFiles({ ...files });
         setDirty(false);

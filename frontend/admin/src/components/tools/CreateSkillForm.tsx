@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createSkill } from "../../api";
+import { useProject } from "../../context/ProjectContext";
 import StatusAlert from "../StatusAlert";
 import { nameToId } from "./helpers";
 
@@ -8,10 +9,12 @@ interface CreateSkillFormProps {
 }
 
 export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
+  const { projectId } = useProject();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [idOverride, setIdOverride] = useState("");
   const [description, setDescription] = useState("");
+  const [scope, setScope] = useState<"shared" | "project">("project");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
@@ -31,7 +34,13 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
     if (!canCreate) return;
     setCreating(true);
     setError("");
-    createSkill(derivedId, trimmedName, trimmedDescription)
+    createSkill(
+      derivedId,
+      trimmedName,
+      trimmedDescription,
+      scope,
+      scope === "project" ? projectId : undefined,
+    )
       .then(() => {
         reset();
         setOpen(false);
@@ -69,6 +78,29 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
       </div>
 
       {error && <StatusAlert type="error" message={error} />}
+
+      <div>
+        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">範圍</label>
+        <div className="flex gap-2">
+          {([
+            { value: "project", label: `專案（${projectId}）` },
+            { value: "shared", label: "共用" },
+          ] as const).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setScope(option.value)}
+              className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border transition-colors ${
+                scope === option.value
+                  ? "bg-primary/10 border-primary/40 text-primary"
+                  : "bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div>
         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">名稱</label>

@@ -17,6 +17,7 @@ import { useVad } from "./useVad";
 import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
+import { useInputHistory } from "./useInputHistory";
 
 const STOP_REPLY_NOTICE = "已停止回覆";
 const STOP_REPLY_NOTICE_MS = 2500;
@@ -167,6 +168,22 @@ export function useChatSession() {
     setSlashOpen,
   } = useSlashAutocomplete(input, setInput);
 
+  const { push: pushHistory, seed: seedHistory, onKeyDown: onHistoryKeyDown } = useInputHistory();
+
+  useEffect(() => {
+    if (sending) return;
+    const userMessages = messages
+      .filter((m) => m.role === "user")
+      .map((m) => m.content);
+    if (userMessages.length > 0) {
+      seedHistory(userMessages);
+    }
+  }, [sessionId, sending, messages, seedHistory]);
+
+  useEffect(() => () => {
+    abortControllerRef.current?.abort();
+  }, []);
+
   // --- ASR & VAD ---
   const asrBaseRef = useRef("");
   const { listening: asrListening, supported: asrSupported, toggle: toggleAsr, restart: restartAsr } = useSpeechRecognition(
@@ -226,12 +243,12 @@ export function useChatSession() {
   }, [clearStopReplyTimer]);
 
   const applyChatResult = useCallback((payload: ChatResultPayload) => {
-    const knowledge = payload.knowledge_results ?? [];
-    const memory = payload.memory_results ?? [];
-    const sources = { knowledge, memory };
+    const sources = {
+      knowledge: payload.knowledge_results ?? [],
+      memory: payload.memory_results ?? [],
+    };
 
     setMessages((current) => applyChatResultToMessages(current, payload, sources));
-
     persistSessionId(payload.session_id);
 
     if (payload.reply) {
@@ -253,6 +270,7 @@ export function useChatSession() {
 
     const userTimestamp = new Date().toISOString();
     setMessages((current) => addPendingExchange(current, nextMessage, userTimestamp));
+    pushHistory(nextMessage);
     setInput("");
 
     try {
@@ -267,15 +285,12 @@ export function useChatSession() {
               loadSessions();
             }
           },
-          onToken: ({ token }) => {
-            setMessages((current) => appendStreamingToken(current, token));
-          },
+          onToken: ({ token }) => setMessages((current) => appendStreamingToken(current, token)),
           onTool: ({ name, result }) => {
             const request = parseActionRequestResult(name, result);
-            if (!request) {
-              return;
+            if (request) {
+              setMessages((current) => appendActionRequestToLastAssistant(current, request));
             }
-            setMessages((current) => appendActionRequestToLastAssistant(current, request));
           },
           onDone: (payload) => {
             applyChatResult(payload);
@@ -300,7 +315,7 @@ export function useChatSession() {
       abortControllerRef.current = null;
       setSending(false);
     }
-  }, [applyChatResult, clearStopReplyTimer, input, loadSessions, loadingPersonas, persistSessionId, selectedPersonaId, sending, sessionId, setError, setMessages, showStoppedReplyNotice]);
+  }, [applyChatResult, clearStopReplyTimer, input, loadSessions, loadingPersonas, persistSessionId, pushHistory, selectedPersonaId, sending, sessionId, setError, setMessages, showStoppedReplyNotice]);
 
   submitRef.current = submit;
 
@@ -361,6 +376,7 @@ export function useChatSession() {
     setError,
     setTtsFallbackToast,
     handleInputChange,
+    onHistoryKeyDown,
     pickSlash,
     playTts,
     loadSessions,

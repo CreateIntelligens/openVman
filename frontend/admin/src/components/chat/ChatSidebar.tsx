@@ -43,7 +43,7 @@ export default function ChatSidebar({
       <div className="absolute inset-0 bg-black/30" />
       <aside
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "var(--color-surface-sunken)" }}
+        style={{ background: "rgb(var(--color-surface-sunken))" }}
         className="absolute left-0 top-0 flex h-full w-[20rem] flex-col border-r border-border shadow-lg"
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">

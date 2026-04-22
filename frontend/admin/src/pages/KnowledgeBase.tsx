@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigation } from "../context/NavigationContext";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
 import FileView from "../components/kb/FileView";
@@ -81,6 +82,13 @@ export default function KnowledgeBase() {
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"documents" | "graph">("documents");
+  const { pendingToken, consumeSubView } = useNavigation();
+  useEffect(() => {
+    const view = consumeSubView("KnowledgeBase");
+    if (view === "graph" || view === "documents") {
+      setActiveTab(view);
+    }
+  }, [pendingToken, consumeSubView]);
 
   const sourceDragDir = useMemo(
     () => draggingPath ? draggingPath.split("/").slice(0, -1).join("/") : "",

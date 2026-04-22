@@ -20,6 +20,11 @@ interface ChatInputProps {
   asrSupported: boolean;
   vadSpeaking: boolean;
   onInputChange: (value: string) => void;
+  onHistoryKeyDown?: (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+    currentValue: string,
+    setValue: (next: string) => void,
+  ) => boolean;
   onSubmit: () => void;
   onStopStreaming: () => void;
   onPickSlash: (skill: SkillInfo) => void;
@@ -53,6 +58,7 @@ export default function ChatInput(props: ChatInputProps) {
     asrSupported,
     vadSpeaking,
     onInputChange,
+    onHistoryKeyDown,
     onSubmit,
     onStopStreaming,
     onPickSlash,
@@ -94,11 +100,39 @@ export default function ChatInput(props: ChatInputProps) {
   } else if (liveConnected) {
     liveMicButtonClassName = "border border-border bg-surface-raised text-content hover:bg-surface-sunken";
   }
+  const hasSlashMatches = slashEnabled && slashOpen && slashMatches.length > 0;
+
+  const handleSlashKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (!hasSlashMatches) {
+      return false;
+    }
+
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        onSlashIndex((prev) => Math.min(prev + 1, slashMatches.length - 1));
+        return true;
+      case "ArrowUp":
+        event.preventDefault();
+        onSlashIndex((prev) => Math.max(prev - 1, 0));
+        return true;
+      case "Tab":
+        event.preventDefault();
+        onPickSlash(slashMatches[clampedSlashIndex]);
+        return true;
+      case "Escape":
+        event.preventDefault();
+        onSlashClose();
+        return true;
+      default:
+        return false;
+    }
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (slashEnabled && slashOpen && slashMatches.length > 0) {
+      if (hasSlashMatches) {
         onPickSlash(slashMatches[clampedSlashIndex]);
       } else {
         onSubmit();
@@ -106,21 +140,15 @@ export default function ChatInput(props: ChatInputProps) {
       return;
     }
 
-    if (slashEnabled && slashOpen && slashMatches.length > 0) {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        onSlashIndex((prev) => Math.min(prev + 1, slashMatches.length - 1));
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        onSlashIndex((prev) => Math.max(prev - 1, 0));
-      } else if (event.key === "Tab") {
-        event.preventDefault();
-        onPickSlash(slashMatches[clampedSlashIndex]);
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        onSlashClose();
-      }
+    // History has priority: the hook only claims the event when caret is at
+    // start / input is empty / already cycling, so normal slash autocomplete
+    // (which runs with text to the right of the caret) still falls through.
+    if (mode === "text" && onHistoryKeyDown) {
+      const handled = onHistoryKeyDown(event, input, onInputChange);
+      if (handled) return;
     }
+
+    handleSlashKeyDown(event);
   };
 
   return (

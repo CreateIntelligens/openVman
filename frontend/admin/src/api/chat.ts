@@ -8,17 +8,27 @@ export interface RetrievalResult {
   _distance?: number;
 }
 
+export type ActionKind = "mutate" | "navigate" | "embed";
+export type ActionRisk = "low" | "medium" | "high";
+
+export interface NavTarget {
+  tab: string;
+  sub_view: string | null;
+}
+
 export interface ActionRequest {
   type: "action_request";
   action: string;
   label: string;
   description: string;
-  risk: string;
+  kind?: ActionKind;
+  risk: ActionRisk;
   endpoint: string;
   method: string;
   params: Record<string, unknown>;
   confirm_required: boolean;
   reason?: string;
+  nav_target?: NavTarget;
 }
 
 export interface ChatMessage {

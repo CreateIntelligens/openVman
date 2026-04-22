@@ -6,7 +6,7 @@
 /* Warm Professional palette. Warm neutral base + deep teal accent. */
 
 :root {
-  /* Neutrals (warm gray / stone) */
+  /* Neutrals (warm gray / stone) — kept as hex for non-tailwind use */
   --stone-50: #faf9f7;
   --stone-100: #f4f2ee;
   --stone-200: #e7e4de;
@@ -19,38 +19,39 @@
   --stone-900: #1c1a17;
   --stone-950: #151311;
 
-  /* Accent (deep teal) */
+  /* Accent (deep teal) — kept as hex for non-tailwind use */
   --teal-50: #effcf9;
   --teal-100: #c7f5eb;
   --teal-500: #0d9488;
   --teal-600: #0b7a70;
   --teal-700: #0a6159;
 
-  /* Semantic — light */
-  --color-surface: #faf9f7;
-  --color-surface-sunken: #f4f2ee;
-  --color-surface-raised: #ffffff;
-  --color-surface-overlay: #ffffff;
+  /* Semantic tokens — RGB channels (space-separated) so tailwind can apply <alpha-value>. */
+  /* Light */
+  --color-surface: 250 249 247;
+  --color-surface-sunken: 244 242 238;
+  --color-surface-raised: 255 255 255;
+  --color-surface-overlay: 255 255 255;
 
-  --color-border: #e7e4de;
-  --color-border-strong: #d3cec5;
+  --color-border: 231 228 222;
+  --color-border-strong: 211 206 197;
 
-  --color-content: #1c1a17;
-  --color-content-muted: #56524a;
-  --color-content-subtle: #7a7469;
-  --color-content-inverse: #faf9f7;
+  --color-content: 28 26 23;
+  --color-content-muted: 86 82 74;
+  --color-content-subtle: 122 116 105;
+  --color-content-inverse: 250 249 247;
 
-  --color-accent: #0d9488;
-  --color-accent-50: #effcf9;
-  --color-accent-100: #c7f5eb;
-  --color-accent-500: #0d9488;
-  --color-accent-600: #0b7a70;
-  --color-accent-700: #0a6159;
+  --color-accent: 13 148 136;
+  --color-accent-50: 239 252 249;
+  --color-accent-100: 199 245 235;
+  --color-accent-500: 13 148 136;
+  --color-accent-600: 11 122 112;
+  --color-accent-700: 10 97 89;
 
-  --color-success: #059669;
-  --color-warn: #b45309;
-  --color-danger: #b91c1c;
-  --color-info: #1d4ed8;
+  --color-success: 5 150 105;
+  --color-warn: 180 83 9;
+  --color-danger: 185 28 28;
+  --color-info: 29 78 216;
 
   /* Radius + layout tokens */
   --radius-sm: 0.375rem;
@@ -60,30 +61,30 @@
 }
 
 .dark {
-  --color-surface: #151311;
-  --color-surface-sunken: #1c1a17;
-  --color-surface-raised: #24211d;
-  --color-surface-overlay: #2d2a25;
+  --color-surface: 21 19 17;
+  --color-surface-sunken: 28 26 23;
+  --color-surface-raised: 36 33 29;
+  --color-surface-overlay: 45 42 37;
 
-  --color-border: #3d3a34;
-  --color-border-strong: #56524a;
+  --color-border: 61 58 52;
+  --color-border-strong: 86 82 74;
 
-  --color-content: #f4f2ee;
-  --color-content-muted: #a9a298;
-  --color-content-subtle: #7a7469;
-  --color-content-inverse: #151311;
+  --color-content: 244 242 238;
+  --color-content-muted: 169 162 152;
+  --color-content-subtle: 122 116 105;
+  --color-content-inverse: 21 19 17;
 
-  --color-accent: #14b8a6;
-  --color-accent-50: #0a6159;
-  --color-accent-100: #0b7a70;
-  --color-accent-500: #14b8a6;
-  --color-accent-600: #2dd4bf;
-  --color-accent-700: #5eead4;
+  --color-accent: 20 184 166;
+  --color-accent-50: 10 97 89;
+  --color-accent-100: 11 122 112;
+  --color-accent-500: 20 184 166;
+  --color-accent-600: 45 212 191;
+  --color-accent-700: 94 234 212;
 
-  --color-success: #10b981;
-  --color-warn: #f59e0b;
-  --color-danger: #f87171;
-  --color-info: #60a5fa;
+  --color-success: 16 185 129;
+  --color-warn: 245 158 11;
+  --color-danger: 248 113 113;
+  --color-info: 96 165 250;
 }
 
 html {
@@ -92,8 +93,8 @@ html {
 
 body {
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-  background: var(--color-surface);
-  color: var(--color-content);
+  background: rgb(var(--color-surface));
+  color: rgb(var(--color-content));
   font-size: 1rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -106,12 +107,12 @@ body {
   .page-scroll {
     @apply h-full overflow-y-auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--color-border-strong) transparent;
+    scrollbar-color: rgb(var(--color-border-strong)) transparent;
   }
 
   .card {
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
+    background: rgb(var(--color-surface-raised));
+    border: 1px solid rgb(var(--color-border));
     border-radius: var(--radius-lg);
   }
 
@@ -135,8 +136,8 @@ body {
   }
 
   .btn-primary {
-    background: var(--color-accent);
-    color: var(--color-content-inverse);
+    background: rgb(var(--color-accent));
+    color: rgb(var(--color-content-inverse));
   }
   .btn-primary:hover:not(:disabled) {
     background: var(--color-accent-600);
@@ -144,37 +145,37 @@ body {
 
   .btn-ghost {
     background: transparent;
-    color: var(--color-content);
-    border-color: var(--color-border);
+    color: rgb(var(--color-content));
+    border-color: rgb(var(--color-border));
   }
   .btn-ghost:hover:not(:disabled) {
-    background: var(--color-surface-sunken);
+    background: rgb(var(--color-surface-sunken));
   }
 
   .btn-danger {
     background: transparent;
-    color: var(--color-danger);
-    border-color: var(--color-border);
+    color: rgb(var(--color-danger));
+    border-color: rgb(var(--color-border));
   }
   .btn-danger:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+    background: color-mix(in srgb, rgb(var(--color-danger)) 10%, transparent);
   }
 
   .input {
     width: 100%;
     padding: 0.5rem 0.75rem;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
+    background: rgb(var(--color-surface-raised));
+    border: 1px solid rgb(var(--color-border));
     border-radius: var(--radius-md);
-    color: var(--color-content);
+    color: rgb(var(--color-content));
     font-size: 0.875rem;
     line-height: 1.5;
     transition: border-color 120ms ease, box-shadow 120ms ease;
   }
   .input:focus {
     outline: none;
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+    border-color: rgb(var(--color-accent));
+    box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--color-accent)) 20%, transparent);
   }
 
   .chip {
@@ -182,11 +183,11 @@ body {
     align-items: center;
     gap: 0.25rem;
     padding: 0.125rem 0.5rem;
-    background: var(--color-surface-sunken);
-    border: 1px solid var(--color-border);
+    background: rgb(var(--color-surface-sunken));
+    border: 1px solid rgb(var(--color-border));
     border-radius: var(--radius-sm);
     font-size: 0.75rem;
-    color: var(--color-content-muted);
+    color: rgb(var(--color-content-muted));
   }
 
   .page-header {
@@ -196,18 +197,18 @@ body {
     gap: 1rem;
     padding-bottom: 1rem;
     margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid rgb(var(--color-border));
   }
   .page-title {
     font-size: 1.5rem;
     font-weight: 600;
     line-height: 1.2;
-    color: var(--color-content);
+    color: rgb(var(--color-content));
   }
   .page-subtitle {
     margin-top: 0.25rem;
     font-size: 0.875rem;
-    color: var(--color-content-muted);
+    color: rgb(var(--color-content-muted));
   }
 }
 
@@ -220,12 +221,12 @@ body {
 }
 
 .page-scroll::-webkit-scrollbar-thumb {
-  background: var(--color-border-strong);
+  background: rgb(var(--color-border-strong));
   border-radius: 9999px;
 }
 
 .page-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--color-content-subtle);
+  background: rgb(var(--color-content-subtle));
 }
 
 /* ── Hide-scrollbar utility ── */
@@ -241,7 +242,7 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-color: rgb(var(--color-border-strong)) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -254,12 +255,12 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--color-border-strong);
+  background: rgb(var(--color-border-strong));
   border-radius: 9999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--color-content-subtle);
+  background: rgb(var(--color-content-subtle));
 }
 
 .material-symbols-outlined {

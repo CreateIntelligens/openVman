@@ -2,6 +2,7 @@ import { useState } from "react";
 import AppSidebar from "./components/app/AppSidebar";
 import TopBar, { MobileNavDrawer } from "./components/app/TopBar";
 import { allTabs, components, type Tab } from "./components/app/navigation";
+import { NavigationProvider } from "./context/NavigationContext";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 
@@ -21,6 +22,7 @@ function AppContent() {
   };
 
   return (
+    <NavigationProvider onSelectTab={switchTab}>
     <div className="flex h-screen overflow-hidden bg-surface text-content">
       <AppSidebar
         active={active}
@@ -63,6 +65,7 @@ function AppContent() {
         </div>
       </main>
     </div>
+    </NavigationProvider>
   );
 }
 

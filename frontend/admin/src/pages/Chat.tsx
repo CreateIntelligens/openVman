@@ -57,6 +57,7 @@ export default function Chat() {
     setError,
     setTtsFallbackToast,
     handleInputChange,
+    onHistoryKeyDown,
     pickSlash,
     playTts,
     loadSessions,
@@ -376,6 +377,7 @@ export default function Chat() {
             asrSupported={asrSupported}
             vadSpeaking={vadSpeaking}
             onInputChange={handleInputChange}
+            onHistoryKeyDown={onHistoryKeyDown}
             onSubmit={handleSubmit}
             onStopStreaming={stopStreaming}
             onPickSlash={pickSlash}

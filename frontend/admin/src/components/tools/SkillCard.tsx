@@ -25,7 +25,21 @@ export default function SkillCard({
             <span className="material-symbols-outlined text-primary text-xl">extension</span>
           </div>
           <div>
-            <p className="font-bold text-sm">{skill.name}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-bold text-sm">{skill.name}</p>
+              {skill.scope && (
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                    skill.scope === "project"
+                      ? "bg-primary/15 text-primary border border-primary/30"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  }`}
+                  title={skill.scope === "project" ? `專案：${skill.project_id}` : "共用範圍"}
+                >
+                  {skill.scope === "project" ? `專案` : "共用"}
+                </span>
+              )}
+            </div>
             <p className="text-[10px] text-slate-500 font-mono">{skill.id} v{skill.version}</p>
           </div>
         </div>
