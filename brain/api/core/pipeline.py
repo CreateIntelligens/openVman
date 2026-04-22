@@ -7,6 +7,7 @@ from typing import Any
 
 from infra.reflection import compress_text
 from protocol.message_envelope import BrainMessage, METADATA_ORIGINAL_USER_MESSAGE
+from tools.actions import action_nl_hints
 
 
 @dataclass(slots=True, frozen=True)
@@ -71,17 +72,10 @@ _TOOL_MEMORY_HINTS = (
     "remember",
     "save memory",
 )
-_TOOL_ACTION_HINTS = (
-    "重建圖譜",
-    "rebuild graph",
-    "rebuild_graph",
-    "graph status",
-    "圖譜狀態",
-)
 _TOOL_QUERY_VERBS_CASEFOLDED = tuple(verb.casefold() for verb in _TOOL_QUERY_VERBS)
 _TOOL_QUERY_TARGETS_CASEFOLDED = tuple(target.casefold() for target in _TOOL_QUERY_TARGETS)
 _TOOL_MEMORY_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in _TOOL_MEMORY_HINTS)
-_TOOL_ACTION_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in _TOOL_ACTION_HINTS)
+_TOOL_ACTION_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in action_nl_hints())
 _SLASH_TOOL_REWRITE_PREFIX = "[系統指令] 請立即呼叫工具 `"
 
 

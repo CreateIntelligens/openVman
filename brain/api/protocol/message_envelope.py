@@ -25,6 +25,7 @@ class RequestContext:
 ALLOWED_ROLES = frozenset({"system", "user", "assistant", "tool", "control"})
 
 METADATA_ORIGINAL_USER_MESSAGE = "original_user_message"
+METADATA_ACTION_REQUESTS = "action_requests"
 
 
 @dataclass(slots=True)

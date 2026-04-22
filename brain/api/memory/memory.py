@@ -71,16 +71,19 @@ def append_session_message(
     role: str,
     content: str,
     project_id: str = "default",
+    metadata: dict[str, Any] | None = None,
 ) -> SessionState:
     """Append a message to the session and enforce max rounds."""
-    return get_session_store(project_id).append_message(session_id, persona_id, role, content)
+    return get_session_store(project_id).append_message(
+        session_id, persona_id, role, content, metadata=metadata,
+    )
 
 
 def list_session_messages(
     session_id: str,
     persona_id: str | None = None,
     project_id: str = "default",
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Return serialized session messages for APIs and prompt building."""
     messages = get_session_store(project_id).list_messages(session_id, persona_id)
     return [dict(message) for message in messages]

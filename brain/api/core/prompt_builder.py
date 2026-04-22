@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from config import get_settings
 from core.pipeline import enforce_context_budget
@@ -91,6 +93,7 @@ def _format_workspace_block(label: str, content: str, max_chars: int) -> str:
 
 
 def _format_request_context(request_context: dict[str, Any]) -> str:
+    now = datetime.now(ZoneInfo(get_settings().dreaming_timezone))
     lines = [
         "REQUEST CONTEXT：",
         f"- trace_id: {request_context.get('trace_id', '')}",
@@ -98,5 +101,6 @@ def _format_request_context(request_context: dict[str, Any]) -> str:
         f"- locale: {request_context.get('locale', 'zh-TW')}",
         f"- persona_id: {request_context.get('persona_id', 'default')}",
         f"- message_type: {request_context.get('message_type', 'user')}",
+        f"- current_time: {now.strftime('%Y-%m-%d %H:%M:%S %Z')} ({now.strftime('%A')})",
     ]
     return "\n".join(lines)

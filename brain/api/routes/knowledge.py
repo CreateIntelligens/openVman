@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 
 from core.chat_service import record_generation_failure
 from knowledge.graph import (
@@ -308,10 +308,53 @@ async def graph_json_route(project_id: str = "default"):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+_GRAPH_HTML_OVERRIDES = """
+<style>
+  #sidebar {
+    position: absolute; top: 0; right: 0; height: 100%;
+    max-width: min(320px, 85vw);
+    transform: translateX(calc(100% - 32px));
+    transition: transform .2s ease;
+    z-index: 10;
+  }
+  #sidebar:hover, #sidebar:focus-within, #sidebar.open { transform: translateX(0); }
+  #sidebar-toggle {
+    position: absolute; top: 50%; left: -30px; transform: translateY(-50%);
+    width: 30px; height: 60px;
+    background: rgba(30,30,30,.85); color: #fff; border: 0;
+    border-radius: 6px 0 0 6px; cursor: pointer; font-size: 14px;
+  }
+  @media (max-width: 640px) {
+    #sidebar { max-width: 90vw; }
+  }
+</style>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    const sb = document.getElementById('sidebar');
+    if (!sb) return;
+    const btn = document.createElement('button');
+    btn.id = 'sidebar-toggle';
+    btn.textContent = '‹';
+    btn.title = '展開/收合側邊欄';
+    btn.addEventListener('click', () => {
+      sb.classList.toggle('open');
+      btn.textContent = sb.classList.contains('open') ? '›' : '‹';
+    });
+    sb.appendChild(btn);
+  });
+</script>
+"""
+
+
 @router.get("/knowledge/graph/html", summary="取得專案圖譜 HTML 視覺化頁面")
 async def graph_html_route(project_id: str = "default"):
     path = get_workspace_root(project_id) / GRAPH_SUBDIR / "graph.html"
     if not path.exists():
         raise HTTPException(status_code=404, detail="graph 尚未建立，請先呼叫 rebuild")
-    return FileResponse(path, media_type="text/html")
+    html = path.read_text(encoding="utf-8")
+    if "</body>" in html:
+        html = html.replace("</body>", f"{_GRAPH_HTML_OVERRIDES}</body>", 1)
+    else:
+        html += _GRAPH_HTML_OVERRIDES
+    return HTMLResponse(html)
 

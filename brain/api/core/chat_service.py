@@ -51,6 +51,7 @@ class GenerationContext:
     user_message: str
     request_context: dict[str, Any]
     prompt_messages: list[dict[str, str]]
+    prior_messages: list[dict[str, Any]]
 
 
 def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
@@ -94,6 +95,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         user_message=stored_user_message,
         request_context=request_ctx,
         prompt_messages=prompt_messages,
+        prior_messages=prior_messages,
     )
 
 
@@ -124,13 +126,18 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
     # no automatic per-turn memory write here.
     maintenance = maybe_run_memory_maintenance(project_id=context.project_id)
 
+    history = [
+        *context.prior_messages,
+        {"role": "user", "content": context.user_message},
+        {"role": "assistant", "content": cleaned_reply},
+    ]
     return {
         "status": "ok",
         "trace_id": context.trace_id,
         "session_id": context.session_id,
         "request_context": context.request_context,
         "reply": cleaned_reply,
-        "history": list_session_messages(context.session_id, context.persona_id, project_id=context.project_id),
+        "history": history,
         "memory_maintenance": maintenance,
     }
 
@@ -147,19 +154,17 @@ async def _finalize_generation_async(context: GenerationContext, reply: str) -> 
         )
 
 
+_pending_finalize_tasks: set[asyncio.Task[None]] = set()
+
+
 _TOOL_FALLBACK_HINT = (
     "[系統提示] 工具流程部分失敗。請優先使用已成功取得的工具資訊回答使用者，"
     "若資訊不足，請誠實說明限制並提供安全的下一步建議。"
 )
 
 
-def _inject_tool_fallback_hint(
-    messages: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Return a new message list with a system hint inserted before the last user message.
-
-    The original list is NOT mutated.
-    """
+def _inject_tool_fallback_hint(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return a new message list with a system hint inserted before the last user message."""
     insert_idx = next(
         (i for i in range(len(messages) - 1, -1, -1) if messages[i].get("role") == "user"),
         len(messages),
@@ -167,36 +172,21 @@ def _inject_tool_fallback_hint(
     return [*messages[:insert_idx], {"role": "system", "content": _TOOL_FALLBACK_HINT}, *messages[insert_idx:]]
 
 
-def _fallback_messages_for_tool_phase_error(
-    context: GenerationContext,
-    exc: ToolPhaseError,
-) -> list[dict[str, Any]]:
-    partial_messages = exc.partial_messages or context.prompt_messages
-    return _inject_tool_fallback_hint(partial_messages)
-
-
-def _tool_error_status_from_steps(tool_steps: list[dict[str, Any]]) -> str:
-    if not tool_steps:
-        return "phase_error"
-    parsed = parse_tool_result(tool_steps[-1].get("result", ""))
-    if parsed is None:
-        return "phase_error"
-    if "逾時" in parsed.error:
-        return "timeout"
-    if parsed.status == "error":
-        return "error"
-    return "phase_error"
-
-
 def _tool_error_event_from_phase_error(trace_id: str, exc: ToolPhaseError) -> ToolErrorEvent:
     last_step = exc.partial_steps[-1] if exc.partial_steps else {}
+    status = "phase_error"
+    if last_step:
+        parsed = parse_tool_result(last_step.get("result", ""))
+        if parsed:
+            status = "timeout" if "逾時" in parsed.error else ("error" if parsed.status == "error" else "phase_error")
+
     return ToolErrorEvent(
         trace_id=trace_id,
         error=str(exc),
         partial_steps_count=len(exc.partial_steps),
         tool_call_id=last_step.get("tool_call_id", ""),
         name=last_step.get("name", ""),
-        status=_tool_error_status_from_steps(exc.partial_steps),
+        status=status,
     )
 
 
@@ -210,9 +200,8 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     try:
         return run_agent_loop(context.prompt_messages, persona_id=context.persona_id, project_id=context.project_id)
     except ToolPhaseError as exc:
-        fallback_messages = _fallback_messages_for_tool_phase_error(context, exc)
-        reply = generate_chat_reply(fallback_messages)
-        return AgentLoopResult(reply=reply, tool_steps=exc.partial_steps)
+        fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
+        return AgentLoopResult(reply=generate_chat_reply(fallback), tool_steps=exc.partial_steps)
 
 
 def _tool_event_from_step(trace_id: str, step: dict[str, Any]) -> ToolEvent:
@@ -250,7 +239,7 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
             for step in tool_steps:
                 yield _tool_event_from_step(context.trace_id, step)
             yield _tool_error_event_from_phase_error(context.trace_id, exc)
-            stream_messages = _fallback_messages_for_tool_phase_error(context, exc)
+            stream_messages = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
 
     # Emit context event after tool phase so counts reflect actual tool usage
     knowledge_count, memory_count = _count_retrieval_from_tool_steps(tool_steps)
@@ -266,7 +255,9 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
         yield TokenEvent(trace_id=context.trace_id, token=token)
 
     full_reply = "".join(reply_parts)
-    finalize_task = asyncio.create_task(_finalize_generation_async(context, full_reply))
+    task = asyncio.create_task(_finalize_generation_async(context, full_reply))
+    _pending_finalize_tasks.add(task)
+    task.add_done_callback(_pending_finalize_tasks.discard)
     yield DoneEvent(
         trace_id=context.trace_id,
         session_id=context.session_id,
@@ -279,19 +270,15 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
 
 def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[int, int]:
     """Count knowledge and memory results from completed tool call steps."""
-    knowledge_count = 0
-    memory_count = 0
+    counts = {"search_knowledge": 0, "search_memory": 0}
     for step in tool_steps:
         name = step.get("name", "")
-        parsed = parse_tool_result(step.get("result", ""))
-        if parsed is None or parsed.status != "ok":
+        if name not in counts:
             continue
-        result_count = len(parsed.data.get("results", []))
-        if name == "search_knowledge":
-            knowledge_count += result_count
-        elif name == "search_memory":
-            memory_count += result_count
-    return knowledge_count, memory_count
+        parsed = parse_tool_result(step.get("result", ""))
+        if parsed and parsed.status == "ok":
+            counts[name] += len(parsed.data.get("results", []))
+    return counts["search_knowledge"], counts["search_memory"]
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:
