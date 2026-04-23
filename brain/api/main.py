@@ -62,6 +62,20 @@ async def warmup_resources() -> None:
     logger.info("背景預熱完成")
 
 
+async def load_privacy_filter_if_enabled() -> None:
+    """Load Privacy Filter model when enabled, degrading safely on failure."""
+    if not get_settings().privacy_filter_enabled:
+        return
+
+    from privacy.model import disable_privacy_filter, load_privacy_filter_model
+
+    try:
+        await asyncio.to_thread(load_privacy_filter_model)
+    except Exception as exc:
+        logger.warning("Privacy Filter model load failed; disabling filter: %s", exc)
+        disable_privacy_filter(str(exc))
+
+
 async def cancel_task(task: asyncio.Task[None] | None) -> None:
     """在 shutdown 時 safe 取消背景任務。"""
     if task is None or task.done():
@@ -82,6 +96,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # 執行資料遷移
     from scripts.migrate_to_projects import run_migration
     await asyncio.to_thread(run_migration)
+    await load_privacy_filter_if_enabled()
 
     # 背景預熱重資源
     app.state.warmup_task = asyncio.create_task(warmup_resources())

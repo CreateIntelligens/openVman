@@ -108,7 +108,10 @@ def _llm_extract(chunk: list[Path], workspace_root: Path, feedback: str = "") ->
         .replace("__FILE_LIST__", file_list)
         .replace("__CONTENTS__", contents)
     )
-    reply = generate_chat_turn([{"role": "user", "content": prompt}])
+    reply = generate_chat_turn(
+        [{"role": "user", "content": prompt}],
+        privacy_source="graph_extractor",
+    )
     try:
         return json.loads(_strip_fences(reply.content))
     except json.JSONDecodeError:
@@ -223,7 +226,10 @@ def _resolve_synonyms(
         return nodes, edges, []
 
     prompt = SYNONYM_PROMPT.replace("__LABELS__", "\n".join(f"- {l}" for l in labels))
-    reply = generate_chat_turn([{"role": "user", "content": prompt}])
+    reply = generate_chat_turn(
+        [{"role": "user", "content": prompt}],
+        privacy_source="graph_extractor",
+    )
     try:
         parsed = json.loads(_strip_fences(reply.content))
     except json.JSONDecodeError:

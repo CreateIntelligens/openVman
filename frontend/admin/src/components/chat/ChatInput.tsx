@@ -1,7 +1,20 @@
+import { useEffect, useMemo, useState } from "react";
+
 import type { SkillInfo, TtsProvider } from "../../api";
 import { TtsControls } from "./TtsControls";
 import { SlashDropdown } from "./SlashDropdown";
 import { AsrButton } from "./AsrButton";
+
+const PII_WARNING_PATTERNS = [
+  /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/,
+  /\b(?:\+?\d[\d -]{7,}\d)\b/,
+  /\b(?:https?:\/\/[^\s]+|(?:\d{1,3}\.){3}\d{1,3})\b/,
+  /(?:password|api[_-]?key|token)\s*[:=]\s*\S+/i,
+] as const;
+
+function mayContainPersonalInfo(value: string) {
+  return PII_WARNING_PATTERNS.some((pattern) => pattern.test(value));
+}
 
 interface ChatInputProps {
   mode: "text" | "live";
@@ -94,6 +107,7 @@ export default function ChatInput(props: ChatInputProps) {
     : "向 Brain 發送訊息...（輸入 / 查看指令）";
   const liveMicLabel = liveMicActive ? "錄音中" : "麥克風";
   const liveMicTitle = liveMicActive ? "停止錄音" : "開始語音輸入";
+  const [dismissedPrivacyWarningFor, setDismissedPrivacyWarningFor] = useState("");
   let liveMicButtonClassName = "cursor-not-allowed border border-border bg-surface-sunken text-content-subtle";
   if (liveMicActive) {
     liveMicButtonClassName = "bg-danger text-content-inverse hover:opacity-90";
@@ -101,6 +115,15 @@ export default function ChatInput(props: ChatInputProps) {
     liveMicButtonClassName = "border border-border bg-surface-raised text-content hover:bg-surface-sunken";
   }
   const hasSlashMatches = slashEnabled && slashOpen && slashMatches.length > 0;
+  const inputMayContainPii = useMemo(() => mayContainPersonalInfo(input), [input]);
+  const showPrivacyWarning = input.trim().length > 0
+    && inputMayContainPii
+    && dismissedPrivacyWarningFor !== input;
+
+  useEffect(() => {
+    if (!dismissedPrivacyWarningFor || inputMayContainPii) return;
+    setDismissedPrivacyWarningFor("");
+  }, [input, dismissedPrivacyWarningFor, inputMayContainPii]);
 
   const handleSlashKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (!hasSlashMatches) {
@@ -170,6 +193,21 @@ export default function ChatInput(props: ChatInputProps) {
             <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger backdrop-blur-md">
               <span>{error}</span>
               <button onClick={onDismissError} className="hover:opacity-80">
+                <span className="material-symbols-outlined text-[1rem]">close</span>
+              </button>
+            </div>
+          )}
+          {showPrivacyWarning && (
+            <div className="flex items-center justify-between rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn backdrop-blur-md">
+              <span className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[1rem]">privacy_tip</span>
+                This message may contain personal information.
+              </span>
+              <button
+                onClick={() => setDismissedPrivacyWarningFor(input)}
+                className="hover:opacity-80"
+                aria-label="Dismiss privacy warning"
+              >
                 <span className="material-symbols-outlined text-[1rem]">close</span>
               </button>
             </div>

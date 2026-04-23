@@ -62,4 +62,22 @@ describe("ChatInput", () => {
     expect(props.onSubmit).not.toHaveBeenCalled();
     expect(screen.getByTitle("停止回覆")).not.toBeNull();
   });
+
+  it("shows a dismissible privacy warning for likely PII", () => {
+    renderChatInput({ input: "call me at 0912345678" });
+
+    expect(screen.getByText("This message may contain personal information.")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss privacy warning" }));
+
+    expect(screen.queryByText("This message may contain personal information.")).toBeNull();
+  });
+
+  it("does not block submission when likely PII is present", () => {
+    const props = renderChatInput({ input: "email jane@example.com" });
+
+    fireEvent.click(screen.getByRole("button", { name: "送出訊息" }));
+
+    expect(props.onSubmit).toHaveBeenCalledTimes(1);
+  });
 });

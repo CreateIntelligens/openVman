@@ -148,6 +148,7 @@ def _llm_summarize(query: str, results: list[dict[str, Any]], config: Any) -> st
     summary = generate_chat_reply(
         messages,
         model_override=(config.auto_recall_llm_model or None),
+        privacy_source="auto_recall",
     ).strip()
 
     # LLM returns "NONE" when results are irrelevant

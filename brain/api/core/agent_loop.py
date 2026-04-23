@@ -97,7 +97,7 @@ def _run_tool_phase(
 
     with bind_tool_context(persona_id, project_id):
         for _ in range(max(1, cfg.agent_loop_max_rounds)):
-            turn = generate_chat_turn(working_messages, tools=tools)
+            turn = generate_chat_turn(working_messages, tools=tools, privacy_source="tool")
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue

@@ -1,6 +1,7 @@
 """大腦層集中設定 — 從 .env 讀取所有環境變數"""
 
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -107,6 +108,13 @@ class BrainSettings(BaseSettings):
     auto_recall_use_llm_summarizer: bool = True
     auto_recall_llm_model: str = ""
 
+    # === Privacy Filter 設定 ===
+    privacy_filter_enabled: bool = True
+    privacy_filter_mode: str = "mask"  # mask | block | off
+    privacy_filter_include_system: bool = False
+    privacy_filter_cache_size: int = 512
+    privacy_filter_block_categories: str = "secret"
+
     # === 歸檔設定 ===
     errors_rotation_max_lines: int = 200
     transcript_retention_days: int = 30
@@ -176,6 +184,14 @@ class BrainSettings(BaseSettings):
             if version not in ordered:
                 ordered.append(version)
         return ordered
+
+    @cached_property
+    def resolved_privacy_filter_block_categories(self) -> list[str]:
+        return [
+            item.strip()
+            for item in self.privacy_filter_block_categories.split(",")
+            if item.strip()
+        ]
 
     @property
     def resolved_llm_api_keys(self) -> list[str]:

@@ -14,6 +14,7 @@ from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
 from core.key_pool import classify_failure
 from core.provider_router import LLMRoute, get_provider_router
+from privacy.filter import FilterSource, sanitize_llm_messages
 from safety.observability import (
     log_event,
     record_chain_exhausted,
@@ -47,9 +48,16 @@ def generate_chat_reply(
     messages: list[dict[str, Any]],
     *,
     model_override: str | None = None,
+    trace_id: str = "",
+    privacy_source: FilterSource = "unknown",
 ) -> str:
     """Generate a chat reply using the configured provider."""
-    return generate_chat_turn(messages, model_override=model_override).content.strip()
+    return generate_chat_turn(
+        messages,
+        model_override=model_override,
+        trace_id=trace_id,
+        privacy_source=privacy_source,
+    ).content.strip()
 
 
 def generate_chat_turn(
@@ -58,10 +66,16 @@ def generate_chat_turn(
     *,
     trace_id: str = "",
     model_override: str | None = None,
+    privacy_source: FilterSource = "unknown",
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
-    response = _create_sync_completion(
+    sanitized_messages = sanitize_llm_messages(
         messages,
+        source=privacy_source,
+        trace_id=trace_id,
+    )
+    response = _create_sync_completion(
+        sanitized_messages,
         tools=tools,
         trace_id=trace_id,
         model_override=model_override,
@@ -90,9 +104,15 @@ async def stream_chat_reply(
     messages: list[dict[str, Any]],
     *,
     trace_id: str = "",
+    privacy_source: FilterSource = "unknown",
 ) -> AsyncIterator[str]:
     """Stream a chat reply token-by-token with fallback chain."""
-    stream = await _create_async_stream(messages, trace_id=trace_id)
+    sanitized_messages = sanitize_llm_messages(
+        messages,
+        source=privacy_source,
+        trace_id=trace_id,
+    )
+    stream = await _create_async_stream(sanitized_messages, trace_id=trace_id)
 
     async for chunk in stream:
         if not chunk.choices:

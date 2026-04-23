@@ -16,6 +16,7 @@ services:
       - ./brain/skills:/skills
       - ./contracts:/contracts:ro
       - hf-cache:/home/appuser/.cache/huggingface
+      - opf-cache:/home/appuser/.opf
     env_file:
       - ./brain/.env
     environment:
@@ -157,6 +158,7 @@ services:
 
 volumes:
   hf-cache:
+  opf-cache:
   admin-node-modules:
   redis-data:
   prometheus-data:

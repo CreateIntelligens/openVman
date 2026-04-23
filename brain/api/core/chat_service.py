@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -51,7 +51,7 @@ class GenerationContext:
     user_message: str
     request_context: dict[str, Any]
     prompt_messages: list[dict[str, str]]
-    prior_messages: list[dict[str, Any]]
+    prior_messages: list[dict[str, Any]] = field(default_factory=list)
 
 
 def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
@@ -194,14 +194,29 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     """Run the configured agent loop on top of prepared prompt messages."""
     if context.route.skip_tools:
         return AgentLoopResult(
-            reply=generate_chat_reply(context.prompt_messages),
+            reply=generate_chat_reply(
+                context.prompt_messages,
+                privacy_source="chat",
+                trace_id=context.trace_id,
+            ),
             tool_steps=[],
         )
     try:
-        return run_agent_loop(context.prompt_messages, persona_id=context.persona_id, project_id=context.project_id)
+        return run_agent_loop(
+            context.prompt_messages,
+            persona_id=context.persona_id,
+            project_id=context.project_id,
+        )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
-        return AgentLoopResult(reply=generate_chat_reply(fallback), tool_steps=exc.partial_steps)
+        return AgentLoopResult(
+            reply=generate_chat_reply(
+                fallback,
+                privacy_source="tool",
+                trace_id=context.trace_id,
+            ),
+            tool_steps=exc.partial_steps,
+        )
 
 
 def _tool_event_from_step(trace_id: str, step: dict[str, Any]) -> ToolEvent:
@@ -250,7 +265,12 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
         request_context=context.request_context,
     )
 
-    async for token in stream_chat_reply(stream_messages):
+    privacy_source = "tool" if tool_steps else "chat"
+    async for token in stream_chat_reply(
+        stream_messages,
+        privacy_source=privacy_source,
+        trace_id=context.trace_id,
+    ):
         reply_parts.append(token)
         yield TokenEvent(trace_id=context.trace_id, token=token)
 
@@ -279,6 +299,7 @@ def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[
         if parsed and parsed.status == "ok":
             counts[name] += len(parsed.data.get("results", []))
     return counts["search_knowledge"], counts["search_memory"]
+
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:
