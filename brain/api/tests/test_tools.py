@@ -69,26 +69,29 @@ def test_registry_build_openai_tools_format(monkeypatch: pytest.MonkeyPatch):
     ]
 
 
-def test_get_tool_registry_syncs_skill_tools_after_initialization(monkeypatch: pytest.MonkeyPatch):
+def test_get_tool_registry_syncs_skill_tools_after_invalidation(monkeypatch: pytest.MonkeyPatch):
     tool_registry, _ = load_tool_modules(monkeypatch)
     import tools.skill_manager as skill_manager_module
+    from tools.skill import Skill, SkillManifest, SkillToolDefinition
 
     manager = SimpleNamespace(skills=[])
     manager.list_skills = lambda: list(manager.skills)
 
-    def make_skill() -> SimpleNamespace:
-        return SimpleNamespace(
-            manifest=SimpleNamespace(
+    def make_skill() -> Skill:
+        return Skill(
+            manifest=SkillManifest(
                 id="demo",
                 name="Demo",
+                description="demo skill",
                 tools=[
-                    SimpleNamespace(
+                    SkillToolDefinition(
                         name="run",
                         description="demo tool",
                         parameters={"type": "object", "properties": {}},
                     )
-                ],
+                ]
             ),
+            path="/tmp/demo-skill",
             handlers={"run": lambda args: {"ok": True}},
             enabled=True,
         )
@@ -101,6 +104,7 @@ def test_get_tool_registry_syncs_skill_tools_after_initialization(monkeypatch: p
         registry.get("demo:run")
 
     manager.skills = [make_skill()]
+    tool_registry.invalidate_skill_tools_sync()
 
     registry = tool_registry.get_tool_registry()
 
