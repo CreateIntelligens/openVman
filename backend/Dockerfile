@@ -8,9 +8,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Heavy packages pinned separately so requirements.txt changes don't bust this cache layer
+RUN pip install --no-cache-dir \
+    "docling>=2.0.0" \
+    "markitdown[all]>=0.1,<1"
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runner
 FROM python:3.11-slim
