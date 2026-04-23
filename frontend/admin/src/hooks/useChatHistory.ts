@@ -14,6 +14,7 @@ import {
        getSessionStorageKey,
        resolvePersonaId,
 } from "../components/chat/helpers";
+import { useRefetchOnRecovery } from "../context/BackendHealthContext";
 
 export function useChatHistory(clearTtsPrefetchState: () => void) {
        const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -83,6 +84,18 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
                      })
                      .catch((reason) => setError(String(reason)));
        }, [deleteSessionTarget, loadSessions, resetViewState, selectedPersonaId, sessionId]);
+
+       // Refetch on backend recovery (don't disturb active stream/state).
+       const refetchOnRecovery = useCallback(() => {
+              if (!selectedPersonaId || loadingPersonas) return;
+              loadSessions();
+              if (sessionId) {
+                     fetchChatHistory(sessionId, selectedPersonaId)
+                            .then((response) => setMessages(response.history ?? []))
+                            .catch(() => {});
+              }
+       }, [loadSessions, loadingPersonas, selectedPersonaId, sessionId]);
+       useRefetchOnRecovery(refetchOnRecovery);
 
        // Initial Persona Load
        useEffect(() => {
