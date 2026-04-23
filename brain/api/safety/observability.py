@@ -114,10 +114,13 @@ def render_prometheus(store: MetricsStore | None = None) -> bytes:
 
     metrics_store = store or get_metrics_store()
     registry = CollectorRegistry()
-    _created: dict[tuple[type, str, tuple[str, ...]], Any] = {}
+    # Key by (cls, metric_name) only so that label-set inconsistencies across
+    # call sites (e.g. different subsets of label keys for the same metric)
+    # do not cause a duplicate-registration ValueError in the local registry.
+    _created: dict[tuple[type, str], Any] = {}
 
     def _get_or_create(cls, metric_name: str, labelnames: tuple[str, ...]):
-        key = (cls, metric_name, labelnames)
+        key = (cls, metric_name)
         if key not in _created:
             _created[key] = cls(metric_name, metric_name, labelnames=labelnames, registry=registry)
         return _created[key]

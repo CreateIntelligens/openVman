@@ -93,7 +93,7 @@ async def _stream_generation_events(context: GenerationContext) -> AsyncIterator
         async for event in stream_generation(context):
             if event.event == "tool":
                 tool_count += 1
-                get_metrics_store().increment("tool_calls_total", tool_name=event.name)
+                get_metrics_store().increment("tool_calls_total", tool_name=event.name, status="ok")
             yield sse_event_to_dict(event)
 
         log_event(
