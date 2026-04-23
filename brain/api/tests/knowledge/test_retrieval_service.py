@@ -119,6 +119,26 @@ class TestRetrievalService:
         assert len(bundle.knowledge_results) >= 1
         assert len(bundle.memory_results) >= 1
 
+    def test_can_disable_knowledge_search(self, monkeypatch):
+        """retrieve_context can limit retrieval to memories for auto recall."""
+        knowledge = [_make_record("k1", 0.1)]
+        memories = [_make_record("m1", 0.15, source="memory")]
+        service, _, _, search_calls = _stub_deps(
+            monkeypatch,
+            knowledge=knowledge,
+            memories=memories,
+        )
+
+        bundle = service.retrieve_context(
+            query="test query",
+            include_knowledge=False,
+            include_memories=True,
+        )
+
+        assert bundle.knowledge_results == []
+        assert len(bundle.memory_results) == 1
+        assert [call["table_name"] for call in search_calls] == ["memories"]
+
     def test_top_k_matches_config(self, monkeypatch):
         """Results respect configured top-k limits."""
         knowledge = [_make_record(f"k{i}", 0.1 * i) for i in range(10)]

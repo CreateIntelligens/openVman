@@ -93,6 +93,8 @@ _BASE_PROMPT_SETTINGS = {
     "prompt_context_char_budget": 0,
     "prompt_system_char_budget": 500,
     "prompt_total_char_budget": 500,
+    "auto_recall_enabled": False,
+    "dreaming_timezone": "Asia/Taipei",
 }
 _EMPTY_WORKSPACE_CONTEXT = {
     "identity": "",

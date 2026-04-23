@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from config import get_settings
+from memory.auto_recall import strip_recall_noise
 
 
 def select_recent_messages(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -16,7 +17,7 @@ def select_recent_messages(messages: list[dict[str, Any]]) -> list[dict[str, str
     used_chars = 0
 
     for message in reversed(trimmed):
-        content = str(message.get("content", "")).strip()
+        content = strip_recall_noise(str(message.get("content", "")).strip())
         if not content:
             continue
         budget = len(content) + 16
@@ -48,7 +49,7 @@ def summarize_message_history(messages: list[dict[str, Any]]) -> str:
     used_chars = len(lines[0])
     for message in older_messages[-8:]:
         role = str(message.get("role", "user"))
-        content = compress_text(str(message.get("content", "")).strip(), 120)
+        content = compress_text(strip_recall_noise(str(message.get("content", "")).strip()), 120)
         if not content:
             continue
         line = f"- {role}: {content}"

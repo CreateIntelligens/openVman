@@ -95,6 +95,18 @@ class BrainSettings(BaseSettings):
     memory_merge_similarity_threshold: float = 0.92
     memory_importance_weight: float = 0.03
 
+    # === Auto Recall 設定 ===
+    auto_recall_enabled: bool = True
+    auto_recall_query_mode: str = "message"  # message | recent | full
+    auto_recall_recent_user_turns: int = 3
+    auto_recall_recent_user_chars: int = 300
+    auto_recall_max_summary_chars: int = 500
+    auto_recall_timeout_ms: int = 3000
+    auto_recall_cache_ttl_ms: int = 15000
+    auto_recall_max_cache_entries: int = 1000
+    auto_recall_use_llm_summarizer: bool = True
+    auto_recall_llm_model: str = ""
+
     # === 歸檔設定 ===
     errors_rotation_max_lines: int = 200
     transcript_retention_days: int = 30

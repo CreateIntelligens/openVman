@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
-from memory.memory import delete_session_for_project, list_sessions_for_project
+from memory.memory import delete_session_for_project, get_session_store, list_sessions_for_project
 from safety.observability import log_event, log_exception
 
 router = APIRouter(prefix="/brain", tags=["Memory & Sessions"])
@@ -26,3 +27,14 @@ async def delete_session(session_id: str, project_id: str = "default"):
     log_event("session_deleted", session_id=session_id, project_id=project_id)
     return {"status": "ok", "session_id": session_id}
 
+
+class RecallToggleBody(BaseModel):
+    disabled: bool
+
+
+@router.post("/sessions/{session_id}/recall-toggle", summary="切換 Session 的 Auto Recall 開關")
+async def recall_toggle(session_id: str, body: RecallToggleBody, project_id: str = "default"):
+    store = get_session_store(project_id=project_id)
+    store.set_recall_disabled(session_id, body.disabled)
+    log_event("recall_toggled", session_id=session_id, project_id=project_id, disabled=body.disabled)
+    return {"session_id": session_id, "recall_disabled": body.disabled}

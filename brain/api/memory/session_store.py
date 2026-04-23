@@ -321,6 +321,26 @@ class SessionStore:
         with self._dedup_lock:
             self._dedup_cache.pop(session_id, None)
 
+    def set_recall_disabled(self, session_id: str, disabled: bool) -> None:
+        """Persist the per-session recall toggle."""
+        with self._lock:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE sessions SET recall_disabled = ? WHERE session_id = ?",
+                    (1 if disabled else 0, session_id),
+                )
+                conn.commit()
+
+    def is_recall_disabled(self, session_id: str) -> bool:
+        """Check whether auto recall is disabled for *session_id*."""
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT recall_disabled FROM sessions WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()
+                return bool(row and row[0])
+
     def _cleanup_session_memory(self, session_id: str) -> None:
         """Remove in-memory state for a deleted/expired session."""
         with self._inflight_meta_lock:
@@ -347,6 +367,10 @@ class SessionStore:
             if "persona_id" not in columns:
                 conn.execute(
                     "ALTER TABLE sessions ADD COLUMN persona_id TEXT NOT NULL DEFAULT 'default'"
+                )
+            if "recall_disabled" not in columns:
+                conn.execute(
+                    "ALTER TABLE sessions ADD COLUMN recall_disabled INTEGER NOT NULL DEFAULT 0"
                 )
             conn.execute(
                 """

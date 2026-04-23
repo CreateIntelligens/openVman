@@ -43,9 +43,13 @@ class LLMReply:
     model: str
 
 
-def generate_chat_reply(messages: list[dict[str, Any]]) -> str:
+def generate_chat_reply(
+    messages: list[dict[str, Any]],
+    *,
+    model_override: str | None = None,
+) -> str:
     """Generate a chat reply using the configured provider."""
-    return generate_chat_turn(messages).content.strip()
+    return generate_chat_turn(messages, model_override=model_override).content.strip()
 
 
 def generate_chat_turn(
@@ -53,9 +57,15 @@ def generate_chat_turn(
     tools: list[dict[str, Any]] | None = None,
     *,
     trace_id: str = "",
+    model_override: str | None = None,
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
-    response = _create_sync_completion(messages, tools=tools, trace_id=trace_id)
+    response = _create_sync_completion(
+        messages,
+        tools=tools,
+        trace_id=trace_id,
+        model_override=model_override,
+    )
     message = response.choices[0].message
     content = (message.content or "").strip()
     tool_calls = [
@@ -177,6 +187,7 @@ def _create_sync_completion(
     tools: list[dict[str, Any]] | None = None,
     *,
     trace_id: str = "",
+    model_override: str | None = None,
 ):
     _require_api_key()
     cfg = get_settings()
@@ -184,6 +195,11 @@ def _create_sync_completion(
     tid = trace_id or uuid.uuid4().hex[:12]
 
     chain, legacy_routes = _resolve_chain_or_routes(tid)
+    chain, legacy_routes = _apply_model_override(
+        chain,
+        legacy_routes,
+        model_override,
+    )
 
     if legacy_routes:
         return _try_routes_sync(legacy_routes, messages, tools, cfg, router)
@@ -218,6 +234,43 @@ def _create_sync_completion(
             )
 
     _raise_chain_exhausted(tid, errors, last_reason, len(chain))
+
+
+def _apply_model_override(
+    chain: list[RouteHop],
+    legacy_routes: list[LLMRoute],
+    model_override: str | None,
+) -> tuple[list[RouteHop], list[LLMRoute]]:
+    """Rewrite resolved routes to a single model when an override is supplied."""
+    if not model_override:
+        return chain, legacy_routes
+
+    if (
+        all(hop.model == model_override for hop in chain)
+        and all(route.model == model_override for route in legacy_routes)
+    ):
+        return chain, legacy_routes
+
+    overridden_chain = [
+        RouteHop(
+            provider=hop.provider,
+            model=model_override,
+            api_key=hop.api_key,
+            base_url=hop.base_url,
+            hop_index=hop.hop_index,
+            trace_id=hop.trace_id,
+        )
+        for hop in chain
+    ]
+    overridden_legacy_routes = [
+        LLMRoute(
+            api_key=route.api_key,
+            model=model_override,
+            base_url=route.base_url,
+        )
+        for route in legacy_routes
+    ]
+    return overridden_chain, overridden_legacy_routes
 
 
 def _try_routes_sync(routes, messages, tools, cfg, router):

@@ -92,7 +92,14 @@ class FakeRetrievalBundle:
     diagnostics: dict[str, Any]
 
 
-def _empty_bundle_with_project(*, query: str = "", persona_id: str = "default", project_id: str = "default") -> FakeRetrievalBundle:
+def _empty_bundle_with_project(
+    *,
+    query: str = "",
+    persona_id: str = "default",
+    project_id: str = "default",
+    include_knowledge: bool = True,
+    include_memories: bool = True,
+) -> FakeRetrievalBundle:
     return FakeRetrievalBundle(knowledge_results=[], memory_results=[], diagnostics={})
 
 

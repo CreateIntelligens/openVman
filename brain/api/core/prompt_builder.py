@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
+
+logger = logging.getLogger("brain")
 
 from config import get_settings
 from core.pipeline import enforce_context_budget
@@ -41,15 +44,30 @@ def build_chat_messages(
     search_memory) during the agent loop — they are NOT injected into the prompt.
     """
     cfg = get_settings()
+    persona_id = str(request_context.get("persona_id", "default"))
+    project_id = str(request_context.get("project_id", "default"))
+    session_id = str(request_context.get("session_id", ""))
+
     workspace = load_core_workspace_context(
-        str(request_context.get("persona_id", "default")),
-        project_id=str(request_context.get("project_id", "default")),
+        persona_id,
+        project_id=project_id,
     )
     history_summary = summarize_message_history(session_messages)
     workspace_blocks = [
         _format_workspace_block(label, workspace[label.lower()], getattr(cfg, budget_attr))
         for label, budget_attr in _WORKSPACE_BLOCK_CONFIG
     ]
+
+    recall_block = _build_recall_block(
+        cfg=cfg,
+        session_messages=session_messages,
+        user_message=user_message,
+        persona_id=persona_id,
+        project_id=project_id,
+        session_id=session_id,
+    )
+    if recall_block:
+        workspace_blocks.insert(0, recall_block)
 
     tool_instructions = (
         "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。"
@@ -85,6 +103,59 @@ def build_chat_messages(
         messages,
         total_char_budget=cfg.prompt_total_char_budget,
     )
+
+
+def _format_recall_block(result: Any) -> str:
+    """Format a RecallResult into a tagged workspace block."""
+    if not result.summary:
+        return ""
+    return f"<!-- ACTIVE_RECALL_TAG -->\nACTIVE_RECALL_CONTEXT：\n{result.summary}"
+
+
+def _build_recall_block(
+    *,
+    cfg: Any,
+    session_messages: list[dict[str, Any]],
+    user_message: str,
+    persona_id: str,
+    project_id: str,
+    session_id: str,
+) -> str:
+    """Return the formatted auto-recall block, degrading silently on failure."""
+    if not cfg.auto_recall_enabled:
+        return ""
+    if _is_session_recall_disabled(session_id=session_id, project_id=project_id):
+        return ""
+
+    try:
+        from memory.auto_recall import run_auto_recall
+
+        result = run_auto_recall(
+            session_messages,
+            user_message,
+            persona_id,
+            project_id,
+            session_id=session_id,
+        )
+    except Exception:
+        logger.warning("auto_recall failed, skipping recall block", exc_info=True)
+        return ""
+
+    return _format_recall_block(result)
+
+
+def _is_session_recall_disabled(*, session_id: str, project_id: str) -> bool:
+    """Best-effort per-session recall toggle lookup."""
+    if not session_id:
+        return False
+
+    try:
+        from memory.memory import get_session_store
+
+        store = get_session_store(project_id=project_id)
+        return store.is_recall_disabled(session_id)
+    except Exception:
+        return False
 
 
 def _format_workspace_block(label: str, content: str, max_chars: int) -> str:
