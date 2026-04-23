@@ -8,7 +8,12 @@ from config import get_settings
 from privacy.audit import PrivacyFilterAuditEvent, PrivacyFilterSource, record_privacy_filter_event
 from privacy.cache import get_privacy_filter_cache
 from privacy.exceptions import PrivacyViolationError
-from privacy.model import detect_and_mask, privacy_filter_runtime_enabled
+from privacy.model import (
+    detect_and_mask,
+    disable_privacy_filter,
+    load_privacy_filter_model,
+    privacy_filter_runtime_enabled,
+)
 
 FilterSource = Literal["chat", "tool", "auto_recall", "graph_extractor", "unknown"]
 _DEFAULT_FILTER_ROLES = frozenset({"user", "tool"})
@@ -58,6 +63,27 @@ def sanitize_llm_messages(
         sanitized.append({**message, "content": masked})
 
     return sanitized
+
+
+def sanitize_llm_reply_text(text: str) -> str:
+    """Mask PII in LLM reply text when outbound reply filtering is enabled."""
+    cfg = get_settings()
+    if (
+        not text
+        or not getattr(cfg, "privacy_filter_enabled", False)
+        or not getattr(cfg, "privacy_filter_egress_enabled", False)
+    ):
+        return text
+
+    if not privacy_filter_runtime_enabled():
+        try:
+            load_privacy_filter_model()
+        except Exception as exc:
+            disable_privacy_filter(str(exc))
+            return text
+
+    masked, _ = detect_and_mask(text)
+    return masked
 
 
 def _blocked_categories(cfg: Any, counts: dict[str, int]) -> list[str]:

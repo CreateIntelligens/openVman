@@ -2,6 +2,7 @@ import type { ActionRequest, ChatMessage as ChatMessageType, RetrievalResult } f
 import MarkdownPreview from "../MarkdownPreview";
 import SourceChips from "./SourceChips";
 import ActionRequestCard from "./ActionRequestCard";
+import { renderWithRedactions } from "./redactedText";
 
 type RenderableChatMessage = Pick<ChatMessageType, "role" | "content"> & {
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
@@ -107,7 +108,7 @@ export default function ChatMessage({
           <MarkdownPreview content={message.content} />
         </div>
       ) : (
-        <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{message.content}</p>
+        <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{renderWithRedactions(message.content)}</p>
       )}
       {isAssistantMessage && message.sources && (
         <SourceChips sources={message.sources} />

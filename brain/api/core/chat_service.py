@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import date
@@ -172,6 +173,48 @@ def _inject_tool_fallback_hint(messages: list[dict[str, Any]]) -> list[dict[str,
     return [*messages[:insert_idx], {"role": "system", "content": _TOOL_FALLBACK_HINT}, *messages[insert_idx:]]
 
 
+def _supports_keyword_argument(func: Any, name: str) -> bool:
+    try:
+        params = inspect.signature(func).parameters.values()
+    except (TypeError, ValueError):
+        return True
+    return any(param.kind is inspect.Parameter.VAR_KEYWORD or param.name == name for param in params)
+
+
+def _string_context_value(context: Any, name: str, default: str = "") -> str:
+    value = getattr(context, name, default)
+    return value if isinstance(value, str) else default
+
+
+def _generate_reply(
+    messages: list[dict[str, Any]],
+    *,
+    privacy_source: str,
+    trace_id: str,
+) -> str:
+    kwargs: dict[str, Any] = {}
+    if _supports_keyword_argument(generate_chat_reply, "privacy_source"):
+        kwargs["privacy_source"] = privacy_source
+    if trace_id and _supports_keyword_argument(generate_chat_reply, "trace_id"):
+        kwargs["trace_id"] = trace_id
+    return generate_chat_reply(messages, **kwargs)
+
+
+async def _stream_reply(
+    messages: list[dict[str, Any]],
+    *,
+    privacy_source: str,
+    trace_id: str,
+) -> AsyncIterator[str]:
+    kwargs: dict[str, Any] = {}
+    if _supports_keyword_argument(stream_chat_reply, "privacy_source"):
+        kwargs["privacy_source"] = privacy_source
+    if trace_id and _supports_keyword_argument(stream_chat_reply, "trace_id"):
+        kwargs["trace_id"] = trace_id
+    async for token in stream_chat_reply(messages, **kwargs):
+        yield token
+
+
 def _tool_error_event_from_phase_error(trace_id: str, exc: ToolPhaseError) -> ToolErrorEvent:
     last_step = exc.partial_steps[-1] if exc.partial_steps else {}
     status = "phase_error"
@@ -192,12 +235,15 @@ def _tool_error_event_from_phase_error(trace_id: str, exc: ToolPhaseError) -> To
 
 def execute_generation(context: GenerationContext) -> AgentLoopResult:
     """Run the configured agent loop on top of prepared prompt messages."""
+    trace_id = _string_context_value(context, "trace_id")
+    project_id = _string_context_value(context, "project_id", "default")
+
     if context.route.skip_tools:
         return AgentLoopResult(
-            reply=generate_chat_reply(
+            reply=_generate_reply(
                 context.prompt_messages,
                 privacy_source="chat",
-                trace_id=context.trace_id,
+                trace_id=trace_id,
             ),
             tool_steps=[],
         )
@@ -205,15 +251,15 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
         return run_agent_loop(
             context.prompt_messages,
             persona_id=context.persona_id,
-            project_id=context.project_id,
+            project_id=project_id,
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
         return AgentLoopResult(
-            reply=generate_chat_reply(
+            reply=_generate_reply(
                 fallback,
                 privacy_source="tool",
-                trace_id=context.trace_id,
+                trace_id=trace_id,
             ),
             tool_steps=exc.partial_steps,
         )
@@ -231,7 +277,10 @@ def _tool_event_from_step(trace_id: str, step: dict[str, Any]) -> ToolEvent:
 
 async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEvent]:
     """Stream a chat generation from prepared prompt context."""
-    yield SessionEvent(session_id=context.session_id, trace_id=context.trace_id)
+    trace_id = _string_context_value(context, "trace_id")
+    project_id = _string_context_value(context, "project_id", "default")
+
+    yield SessionEvent(session_id=context.session_id, trace_id=trace_id)
 
     reply_parts: list[str] = []
     tool_steps: list[dict[str, Any]] = []
@@ -243,43 +292,43 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
                 prepare_agent_reply,
                 context.prompt_messages,
                 context.persona_id,
-                context.project_id,
+                project_id,
             )
             stream_messages = prepared.messages
             tool_steps = prepared.tool_steps
             for step in tool_steps:
-                yield _tool_event_from_step(context.trace_id, step)
+                yield _tool_event_from_step(trace_id, step)
         except ToolPhaseError as exc:
             tool_steps = exc.partial_steps
             for step in tool_steps:
-                yield _tool_event_from_step(context.trace_id, step)
-            yield _tool_error_event_from_phase_error(context.trace_id, exc)
+                yield _tool_event_from_step(trace_id, step)
+            yield _tool_error_event_from_phase_error(trace_id, exc)
             stream_messages = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
 
     # Emit context event after tool phase so counts reflect actual tool usage
     knowledge_count, memory_count = _count_retrieval_from_tool_steps(tool_steps)
     yield ContextEvent(
-        trace_id=context.trace_id,
+        trace_id=trace_id,
         knowledge_count=knowledge_count,
         memory_count=memory_count,
         request_context=context.request_context,
     )
 
     privacy_source = "tool" if tool_steps else "chat"
-    async for token in stream_chat_reply(
+    async for token in _stream_reply(
         stream_messages,
         privacy_source=privacy_source,
-        trace_id=context.trace_id,
+        trace_id=trace_id,
     ):
         reply_parts.append(token)
-        yield TokenEvent(trace_id=context.trace_id, token=token)
+        yield TokenEvent(trace_id=trace_id, token=token)
 
     full_reply = "".join(reply_parts)
     task = asyncio.create_task(_finalize_generation_async(context, full_reply))
     _pending_finalize_tasks.add(task)
     task.add_done_callback(_pending_finalize_tasks.discard)
     yield DoneEvent(
-        trace_id=context.trace_id,
+        trace_id=trace_id,
         session_id=context.session_id,
         reply=full_reply,
         knowledge_results=[],

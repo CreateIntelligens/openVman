@@ -37,10 +37,11 @@ _runtime_disabled_reason: str | None = None
 def load_privacy_filter_model() -> None:
     """Load the OPF model (downloads to ~/.opf/privacy_filter on first run)."""
     global _opf, _runtime_disabled_reason
+    from config import get_settings
     from opf import OPF
-    _opf = OPF(trim_whitespace=True)
+    device = get_settings().privacy_filter_device
+    _opf = OPF(trim_whitespace=True, device=device)  # type: ignore[call-arg]
     _runtime_disabled_reason = None
-    # Warm up Triton JIT kernels so the first real request isn't slow.
     assert _opf is not None
     _opf.redact("warmup")
 

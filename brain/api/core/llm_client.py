@@ -14,7 +14,7 @@ from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
 from core.key_pool import classify_failure
 from core.provider_router import LLMRoute, get_provider_router
-from privacy.filter import FilterSource, sanitize_llm_messages
+from privacy.filter import FilterSource, sanitize_llm_messages, sanitize_llm_reply_text
 from safety.observability import (
     log_event,
     record_chain_exhausted,
@@ -52,12 +52,13 @@ def generate_chat_reply(
     privacy_source: FilterSource = "unknown",
 ) -> str:
     """Generate a chat reply using the configured provider."""
-    return generate_chat_turn(
+    reply = generate_chat_turn(
         messages,
         model_override=model_override,
         trace_id=trace_id,
         privacy_source=privacy_source,
     ).content.strip()
+    return sanitize_llm_reply_text(reply)
 
 
 def generate_chat_turn(
@@ -112,14 +113,17 @@ async def stream_chat_reply(
         source=privacy_source,
         trace_id=trace_id,
     )
-    stream = await _create_async_stream(sanitized_messages, trace_id=trace_id)
+    stream = await _create_async_stream(sanitized_messages, trace_id=trace_id, tool_choice="none")
 
+    tokens: list[str] = []
     async for chunk in stream:
         if not chunk.choices:
             continue
         token = chunk.choices[0].delta.content or ""
         if token:
-            yield token
+            tokens.append(token)
+
+    yield sanitize_llm_reply_text("".join(tokens))
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +326,7 @@ async def _create_async_stream(
     messages: list[dict[str, Any]],
     *,
     trace_id: str = "",
+    tool_choice: str | None = None,
 ):
     _require_api_key()
     cfg = get_settings()
@@ -331,7 +336,7 @@ async def _create_async_stream(
     chain, legacy_routes = _resolve_chain_or_routes(tid)
 
     if legacy_routes:
-        return await _try_routes_async(legacy_routes, messages, cfg, router)
+        return await _try_routes_async(legacy_routes, messages, cfg, router, tool_choice=tool_choice)
 
     errors: list[str] = []
     last_reason = ""
@@ -346,11 +351,14 @@ async def _create_async_stream(
         )
         client = AsyncOpenAI(api_key=hop.api_key, base_url=hop.base_url or None)
         try:
+            create_kwargs: dict[str, Any] = {"stream": True}
+            if tool_choice is not None:
+                create_kwargs["tool_choice"] = tool_choice
             stream = await client.chat.completions.create(
                 model=hop.model,
                 messages=messages,
                 temperature=cfg.llm_temperature,
-                stream=True,
+                **create_kwargs,
             )
             router.mark_success(hop.api_key)
             log_event(
@@ -369,9 +377,12 @@ async def _create_async_stream(
     _raise_chain_exhausted(tid, errors, last_reason, len(chain))
 
 
-async def _try_routes_async(routes, messages, cfg, router):
+async def _try_routes_async(routes, messages, cfg, router, *, tool_choice: str | None = None):
     """Legacy async route loop."""
     errors: list[str] = []
+    extra: dict[str, Any] = {"stream": True}
+    if tool_choice is not None:
+        extra["tool_choice"] = tool_choice
     for route in routes:
         client = AsyncOpenAI(api_key=route.api_key, base_url=route.base_url or None)
         try:
@@ -379,7 +390,7 @@ async def _try_routes_async(routes, messages, cfg, router):
                 model=route.model,
                 messages=messages,
                 temperature=cfg.llm_temperature,
-                stream=True,
+                **extra,
             )
             router.mark_success(route.api_key)
             return stream

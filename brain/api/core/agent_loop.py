@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from typing import Any
 
 from config import get_settings
 from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn
+from privacy.filter import sanitize_llm_reply_text
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
 
@@ -41,6 +43,21 @@ class PreparedAgentReply:
     tool_steps: list[dict[str, Any]]
 
 
+def _supports_keyword_argument(func: Any, name: str) -> bool:
+    try:
+        params = inspect.signature(func).parameters.values()
+    except (TypeError, ValueError):
+        return True
+    return any(param.kind is inspect.Parameter.VAR_KEYWORD or param.name == name for param in params)
+
+
+def _generate_turn(messages: list[dict[str, Any]], *, tools: list[dict[str, Any]]) -> LLMReply:
+    kwargs: dict[str, Any] = {"tools": tools}
+    if _supports_keyword_argument(generate_chat_turn, "privacy_source"):
+        kwargs["privacy_source"] = "tool"
+    return generate_chat_turn(messages, **kwargs)
+
+
 def run_agent_loop(
     messages: list[dict[str, Any]],
     persona_id: str = "default",
@@ -57,7 +74,7 @@ def run_agent_loop(
     reply = final_turn.content.strip()
     if not reply:
         raise ValueError("LLM 沒有回傳內容")
-    return AgentLoopResult(reply=reply, tool_steps=tool_steps)
+    return AgentLoopResult(reply=sanitize_llm_reply_text(reply), tool_steps=tool_steps)
 
 
 def prepare_agent_reply(
@@ -97,7 +114,7 @@ def _run_tool_phase(
 
     with bind_tool_context(persona_id, project_id):
         for _ in range(max(1, cfg.agent_loop_max_rounds)):
-            turn = generate_chat_turn(working_messages, tools=tools, privacy_source="tool")
+            turn = _generate_turn(working_messages, tools=tools)
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue

@@ -7,12 +7,13 @@ import logging
 import pytest
 
 from privacy.exceptions import PrivacyViolationError
-from privacy.filter import sanitize_llm_messages
+from privacy.filter import sanitize_llm_messages, sanitize_llm_reply_text
 from privacy.model import enable_regex_detector_for_tests
 
 
 class _Settings:
     privacy_filter_enabled = True
+    privacy_filter_egress_enabled = True
     privacy_filter_mode = "mask"
     privacy_filter_include_system = False
     privacy_filter_cache_size = 8
@@ -88,6 +89,18 @@ def test_sanitize_disabled_returns_original_messages(monkeypatch: pytest.MonkeyP
     messages = [{"role": "user", "content": "Call 0912345678"}]
 
     assert sanitize_llm_messages(messages, source="chat", trace_id="t1") is messages
+
+
+def test_sanitize_llm_reply_text_masks_pii_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(monkeypatch)
+
+    assert sanitize_llm_reply_text("Call 0912345678") == "Call [REDACTED:private_phone]"
+
+
+def test_sanitize_llm_reply_text_skips_when_egress_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(monkeypatch, privacy_filter_egress_enabled=False)
+
+    assert sanitize_llm_reply_text("Call 0912345678") == "Call 0912345678"
 
 
 def test_audit_log_never_contains_raw_pii(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
