@@ -4,6 +4,7 @@ import Embed from "../../pages/Embed";
 import Health from "../../pages/Health";
 import KnowledgeBase from "../../pages/KnowledgeBase";
 import Memory from "../../pages/Memory";
+import Monitoring from "../../pages/Monitoring";
 import Personas from "../../pages/Personas";
 import Projects from "../../pages/Projects";
 import Search from "../../pages/Search";
@@ -26,6 +27,7 @@ export const knowledgeTabs = [
 export const systemTabs = [
   { key: "Projects", label: "Projects", icon: "folder_copy" },
   { key: "Health", label: "Health", icon: "health_metrics" },
+  { key: "Monitoring", label: "Monitoring", icon: "monitoring" },
   { key: "Embed", label: "Embed", icon: "code" },
 ] as const;
 
@@ -44,6 +46,7 @@ export type ProjectSummary = { project_id: string; label: string };
 export const components: Record<Tab, FC> = {
   Chat,
   Health,
+  Monitoring,
   Embed,
   Search,
   Memory,

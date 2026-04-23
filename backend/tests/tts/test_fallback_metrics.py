@@ -99,7 +99,11 @@ class TestFallbackMetrics:
 
         latency_keys = [k for k in snap["timings"] if "tts_provider_latency_ms" in k]
         assert len(latency_keys) >= 1
-        assert snap["timings"][latency_keys[0]][0] >= 0
+        bucket = snap["timings"][latency_keys[0]]
+        assert bucket["count"] == 1
+        assert bucket["sum_ms"] >= 0
+        assert bucket["max_ms"] >= 0
+        assert bucket["avg_ms"] >= 0
 
     def test_provider_request_counter(self):
         svc = TTSRouterService(_make_config())

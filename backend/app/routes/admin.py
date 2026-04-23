@@ -10,7 +10,7 @@ from app.gateway.redis_pool import redis_available
 from app.gateway.temp_storage import get_temp_storage
 from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
-from app.observability import get_metrics_snapshot
+from app.observability import build_prometheus_response, get_metrics_snapshot
 from app.providers.vibevoice_adapter import VIBEVOICE_DEFAULT_SPEAKER, VIBEVOICE_SPEAKERS
 
 logger = logging.getLogger("backend")
@@ -67,6 +67,11 @@ async def metrics() -> dict:
     return get_metrics_snapshot()
 
 
+@router.get("/metrics/prometheus", tags=["System"], summary="Prometheus 格式指標")
+async def metrics_prometheus():
+    return build_prometheus_response()
+
+
 @router.get("/v1/tts/providers", tags=["TTS"], summary="取得 TTS Provider 清單")
 async def get_tts_providers() -> JSONResponse:
     cfg = get_tts_config()
@@ -119,4 +124,3 @@ async def get_tts_providers() -> JSONResponse:
         })
 
     return JSONResponse(content=providers)
-

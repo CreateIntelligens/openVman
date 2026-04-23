@@ -7,14 +7,20 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from time import monotonic
 
 import httpx
-from fastapi import FastAPI, File, Response, UploadFile
+from fastapi import FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
+from app.observability import (
+    normalize_http_metrics_endpoint,
+    record_http_request,
+    should_record_http_metrics,
+)
 from app.brain_proxy import _http as _brain_proxy_http
 from app.brain_proxy import router as brain_proxy_router
 from app.config import get_tts_config
@@ -95,6 +101,24 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="openVman Backend", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def http_metrics_middleware(request: Request, call_next):
+    start = monotonic()
+    response = await call_next(request)
+    endpoint = normalize_http_metrics_endpoint(request)
+    if should_record_http_metrics(endpoint):
+        duration_ms = (monotonic() - start) * 1000
+        record_http_request(
+            endpoint=endpoint,
+            method=request.method,
+            status_code=response.status_code,
+            duration_ms=duration_ms,
+        )
+    return response
+
+
 app.include_router(gateway_router)
 app.include_router(internal_router)
 app.include_router(brain_proxy_router)

@@ -9,7 +9,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.gateway.brain_live_relay import BrainLiveRelay, DEFAULT_VOICE_SOURCE, _normalize_voice_source
 from app.guard_agent import GuardAgent
-from app.observability import record_interruption, set_active_sessions
+from app.observability import record_interruption, record_ws_disconnect, record_ws_error, record_ws_reconnect, set_active_sessions
 from app.session_manager import Session, SessionManager
 
 logger = logging.getLogger("backend")
@@ -28,7 +28,13 @@ def _get_requested_voice_source(data: dict[str, object]) -> str:
 @router.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await websocket.accept()
+    is_reconnect = any(
+        s.metadata.get("client_id") == client_id
+        for s in _session_manager.active_sessions.values()
+    )
     session = _session_manager.create_session(client_id, websocket=websocket)
+    if is_reconnect:
+        record_ws_reconnect()
     set_active_sessions(len(_session_manager.active_sessions))
     logger.info("WebSocket session created: %s for client: %s", session.session_id, client_id)
 
@@ -44,8 +50,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             await _handle_websocket_event(event, data, session, websocket)
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected: %s", session.session_id)
+        record_ws_disconnect(reason="client")
     except Exception as exc:
         logger.error("WebSocket error in %s: %s", session.session_id, exc)
+        record_ws_error(error_type=type(exc).__name__)
     finally:
         await session.cancel_all_tasks()
         if session.brain_live_relay is not None:

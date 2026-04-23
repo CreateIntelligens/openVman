@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from health_payload import build_health_payload
 from knowledge.workspace import parse_identity
-from safety.observability import get_metrics_store
+from safety.observability import get_metrics_store, render_prometheus
 
 router = APIRouter(prefix="/brain", tags=["System"])
 
@@ -19,7 +19,14 @@ async def metrics():
     return get_metrics_store().snapshot()
 
 
+@router.get("/metrics/prometheus", summary="Prometheus text exposition format")
+async def metrics_prometheus():
+    return Response(
+        content=render_prometheus(get_metrics_store()),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
 @router.get("/identity", summary="解析前端身份")
 async def get_identity(persona_id: str = "default", project_id: str = "default"):
     return parse_identity(project_id, persona_id)
-

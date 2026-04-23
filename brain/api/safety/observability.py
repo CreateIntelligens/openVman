@@ -11,22 +11,25 @@ from typing import Any
 
 logger = logging.getLogger("brain")
 
+MetricLabels = tuple[tuple[str, str], ...]
+MetricSeriesKey = tuple[str, MetricLabels]
+
 
 class MetricsStore:
     def __init__(self) -> None:
         self._lock = Lock()
-        self._counters: dict[str, int] = defaultdict(int)
-        self._timings: dict[str, dict[str, float]] = defaultdict(
+        self._counters: dict[MetricSeriesKey, int] = defaultdict(int)
+        self._timings: dict[MetricSeriesKey, dict[str, float]] = defaultdict(
             lambda: {"count": 0, "sum_ms": 0.0, "max_ms": 0.0}
         )
 
     def increment(self, name: str, value: int = 1, **labels: object) -> None:
         with self._lock:
-            self._counters[_metric_key(name, labels)] += value
+            self._counters[(name, _metric_labels(labels))] += value
 
     def observe(self, name: str, value_ms: float, **labels: object) -> None:
         with self._lock:
-            bucket = self._timings[_metric_key(name, labels)]
+            bucket = self._timings[(name, _metric_labels(labels))]
             bucket["count"] += 1
             bucket["sum_ms"] += value_ms
             bucket["max_ms"] = max(bucket["max_ms"], value_ms)
@@ -34,16 +37,33 @@ class MetricsStore:
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             timings = {
-                key: {
+                _metric_key(name, labels): {
                     **value,
                     "avg_ms": round(value["sum_ms"] / value["count"], 2) if value["count"] else 0.0,
                 }
-                for key, value in self._timings.items()
+                for (name, labels), value in self._timings.items()
             }
             return {
-                "counters": dict(self._counters),
+                "counters": {
+                    _metric_key(name, labels): value
+                    for (name, labels), value in self._counters.items()
+                },
                 "timings": timings,
             }
+
+    def iter_counters(self) -> list[tuple[str, dict[str, str], int]]:
+        with self._lock:
+            return [
+                (name, dict(labels), value)
+                for (name, labels), value in self._counters.items()
+            ]
+
+    def iter_timings(self) -> list[tuple[str, dict[str, str], dict[str, float]]]:
+        with self._lock:
+            return [
+                (name, dict(labels), dict(value))
+                for (name, labels), value in self._timings.items()
+            ]
 
 
 _metrics: MetricsStore | None = None
@@ -76,11 +96,46 @@ def log_exception(event: str, exc: Exception, **fields: object) -> None:
     logger.exception(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
 
-def _metric_key(name: str, labels: dict[str, object]) -> str:
-    if not labels:
+def _metric_labels(labels: dict[str, object]) -> MetricLabels:
+    return tuple((key, str(labels[key])) for key in sorted(labels))
+
+
+def _metric_key(name: str, labels: dict[str, object] | MetricLabels) -> str:
+    label_items = _metric_labels(labels) if isinstance(labels, dict) else labels
+    if not label_items:
         return name
-    serialized = ",".join(f"{key}={labels[key]}" for key in sorted(labels))
+    serialized = ",".join(f"{key}={value}" for key, value in label_items)
     return f"{name}|{serialized}"
+
+
+def render_prometheus(store: MetricsStore | None = None) -> bytes:
+    """Render metrics using prometheus_client instead of hand-built text output."""
+    from prometheus_client import CollectorRegistry, Counter, Gauge, generate_latest
+
+    metrics_store = store or get_metrics_store()
+    registry = CollectorRegistry()
+    _created: dict[tuple[type, str, tuple[str, ...]], Any] = {}
+
+    def _get_or_create(cls, metric_name: str, labelnames: tuple[str, ...]):
+        key = (cls, metric_name, labelnames)
+        if key not in _created:
+            _created[key] = cls(metric_name, metric_name, labelnames=labelnames, registry=registry)
+        return _created[key]
+
+    for metric_name, labels, value in metrics_store.iter_counters():
+        labelnames = tuple(labels)
+        metric = _get_or_create(Counter, metric_name, labelnames)
+        child = metric.labels(**labels) if labelnames else metric
+        child.inc(value)
+
+    for metric_name, labels, bucket in metrics_store.iter_timings():
+        labelnames = tuple(labels)
+        for suffix, field in (("_count", "count"), ("_sum", "sum_ms"), ("_max", "max_ms")):
+            gauge = _get_or_create(Gauge, f"{metric_name}{suffix}", labelnames)
+            child = gauge.labels(**labels) if labelnames else gauge
+            child.set(bucket[field])
+
+    return generate_latest(registry)
 
 
 # ---------------------------------------------------------------------------

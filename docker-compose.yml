@@ -112,6 +112,29 @@ services:
     volumes:
       - redis-data:/data
 
+  prometheus:
+    <<: *shared
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+
+  grafana:
+    <<: *shared
+    image: grafana/grafana:10.4.2
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/etc/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    depends_on:
+      - prometheus
+
   backend:
     <<: *shared
     build:
@@ -136,3 +159,5 @@ volumes:
   hf-cache:
   admin-node-modules:
   redis-data:
+  prometheus-data:
+  grafana-data:
