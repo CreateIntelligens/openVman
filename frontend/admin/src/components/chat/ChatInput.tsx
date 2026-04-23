@@ -175,7 +175,7 @@ export default function ChatInput(props: ChatInputProps) {
   };
 
   return (
-    <div className="shrink-0 border-t border-border bg-surface px-4 py-4">
+    <div className="shrink-0 bg-surface px-4 py-4">
       <div className="relative mx-auto flex max-w-3xl flex-col gap-3">
         <div className="absolute bottom-full left-0 right-0 mb-3 flex flex-col gap-2">
           {ttsFallbackToast && (
