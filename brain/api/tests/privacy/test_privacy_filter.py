@@ -36,7 +36,7 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch, **overrides: object) -> _Se
     return settings
 
 
-def test_sanitize_filters_user_and_tool_roles(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sanitize_filters_user_role_only(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_settings(monkeypatch)
 
     sanitized = sanitize_llm_messages(
@@ -49,7 +49,8 @@ def test_sanitize_filters_user_and_tool_roles(monkeypatch: pytest.MonkeyPatch) -
     )
 
     assert sanitized[0]["content"] == "Call [REDACTED:private_phone]"
-    assert sanitized[1]["content"] == "owner [REDACTED:private_email]"
+    # Tool-role messages are trusted internal system output; not masked.
+    assert sanitized[1]["content"] == "owner jane@example.com"
 
 
 def test_sanitize_skips_system_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,8 +62,8 @@ def test_sanitize_skips_system_by_default(monkeypatch: pytest.MonkeyPatch) -> No
     assert sanitized == [message]
 
 
-def test_sanitize_filters_system_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch, privacy_filter_include_system=True)
+def test_sanitize_never_touches_system_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(monkeypatch)
 
     sanitized = sanitize_llm_messages(
         [{"role": "system", "content": "System phone 0912345678"}],
@@ -70,7 +71,8 @@ def test_sanitize_filters_system_when_enabled(monkeypatch: pytest.MonkeyPatch) -
         trace_id="t1",
     )
 
-    assert sanitized[0]["content"] == "System phone [REDACTED:private_phone]"
+    # System role is always trusted internal output; never masked.
+    assert sanitized[0]["content"] == "System phone 0912345678"
 
 
 def test_sanitize_blocks_configured_secret_category(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -94,7 +96,7 @@ def test_sanitize_disabled_returns_original_messages(monkeypatch: pytest.MonkeyP
 def test_sanitize_llm_reply_text_masks_pii_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_settings(monkeypatch)
 
-    assert sanitize_llm_reply_text("Call 0912345678") == "Call [REDACTED:private_phone]"
+    assert sanitize_llm_reply_text("Call 0912345678") == "Call 091****678"
 
 
 def test_sanitize_llm_reply_text_skips_when_egress_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -116,3 +118,4 @@ def test_audit_log_never_contains_raw_pii(monkeypatch: pytest.MonkeyPatch, caplo
     log_output = "\n".join(record.getMessage() for record in caplog.records)
     assert "0912345678" not in log_output
     assert "Call [REDACTED:private_phone]" not in log_output
+    assert "Call 091****678" not in log_output

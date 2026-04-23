@@ -14,7 +14,7 @@ from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
 from core.key_pool import classify_failure
 from core.provider_router import LLMRoute, get_provider_router
-from privacy.filter import FilterSource, sanitize_llm_messages, sanitize_llm_reply_text
+from privacy.filter import FilterSource, sanitize_llm_messages, sanitize_llm_reply_text, sanitize_llm_reply_text_async
 from safety.observability import (
     log_event,
     record_chain_exhausted,
@@ -123,7 +123,7 @@ async def stream_chat_reply(
         if token:
             tokens.append(token)
 
-    yield sanitize_llm_reply_text("".join(tokens))
+    yield await sanitize_llm_reply_text_async("".join(tokens))
 
 
 # ---------------------------------------------------------------------------

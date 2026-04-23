@@ -113,7 +113,6 @@ class BrainSettings(BaseSettings):
     privacy_filter_egress_enabled: bool = True   # 是否掃描 LLM 回應（egress）
     privacy_filter_device: str = "cpu"           # cpu | cuda
     privacy_filter_mode: str = "mask"            # mask | block | off
-    privacy_filter_include_system: bool = False
     privacy_filter_cache_size: int = 512
     privacy_filter_block_categories: str = "secret"
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Literal, cast
 
 from config import get_settings
@@ -10,13 +11,14 @@ from privacy.cache import get_privacy_filter_cache
 from privacy.exceptions import PrivacyViolationError
 from privacy.model import (
     detect_and_mask,
+    detect_and_partial_mask,
     disable_privacy_filter,
     load_privacy_filter_model,
     privacy_filter_runtime_enabled,
 )
 
 FilterSource = Literal["chat", "tool", "auto_recall", "graph_extractor", "unknown"]
-_DEFAULT_FILTER_ROLES = frozenset({"user", "tool"})
+_FILTER_ROLES = frozenset({"user"})
 
 
 def sanitize_llm_messages(
@@ -35,13 +37,12 @@ def sanitize_llm_messages(
         return messages
 
     cache = get_privacy_filter_cache(getattr(cfg, "privacy_filter_cache_size", 512))
-    filter_roles = frozenset(_DEFAULT_FILTER_ROLES | ({"system"} if getattr(cfg, "privacy_filter_include_system", False) else set()))
 
     sanitized: list[dict[str, Any]] = []
     for message in messages:
         role = str(message.get("role", ""))
         content = message.get("content")
-        if role not in filter_roles or not isinstance(content, str) or not content:
+        if role not in _FILTER_ROLES or not isinstance(content, str) or not content:
             sanitized.append(dict(message))
             continue
 
@@ -67,23 +68,46 @@ def sanitize_llm_messages(
 
 def sanitize_llm_reply_text(text: str) -> str:
     """Mask PII in LLM reply text when outbound reply filtering is enabled."""
-    cfg = get_settings()
-    if (
-        not text
-        or not getattr(cfg, "privacy_filter_enabled", False)
-        or not getattr(cfg, "privacy_filter_egress_enabled", False)
-    ):
+    if not _egress_mask_enabled(text):
         return text
-
-    if not privacy_filter_runtime_enabled():
-        try:
-            load_privacy_filter_model()
-        except Exception as exc:
-            disable_privacy_filter(str(exc))
-            return text
-
-    masked, _ = detect_and_mask(text)
+    if not _ensure_model_loaded():
+        return text
+    masked, _ = detect_and_partial_mask(text)
     return masked
+
+
+async def sanitize_llm_reply_text_async(text: str) -> str:
+    """Async variant that offloads the CPU-bound OPF inference to a thread.
+
+    Keeps the FastAPI event loop responsive so concurrent requests (health
+    checks, other chat streams) don't block while OPF runs on CPU.
+    """
+    if not _egress_mask_enabled(text):
+        return text
+    if not _ensure_model_loaded():
+        return text
+    masked, _ = await asyncio.to_thread(detect_and_partial_mask, text)
+    return masked
+
+
+def _egress_mask_enabled(text: str) -> bool:
+    cfg = get_settings()
+    return bool(
+        text
+        and getattr(cfg, "privacy_filter_enabled", False)
+        and getattr(cfg, "privacy_filter_egress_enabled", False)
+    )
+
+
+def _ensure_model_loaded() -> bool:
+    if privacy_filter_runtime_enabled():
+        return True
+    try:
+        load_privacy_filter_model()
+    except Exception as exc:
+        disable_privacy_filter(str(exc))
+        return False
+    return True
 
 
 def _blocked_categories(cfg: Any, counts: dict[str, int]) -> list[str]:
