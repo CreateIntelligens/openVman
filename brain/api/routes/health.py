@@ -2,15 +2,25 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Response
 
-from health_payload import build_health_payload
+from health_payload import build_health_payload, build_readiness_payload
 from knowledge.workspace import parse_identity
 from safety.observability import get_metrics_store, render_prometheus
 
 router = APIRouter(prefix="/brain", tags=["System"])
 
 
-@router.get("/health", summary="大腦層健康檢查")
-async def health(project_id: str = "default"):
+@router.get("/health", summary="Liveness probe — 0 queries")
+async def health():
+    return {"status": "ok"}
+
+
+@router.get("/health/ready", summary="Readiness probe — lightweight DB ping")
+async def health_ready():
+    return build_readiness_payload()
+
+
+@router.get("/health/detailed", summary="詳細健康報告（含 DB 狀態、embedding、metrics）")
+async def health_detailed(project_id: str = "default"):
     return build_health_payload(project_id)
 
 

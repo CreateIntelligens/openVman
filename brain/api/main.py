@@ -35,6 +35,7 @@ logger = logging.getLogger("brain")
 
 _ACCESS_LOG_SILENT_PATHS = frozenset({
     "/brain/health",
+    "/brain/health/ready",
     "/brain/metrics",
     "/brain/metrics/prometheus",
 })
@@ -45,13 +46,11 @@ class _SilentAccessPathsFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         args = record.args
+        # uvicorn access log: args = (client, method, path, http_version, status)
         if not isinstance(args, tuple) or len(args) < 3:
             return True
-        request_line = str(args[1])
-        return not any(
-            f" {path} " in request_line or request_line.endswith(f" {path}")
-            for path in _ACCESS_LOG_SILENT_PATHS
-        )
+        path = str(args[2]).split("?")[0]
+        return path not in _ACCESS_LOG_SILENT_PATHS
 
 
 logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())

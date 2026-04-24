@@ -48,6 +48,24 @@ from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.service import TTSRouterService
 
 logger = logging.getLogger("backend")
+
+_ACCESS_LOG_SILENT_PATHS = frozenset({"/api/health", "/healthz"})
+
+
+class _SilentAccessPathsFilter(logging.Filter):
+    """Drop uvicorn access log lines for infra polling endpoints."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn access log: args = (client, method, path, http_version, status)
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        path = str(args[2]).split("?")[0]
+        return path not in _ACCESS_LOG_SILENT_PATHS
+
+
+logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())
+
 _service: TTSRouterService | None = None
 _md_converter: MarkItDown | None = None
 _health_http = SharedAsyncClient()

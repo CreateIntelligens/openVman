@@ -1,6 +1,7 @@
 import os
 import asyncio
 import io
+import logging
 import struct
 import traceback
 import tempfile
@@ -18,6 +19,19 @@ import numpy as np
 import soundfile as sf
 
 from indextts.infer_vllm import IndexTTS
+
+
+class _SilentHealthFilter(logging.Filter):
+    """Drop uvicorn access log lines for the /health liveness endpoint."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        return str(args[2]).split("?")[0] != "/health"
+
+
+logging.getLogger("uvicorn.access").addFilter(_SilentHealthFilter())
 
 # 🚀 提升音頻處理並行數至 20，消除轉檔排隊瓶頸
 audio_processing_semaphore = asyncio.Semaphore(20)
