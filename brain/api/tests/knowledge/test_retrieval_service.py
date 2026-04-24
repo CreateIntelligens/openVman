@@ -109,59 +109,36 @@ def _make_record(text, distance, source="knowledge", path="doc.md", **extra_meta
 
 
 class TestRetrievalService:
-    def test_returns_knowledge_and_memory_results(self, monkeypatch):
-        """retrieve_context returns both knowledge and memory results."""
-        knowledge = [_make_record("k1", 0.1), _make_record("k2", 0.2)]
+    def test_returns_memory_results(self, monkeypatch):
+        """retrieve_context returns memory results; knowledge_results is always empty."""
         memories = [_make_record("m1", 0.15, source="memory")]
-        service, _, _, _ = _stub_deps(monkeypatch, knowledge=knowledge, memories=memories)
+        service, _, _, _ = _stub_deps(monkeypatch, memories=memories)
 
         bundle = service.retrieve_context(query="test query")
-        assert len(bundle.knowledge_results) >= 1
-        assert len(bundle.memory_results) >= 1
-
-    def test_can_disable_knowledge_search(self, monkeypatch):
-        """retrieve_context can limit retrieval to memories for auto recall."""
-        knowledge = [_make_record("k1", 0.1)]
-        memories = [_make_record("m1", 0.15, source="memory")]
-        service, _, _, search_calls = _stub_deps(
-            monkeypatch,
-            knowledge=knowledge,
-            memories=memories,
-        )
-
-        bundle = service.retrieve_context(
-            query="test query",
-            include_knowledge=False,
-            include_memories=True,
-        )
-
         assert bundle.knowledge_results == []
-        assert len(bundle.memory_results) == 1
-        assert [call["table_name"] for call in search_calls] == ["memories"]
+        assert len(bundle.memory_results) >= 1
 
     def test_top_k_matches_config(self, monkeypatch):
         """Results respect configured top-k limits."""
-        knowledge = [_make_record(f"k{i}", 0.1 * i) for i in range(10)]
         memories = [_make_record(f"m{i}", 0.1 * i, source="memory") for i in range(10)]
-        service, cfg, _, _ = _stub_deps(monkeypatch, knowledge=knowledge, memories=memories)
-        cfg.rag_knowledge_top_k = 3
+        service, cfg, _, _ = _stub_deps(monkeypatch, memories=memories)
         cfg.rag_memory_top_k = 2
 
         bundle = service.retrieve_context(query="test")
-        assert len(bundle.knowledge_results) <= 3
+        assert len(bundle.knowledge_results) == 0
         assert len(bundle.memory_results) <= 2
 
     def test_rerank_orders_by_distance(self, monkeypatch):
-        """Results should be ordered by distance (ascending)."""
-        knowledge = [
-            _make_record("far", 0.9),
-            _make_record("close", 0.1),
-            _make_record("mid", 0.5),
+        """Memory results should be ordered by distance (ascending)."""
+        memories = [
+            _make_record("far", 0.9, source="memory"),
+            _make_record("close", 0.1, source="memory"),
+            _make_record("mid", 0.5, source="memory"),
         ]
-        service, _, _, _ = _stub_deps(monkeypatch, knowledge=knowledge)
+        service, _, _, _ = _stub_deps(monkeypatch, memories=memories)
 
         bundle = service.retrieve_context(query="test")
-        distances = [r["_distance"] for r in bundle.knowledge_results]
+        distances = [r["_distance"] for r in bundle.memory_results]
         assert distances == sorted(distances)
 
     def test_memory_distance_bonus_applies(self, monkeypatch):
@@ -179,8 +156,8 @@ class TestRetrievalService:
 
     def test_diagnostics_contains_required_fields(self, monkeypatch):
         """Diagnostics should contain candidate counts and top hits."""
-        knowledge = [_make_record("k1", 0.1, path="diabetes.md")]
-        service, _, _, _ = _stub_deps(monkeypatch, knowledge=knowledge)
+        memories = [_make_record("m1", 0.1, source="memory")]
+        service, _, _, _ = _stub_deps(monkeypatch, memories=memories)
 
         bundle = service.retrieve_context(query="糖尿病症狀")
         diag = bundle.diagnostics
@@ -302,7 +279,6 @@ class TestRetrievalService:
         )
         service, _, _, search_calls = _stub_deps(
             monkeypatch,
-            knowledge=[_make_record("k1", 0.1)],
             memories=[_make_record("m1", 0.2, source="memory")],
             embedding_route=route,
         )
@@ -311,7 +287,4 @@ class TestRetrievalService:
 
         assert bundle.diagnostics["embedding_version"] == "gemini"
         assert bundle.diagnostics["embedding_attempts"] == route.attempted_versions
-        assert [call["embedding_version"] for call in search_calls] == [
-            "gemini",
-            "gemini",
-        ]
+        assert [call["embedding_version"] for call in search_calls] == ["gemini"]

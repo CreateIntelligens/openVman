@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from privacy.model import detect_and_mask, detect_and_partial_mask
+from privacy.model import detect_and_mask
 
 
 @pytest.mark.parametrize(
@@ -28,23 +28,3 @@ def test_detect_and_mask_known_pii_categories(text: str, category: str, raw_valu
     assert counts[category] >= 1
 
 
-@pytest.mark.parametrize(
-    ("text", "category", "raw_value", "expected_fragment"),
-    [
-        ("Call 0912345678 tomorrow.", "private_phone", "0912345678", "091****678"),
-        ("Email me at jane@example.com.", "private_email", "jane@example.com", "j***@example.com"),
-        ("Account number 123456789012 is active.", "account_number", "123456789012", "12********12"),
-    ],
-)
-def test_partial_mask_preserves_head_and_tail(
-    text: str, category: str, raw_value: str, expected_fragment: str,
-) -> None:
-    masked, counts = detect_and_partial_mask(text)
-
-    assert raw_value not in masked
-    assert expected_fragment in masked
-    assert counts[category] >= 1
-
-
-def test_partial_mask_empty_text_returns_empty() -> None:
-    assert detect_and_partial_mask("") == ("", {})

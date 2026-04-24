@@ -46,6 +46,7 @@ export default function Chat() {
     clampedSlashIndex,
     conversationTitle,
     conversationStatus,
+    privacyWarningsVisible,
     sessions,
     loadingSessions,
     deleteSessionTarget,
@@ -55,6 +56,7 @@ export default function Chat() {
     setSlashIndex,
     setSlashOpen,
     setError,
+    setPrivacyWarningsVisible,
     setTtsFallbackToast,
     handleInputChange,
     onHistoryKeyDown,
@@ -313,6 +315,7 @@ export default function Chat() {
                     ttsPrefetching={ttsPrefetching}
                     isLastMessage={index === messages.length - 1}
                     onPlayTts={playTts}
+                    privacyWarningsVisible={privacyWarningsVisible}
                     showAssistantActions
                     onActionConfirmed={handleActionConfirmed}
                     onActionCancelled={handleActionCancelled}
@@ -376,6 +379,7 @@ export default function Chat() {
             asrListening={asrListening}
             asrSupported={asrSupported}
             vadSpeaking={vadSpeaking}
+            privacyWarningsVisible={privacyWarningsVisible}
             onInputChange={handleInputChange}
             onHistoryKeyDown={onHistoryKeyDown}
             onSubmit={handleSubmit}
@@ -388,6 +392,7 @@ export default function Chat() {
             onDismissError={handleDismissError}
             onDismissFallbackToast={handleDismissFallbackToast}
             onToggleAsr={toggleAsr}
+            onPrivacyWarningsVisibleChange={setPrivacyWarningsVisible}
             liveWsState={liveSession.wsState}
             liveMicActive={liveSession.micActive}
             onLiveToggleMic={handleLiveToggleMic}

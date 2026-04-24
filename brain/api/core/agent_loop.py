@@ -8,7 +8,7 @@ from typing import Any
 
 from config import get_settings
 from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn
-from privacy.filter import sanitize_llm_reply_text
+from privacy.filter import PiiDetectionReport
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
 
@@ -35,6 +35,7 @@ class ToolPhaseError(Exception):
 class AgentLoopResult:
     reply: str
     tool_steps: list[dict[str, Any]]
+    pii_report: PiiDetectionReport | None = None
 
 
 @dataclass(slots=True)
@@ -74,7 +75,11 @@ def run_agent_loop(
     reply = final_turn.content.strip()
     if not reply:
         raise ValueError("LLM 沒有回傳內容")
-    return AgentLoopResult(reply=sanitize_llm_reply_text(reply), tool_steps=tool_steps)
+    return AgentLoopResult(
+        reply=reply,
+        tool_steps=tool_steps,
+        pii_report=final_turn.pii_report,
+    )
 
 
 def prepare_agent_reply(

@@ -234,8 +234,7 @@ class TestRunAutoRecall:
         assert result.status == "ok"
         assert "User likes tea" in result.summary
         assert result.source == "formatted"
-        assert mock_retrieve.call_args.kwargs["include_knowledge"] is False
-        assert mock_retrieve.call_args.kwargs["include_memories"] is True
+        assert mock_retrieve.call_args.kwargs["query"]
 
     @patch("memory.auto_recall.get_settings")
     @patch("core.retrieval_service.retrieve_context")

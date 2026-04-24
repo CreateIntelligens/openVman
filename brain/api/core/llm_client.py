@@ -14,7 +14,7 @@ from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
 from core.key_pool import classify_failure
 from core.provider_router import LLMRoute, get_provider_router
-from privacy.filter import FilterSource, sanitize_llm_messages, sanitize_llm_reply_text, sanitize_llm_reply_text_async
+from privacy.filter import FilterSource, PiiDetectionReport, detect_llm_messages_pii
 from safety.observability import (
     log_event,
     record_chain_exhausted,
@@ -42,6 +42,13 @@ class LLMReply:
     content: str
     tool_calls: list[LLMToolCall]
     model: str
+    pii_report: PiiDetectionReport | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LLMStreamReply:
+    tokens: AsyncIterator[str]
+    pii_report: PiiDetectionReport | None = None
 
 
 def generate_chat_reply(
@@ -52,13 +59,12 @@ def generate_chat_reply(
     privacy_source: FilterSource = "unknown",
 ) -> str:
     """Generate a chat reply using the configured provider."""
-    reply = generate_chat_turn(
+    return generate_chat_turn(
         messages,
         model_override=model_override,
         trace_id=trace_id,
         privacy_source=privacy_source,
     ).content.strip()
-    return sanitize_llm_reply_text(reply)
 
 
 def generate_chat_turn(
@@ -70,13 +76,13 @@ def generate_chat_turn(
     privacy_source: FilterSource = "unknown",
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
-    sanitized_messages = sanitize_llm_messages(
+    pii_report = detect_llm_messages_pii(
         messages,
         source=privacy_source,
         trace_id=trace_id,
     )
     response = _create_sync_completion(
-        sanitized_messages,
+        messages,
         tools=tools,
         trace_id=trace_id,
         model_override=model_override,
@@ -98,6 +104,7 @@ def generate_chat_turn(
         content=content,
         tool_calls=tool_calls,
         model=response.model,
+        pii_report=pii_report,
     )
 
 
@@ -108,22 +115,38 @@ async def stream_chat_reply(
     privacy_source: FilterSource = "unknown",
 ) -> AsyncIterator[str]:
     """Stream a chat reply token-by-token with fallback chain."""
-    sanitized_messages = sanitize_llm_messages(
+    stream_reply = await prepare_stream_chat_reply(
+        messages,
+        trace_id=trace_id,
+        privacy_source=privacy_source,
+    )
+    async for token in stream_reply.tokens:
+        yield token
+
+
+async def prepare_stream_chat_reply(
+    messages: list[dict[str, Any]],
+    *,
+    trace_id: str = "",
+    privacy_source: FilterSource = "unknown",
+) -> LLMStreamReply:
+    """Prepare a streamed chat reply plus any privacy detection metadata."""
+    pii_report = detect_llm_messages_pii(
         messages,
         source=privacy_source,
         trace_id=trace_id,
     )
-    stream = await _create_async_stream(sanitized_messages, trace_id=trace_id, tool_choice="none")
+    stream = await _create_async_stream(messages, trace_id=trace_id, tool_choice="none")
 
-    tokens: list[str] = []
-    async for chunk in stream:
-        if not chunk.choices:
-            continue
-        token = chunk.choices[0].delta.content or ""
-        if token:
-            tokens.append(token)
+    async def _token_iterator() -> AsyncIterator[str]:
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            token = chunk.choices[0].delta.content or ""
+            if token:
+                yield token
 
-    yield await sanitize_llm_reply_text_async("".join(tokens))
+    return LLMStreamReply(tokens=_token_iterator(), pii_report=pii_report)
 
 
 # ---------------------------------------------------------------------------

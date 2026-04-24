@@ -33,6 +33,29 @@ from safety.observability import get_metrics_store, log_event, log_exception
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("brain")
 
+_ACCESS_LOG_SILENT_PATHS = frozenset({
+    "/brain/health",
+    "/brain/metrics",
+    "/brain/metrics/prometheus",
+})
+
+
+class _SilentAccessPathsFilter(logging.Filter):
+    """Drop uvicorn access log lines for infra polling endpoints."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        request_line = str(args[1])
+        return not any(
+            f" {path} " in request_line or request_line.endswith(f" {path}")
+            for path in _ACCESS_LOG_SILENT_PATHS
+        )
+
+
+logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())
+
 _OPENAPI_TAGS = [
     {"name": "System", "description": "Health, metrics, and identity endpoints."},
     {"name": "Tools & Skills", "description": "Tool registry and skill management APIs."},
@@ -161,11 +184,12 @@ async def metrics_middleware(request: Request, call_next):
         duration_ms = round((perf_counter() - start) * 1000, 2)
         store.increment("http_requests_total", method=method, path=path, status=status)
         store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
-        log_event(
-            "http_request",
-            trace_id=trace_id, method=method, path=path,
-            status=status, duration_ms=duration_ms,
-        )
+        if path not in _ACCESS_LOG_SILENT_PATHS:
+            log_event(
+                "http_request",
+                trace_id=trace_id, method=method, path=path,
+                status=status, duration_ms=duration_ms,
+            )
 
     return response
 

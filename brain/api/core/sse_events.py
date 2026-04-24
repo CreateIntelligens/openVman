@@ -44,6 +44,14 @@ class TokenEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class PiiWarningEvent:
+    trace_id: str
+    categories: tuple[str, ...]
+    counts: dict[str, int]
+    event: str = "pii_warning"
+
+
+@dataclass(frozen=True, slots=True)
 class ToolErrorEvent:
     trace_id: str
     error: str
@@ -65,7 +73,7 @@ class DoneEvent:
     event: str = "done"
 
 
-SSEEvent = SessionEvent | ContextEvent | ToolEvent | ToolErrorEvent | TokenEvent | DoneEvent
+SSEEvent = SessionEvent | ContextEvent | ToolEvent | ToolErrorEvent | TokenEvent | PiiWarningEvent | DoneEvent
 
 
 def _encode_sse_data(payload: dict[str, Any]) -> str:

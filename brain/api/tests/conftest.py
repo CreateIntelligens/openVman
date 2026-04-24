@@ -38,15 +38,17 @@ def make_fake_agent_loop() -> types.ModuleType:
     fake = types.ModuleType("core.agent_loop")
 
     class AgentLoopResult:
-        def __init__(self, reply: str, tool_steps: list[dict]):
+        def __init__(self, reply: str, tool_steps: list[dict], pii_report=None):
             self.reply = reply
             self.tool_steps = tool_steps
+            self.pii_report = pii_report
 
         def __eq__(self, other: object) -> bool:
             return (
                 isinstance(other, AgentLoopResult)
                 and self.reply == other.reply
                 and self.tool_steps == other.tool_steps
+                and self.pii_report == other.pii_report
             )
 
     class PreparedAgentReply:
@@ -97,7 +99,6 @@ def _empty_bundle_with_project(
     query: str = "",
     persona_id: str = "default",
     project_id: str = "default",
-    include_knowledge: bool = True,
     include_memories: bool = True,
 ) -> FakeRetrievalBundle:
     return FakeRetrievalBundle(knowledge_results=[], memory_results=[], diagnostics={})

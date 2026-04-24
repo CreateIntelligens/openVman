@@ -31,12 +31,18 @@ export interface ActionRequest {
   nav_target?: NavTarget;
 }
 
+export interface PiiWarningSummary {
+  categories: string[];
+  counts: Record<string, number>;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
   created_at?: string;
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
   action_requests?: ActionRequest[];
+  privacy_warning?: PiiWarningSummary;
 }
 
 export interface ToolStep {
@@ -70,9 +76,12 @@ export interface ChatToolEvent {
   result: string;
 }
 
+export type ChatPiiWarningEvent = PiiWarningSummary;
+
 export interface ChatStreamHandlers {
   onSession?: (payload: { session_id: string }) => void;
   onContext?: (payload: ChatContextEvent) => void;
+  onPiiWarning?: (payload: ChatPiiWarningEvent) => void;
   onToken?: (payload: { token: string }) => void;
   onTool?: (payload: ChatToolEvent) => void;
   onDone?: (payload: ChatDoneEvent) => void;
@@ -180,6 +189,7 @@ function dispatchSseEvent(eventName: string, payload: unknown, handlers: ChatStr
   const handlerMap: Record<string, ((p: never) => void) | undefined> = {
     session: handlers.onSession,
     context: handlers.onContext,
+    pii_warning: handlers.onPiiWarning,
     token: handlers.onToken,
     tool: handlers.onTool,
     done: handlers.onDone,

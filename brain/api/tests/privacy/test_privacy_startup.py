@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from privacy.filter import sanitize_llm_messages
+from privacy.filter import detect_llm_messages_pii
 from privacy.model import disable_privacy_filter, enable_regex_detector_for_tests
 
 
 class _Settings:
     privacy_filter_enabled = True
-    privacy_filter_mode = "mask"
     privacy_filter_include_system = False
     privacy_filter_cache_size = 8
     privacy_filter_block_categories = "secret"
@@ -27,7 +26,7 @@ def test_model_load_failure_flag_passes_messages_through(monkeypatch) -> None:
     disable_privacy_filter("load failed")
 
     messages = [{"role": "user", "content": "Call 0912345678"}]
-    assert sanitize_llm_messages(messages, source="chat", trace_id="t1") is messages
+    assert detect_llm_messages_pii(messages, source="chat", trace_id="t1") is None
 
 
 @pytest.mark.asyncio
@@ -45,4 +44,4 @@ async def test_startup_model_load_failure_disables_filter(monkeypatch) -> None:
     await main.load_privacy_filter_if_enabled()
 
     messages = [{"role": "user", "content": "Call 0912345678"}]
-    assert sanitize_llm_messages(messages, source="chat", trace_id="t1") is messages
+    assert detect_llm_messages_pii(messages, source="chat", trace_id="t1") is None

@@ -11,12 +11,13 @@ from typing import Any
 
 from config import get_settings
 from core.agent_loop import AgentLoopResult, ToolPhaseError, prepare_agent_reply, run_agent_loop
-from core.llm_client import generate_chat_reply, stream_chat_reply
+from core.llm_client import LLMReply, LLMStreamReply, generate_chat_turn, prepare_stream_chat_reply
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
 from core.sse_events import (
     ContextEvent,
     DoneEvent,
+    PiiWarningEvent,
     SessionEvent,
     SSEEvent,
     TokenEvent,
@@ -38,6 +39,7 @@ from protocol.message_envelope import (
     read_text,
     serialize_context,
 )
+from privacy.filter import PiiDetectionReport
 from safety.guardrails import enforce_guardrails, enforce_session_limits
 from tools.tool_executor import parse_tool_result
 
@@ -186,33 +188,65 @@ def _string_context_value(context: Any, name: str, default: str = "") -> str:
     return value if isinstance(value, str) else default
 
 
-def _generate_reply(
+def _generate_turn_result(
     messages: list[dict[str, Any]],
     *,
     privacy_source: str,
     trace_id: str,
-) -> str:
+) -> LLMReply:
     kwargs: dict[str, Any] = {}
-    if _supports_keyword_argument(generate_chat_reply, "privacy_source"):
+    if _supports_keyword_argument(generate_chat_turn, "privacy_source"):
         kwargs["privacy_source"] = privacy_source
-    if trace_id and _supports_keyword_argument(generate_chat_reply, "trace_id"):
+    if trace_id and _supports_keyword_argument(generate_chat_turn, "trace_id"):
         kwargs["trace_id"] = trace_id
-    return generate_chat_reply(messages, **kwargs)
+    return generate_chat_turn(messages, **kwargs)
 
 
-async def _stream_reply(
+def _reply_from_turn(turn: LLMReply) -> str:
+    reply = turn.content.strip()
+    if not reply:
+        raise ValueError("LLM 沒有回傳內容")
+    return reply
+
+
+async def _prepare_stream_reply(
     messages: list[dict[str, Any]],
     *,
     privacy_source: str,
     trace_id: str,
-) -> AsyncIterator[str]:
+) -> LLMStreamReply:
     kwargs: dict[str, Any] = {}
-    if _supports_keyword_argument(stream_chat_reply, "privacy_source"):
+    if _supports_keyword_argument(prepare_stream_chat_reply, "privacy_source"):
         kwargs["privacy_source"] = privacy_source
-    if trace_id and _supports_keyword_argument(stream_chat_reply, "trace_id"):
+    if trace_id and _supports_keyword_argument(prepare_stream_chat_reply, "trace_id"):
         kwargs["trace_id"] = trace_id
-    async for token in stream_chat_reply(messages, **kwargs):
-        yield token
+    return await prepare_stream_chat_reply(messages, **kwargs)
+
+
+def _pii_warning_event(
+    trace_id: str,
+    messages: list[dict[str, Any]],
+    report: PiiDetectionReport | None,
+) -> PiiWarningEvent | None:
+    if report is None:
+        return None
+
+    user_index = next(
+        (index for index in range(len(messages) - 1, -1, -1) if messages[index].get("role") == "user"),
+        -1,
+    )
+    if user_index < 0 or user_index >= len(report.per_message):
+        return None
+
+    counts = dict(report.per_message[user_index])
+    if not counts:
+        return None
+
+    return PiiWarningEvent(
+        trace_id=trace_id,
+        categories=tuple(sorted(counts)),
+        counts=counts,
+    )
 
 
 def _tool_error_event_from_phase_error(trace_id: str, exc: ToolPhaseError) -> ToolErrorEvent:
@@ -239,13 +273,15 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     project_id = _string_context_value(context, "project_id", "default")
 
     if context.route.skip_tools:
+        turn = _generate_turn_result(
+            context.prompt_messages,
+            privacy_source="chat",
+            trace_id=trace_id,
+        )
         return AgentLoopResult(
-            reply=_generate_reply(
-                context.prompt_messages,
-                privacy_source="chat",
-                trace_id=trace_id,
-            ),
+            reply=_reply_from_turn(turn),
             tool_steps=[],
+            pii_report=turn.pii_report,
         )
     try:
         return run_agent_loop(
@@ -255,13 +291,15 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
+        turn = _generate_turn_result(
+            fallback,
+            privacy_source="tool",
+            trace_id=trace_id,
+        )
         return AgentLoopResult(
-            reply=_generate_reply(
-                fallback,
-                privacy_source="tool",
-                trace_id=trace_id,
-            ),
+            reply=_reply_from_turn(turn),
             tool_steps=exc.partial_steps,
+            pii_report=turn.pii_report,
         )
 
 
@@ -315,11 +353,16 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
     )
 
     privacy_source = "tool" if tool_steps else "chat"
-    async for token in _stream_reply(
+    stream_reply = await _prepare_stream_reply(
         stream_messages,
         privacy_source=privacy_source,
         trace_id=trace_id,
-    ):
+    )
+    pii_warning = _pii_warning_event(trace_id, stream_messages, stream_reply.pii_report)
+    if pii_warning is not None:
+        yield pii_warning
+
+    async for token in stream_reply.tokens:
         reply_parts.append(token)
         yield TokenEvent(trace_id=trace_id, token=token)
 

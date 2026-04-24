@@ -309,8 +309,16 @@ class TestGracefulDegradation:
         seen_messages: list[dict[str, Any]] = []
         monkeypatch.setattr(
             chat_service,
-            "generate_chat_reply",
-            lambda msgs: (seen_messages.extend(msgs), "fallback answer")[1],
+            "generate_chat_turn",
+            lambda msgs, **kwargs: (
+                seen_messages.extend(msgs),
+                types.SimpleNamespace(
+                    content="fallback answer",
+                    tool_calls=[],
+                    model="test-model",
+                    pii_report=None,
+                ),
+            )[1],
         )
 
         fake_route = MagicMock()
@@ -363,8 +371,11 @@ class TestGracefulDegradation:
             for token in ["fall", "back"]:
                 yield token
 
+        async def fake_prepare_stream(msgs, **kwargs):
+            return chat_service.LLMStreamReply(tokens=fake_stream(msgs), pii_report=None)
+
         monkeypatch.setattr(chat_service.asyncio, "to_thread", immediate_to_thread)
-        monkeypatch.setattr(chat_service, "stream_chat_reply", fake_stream)
+        monkeypatch.setattr(chat_service, "prepare_stream_chat_reply", fake_prepare_stream)
         monkeypatch.setattr(chat_service, "finalize_generation", lambda ctx, reply: None)
 
         fake_route = MagicMock()
@@ -415,8 +426,11 @@ class TestGracefulDegradation:
             yield "hello"
             yield " world"
 
+        async def fake_prepare_stream(msgs, **kwargs):
+            return chat_service.LLMStreamReply(tokens=fake_stream(msgs), pii_report=None)
+
         monkeypatch.setattr(chat_service.asyncio, "to_thread", immediate_to_thread)
-        monkeypatch.setattr(chat_service, "stream_chat_reply", fake_stream)
+        monkeypatch.setattr(chat_service, "prepare_stream_chat_reply", fake_prepare_stream)
         monkeypatch.setattr(chat_service, "finalize_generation", lambda ctx, reply: None)
 
         fake_route = MagicMock()

@@ -7,9 +7,9 @@ from privacy.cache import PrivacyFilterCache
 
 def test_cache_hit_returns_cached_value() -> None:
     cache = PrivacyFilterCache(max_entries=2)
-    cache.set("hello@example.com", ("[REDACTED:private_email]", {"private_email": 1}))
+    cache.set("hello@example.com", {"private_email": 1})
 
-    assert cache.get("hello@example.com") == ("[REDACTED:private_email]", {"private_email": 1})
+    assert cache.get("hello@example.com") == {"private_email": 1}
 
 
 def test_cache_miss_returns_none() -> None:
@@ -20,12 +20,12 @@ def test_cache_miss_returns_none() -> None:
 
 def test_cache_evicts_least_recently_used_entry() -> None:
     cache = PrivacyFilterCache(max_entries=2)
-    cache.set("first", ("first", {}))
-    cache.set("second", ("second", {}))
-    assert cache.get("first") == ("first", {})
+    cache.set("first", {})
+    cache.set("second", {"private_email": 1})
+    assert cache.get("first") == {}
 
-    cache.set("third", ("third", {}))
+    cache.set("third", {"private_phone": 1})
 
     assert cache.get("second") is None
-    assert cache.get("first") == ("first", {})
-    assert cache.get("third") == ("third", {})
+    assert cache.get("first") == {}
+    assert cache.get("third") == {"private_phone": 1}

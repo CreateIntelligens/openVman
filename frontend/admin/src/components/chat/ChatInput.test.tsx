@@ -21,6 +21,7 @@ function renderChatInput(overrides: Partial<ComponentProps<typeof ChatInput>> = 
     asrListening: false,
     asrSupported: true,
     vadSpeaking: false,
+    privacyWarningsVisible: true,
     onInputChange: vi.fn(),
     onSubmit: vi.fn(),
     onStopStreaming: vi.fn(),
@@ -32,6 +33,7 @@ function renderChatInput(overrides: Partial<ComponentProps<typeof ChatInput>> = 
     onDismissError: vi.fn(),
     onDismissFallbackToast: vi.fn(),
     onToggleAsr: vi.fn(),
+    onPrivacyWarningsVisibleChange: vi.fn(),
     liveWsState: "connected",
     liveMicActive: false,
     onLiveToggleMic: vi.fn(),
@@ -63,21 +65,18 @@ describe("ChatInput", () => {
     expect(screen.getByTitle("停止回覆")).not.toBeNull();
   });
 
-  it("shows a dismissible privacy warning for likely PII", () => {
+  it("does not show the legacy regex privacy warning anymore", () => {
     renderChatInput({ input: "call me at 0912345678" });
-
-    expect(screen.getByText("This message may contain personal information.")).not.toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss privacy warning" }));
 
     expect(screen.queryByText("This message may contain personal information.")).toBeNull();
   });
 
-  it("does not block submission when likely PII is present", () => {
-    const props = renderChatInput({ input: "email jane@example.com" });
+  it("renders the privacy warning toggle and forwards changes", () => {
+    const props = renderChatInput({ privacyWarningsVisible: true });
 
-    fireEvent.click(screen.getByRole("button", { name: "送出訊息" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "顯示隱私警告" }));
 
-    expect(props.onSubmit).toHaveBeenCalledTimes(1);
+    expect(props.onPrivacyWarningsVisibleChange).toHaveBeenCalledWith(false);
   });
+
 });

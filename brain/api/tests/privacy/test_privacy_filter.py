@@ -7,14 +7,12 @@ import logging
 import pytest
 
 from privacy.exceptions import PrivacyViolationError
-from privacy.filter import sanitize_llm_messages, sanitize_llm_reply_text
+from privacy.filter import detect_llm_messages_pii
 from privacy.model import enable_regex_detector_for_tests
 
 
 class _Settings:
     privacy_filter_enabled = True
-    privacy_filter_egress_enabled = True
-    privacy_filter_mode = "mask"
     privacy_filter_include_system = False
     privacy_filter_cache_size = 8
     privacy_filter_block_categories = "secret"
@@ -36,80 +34,80 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch, **overrides: object) -> _Se
     return settings
 
 
-def test_sanitize_filters_user_role_only(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_reports_user_and_tool_roles_without_mutating_messages(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_settings(monkeypatch)
+    messages = [
+        {"role": "user", "content": "Call 0912345678"},
+        {"role": "tool", "content": "owner jane@example.com"},
+    ]
 
-    sanitized = sanitize_llm_messages(
-        [
-            {"role": "user", "content": "Call 0912345678"},
-            {"role": "tool", "content": "owner jane@example.com"},
-        ],
+    report = detect_llm_messages_pii(
+        messages,
         source="chat",
         trace_id="t1",
     )
 
-    assert sanitized[0]["content"] == "Call [REDACTED:private_phone]"
-    # Tool-role messages are trusted internal system output; not masked.
-    assert sanitized[1]["content"] == "owner jane@example.com"
+    assert report is not None
+    assert messages == [
+        {"role": "user", "content": "Call 0912345678"},
+        {"role": "tool", "content": "owner jane@example.com"},
+    ]
+    assert report.categories == ("private_email", "private_phone")
+    assert report.counts == {"private_email": 1, "private_phone": 1}
+    assert report.per_message == (
+        {"private_phone": 1},
+        {"private_email": 1},
+    )
 
 
-def test_sanitize_skips_system_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_skips_system_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_settings(monkeypatch)
     message = {"role": "system", "content": "System phone 0912345678"}
 
-    sanitized = sanitize_llm_messages([message], source="chat", trace_id="t1")
+    report = detect_llm_messages_pii([message], source="chat", trace_id="t1")
 
-    assert sanitized == [message]
+    assert report is not None
+    assert report.counts == {}
+    assert report.per_message == ({},)
 
 
-def test_sanitize_never_touches_system_role(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch)
+def test_detect_includes_system_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_settings(monkeypatch, privacy_filter_include_system=True)
 
-    sanitized = sanitize_llm_messages(
+    report = detect_llm_messages_pii(
         [{"role": "system", "content": "System phone 0912345678"}],
         source="chat",
         trace_id="t1",
     )
 
-    # System role is always trusted internal output; never masked.
-    assert sanitized[0]["content"] == "System phone 0912345678"
+    assert report is not None
+    assert report.counts == {"private_phone": 1}
+    assert report.per_message == ({"private_phone": 1},)
 
 
-def test_sanitize_blocks_configured_secret_category(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_blocks_configured_secret_category(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_settings(monkeypatch)
 
     with pytest.raises(PrivacyViolationError):
-        sanitize_llm_messages(
+        detect_llm_messages_pii(
             [{"role": "user", "content": "password=super-secret"}],
             source="chat",
             trace_id="t1",
         )
 
 
-def test_sanitize_disabled_returns_original_messages(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detect_disabled_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_settings(monkeypatch, privacy_filter_enabled=False)
     messages = [{"role": "user", "content": "Call 0912345678"}]
 
-    assert sanitize_llm_messages(messages, source="chat", trace_id="t1") is messages
-
-
-def test_sanitize_llm_reply_text_masks_pii_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch)
-
-    assert sanitize_llm_reply_text("Call 0912345678") == "Call 091****678"
-
-
-def test_sanitize_llm_reply_text_skips_when_egress_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_settings(monkeypatch, privacy_filter_egress_enabled=False)
-
-    assert sanitize_llm_reply_text("Call 0912345678") == "Call 0912345678"
+    assert detect_llm_messages_pii(messages, source="chat", trace_id="t1") is None
 
 
 def test_audit_log_never_contains_raw_pii(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     _patch_settings(monkeypatch)
     caplog.set_level(logging.INFO, logger="brain")
 
-    sanitize_llm_messages(
+    detect_llm_messages_pii(
         [{"role": "user", "content": "Call 0912345678"}],
         source="chat",
         trace_id="t1",
@@ -118,4 +116,3 @@ def test_audit_log_never_contains_raw_pii(monkeypatch: pytest.MonkeyPatch, caplo
     log_output = "\n".join(record.getMessage() for record in caplog.records)
     assert "0912345678" not in log_output
     assert "Call [REDACTED:private_phone]" not in log_output
-    assert "Call 091****678" not in log_output

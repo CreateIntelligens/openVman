@@ -1,12 +1,14 @@
-import type { ActionRequest, ChatMessage as ChatMessageType, RetrievalResult } from "../../api";
+import type { ActionRequest, ChatMessage as ChatMessageType, PiiWarningSummary, RetrievalResult } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
 import SourceChips from "./SourceChips";
 import ActionRequestCard from "./ActionRequestCard";
 import { renderWithRedactions } from "./redactedText";
+import { formatPiiWarningSummary, hasPiiWarning } from "./privacyWarnings";
 
 type RenderableChatMessage = Pick<ChatMessageType, "role" | "content"> & {
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
   action_requests?: ActionRequest[];
+  privacy_warning?: PiiWarningSummary;
 };
 
 function formatMessageTime(value: string | number | undefined): string | null {
@@ -31,6 +33,7 @@ export default function ChatMessage({
   isLastMessage,
   onPlayTts,
   renderMarkdown,
+  privacyWarningsVisible,
   showAssistantActions,
   onActionConfirmed,
   onActionCancelled,
@@ -43,16 +46,25 @@ export default function ChatMessage({
   isLastMessage?: boolean;
   onPlayTts?: (text: string, index: number) => void;
   renderMarkdown?: boolean;
+  privacyWarningsVisible?: boolean;
   showAssistantActions?: boolean;
   onActionConfirmed?: (request: ActionRequest) => void;
   onActionCancelled?: (request: ActionRequest) => void;
 }) {
   const isUserMessage = message.role === "user";
   const isAssistantMessage = message.role === "assistant";
+  const isEmptyAssistantDraft = isAssistantMessage && !message.content;
   const isPlaying = playingIndex === index;
   const isPrefetching = Boolean(ttsPrefetching && isLastMessage);
   const timestamp = formatMessageTime(createdAt);
   const shouldRenderMarkdown = renderMarkdown ?? isAssistantMessage;
+  const privacyWarning = message.privacy_warning;
+  const shouldShowPrivacyWarning = isUserMessage
+    && Boolean(privacyWarningsVisible)
+    && hasPiiWarning(privacyWarning);
+  const privacyWarningText = shouldShowPrivacyWarning
+    ? formatPiiWarningSummary(privacyWarning)
+    : "";
   const shouldShowAssistantActions = Boolean(
     showAssistantActions
     && isAssistantMessage
@@ -103,12 +115,24 @@ export default function ChatMessage({
           </div>
         )}
       </div>
-      {shouldRenderMarkdown ? (
+      {isEmptyAssistantDraft ? (
+        <div className="flex items-center gap-1 py-1" aria-label="Brain 正在思考">
+          <span className="h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce [animation-delay:-0.3s]" />
+          <span className="h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce [animation-delay:-0.15s]" />
+          <span className="h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce" />
+        </div>
+      ) : shouldRenderMarkdown ? (
         <div className="text-[15px] leading-relaxed relative z-10">
           <MarkdownPreview content={message.content} />
         </div>
       ) : (
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{renderWithRedactions(message.content)}</p>
+      )}
+      {shouldShowPrivacyWarning && (
+        <div className="mt-3 flex items-center gap-1.5 text-xs text-primary-100/90">
+          <span className="material-symbols-outlined text-[0.95rem]">privacy_tip</span>
+          <span>{`偵測到：${privacyWarningText}`}</span>
+        </div>
       )}
       {isAssistantMessage && message.sources && (
         <SourceChips sources={message.sources} />

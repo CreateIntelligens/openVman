@@ -7,7 +7,7 @@ from typing import Literal
 
 from safety.observability import log_event
 
-PrivacyFilterAction = Literal["masked", "skipped", "error"]
+PrivacyFilterAction = Literal["detected", "skipped", "error"]
 PrivacyFilterSource = Literal["chat", "tool", "auto_recall", "graph_extractor", "unknown"]
 
 

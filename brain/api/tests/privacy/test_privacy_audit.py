@@ -19,7 +19,7 @@ def test_audit_event_has_no_raw_content_fields() -> None:
 def test_audit_event_rejects_content_field() -> None:
     with pytest.raises(TypeError):
         PrivacyFilterAuditEvent(
-            action="masked",
+            action="detected",
             source="chat",
             categories=("private_phone",),
             counts={"private_phone": 1},
@@ -30,4 +30,4 @@ def test_audit_event_rejects_content_field() -> None:
 
 def test_record_privacy_filter_event_requires_typed_event() -> None:
     with pytest.raises(TypeError):
-        record_privacy_filter_event("masked")
+        record_privacy_filter_event("detected")

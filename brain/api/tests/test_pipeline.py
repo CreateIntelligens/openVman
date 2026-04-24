@@ -457,8 +457,13 @@ def test_execute_generation_skips_tool_loop_for_direct_route(monkeypatch: pytest
     )
     monkeypatch.setattr(
         chat_service,
-        "generate_chat_reply",
-        lambda messages: "direct reply",
+        "generate_chat_turn",
+        lambda messages: SimpleNamespace(
+            content="direct reply",
+            tool_calls=[],
+            model="test-model",
+            pii_report=None,
+        ),
         raising=False,
     )
 

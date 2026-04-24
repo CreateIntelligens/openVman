@@ -1,4 +1,4 @@
-import { getActiveProjectId, type ChatMessage, type PersonaSummary } from "../../api";
+import { getActiveProjectId, type ChatMessage, type PersonaSummary, type PiiWarningSummary } from "../../api";
 
 export const defaultPersona: PersonaSummary = {
   persona_id: "default",
@@ -45,6 +45,44 @@ export function removeEmptyAssistantDraft(messages: ChatMessage[]) {
     return messages.slice(0, -1);
   }
   return messages;
+}
+
+function findLastUserMessageIndex(messages: ChatMessage[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "user") {
+      return index;
+    }
+  }
+  return -1;
+}
+
+export function attachPrivacyWarningToLastUserMessage(
+  messages: ChatMessage[],
+  warning: PiiWarningSummary,
+) {
+  const index = findLastUserMessageIndex(messages);
+  if (index < 0) return messages;
+  return [
+    ...messages.slice(0, index),
+    { ...messages[index], privacy_warning: warning },
+    ...messages.slice(index + 1),
+  ];
+}
+
+export function mergeUserPrivacyWarnings(history: ChatMessage[], current: ChatMessage[]) {
+  const warnings = current
+    .filter((message) => message.role === "user")
+    .map((message) => message.privacy_warning);
+
+  let userIndex = 0;
+  return history.map((message) => {
+    if (message.role !== "user") {
+      return message;
+    }
+    const warning = warnings[userIndex];
+    userIndex += 1;
+    return warning ? { ...message, privacy_warning: warning } : message;
+  });
 }
 
 export function parseMetadata(raw?: string) {

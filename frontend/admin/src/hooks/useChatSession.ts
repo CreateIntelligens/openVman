@@ -7,11 +7,17 @@ import {
 } from "../api";
 import {
   addPendingExchange,
+  attachPrivacyWarningToLastUserMessage,
   appendStreamingToken,
   getConversationTitle,
+  mergeUserPrivacyWarnings,
   removeEmptyAssistantDraft,
   starterPrompts,
 } from "../components/chat/helpers";
+import {
+  readPrivacyWarningsVisible,
+  writePrivacyWarningsVisible,
+} from "../components/chat/privacyWarnings";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 import { useVad } from "./useVad";
 import { useTts } from "./useTts";
@@ -48,7 +54,7 @@ function applyChatResultToMessages(
   const pendingActions = getLastAssistantActions(current);
 
   if (payload.history) {
-    const history = [...payload.history];
+    const history = mergeUserPrivacyWarnings([...payload.history], current);
     for (let index = history.length - 1; index >= 0; index -= 1) {
       const message = history[index];
       if (message.role !== "assistant") {
@@ -114,6 +120,7 @@ function appendActionRequestToLastAssistant(
 export function useChatSession() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [privacyWarningsVisible, setPrivacyWarningsVisible] = useState(() => readPrivacyWarningsVisible());
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const stopReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -183,6 +190,10 @@ export function useChatSession() {
   useEffect(() => () => {
     abortControllerRef.current?.abort();
   }, []);
+
+  useEffect(() => {
+    writePrivacyWarningsVisible(privacyWarningsVisible);
+  }, [privacyWarningsVisible]);
 
   // --- ASR & VAD ---
   const asrBaseRef = useRef("");
@@ -285,6 +296,9 @@ export function useChatSession() {
               loadSessions();
             }
           },
+          onPiiWarning: (payload) => {
+            setMessages((current) => attachPrivacyWarningToLastUserMessage(current, payload));
+          },
           onToken: ({ token }) => setMessages((current) => appendStreamingToken(current, token)),
           onTool: ({ name, result }) => {
             const request = parseActionRequestResult(name, result);
@@ -365,6 +379,7 @@ export function useChatSession() {
     clampedSlashIndex,
     conversationTitle,
     conversationStatus,
+    privacyWarningsVisible,
     sessions,
     loadingSessions,
     deleteSessionTarget,
@@ -374,6 +389,7 @@ export function useChatSession() {
     setSlashIndex,
     setSlashOpen,
     setError,
+    setPrivacyWarningsVisible,
     setTtsFallbackToast,
     handleInputChange,
     onHistoryKeyDown,

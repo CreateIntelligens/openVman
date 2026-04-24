@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -68,13 +68,6 @@ def detect_and_mask(text: str) -> tuple[str, dict[str, int]]:
     if not text:
         return text, {}
     return _mask_spans(text, _detect_spans(text))
-
-
-def detect_and_partial_mask(text: str) -> tuple[str, dict[str, int]]:
-    """Egress-facing mask that preserves head/tail of each detected span."""
-    if not text:
-        return text, {}
-    return _partial_mask_spans(text, _detect_spans(text))
 
 
 def _detect_spans(text: str) -> list[_Span]:
@@ -147,67 +140,3 @@ def _ranges_overlap(left: range, right: range) -> bool:
     return left.start < right.stop and right.start < left.stop
 
 
-# ---------------------------------------------------------------------------
-# Partial mask (egress): keep head/tail, replace middle with asterisks
-# ---------------------------------------------------------------------------
-
-
-def _partial_mask_spans(text: str, spans: Iterable[_Span]) -> tuple[str, dict[str, int]]:
-    selected = _select_non_overlapping_spans(spans)
-    counts: dict[str, int] = {}
-    masked = text
-    for span in reversed(selected):
-        original = text[span.start:span.end]
-        replacement = _partial_replace(original, span.category)
-        masked = f"{masked[:span.start]}{replacement}{masked[span.end:]}"
-        counts[span.category] = counts.get(span.category, 0) + 1
-    return masked, counts
-
-
-def _mask_name(value: str) -> str:
-    stripped = value.strip()
-    if not stripped:
-        return value
-    if len(stripped) <= 1:
-        return "*"
-    if len(stripped) == 2:
-        return f"{stripped[0]}*"
-    return f"{stripped[0]}{'*' * (len(stripped) - 2)}{stripped[-1]}"
-
-
-def _mask_email(value: str) -> str:
-    if "@" not in value:
-        return _keep_head_tail(value, head=1, tail=0)
-    local, domain = value.split("@", 1)
-    if not local:
-        return f"***@{domain}"
-    middle = "*" * max(len(local) - 1, 1)
-    return f"{local[0]}{middle}@{domain}"
-
-
-def _keep_head_tail(value: str, *, head: int, tail: int) -> str:
-    if len(value) <= head + tail:
-        return "*" * max(len(value), 1)
-    middle_len = len(value) - head - tail
-    return f"{value[:head]}{'*' * middle_len}{value[-tail:] if tail else ''}"
-
-
-def _mask_keep_2_2(v: str) -> str: return _keep_head_tail(v, head=2, tail=2)
-def _mask_keep_3_3(v: str) -> str: return _keep_head_tail(v, head=3, tail=3)
-def _mask_keep_4_2(v: str) -> str: return _keep_head_tail(v, head=4, tail=2)
-def _mask_keep_1_1(v: str) -> str: return _keep_head_tail(v, head=1, tail=1)
-
-_PARTIAL_STRATEGIES: dict[str, Callable[[str], str]] = {
-    "private_person": _mask_name,
-    "private_email": _mask_email,
-    "private_phone": _mask_keep_3_3,
-    "private_address": _mask_keep_2_2,
-    "account_number": _mask_keep_2_2,
-    "secret": _mask_keep_2_2,
-    "private_url": _mask_keep_4_2,
-    "private_date": _mask_keep_2_2,
-}
-
-
-def _partial_replace(value: str, category: str) -> str:
-    return _PARTIAL_STRATEGIES.get(category, _mask_keep_1_1)(value)
