@@ -1,27 +1,24 @@
 {
-  "name": "frontend",
+  "name": "openvman-avatar",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "type-check": "vue-tsc --noEmit",
+    "type-check:watch": "vue-tsc --noEmit --watch"
   },
   "dependencies": {
-    "onnxruntime-web": "^1.19.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "vue": "^3.5.13",
+    "pako": "^2.1.0"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "jsdom": "^29.0.2",
+    "@types/pako": "^2.0.3",
+    "@vitejs/plugin-vue": "^5.2.3",
     "typescript": "^5.6.3",
     "vite": "^6.0.5",
-    "vitest": "^3.1.1"
+    "vue-tsc": "^2.2.0"
   }
 }

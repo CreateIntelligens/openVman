@@ -1,22 +1,19 @@
-FROM node:20-alpine
+# syntax=docker/dockerfile:1.7
+
+# --- Stage 1: Builder (deps prewarm for volume mount layout) ---
+FROM node:20-alpine AS builder
 
 WORKDIR /app
-
-# Install curl for model download
-RUN apk add --no-cache curl
-
 COPY package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
-# Create models directory
-RUN mkdir -p /app/public/models
+# --- Stage 2: Runner (vite dev server) ---
+FROM node:20-alpine AS runner
 
-# Download Wav2Lip ONNX model during build
-# This avoids runtime download and allows offline deployment
-RUN curl -L -o /app/public/models/wav2lip.onnx \
-    "https://huggingface.co/bluefoxcreation/Wav2lip-Onnx/resolve/main/wav2lip.onnx" \
-    || echo "Model download failed - will use fallback at runtime"
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
 
-EXPOSE 5173
+EXPOSE 80
 
-CMD ["sh", "-c", "npx vite --host"]
+CMD ["npx", "vite", "--host", "--port", "80"]

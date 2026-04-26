@@ -1,0 +1,10 @@
+# Character asset files — large binaries, not tracked in git.
+# Deploy separately (CDN, volume mount, etc.)
+**/*.webm
+**/*.gz
+**/*.jpg
+**/*.jpeg
+**/*.png
+**/*.mp4
+**/*.wav
+**/*.mp3

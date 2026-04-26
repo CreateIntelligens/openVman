@@ -1,30 +1,31 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
 
-// https://vite.dev/config/
+const publicPort = Number(process.env.PORT ?? 8787);
+
 export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      '@contracts': path.resolve(__dirname, '../../contracts'),
-    },
-  },
-  test: {
-    environment: 'jsdom',
-    globals: true,
-  },
+  plugins: [vue()],
   server: {
-    port: 3000,
+    host: true,
+    port: 80,
+    strictPort: true,
+    allowedHosts: true,
+    hmr: {
+      protocol: "ws",
+      clientPort: publicPort,
+    },
     proxy: {
-      '/api': {
-        target: 'http://localhost:8200',
-        changeOrigin: true,
-      },
-      '/ws': {
-        target: 'ws://localhost:8200',
+      "/ws": {
+        target: "http://localhost:8200",
         ws: true,
       },
+      "/api": {
+        target: "http://localhost:8200",
+      },
     },
+  },
+  build: {
+    outDir: "dist",
+    assetsInlineLimit: 0, // Don't inline WASM or large assets
   },
 });
