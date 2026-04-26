@@ -1,4 +1,4 @@
-import { fetchJson, apiUrl, projectUrl, post, getActiveProjectId } from "./common";
+import { fetchJson, apiUrl, post, getActiveProjectId } from "./common";
 
 export interface MetricsTimingBucket {
   count: number;
@@ -19,7 +19,7 @@ export async function fetchHealth<T = Record<string, unknown>>() {
 }
 
 export async function fetchHealthDetailed<T = Record<string, unknown>>() {
-  return fetchJson<T>(projectUrl("/health/detailed"));
+  return fetchJson<T>(apiUrl("/health/detailed"));
 }
 
 export function postEmbed<T = Record<string, unknown>>(texts: string[]) {
