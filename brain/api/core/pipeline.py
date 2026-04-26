@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 from infra.reflection import compress_text
 from protocol.message_envelope import BrainMessage, METADATA_ORIGINAL_USER_MESSAGE
 from tools.actions import action_nl_hints
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -88,6 +91,8 @@ def route_message(brain_message: BrainMessage) -> RouteDecision:
         return RouteDecision(path="tool", skip_rag=True, skip_tools=False)
     if _is_forced_tool_call(brain_message):
         tool_name = _extract_forced_tool_name(brain_message.content)
+        if tool_name is None:
+            logger.warning("forced tool call detected but could not extract tool name from: %r", brain_message.content[:80])
         return RouteDecision(path="tool", skip_rag=False, skip_tools=False, forced_tool_name=tool_name)
 
     content = brain_message.content.strip().casefold()

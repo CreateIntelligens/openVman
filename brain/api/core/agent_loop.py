@@ -61,7 +61,7 @@ def _generate_turn(
     kwargs: dict[str, Any] = {"tools": tools}
     if _supports_keyword_argument(generate_chat_turn, "privacy_source"):
         kwargs["privacy_source"] = "tool"
-    if forced_tool_name and _supports_keyword_argument(generate_chat_turn, "forced_tool_name"):
+    if forced_tool_name:
         kwargs["forced_tool_name"] = forced_tool_name
     return generate_chat_turn(messages, **kwargs)
 

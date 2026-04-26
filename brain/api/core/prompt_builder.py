@@ -70,9 +70,10 @@ def build_chat_messages(
         workspace_blocks.insert(0, recall_block)
 
     tool_instructions = (
-        "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。"
-        "當使用者要求你記住某事、或對話中出現值得長期保留的偏好/事實/指令時，使用 save_memory 工具儲存。"
-        "儲存時用簡潔的陳述句（如「使用者是男生」），不要儲存閒聊或普通問題。"
+        "你可以使用以下工具：\n"
+        "- search_knowledge、search_memory：查詢知識庫和記憶，需要時主動呼叫。\n"
+        "- save_memory：當使用者要求記住某事、或出現值得長期保留的偏好/事實/指令時使用，用簡潔陳述句儲存，不要儲存閒聊。\n"
+        "- 其他已啟用的技能工具（如 joke:get_joke、weather:get_current_weather 等）：使用者明確要求時可直接呼叫。"
         if allow_tools
         else (
             "你目前沒有任何可用的工具。"
