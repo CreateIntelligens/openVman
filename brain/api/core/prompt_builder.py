@@ -73,7 +73,9 @@ def build_chat_messages(
         "你可以使用以下工具：\n"
         "- search_knowledge、search_memory：查詢知識庫和記憶，需要時主動呼叫。\n"
         "- save_memory：當使用者要求記住某事、或出現值得長期保留的偏好/事實/指令時使用，用簡潔陳述句儲存，不要儲存閒聊。\n"
-        "- 其他已啟用的技能工具（如 joke:get_joke、weather:get_current_weather 等）：使用者明確要求時可直接呼叫。"
+        "- 其他已啟用的技能工具（如 joke:get_joke、weather:get_current_weather 等）：使用者明確要求時可直接呼叫。\n"
+        "CRITICAL: Never write tool calls as plain text (e.g., search_memory(...)) in your reply content. "
+        "Always use the function-calling API. If you have no more tools to call, reply in natural language only."
         if allow_tools
         else (
             "你目前沒有任何可用的工具。"

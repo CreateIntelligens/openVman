@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import re
 from dataclasses import dataclass
 import inspect
 from typing import Any
@@ -11,6 +13,13 @@ from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn
 from privacy.filter import PiiDetectionReport
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
+
+logger = logging.getLogger(__name__)
+
+_HALLUCINATED_TOOL_RETRY_MSG = (
+    "Invalid response format. You wrote a tool call as plain text. "
+    "Use the function-calling API instead, or reply in natural language."
+)
 
 
 class ToolPhaseError(Exception):
@@ -128,15 +137,27 @@ def _run_tool_phase(
     cfg = get_settings()
     working_messages = [dict(message) for message in messages]
     tool_steps: list[dict[str, Any]] = []
-    tools = get_tool_registry().build_openai_tools()
+    registry = get_tool_registry()
+    tools = registry.build_openai_tools()
+    hallucination_pattern = _build_hallucination_pattern(tools)
+    hallucination_retried = False
 
     with bind_tool_context(persona_id, project_id):
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
-            # Only force the specific tool on the first iteration
             current_forced = forced_tool_name if iteration == 0 else None
             turn = _generate_turn(working_messages, tools=tools, forced_tool_name=current_forced)
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
+                continue
+            # Detect hallucinated tool call (plain-text function syntax, no real tool_calls)
+            if (
+                not hallucination_retried
+                and hallucination_pattern is not None
+                and hallucination_pattern.match(turn.content.strip())
+            ):
+                logger.warning("hallucinated tool call detected in reply: %r — retrying", turn.content.strip()[:80])
+                hallucination_retried = True
+                working_messages.append({"role": "user", "content": _HALLUCINATED_TOOL_RETRY_MSG})
                 continue
             return working_messages, tool_steps, turn
 
@@ -192,3 +213,11 @@ def _execute_tool_call(tool_call: LLMToolCall) -> dict[str, Any]:
         "arguments": tool_call.arguments,
         "result": result,
     }
+
+
+def _build_hallucination_pattern(tools: list[dict[str, Any]]) -> re.Pattern[str] | None:
+    """Build a regex that matches a reply consisting only of a plain-text tool call."""
+    names = {t["function"]["name"] for t in tools}
+    if not names:
+        return None
+    return re.compile(r"^(" + "|".join(re.escape(n) for n in names) + r")\s*\(.*\)\s*$", re.DOTALL)
