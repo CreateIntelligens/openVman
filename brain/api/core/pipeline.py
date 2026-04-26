@@ -17,6 +17,7 @@ class RouteDecision:
     path: str       # "direct" | "rag" | "tool"
     skip_rag: bool
     skip_tools: bool
+    forced_tool_name: str | None = None  # set by slash commands to force a specific tool call
 
 
 _DIRECT_ROLES = frozenset({"system", "assistant", "control"})
@@ -86,7 +87,8 @@ def route_message(brain_message: BrainMessage) -> RouteDecision:
     if brain_message.role == "tool":
         return RouteDecision(path="tool", skip_rag=True, skip_tools=False)
     if _is_forced_tool_call(brain_message):
-        return RouteDecision(path="tool", skip_rag=False, skip_tools=False)
+        tool_name = _extract_forced_tool_name(brain_message.content)
+        return RouteDecision(path="tool", skip_rag=False, skip_tools=False, forced_tool_name=tool_name)
 
     content = brain_message.content.strip().casefold()
     if _needs_tooling(content):
@@ -113,6 +115,15 @@ def _contains_any(content: str, hints: tuple[str, ...]) -> bool:
 def _is_forced_tool_call(brain_message: BrainMessage) -> bool:
     original_user_message = brain_message.metadata.get(METADATA_ORIGINAL_USER_MESSAGE)
     return bool(original_user_message) and brain_message.content.startswith(_SLASH_TOOL_REWRITE_PREFIX)
+
+
+def _extract_forced_tool_name(content: str) -> str | None:
+    """Extract the tool name from a slash-command-rewritten message."""
+    if not content.startswith(_SLASH_TOOL_REWRITE_PREFIX):
+        return None
+    rest = content[len(_SLASH_TOOL_REWRITE_PREFIX):]
+    end = rest.find("`")
+    return rest[:end] or None if end >= 0 else None
 
 
 def enforce_context_budget(

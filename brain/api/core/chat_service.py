@@ -55,6 +55,7 @@ class GenerationContext:
     request_context: dict[str, Any]
     prompt_messages: list[dict[str, str]]
     prior_messages: list[dict[str, Any]] = field(default_factory=list)
+    forced_tool_name: str | None = None
 
 
 def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
@@ -99,6 +100,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         request_context=request_ctx,
         prompt_messages=prompt_messages,
         prior_messages=prior_messages,
+        forced_tool_name=route.forced_tool_name,
     )
 
 
@@ -288,6 +290,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             context.prompt_messages,
             persona_id=context.persona_id,
             project_id=project_id,
+            forced_tool_name=context.forced_tool_name,
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
@@ -331,6 +334,7 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
                 context.prompt_messages,
                 context.persona_id,
                 project_id,
+                forced_tool_name=context.forced_tool_name,
             )
             stream_messages = prepared.messages
             tool_steps = prepared.tool_steps

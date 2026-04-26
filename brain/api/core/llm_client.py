@@ -74,6 +74,7 @@ def generate_chat_turn(
     trace_id: str = "",
     model_override: str | None = None,
     privacy_source: FilterSource = "unknown",
+    forced_tool_name: str | None = None,
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
     pii_report = detect_llm_messages_pii(
@@ -86,6 +87,7 @@ def generate_chat_turn(
         tools=tools,
         trace_id=trace_id,
         model_override=model_override,
+        forced_tool_name=forced_tool_name,
     )
     message = response.choices[0].message
     content = (message.content or "").strip()
@@ -235,6 +237,7 @@ def _create_sync_completion(
     *,
     trace_id: str = "",
     model_override: str | None = None,
+    forced_tool_name: str | None = None,
 ):
     _require_api_key()
     cfg = get_settings()
@@ -249,7 +252,7 @@ def _create_sync_completion(
     )
 
     if legacy_routes:
-        return _try_routes_sync(legacy_routes, messages, tools, cfg, router)
+        return _try_routes_sync(legacy_routes, messages, tools, cfg, router, forced_tool_name=forced_tool_name)
 
     errors: list[str] = []
     last_reason = ""
@@ -262,7 +265,7 @@ def _create_sync_completion(
                 model=hop.model,
                 messages=messages,
                 temperature=cfg.llm_temperature,
-                **_build_create_kwargs(tools),
+                **_build_create_kwargs(tools, forced_tool_name=forced_tool_name),
             )
             router.mark_success(hop.api_key)
             record_route_attempt(
@@ -320,7 +323,7 @@ def _apply_model_override(
     return overridden_chain, overridden_legacy_routes
 
 
-def _try_routes_sync(routes, messages, tools, cfg, router):
+def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: str | None = None):
     """Legacy route loop for when no fallback chain is configured."""
     errors: list[str] = []
     for route in routes:
@@ -330,7 +333,7 @@ def _try_routes_sync(routes, messages, tools, cfg, router):
                 model=route.model,
                 messages=messages,
                 temperature=cfg.llm_temperature,
-                **_build_create_kwargs(tools),
+                **_build_create_kwargs(tools, forced_tool_name=forced_tool_name),
             )
             router.mark_success(route.api_key)
             return response
@@ -428,13 +431,14 @@ async def _try_routes_async(routes, messages, cfg, router, *, tool_choice: str |
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _build_create_kwargs(tools: list[dict[str, Any]] | None) -> dict[str, Any]:
+def _build_create_kwargs(tools: list[dict[str, Any]] | None, *, forced_tool_name: str | None = None) -> dict[str, Any]:
     if not tools:
         return {}
-    return {
-        "tools": tools,
-        "tool_choice": "auto",
-    }
+    if forced_tool_name:
+        tool_choice: str | dict[str, Any] = {"type": "function", "function": {"name": forced_tool_name}}
+    else:
+        tool_choice = "auto"
+    return {"tools": tools, "tool_choice": tool_choice}
 
 
 def _now_ms() -> float:

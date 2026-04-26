@@ -52,10 +52,17 @@ def _supports_keyword_argument(func: Any, name: str) -> bool:
     return any(param.kind is inspect.Parameter.VAR_KEYWORD or param.name == name for param in params)
 
 
-def _generate_turn(messages: list[dict[str, Any]], *, tools: list[dict[str, Any]]) -> LLMReply:
+def _generate_turn(
+    messages: list[dict[str, Any]],
+    *,
+    tools: list[dict[str, Any]],
+    forced_tool_name: str | None = None,
+) -> LLMReply:
     kwargs: dict[str, Any] = {"tools": tools}
     if _supports_keyword_argument(generate_chat_turn, "privacy_source"):
         kwargs["privacy_source"] = "tool"
+    if forced_tool_name and _supports_keyword_argument(generate_chat_turn, "forced_tool_name"):
+        kwargs["forced_tool_name"] = forced_tool_name
     return generate_chat_turn(messages, **kwargs)
 
 
@@ -63,9 +70,11 @@ def run_agent_loop(
     messages: list[dict[str, Any]],
     persona_id: str = "default",
     project_id: str = "default",
+    *,
+    forced_tool_name: str | None = None,
 ) -> AgentLoopResult:
     """Run a bounded think -> tool -> observe loop until the model returns text."""
-    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id)
+    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id, forced_tool_name=forced_tool_name)
     if final_turn is None:
         raise ToolPhaseError(
             "工具調用超出最大輪次",
@@ -86,13 +95,15 @@ def prepare_agent_reply(
     messages: list[dict[str, Any]],
     persona_id: str = "default",
     project_id: str = "default",
+    *,
+    forced_tool_name: str | None = None,
 ) -> PreparedAgentReply:
     """Run only the tool turns, returning messages ready for a final streaming call.
 
     Unlike run_agent_loop, this does NOT make the final text completion.
     The caller is expected to stream the final reply via stream_chat_reply().
     """
-    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id)
+    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id, forced_tool_name=forced_tool_name)
     if final_turn is None:
         raise ToolPhaseError(
             "工具調用超出最大輪次",
@@ -106,6 +117,8 @@ def _run_tool_phase(
     messages: list[dict[str, Any]],
     persona_id: str,
     project_id: str = "default",
+    *,
+    forced_tool_name: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
     """Execute tool call rounds until the LLM returns a text turn or rounds are exhausted.
 
@@ -118,8 +131,10 @@ def _run_tool_phase(
     tools = get_tool_registry().build_openai_tools()
 
     with bind_tool_context(persona_id, project_id):
-        for _ in range(max(1, cfg.agent_loop_max_rounds)):
-            turn = _generate_turn(working_messages, tools=tools)
+        for iteration in range(max(1, cfg.agent_loop_max_rounds)):
+            # Only force the specific tool on the first iteration
+            current_forced = forced_tool_name if iteration == 0 else None
+            turn = _generate_turn(working_messages, tools=tools, forced_tool_name=current_forced)
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue
