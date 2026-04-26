@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchHealth, fetchMetrics, type MetricsSnapshot } from "../api/metrics";
+import { fetchHealthDetailed, fetchMetrics, type MetricsSnapshot } from "../api/metrics";
 
 export interface HealthData {
   status: string;
@@ -26,7 +26,7 @@ export function useHealthDashboard() {
     setLoading(true);
 
     const [healthResult, metricsResult] = await Promise.allSettled([
-      fetchHealth<HealthData>(),
+      fetchHealthDetailed<HealthData>(),
       fetchMetrics(),
     ]);
 

@@ -15,7 +15,11 @@ export interface MetricsSnapshot {
 }
 
 export async function fetchHealth<T = Record<string, unknown>>() {
-  return fetchJson<T>(projectUrl("/health"));
+  return fetchJson<T>(apiUrl("/health"));
+}
+
+export async function fetchHealthDetailed<T = Record<string, unknown>>() {
+  return fetchJson<T>(projectUrl("/health/detailed"));
 }
 
 export function postEmbed<T = Record<string, unknown>>(texts: string[]) {
