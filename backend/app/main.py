@@ -12,7 +12,7 @@ from time import monotonic
 import httpx
 from fastapi import FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
@@ -284,6 +284,54 @@ async def create_speech(body: SpeechRequest) -> Response:
         asyncio.create_task(cache_put(cache_key, _to_cached_tts_entry(output.result), cfg.tts_cache_ttl_seconds))
 
     return Response(content=output.result.audio_bytes, media_type=output.result.content_type, headers=headers)
+
+
+class TtsStreamRequest(BaseModel):
+    text: str
+    character: str = ""
+
+
+@app.post("/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
+async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
+    cfg = get_tts_config()
+    cleaned = clean_for_tts(body.text.strip())
+    if not cleaned:
+        return JSONResponse(status_code=400, content={"error": "empty text"})
+
+    character = body.character or cfg.tts_indextts_default_character
+
+    # Primary: proxy stream directly from IndexTTS
+    if cfg.tts_indextts_url:
+        indextts_stream_url = cfg.tts_indextts_url.rstrip("/") + "/tts_stream"
+
+        async def _proxy_stream() -> AsyncIterator[bytes]:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
+                try:
+                    async with client.stream(
+                        "POST",
+                        indextts_stream_url,
+                        json={"text": cleaned, "character": character},
+                    ) as resp:
+                        if resp.status_code >= 400:
+                            logger.warning(
+                                "tts_stream indextts error status=%s", resp.status_code
+                            )
+                            return
+                        async for chunk in resp.aiter_bytes(chunk_size=4096):
+                            yield chunk
+                except Exception as exc:
+                    logger.error("tts_stream proxy error: %s", exc)
+
+        return StreamingResponse(_proxy_stream(), media_type="audio/wav")
+
+    # Fallback: buffer with service chain
+    svc = _get_service()
+    try:
+        output = svc.synthesize(SynthesizeRequest(text=cleaned, voice_hint=""))
+    except RuntimeError as exc:
+        return JSONResponse(status_code=502, content={"error": str(exc)})
+
+    return Response(content=output.result.audio_bytes, media_type=output.result.content_type)
 
 
 @app.post("/documents/convert", tags=["Documents"], summary="文件轉 Markdown")
