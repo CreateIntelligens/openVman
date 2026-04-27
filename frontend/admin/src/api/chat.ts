@@ -51,6 +51,7 @@ export interface ToolStep {
   name: string;
   arguments?: string;
   result?: string;
+  duration_s?: number;
 }
 
 export interface ChatResponse {
