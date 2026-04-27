@@ -176,6 +176,7 @@ class TestToolPhaseError:
             content="", tool_calls=[fake_tool_call], model="test-model",
         )
 
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", lambda msgs, tools=None, **kw: fake_turn)
         monkeypatch.setattr(agent_loop, "generate_chat_turn", lambda msgs, tools=None: fake_turn)
         monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
 
@@ -210,6 +211,7 @@ class TestToolPhaseError:
                 model="test-model",
             )
 
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", fake_generate)
         monkeypatch.setattr(agent_loop, "generate_chat_turn", fake_generate)
         monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
 
@@ -227,6 +229,89 @@ class TestToolPhaseError:
 
         assert len(exc_info.value.partial_steps) == 3
         assert len(exc_info.value.partial_messages) > 0
+
+
+# ---------------------------------------------------------------------------
+# Step 5: stream_chat_turn iteration dispatch
+# ---------------------------------------------------------------------------
+
+class TestStreamChatTurnIterationDispatch:
+    def test_no_tool_message_uses_single_stream_call(self, monkeypatch: pytest.MonkeyPatch):
+        """Non-tool message: only stream_chat_turn called (iteration 0), no _generate_turn."""
+        agent_loop = _load_agent_loop(monkeypatch)
+
+        text_turn = agent_loop.LLMReply(content="hello", tool_calls=[], model="m1")
+
+        stream_calls: list[int] = []
+        generate_calls: list[int] = []
+
+        def fake_stream(msgs, tools=None, **kw):
+            stream_calls.append(1)
+            return text_turn
+
+        def fake_generate(msgs, tools=None, **kw):
+            generate_calls.append(1)
+            return text_turn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", fake_stream)
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", fake_generate)
+        monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
+
+        fake_registry = MagicMock()
+        fake_registry.build_openai_tools.return_value = []
+        monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+
+        fake_cfg = MagicMock()
+        fake_cfg.agent_loop_max_rounds = 3
+        monkeypatch.setattr(agent_loop, "get_settings", lambda: fake_cfg)
+
+        result = agent_loop.run_agent_loop([{"role": "user", "content": "早安"}])
+
+        assert result.reply == "hello"
+        assert len(stream_calls) == 1
+        assert len(generate_calls) == 0
+
+    def test_tool_use_message_uses_stream_then_generate(self, monkeypatch: pytest.MonkeyPatch):
+        """Tool-use: stream_chat_turn on iteration 0, _generate_turn on iteration 1."""
+        agent_loop = _load_agent_loop(monkeypatch)
+
+        tool_turn = agent_loop.LLMReply(
+            content="",
+            tool_calls=[agent_loop.LLMToolCall(id="c1", name="do_thing", arguments="{}", extra_content=None)],
+            model="m1",
+        )
+        text_turn = agent_loop.LLMReply(content="done", tool_calls=[], model="m1")
+
+        stream_calls: list[int] = []
+        generate_calls: list[int] = []
+
+        def fake_stream(msgs, tools=None, **kw):
+            stream_calls.append(1)
+            return tool_turn
+
+        def fake_generate(msgs, tools=None, **kw):
+            generate_calls.append(1)
+            return text_turn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", fake_stream)
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", fake_generate)
+        monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"do_thing","data":{},"error":""}')
+
+        fake_registry = MagicMock()
+        fake_registry.build_openai_tools.return_value = []
+        monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+
+        fake_cfg = MagicMock()
+        fake_cfg.agent_loop_max_rounds = 3
+        monkeypatch.setattr(agent_loop, "get_settings", lambda: fake_cfg)
+
+        result = agent_loop.run_agent_loop([{"role": "user", "content": "do something"}])
+
+        assert result.reply == "done"
+        assert len(stream_calls) == 1
+        assert len(generate_calls) == 1
 
 
 # ---------------------------------------------------------------------------

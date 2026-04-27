@@ -15,9 +15,7 @@
               :width="800"
               :height="800"
               :show-loading="wasm.isLoading.value"
-              :show-start="showStartBtn"
               :loading-text="loadingText"
-              @start="handleStart"
             />
           </div>
         </div>
@@ -29,7 +27,7 @@
           :current-char-id="wasm.currentCharId.value"
           :tts-engine="settings.ttsEngine"
           :state="chat.state.value"
-          :disabled="!isStarted"
+          :disabled="!wasm.isReady.value || wasm.isLoading.value"
           :error-message="wasm.error.value"
           @char-change="handleCharChange"
           @tts-change="handleTtsChange"
@@ -37,7 +35,7 @@
 
         <ChatPanel
           :messages="chat.messages.value"
-          :disabled="!isStarted || chat.state.value === 'DISCONNECTED'"
+          :disabled="!wasm.isReady.value || wasm.isLoading.value || chat.state.value === 'CONNECTING'"
           :placeholder="chatPlaceholder"
           :is-thinking="chat.state.value === 'THINKING'"
           :is-typing="isTyping"
@@ -49,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";
@@ -131,10 +129,6 @@ const chat = useAvatarChat({
   },
 });
 
-const showStartBtn = computed(() =>
-  !isStarted.value && wasm.isReady.value && !wasm.isLoading.value,
-);
-
 const loadingText = computed(() => {
   if (!wasm.isReady.value) return "載入接待引擎中...";
   if (wasm.isLoading.value) return "切換展示角色中...";
@@ -142,25 +136,46 @@ const loadingText = computed(() => {
 });
 
 const chatPlaceholder = computed(() => {
-  if (!isStarted.value) return "請先啟動接待台";
-  if (chat.state.value === "DISCONNECTED") return "正在重新連線接待服務...";
+  if (!wasm.isReady.value) return "正在準備接待台...";
+  if (wasm.isLoading.value) return "切換展示角色中...";
+  if (chat.state.value === "CONNECTING") return "連線中...";
+  if (chat.state.value === "DISCONNECTED") return "向數位接待員提問...";
   return "向數位接待員提問...";
 });
 
-async function handleStart(): Promise<void> {
-  await audio.resumeContext();
-  const firstChar = settings.characterId || characters.value[0]?.id || "001";
-  try {
-    await wasm.loadCharacter(firstChar);
-  } catch {
-    console.warn("[App] Character load failed, continuing without avatar");
+async function handleSend(text: string): Promise<void> {
+  if (!isStarted.value) {
+    try {
+      await audio.resumeContext();
+      await chat.connect();
+      
+      // Wait for session to initialize so we don't accidentally fall back to plain-text
+      if (!chat.sessionId.value) {
+        await new Promise<void>((resolve) => {
+          const unwatch = watch(() => chat.sessionId.value, (newVal) => {
+            if (newVal) {
+              unwatch();
+              resolve();
+            }
+          });
+          setTimeout(() => {
+            unwatch();
+            resolve();
+          }, 2000);
+        });
+      }
+      
+      if (window.characterVideo && window.characterVideo.paused) {
+        window.characterVideo.play().catch(e => console.warn("[App] characterVideo play failed:", e));
+      }
+      
+      isStarted.value = true;
+    } catch (e) {
+      console.error("[App] Initial connection failed:", e);
+      return;
+    }
   }
-  try {
-    chat.connect();
-    isStarted.value = true;
-  } catch (error) {
-    console.error("[App] Chat connect failed:", error);
-  }
+  chat.sendMessage(text);
 }
 
 async function handleCharChange(charId: string): Promise<void> {
@@ -174,15 +189,15 @@ function handleTtsChange(engine: string): void {
   chat.setTtsEngine(engine);
 }
 
-function handleSend(text: string): void {
-  chat.sendMessage(text);
-}
+
 
 onMounted(async () => {
   try {
     await wasm.initWasm();
+    const firstChar = settings.characterId || characters.value[0]?.id || "001";
+    await wasm.loadCharacter(firstChar);
   } catch (e) {
-    console.error("[App] WASM init failed:", e);
+    console.error("[App] WASM init or char load failed:", e);
   }
 });
 </script>

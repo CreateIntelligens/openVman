@@ -12,9 +12,6 @@
       <div class="spinner" />
       <span>{{ loadingText }}</span>
     </div>
-    <div v-if="showStart" class="avatar-overlay start" @click="$emit('start')">
-      點擊開始對話
-    </div>
   </div>
 </template>
 
@@ -23,13 +20,10 @@ defineProps<{
   width?: number
   height?: number
   showLoading?: boolean
-  showStart?: boolean
   loadingText?: string
 }>()
 
-defineEmits<{
-  start: []
-}>()
+defineEmits<{}>()
 </script>
 
 <style scoped>
@@ -90,19 +84,6 @@ defineEmits<{
   flex-direction: column;
   align-items: center;
   gap: 12px;
-}
-
-.avatar-overlay.start {
-  background: linear-gradient(135deg, #4ade80, #22d3ee);
-  font-size: 22px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 4px 24px rgba(74, 222, 128, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.avatar-overlay.start:hover {
-  transform: translate(-50%, -50%) scale(1.05);
-  box-shadow: 0 6px 32px rgba(74, 222, 128, 0.6);
 }
 
 .spinner {

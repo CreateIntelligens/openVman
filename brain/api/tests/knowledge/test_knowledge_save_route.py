@@ -47,6 +47,10 @@ def _load_knowledge_routes_module():
         "safety.observability",
         log_event=lambda *args, **kwargs: None,
         log_exception=lambda *args, **kwargs: None,
+        record_circuit_state_change=lambda *args, **kwargs: None,
+        record_chain_exhausted=lambda *args, **kwargs: None,
+        record_fallback_hop=lambda *args, **kwargs: None,
+        record_route_attempt=lambda *args, **kwargs: None,
     )
 
     return importlib.import_module("routes.knowledge")

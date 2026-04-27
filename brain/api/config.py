@@ -197,26 +197,16 @@ class BrainSettings(BaseSettings):
 
     @property
     def resolved_llm_api_keys(self) -> list[str]:
-        """Combine the legacy single key and the new key-pool env into one list.
-        If both are empty, fall back to the provider-specific key.
-        """
-        candidates = []
-        if self.llm_api_keys.strip():
-            candidates.extend(
-                key.strip()
-                for key in self.llm_api_keys.split(",")
-                if key.strip()
-            )
+        """Combine raw LLM_API_KEYS pool, legacy LLM_API_KEY, and provider-specific key."""
+        keys = [k.strip() for k in self.llm_api_keys.split(",") if k.strip()]
         if self.llm_api_key.strip():
-            candidates.append(self.llm_api_key.strip())
+            keys.append(self.llm_api_key.strip())
+        
+        if not keys:
+            if specific_key := self.resolve_api_key_for_provider(self.llm_provider):
+                keys.append(specific_key)
 
-        # If still empty, try to resolve from the specific provider's key
-        if not candidates:
-            specific_key = self.resolve_api_key_for_provider(self.llm_provider)
-            if specific_key:
-                candidates.append(specific_key)
-
-        return list(dict.fromkeys(candidates))
+        return list(dict.fromkeys(keys))
 
     @property
     def resolved_llm_models(self) -> list[str]:
@@ -230,24 +220,20 @@ class BrainSettings(BaseSettings):
     @property
     def resolved_fallback_chain(self) -> list[tuple[str, str]]:
         """Parse LLM_FALLBACK_CHAIN into (provider, model) pairs.
-
         Format: ``provider:model,provider:model,...``
-        Falls back to the primary provider/model if not configured.
         """
-        if not self.llm_fallback_chain.strip():
-            return [
-                (self.llm_provider, model)
-                for model in self.resolved_llm_models
-            ]
+        raw_chain = self.llm_fallback_chain.strip()
+        if not raw_chain:
+            return [(self.llm_provider, model) for model in self.resolved_llm_models]
+
         pairs: list[tuple[str, str]] = []
-        for raw_entry in self.llm_fallback_chain.split(","):
-            stripped = raw_entry.strip()
-            if ":" not in stripped:
-                continue
-            provider, model = stripped.split(":", 1)
-            if provider.strip() and model.strip():
-                pairs.append((provider.strip(), model.strip()))
-        return pairs if pairs else [(self.llm_provider, self.llm_model)]
+        for entry in raw_chain.split(","):
+            if ":" in entry:
+                provider, model = entry.split(":", 1)
+                if provider.strip() and model.strip():
+                    pairs.append((provider.strip(), model.strip()))
+        
+        return pairs or [(self.llm_provider, self.llm_model)]
 
     _BASE_URL_DEFAULTS: dict[str, str] = {
         "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -269,22 +255,22 @@ class BrainSettings(BaseSettings):
 
     def resolve_api_key_for_provider(self, provider: str) -> str:
         """Return the first API key available for a given provider."""
-        # Check provider-specific env vars first (avoids recursion with resolved_llm_api_keys)
         key_map = {
             "gemini": self.gemini_api_key,
             "groq": self.groq_api_key,
             "openai": self.openai_api_key,
+            "voyage": self.voyage_api_key,
         }
-        provider_key = key_map.get(provider, "")
-        if provider_key:
-            return provider_key
-        # For the active provider, fall back to generic llm_api_key(s) without
-        # going through resolved_llm_api_keys to avoid infinite recursion.
+        if key := key_map.get(provider):
+            return key
+
         if provider == self.llm_provider:
-            if self.llm_api_keys.strip():
-                return next((k.strip() for k in self.llm_api_keys.split(",") if k.strip()), "")
-            if self.llm_api_key.strip():
-                return self.llm_api_key.strip()
+            # Check llm_api_keys pool first
+            for k in self.llm_api_keys.split(","):
+                if stripped := k.strip():
+                    return stripped
+            return self.llm_api_key.strip()
+        
         return ""
 
     @property

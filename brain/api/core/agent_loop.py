@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from config import get_settings
-from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn
+from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn, stream_chat_turn
 from privacy.filter import PiiDetectionReport
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
@@ -55,22 +55,40 @@ def _supports_keyword_argument(func: Any, name: str) -> bool:
     return any(param.kind is inspect.Parameter.VAR_KEYWORD or param.name == name for param in params)
 
 
-def _generate_turn(
-    messages: list[dict[str, Any]],
-    *,
+def _build_turn_kwargs(
+    func: Any,
     tools: list[dict[str, Any]],
-    forced_tool_name: str | None = None,
-) -> LLMReply:
-    cfg = get_settings()
+    forced_tool_name: str | None,
+    cfg: Any,
+) -> dict[str, Any]:
+    """Build the shared kwargs for generate_chat_turn / stream_chat_turn calls."""
     kwargs: dict[str, Any] = {"tools": tools}
-    if _supports_keyword_argument(generate_chat_turn, "privacy_source"):
+    if _supports_keyword_argument(func, "privacy_source"):
         kwargs["privacy_source"] = "tool"
     if forced_tool_name:
         kwargs["forced_tool_name"] = forced_tool_name
         if cfg.forced_tool_model_override:
             kwargs["model_override"] = cfg.forced_tool_model_override
         kwargs["max_tokens"] = cfg.forced_tool_max_tokens
-    return generate_chat_turn(messages, **kwargs)
+    return kwargs
+
+
+def _generate_turn(
+    messages: list[dict[str, Any]],
+    *,
+    tools: list[dict[str, Any]],
+    forced_tool_name: str | None = None,
+) -> LLMReply:
+    return generate_chat_turn(messages, **_build_turn_kwargs(generate_chat_turn, tools, forced_tool_name, get_settings()))
+
+
+def _stream_turn(
+    messages: list[dict[str, Any]],
+    *,
+    tools: list[dict[str, Any]],
+    forced_tool_name: str | None = None,
+) -> LLMReply:
+    return stream_chat_turn(messages, **_build_turn_kwargs(stream_chat_turn, tools, forced_tool_name, get_settings()))
 
 
 def run_agent_loop(
@@ -121,7 +139,8 @@ def _run_tool_phase(
     with bind_tool_context(persona_id, project_id):
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             current_forced = forced_tool_name if iteration == 0 else None
-            turn = _generate_turn(working_messages, tools=tools, forced_tool_name=current_forced)
+            turn_fn = _stream_turn if iteration == 0 else _generate_turn
+            turn = turn_fn(working_messages, tools=tools, forced_tool_name=current_forced)
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue

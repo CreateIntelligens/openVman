@@ -127,6 +127,72 @@ def generate_chat_turn(
     )
 
 
+def stream_chat_turn(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
+    *,
+    trace_id: str = "",
+    model_override: str | None = None,
+    privacy_source: FilterSource = "unknown",
+    forced_tool_name: str | None = None,
+    max_tokens: int | None = None,
+) -> LLMReply:
+    """Stream one chat turn; detect tool calls vs text without a second round-trip.
+
+    Identical return type and signature to generate_chat_turn — callers need no changes.
+    Reuses the provider fallback chain and key-pool infrastructure.
+    """
+    _PII_EXECUTOR.submit(
+        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
+    )
+    _require_api_key()
+    cfg = get_settings()
+    router = get_provider_router()
+    tid = trace_id or uuid.uuid4().hex[:12]
+
+    chain, legacy_routes = _resolve_chain_or_routes(tid)
+    chain, legacy_routes = _apply_model_override(chain, legacy_routes, model_override)
+
+    create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+    if max_tokens:
+        create_kwargs["max_tokens"] = max_tokens
+
+    if legacy_routes:
+        return _stream_routes(legacy_routes, messages, cfg, router, create_kwargs)
+
+    errors: list[str] = []
+    last_reason = ""
+    for hop in chain:
+        t0 = _now_ms()
+        client = _get_sync_client(hop.api_key, hop.base_url)
+        try:
+            reply = _consume_stream(
+                client.chat.completions.create(
+                    model=hop.model,
+                    messages=cast(Any, messages),
+                    temperature=cfg.llm_temperature,
+                    stream=True,
+                    **create_kwargs,
+                ),
+                model=hop.model,
+            )
+            router.mark_success(hop.api_key)
+            record_route_attempt(
+                trace_id=tid,
+                provider=hop.provider,
+                model=hop.model,
+                hop_index=hop.hop_index,
+                result="success",
+                latency_ms=_now_ms() - t0,
+                chain_length=len(chain),
+            )
+            return reply
+        except ValueError:
+            raise
+        except Exception as exc:
+            last_reason = _record_hop_failure(hop, exc, _now_ms() - t0, chain, errors, tid)
+
+    _raise_chain_exhausted(tid, errors, last_reason, len(chain))
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +395,91 @@ def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: 
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
+# ---------------------------------------------------------------------------
+# Stream completion
+# ---------------------------------------------------------------------------
+
+def _consume_stream(stream: Any, *, model: str) -> LLMReply:
+    """Drain a streaming completion and return an LLMReply.
+
+    Accumulates text tokens into content or assembles tool call fragments by
+    index. Raises ValueError if the stream ends with neither content nor tool calls.
+    """
+    text_buf = ""
+    tool_call_acc: dict[int, dict[str, str]] = {}
+    finish_reason: str | None = None
+
+    for chunk in stream:
+        choice = chunk.choices[0] if chunk.choices else None
+        if choice is None:
+            continue
+        if choice.finish_reason:
+            finish_reason = choice.finish_reason
+        delta = choice.delta
+        if delta.content:
+            text_buf += delta.content
+        if delta.tool_calls:
+            for tc_delta in delta.tool_calls:
+                idx = tc_delta.index
+                if idx not in tool_call_acc:
+                    tool_call_acc[idx] = {"id": "", "name": "", "arguments_buf": ""}
+                entry = tool_call_acc[idx]
+                if tc_delta.id:
+                    entry["id"] = tc_delta.id
+                if tc_delta.function:
+                    if tc_delta.function.name:
+                        entry["name"] += tc_delta.function.name
+                    if tc_delta.function.arguments:
+                        entry["arguments_buf"] += tc_delta.function.arguments
+
+    if not text_buf and not tool_call_acc:
+        raise ValueError("LLM 沒有回傳內容")
+
+    if finish_reason == "tool_calls" or tool_call_acc:
+        tool_calls = [
+            LLMToolCall(
+                id=tool_call_acc[idx]["id"],
+                name=tool_call_acc[idx]["name"],
+                arguments=tool_call_acc[idx]["arguments_buf"],
+            )
+            for idx in sorted(tool_call_acc)
+        ]
+        return LLMReply(content="", tool_calls=tool_calls, model=model)
+
+    return LLMReply(content=text_buf.strip(), tool_calls=[], model=model)
+
+
+def _stream_routes(
+    routes: list[Any],
+    messages: list[dict[str, Any]],
+    cfg: Any,
+    router: Any,
+    create_kwargs: dict[str, Any],
+) -> LLMReply:
+    """Legacy route loop for streaming when no fallback chain is configured."""
+    errors: list[str] = []
+    for route in routes:
+        client = _get_sync_client(route.api_key, route.base_url)
+        try:
+            reply = _consume_stream(
+                client.chat.completions.create(
+                    model=route.model,
+                    messages=cast(Any, messages),
+                    temperature=cfg.llm_temperature,
+                    stream=True,
+                    **create_kwargs,
+                ),
+                model=route.model,
+            )
+            router.mark_success(route.api_key)
+            return reply
+        except ValueError:
+            raise
+        except Exception as exc:
+            router.mark_failure(route.api_key, route.model, exc)
+            errors.append(f"{route.model}: {type(exc).__name__}: {exc}")
+
+    raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
 # ---------------------------------------------------------------------------

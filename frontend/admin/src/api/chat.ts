@@ -75,6 +75,7 @@ export async function fetchChat(
 ): Promise<ChatDoneEvent> {
   return fetchJson<ChatDoneEvent>(apiUrl("/chat"), {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, persona_id: personaId, session_id: sessionId, project_id: getActiveProjectId() }),
     signal,
   });

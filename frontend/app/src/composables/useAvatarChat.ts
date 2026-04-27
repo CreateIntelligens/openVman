@@ -70,58 +70,69 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let utteranceBuffer = ''
 
        // ── Connect ────────────────────────────────────────────
-       function connect(url?: string): void {
-              if (socket) return
-
-              const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-              const host = window.location.host
-              const clientId = createClientId()
-              const wsUrl = url ?? `${protocol}://${host}/ws/${clientId}`
-
-              state.value = 'CONNECTING'
-              socket = new WebSocket(wsUrl)
-              socket.binaryType = 'arraybuffer'
-
-              socket.onopen = () => {
-                     console.log('[AvatarChat] WebSocket connected')
-                     // Send client_init (openVman backend protocol)
-                     sendEvent({
-                            event: 'client_init',
-                            client_id: clientId,
-                            protocol_version: '1.0.0',
-                            auth_token: 'openvman-admin',
-                            capabilities: {
-                                   mode: 'gemini_live',
-                                   project_id: 'default',
-                                   surface: 'avatar',
-                                   voice_source: 'custom'
-                            },
-                            timestamp: Date.now(),
-                     })
-              }
-
-              socket.onmessage = (event) => {
-                     if (typeof event.data === 'string') {
-                            handleJsonMessage(JSON.parse(event.data))
-                     } else {
-                            // Binary frame = PCM audio chunk
-                            options.onAudioChunk?.(event.data as ArrayBuffer)
+       function connect(url?: string): Promise<void> {
+              return new Promise((resolve, reject) => {
+                     if (socket) {
+                            if (socket.readyState === WebSocket.OPEN) {
+                                   resolve()
+                            } else {
+                                   resolve() // Assuming it's already connecting, resolve so that caller can proceed (or could reject/await)
+                            }
+                            return
                      }
-              }
 
-              socket.onclose = () => {
-                     console.log('[AvatarChat] WebSocket disconnected')
-                     socket = null
-                     sessionId.value = null
-                     state.value = 'DISCONNECTED'
-                     // Auto-reconnect after 3s
-                     reconnectTimer = setTimeout(() => connect(wsUrl), 3000)
-              }
+                     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+                     const host = window.location.host
+                     const clientId = createClientId()
+                     const wsUrl = url ?? `${protocol}://${host}/ws/${clientId}`
 
-              socket.onerror = (err) => {
-                     console.error('[AvatarChat] WebSocket error:', err)
-                     state.value = 'ERROR'
-              }
+                     state.value = 'CONNECTING'
+                     socket = new WebSocket(wsUrl)
+                     socket.binaryType = 'arraybuffer'
+
+                     socket.onopen = () => {
+                            console.log('[AvatarChat] WebSocket connected')
+                            // Send client_init (openVman backend protocol)
+                            sendEvent({
+                                   event: 'client_init',
+                                   client_id: clientId,
+                                   protocol_version: '1.0.0',
+                                   auth_token: 'openvman-admin',
+                                   capabilities: {
+                                          mode: 'gemini_live',
+                                          project_id: 'default',
+                                          surface: 'avatar',
+                                          voice_source: 'custom'
+                                   },
+                                   timestamp: Date.now(),
+                            })
+                            resolve()
+                     }
+
+                     socket.onmessage = (event) => {
+                            if (typeof event.data === 'string') {
+                                   handleJsonMessage(JSON.parse(event.data))
+                            } else {
+                                   // Binary frame = PCM audio chunk
+                                   options.onAudioChunk?.(event.data as ArrayBuffer)
+                            }
+                     }
+
+                     socket.onclose = () => {
+                            console.log('[AvatarChat] WebSocket disconnected')
+                            socket = null
+                            sessionId.value = null
+                            state.value = 'DISCONNECTED'
+                            // Auto-reconnect after 3s
+                            reconnectTimer = setTimeout(() => { void connect(wsUrl).catch(console.error) }, 3000)
+                     }
+
+                     socket.onerror = (err) => {
+                            console.error('[AvatarChat] WebSocket error:', err)
+                            state.value = 'ERROR'
+                            reject(err)
+                     }
+              })
        }
 
        // ── Handle incoming JSON events ────────────────────────

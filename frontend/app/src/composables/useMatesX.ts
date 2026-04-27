@@ -153,7 +153,14 @@ export function useMatesX() {
                      window.characterVideo.muted = true
                      window.characterVideo.playsInline = true
                      window.characterVideo.load()
-                     await window.characterVideo.play()
+
+                     try {
+                            await window.characterVideo.play()
+                     } catch (playErr) {
+                            console.warn('[MatesX] video play() interrupted or not allowed (power saving/policy):', playErr)
+                            // We ignore this error because the video is loaded and ready, 
+                            // it just cannot auto-play right now. It can be resumed later.
+                     }
 
                      currentCharId.value = charId
                      chunkIndex = 0
