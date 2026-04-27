@@ -117,11 +117,6 @@ const chat = useAvatarChat({
     typewriter.flush();
     isTyping.value = false;
   },
-  onTextResponse: (_text, ttsText) => {
-    if (ttsText && ttsText !== _text) {
-      chat.requestTts(ttsText, settings.ttsEngine);
-    }
-  },
   onUtteranceComplete: (fullText) => {
     audio.resetSchedule();
     pendingText = fullText;
@@ -186,7 +181,6 @@ async function handleCharChange(charId: string): Promise<void> {
 
 function handleTtsChange(engine: string): void {
   settings.ttsEngine = engine;
-  chat.setTtsEngine(engine);
 }
 
 

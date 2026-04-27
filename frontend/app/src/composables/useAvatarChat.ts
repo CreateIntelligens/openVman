@@ -2,13 +2,10 @@
  * useAvatarChat — Vue 3 composable for WebSocket communication
  * with the openVman backend gateway.
  *
- * Implements the existing backend protocol:
+ * Protocol:
  *   client_init → server_init_ack
  *   user_speak  → server_stream_chunk (audio) → server_stop_audio
  *   client_interrupt
- *
- * Also supports the matesx-style simple protocol as fallback:
- *   text message → JSON {type:"text"} + binary PCM chunks
  */
 import { ref, readonly, onUnmounted } from 'vue'
 
@@ -25,8 +22,6 @@ interface ChatOptions {
        onAudioChunk?: (data: ArrayBuffer) => void
        /** Called when audio playback should stop */
        onStopAudio?: () => void
-       /** Called when AI text response arrives (per-chunk, incremental) */
-       onTextResponse?: (text: string, ttsText?: string) => void
        /**
         * Called when an LLM utterance finishes (is_final=true on
         * server_stream_chunk). Receives the fully accumulated text for the
@@ -137,10 +132,9 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Handle incoming JSON events ────────────────────────
        function handleJsonMessage(data: Record<string, unknown>): void {
-              const event = (data.event ?? data.type) as string | undefined
+              const event = data.event as string | undefined
 
               switch (event) {
-                     // openVman backend protocol
                      case 'server_init_ack':
                             sessionId.value = data.session_id as string
                             state.value = 'IDLE'
@@ -149,8 +143,6 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
                      case 'server_stream_chunk': {
                             state.value = 'SPEAKING'
-                            // Backend strips inline audio for custom-voice sessions;
-                            // we rely on /tts/stream triggered by onUtteranceComplete.
                             if (data.audio_base64) {
                                    const bin = atob(data.audio_base64 as string)
                                    const bytes = new Uint8Array(bin.length)
@@ -164,9 +156,6 @@ export function useAvatarChat(options: ChatOptions = {}) {
                                    const full = utteranceBuffer
                                    utteranceBuffer = ''
                                    if (full.trim()) {
-                                          // Do NOT push to messages yet — App.vue
-                                          // reveals text progressively once TTS
-                                          // audio begins playing.
                                           options.onUtteranceComplete?.(full)
                                    }
                             }
@@ -186,62 +175,21 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      case 'ping':
                             sendRaw(JSON.stringify({ event: 'pong', timestamp: Date.now() }))
                             break
-
-                     // matesx-style protocol (fallback)
-                     case 'text': {
-                            const text = data.text as string
-                            const ttsText = (data.tts_text ?? text) as string
-                            messages.value.push({ role: 'ai', text, timestamp: Date.now() })
-                            options.onTextResponse?.(text, ttsText)
-                            break
-                     }
-
-                     case 'start_reply':
-                            state.value = 'SPEAKING'
-                            options.onStopAudio?.() // clear previous audio
-                            break
-
-                     case 'end':
-                            state.value = 'IDLE'
-                            break
-
-                     case 'error':
-                            console.error('[AvatarChat] Error:', data.message)
-                            messages.value.push({ role: 'ai', text: `[錯誤: ${data.message}]`, timestamp: Date.now() })
-                            state.value = 'ERROR'
-                            break
               }
        }
 
        // ── Send user message ──────────────────────────────────
        function sendMessage(text: string): void {
-              if (!socket || socket.readyState !== WebSocket.OPEN) return
+              if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
 
               utteranceBuffer = ''
               messages.value.push({ role: 'user', text, timestamp: Date.now() })
-
-              if (sessionId.value) {
-                     // openVman backend protocol
-                     state.value = 'THINKING'
-                     sendEvent({
-                            event: 'user_speak',
-                            text,
-                            timestamp: Date.now(),
-                     })
-              } else {
-                     // matesx-style: send plain text
-                     socket.send(text)
-              }
-       }
-
-       // ── Request TTS (matesx-style) ─────────────────────────
-       function requestTts(text: string, engine = 'edge'): void {
-              sendEvent({ type: 'do_tts', text, engine })
-       }
-
-       // ── Set TTS engine (matesx-style) ──────────────────────
-       function setTtsEngine(engine: string): void {
-              sendEvent({ type: 'set_tts', engine })
+              state.value = 'THINKING'
+              sendEvent({
+                     event: 'user_speak',
+                     text,
+                     timestamp: Date.now(),
+              })
        }
 
        // ── Interrupt ──────────────────────────────────────────
@@ -304,8 +252,6 @@ export function useAvatarChat(options: ChatOptions = {}) {
               connect,
               disconnect,
               sendMessage,
-              requestTts,
-              setTtsEngine,
               interrupt,
               beginAssistantMessage,
               appendAssistantText,
