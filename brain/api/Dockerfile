@@ -36,9 +36,12 @@ FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runner
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+ENV TZ=Asia/Taipei
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     python3.11 python3.11-distutils libpython3.11 \
-    libstdc++6 libgomp1 zlib1g && \
+    libstdc++6 libgomp1 zlib1g tzdata && \
     ln -sf /usr/bin/python3.11 /usr/bin/python && \
     ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
     rm -rf /var/lib/apt/lists/*
