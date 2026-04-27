@@ -76,7 +76,7 @@ _UVICORN_LOG_CONFIG = {
     },
 }
 
-_ACCESS_LOG_SILENT_PATHS = frozenset({"/api/health", "/healthz"})
+_ACCESS_LOG_SILENT_PATHS = frozenset({"/api/health", "/api/health/detailed", "/healthz"})
 
 
 class _SilentAccessPathsFilter(logging.Filter):

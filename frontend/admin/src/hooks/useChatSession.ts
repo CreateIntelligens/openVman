@@ -34,6 +34,8 @@ type ChatResultPayload = {
   knowledge_results: RetrievalResult[];
   memory_results: RetrievalResult[];
   history?: ChatMessageType[];
+  tool_steps?: import("../api/chat").ToolStep[];
+  response_time_s?: number;
 };
 
 function getLastAssistantActions(messages: ChatMessageType[]): ActionRequest[] | undefined {
@@ -62,8 +64,8 @@ function applyChatResultToMessages(
       }
 
       history[index] = pendingActions
-        ? { ...message, sources, action_requests: pendingActions }
-        : { ...message, sources };
+        ? { ...message, sources, action_requests: pendingActions, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
+        : { ...message, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s };
       break;
     }
     return history;
@@ -75,7 +77,7 @@ function applyChatResultToMessages(
 
   return current.map((message, index) => (
     index === current.length - 1 && message.role === "assistant"
-      ? { ...message, content: payload.reply, sources }
+      ? { ...message, content: payload.reply, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
       : message
   ));
 }
@@ -280,6 +282,7 @@ export function useChatSession() {
     abortControllerRef.current = controller;
 
     const userTimestamp = new Date().toISOString();
+    const submitTime = performance.now();
     setMessages((current) => addPendingExchange(current, nextMessage, userTimestamp));
     pushHistory(nextMessage);
     setInput("");
@@ -307,7 +310,8 @@ export function useChatSession() {
             }
           },
           onDone: (payload) => {
-            applyChatResult(payload);
+            const response_time_s = Math.round((performance.now() - submitTime) / 10) / 100;
+            applyChatResult({ ...payload, response_time_s });
             setSending(false);
           },
           onError: ({ message }) => {

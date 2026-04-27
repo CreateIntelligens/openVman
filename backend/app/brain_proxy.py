@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 import logging
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Request
@@ -95,7 +96,7 @@ _HOP_BY_HOP = frozenset({
 _http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
 
 
-def _filter_headers(headers: httpx.Headers | dict) -> dict[str, str]:
+def _filter_headers(headers: httpx.Headers | dict | Any) -> dict[str, str]:
     return {
         k: v
         for k, v in headers.items()
@@ -144,6 +145,12 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
         logger.warning("brain upstream disconnected path=%s error=%s", path, exc)
         return JSONResponse(
             content={"error": "brain upstream disconnected"},
+            status_code=502,
+        )
+    except httpx.ReadError as exc:
+        logger.warning("brain upstream read error path=%s error=%s", path, exc)
+        return JSONResponse(
+            content={"error": "brain upstream read error"},
             status_code=502,
         )
 

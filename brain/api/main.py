@@ -67,6 +67,7 @@ _UVICORN_LOG_CONFIG = {
 _ACCESS_LOG_SILENT_PATHS = frozenset({
     "/brain/health",
     "/brain/health/ready",
+    "/brain/health/detailed",
     "/brain/metrics",
     "/brain/metrics/prometheus",
 })

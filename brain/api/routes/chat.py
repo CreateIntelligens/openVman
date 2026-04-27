@@ -91,7 +91,7 @@ async def _stream_generation_events(context: GenerationContext) -> AsyncIterator
     try:
         tool_count = 0
         async for event in stream_generation(context):
-            if event.event == "tool":
+            if isinstance(event, ToolEvent):
                 tool_count += 1
                 get_metrics_store().increment("tool_calls_total", tool_name=event.name, status="ok")
             yield sse_event_to_dict(event)
@@ -121,9 +121,9 @@ async def _stream_generation_events(context: GenerationContext) -> AsyncIterator
 @router.post("/chat", summary="非串流對話")
 async def chat(request: Request, payload: ChatRequest):
     try:
-        context = _prepare_chat_context(request, payload)
+        context = await asyncio.to_thread(_prepare_chat_context, request, payload)
         result = await asyncio.to_thread(execute_generation, context)
-        response = finalize_generation(context, result.reply)
+        response = await asyncio.to_thread(finalize_generation, context, result.reply)
         response["tool_steps"] = result.tool_steps
         _log_generation_success(context, len(result.tool_steps))
         return response
@@ -202,7 +202,7 @@ async def chat_stream(request: Request, payload: ChatRequest):
     if shortcut is not None:
         return EventSourceResponse(_stream_shortcut_events(payload, shortcut))
     try:
-        context = _prepare_chat_context(request, payload)
+        context = await asyncio.to_thread(_prepare_chat_context, request, payload)
         return EventSourceResponse(_stream_generation_events(context))
     except Exception as exc:
         _handle_generation_error(exc, "chat_stream", request)

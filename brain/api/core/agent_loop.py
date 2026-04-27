@@ -67,11 +67,15 @@ def _generate_turn(
     tools: list[dict[str, Any]],
     forced_tool_name: str | None = None,
 ) -> LLMReply:
+    cfg = get_settings()
     kwargs: dict[str, Any] = {"tools": tools}
     if _supports_keyword_argument(generate_chat_turn, "privacy_source"):
         kwargs["privacy_source"] = "tool"
     if forced_tool_name:
         kwargs["forced_tool_name"] = forced_tool_name
+        if cfg.forced_tool_model_override:
+            kwargs["model_override"] = cfg.forced_tool_model_override
+        kwargs["max_tokens"] = cfg.forced_tool_max_tokens
     return generate_chat_turn(messages, **kwargs)
 
 

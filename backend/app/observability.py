@@ -201,7 +201,7 @@ def record_route_attempt(
         "tts_route_attempt",
         target=target,
         result=result,
-        latency_ms=round(latency_ms, 2),
+        latency_s=round(latency_ms / 1000, 3),
         reason=reason,
     )
 
@@ -240,14 +240,14 @@ def record_cache_hit(latency_ms: float) -> None:
     """Record a successful TTS cache lookup."""
     increment_counter("tts_cache_hit")
     record_timing("tts_cache_get_ms", latency_ms)
-    log_event("tts_cache_hit", latency_ms=round(latency_ms, 2))
+    log_event("tts_cache_hit", latency_s=round(latency_ms / 1000, 3))
 
 
 def record_cache_miss(latency_ms: float) -> None:
     """Record a TTS cache miss."""
     increment_counter("tts_cache_miss")
     record_timing("tts_cache_get_ms", latency_ms)
-    log_event("tts_cache_miss", latency_ms=round(latency_ms, 2))
+    log_event("tts_cache_miss", latency_s=round(latency_ms / 1000, 3))
 
 
 def record_cache_store(latency_ms: float) -> None:
@@ -283,7 +283,7 @@ def record_voice_latency(latency_ms: float) -> None:
     """Record user_speak to first-audio latency."""
     record_timing("live_voice_latency_ms", latency_ms)
     _prom_ttfb_ms.observe(latency_ms)
-    log_event("live_voice_latency", latency_ms=round(latency_ms, 2))
+    log_event("live_voice_latency", latency_s=round(latency_ms / 1000, 3))
 
 
 # ---------------------------------------------------------------------------

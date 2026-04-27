@@ -1,7 +1,8 @@
-import type { ActionRequest, ChatMessage as ChatMessageType, PiiWarningSummary, RetrievalResult } from "../../api";
+import type { ActionRequest, ChatMessage as ChatMessageType, PiiWarningSummary, RetrievalResult, ToolStep } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
 import SourceChips from "./SourceChips";
 import ActionRequestCard from "./ActionRequestCard";
+import MessageMeta from "./MessageMeta";
 import { renderWithRedactions } from "./redactedText";
 import { formatPiiWarningSummary, hasPiiWarning } from "./privacyWarnings";
 
@@ -9,6 +10,8 @@ type RenderableChatMessage = Pick<ChatMessageType, "role" | "content"> & {
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
   action_requests?: ActionRequest[];
   privacy_warning?: PiiWarningSummary;
+  tool_steps?: ToolStep[];
+  response_time_s?: number;
 };
 
 function formatMessageTime(value: string | number | undefined): string | null {
@@ -16,7 +19,7 @@ function formatMessageTime(value: string | number | undefined): string | null {
     return null;
   }
 
-  const date = typeof value === "number" ? new Date(value) : new Date(value);
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
@@ -148,6 +151,13 @@ export default function ChatMessage({
             />
           ))}
         </div>
+      )}
+      {isAssistantMessage && (
+        <MessageMeta
+          toolSteps={message.tool_steps}
+          sources={message.sources}
+          responseTimeS={message.response_time_s}
+        />
       )}
     </article>
   );

@@ -43,6 +43,8 @@ export interface ChatMessage {
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
   action_requests?: ActionRequest[];
   privacy_warning?: PiiWarningSummary;
+  tool_steps?: ToolStep[];
+  response_time_s?: number;
 }
 
 export interface ToolStep {

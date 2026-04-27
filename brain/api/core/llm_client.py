@@ -2,13 +2,45 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
 from time import monotonic
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from openai import AsyncOpenAI, OpenAI
+
+# ---------------------------------------------------------------------------
+# Module-level shared resources
+# ---------------------------------------------------------------------------
+
+# Shared thread pool for fire-and-forget PII detection (fix #1).
+_PII_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii")
+
+# Client caches keyed by (api_key, base_url) to reuse httpx connection pools
+# (fix #3). Plain dicts are safe under the GIL for read-heavy workloads.
+_SYNC_CLIENT_CACHE: dict[tuple[str, str | None], OpenAI] = {}
+_ASYNC_CLIENT_CACHE: dict[tuple[str, str | None], AsyncOpenAI] = {}
+
+
+def _get_sync_client(api_key: str, base_url: str | None) -> OpenAI:
+    key = (api_key, base_url)
+    client = _SYNC_CLIENT_CACHE.get(key)
+    if client is None:
+        client = OpenAI(api_key=api_key, base_url=base_url or None)
+        _SYNC_CLIENT_CACHE[key] = client
+    return client
+
+
+def _get_async_client(api_key: str, base_url: str | None) -> AsyncOpenAI:
+    key = (api_key, base_url)
+    client = _ASYNC_CLIENT_CACHE.get(key)
+    if client is None:
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
+        _ASYNC_CLIENT_CACHE[key] = client
+    return client
 
 from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
@@ -51,6 +83,22 @@ class LLMStreamReply:
     pii_report: PiiDetectionReport | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class FirstTurnStreamResult:
+    """Result of stream_first_turn().
+
+    If tool_calls is non-empty the model wants to call tools — the caller
+    should execute them synchronously and then call prepare_stream_chat_reply()
+    for the final text turn.
+
+    If tool_calls is empty, tokens already contains the full streamed reply and
+    no second LLM call is needed.
+    """
+
+    tokens: AsyncIterator[str]
+    tool_calls: list[LLMToolCall]
+
+
 def generate_chat_reply(
     messages: list[dict[str, Any]],
     *,
@@ -75,12 +123,13 @@ def generate_chat_turn(
     model_override: str | None = None,
     privacy_source: FilterSource = "unknown",
     forced_tool_name: str | None = None,
+    max_tokens: int | None = None,
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
-    pii_report = detect_llm_messages_pii(
-        messages,
-        source=privacy_source,
-        trace_id=trace_id,
+    # Fire PII detection asynchronously; don't block the LLM response on it
+    # (fix #1 — shared executor, fire-and-forget, no blocking wait).
+    _PII_EXECUTOR.submit(
+        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
     )
     response = _create_sync_completion(
         messages,
@@ -88,7 +137,9 @@ def generate_chat_turn(
         trace_id=trace_id,
         model_override=model_override,
         forced_tool_name=forced_tool_name,
+        max_tokens=max_tokens,
     )
+    assert response is not None
     message = response.choices[0].message
     content = (message.content or "").strip()
     tool_calls = [
@@ -106,7 +157,7 @@ def generate_chat_turn(
         content=content,
         tool_calls=tool_calls,
         model=response.model,
-        pii_report=pii_report,
+        pii_report=None,  # PII runs fire-and-forget; not available synchronously
     )
 
 
@@ -133,12 +184,14 @@ async def prepare_stream_chat_reply(
     privacy_source: FilterSource = "unknown",
 ) -> LLMStreamReply:
     """Prepare a streamed chat reply plus any privacy detection metadata."""
-    pii_report = detect_llm_messages_pii(
-        messages,
-        source=privacy_source,
-        trace_id=trace_id,
+    # Fire PII detection as a background task without awaiting it before
+    # returning — the await was blocking the first token from flowing (fix #2).
+    # PII on the streaming path is observability-only; callers receive None.
+    asyncio.ensure_future(
+        asyncio.to_thread(detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id)
     )
     stream = await _create_async_stream(messages, trace_id=trace_id, tool_choice="none")
+    assert stream is not None
 
     async def _token_iterator() -> AsyncIterator[str]:
         async for chunk in stream:
@@ -148,7 +201,107 @@ async def prepare_stream_chat_reply(
             if token:
                 yield token
 
-    return LLMStreamReply(tokens=_token_iterator(), pii_report=pii_report)
+    return LLMStreamReply(tokens=_token_iterator(), pii_report=None)
+
+
+async def _empty_iterator() -> AsyncIterator[str]:
+    """Empty async iterator used as a no-op token stream."""
+    if False:
+        yield ""
+
+
+async def stream_first_turn(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    *,
+    trace_id: str = "",
+    forced_tool_name: str | None = None,
+) -> FirstTurnStreamResult:
+    """Stream the first LLM turn with live tool detection.
+
+    Peeks at the first chunk to decide text-vs-tool:
+    - If the first delta has tool_calls → drain the stream synchronously,
+      return assembled LLMToolCall list with empty tokens iterator.
+    - If the first delta has content → yield it plus remaining chunks as
+      tokens, no second LLM call needed.
+
+    This means zero latency penalty for the common no-tool case: the first
+    token is forwarded as soon as it arrives from the model.
+    """
+    tool_choice: Any = "auto"
+    if forced_tool_name:
+        tool_choice = {"type": "function", "function": {"name": forced_tool_name}}
+
+    stream = await _create_async_stream(
+        messages,
+        trace_id=trace_id,
+        tool_choice=None,
+        tools=tools,
+        forced_tool_choice=tool_choice,
+    )
+    assert stream is not None
+
+    # Peek at the first meaningful chunk to branch early.
+    async def _advance() -> Any:
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            return chunk
+        return None
+
+    first_chunk = await _advance()
+    if first_chunk is None:
+        return FirstTurnStreamResult(tokens=_empty_iterator(), tool_calls=[])
+
+    first_delta = first_chunk.choices[0].delta
+    if first_delta.tool_calls:
+        # Tool path — drain stream and assemble tool call objects.
+        accumulated: dict[int, dict[str, Any]] = {}
+
+        def _apply_delta(delta: Any) -> None:
+            for tc in (delta.tool_calls or []):
+                idx = tc.index
+                if idx not in accumulated:
+                    accumulated[idx] = {
+                        "id": tc.id or "",
+                        "name": (tc.function and tc.function.name) or "",
+                        "arguments": "",
+                    }
+                else:
+                    if tc.id:
+                        accumulated[idx]["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            accumulated[idx]["name"] += tc.function.name
+                        if tc.function.arguments:
+                            accumulated[idx]["arguments"] += tc.function.arguments
+
+        _apply_delta(first_delta)
+        async for chunk in stream:
+            if chunk.choices:
+                _apply_delta(chunk.choices[0].delta)
+
+        tool_calls = [
+            LLMToolCall(id=d["id"], name=d["name"], arguments=d["arguments"])
+            for _, d in sorted(accumulated.items())
+        ]
+
+        return FirstTurnStreamResult(tokens=_empty_iterator(), tool_calls=tool_calls)
+
+    # Text path — yield first content token immediately, then stream the rest.
+    first_content = first_delta.content or ""
+
+    async def _text_tokens() -> AsyncIterator[str]:
+        if first_content:
+            yield first_content
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            token = chunk.choices[0].delta.content or ""
+            if token:
+                yield token
+
+    return FirstTurnStreamResult(tokens=_text_tokens(), tool_calls=[])
 
 
 # ---------------------------------------------------------------------------
@@ -238,6 +391,7 @@ def _create_sync_completion(
     trace_id: str = "",
     model_override: str | None = None,
     forced_tool_name: str | None = None,
+    max_tokens: int | None = None,
 ):
     _require_api_key()
     cfg = get_settings()
@@ -252,20 +406,23 @@ def _create_sync_completion(
     )
 
     if legacy_routes:
-        return _try_routes_sync(legacy_routes, messages, tools, cfg, router, forced_tool_name=forced_tool_name)
+        return _try_routes_sync(legacy_routes, messages, tools, cfg, router, forced_tool_name=forced_tool_name, max_tokens=max_tokens)
 
     errors: list[str] = []
     last_reason = ""
 
     for hop in chain:
         t0 = _now_ms()
-        client = OpenAI(api_key=hop.api_key, base_url=hop.base_url or None)
+        client = _get_sync_client(hop.api_key, hop.base_url)  # cached (fix #3)
         try:
+            create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+            if max_tokens:
+                create_kwargs["max_tokens"] = max_tokens
             response = client.chat.completions.create(
                 model=hop.model,
-                messages=messages,
+                messages=cast(Any, messages),
                 temperature=cfg.llm_temperature,
-                **_build_create_kwargs(tools, forced_tool_name=forced_tool_name),
+                **create_kwargs,
             )
             router.mark_success(hop.api_key)
             record_route_attempt(
@@ -323,17 +480,20 @@ def _apply_model_override(
     return overridden_chain, overridden_legacy_routes
 
 
-def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: str | None = None):
+def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: str | None = None, max_tokens: int | None = None):
     """Legacy route loop for when no fallback chain is configured."""
     errors: list[str] = []
     for route in routes:
-        client = OpenAI(api_key=route.api_key, base_url=route.base_url or None)
+        client = _get_sync_client(route.api_key, route.base_url)  # cached (fix #3)
         try:
+            create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+            if max_tokens:
+                create_kwargs["max_tokens"] = max_tokens
             response = client.chat.completions.create(
                 model=route.model,
-                messages=messages,
+                messages=cast(Any, messages),
                 temperature=cfg.llm_temperature,
-                **_build_create_kwargs(tools, forced_tool_name=forced_tool_name),
+                **create_kwargs,
             )
             router.mark_success(route.api_key)
             return response
@@ -353,6 +513,8 @@ async def _create_async_stream(
     *,
     trace_id: str = "",
     tool_choice: str | None = None,
+    tools: list[dict[str, Any]] | None = None,
+    forced_tool_choice: Any = None,
 ):
     _require_api_key()
     cfg = get_settings()
@@ -361,8 +523,14 @@ async def _create_async_stream(
 
     chain, legacy_routes = _resolve_chain_or_routes(tid)
 
+    # Resolve effective tool_choice: forced_tool_choice wins, then tool_choice str
+    effective_tool_choice: Any = forced_tool_choice if forced_tool_choice is not None else tool_choice
+
     if legacy_routes:
-        return await _try_routes_async(legacy_routes, messages, cfg, router, tool_choice=tool_choice)
+        return await _try_routes_async(
+            legacy_routes, messages, cfg, router,
+            tool_choice=effective_tool_choice, tools=tools,
+        )
 
     errors: list[str] = []
     last_reason = ""
@@ -375,14 +543,16 @@ async def _create_async_stream(
             provider=hop.provider,
             model=hop.model,
         )
-        client = AsyncOpenAI(api_key=hop.api_key, base_url=hop.base_url or None)
+        client = _get_async_client(hop.api_key, hop.base_url)  # cached (fix #3)
         try:
             create_kwargs: dict[str, Any] = {"stream": True}
-            if tool_choice is not None:
-                create_kwargs["tool_choice"] = tool_choice
+            if effective_tool_choice is not None:
+                create_kwargs["tool_choice"] = effective_tool_choice
+            if tools:
+                create_kwargs["tools"] = tools
             stream = await client.chat.completions.create(
                 model=hop.model,
-                messages=messages,
+                messages=cast(Any, messages),
                 temperature=cfg.llm_temperature,
                 **create_kwargs,
             )
@@ -403,18 +573,20 @@ async def _create_async_stream(
     _raise_chain_exhausted(tid, errors, last_reason, len(chain))
 
 
-async def _try_routes_async(routes, messages, cfg, router, *, tool_choice: str | None = None):
+async def _try_routes_async(routes, messages, cfg, router, *, tool_choice: Any = None, tools: list[dict[str, Any]] | None = None):
     """Legacy async route loop."""
     errors: list[str] = []
     extra: dict[str, Any] = {"stream": True}
     if tool_choice is not None:
         extra["tool_choice"] = tool_choice
+    if tools:
+        extra["tools"] = tools
     for route in routes:
-        client = AsyncOpenAI(api_key=route.api_key, base_url=route.base_url or None)
+        client = _get_async_client(route.api_key, route.base_url)  # cached (fix #3)
         try:
             stream = await client.chat.completions.create(
                 model=route.model,
-                messages=messages,
+                messages=cast(Any, messages),
                 temperature=cfg.llm_temperature,
                 **extra,
             )

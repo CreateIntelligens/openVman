@@ -85,48 +85,59 @@ class IndexTTS:
         self.conditioning_cache = {}
         self.bigvgan_lock = asyncio.Lock()
 
+    def _run_bigvgan(self, latent: torch.Tensor, auto_conditioning: list) -> torch.Tensor:
+        """Execute BigVGAN on the given latent and conditioning tensors (CPU result)."""
+        with torch.no_grad():
+            v, _ = self.bigvgan(latent, [ap_.transpose(1, 2) for ap_ in auto_conditioning])
+            v = torch.clamp(32767 * v.squeeze(1), -32767.0, 32767.0)
+            return v.cpu()
+
+    async def _get_conditioning(self, audio_prompt: list[str]):
+        """Return (auto_conditioning, speech_conditioning_latent), using cache."""
+        abs_prompts = tuple(sorted([os.path.abspath(p) for p in audio_prompt]))
+        if abs_prompts in self.conditioning_cache:
+            print(">> Conditioning Cache Hit!")
+            return self.conditioning_cache[abs_prompts]
+
+        auto_conditioning = []
+        for ap_ in audio_prompt:
+            audio, sr = torchaudio.load(ap_)
+            audio = torch.mean(audio, dim=0, keepdim=True)
+            audio = torchaudio.transforms.Resample(sr, 24000)(audio)
+            cond_mel = MelSpectrogramFeatures()(audio).to(self.device)
+            auto_conditioning.append(cond_mel)
+
+        speech_conditioning_latent_list = [
+            self.gpt.get_conditioning(cond_mel, torch.tensor([cond_mel.shape[-1]], device=self.device))
+            for cond_mel in auto_conditioning
+        ]
+        speech_conditioning_latent = torch.stack(speech_conditioning_latent_list).sum(dim=0) / len(auto_conditioning)
+
+        if len(self.conditioning_cache) < 50:
+            self.conditioning_cache[abs_prompts] = (auto_conditioning, speech_conditioning_latent)
+
+        return auto_conditioning, speech_conditioning_latent
+
     async def infer(self, audio_prompt: List[str], text, output_path=None, verbose=False, seed=None):
         print(">> start inference...")
         start_time = time.perf_counter()
-        
-        abs_prompts = tuple(sorted([os.path.abspath(p) for p in audio_prompt]))
-        if abs_prompts in self.conditioning_cache:
-            auto_conditioning, speech_conditioning_latent = self.conditioning_cache[abs_prompts]
-            print(">> Conditioning Cache Hit!")
-        else:
-            auto_conditioning = []
-            for ap_ in audio_prompt:
-                audio, sr = torchaudio.load(ap_)
-                audio = torch.mean(audio, dim=0, keepdim=True)
-                audio = torchaudio.transforms.Resample(sr, 24000)(audio)
-                cond_mel = MelSpectrogramFeatures()(audio).to(self.device)
-                auto_conditioning.append(cond_mel)
 
-            speech_conditioning_latent = []
-            for cond_mel in auto_conditioning:
-                speech_conditioning_latent_ = self.gpt.get_conditioning(
-                    cond_mel, torch.tensor([cond_mel.shape[-1]], device=self.device)
-                )
-                speech_conditioning_latent.append(speech_conditioning_latent_)
-            speech_conditioning_latent = torch.stack(speech_conditioning_latent).sum(dim=0) / len(auto_conditioning)
-            
-            if len(self.conditioning_cache) < 50:
-                self.conditioning_cache[abs_prompts] = (auto_conditioning, speech_conditioning_latent)
+        auto_conditioning, speech_conditioning_latent = await self._get_conditioning(audio_prompt)
 
         text_tokens_list = self.tokenizer.tokenize(text)
         sentences = self.tokenizer.split_sentences(text_tokens_list)
         wavs = []
         gpt_gen_time = 0
         bigvgan_time = 0
-        
+
         for sent in sentences:
             text_tokens = torch.tensor(self.tokenizer.convert_tokens_to_ids(sent), dtype=torch.int32, device=self.device).unsqueeze(0)
-            
+
             m_start = time.perf_counter()
             with torch.no_grad():
                 self.gpt.sampling_params.seed = int(seed) if seed is not None else None
                 codes, _ = await self.gpt.inference_speech(speech_conditioning_latent, text_tokens)
-                
+
                 codes = torch.tensor(codes, dtype=torch.long, device=self.device).unsqueeze(0)
                 latent = self.gpt(speech_conditioning_latent, text_tokens,
                                 torch.tensor([text_tokens.shape[-1]], device=text_tokens.device), codes,
@@ -137,13 +148,7 @@ class IndexTTS:
 
                 m_start = time.perf_counter()
                 async with self.bigvgan_lock:
-                    def run_bigvgan():
-                        with torch.no_grad():
-                            v, _ = self.bigvgan(latent, [ap_.transpose(1, 2) for ap_ in auto_conditioning])
-                            # 🚀 修正處：補回縮放係數與裁切
-                            v = torch.clamp(32767 * v.squeeze(1), -32767.0, 32767.0)
-                            return v.cpu()
-                    wav = await asyncio.to_thread(run_bigvgan)
+                    wav = await asyncio.to_thread(self._run_bigvgan, latent, auto_conditioning)
                 bigvgan_time += time.perf_counter() - m_start
                 wavs.append(wav)
 
@@ -152,7 +157,7 @@ class IndexTTS:
         
         wav_len = wav.shape[-1] / 24000
         print(f">> gpt_gen_time: {gpt_gen_time:.2f}s | bigvgan_time: {bigvgan_time:.2f}s")
-        print(f">> Total: {end_time - start_time:.2f}s | RTF: {(end_time - start_time)/wav_len:.4f}")
+        print(f">> Total: {end_time - start_time:.2f}s | RTF: {(end_time - start_time)/wav_len:.2f}")
 
         wav_data = wav.type(torch.int16).numpy().T
         wav_data = trim_and_pad_silence(wav_data)
@@ -185,13 +190,7 @@ class IndexTTS:
                 
                 m_start = time.perf_counter()
                 async with self.bigvgan_lock:
-                    def run_bigvgan():
-                        with torch.no_grad():
-                            v, _ = self.bigvgan(latent, [ap_.transpose(1, 2) for ap_ in auto_conditioning])
-                            # 🚀 修正處：補回縮放係數與裁切
-                            v = torch.clamp(32767 * v.squeeze(1), -32767.0, 32767.0)
-                            return v.cpu()
-                    wav = await asyncio.to_thread(run_bigvgan)
+                    wav = await asyncio.to_thread(self._run_bigvgan, latent, auto_conditioning)
                 bigvgan_time += time.perf_counter() - m_start
                 wavs.append(wav)
         
@@ -199,7 +198,7 @@ class IndexTTS:
         end_time = time.perf_counter()
         wav_len = wav.shape[-1] / 24000
         print(f">> [Speaker] gpt_gen_time: {gpt_gen_time:.2f}s | bigvgan_time: {bigvgan_time:.2f}s")
-        print(f">> [Speaker] Total: {end_time - start_time:.2f}s | RTF: {(end_time - start_time)/wav_len:.4f}")
+        print(f">> [Speaker] Total: {end_time - start_time:.2f}s | RTF: {(end_time - start_time)/wav_len:.2f}")
 
         wav_data = wav.type(torch.int16).numpy().T
         wav_data = trim_and_pad_silence(wav_data)
@@ -207,26 +206,7 @@ class IndexTTS:
 
     async def infer_stream(self, audio_prompt: List[str], text, seed=None):
         """Async generator: yields raw int16 numpy PCM chunks (16kHz mono) per sentence."""
-        abs_prompts = tuple(sorted([os.path.abspath(p) for p in audio_prompt]))
-        if abs_prompts in self.conditioning_cache:
-            auto_conditioning, speech_conditioning_latent = self.conditioning_cache[abs_prompts]
-        else:
-            auto_conditioning = []
-            for ap_ in audio_prompt:
-                audio, sr = torchaudio.load(ap_)
-                audio = torch.mean(audio, dim=0, keepdim=True)
-                audio = torchaudio.transforms.Resample(sr, 24000)(audio)
-                cond_mel = MelSpectrogramFeatures()(audio).to(self.device)
-                auto_conditioning.append(cond_mel)
-            speech_conditioning_latent = []
-            for cond_mel in auto_conditioning:
-                speech_conditioning_latent_ = self.gpt.get_conditioning(
-                    cond_mel, torch.tensor([cond_mel.shape[-1]], device=self.device)
-                )
-                speech_conditioning_latent.append(speech_conditioning_latent_)
-            speech_conditioning_latent = torch.stack(speech_conditioning_latent).sum(dim=0) / len(auto_conditioning)
-            if len(self.conditioning_cache) < 50:
-                self.conditioning_cache[abs_prompts] = (auto_conditioning, speech_conditioning_latent)
+        auto_conditioning, speech_conditioning_latent = await self._get_conditioning(audio_prompt)
 
         text_tokens_list = self.tokenizer.tokenize(text)
         sentences = self.tokenizer.split_sentences(text_tokens_list)
@@ -243,12 +223,7 @@ class IndexTTS:
                                 cond_mel_lengths=torch.tensor([speech_conditioning_latent.shape[-1]], device=text_tokens.device),
                                 return_latent=True, clip_inputs=False)
                 async with self.bigvgan_lock:
-                    def run_bigvgan():
-                        with torch.no_grad():
-                            v, _ = self.bigvgan(latent, [ap_.transpose(1, 2) for ap_ in auto_conditioning])
-                            v = torch.clamp(32767 * v.squeeze(1), -32767.0, 32767.0)
-                            return v.cpu()
-                    wav = await asyncio.to_thread(run_bigvgan)
+                    wav = await asyncio.to_thread(self._run_bigvgan, latent, auto_conditioning)
 
             is_last = (i == len(sentences) - 1)
             wav_data = wav.type(torch.int16).numpy().T
@@ -279,12 +254,7 @@ class IndexTTS:
                                 cond_mel_lengths=torch.tensor([speech_conditioning_latent.shape[-1]], device=text_tokens.device),
                                 return_latent=True, clip_inputs=False)
                 async with self.bigvgan_lock:
-                    def run_bigvgan():
-                        with torch.no_grad():
-                            v, _ = self.bigvgan(latent, [ap_.transpose(1, 2) for ap_ in auto_conditioning])
-                            v = torch.clamp(32767 * v.squeeze(1), -32767.0, 32767.0)
-                            return v.cpu()
-                    wav = await asyncio.to_thread(run_bigvgan)
+                    wav = await asyncio.to_thread(self._run_bigvgan, latent, auto_conditioning)
 
             is_last = (i == len(sentences) - 1)
             wav_data = wav.type(torch.int16).numpy().T

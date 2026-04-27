@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, replace
 from threading import Lock
 from time import monotonic
@@ -48,6 +49,9 @@ def classify_failure(exc: Exception) -> str:
             return FAILURE_QUOTA_EXHAUSTED
         if exc.status_code >= 500:
             return FAILURE_PROVIDER_ERROR
+        logging.getLogger(__name__).warning(
+            "LLM API %d: %s", exc.status_code, getattr(exc, "body", exc)
+        )
         return FAILURE_TRANSIENT_ERROR
 
     if isinstance(exc, (APIConnectionError, APITimeoutError)):

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from config import get_settings
 from privacy.audit import PrivacyFilterAction, PrivacyFilterAuditEvent, PrivacyFilterSource, record_privacy_filter_event
 from privacy.cache import get_privacy_filter_cache
-from privacy.exceptions import PrivacyViolationError
 from privacy.model import detect_and_mask, privacy_filter_runtime_enabled
 
 FilterSource = PrivacyFilterSource
@@ -57,8 +59,7 @@ def detect_llm_messages_pii(
 
         blocked = _blocked_categories(cfg, counts)
         if blocked:
-            _record_event(action="error", source=source, counts=counts, trace_id=trace_id)
-            raise PrivacyViolationError(blocked[0], source)
+            logger.warning("[privacy] 偵測到敏感資訊 category=%s source=%s", blocked[0], source)
 
         if counts:
             _record_event(action="detected", source=source, counts=counts, trace_id=trace_id)

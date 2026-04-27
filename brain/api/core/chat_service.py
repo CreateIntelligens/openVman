@@ -10,14 +10,13 @@ from datetime import date
 from typing import Any
 
 from config import get_settings
-from core.agent_loop import AgentLoopResult, ToolPhaseError, prepare_agent_reply, run_agent_loop
-from core.llm_client import LLMReply, LLMStreamReply, generate_chat_turn, prepare_stream_chat_reply
+from core.agent_loop import AgentLoopResult, PreparedAgentReply, ToolPhaseError, _append_tool_turns, _run_tool_phase, run_agent_loop
+from core.llm_client import LLMReply, LLMStreamReply, generate_chat_turn, prepare_stream_chat_reply, stream_first_turn
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
 from core.sse_events import (
     ContextEvent,
     DoneEvent,
-    PiiWarningEvent,
     SessionEvent,
     SSEEvent,
     TokenEvent,
@@ -39,7 +38,6 @@ from protocol.message_envelope import (
     read_text,
     serialize_context,
 )
-from privacy.filter import PiiDetectionReport
 from safety.guardrails import enforce_guardrails, enforce_session_limits
 from tools.tool_executor import parse_tool_result
 
@@ -225,31 +223,6 @@ async def _prepare_stream_reply(
     return await prepare_stream_chat_reply(messages, **kwargs)
 
 
-def _pii_warning_event(
-    trace_id: str,
-    messages: list[dict[str, Any]],
-    report: PiiDetectionReport | None,
-) -> PiiWarningEvent | None:
-    if report is None:
-        return None
-
-    user_index = next(
-        (index for index in range(len(messages) - 1, -1, -1) if messages[index].get("role") == "user"),
-        -1,
-    )
-    if user_index < 0 or user_index >= len(report.per_message):
-        return None
-
-    counts = dict(report.per_message[user_index])
-    if not counts:
-        return None
-
-    return PiiWarningEvent(
-        trace_id=trace_id,
-        categories=tuple(sorted(counts)),
-        counts=counts,
-    )
-
 
 def _tool_error_event_from_phase_error(trace_id: str, exc: ToolPhaseError) -> ToolErrorEvent:
     last_step = exc.partial_steps[-1] if exc.partial_steps else {}
@@ -328,47 +301,79 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
     stream_messages: list[dict[str, Any]] = context.prompt_messages
 
     if not context.route.skip_tools:
-        try:
-            prepared = await asyncio.to_thread(
-                prepare_agent_reply,
+        from tools.tool_registry import bind_tool_context, get_tool_registry
+        registry = get_tool_registry()
+        tools = registry.build_openai_tools()
+
+        with bind_tool_context(context.persona_id, project_id):
+            first_turn = await stream_first_turn(
                 context.prompt_messages,
-                context.persona_id,
-                project_id,
+                tools=tools,
+                trace_id=trace_id,
                 forced_tool_name=context.forced_tool_name,
             )
-            stream_messages = prepared.messages
-            tool_steps = prepared.tool_steps
-            for step in tool_steps:
-                yield _tool_event_from_step(trace_id, step)
-        except ToolPhaseError as exc:
-            tool_steps = exc.partial_steps
-            for step in tool_steps:
-                yield _tool_event_from_step(trace_id, step)
-            yield _tool_error_event_from_phase_error(trace_id, exc)
-            stream_messages = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
 
-    # Emit context event after tool phase so counts reflect actual tool usage
-    knowledge_count, memory_count = _count_retrieval_from_tool_steps(tool_steps)
-    yield ContextEvent(
-        trace_id=trace_id,
-        knowledge_count=knowledge_count,
-        memory_count=memory_count,
-        request_context=context.request_context,
-    )
+        if first_turn.tool_calls:
+            # Model wants tools — fall back to sync tool phase for remaining rounds
+            try:
+                prepared = await asyncio.to_thread(
+                    _run_tool_phase_from_calls,
+                    context.prompt_messages,
+                    first_turn.tool_calls,
+                    context.persona_id,
+                    project_id,
+                )
+                stream_messages = prepared.messages
+                tool_steps = prepared.tool_steps
+            except ToolPhaseError as exc:
+                tool_steps = exc.partial_steps
+                stream_messages = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
+                for step in tool_steps:
+                    yield _tool_event_from_step(trace_id, step)
+                yield _tool_error_event_from_phase_error(trace_id, exc)
+            else:
+                for step in tool_steps:
+                    yield _tool_event_from_step(trace_id, step)
 
-    privacy_source = "tool" if tool_steps else "chat"
-    stream_reply = await _prepare_stream_reply(
-        stream_messages,
-        privacy_source=privacy_source,
-        trace_id=trace_id,
-    )
-    pii_warning = _pii_warning_event(trace_id, stream_messages, stream_reply.pii_report)
-    if pii_warning is not None:
-        yield pii_warning
-
-    async for token in stream_reply.tokens:
-        reply_parts.append(token)
-        yield TokenEvent(trace_id=trace_id, token=token)
+            # Emit context event then do a second streaming call for the final reply
+            knowledge_count, memory_count = _count_retrieval_from_tool_steps(tool_steps)
+            yield ContextEvent(
+                trace_id=trace_id,
+                knowledge_count=knowledge_count,
+                memory_count=memory_count,
+                request_context=context.request_context,
+            )
+            stream_reply = await _prepare_stream_reply(
+                stream_messages, privacy_source="tool", trace_id=trace_id,
+            )
+            async for token in stream_reply.tokens:
+                reply_parts.append(token)
+                yield TokenEvent(trace_id=trace_id, token=token)
+        else:
+            # No tools — first_turn.tokens IS the reply, zero extra LLM calls
+            yield ContextEvent(
+                trace_id=trace_id,
+                knowledge_count=0,
+                memory_count=0,
+                request_context=context.request_context,
+            )
+            async for token in first_turn.tokens:
+                reply_parts.append(token)
+                yield TokenEvent(trace_id=trace_id, token=token)
+    else:
+        # skip_tools path (system/assistant messages) — direct stream
+        yield ContextEvent(
+            trace_id=trace_id,
+            knowledge_count=0,
+            memory_count=0,
+            request_context=context.request_context,
+        )
+        stream_reply = await _prepare_stream_reply(
+            stream_messages, privacy_source="chat", trace_id=trace_id,
+        )
+        async for token in stream_reply.tokens:
+            reply_parts.append(token)
+            yield TokenEvent(trace_id=trace_id, token=token)
 
     full_reply = "".join(reply_parts)
     task = asyncio.create_task(_finalize_generation_async(context, full_reply))
@@ -384,6 +389,43 @@ async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEven
     )
 
 
+def _run_tool_phase_from_calls(
+    messages: list[dict[str, Any]],
+    first_tool_calls: list[Any],
+    persona_id: str,
+    project_id: str,
+) -> PreparedAgentReply:
+    """Continue the agent loop starting from already-decoded first-turn tool calls.
+
+    Used by stream_generation() when stream_first_turn() detects tool calls in
+    the streaming response.  Executes those tool calls, appends results, then
+    runs remaining tool rounds via the normal sync agent loop.
+    """
+    from tools.tool_registry import bind_tool_context
+
+    working_messages = [dict(m) for m in messages]
+    tool_steps: list[dict[str, Any]] = []
+
+    class _FakeTurn:
+        def __init__(self, calls: list[Any]) -> None:
+            self.content = ""
+            self.tool_calls = calls
+            self.pii_report = None
+            self.model = ""
+
+    with bind_tool_context(persona_id, project_id):
+        _append_tool_turns(working_messages, tool_steps, _FakeTurn(first_tool_calls))  # type: ignore[arg-type]
+        # Run remaining rounds (may be 0 if model returns text after first tool)
+        final_messages, extra_steps, final_turn = _run_tool_phase(
+            working_messages, persona_id, project_id,
+        )
+        tool_steps.extend(extra_steps)
+        if final_turn is None:
+            raise ToolPhaseError("工具調用超出最大輪次", partial_steps=tool_steps, partial_messages=final_messages)
+
+    return PreparedAgentReply(messages=final_messages, tool_steps=tool_steps)
+
+
 def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[int, int]:
     """Count knowledge and memory results from completed tool call steps."""
     counts = {"search_knowledge": 0, "search_memory": 0}
@@ -395,7 +437,6 @@ def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[
         if parsed and parsed.status == "ok":
             counts[name] += len(parsed.data.get("results", []))
     return counts["search_knowledge"], counts["search_memory"]
-
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:

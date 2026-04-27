@@ -37,7 +37,7 @@ class BrainSettings(BaseSettings):
     llm_provider: str = "gemini"
     llm_api_key: str = ""
     llm_api_keys: str = ""
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-3.1-flash-lite-preview"
     llm_fallback_model: str = ""
     llm_base_url: str = ""
     llm_temperature: float = 0.3
@@ -134,6 +134,8 @@ class BrainSettings(BaseSettings):
     agent_loop_max_rounds: int = 6
     tool_call_timeout_seconds: int = 30
     tool_document_char_limit: int = 4000
+    forced_tool_model_override: str = ""   # e.g. "gemini-2.0-flash-lite" for faster forced tool calls
+    forced_tool_max_tokens: int = 200
 
     # === Web Search ===
     gateway_base_url: str = "http://backend:8200"

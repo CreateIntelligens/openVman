@@ -271,7 +271,7 @@ class IndexTTS:
         print(f">> bigvgan_time: {bigvgan_time:.2f} seconds")
         print(f">> Total inference time: {end_time - start_time:.2f} seconds")
         print(f">> Generated audio length: {wav_length:.2f} seconds")
-        print(f">> RTF: {(end_time - start_time) / wav_length:.4f}")
+        print(f">> RTF: {(end_time - start_time) / wav_length:.2f}")
 
         # save audio
         wav = wav.cpu()  # to cpu
