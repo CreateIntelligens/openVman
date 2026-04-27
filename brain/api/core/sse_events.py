@@ -1,29 +1,12 @@
-"""SSE event types for streaming generation."""
+"""Protocol error helpers for chat endpoints."""
 
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from time import time
 from typing import Any
 
 from protocol.protocol_events import ProtocolValidationError, validate_server_event
-
-
-@dataclass(frozen=True, slots=True)
-class SessionEvent:
-    session_id: str
-    trace_id: str
-    event: str = "session"
-
-
-@dataclass(frozen=True, slots=True)
-class ContextEvent:
-    trace_id: str
-    knowledge_count: int
-    memory_count: int
-    request_context: dict[str, Any]
-    event: str = "context"
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,21 +17,6 @@ class ToolEvent:
     arguments: str
     result: str
     event: str = "tool"
-
-
-@dataclass(frozen=True, slots=True)
-class TokenEvent:
-    trace_id: str
-    token: str
-    event: str = "token"
-
-
-@dataclass(frozen=True, slots=True)
-class PiiWarningEvent:
-    trace_id: str
-    categories: tuple[str, ...]
-    counts: dict[str, int]
-    event: str = "pii_warning"
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,24 +39,6 @@ class DoneEvent:
     memory_results: list[dict[str, Any]]
     tool_steps: list[dict[str, Any]]
     event: str = "done"
-
-
-SSEEvent = SessionEvent | ContextEvent | ToolEvent | ToolErrorEvent | TokenEvent | PiiWarningEvent | DoneEvent
-
-
-def _encode_sse_data(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False)
-
-
-def sse_event_to_dict(event: SSEEvent) -> dict[str, str]:
-    """Convert an SSE event dataclass to a dict suitable for EventSourceResponse."""
-    data = asdict(event)
-    event_type = data.pop("event")
-    return {
-        "event": event_type,
-        "id": event.trace_id,
-        "data": _encode_sse_data(data),
-    }
 
 
 def build_protocol_error(
@@ -126,10 +76,3 @@ def build_exception_protocol_error(exc: Exception) -> dict[str, object]:
     message = str(exc)
     return build_protocol_error(protocol_error_code_for_exception(message), message)
 
-
-def sse_error_to_dict(error_payload: dict[str, object], trace_id: str) -> dict[str, str]:
-    return {
-        "event": "error",
-        "id": trace_id,
-        "data": _encode_sse_data(error_payload),
-    }

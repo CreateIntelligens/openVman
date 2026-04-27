@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  streamChat,
+  fetchChat,
   type ActionRequest,
   type ChatMessage as ChatMessageType,
   type RetrievalResult,
 } from "../api";
 import {
   addPendingExchange,
-  attachPrivacyWarningToLastUserMessage,
-  appendStreamingToken,
   getConversationTitle,
   mergeUserPrivacyWarnings,
   removeEmptyAssistantDraft,
@@ -232,7 +230,7 @@ export function useChatSession() {
   // --- Coordination ---
   const conversationTitle = getConversationTitle(loadingHistory, sending);
   const conversationStatus = sending
-    ? `streaming · ${selectedPersonaId}`
+    ? `thinking · ${selectedPersonaId}`
     : `${messages.length} messages · ${selectedPersonaId}`;
 
   const clearStopReplyTimer = useCallback(() => {
@@ -288,39 +286,27 @@ export function useChatSession() {
     setInput("");
 
     try {
-      await streamChat(
+      const payload = await fetchChat(
         nextMessage,
         selectedPersonaId,
         sessionId || undefined,
-        {
-          onSession: (payload) => {
-            if (!sessionId) {
-              persistSessionId(payload.session_id);
-              loadSessions();
-            }
-          },
-          onPiiWarning: (payload) => {
-            setMessages((current) => attachPrivacyWarningToLastUserMessage(current, payload));
-          },
-          onToken: ({ token }) => setMessages((current) => appendStreamingToken(current, token)),
-          onTool: ({ name, result }) => {
-            const request = parseActionRequestResult(name, result);
-            if (request) {
-              setMessages((current) => appendActionRequestToLastAssistant(current, request));
-            }
-          },
-          onDone: (payload) => {
-            const response_time_s = Math.round((performance.now() - submitTime) / 10) / 100;
-            applyChatResult({ ...payload, response_time_s });
-            setSending(false);
-          },
-          onError: ({ message }) => {
-            clearStopReplyTimer();
-            setError(message);
-          },
-        },
         controller.signal,
       );
+      const response_time_s = Math.round((performance.now() - submitTime) / 10) / 100;
+
+      if (!sessionId) {
+        persistSessionId(payload.session_id);
+        loadSessions();
+      }
+
+      for (const step of payload.tool_steps ?? []) {
+        const request = parseActionRequestResult(step.name, step.result ?? "");
+        if (request) {
+          setMessages((current) => appendActionRequestToLastAssistant(current, request));
+        }
+      }
+
+      applyChatResult({ ...payload, response_time_s });
     } catch (reason) {
       if (controller.signal.aborted) {
         showStoppedReplyNotice();

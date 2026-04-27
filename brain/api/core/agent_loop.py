@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import re
 from dataclasses import dataclass
-import inspect
 from typing import Any
 
 from config import get_settings
@@ -45,12 +45,6 @@ class AgentLoopResult:
     reply: str
     tool_steps: list[dict[str, Any]]
     pii_report: PiiDetectionReport | None = None
-
-
-@dataclass(slots=True)
-class PreparedAgentReply:
-    messages: list[dict[str, Any]]
-    tool_steps: list[dict[str, Any]]
 
 
 def _supports_keyword_argument(func: Any, name: str) -> bool:
@@ -102,28 +96,6 @@ def run_agent_loop(
         tool_steps=tool_steps,
         pii_report=final_turn.pii_report,
     )
-
-
-def prepare_agent_reply(
-    messages: list[dict[str, Any]],
-    persona_id: str = "default",
-    project_id: str = "default",
-    *,
-    forced_tool_name: str | None = None,
-) -> PreparedAgentReply:
-    """Run only the tool turns, returning messages ready for a final streaming call.
-
-    Unlike run_agent_loop, this does NOT make the final text completion.
-    The caller is expected to stream the final reply via stream_chat_reply().
-    """
-    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id, forced_tool_name=forced_tool_name)
-    if final_turn is None:
-        raise ToolPhaseError(
-            "工具調用超出最大輪次",
-            partial_steps=tool_steps,
-            partial_messages=working_messages,
-        )
-    return PreparedAgentReply(messages=working_messages, tool_steps=tool_steps)
 
 
 def _run_tool_phase(

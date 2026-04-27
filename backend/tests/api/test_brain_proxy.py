@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -60,28 +59,6 @@ def test_gateway_brain_proxy_forwards_to_brain_api(client: TestClient):
     mock_client.build_request.assert_called_once()
     build_kwargs = mock_client.build_request.call_args.kwargs
     assert build_kwargs["url"] == "http://brain:8100/brain/health?project_id=default"
-
-
-def test_gateway_brain_proxy_closes_sse_upstream(client: TestClient):
-    async def _aiter_bytes() -> AsyncIterator[bytes]:
-        yield b"event: token\ndata: {\"token\":\"hi\"}\n\n"
-
-    upstream = _make_response(content_type="text/event-stream")
-    upstream.aiter_bytes = _aiter_bytes
-    mock_client = MagicMock()
-    mock_client.build_request = MagicMock(return_value="request")
-    mock_client.send = AsyncMock(return_value=upstream)
-
-    with (
-        patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
-        patch("app.brain_proxy._http.get", return_value=mock_client),
-    ):
-        with client.stream("GET", "/api/chat/stream") as response:
-            body = b"".join(response.iter_bytes())
-
-    assert response.status_code == 200
-    assert body == b"event: token\ndata: {\"token\":\"hi\"}\n\n"
-    upstream.aclose.assert_awaited_once()
 
 
 def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):

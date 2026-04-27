@@ -51,11 +51,6 @@ def make_fake_agent_loop() -> types.ModuleType:
                 and self.pii_report == other.pii_report
             )
 
-    class PreparedAgentReply:
-        def __init__(self, messages: list[dict], tool_steps: list[dict]):
-            self.messages = messages
-            self.tool_steps = tool_steps
-
     class ToolPhaseError(Exception):
         def __init__(
             self,
@@ -68,14 +63,9 @@ def make_fake_agent_loop() -> types.ModuleType:
             self.partial_messages = partial_messages or []
 
     fake.AgentLoopResult = AgentLoopResult
-    fake.PreparedAgentReply = PreparedAgentReply
     fake.ToolPhaseError = ToolPhaseError
     fake.run_agent_loop = lambda messages, persona_id="default", project_id="default": AgentLoopResult(
         reply="tool reply",
-        tool_steps=[],
-    )
-    fake.prepare_agent_reply = lambda messages, persona_id="default", project_id="default": PreparedAgentReply(
-        messages=list(messages),
         tool_steps=[],
     )
     return fake

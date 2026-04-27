@@ -1,14 +1,13 @@
-"""Live voice pipeline: orchestrates Brain token stream to TTS audio chunks.
+"""Live voice pipeline: orchestrates Brain reply to TTS audio chunks.
 
-Uses a producer/consumer pattern so Brain SSE reading and TTS synthesis
+Uses a producer/consumer pattern so text chunking and TTS synthesis
 run concurrently — the next chunk starts synthesizing while the previous
 one is being sent to the client.
 """
 
 import asyncio
-import json
-import logging
 import base64
+import logging
 import time
 from typing import AsyncIterator, Optional
 
@@ -22,11 +21,12 @@ from app.observability import record_voice_latency
 
 logger = logging.getLogger("backend.live_pipeline")
 
-_SENTINEL = object()  # marks end of text/audio queues
+_SENTINEL: str = "\x00"  # marks end of text queue
+_AUDIO_SENTINEL: dict = {}  # marks end of audio queue
 
 
 class LiveVoicePipeline:
-    """Consumes Brain SSE stream, chunks text, synthesizes audio, and yields WebSocket events."""
+    """Calls Brain /chat, chunks the reply by punctuation, synthesizes audio, and yields WebSocket events."""
 
     def __init__(self, session: Session):
         self.session = session
@@ -35,29 +35,32 @@ class LiveVoicePipeline:
         self.tts_router = TTSRouterService(self.config)
 
     async def run(self, user_text: str) -> AsyncIterator[dict]:
-        """Run the end-to-end pipeline with concurrent Brain reading and TTS synthesis."""
+        """Run the end-to-end pipeline with concurrent text chunking and TTS synthesis."""
         logger.info("Starting live pipeline for session %s", self.session.session_id)
         t_start = time.monotonic()
+
+        reply = await self._fetch_brain_reply(user_text)
+        if reply is None:
+            yield {"event": "server_error", "error_code": "internal_error", "message": "Brain 回覆失敗"}
+            return
 
         text_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
         audio_queue: asyncio.Queue[Optional[dict]] = asyncio.Queue()
 
-        # Producer: read Brain SSE → chunk text → put into text_queue
-        producer_task = asyncio.create_task(
-            self._read_brain_stream(user_text, text_queue)
-        )
+        for chunk in self.chunker.split(reply):
+            if chunk:
+                await text_queue.put(chunk)
+        await text_queue.put(_SENTINEL)  # end marker
 
-        # Consumer: take text chunks → synthesize → put audio events into audio_queue
         consumer_task = asyncio.create_task(
             self._synthesize_worker(text_queue, audio_queue)
         )
 
-        # Yield audio events as they become ready
         first_chunk_sent = False
         try:
             while True:
                 event = await audio_queue.get()
-                if event is _SENTINEL:
+                if event is _AUDIO_SENTINEL:
                     break
                 if not first_chunk_sent:
                     latency_ms = (time.monotonic() - t_start) * 1000
@@ -66,67 +69,30 @@ class LiveVoicePipeline:
                 yield event
         except Exception as e:
             logger.error("Live pipeline error: %s", e)
-            producer_task.cancel()
             consumer_task.cancel()
             yield {"event": "server_error", "error_code": "internal_error", "message": str(e)}
             return
 
-        # Ensure tasks are done
-        await asyncio.gather(producer_task, consumer_task, return_exceptions=True)
+        await consumer_task
 
-    async def _read_brain_stream(
-        self, user_text: str, text_queue: asyncio.Queue[Optional[str]]
-    ) -> None:
-        """Read Brain SSE, chunk by punctuation, and enqueue text chunks."""
-        brain_url = f"{self.config.brain_url}/brain/chat/stream"
+    async def _fetch_brain_reply(self, user_text: str) -> Optional[str]:
+        """Call Brain /chat and return the full reply text."""
+        brain_url = f"{self.config.brain_url}/brain/chat"
         payload = {
             "message": user_text,
             "session_id": self.session.session_id,
-            "stream": True,
         }
-
         try:
-            async with httpx.AsyncClient(timeout=30.0) as http_client:
-                async with http_client.stream("POST", brain_url, json=payload) as response:
-                    if response.status_code >= 400:
-                        error_text = await response.aread()
-                        logger.error("Brain stream failed: %s - %s", response.status_code, error_text)
-                        await text_queue.put(_SENTINEL)
-                        return
-
-                    text_buffer = ""
-
-                    async for line in response.aiter_lines():
-                        line = line.strip()
-                        if not line.startswith("data: "):
-                            continue
-
-                        data_str = line.removeprefix("data: ").strip()
-                        if data_str == "[DONE]":
-                            break
-
-                        try:
-                            data = json.loads(data_str)
-                            token = data.get("token", "")
-                            text_buffer += token
-
-                            if any(p in token for p in "，。？！；"):
-                                for chunk in self.chunker.split(text_buffer):
-                                    await text_queue.put(chunk)
-                                text_buffer = ""
-
-                        except json.JSONDecodeError:
-                            continue
-
-                    # Final flush
-                    if text_buffer.strip():
-                        for chunk in self.chunker.split(text_buffer):
-                            await text_queue.put(chunk)
-
+            async with httpx.AsyncClient(timeout=60.0) as http_client:
+                response = await http_client.post(brain_url, json=payload)
+                if response.status_code >= 400:
+                    logger.error("Brain chat failed: %s - %s", response.status_code, response.text)
+                    return None
+                data = response.json()
+                return data.get("reply") or ""
         except Exception as e:
-            logger.error("Brain stream error: %s", e)
-        finally:
-            await text_queue.put(_SENTINEL)
+            logger.error("Brain chat error: %s", e)
+            return None
 
     async def _synthesize_worker(
         self, text_queue: asyncio.Queue[Optional[str]], audio_queue: asyncio.Queue[Optional[dict]]
@@ -140,8 +106,6 @@ class LiveVoicePipeline:
                 text = await text_queue.get()
                 if text is _SENTINEL:
                     break
-                if not text.strip():
-                    continue
 
                 event = await self._synthesize_chunk(text, loop)
                 if event:
@@ -154,7 +118,7 @@ class LiveVoicePipeline:
             if last_event is not None:
                 last_event["is_final"] = True
                 await audio_queue.put(last_event)
-            await audio_queue.put(_SENTINEL)
+            await audio_queue.put(_AUDIO_SENTINEL)
 
     async def _synthesize_chunk(self, text: str, loop: asyncio.AbstractEventLoop) -> Optional[dict]:
         """Synthesize a single text chunk into audio and wrap in WebSocket event."""

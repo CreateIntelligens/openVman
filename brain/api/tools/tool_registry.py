@@ -419,7 +419,7 @@ def get_tool_registry() -> ToolRegistry:
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "要搜尋的查詢文字"},
-                        "top_k": {"type": "integer", "description": "最多回傳幾筆結果", "default": 3},
+                        "top_k": {"type": "integer", "description": "最多回傳幾筆結果"},
                     },
                     "required": ["query"],
                 },
@@ -434,7 +434,7 @@ def get_tool_registry() -> ToolRegistry:
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "要搜尋的查詢文字"},
-                        "top_k": {"type": "integer", "description": "最多回傳幾筆結果", "default": 3},
+                        "top_k": {"type": "integer", "description": "最多回傳幾筆結果"},
                     },
                     "required": ["query"],
                 },
@@ -527,7 +527,6 @@ def get_tool_registry() -> ToolRegistry:
                         "depth": {
                             "type": "integer",
                             "description": "BFS 深度，預設 2 (範圍 1-3)",
-                            "default": 2,
                         },
                     },
                     "required": ["question"],

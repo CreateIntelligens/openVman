@@ -234,9 +234,9 @@ class TestToolPhaseError:
 # ---------------------------------------------------------------------------
 
 class TestToolErrorEvent:
-    def test_tool_error_event_frozen_and_serializes(self):
-        """ToolErrorEvent frozen + sse_event_to_dict 正確"""
-        from core.sse_events import ToolErrorEvent, sse_event_to_dict
+    def test_tool_error_event_frozen(self):
+        """ToolErrorEvent is frozen dataclass"""
+        from core.sse_events import ToolErrorEvent
 
         evt = ToolErrorEvent(
             trace_id="t1",
@@ -247,18 +247,12 @@ class TestToolErrorEvent:
             status="timeout",
         )
 
+        assert evt.trace_id == "t1"
+        assert evt.error == "boom"
+        assert evt.status == "timeout"
+
         with pytest.raises(AttributeError):
             evt.error = "other"  # type: ignore[misc]
-
-        result = sse_event_to_dict(evt)
-        assert result["event"] == "tool_error"
-        assert result["id"] == "t1"
-        data = json.loads(result["data"])
-        assert data["error"] == "boom"
-        assert data["partial_steps_count"] == 2
-        assert data["tool_call_id"] == "call_1"
-        assert data["name"] == "query_order"
-        assert data["status"] == "timeout"
 
 
 # ---------------------------------------------------------------------------
@@ -336,123 +330,3 @@ class TestGracefulDegradation:
         assert any(message.get("role") == "tool" for message in seen_messages)
         assert any("工具流程部分失敗" in str(message.get("content", "")) for message in seen_messages)
 
-    def test_stream_generation_yields_tool_error_event_on_failure(self, monkeypatch: pytest.MonkeyPatch):
-        """prepare_agent_reply raise → ToolErrorEvent + 繼續 stream"""
-        chat_service = _stub_heavy_modules(monkeypatch)
-        ToolPhaseError = chat_service.ToolPhaseError
-        from core.sse_events import DoneEvent, ToolErrorEvent, TokenEvent
-
-        partial = [{"tool_call_id": "c1", "name": "t", "arguments": "{}", "result": "{}"}]
-        partial_messages = [
-            {"role": "user", "content": "hi"},
-            {"role": "assistant", "content": None, "tool_calls": []},
-            {"role": "tool", "tool_call_id": "c1", "name": "t", "content": "{}"},
-        ]
-
-        monkeypatch.setattr(
-            chat_service,
-            "prepare_agent_reply",
-            MagicMock(
-                side_effect=ToolPhaseError(
-                    "max rounds",
-                    partial_steps=partial,
-                    partial_messages=partial_messages,
-                )
-            ),
-        )
-
-        async def immediate_to_thread(func, /, *args, **kwargs):
-            return func(*args, **kwargs)
-
-        seen_stream_messages: list[dict[str, Any]] = []
-
-        async def fake_stream(msgs):
-            seen_stream_messages.extend(msgs)
-            for token in ["fall", "back"]:
-                yield token
-
-        async def fake_prepare_stream(msgs, **kwargs):
-            return chat_service.LLMStreamReply(tokens=fake_stream(msgs), pii_report=None)
-
-        monkeypatch.setattr(chat_service.asyncio, "to_thread", immediate_to_thread)
-        monkeypatch.setattr(chat_service, "prepare_stream_chat_reply", fake_prepare_stream)
-        monkeypatch.setattr(chat_service, "finalize_generation", lambda ctx, reply: None)
-
-        fake_route = MagicMock()
-        fake_route.skip_tools = False
-
-        ctx = MagicMock()
-        ctx.route = fake_route
-        ctx.prompt_messages = [{"role": "user", "content": "hi"}]
-        ctx.persona_id = "default"
-        ctx.trace_id = "trace1"
-        ctx.session_id = "sess1"
-        ctx.request_context = {}
-
-        async def collect():
-            events = []
-            async for evt in chat_service.stream_generation(ctx):
-                events.append(evt)
-            return events
-
-        events = asyncio.run(collect())
-
-        event_types = [type(e).__name__ for e in events]
-        assert "ToolErrorEvent" in event_types
-        assert "TokenEvent" in event_types
-        assert "DoneEvent" in event_types
-        assert "ToolEvent" in event_types
-        assert any(message.get("role") == "tool" for message in seen_stream_messages)
-        tool_error_event = next(evt for evt in events if type(evt).__name__ == "ToolErrorEvent")
-        assert tool_error_event.tool_call_id == "c1"
-        assert tool_error_event.name == "t"
-
-    def test_stream_generation_continues_after_tool_error(self, monkeypatch: pytest.MonkeyPatch):
-        """tool phase 失敗後仍有 token + done events"""
-        chat_service = _stub_heavy_modules(monkeypatch)
-        ToolPhaseError = chat_service.ToolPhaseError
-        from core.sse_events import TokenEvent
-
-        monkeypatch.setattr(
-            chat_service,
-            "prepare_agent_reply",
-            MagicMock(side_effect=ToolPhaseError("boom", partial_steps=[], partial_messages=[])),
-        )
-
-        async def immediate_to_thread(func, /, *args, **kwargs):
-            return func(*args, **kwargs)
-
-        async def fake_stream(msgs):
-            yield "hello"
-            yield " world"
-
-        async def fake_prepare_stream(msgs, **kwargs):
-            return chat_service.LLMStreamReply(tokens=fake_stream(msgs), pii_report=None)
-
-        monkeypatch.setattr(chat_service.asyncio, "to_thread", immediate_to_thread)
-        monkeypatch.setattr(chat_service, "prepare_stream_chat_reply", fake_prepare_stream)
-        monkeypatch.setattr(chat_service, "finalize_generation", lambda ctx, reply: None)
-
-        fake_route = MagicMock()
-        fake_route.skip_tools = False
-
-        ctx = MagicMock()
-        ctx.route = fake_route
-        ctx.prompt_messages = [{"role": "user", "content": "test"}]
-        ctx.persona_id = "default"
-        ctx.trace_id = "t2"
-        ctx.session_id = "s2"
-        ctx.request_context = {}
-
-        async def collect():
-            events = []
-            async for evt in chat_service.stream_generation(ctx):
-                events.append(evt)
-            return events
-
-        events = asyncio.run(collect())
-
-        token_events = [e for e in events if isinstance(e, TokenEvent)]
-        assert len(token_events) == 2
-        tokens = [e.token for e in token_events]
-        assert tokens == ["hello", " world"]
