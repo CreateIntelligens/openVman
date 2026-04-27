@@ -12,6 +12,7 @@ from infra.db import (
     vector_table_exists,
 )
 from knowledge.doc_meta import list_disabled_document_paths
+from memory.dreaming.recall_tracker import record_trace
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -69,10 +70,8 @@ def search_records(
         if len(filtered) >= limit:
             break
 
-    # Non-blocking recall trace for dreaming consolidation
     if filtered:
         try:
-            from memory.dreaming.recall_tracker import record_trace
             record_trace(
                 query=query_text or "",
                 persona_id=persona_id,
@@ -146,7 +145,13 @@ def _matches_persona(record: dict[str, Any], persona_id: str) -> bool:
 
 
 def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in record.items() if key != "vector"}
+    result = {key: value for key, value in record.items() if key != "vector"}
+    meta = parse_record_metadata(record)
+    if path := str(meta.get("path", "")).strip():
+        result["path"] = path
+    if title := str(meta.get("title", "")).strip():
+        result["title"] = title
+    return result
 
 
 def _matches_disabled_knowledge_path(record: dict[str, Any], disabled_paths: set[str]) -> bool:

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import inspect
+import contextvars
 import logging
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +22,9 @@ _HALLUCINATED_TOOL_RETRY_MSG = (
     "Invalid response format. You wrote a tool call as plain text. "
     "Use the function-calling API instead, or reply in natural language."
 )
+
+_TOOL_PARALLEL_THRESHOLD = 2
+_TOOL_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool")
 
 
 class ToolPhaseError(Exception):
@@ -47,24 +52,13 @@ class AgentLoopResult:
     pii_report: PiiDetectionReport | None = None
 
 
-def _supports_keyword_argument(func: Any, name: str) -> bool:
-    try:
-        params = inspect.signature(func).parameters.values()
-    except (TypeError, ValueError):
-        return True
-    return any(param.kind is inspect.Parameter.VAR_KEYWORD or param.name == name for param in params)
-
-
 def _build_turn_kwargs(
-    func: Any,
     tools: list[dict[str, Any]],
     forced_tool_name: str | None,
     cfg: Any,
 ) -> dict[str, Any]:
     """Build the shared kwargs for generate_chat_turn / stream_chat_turn calls."""
-    kwargs: dict[str, Any] = {"tools": tools}
-    if _supports_keyword_argument(func, "privacy_source"):
-        kwargs["privacy_source"] = "tool"
+    kwargs: dict[str, Any] = {"tools": tools, "privacy_source": "tool"}
     if forced_tool_name:
         kwargs["forced_tool_name"] = forced_tool_name
         if cfg.forced_tool_model_override:
@@ -79,7 +73,7 @@ def _generate_turn(
     tools: list[dict[str, Any]],
     forced_tool_name: str | None = None,
 ) -> LLMReply:
-    return generate_chat_turn(messages, **_build_turn_kwargs(generate_chat_turn, tools, forced_tool_name, get_settings()))
+    return generate_chat_turn(messages, **_build_turn_kwargs(tools, forced_tool_name, get_settings()))
 
 
 def _stream_turn(
@@ -88,7 +82,7 @@ def _stream_turn(
     tools: list[dict[str, Any]],
     forced_tool_name: str | None = None,
 ) -> LLMReply:
-    return stream_chat_turn(messages, **_build_turn_kwargs(stream_chat_turn, tools, forced_tool_name, get_settings()))
+    return stream_chat_turn(messages, **_build_turn_kwargs(tools, forced_tool_name, get_settings()))
 
 
 def run_agent_loop(
@@ -144,7 +138,6 @@ def _run_tool_phase(
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue
-            # Detect hallucinated tool call (plain-text function syntax, no real tool_calls)
             if (
                 not hallucination_retried
                 and hallucination_pattern is not None
@@ -187,8 +180,8 @@ def _append_tool_turns(
     turn: LLMReply,
 ) -> None:
     working_messages.append(_assistant_tool_message(turn))
-    for tool_call in turn.tool_calls:
-        step = _execute_tool_call(tool_call)
+    steps = _execute_tool_calls(turn.tool_calls)
+    for step in steps:
         tool_steps.append(step)
         working_messages.append(
             {
@@ -200,13 +193,34 @@ def _append_tool_turns(
         )
 
 
+def _execute_tool_calls(tool_calls: list[LLMToolCall]) -> list[dict[str, Any]]:
+    """Run tool calls; parallelize when 2+ calls arrive in the same turn.
+
+    Tool execution depends on persona/project ContextVars set by ``bind_tool_context``.
+    We capture the parent context and re-enter it inside each worker thread so
+    persona/project routing is preserved.
+    """
+    if len(tool_calls) < _TOOL_PARALLEL_THRESHOLD:
+        return [_execute_tool_call(tc) for tc in tool_calls]
+
+    parent_ctx = contextvars.copy_context()
+    futures = [
+        _TOOL_EXECUTOR.submit(parent_ctx.copy().run, _execute_tool_call, tc)
+        for tc in tool_calls
+    ]
+    return [future.result() for future in futures]
+
+
 def _execute_tool_call(tool_call: LLMToolCall) -> dict[str, Any]:
+    t0 = time.monotonic()
     result = execute_tool_call(tool_call.name, tool_call.arguments)
+    elapsed = round(time.monotonic() - t0, 3)
     return {
         "tool_call_id": tool_call.id,
         "name": tool_call.name,
         "arguments": tool_call.arguments,
         "result": result,
+        "duration_s": elapsed,
     }
 
 

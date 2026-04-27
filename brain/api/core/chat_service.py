@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-import inspect
+import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -20,6 +21,7 @@ from memory.memory import (
     list_session_messages,
 )
 from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
+from privacy.filter import PiiDetectionReport
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
     MessageEnvelope,
@@ -28,6 +30,8 @@ from protocol.message_envelope import (
     serialize_context,
 )
 from safety.guardrails import enforce_guardrails, enforce_session_limits
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -90,13 +94,78 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     )
 
 
-def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any]:
-    """Persist the assistant reply and return the standard API payload."""
+def _serialize_history_message(msg: dict[str, Any]) -> dict[str, Any]:
+    entry: dict[str, Any] = {"role": msg["role"], "content": msg["content"]}
+    msg_meta = msg.get("metadata") or {}
+    if steps := msg_meta.get("tool_steps"):
+        entry["tool_steps"] = steps
+    if rts := msg_meta.get("response_time_s"):
+        entry["response_time_s"] = rts
+    return entry
+
+
+def _pii_to_warning(report: PiiDetectionReport | None) -> dict[str, Any] | None:
+    if report is None or not report.counts:
+        return None
+    return {"categories": list(report.categories), "counts": dict(report.counts)}
+
+
+def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> None:
+    """Run memory governance off the request hot path."""
+    persona_id = context.persona_id
+    project_id = context.project_id
+    session_id = context.session_id
+    user_message = context.user_message
+    day = date.today().isoformat()
+    summary_text = f"User: {user_message}\nAssistant: {cleaned_reply}"
+
+    def _work() -> None:
+        try:
+            write_summary_and_reindex(
+                persona_id=persona_id,
+                day=day,
+                summary_text=summary_text,
+                source_turns=1,
+                session_id=session_id,
+                project_id=project_id,
+            )
+            maybe_run_memory_maintenance(project_id=project_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("background memory write failed project=%s: %s", project_id, exc)
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.run_in_executor(None, _work)
+    except RuntimeError:
+        # No running loop (sync test path); execute inline.
+        _work()
+
+
+def finalize_generation(
+    context: GenerationContext,
+    reply: str,
+    tool_steps: list[dict[str, Any]] | None = None,
+    response_time_s: float | None = None,
+    pii_report: PiiDetectionReport | None = None,
+) -> dict[str, Any]:
+    """Persist the assistant reply and return the standard API payload.
+
+    Memory governance (summary/reindex/maintenance) is dispatched to a background
+    thread so it does not block the response.
+    """
     cleaned_reply = reply.strip()
     if not cleaned_reply:
         raise ValueError("LLM 沒有回傳內容")
 
-    append_session_message(context.session_id, context.persona_id, "assistant", cleaned_reply, project_id=context.project_id)
+    meta: dict[str, Any] = {}
+    if tool_steps:
+        meta["tool_steps"] = tool_steps
+    if response_time_s is not None:
+        meta["response_time_s"] = response_time_s
+    append_session_message(
+        context.session_id, context.persona_id, "assistant", cleaned_reply,
+        project_id=context.project_id, metadata=meta or None,
+    )
     archive_session_turn(
         context.session_id,
         context.user_message,
@@ -104,24 +173,19 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         context.persona_id,
         project_id=context.project_id,
     )
-    write_summary_and_reindex(
-        persona_id=context.persona_id,
-        day=date.today().isoformat(),
-        summary_text=f"User: {context.user_message}\nAssistant: {cleaned_reply}",
-        source_turns=1,
-        session_id=context.session_id,
-        project_id=context.project_id,
-    )
+    _schedule_memory_writes(context, cleaned_reply)
 
-    # Memory is now written by the LLM via the save_memory tool —
-    # no automatic per-turn memory write here.
-    maintenance = maybe_run_memory_maintenance(project_id=context.project_id)
-
-    history = [
-        *context.prior_messages,
-        {"role": "user", "content": context.user_message},
-        {"role": "assistant", "content": cleaned_reply},
-    ]
+    history = [_serialize_history_message(msg) for msg in context.prior_messages]
+    user_entry: dict[str, Any] = {"role": "user", "content": context.user_message}
+    if warning := _pii_to_warning(pii_report):
+        user_entry["privacy_warning"] = warning
+    history.append(user_entry)
+    assistant_entry: dict[str, Any] = {"role": "assistant", "content": cleaned_reply}
+    if tool_steps:
+        assistant_entry["tool_steps"] = tool_steps
+    if response_time_s is not None:
+        assistant_entry["response_time_s"] = response_time_s
+    history.append(assistant_entry)
     return {
         "status": "ok",
         "trace_id": context.trace_id,
@@ -129,7 +193,6 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         "request_context": context.request_context,
         "reply": cleaned_reply,
         "history": history,
-        "memory_maintenance": maintenance,
     }
 
 
@@ -148,31 +211,9 @@ def _inject_tool_fallback_hint(messages: list[dict[str, Any]]) -> list[dict[str,
     return [*messages[:insert_idx], {"role": "system", "content": _TOOL_FALLBACK_HINT}, *messages[insert_idx:]]
 
 
-def _supports_keyword_argument(func: Any, name: str) -> bool:
-    try:
-        params = inspect.signature(func).parameters.values()
-    except (TypeError, ValueError):
-        return True
-    return any(param.kind is inspect.Parameter.VAR_KEYWORD or param.name == name for param in params)
-
-
 def _string_context_value(context: Any, name: str, default: str = "") -> str:
     value = getattr(context, name, default)
     return value if isinstance(value, str) else default
-
-
-def _generate_turn_result(
-    messages: list[dict[str, Any]],
-    *,
-    privacy_source: str,
-    trace_id: str,
-) -> LLMReply:
-    kwargs: dict[str, Any] = {}
-    if _supports_keyword_argument(generate_chat_turn, "privacy_source"):
-        kwargs["privacy_source"] = privacy_source
-    if trace_id and _supports_keyword_argument(generate_chat_turn, "trace_id"):
-        kwargs["trace_id"] = trace_id
-    return generate_chat_turn(messages, **kwargs)
 
 
 def _reply_from_turn(turn: LLMReply) -> str:
@@ -188,7 +229,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     project_id = _string_context_value(context, "project_id", "default")
 
     if context.route.skip_tools:
-        turn = _generate_turn_result(
+        turn = generate_chat_turn(
             context.prompt_messages,
             privacy_source="chat",
             trace_id=trace_id,
@@ -207,7 +248,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
-        turn = _generate_turn_result(
+        turn = generate_chat_turn(
             fallback,
             privacy_source="tool",
             trace_id=trace_id,

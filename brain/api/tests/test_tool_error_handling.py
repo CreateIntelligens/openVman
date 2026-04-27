@@ -177,7 +177,7 @@ class TestToolPhaseError:
         )
 
         monkeypatch.setattr(agent_loop, "stream_chat_turn", lambda msgs, tools=None, **kw: fake_turn)
-        monkeypatch.setattr(agent_loop, "generate_chat_turn", lambda msgs, tools=None: fake_turn)
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", lambda msgs, tools=None, **kw: fake_turn)
         monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
 
         fake_registry = MagicMock()
@@ -200,7 +200,7 @@ class TestToolPhaseError:
 
         call_count = 0
 
-        def fake_generate(msgs, tools=None):
+        def fake_generate(msgs, tools=None, **kw):
             nonlocal call_count
             call_count += 1
             return agent_loop.LLMReply(

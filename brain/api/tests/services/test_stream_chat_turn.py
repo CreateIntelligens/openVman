@@ -140,7 +140,6 @@ def _stub_config(monkeypatch: pytest.MonkeyPatch, llm_client: Any, *, api_key: s
     fake_privacy.FilterSource = str
     fake_privacy.PiiDetectionReport = None
     monkeypatch.setitem(sys.modules, "privacy.filter", fake_privacy)
-    llm_client._PII_EXECUTOR.submit = lambda fn, *a, **kw: None
 
 
 # ---------------------------------------------------------------------------

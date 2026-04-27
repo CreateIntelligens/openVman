@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, HTTPException, Request
@@ -77,10 +78,15 @@ def _handle_generation_error(exc: Exception, action: str, request: Request) -> N
 @router.post("/chat", summary="非串流對話")
 async def chat(request: Request, payload: ChatRequest):
     try:
+        t0 = time.monotonic()
         context = await asyncio.to_thread(_prepare_chat_context, request, payload)
         result = await asyncio.to_thread(execute_generation, context)
-        response = await asyncio.to_thread(finalize_generation, context, result.reply)
+        response_time_s = round(time.monotonic() - t0, 2)
+        response = finalize_generation(
+            context, result.reply, result.tool_steps, response_time_s, result.pii_report,
+        )
         response["tool_steps"] = result.tool_steps
+        response["response_time_s"] = response_time_s
         _log_generation_success(context, len(result.tool_steps))
         return response
     except Exception as exc:
@@ -100,6 +106,12 @@ async def chat_history(session_id: str, project_id: str = "default", persona_id:
             action_requests = metadata.get(METADATA_ACTION_REQUESTS)
             if isinstance(action_requests, list) and action_requests:
                 entry[METADATA_ACTION_REQUESTS] = action_requests
+            tool_steps = metadata.get("tool_steps")
+            if isinstance(tool_steps, list) and tool_steps:
+                entry["tool_steps"] = tool_steps
+            rts = metadata.get("response_time_s")
+            if rts is not None:
+                entry["response_time_s"] = rts
         history.append(entry)
     return {"session_id": session_id, "persona_id": persona_id, "history": history}
 
