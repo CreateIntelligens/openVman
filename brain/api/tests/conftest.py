@@ -38,21 +38,18 @@ def make_fake_agent_loop() -> types.ModuleType:
     fake = types.ModuleType("core.agent_loop")
 
     class AgentLoopResult:
-        def __init__(self, reply: str, tool_steps: list[dict]):
+        def __init__(self, reply: str, tool_steps: list[dict], pii_report=None):
             self.reply = reply
             self.tool_steps = tool_steps
+            self.pii_report = pii_report
 
         def __eq__(self, other: object) -> bool:
             return (
                 isinstance(other, AgentLoopResult)
                 and self.reply == other.reply
                 and self.tool_steps == other.tool_steps
+                and self.pii_report == other.pii_report
             )
-
-    class PreparedAgentReply:
-        def __init__(self, messages: list[dict], tool_steps: list[dict]):
-            self.messages = messages
-            self.tool_steps = tool_steps
 
     class ToolPhaseError(Exception):
         def __init__(
@@ -66,14 +63,9 @@ def make_fake_agent_loop() -> types.ModuleType:
             self.partial_messages = partial_messages or []
 
     fake.AgentLoopResult = AgentLoopResult
-    fake.PreparedAgentReply = PreparedAgentReply
     fake.ToolPhaseError = ToolPhaseError
     fake.run_agent_loop = lambda messages, persona_id="default", project_id="default": AgentLoopResult(
         reply="tool reply",
-        tool_steps=[],
-    )
-    fake.prepare_agent_reply = lambda messages, persona_id="default", project_id="default": PreparedAgentReply(
-        messages=list(messages),
         tool_steps=[],
     )
     return fake
@@ -97,7 +89,6 @@ def _empty_bundle_with_project(
     query: str = "",
     persona_id: str = "default",
     project_id: str = "default",
-    include_knowledge: bool = True,
     include_memories: bool = True,
 ) -> FakeRetrievalBundle:
     return FakeRetrievalBundle(knowledge_results=[], memory_results=[], diagnostics={})

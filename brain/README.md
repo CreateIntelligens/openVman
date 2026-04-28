@@ -332,21 +332,6 @@ user input
   -> capture learnings / errors
 ```
 
-### 串流生成
-
-`/brain/chat/stream` 會以 SSE 傳送事件。前端目前會處理的事件類型包含：
-
-- `session`
-  - 回傳 session id
-- `context`
-  - 回傳本輪檢索摘要與上下文資訊
-- `token`
-  - 逐 token 串流文字
-- `done`
-  - 串流結束與最終 metadata
-- `error`
-  - 生成失敗
-
 ## 8. API 一覽
 
 ### Core API
@@ -360,9 +345,7 @@ user input
 - `POST /brain/memories`
   - 寫入 memory
 - `POST /brain/chat`
-  - 一次性取得完整回答
-- `POST /brain/chat/stream`
-  - 以 SSE 串流回答
+  - 取得完整回答（含 tool call 執行結果）
 - `GET /brain/chat/history`
   - 讀取當前 session history
 
@@ -419,7 +402,7 @@ PORT=8787
 
 BRAIN_LLM_PROVIDER=gemini
 BRAIN_LLM_API_KEY=
-BRAIN_LLM_MODEL=gemini-2.0-flash
+BRAIN_LLM_MODEL=gemini-3.1-flash-lite-preview
 
 EMBEDDING_MODEL=BAAI/bge-m3
 EMBEDDING_USE_FP16=true

@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  streamChat,
+  fetchChat,
+  fetchChatHistory,
   type ActionRequest,
   type ChatMessage as ChatMessageType,
   type RetrievalResult,
 } from "../api";
 import {
   addPendingExchange,
-  appendStreamingToken,
   getConversationTitle,
   removeEmptyAssistantDraft,
   starterPrompts,
 } from "../components/chat/helpers";
+import {
+  readPrivacyWarningsVisible,
+  writePrivacyWarningsVisible,
+} from "../components/chat/privacyWarnings";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 import { useVad } from "./useVad";
 import { useTts } from "./useTts";
@@ -28,7 +32,36 @@ type ChatResultPayload = {
   knowledge_results: RetrievalResult[];
   memory_results: RetrievalResult[];
   history?: ChatMessageType[];
+  tool_steps?: import("../api/chat").ToolStep[];
+  response_time_s?: number;
+  pii_pending?: boolean;
 };
+
+const PII_POLL_INTERVAL_MS = 2000;
+const PII_POLL_TIMEOUT_MS = 10000;
+
+async function pollForReplyPiiWarning(
+  sessionId: string,
+  personaId: string,
+  applyHistory: (history: ChatMessageType[]) => void,
+): Promise<void> {
+  const deadline = performance.now() + PII_POLL_TIMEOUT_MS;
+  while (performance.now() < deadline) {
+    await new Promise((r) => setTimeout(r, PII_POLL_INTERVAL_MS));
+    try {
+      const { history } = await fetchChatHistory(sessionId, personaId);
+      const reversed = [...history].reverse();
+      const lastAssistant = reversed.find((m) => m.role === "assistant");
+      const lastUser = reversed.find((m) => m.role === "user");
+      if (lastAssistant?.privacy_warning || lastUser?.privacy_warning) {
+        applyHistory(history);
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
+}
 
 function getLastAssistantActions(messages: ChatMessageType[]): ActionRequest[] | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -56,8 +89,8 @@ function applyChatResultToMessages(
       }
 
       history[index] = pendingActions
-        ? { ...message, sources, action_requests: pendingActions }
-        : { ...message, sources };
+        ? { ...message, sources, action_requests: pendingActions, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
+        : { ...message, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s };
       break;
     }
     return history;
@@ -69,7 +102,7 @@ function applyChatResultToMessages(
 
   return current.map((message, index) => (
     index === current.length - 1 && message.role === "assistant"
-      ? { ...message, content: payload.reply, sources }
+      ? { ...message, content: payload.reply, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
       : message
   ));
 }
@@ -114,6 +147,7 @@ function appendActionRequestToLastAssistant(
 export function useChatSession() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [privacyWarningsVisible, setPrivacyWarningsVisible] = useState(() => readPrivacyWarningsVisible());
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const stopReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -184,6 +218,10 @@ export function useChatSession() {
     abortControllerRef.current?.abort();
   }, []);
 
+  useEffect(() => {
+    writePrivacyWarningsVisible(privacyWarningsVisible);
+  }, [privacyWarningsVisible]);
+
   // --- ASR & VAD ---
   const asrBaseRef = useRef("");
   const { listening: asrListening, supported: asrSupported, toggle: toggleAsr, restart: restartAsr } = useSpeechRecognition(
@@ -219,7 +257,7 @@ export function useChatSession() {
   // --- Coordination ---
   const conversationTitle = getConversationTitle(loadingHistory, sending);
   const conversationStatus = sending
-    ? `streaming · ${selectedPersonaId}`
+    ? `thinking · ${selectedPersonaId}`
     : `${messages.length} messages · ${selectedPersonaId}`;
 
   const clearStopReplyTimer = useCallback(() => {
@@ -269,40 +307,57 @@ export function useChatSession() {
     abortControllerRef.current = controller;
 
     const userTimestamp = new Date().toISOString();
+    const submitTime = performance.now();
     setMessages((current) => addPendingExchange(current, nextMessage, userTimestamp));
     pushHistory(nextMessage);
     setInput("");
 
     try {
-      await streamChat(
+      const payload = await fetchChat(
         nextMessage,
         selectedPersonaId,
         sessionId || undefined,
-        {
-          onSession: (payload) => {
-            if (!sessionId) {
-              persistSessionId(payload.session_id);
-              loadSessions();
-            }
-          },
-          onToken: ({ token }) => setMessages((current) => appendStreamingToken(current, token)),
-          onTool: ({ name, result }) => {
-            const request = parseActionRequestResult(name, result);
-            if (request) {
-              setMessages((current) => appendActionRequestToLastAssistant(current, request));
-            }
-          },
-          onDone: (payload) => {
-            applyChatResult(payload);
-            setSending(false);
-          },
-          onError: ({ message }) => {
-            clearStopReplyTimer();
-            setError(message);
-          },
-        },
         controller.signal,
       );
+      const response_time_s = Math.round((performance.now() - submitTime) / 10) / 100;
+
+      if (!sessionId) {
+        persistSessionId(payload.session_id);
+        loadSessions();
+      }
+
+      for (const step of payload.tool_steps ?? []) {
+        const request = parseActionRequestResult(step.name, step.result ?? "");
+        if (request) {
+          setMessages((current) => appendActionRequestToLastAssistant(current, request));
+        }
+      }
+
+      applyChatResult({ ...payload, response_time_s });
+
+      if (payload.pii_pending && payload.session_id) {
+        void pollForReplyPiiWarning(
+          payload.session_id,
+          selectedPersonaId,
+          (history) => setMessages((current) => {
+            const merged = [...history];
+            // Preserve sources / action_requests / tool_steps that the chat response
+            // already attached to the latest assistant — history endpoint may lack them.
+            const last = current[current.length - 1];
+            if (last?.role === "assistant" && merged.length > 0) {
+              const idx = merged.length - 1;
+              merged[idx] = {
+                ...merged[idx],
+                sources: last.sources ?? merged[idx].sources,
+                action_requests: last.action_requests ?? merged[idx].action_requests,
+                tool_steps: last.tool_steps ?? merged[idx].tool_steps,
+                response_time_s: last.response_time_s ?? merged[idx].response_time_s,
+              };
+            }
+            return merged;
+          }),
+        );
+      }
     } catch (reason) {
       if (controller.signal.aborted) {
         showStoppedReplyNotice();
@@ -365,6 +420,7 @@ export function useChatSession() {
     clampedSlashIndex,
     conversationTitle,
     conversationStatus,
+    privacyWarningsVisible,
     sessions,
     loadingSessions,
     deleteSessionTarget,
@@ -374,6 +430,7 @@ export function useChatSession() {
     setSlashIndex,
     setSlashOpen,
     setError,
+    setPrivacyWarningsVisible,
     setTtsFallbackToast,
     handleInputChange,
     onHistoryKeyDown,

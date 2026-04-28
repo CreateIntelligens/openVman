@@ -70,9 +70,12 @@ def build_chat_messages(
         workspace_blocks.insert(0, recall_block)
 
     tool_instructions = (
-        "你可以使用 search_knowledge 和 search_memory 工具來查詢知識庫和記憶，請在需要時主動呼叫。"
-        "當使用者要求你記住某事、或對話中出現值得長期保留的偏好/事實/指令時，使用 save_memory 工具儲存。"
-        "儲存時用簡潔的陳述句（如「使用者是男生」），不要儲存閒聊或普通問題。"
+        "你可以使用以下工具：\n"
+        "- search_knowledge、search_memory：查詢知識庫和記憶，需要時主動呼叫。\n"
+        "- save_memory：當使用者要求記住某事、或出現值得長期保留的偏好/事實/指令時使用，用簡潔陳述句儲存，不要儲存閒聊。\n"
+        "- 其他已啟用的技能工具（如 joke:get_joke、weather:get_current_weather 等）：使用者明確要求時可直接呼叫。\n"
+        "CRITICAL: Never write tool calls as plain text (e.g., search_memory(...)) in your reply content. "
+        "Always use the function-calling API. If you have no more tools to call, reply in natural language only."
         if allow_tools
         else (
             "你目前沒有任何可用的工具。"
@@ -83,6 +86,7 @@ def build_chat_messages(
     )
     answer_rules = (
         "回答規則：如果資訊不足，先嘗試使用工具搜尋；若仍不足，直接說明缺少什麼；若問題涉及流程，給出清楚下一步；除非使用者要求，否則用繁體中文。"
+        "禁止在回答中說「根據記憶」、「根據知識庫」、「根據搜尋結果」、「記憶顯示」、「知識庫顯示」等來源標記語言；直接陳述答案即可。"
         if allow_tools
         else "回答規則：直接根據目前對話回答；如果資訊不足，直接說明缺少什麼；若問題涉及流程，給出清楚下一步；除非使用者要求，否則用繁體中文。"
     )

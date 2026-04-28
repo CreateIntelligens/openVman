@@ -36,9 +36,13 @@ FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runner
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3.11-distutils libpython3.11 \
-    libstdc++6 libgomp1 zlib1g && \
+ENV TZ=Asia/Taipei
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    python3.11 python3.11-dev python3.11-distutils libpython3.11 \
+    libstdc++6 libgomp1 zlib1g tzdata \
+    gcc libc6-dev && \
     ln -sf /usr/bin/python3.11 /usr/bin/python && \
     ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
     rm -rf /var/lib/apt/lists/*
@@ -53,6 +57,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 RUN groupadd -g 1000 appuser && useradd -u 1000 -g 1000 -m appuser \
     && mkdir -p /home/appuser/.cache/huggingface \
     && mkdir -p /home/appuser/.opf \
+    && mkdir -p /home/appuser/.triton \
     && chown -R 1000:1000 /home/appuser
 
 EXPOSE 8100

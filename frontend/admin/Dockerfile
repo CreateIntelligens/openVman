@@ -1,6 +1,7 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache nginx supervisor
+ENV TZ=Asia/Taipei
+RUN apk add --no-cache tzdata nginx supervisor
 WORKDIR /app
 
 COPY package*.json ./

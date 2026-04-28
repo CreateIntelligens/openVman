@@ -104,48 +104,36 @@ class IndexTTS:
         self.gr_progress = None
 
     def remove_long_silence(self, codes: torch.Tensor, latent: torch.Tensor, silent_token=52, max_consecutive=30):
-        code_lens = []
         codes_list = []
-        device = codes.device
-        dtype = codes.dtype
+        device, dtype = codes.device, codes.dtype
         isfix = False
-        for i in range(0, codes.shape[0]):
+        
+        for i in range(codes.shape[0]):
             code = codes[i]
-            if self.cfg.gpt.stop_mel_token not in code:
-                code_lens.append(len(code))
-                len_ = len(code)
+            if self.stop_mel_token in code:
+                len_ = (code == self.stop_mel_token).nonzero(as_tuple=False)[0].item() - 1
             else:
-                # len_ = code.cpu().tolist().index(8193)+1
-                len_ = (code == self.stop_mel_token).nonzero(as_tuple=False)[0] + 1
-                len_ = len_ - 2
+                len_ = len(code)
 
-            count = torch.sum(code == silent_token).item()
-            if count > max_consecutive:
-                code = code.cpu().tolist()
+            if torch.sum(code == silent_token).item() > max_consecutive:
+                code_l = code.cpu().tolist()
                 ncode = []
                 n = 0
-                for k in range(0, len_):
-                    if code[k] != silent_token:
-                        ncode.append(code[k])
+                for k in range(len_):
+                    if code_l[k] != silent_token:
+                        ncode.append(code_l[k])
                         n = 0
-                    elif code[k] == silent_token and n < 10:
-                        ncode.append(code[k])
+                    elif n < 10:
+                        ncode.append(code_l[k])
                         n += 1
-                    # if (k == 0 and code[k] == 52) or (code[k] == 52 and code[k-1] == 52):
-                    #    n += 1
-                len_ = len(ncode)
-                ncode = torch.LongTensor(ncode)
-                codes_list.append(ncode.to(device, dtype=dtype))
+                
+                codes_list.append(torch.LongTensor(ncode).to(device, dtype=dtype))
                 isfix = True
-                # codes[i] = self.stop_mel_token
-                # codes[i, 0:len_] = ncode
             else:
-                codes_list.append(codes[i])
-            code_lens.append(len_)
+                codes_list.append(code)
 
         codes = pad_sequence(codes_list, batch_first=True) if isfix else codes[:, :-2]
-        code_lens = torch.LongTensor(code_lens).to(device, dtype=dtype)
-        return codes, code_lens
+        return codes, None # code_lens not used by caller
 
     def _set_gr_progress(self, value, desc):
         if self.gr_progress is not None:
@@ -155,113 +143,53 @@ class IndexTTS:
     def infer(self, audio_prompt, text, output_path, verbose=False):
         print(">> start inference...")
         self._set_gr_progress(0, "start inference...")
-        if verbose:
-            print(f"origin text:{text}")
         start_time = time.perf_counter()
 
-        # 如果参考音频改变了，才需要重新生成 cond_mel, 提升速度
+        # Cond mel cache
         if self.cache_cond_mel is None or self.cache_audio_prompt != audio_prompt:
             audio, sr = torchaudio.load(audio_prompt)
             audio = torch.mean(audio, dim=0, keepdim=True)
-            if audio.shape[0] > 1:
-                audio = audio[0].unsqueeze(0)
             audio = torchaudio.transforms.Resample(sr, 24000)(audio)
             cond_mel = MelSpectrogramFeatures()(audio).to(self.device)
-            cond_mel_frame = cond_mel.shape[-1]
-            if verbose:
-                print(f"cond_mel shape: {cond_mel.shape}", "dtype:", cond_mel.dtype)
-
             self.cache_audio_prompt = audio_prompt
             self.cache_cond_mel = cond_mel
         else:
             cond_mel = self.cache_cond_mel
-            cond_mel_frame = cond_mel.shape[-1]
-            pass
 
-        auto_conditioning = cond_mel
+        cond_mel_frame = cond_mel.shape[-1]
         text_tokens_list = self.tokenizer.tokenize(text)
         sentences = self.tokenizer.split_sentences(text_tokens_list)
-        if verbose:
-            print("text token count:", len(text_tokens_list))
-            print("sentences count:", len(sentences))
-            print(*sentences, sep="\n")
-        top_p = 0.8
-        top_k = 30
-        temperature = 1.0
-        autoregressive_batch_size = 1
-        length_penalty = 0.0
-        num_beams = 1
-        repetition_penalty = 10.0
-        max_mel_tokens = 600
-        sampling_rate = 24000
-        # lang = "EN"
-        # lang = "ZH"
+        
         wavs = []
         gpt_gen_time = 0
         bigvgan_time = 0
+        sampling_rate = 24000
 
         speech_conditioning_latent = self.gpt.get_conditioning(
-            auto_conditioning.half(),
-            torch.tensor([auto_conditioning.shape[-1]], device=self.device)
+            cond_mel.half() if self.is_fp16 else cond_mel,
+            torch.tensor([cond_mel_frame], device=self.device)
         )
 
         for sent in sentences:
-            text_tokens = self.tokenizer.convert_tokens_to_ids(sent)
-            text_tokens = torch.tensor(text_tokens, dtype=torch.int32, device=self.device).unsqueeze(0)
-            # text_tokens = F.pad(text_tokens, (0, 1))  # This may not be necessary.
-            # text_tokens = F.pad(text_tokens, (1, 0), value=0)
-            # text_tokens = F.pad(text_tokens, (0, 1), value=1)
-            if verbose:
-                print(text_tokens)
-                print(f"text_tokens shape: {text_tokens.shape}, text_tokens type: {text_tokens.dtype}")
-                # debug tokenizer
-                text_token_syms = self.tokenizer.convert_ids_to_tokens(text_tokens[0].tolist())
-                print("text_token_syms is same as sentence tokens", text_token_syms == sent)
+            text_tokens = torch.tensor(self.tokenizer.convert_tokens_to_ids(sent), dtype=torch.int32, device=self.device).unsqueeze(0)
 
-            # text_len = torch.IntTensor([text_tokens.size(1)], device=text_tokens.device)
-            # print(text_len)
-
-            m_start_time = time.perf_counter()
+            m_start = time.perf_counter()
             with torch.no_grad():
                 with torch.amp.autocast(text_tokens.device.type, enabled=self.dtype is not None, dtype=self.dtype):
-                    codes, latent = self.gpt.inference_speech(speech_conditioning_latent, text_tokens,
-                                                        cond_mel_lengths=torch.tensor([auto_conditioning.shape[-1]],
-                                                                                      device=text_tokens.device),
-                                                        # text_lengths=text_len,
-                                                        do_sample=True,
-                                                        top_p=top_p,
-                                                        top_k=top_k,
-                                                        temperature=temperature,
-                                                        num_return_sequences=autoregressive_batch_size,
-                                                        length_penalty=length_penalty,
-                                                        num_beams=num_beams,
-                                                        repetition_penalty=repetition_penalty,
-                                                        max_generate_length=max_mel_tokens)
-                gpt_gen_time += time.perf_counter() - m_start_time
+                    codes, latent = self.gpt.inference_speech(
+                        speech_conditioning_latent, text_tokens,
+                        cond_mel_lengths=torch.tensor([cond_mel_frame], device=self.device),
+                        do_sample=True, top_p=0.8, top_k=30, temperature=1.0,
+                        num_return_sequences=1, length_penalty=0.0, num_beams=1,
+                        repetition_penalty=10.0, max_generate_length=600
+                    )
+                gpt_gen_time += time.perf_counter() - m_start
                 
-                # code_lens = torch.tensor([codes.shape[-1]], device=codes.device, dtype=codes.dtype)
-                # if verbose:
-                #     print(codes, type(codes))
-                #     print(f"codes shape: {codes.shape}, codes type: {codes.dtype}")
-                #     print(f"code len: {code_lens}")
+                m_start = time.perf_counter()
+                wav, _ = self.bigvgan(latent, cond_mel.transpose(1, 2))
+                bigvgan_time += time.perf_counter() - m_start
+                wavs.append(torch.clamp(32767 * wav.squeeze(1), -32767.0, 32767.0).cpu())
 
-                # # remove ultra-long silence if exits
-                # # temporarily fix the long silence bug.
-                # codes, code_lens = self.remove_long_silence(codes, latent, silent_token=52, max_consecutive=30)
-                # if verbose:
-                #     print(codes, type(codes))
-                #     print(f"fix codes shape: {codes.shape}, codes type: {codes.dtype}")
-                #     print(f"code len: {code_lens}")
-
-                m_start_time = time.perf_counter()
-                wav, _ = self.bigvgan(latent, auto_conditioning.transpose(1, 2))
-                bigvgan_time += time.perf_counter() - m_start_time
-                wav = wav.squeeze(1)
-
-                wav = torch.clamp(32767 * wav, -32767.0, 32767.0)
-                print(f"wav shape: {wav.shape}", "min:", wav.min(), "max:", wav.max())
-                # wavs.append(wav[:, :-512])
-                wavs.append(wav.cpu())  # to cpu before saving
         end_time = time.perf_counter()
 
         wav = torch.cat(wavs, dim=1)
@@ -271,7 +199,7 @@ class IndexTTS:
         print(f">> bigvgan_time: {bigvgan_time:.2f} seconds")
         print(f">> Total inference time: {end_time - start_time:.2f} seconds")
         print(f">> Generated audio length: {wav_length:.2f} seconds")
-        print(f">> RTF: {(end_time - start_time) / wav_length:.4f}")
+        print(f">> RTF: {(end_time - start_time) / wav_length:.2f}")
 
         # save audio
         wav = wav.cpu()  # to cpu

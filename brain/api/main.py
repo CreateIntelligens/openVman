@@ -30,8 +30,62 @@ from routes.tools import router as tools_router
 from routes.workspace import router as workspace_router
 from safety.observability import get_metrics_store, log_event, log_exception
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    datefmt="%H:%M:%S",
+)
 logger = logging.getLogger("brain")
+
+_UVICORN_LOG_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "()": "uvicorn.logging.DefaultFormatter",
+            "fmt": "%(asctime)s %(levelprefix)s %(message)s",
+            "datefmt": "%H:%M:%S",
+            "use_colors": None,
+        },
+        "access": {
+            "()": "uvicorn.logging.AccessFormatter",
+            "fmt": '%(asctime)s %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+            "datefmt": "%H:%M:%S",
+        },
+    },
+    "handlers": {
+        "default": {"formatter": "default", "class": "logging.StreamHandler", "stream": "ext://sys.stderr"},
+        "access": {"formatter": "access", "class": "logging.StreamHandler", "stream": "ext://sys.stdout"},
+    },
+    "loggers": {
+        "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.error": {"level": "INFO"},
+        "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+    },
+}
+
+_ACCESS_LOG_SILENT_PATHS = frozenset({
+    "/brain/health",
+    "/brain/health/ready",
+    "/brain/health/detailed",
+    "/brain/metrics",
+    "/brain/metrics/prometheus",
+})
+
+
+class _SilentAccessPathsFilter(logging.Filter):
+    """Drop uvicorn access log lines for infra polling endpoints."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn access log: args = (client, method, path, http_version, status)
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        path = str(args[2]).split("?")[0]
+        return path not in _ACCESS_LOG_SILENT_PATHS
+
+
+logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())
 
 _OPENAPI_TAGS = [
     {"name": "System", "description": "Health, metrics, and identity endpoints."},
@@ -67,13 +121,17 @@ async def load_privacy_filter_if_enabled() -> None:
     if not get_settings().privacy_filter_enabled:
         return
 
-    from privacy.model import disable_privacy_filter, load_privacy_filter_model
+    from privacy.model import load_privacy_filter_model
 
     try:
         await asyncio.to_thread(load_privacy_filter_model)
     except Exception as exc:
-        logger.warning("Privacy Filter model load failed; disabling filter: %s", exc)
-        disable_privacy_filter(str(exc))
+        logger.warning("Privacy Filter GPU load failed; retrying on CPU: %s", exc)
+        from privacy.model import load_privacy_filter_model_cpu
+        try:
+            await asyncio.to_thread(load_privacy_filter_model_cpu)
+        except Exception as cpu_exc:
+            logger.warning("Privacy Filter CPU load also failed; regex fallback will be used: %s", cpu_exc)
 
 
 async def cancel_task(task: asyncio.Task[None] | None) -> None:
@@ -161,11 +219,12 @@ async def metrics_middleware(request: Request, call_next):
         duration_ms = round((perf_counter() - start) * 1000, 2)
         store.increment("http_requests_total", method=method, path=path, status=status)
         store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
-        log_event(
-            "http_request",
-            trace_id=trace_id, method=method, path=path,
-            status=status, duration_ms=duration_ms,
-        )
+        if path not in _ACCESS_LOG_SILENT_PATHS:
+            log_event(
+                "http_request",
+                trace_id=trace_id, method=method, path=path,
+                status=status, duration_ms=duration_ms,
+            )
 
     return response
 
@@ -179,4 +238,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=API_INTERNAL_PORT,
         reload=cfg.is_dev,
+        log_config=_UVICORN_LOG_CONFIG,
     )

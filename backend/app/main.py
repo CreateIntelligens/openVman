@@ -12,7 +12,7 @@ from time import monotonic
 import httpx
 from fastapi import FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
@@ -48,6 +48,51 @@ from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.service import TTSRouterService
 
 logger = logging.getLogger("backend")
+
+_UVICORN_LOG_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "()": "uvicorn.logging.DefaultFormatter",
+            "fmt": "%(asctime)s %(levelprefix)s %(message)s",
+            "datefmt": "%H:%M:%S",
+            "use_colors": None,
+        },
+        "access": {
+            "()": "uvicorn.logging.AccessFormatter",
+            "fmt": '%(asctime)s %(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+            "datefmt": "%H:%M:%S",
+        },
+    },
+    "handlers": {
+        "default": {"formatter": "default", "class": "logging.StreamHandler", "stream": "ext://sys.stderr"},
+        "access": {"formatter": "access", "class": "logging.StreamHandler", "stream": "ext://sys.stdout"},
+    },
+    "loggers": {
+        "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.error": {"level": "INFO"},
+        "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": False},
+    },
+}
+
+_ACCESS_LOG_SILENT_PATHS = frozenset({"/api/health", "/api/health/detailed", "/healthz"})
+
+
+class _SilentAccessPathsFilter(logging.Filter):
+    """Drop uvicorn access log lines for infra polling endpoints."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn access log: args = (client, method, path, http_version, status)
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        path = str(args[2]).split("?")[0]
+        return path not in _ACCESS_LOG_SILENT_PATHS
+
+
+logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())
+
 _service: TTSRouterService | None = None
 _md_converter: MarkItDown | None = None
 _health_http = SharedAsyncClient()
@@ -268,6 +313,54 @@ async def create_speech(body: SpeechRequest) -> Response:
     return Response(content=output.result.audio_bytes, media_type=output.result.content_type, headers=headers)
 
 
+class TtsStreamRequest(BaseModel):
+    text: str
+    character: str = ""
+
+
+@app.post("/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
+async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
+    cfg = get_tts_config()
+    cleaned = clean_for_tts(body.text.strip())
+    if not cleaned:
+        return JSONResponse(status_code=400, content={"error": "empty text"})
+
+    character = body.character or cfg.tts_indextts_default_character
+
+    # Primary: proxy stream directly from IndexTTS
+    if cfg.tts_indextts_url:
+        indextts_stream_url = cfg.tts_indextts_url.rstrip("/") + "/tts_stream"
+
+        async def _proxy_stream() -> AsyncIterator[bytes]:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
+                try:
+                    async with client.stream(
+                        "POST",
+                        indextts_stream_url,
+                        json={"text": cleaned, "character": character},
+                    ) as resp:
+                        if resp.status_code >= 400:
+                            logger.warning(
+                                "tts_stream indextts error status=%s", resp.status_code
+                            )
+                            return
+                        async for chunk in resp.aiter_bytes(chunk_size=4096):
+                            yield chunk
+                except Exception as exc:
+                    logger.error("tts_stream proxy error: %s", exc)
+
+        return StreamingResponse(_proxy_stream(), media_type="audio/wav")
+
+    # Fallback: buffer with service chain
+    svc = _get_service()
+    try:
+        output = svc.synthesize(SynthesizeRequest(text=cleaned, voice_hint=""))
+    except RuntimeError as exc:
+        return JSONResponse(status_code=502, content={"error": str(exc)})
+
+    return Response(content=output.result.audio_bytes, media_type=output.result.content_type)
+
+
 @app.post("/documents/convert", tags=["Documents"], summary="文件轉 Markdown")
 async def convert(file: UploadFile = File(...)) -> JSONResponse:
     suffix = os.path.splitext(file.filename or "")[1]
@@ -303,7 +396,13 @@ def run_server() -> None:
     import uvicorn
 
     cfg = get_tts_config()
-    uvicorn.run("app.main:app", host="0.0.0.0", port=cfg.backend_port, reload=cfg.is_dev)
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=cfg.backend_port,
+        reload=cfg.is_dev,
+        log_config=_UVICORN_LOG_CONFIG,
+    )
 
 
 if __name__ == "__main__":

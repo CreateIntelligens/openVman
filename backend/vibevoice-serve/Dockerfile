@@ -2,7 +2,11 @@ FROM nvcr.io/nvidia/pytorch:25.01-py3
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+ENV TZ=Asia/Taipei
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    tzdata \
     ffmpeg \
     git \
     && rm -rf /var/lib/apt/lists/*

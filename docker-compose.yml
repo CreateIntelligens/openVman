@@ -17,10 +17,12 @@ services:
       - ./contracts:/contracts:ro
       - hf-cache:/home/appuser/.cache/huggingface
       - opf-cache:/home/appuser/.opf
+      - triton-cache:/home/appuser/.triton
     env_file:
       - ./brain/.env
     environment:
       - HOME=/home/appuser
+      - OPF_MOE_TRITON=false
     deploy:
       resources:
         reservations:
@@ -90,6 +92,25 @@ services:
   #             count: 1
   #             capabilities: [gpu]
 
+  avatar:
+    <<: *shared
+    build:
+      context: ./frontend/app
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend/app:/app
+      - avatar-node-modules:/app/node_modules
+
+  avatar-typecheck:
+    <<: *shared
+    build:
+      context: ./frontend/app
+      dockerfile: Dockerfile
+    command: sh -lc "npm run type-check:watch"
+    volumes:
+      - ./frontend/app:/app
+      - avatar-node-modules:/app/node_modules
+
   admin:
     <<: *shared
     build:
@@ -106,6 +127,7 @@ services:
       - api
       - backend
       - index-tts-vllm
+      - avatar
 
   redis:
     <<: *shared
@@ -159,7 +181,9 @@ services:
 volumes:
   hf-cache:
   opf-cache:
+  triton-cache:
   admin-node-modules:
+  avatar-node-modules:
   redis-data:
   prometheus-data:
   grafana-data:

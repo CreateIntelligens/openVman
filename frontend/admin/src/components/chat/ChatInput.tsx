@@ -1,20 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import type { KeyboardEvent } from "react";
 
 import type { SkillInfo, TtsProvider } from "../../api";
 import { TtsControls } from "./TtsControls";
 import { SlashDropdown } from "./SlashDropdown";
 import { AsrButton } from "./AsrButton";
-
-const PII_WARNING_PATTERNS = [
-  /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/,
-  /\b(?:\+?\d[\d -]{7,}\d)\b/,
-  /\b(?:https?:\/\/[^\s]+|(?:\d{1,3}\.){3}\d{1,3})\b/,
-  /(?:password|api[_-]?key|token)\s*[:=]\s*\S+/i,
-] as const;
-
-function mayContainPersonalInfo(value: string) {
-  return PII_WARNING_PATTERNS.some((pattern) => pattern.test(value));
-}
+import PrivacyWarningToggle from "./PrivacyWarningToggle";
 
 interface ChatInputProps {
   mode: "text" | "live";
@@ -32,9 +22,10 @@ interface ChatInputProps {
   asrListening: boolean;
   asrSupported: boolean;
   vadSpeaking: boolean;
+  privacyWarningsVisible: boolean;
   onInputChange: (value: string) => void;
   onHistoryKeyDown?: (
-    event: React.KeyboardEvent<HTMLTextAreaElement>,
+    event: KeyboardEvent<HTMLTextAreaElement>,
     currentValue: string,
     setValue: (next: string) => void,
   ) => boolean;
@@ -48,6 +39,7 @@ interface ChatInputProps {
   onDismissError: () => void;
   onDismissFallbackToast: () => void;
   onToggleAsr: () => void;
+  onPrivacyWarningsVisibleChange: (visible: boolean) => void;
   liveWsState: "connecting" | "connected" | "disconnected";
   liveMicActive: boolean;
   onLiveToggleMic: () => void;
@@ -70,6 +62,7 @@ export default function ChatInput(props: ChatInputProps) {
     asrListening,
     asrSupported,
     vadSpeaking,
+    privacyWarningsVisible,
     onInputChange,
     onHistoryKeyDown,
     onSubmit,
@@ -82,6 +75,7 @@ export default function ChatInput(props: ChatInputProps) {
     onDismissError,
     onDismissFallbackToast,
     onToggleAsr,
+    onPrivacyWarningsVisibleChange,
     liveWsState,
     liveMicActive,
     onLiveToggleMic,
@@ -107,7 +101,6 @@ export default function ChatInput(props: ChatInputProps) {
     : "向 Brain 發送訊息...（輸入 / 查看指令）";
   const liveMicLabel = liveMicActive ? "錄音中" : "麥克風";
   const liveMicTitle = liveMicActive ? "停止錄音" : "開始語音輸入";
-  const [dismissedPrivacyWarningFor, setDismissedPrivacyWarningFor] = useState("");
   let liveMicButtonClassName = "cursor-not-allowed border border-border bg-surface-sunken text-content-subtle";
   if (liveMicActive) {
     liveMicButtonClassName = "bg-danger text-content-inverse hover:opacity-90";
@@ -115,17 +108,8 @@ export default function ChatInput(props: ChatInputProps) {
     liveMicButtonClassName = "border border-border bg-surface-raised text-content hover:bg-surface-sunken";
   }
   const hasSlashMatches = slashEnabled && slashOpen && slashMatches.length > 0;
-  const inputMayContainPii = useMemo(() => mayContainPersonalInfo(input), [input]);
-  const showPrivacyWarning = input.trim().length > 0
-    && inputMayContainPii
-    && dismissedPrivacyWarningFor !== input;
 
-  useEffect(() => {
-    if (!dismissedPrivacyWarningFor || inputMayContainPii) return;
-    setDismissedPrivacyWarningFor("");
-  }, [input, dismissedPrivacyWarningFor, inputMayContainPii]);
-
-  const handleSlashKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
+  const handleSlashKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (!hasSlashMatches) {
       return false;
     }
@@ -152,7 +136,7 @@ export default function ChatInput(props: ChatInputProps) {
     }
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       if (hasSlashMatches) {
@@ -197,21 +181,6 @@ export default function ChatInput(props: ChatInputProps) {
               </button>
             </div>
           )}
-          {showPrivacyWarning && (
-            <div className="flex items-center justify-between rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn backdrop-blur-md">
-              <span className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[1rem]">privacy_tip</span>
-                This message may contain personal information.
-              </span>
-              <button
-                onClick={() => setDismissedPrivacyWarningFor(input)}
-                className="hover:opacity-80"
-                aria-label="Dismiss privacy warning"
-              >
-                <span className="material-symbols-outlined text-[1rem]">close</span>
-              </button>
-            </div>
-          )}
         </div>
 
         <div className="relative flex flex-col rounded-xl border border-border bg-surface-raised shadow-xs transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
@@ -241,14 +210,20 @@ export default function ChatInput(props: ChatInputProps) {
           <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
             <div className="pointer-events-auto">
               {mode === "text" && (
-                <TtsControls
-                  ttsProviders={ttsProviders}
-                  ttsProvider={ttsProvider}
-                  ttsVoice={ttsVoice}
-                  activeTtsProvider={activeTtsProvider}
-                  onTtsProviderChange={onTtsProviderChange}
-                  onTtsVoiceChange={onTtsVoiceChange}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <TtsControls
+                    ttsProviders={ttsProviders}
+                    ttsProvider={ttsProvider}
+                    ttsVoice={ttsVoice}
+                    activeTtsProvider={activeTtsProvider}
+                    onTtsProviderChange={onTtsProviderChange}
+                    onTtsVoiceChange={onTtsVoiceChange}
+                  />
+                  <PrivacyWarningToggle
+                    visible={privacyWarningsVisible}
+                    onChange={onPrivacyWarningsVisibleChange}
+                  />
+                </div>
               )}
             </div>
             <div className="flex gap-2 pointer-events-auto">

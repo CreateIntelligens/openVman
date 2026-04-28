@@ -1,36 +1,29 @@
-"""Shared chat generation workflow for sync and streaming endpoints."""
+"""Chat generation workflow."""
 
 from __future__ import annotations
 
 import asyncio
-import inspect
-from collections.abc import AsyncIterator
+import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
 from config import get_settings
-from core.agent_loop import AgentLoopResult, ToolPhaseError, prepare_agent_reply, run_agent_loop
-from core.llm_client import generate_chat_reply, stream_chat_reply
+from core.agent_loop import AgentLoopResult, ToolPhaseError, run_agent_loop  # noqa: F401 (ToolPhaseError re-exported)
+from core.llm_client import LLMReply, generate_chat_turn
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
-from core.sse_events import (
-    ContextEvent,
-    DoneEvent,
-    SessionEvent,
-    SSEEvent,
-    TokenEvent,
-    ToolErrorEvent,
-    ToolEvent,
-)
 from infra.learnings import record_error_event
 from memory.memory import (
-    append_session_message,
+    append_session_message_with_id,
     archive_session_turn,
     get_or_create_session,
     list_session_messages,
+    update_session_message_metadata,
 )
 from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
+from privacy.filter import PiiDetectionReport, detect_llm_messages_pii
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
     MessageEnvelope,
@@ -39,7 +32,10 @@ from protocol.message_envelope import (
     serialize_context,
 )
 from safety.guardrails import enforce_guardrails, enforce_session_limits
-from tools.tool_executor import parse_tool_result
+
+_pii_writeback_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-writeback")
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -53,6 +49,7 @@ class GenerationContext:
     request_context: dict[str, Any]
     prompt_messages: list[dict[str, str]]
     prior_messages: list[dict[str, Any]] = field(default_factory=list)
+    forced_tool_name: str | None = None
 
 
 def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
@@ -77,7 +74,6 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     route = route_message(normalize_to_brain_message(envelope))
     session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
     prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
-    append_session_message(session.session_id, persona_id, "user", stored_user_message, project_id=project_id)
 
     request_ctx = serialize_context(envelope.context)
     prompt_messages = build_chat_messages(
@@ -97,16 +93,132 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         request_context=request_ctx,
         prompt_messages=prompt_messages,
         prior_messages=prior_messages,
+        forced_tool_name=route.forced_tool_name,
     )
 
 
-def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any]:
-    """Persist the assistant reply and return the standard API payload."""
+def _serialize_history_message(msg: dict[str, Any]) -> dict[str, Any]:
+    entry: dict[str, Any] = {"role": msg["role"], "content": msg["content"]}
+    msg_meta = msg.get("metadata") or {}
+    if steps := msg_meta.get("tool_steps"):
+        entry["tool_steps"] = steps
+    if rts := msg_meta.get("response_time_s"):
+        entry["response_time_s"] = rts
+    if pw := msg_meta.get("privacy_warning"):
+        entry["privacy_warning"] = pw
+    return entry
+
+
+def _pii_to_warning(report: PiiDetectionReport | None) -> dict[str, Any] | None:
+    if report is None or not report.counts:
+        return None
+    return {"categories": list(report.categories), "counts": dict(report.counts)}
+
+
+def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> None:
+    """Run memory governance off the request hot path."""
+    persona_id = context.persona_id
+    project_id = context.project_id
+    session_id = context.session_id
+    user_message = context.user_message
+    day = date.today().isoformat()
+    summary_text = f"User: {user_message}\nAssistant: {cleaned_reply}"
+
+    def _work() -> None:
+        try:
+            write_summary_and_reindex(
+                persona_id=persona_id,
+                day=day,
+                summary_text=summary_text,
+                source_turns=1,
+                session_id=session_id,
+                project_id=project_id,
+            )
+            maybe_run_memory_maintenance(project_id=project_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("background memory write failed project=%s: %s", project_id, exc)
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.run_in_executor(None, _work)
+    except RuntimeError:
+        # No running loop (sync test path); execute inline.
+        _work()
+
+
+def _scan_reply_pii(reply: str, trace_id: str) -> dict[str, Any] | None:
+    """Run OPF on a reply and return the warning dict (or None)."""
+    try:
+        report = detect_llm_messages_pii(
+            [{"role": "user", "content": reply}],
+            source="chat",
+            trace_id=trace_id,
+        )
+        return _pii_to_warning(report)
+    except Exception:
+        logger.exception("[privacy] reply PII scan failed")
+        return None
+
+
+def _patch_reply_pii_metadata(
+    future: Any, message_id: int, project_id: str,
+) -> None:
+    """Background task: wait for PII scan and write the warning to DB."""
+    try:
+        warning = future.result()
+        if warning:
+            update_session_message_metadata(
+                message_id, {"privacy_warning": warning}, project_id=project_id,
+            )
+    except Exception:
+        logger.exception("[privacy] reply PII writeback failed")
+
+
+def finalize_generation(
+    context: GenerationContext,
+    reply: str,
+    tool_steps: list[dict[str, Any]] | None = None,
+    response_time_s: float | None = None,
+) -> dict[str, Any]:
+    """Persist the assistant reply and return the standard API payload.
+
+    Memory governance (summary/reindex/maintenance) is dispatched to a background
+    thread so it does not block the response.
+    """
     cleaned_reply = reply.strip()
     if not cleaned_reply:
         raise ValueError("LLM 沒有回傳內容")
 
-    append_session_message(context.session_id, context.persona_id, "assistant", cleaned_reply, project_id=context.project_id)
+    # Run user + reply PII scans in the background so they don't block the response.
+    user_pii_future = _pii_writeback_executor.submit(
+        _scan_reply_pii, context.user_message, context.trace_id,
+    )
+    reply_pii_future = _pii_writeback_executor.submit(
+        _scan_reply_pii, cleaned_reply, context.trace_id,
+    )
+
+    _, user_message_id = append_session_message_with_id(
+        context.session_id, context.persona_id, "user", context.user_message,
+        project_id=context.project_id,
+    )
+    _pii_writeback_executor.submit(
+        _patch_reply_pii_metadata,
+        user_pii_future, user_message_id, context.project_id,
+    )
+
+    meta: dict[str, Any] = {}
+    if tool_steps:
+        meta["tool_steps"] = tool_steps
+    if response_time_s is not None:
+        meta["response_time_s"] = response_time_s
+    _, assistant_message_id = append_session_message_with_id(
+        context.session_id, context.persona_id, "assistant", cleaned_reply,
+        project_id=context.project_id, metadata=meta or None,
+    )
+    _pii_writeback_executor.submit(
+        _patch_reply_pii_metadata,
+        reply_pii_future, assistant_message_id, context.project_id,
+    )
     archive_session_turn(
         context.session_id,
         context.user_message,
@@ -114,24 +226,29 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         context.persona_id,
         project_id=context.project_id,
     )
-    write_summary_and_reindex(
-        persona_id=context.persona_id,
-        day=date.today().isoformat(),
-        summary_text=f"User: {context.user_message}\nAssistant: {cleaned_reply}",
-        source_turns=1,
-        session_id=context.session_id,
-        project_id=context.project_id,
-    )
+    _schedule_memory_writes(context, cleaned_reply)
 
-    # Memory is now written by the LLM via the save_memory tool —
-    # no automatic per-turn memory write here.
-    maintenance = maybe_run_memory_maintenance(project_id=context.project_id)
-
-    history = [
-        *context.prior_messages,
-        {"role": "user", "content": context.user_message},
-        {"role": "assistant", "content": cleaned_reply},
-    ]
+    history = [_serialize_history_message(msg) for msg in context.prior_messages]
+    user_entry: dict[str, Any] = {"role": "user", "content": context.user_message}
+    # Opportunistic: include user/reply warnings if scans finished in time.
+    pii_pending = False
+    if user_pii_future.done():
+        if (warning := user_pii_future.result()) is not None:
+            user_entry["privacy_warning"] = warning
+    else:
+        pii_pending = True
+    history.append(user_entry)
+    assistant_entry: dict[str, Any] = {"role": "assistant", "content": cleaned_reply}
+    if reply_pii_future.done():
+        if (warning := reply_pii_future.result()) is not None:
+            assistant_entry["privacy_warning"] = warning
+    else:
+        pii_pending = True
+    if tool_steps:
+        assistant_entry["tool_steps"] = tool_steps
+    if response_time_s is not None:
+        assistant_entry["response_time_s"] = response_time_s
+    history.append(assistant_entry)
     return {
         "status": "ok",
         "trace_id": context.trace_id,
@@ -139,23 +256,8 @@ def finalize_generation(context: GenerationContext, reply: str) -> dict[str, Any
         "request_context": context.request_context,
         "reply": cleaned_reply,
         "history": history,
-        "memory_maintenance": maintenance,
+        "pii_pending": pii_pending,
     }
-
-
-async def _finalize_generation_async(context: GenerationContext, reply: str) -> None:
-    """Persist a streamed reply without delaying the final SSE done event."""
-    try:
-        await asyncio.to_thread(finalize_generation, context, reply)
-    except Exception as exc:  # pragma: no cover - best effort after done
-        record_error_event(
-            area="chat_stream_finalize",
-            summary="failed to persist streamed reply",
-            detail=str(exc),
-        )
-
-
-_pending_finalize_tasks: set[asyncio.Task[None]] = set()
 
 
 _TOOL_FALLBACK_HINT = (
@@ -173,64 +275,16 @@ def _inject_tool_fallback_hint(messages: list[dict[str, Any]]) -> list[dict[str,
     return [*messages[:insert_idx], {"role": "system", "content": _TOOL_FALLBACK_HINT}, *messages[insert_idx:]]
 
 
-def _supports_keyword_argument(func: Any, name: str) -> bool:
-    try:
-        params = inspect.signature(func).parameters.values()
-    except (TypeError, ValueError):
-        return True
-    return any(param.kind is inspect.Parameter.VAR_KEYWORD or param.name == name for param in params)
-
-
 def _string_context_value(context: Any, name: str, default: str = "") -> str:
     value = getattr(context, name, default)
     return value if isinstance(value, str) else default
 
 
-def _generate_reply(
-    messages: list[dict[str, Any]],
-    *,
-    privacy_source: str,
-    trace_id: str,
-) -> str:
-    kwargs: dict[str, Any] = {}
-    if _supports_keyword_argument(generate_chat_reply, "privacy_source"):
-        kwargs["privacy_source"] = privacy_source
-    if trace_id and _supports_keyword_argument(generate_chat_reply, "trace_id"):
-        kwargs["trace_id"] = trace_id
-    return generate_chat_reply(messages, **kwargs)
-
-
-async def _stream_reply(
-    messages: list[dict[str, Any]],
-    *,
-    privacy_source: str,
-    trace_id: str,
-) -> AsyncIterator[str]:
-    kwargs: dict[str, Any] = {}
-    if _supports_keyword_argument(stream_chat_reply, "privacy_source"):
-        kwargs["privacy_source"] = privacy_source
-    if trace_id and _supports_keyword_argument(stream_chat_reply, "trace_id"):
-        kwargs["trace_id"] = trace_id
-    async for token in stream_chat_reply(messages, **kwargs):
-        yield token
-
-
-def _tool_error_event_from_phase_error(trace_id: str, exc: ToolPhaseError) -> ToolErrorEvent:
-    last_step = exc.partial_steps[-1] if exc.partial_steps else {}
-    status = "phase_error"
-    if last_step:
-        parsed = parse_tool_result(last_step.get("result", ""))
-        if parsed:
-            status = "timeout" if "逾時" in parsed.error else ("error" if parsed.status == "error" else "phase_error")
-
-    return ToolErrorEvent(
-        trace_id=trace_id,
-        error=str(exc),
-        partial_steps_count=len(exc.partial_steps),
-        tool_call_id=last_step.get("tool_call_id", ""),
-        name=last_step.get("name", ""),
-        status=status,
-    )
+def _reply_from_turn(turn: LLMReply) -> str:
+    reply = turn.content.strip()
+    if not reply:
+        raise ValueError("LLM 沒有回傳內容")
+    return reply
 
 
 def execute_generation(context: GenerationContext) -> AgentLoopResult:
@@ -239,116 +293,27 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
     project_id = _string_context_value(context, "project_id", "default")
 
     if context.route.skip_tools:
-        return AgentLoopResult(
-            reply=_generate_reply(
-                context.prompt_messages,
-                privacy_source="chat",
-                trace_id=trace_id,
-            ),
-            tool_steps=[],
+        turn = generate_chat_turn(
+            context.prompt_messages,
+            privacy_source="chat",
+            trace_id=trace_id,
         )
+        return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=[])
     try:
         return run_agent_loop(
             context.prompt_messages,
             persona_id=context.persona_id,
             project_id=project_id,
+            forced_tool_name=context.forced_tool_name,
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
-        return AgentLoopResult(
-            reply=_generate_reply(
-                fallback,
-                privacy_source="tool",
-                trace_id=trace_id,
-            ),
-            tool_steps=exc.partial_steps,
+        turn = generate_chat_turn(
+            fallback,
+            privacy_source="tool",
+            trace_id=trace_id,
         )
-
-
-def _tool_event_from_step(trace_id: str, step: dict[str, Any]) -> ToolEvent:
-    return ToolEvent(
-        trace_id=trace_id,
-        tool_call_id=step.get("tool_call_id", ""),
-        name=step.get("name", ""),
-        arguments=step.get("arguments", ""),
-        result=step.get("result", ""),
-    )
-
-
-async def stream_generation(context: GenerationContext) -> AsyncIterator[SSEEvent]:
-    """Stream a chat generation from prepared prompt context."""
-    trace_id = _string_context_value(context, "trace_id")
-    project_id = _string_context_value(context, "project_id", "default")
-
-    yield SessionEvent(session_id=context.session_id, trace_id=trace_id)
-
-    reply_parts: list[str] = []
-    tool_steps: list[dict[str, Any]] = []
-    stream_messages: list[dict[str, Any]] = context.prompt_messages
-
-    if not context.route.skip_tools:
-        try:
-            prepared = await asyncio.to_thread(
-                prepare_agent_reply,
-                context.prompt_messages,
-                context.persona_id,
-                project_id,
-            )
-            stream_messages = prepared.messages
-            tool_steps = prepared.tool_steps
-            for step in tool_steps:
-                yield _tool_event_from_step(trace_id, step)
-        except ToolPhaseError as exc:
-            tool_steps = exc.partial_steps
-            for step in tool_steps:
-                yield _tool_event_from_step(trace_id, step)
-            yield _tool_error_event_from_phase_error(trace_id, exc)
-            stream_messages = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)
-
-    # Emit context event after tool phase so counts reflect actual tool usage
-    knowledge_count, memory_count = _count_retrieval_from_tool_steps(tool_steps)
-    yield ContextEvent(
-        trace_id=trace_id,
-        knowledge_count=knowledge_count,
-        memory_count=memory_count,
-        request_context=context.request_context,
-    )
-
-    privacy_source = "tool" if tool_steps else "chat"
-    async for token in _stream_reply(
-        stream_messages,
-        privacy_source=privacy_source,
-        trace_id=trace_id,
-    ):
-        reply_parts.append(token)
-        yield TokenEvent(trace_id=trace_id, token=token)
-
-    full_reply = "".join(reply_parts)
-    task = asyncio.create_task(_finalize_generation_async(context, full_reply))
-    _pending_finalize_tasks.add(task)
-    task.add_done_callback(_pending_finalize_tasks.discard)
-    yield DoneEvent(
-        trace_id=trace_id,
-        session_id=context.session_id,
-        reply=full_reply,
-        knowledge_results=[],
-        memory_results=[],
-        tool_steps=tool_steps,
-    )
-
-
-def _count_retrieval_from_tool_steps(tool_steps: list[dict[str, Any]]) -> tuple[int, int]:
-    """Count knowledge and memory results from completed tool call steps."""
-    counts = {"search_knowledge": 0, "search_memory": 0}
-    for step in tool_steps:
-        name = step.get("name", "")
-        if name not in counts:
-            continue
-        parsed = parse_tool_result(step.get("result", ""))
-        if parsed and parsed.status == "ok":
-            counts[name] += len(parsed.data.get("results", []))
-    return counts["search_knowledge"], counts["search_memory"]
-
+        return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=exc.partial_steps)
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:

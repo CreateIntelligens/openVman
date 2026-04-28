@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 import logging
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Request
@@ -49,7 +50,6 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["DELETE"], "tags": _TAG_PERSONAS, "summary": "Delete Persona"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas/clone", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Clone Persona"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat"},
-    {"path": f"{_PUBLIC_API_PREFIX}/chat/stream", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat Stream"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat/history", "methods": ["GET"], "tags": _TAG_CHAT, "summary": "Chat History"},
     {"path": f"{_PUBLIC_API_PREFIX}/embed", "methods": ["POST"], "tags": _TAG_SEARCH, "summary": "Embed Text"},
     {"path": f"{_PUBLIC_API_PREFIX}/search", "methods": ["POST"], "tags": _TAG_SEARCH, "summary": "Search"},
@@ -95,7 +95,7 @@ _HOP_BY_HOP = frozenset({
 _http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
 
 
-def _filter_headers(headers: httpx.Headers | dict) -> dict[str, str]:
+def _filter_headers(headers: httpx.Headers | dict | Any) -> dict[str, str]:
     return {
         k: v
         for k, v in headers.items()
@@ -144,6 +144,12 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
         logger.warning("brain upstream disconnected path=%s error=%s", path, exc)
         return JSONResponse(
             content={"error": "brain upstream disconnected"},
+            status_code=502,
+        )
+    except httpx.ReadError as exc:
+        logger.warning("brain upstream read error path=%s error=%s", path, exc)
+        return JSONResponse(
+            content={"error": "brain upstream read error"},
             status_code=502,
         )
 

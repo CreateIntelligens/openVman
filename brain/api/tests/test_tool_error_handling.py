@@ -176,7 +176,8 @@ class TestToolPhaseError:
             content="", tool_calls=[fake_tool_call], model="test-model",
         )
 
-        monkeypatch.setattr(agent_loop, "generate_chat_turn", lambda msgs, tools=None: fake_turn)
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", lambda msgs, tools=None, **kw: fake_turn)
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", lambda msgs, tools=None, **kw: fake_turn)
         monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
 
         fake_registry = MagicMock()
@@ -199,7 +200,7 @@ class TestToolPhaseError:
 
         call_count = 0
 
-        def fake_generate(msgs, tools=None):
+        def fake_generate(msgs, tools=None, **kw):
             nonlocal call_count
             call_count += 1
             return agent_loop.LLMReply(
@@ -210,6 +211,7 @@ class TestToolPhaseError:
                 model="test-model",
             )
 
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", fake_generate)
         monkeypatch.setattr(agent_loop, "generate_chat_turn", fake_generate)
         monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
 
@@ -230,13 +232,96 @@ class TestToolPhaseError:
 
 
 # ---------------------------------------------------------------------------
+# Step 5: stream_chat_turn iteration dispatch
+# ---------------------------------------------------------------------------
+
+class TestStreamChatTurnIterationDispatch:
+    def test_no_tool_message_uses_single_stream_call(self, monkeypatch: pytest.MonkeyPatch):
+        """Non-tool message: only stream_chat_turn called (iteration 0), no _generate_turn."""
+        agent_loop = _load_agent_loop(monkeypatch)
+
+        text_turn = agent_loop.LLMReply(content="hello", tool_calls=[], model="m1")
+
+        stream_calls: list[int] = []
+        generate_calls: list[int] = []
+
+        def fake_stream(msgs, tools=None, **kw):
+            stream_calls.append(1)
+            return text_turn
+
+        def fake_generate(msgs, tools=None, **kw):
+            generate_calls.append(1)
+            return text_turn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", fake_stream)
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", fake_generate)
+        monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
+
+        fake_registry = MagicMock()
+        fake_registry.build_openai_tools.return_value = []
+        monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+
+        fake_cfg = MagicMock()
+        fake_cfg.agent_loop_max_rounds = 3
+        monkeypatch.setattr(agent_loop, "get_settings", lambda: fake_cfg)
+
+        result = agent_loop.run_agent_loop([{"role": "user", "content": "早安"}])
+
+        assert result.reply == "hello"
+        assert len(stream_calls) == 1
+        assert len(generate_calls) == 0
+
+    def test_tool_use_message_uses_stream_then_generate(self, monkeypatch: pytest.MonkeyPatch):
+        """Tool-use: stream_chat_turn on iteration 0, _generate_turn on iteration 1."""
+        agent_loop = _load_agent_loop(monkeypatch)
+
+        tool_turn = agent_loop.LLMReply(
+            content="",
+            tool_calls=[agent_loop.LLMToolCall(id="c1", name="do_thing", arguments="{}", extra_content=None)],
+            model="m1",
+        )
+        text_turn = agent_loop.LLMReply(content="done", tool_calls=[], model="m1")
+
+        stream_calls: list[int] = []
+        generate_calls: list[int] = []
+
+        def fake_stream(msgs, tools=None, **kw):
+            stream_calls.append(1)
+            return tool_turn
+
+        def fake_generate(msgs, tools=None, **kw):
+            generate_calls.append(1)
+            return text_turn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", fake_stream)
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", fake_generate)
+        monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"do_thing","data":{},"error":""}')
+
+        fake_registry = MagicMock()
+        fake_registry.build_openai_tools.return_value = []
+        monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+
+        fake_cfg = MagicMock()
+        fake_cfg.agent_loop_max_rounds = 3
+        monkeypatch.setattr(agent_loop, "get_settings", lambda: fake_cfg)
+
+        result = agent_loop.run_agent_loop([{"role": "user", "content": "do something"}])
+
+        assert result.reply == "done"
+        assert len(stream_calls) == 1
+        assert len(generate_calls) == 1
+
+
+# ---------------------------------------------------------------------------
 # Step 3: ToolErrorEvent
 # ---------------------------------------------------------------------------
 
 class TestToolErrorEvent:
-    def test_tool_error_event_frozen_and_serializes(self):
-        """ToolErrorEvent frozen + sse_event_to_dict 正確"""
-        from core.sse_events import ToolErrorEvent, sse_event_to_dict
+    def test_tool_error_event_frozen(self):
+        """ToolErrorEvent is frozen dataclass"""
+        from core.sse_events import ToolErrorEvent
 
         evt = ToolErrorEvent(
             trace_id="t1",
@@ -247,18 +332,12 @@ class TestToolErrorEvent:
             status="timeout",
         )
 
+        assert evt.trace_id == "t1"
+        assert evt.error == "boom"
+        assert evt.status == "timeout"
+
         with pytest.raises(AttributeError):
             evt.error = "other"  # type: ignore[misc]
-
-        result = sse_event_to_dict(evt)
-        assert result["event"] == "tool_error"
-        assert result["id"] == "t1"
-        data = json.loads(result["data"])
-        assert data["error"] == "boom"
-        assert data["partial_steps_count"] == 2
-        assert data["tool_call_id"] == "call_1"
-        assert data["name"] == "query_order"
-        assert data["status"] == "timeout"
 
 
 # ---------------------------------------------------------------------------
@@ -309,8 +388,16 @@ class TestGracefulDegradation:
         seen_messages: list[dict[str, Any]] = []
         monkeypatch.setattr(
             chat_service,
-            "generate_chat_reply",
-            lambda msgs: (seen_messages.extend(msgs), "fallback answer")[1],
+            "generate_chat_turn",
+            lambda msgs, **kwargs: (
+                seen_messages.extend(msgs),
+                types.SimpleNamespace(
+                    content="fallback answer",
+                    tool_calls=[],
+                    model="test-model",
+                    pii_report=None,
+                ),
+            )[1],
         )
 
         fake_route = MagicMock()
@@ -328,117 +415,3 @@ class TestGracefulDegradation:
         assert any(message.get("role") == "tool" for message in seen_messages)
         assert any("工具流程部分失敗" in str(message.get("content", "")) for message in seen_messages)
 
-    def test_stream_generation_yields_tool_error_event_on_failure(self, monkeypatch: pytest.MonkeyPatch):
-        """prepare_agent_reply raise → ToolErrorEvent + 繼續 stream"""
-        chat_service = _stub_heavy_modules(monkeypatch)
-        ToolPhaseError = chat_service.ToolPhaseError
-        from core.sse_events import DoneEvent, ToolErrorEvent, TokenEvent
-
-        partial = [{"tool_call_id": "c1", "name": "t", "arguments": "{}", "result": "{}"}]
-        partial_messages = [
-            {"role": "user", "content": "hi"},
-            {"role": "assistant", "content": None, "tool_calls": []},
-            {"role": "tool", "tool_call_id": "c1", "name": "t", "content": "{}"},
-        ]
-
-        monkeypatch.setattr(
-            chat_service,
-            "prepare_agent_reply",
-            MagicMock(
-                side_effect=ToolPhaseError(
-                    "max rounds",
-                    partial_steps=partial,
-                    partial_messages=partial_messages,
-                )
-            ),
-        )
-
-        async def immediate_to_thread(func, /, *args, **kwargs):
-            return func(*args, **kwargs)
-
-        seen_stream_messages: list[dict[str, Any]] = []
-
-        async def fake_stream(msgs):
-            seen_stream_messages.extend(msgs)
-            for token in ["fall", "back"]:
-                yield token
-
-        monkeypatch.setattr(chat_service.asyncio, "to_thread", immediate_to_thread)
-        monkeypatch.setattr(chat_service, "stream_chat_reply", fake_stream)
-        monkeypatch.setattr(chat_service, "finalize_generation", lambda ctx, reply: None)
-
-        fake_route = MagicMock()
-        fake_route.skip_tools = False
-
-        ctx = MagicMock()
-        ctx.route = fake_route
-        ctx.prompt_messages = [{"role": "user", "content": "hi"}]
-        ctx.persona_id = "default"
-        ctx.trace_id = "trace1"
-        ctx.session_id = "sess1"
-        ctx.request_context = {}
-
-        async def collect():
-            events = []
-            async for evt in chat_service.stream_generation(ctx):
-                events.append(evt)
-            return events
-
-        events = asyncio.run(collect())
-
-        event_types = [type(e).__name__ for e in events]
-        assert "ToolErrorEvent" in event_types
-        assert "TokenEvent" in event_types
-        assert "DoneEvent" in event_types
-        assert "ToolEvent" in event_types
-        assert any(message.get("role") == "tool" for message in seen_stream_messages)
-        tool_error_event = next(evt for evt in events if type(evt).__name__ == "ToolErrorEvent")
-        assert tool_error_event.tool_call_id == "c1"
-        assert tool_error_event.name == "t"
-
-    def test_stream_generation_continues_after_tool_error(self, monkeypatch: pytest.MonkeyPatch):
-        """tool phase 失敗後仍有 token + done events"""
-        chat_service = _stub_heavy_modules(monkeypatch)
-        ToolPhaseError = chat_service.ToolPhaseError
-        from core.sse_events import TokenEvent
-
-        monkeypatch.setattr(
-            chat_service,
-            "prepare_agent_reply",
-            MagicMock(side_effect=ToolPhaseError("boom", partial_steps=[], partial_messages=[])),
-        )
-
-        async def immediate_to_thread(func, /, *args, **kwargs):
-            return func(*args, **kwargs)
-
-        async def fake_stream(msgs):
-            yield "hello"
-            yield " world"
-
-        monkeypatch.setattr(chat_service.asyncio, "to_thread", immediate_to_thread)
-        monkeypatch.setattr(chat_service, "stream_chat_reply", fake_stream)
-        monkeypatch.setattr(chat_service, "finalize_generation", lambda ctx, reply: None)
-
-        fake_route = MagicMock()
-        fake_route.skip_tools = False
-
-        ctx = MagicMock()
-        ctx.route = fake_route
-        ctx.prompt_messages = [{"role": "user", "content": "test"}]
-        ctx.persona_id = "default"
-        ctx.trace_id = "t2"
-        ctx.session_id = "s2"
-        ctx.request_context = {}
-
-        async def collect():
-            events = []
-            async for evt in chat_service.stream_generation(ctx):
-                events.append(evt)
-            return events
-
-        events = asyncio.run(collect())
-
-        token_events = [e for e in events if isinstance(e, TokenEvent)]
-        assert len(token_events) == 2
-        tokens = [e.token for e in token_events]
-        assert tokens == ["hello", " world"]

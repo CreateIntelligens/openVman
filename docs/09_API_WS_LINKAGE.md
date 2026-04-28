@@ -9,7 +9,7 @@
 | :--- | :--- | :--- | :--- |
 | Frontend | Backend | WebSocket | 即時語句、中斷指令、音訊接收 |
 | Frontend | Backend (Gateway Routes) | REST (POST) | 文件/媒體檔案上傳 |
-| Backend | Brain | REST (POST) | 請求 LLM 生成回應文字串流 |
+| Backend | Brain | REST (POST) | 請求 LLM 生成完整回覆，切句後送 TTS |
 | Backend (Gateway Worker) | Backend (/internal/enrich) | REST (POST) | 將媒體處理結果作為 enriched context 寫入指定 Session |
 | Backend (/internal/enrich) | Brain (/internal/enrich) | REST (POST) | 驗證 internal token 後轉發 enriched context |
 | Backend (Knowledge Upload Route) | Brain (/brain/knowledge/upload) | REST (POST) | 將標準化後的知識文件寫入 Brain 工作區並觸發背景索引 |
@@ -19,7 +19,7 @@
 ### 2. 關鍵時序圖 (Sequence Diagrams)
 
 #### 2.1 即時對話流 (Conversational Flow)
-展示即時語音閉環。Backend 透過 `LiveVoicePipeline` 協調 Brain SSE 串流與 VibeVoice TTS。
+展示即時語音閉環。Backend 透過 `LiveVoicePipeline` 呼叫 Brain REST API 取得完整回覆，切句後依序送 VibeVoice TTS 合成。
 
 ```mermaid
 sequenceDiagram
@@ -31,23 +31,22 @@ sequenceDiagram
     F->>B: WS: client_init (Handshake)
     B-->>F: WS: server_init_ack
     F->>B: WS: user_speak (text)
-    B->>BR: REST: POST /brain/chat/stream (SSE)
+    B->>BR: REST: POST /brain/chat
+    BR-->>B: 完整回覆文字
     rect rgb(200, 220, 240)
-        loop Token Stream
-            BR-->>B: Text Token
-            B->>B: Chunker (遇到標點符號)
-            B->>T: 合成音訊 (0.5B Real-time)
+        loop 切句 TTS
+            B->>B: Chunker (按標點語意切句)
+            B->>T: 合成音訊
             T-->>B: Audio Buffer
             B->>F: WS: server_stream_chunk (JSON + Base64 Audio)
         end
     end
-    F->>F: Audio-driven Lip-Sync 播放
 
     Note over F,B: 若用戶插話
     F->>B: WS: client_interrupt (partial_asr)
     B->>B: Guard Agent 判定
     B->>F: WS: server_stop_audio
-    Note over B: 終止當前 Brain/TTS 任務
+    Note over B: 終止當前 TTS 任務
 ```
 
 ### 3. WebSocket 事件清單 (Live Voice Events)

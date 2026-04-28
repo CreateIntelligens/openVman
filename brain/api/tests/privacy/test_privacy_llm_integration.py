@@ -11,7 +11,6 @@ from unittest.mock import MagicMock
 class _Settings:
     llm_temperature = 0.3
     privacy_filter_enabled = True
-    privacy_filter_mode = "mask"
     privacy_filter_include_system = False
     privacy_filter_cache_size = 8
     privacy_filter_block_categories = ""
@@ -23,7 +22,7 @@ class _Settings:
         return []
 
 
-def test_generate_chat_turn_sends_masked_messages_to_provider(monkeypatch) -> None:
+def test_generate_chat_turn_sends_original_messages_and_returns_report(monkeypatch) -> None:
     fake_observability = types.ModuleType("safety.observability")
     fake_observability.log_event = lambda *args, **kwargs: None
     fake_observability.record_route_attempt = lambda **kwargs: None
@@ -50,10 +49,10 @@ def test_generate_chat_turn_sends_masked_messages_to_provider(monkeypatch) -> No
     monkeypatch.setattr(llm_client, "_resolve_chain_or_routes", lambda trace_id: ([], [MagicMock(model="m1", api_key="key", base_url="")]))
 
     import privacy.filter as privacy_filter
-    from privacy.model import enable_regex_detector_for_tests
+    from privacy.model import enable_stub_detector_for_tests
 
     monkeypatch.setattr(privacy_filter, "get_settings", lambda: settings)
-    enable_regex_detector_for_tests()
+    enable_stub_detector_for_tests()
 
     response = MagicMock()
     response.model = "m1"
@@ -71,10 +70,13 @@ def test_generate_chat_turn_sends_masked_messages_to_provider(monkeypatch) -> No
 
     monkeypatch.setattr(llm_client, "OpenAI", _FakeOpenAI)
 
-    llm_client.generate_chat_turn(
+    reply = llm_client.generate_chat_turn(
         [{"role": "user", "content": "Call 0912345678"}],
         privacy_source="chat",
         trace_id="trace-1",
     )
 
-    assert created_messages[0]["content"] == "Call [REDACTED:private_phone]"
+    assert created_messages[0]["content"] == "Call 0912345678"
+    assert reply.pii_report is not None
+    assert reply.pii_report.counts == {"private_phone": 1}
+    assert reply.pii_report.per_message == ({"private_phone": 1},)

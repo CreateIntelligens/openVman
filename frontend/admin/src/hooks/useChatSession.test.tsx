@@ -100,11 +100,14 @@ vi.mock("./useVad", () => ({
 }));
 
 vi.mock("./useSlashAutocomplete", () => ({
-  useSlashAutocomplete: () => ({
+  useSlashAutocomplete: (_input: string, setInput: (value: string) => void) => ({
     slashOpen: false,
     slashMatches: [],
     clampedSlashIndex: 0,
-    handleInputChange: handleInputChangeMock,
+    handleInputChange: (value: string) => {
+      handleInputChangeMock(value);
+      setInput(value);
+    },
     pickSlash: pickSlashMock,
     setSlashIndex: setSlashIndexMock,
     setSlashOpen: setSlashOpenMock,
@@ -116,6 +119,7 @@ import { useChatSession } from "./useChatSession";
 describe("useChatSession TTS prefetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
@@ -232,4 +236,66 @@ describe("useChatSession TTS prefetch", () => {
 
     expect(result.current.error).toBe("");
   });
+
+  it("stores backend pii warnings on the latest user message and keeps them after done history", async () => {
+    streamChatMock.mockImplementation(
+      async (
+        _message: string,
+        _personaId: string,
+        _sessionId: string | undefined,
+        handlers: {
+          onPiiWarning?: (payload: {
+            categories: string[];
+            counts: Record<string, number>;
+          }) => void;
+          onDone?: (payload: {
+            session_id: string;
+            reply: string;
+            knowledge_results: [];
+            memory_results: [];
+            history: Array<{ role: string; content: string }>;
+          }) => void;
+        },
+      ) => {
+        await Promise.resolve();
+        handlers.onPiiWarning?.({
+          categories: ["private_phone"],
+          counts: { private_phone: 1 },
+        });
+        handlers.onDone?.({
+          session_id: "sess-1",
+          reply: "助手最終回覆",
+          knowledge_results: [],
+          memory_results: [],
+          history: [
+            { role: "user", content: "使用者問題" },
+            { role: "assistant", content: "助手最終回覆" },
+          ],
+        });
+      },
+    );
+
+    const { result } = renderHook(() => useChatSession());
+
+    await act(async () => {
+      await result.current.submit("使用者問題");
+    });
+
+    await waitFor(() => expect(result.current.messages[0].privacy_warning?.counts.private_phone).toBe(1));
+  });
+
+  it("defaults privacy warnings to visible and persists toggle changes", () => {
+    window.localStorage.removeItem("chat.privacy_warning_visible");
+
+    const { result } = renderHook(() => useChatSession());
+
+    expect(result.current.privacyWarningsVisible).toBe(true);
+
+    act(() => {
+      result.current.setPrivacyWarningsVisible(false);
+    });
+
+    expect(window.localStorage.getItem("chat.privacy_warning_visible")).toBe("false");
+  });
+
 });

@@ -21,11 +21,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Stage 2: Runner
 FROM python:3.11-slim
 
+ENV TZ=Asia/Taipei
 ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 ENV CUDA_LAUNCH_BLOCKING=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/opt/venv/bin:$PATH"
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ffmpeg \
@@ -34,7 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     tesseract-ocr \
     tesseract-ocr-chi-tra \
+    tzdata \
     wget \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

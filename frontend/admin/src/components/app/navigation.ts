@@ -1,6 +1,5 @@
 import type { FC } from "react";
 import Chat from "../../pages/Chat";
-import Embed from "../../pages/Embed";
 import Health from "../../pages/Health";
 import KnowledgeBase from "../../pages/KnowledgeBase";
 import Memory from "../../pages/Memory";
@@ -28,7 +27,6 @@ export const systemTabs = [
   { key: "Projects", label: "Projects", icon: "folder_copy" },
   { key: "Health", label: "Health", icon: "health_metrics" },
   { key: "Monitoring", label: "Monitoring", icon: "monitoring" },
-  { key: "Embed", label: "Embed", icon: "code" },
 ] as const;
 
 export const tabGroups = [
@@ -47,7 +45,6 @@ export const components: Record<Tab, FC> = {
   Chat,
   Health,
   Monitoring,
-  Embed,
   Search,
   Memory,
   Personas,

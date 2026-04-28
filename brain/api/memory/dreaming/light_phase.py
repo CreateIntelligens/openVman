@@ -293,7 +293,7 @@ def _fingerprint(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _read_phase_signals(project_id: str) -> dict[str, Any]:
-    path = _dreams_dir(project_id) / "phase-signals.json"
+    path = dreams_dir(project_id) / "phase-signals.json"
     try:
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     except (json.JSONDecodeError, OSError):
@@ -308,7 +308,7 @@ def _write_candidates(
     project_id: str,
     candidates: list[dict[str, Any]],
 ) -> None:
-    path = _dreams_dir(project_id) / "candidates.json"
+    path = dreams_dir(project_id) / "candidates.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(candidates, ensure_ascii=False, indent=2),
@@ -334,10 +334,6 @@ def _write_light_report(
     if candidates:
         lines += ["### 候選預覽（前 10 筆）", ""]
         for i, c in enumerate(candidates[:10], 1):
-            lines.append(f"{i}. [{c.get('score', 0.0):.3f}] {c['text'][:80]}")
+            lines.append(f"{i}. [{c.get('score', 0.0):.2f}] {c['text'][:80]}")
         lines.append("")
     write_dreaming_report(project_id, "light", lines)
-
-
-def _dreams_dir(project_id: str) -> Path:
-    return dreams_dir(project_id)

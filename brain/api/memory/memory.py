@@ -74,9 +74,33 @@ def append_session_message(
     metadata: dict[str, Any] | None = None,
 ) -> SessionState:
     """Append a message to the session and enforce max rounds."""
+    state, _ = get_session_store(project_id).append_message(
+        session_id, persona_id, role, content, metadata=metadata,
+    )
+    return state
+
+
+def append_session_message_with_id(
+    session_id: str,
+    persona_id: str,
+    role: str,
+    content: str,
+    project_id: str = "default",
+    metadata: dict[str, Any] | None = None,
+) -> tuple[SessionState, int]:
+    """Append and return the new message's row id for later metadata patches."""
     return get_session_store(project_id).append_message(
         session_id, persona_id, role, content, metadata=metadata,
     )
+
+
+def update_session_message_metadata(
+    message_id: int,
+    metadata: dict[str, Any],
+    project_id: str = "default",
+) -> None:
+    """Merge metadata into an existing message (used for late PII warnings)."""
+    get_session_store(project_id).update_message_metadata(message_id, metadata)
 
 
 def list_session_messages(

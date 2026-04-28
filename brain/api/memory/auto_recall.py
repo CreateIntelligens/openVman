@@ -177,8 +177,6 @@ def _run_recall(
         query=query,
         persona_id=persona_id,
         project_id=project_id,
-        include_knowledge=False,
-        include_memories=True,
     )
     memory_results = bundle.memory_results
 

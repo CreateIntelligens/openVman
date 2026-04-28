@@ -192,7 +192,6 @@ async def _ensure_brain_relay(session: Session, websocket: WebSocket) -> None:
     if session.brain_live_relay is None:
         session.brain_live_relay = BrainLiveRelay(
             session,
-            voice_source=session.metadata.get("voice_source", DEFAULT_VOICE_SOURCE),
             event_sink=websocket.send_json,
         )
 

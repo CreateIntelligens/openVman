@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -32,6 +32,7 @@ class _Span:
 
 _opf: OPF | None = None
 _runtime_disabled_reason: str | None = None
+_regex_fallback_for_tests: bool = False
 
 
 def load_privacy_filter_model() -> None:
@@ -46,6 +47,27 @@ def load_privacy_filter_model() -> None:
     _opf.redact("warmup")
 
 
+def load_privacy_filter_model_cpu() -> None:
+    """Load the OPF model on CPU (fallback when GPU is unavailable)."""
+    global _opf, _runtime_disabled_reason
+    import os
+    from opf import OPF
+    # Hide GPU only for OPF init; torch caches device visibility at first use so
+    # we must set the env var before the first torch CUDA call inside OPF.
+    old = os.environ.get("CUDA_VISIBLE_DEVICES")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    try:
+        _opf = OPF(trim_whitespace=True, device="cpu")  # type: ignore[call-arg]
+        _runtime_disabled_reason = None
+        assert _opf is not None
+        _opf.redact("warmup")
+    finally:
+        if old is None:
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = old
+
+
 def disable_privacy_filter(reason: str) -> None:
     """Disable runtime filtering after startup load failure."""
     global _runtime_disabled_reason
@@ -56,11 +78,18 @@ def privacy_filter_runtime_enabled() -> bool:
     return _runtime_disabled_reason is None
 
 
-def enable_regex_detector_for_tests() -> None:
-    """Reset to regex-only mode for deterministic unit tests."""
-    global _opf, _runtime_disabled_reason
+def enable_stub_detector_for_tests() -> None:
+    """Reset to regex-only stub mode for unit tests.
+
+    Tests using this helper verify the privacy *pipeline plumbing* (routing,
+    caching, audit events) — not OPF detection accuracy.  Use the
+    ``@pytest.mark.integration`` test suite for real OPF behaviour.
+    """
+    global _opf, _runtime_disabled_reason, _regex_fallback_for_tests
     _opf = None
     _runtime_disabled_reason = None
+    _regex_fallback_for_tests = True
+
 
 
 def detect_and_mask(text: str) -> tuple[str, dict[str, int]]:
@@ -68,13 +97,6 @@ def detect_and_mask(text: str) -> tuple[str, dict[str, int]]:
     if not text:
         return text, {}
     return _mask_spans(text, _detect_spans(text))
-
-
-def detect_and_partial_mask(text: str) -> tuple[str, dict[str, int]]:
-    """Egress-facing mask that preserves head/tail of each detected span."""
-    if not text:
-        return text, {}
-    return _partial_mask_spans(text, _detect_spans(text))
 
 
 def _detect_spans(text: str) -> list[_Span]:
@@ -85,7 +107,9 @@ def _detect_spans(text: str) -> list[_Span]:
             for s in result.detected_spans
             if s.label in PII_CATEGORIES
         ]
-    return _pattern_spans(text)
+    if _regex_fallback_for_tests:
+        return _pattern_spans(text)
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -147,67 +171,3 @@ def _ranges_overlap(left: range, right: range) -> bool:
     return left.start < right.stop and right.start < left.stop
 
 
-# ---------------------------------------------------------------------------
-# Partial mask (egress): keep head/tail, replace middle with asterisks
-# ---------------------------------------------------------------------------
-
-
-def _partial_mask_spans(text: str, spans: Iterable[_Span]) -> tuple[str, dict[str, int]]:
-    selected = _select_non_overlapping_spans(spans)
-    counts: dict[str, int] = {}
-    masked = text
-    for span in reversed(selected):
-        original = text[span.start:span.end]
-        replacement = _partial_replace(original, span.category)
-        masked = f"{masked[:span.start]}{replacement}{masked[span.end:]}"
-        counts[span.category] = counts.get(span.category, 0) + 1
-    return masked, counts
-
-
-def _mask_name(value: str) -> str:
-    stripped = value.strip()
-    if not stripped:
-        return value
-    if len(stripped) <= 1:
-        return "*"
-    if len(stripped) == 2:
-        return f"{stripped[0]}*"
-    return f"{stripped[0]}{'*' * (len(stripped) - 2)}{stripped[-1]}"
-
-
-def _mask_email(value: str) -> str:
-    if "@" not in value:
-        return _keep_head_tail(value, head=1, tail=0)
-    local, domain = value.split("@", 1)
-    if not local:
-        return f"***@{domain}"
-    middle = "*" * max(len(local) - 1, 1)
-    return f"{local[0]}{middle}@{domain}"
-
-
-def _keep_head_tail(value: str, *, head: int, tail: int) -> str:
-    if len(value) <= head + tail:
-        return "*" * max(len(value), 1)
-    middle_len = len(value) - head - tail
-    return f"{value[:head]}{'*' * middle_len}{value[-tail:] if tail else ''}"
-
-
-def _mask_keep_2_2(v: str) -> str: return _keep_head_tail(v, head=2, tail=2)
-def _mask_keep_3_3(v: str) -> str: return _keep_head_tail(v, head=3, tail=3)
-def _mask_keep_4_2(v: str) -> str: return _keep_head_tail(v, head=4, tail=2)
-def _mask_keep_1_1(v: str) -> str: return _keep_head_tail(v, head=1, tail=1)
-
-_PARTIAL_STRATEGIES: dict[str, Callable[[str], str]] = {
-    "private_person": _mask_name,
-    "private_email": _mask_email,
-    "private_phone": _mask_keep_3_3,
-    "private_address": _mask_keep_2_2,
-    "account_number": _mask_keep_2_2,
-    "secret": _mask_keep_2_2,
-    "private_url": _mask_keep_4_2,
-    "private_date": _mask_keep_2_2,
-}
-
-
-def _partial_replace(value: str, category: str) -> str:
-    return _PARTIAL_STRATEGIES.get(category, _mask_keep_1_1)(value)

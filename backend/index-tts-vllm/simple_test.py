@@ -92,14 +92,14 @@ class TTSStressTester:
             max_duration = max(durations)
             min_duration = min(durations)
             print(f"\n响应时间统计:")
-            print(f"平均: {avg_duration:.3f}秒")
-            print(f"最大: {max_duration:.3f}秒")
-            print(f"最小: {min_duration:.3f}秒")
+            print(f"平均: {avg_duration:.2f}秒")
+            print(f"最大: {max_duration:.2f}秒")
+            print(f"最小: {min_duration:.2f}秒")
             
             sorted_durations = sorted(durations)
             for p in [50, 90, 95, 99]:
                 index = int(p / 100 * len(sorted_durations))
-                print(f"P{p}: {sorted_durations[index]:.3f}秒")
+                print(f"P{p}: {sorted_durations[index]:.2f}秒")
 
         print("\n状态码分布:")
         for code, count in self.stats['status_codes'].items():

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 from infra.reflection import compress_text
 from protocol.message_envelope import BrainMessage, METADATA_ORIGINAL_USER_MESSAGE
-from tools.actions import action_nl_hints
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -17,65 +19,10 @@ class RouteDecision:
     path: str       # "direct" | "rag" | "tool"
     skip_rag: bool
     skip_tools: bool
+    forced_tool_name: str | None = None  # set by slash commands to force a specific tool call
 
 
 _DIRECT_ROLES = frozenset({"system", "assistant", "control"})
-_TOOL_QUERY_VERBS = (
-    "查",
-    "查詢",
-    "查一下",
-    "搜尋",
-    "搜索",
-    "找出",
-    "找一下",
-    "看看",
-    "看一下",
-    "列出",
-    "讀取",
-    "read",
-    "search",
-    "find",
-    "list",
-    "show",
-    "open",
-    "look up",
-)
-_TOOL_QUERY_TARGETS = (
-    "知識庫",
-    "文件",
-    "文檔",
-    "檔案",
-    "docs",
-    "doc",
-    "readme",
-    "repo",
-    "repository",
-    "專案",
-    "project",
-    "程式碼",
-    "代碼",
-    "代码",
-    "code",
-    "codebase",
-    "圖譜",
-    "graph",
-    "工具",
-    "tool",
-    "tools",
-    "skill",
-    "skills",
-)
-_TOOL_MEMORY_HINTS = (
-    "記住",
-    "記下",
-    "請記得",
-    "remember",
-    "save memory",
-)
-_TOOL_QUERY_VERBS_CASEFOLDED = tuple(verb.casefold() for verb in _TOOL_QUERY_VERBS)
-_TOOL_QUERY_TARGETS_CASEFOLDED = tuple(target.casefold() for target in _TOOL_QUERY_TARGETS)
-_TOOL_MEMORY_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in _TOOL_MEMORY_HINTS)
-_TOOL_ACTION_HINTS_CASEFOLDED = tuple(hint.casefold() for hint in action_nl_hints())
 _SLASH_TOOL_REWRITE_PREFIX = "[系統指令] 請立即呼叫工具 `"
 
 
@@ -86,33 +33,26 @@ def route_message(brain_message: BrainMessage) -> RouteDecision:
     if brain_message.role == "tool":
         return RouteDecision(path="tool", skip_rag=True, skip_tools=False)
     if _is_forced_tool_call(brain_message):
-        return RouteDecision(path="tool", skip_rag=False, skip_tools=False)
+        tool_name = _extract_forced_tool_name(brain_message.content)
+        if tool_name is None:
+            logger.warning("forced tool call detected but could not extract tool name from: %r", brain_message.content[:80])
+        return RouteDecision(path="tool", skip_rag=False, skip_tools=False, forced_tool_name=tool_name)
 
-    content = brain_message.content.strip().casefold()
-    if _needs_tooling(content):
-        return RouteDecision(path="tool", skip_rag=False, skip_tools=False)
-    return RouteDecision(path="direct", skip_rag=True, skip_tools=True)
-
-
-def _needs_tooling(content: str) -> bool:
-    if not content:
-        return False
-    if _contains_any(content, _TOOL_MEMORY_HINTS_CASEFOLDED):
-        return True
-    if _contains_any(content, _TOOL_ACTION_HINTS_CASEFOLDED):
-        return True
-    has_query_verb = _contains_any(content, _TOOL_QUERY_VERBS_CASEFOLDED)
-    has_query_target = _contains_any(content, _TOOL_QUERY_TARGETS_CASEFOLDED)
-    return has_query_verb and has_query_target
-
-
-def _contains_any(content: str, hints: tuple[str, ...]) -> bool:
-    return any(hint in content for hint in hints)
+    return RouteDecision(path="tool", skip_rag=False, skip_tools=False)
 
 
 def _is_forced_tool_call(brain_message: BrainMessage) -> bool:
     original_user_message = brain_message.metadata.get(METADATA_ORIGINAL_USER_MESSAGE)
     return bool(original_user_message) and brain_message.content.startswith(_SLASH_TOOL_REWRITE_PREFIX)
+
+
+def _extract_forced_tool_name(content: str) -> str | None:
+    """Extract the tool name from a slash-command-rewritten message."""
+    if not content.startswith(_SLASH_TOOL_REWRITE_PREFIX):
+        return None
+    rest = content[len(_SLASH_TOOL_REWRITE_PREFIX):]
+    end = rest.find("`")
+    return rest[:end] or None if end >= 0 else None
 
 
 def enforce_context_budget(

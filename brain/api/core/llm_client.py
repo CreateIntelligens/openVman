@@ -3,24 +3,45 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
-from time import monotonic
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from threading import Lock
+from time import monotonic
+from typing import Any, cast
 
-from openai import AsyncOpenAI, OpenAI
+from openai import OpenAI
 
 from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
 from core.key_pool import classify_failure
 from core.provider_router import LLMRoute, get_provider_router
-from privacy.filter import FilterSource, sanitize_llm_messages, sanitize_llm_reply_text, sanitize_llm_reply_text_async
+from privacy.filter import FilterSource, detect_llm_messages_pii
 from safety.observability import (
-    log_event,
     record_chain_exhausted,
     record_fallback_hop,
     record_route_attempt,
 )
+
+_pii_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-scan")
+
+_CLIENT_CACHE_MAX = 32
+_SYNC_CLIENT_CACHE: "OrderedDict[tuple[str, str | None], OpenAI]" = OrderedDict()
+_SYNC_CLIENT_CACHE_LOCK = Lock()
+
+
+def _get_sync_client(api_key: str, base_url: str | None) -> OpenAI:
+    key = (api_key, base_url)
+    with _SYNC_CLIENT_CACHE_LOCK:
+        client = _SYNC_CLIENT_CACHE.get(key)
+        if client is not None:
+            _SYNC_CLIENT_CACHE.move_to_end(key)
+            return client
+        client = OpenAI(api_key=api_key, base_url=base_url or None)
+        _SYNC_CLIENT_CACHE[key] = client
+        if len(_SYNC_CLIENT_CACHE) > _CLIENT_CACHE_MAX:
+            _SYNC_CLIENT_CACHE.popitem(last=False)
+        return client
 
 
 def _require_api_key() -> None:
@@ -52,13 +73,12 @@ def generate_chat_reply(
     privacy_source: FilterSource = "unknown",
 ) -> str:
     """Generate a chat reply using the configured provider."""
-    reply = generate_chat_turn(
+    return generate_chat_turn(
         messages,
         model_override=model_override,
         trace_id=trace_id,
         privacy_source=privacy_source,
     ).content.strip()
-    return sanitize_llm_reply_text(reply)
 
 
 def generate_chat_turn(
@@ -68,19 +88,24 @@ def generate_chat_turn(
     trace_id: str = "",
     model_override: str | None = None,
     privacy_source: FilterSource = "unknown",
+    forced_tool_name: str | None = None,
+    max_tokens: int | None = None,
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
-    sanitized_messages = sanitize_llm_messages(
-        messages,
-        source=privacy_source,
-        trace_id=trace_id,
+    # PII scan runs in the background purely for audit / block-on-secret side effects;
+    # the report is no longer consumed by the chat pipeline.
+    _pii_executor.submit(
+        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
     )
     response = _create_sync_completion(
-        sanitized_messages,
+        messages,
         tools=tools,
         trace_id=trace_id,
         model_override=model_override,
+        forced_tool_name=forced_tool_name,
+        max_tokens=max_tokens,
     )
+    assert response is not None
     message = response.choices[0].message
     content = (message.content or "").strip()
     tool_calls = [
@@ -94,41 +119,77 @@ def generate_chat_turn(
     ]
     if not content and not tool_calls:
         raise ValueError("LLM 沒有回傳內容")
-    return LLMReply(
-        content=content,
-        tool_calls=tool_calls,
-        model=response.model,
-    )
+    return LLMReply(content=content, tool_calls=tool_calls, model=response.model)
 
 
-async def stream_chat_reply(
+def stream_chat_turn(
     messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
     *,
     trace_id: str = "",
+    model_override: str | None = None,
     privacy_source: FilterSource = "unknown",
-) -> AsyncIterator[str]:
-    """Stream a chat reply token-by-token with fallback chain."""
-    sanitized_messages = sanitize_llm_messages(
-        messages,
-        source=privacy_source,
-        trace_id=trace_id,
+    forced_tool_name: str | None = None,
+    max_tokens: int | None = None,
+) -> LLMReply:
+    """Stream one chat turn; detect tool calls vs text without a second round-trip.
+
+    Identical return type and signature to generate_chat_turn — callers need no changes.
+    Reuses the provider fallback chain and key-pool infrastructure.
+    """
+    _pii_executor.submit(
+        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
     )
-    stream = await _create_async_stream(sanitized_messages, trace_id=trace_id, tool_choice="none")
+    _require_api_key()
+    cfg = get_settings()
+    router = get_provider_router()
+    tid = trace_id or uuid.uuid4().hex[:12]
 
-    tokens: list[str] = []
-    async for chunk in stream:
-        if not chunk.choices:
-            continue
-        token = chunk.choices[0].delta.content or ""
-        if token:
-            tokens.append(token)
+    chain, legacy_routes = _resolve_chain_or_routes(tid)
+    chain, legacy_routes = _apply_model_override(chain, legacy_routes, model_override)
 
-    yield await sanitize_llm_reply_text_async("".join(tokens))
+    create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+    if max_tokens:
+        create_kwargs["max_tokens"] = max_tokens
 
+    if legacy_routes:
+        return _stream_routes(legacy_routes, messages, cfg, router, create_kwargs)
 
-# ---------------------------------------------------------------------------
-# Shared chain resolution
-# ---------------------------------------------------------------------------
+    errors: list[str] = []
+    last_reason = ""
+    for hop in chain:
+        t0 = _now_ms()
+        client = _get_sync_client(hop.api_key, hop.base_url)
+        try:
+            reply = _consume_stream(
+                client.chat.completions.create(
+                    model=hop.model,
+                    messages=cast(Any, messages),
+                    temperature=cfg.llm_temperature,
+                    stream=True,
+                    **create_kwargs,
+                ),
+                model=hop.model,
+            )
+            router.mark_success(hop.api_key)
+            record_route_attempt(
+                trace_id=tid,
+                provider=hop.provider,
+                model=hop.model,
+                hop_index=hop.hop_index,
+                result="success",
+                latency_ms=_now_ms() - t0,
+                chain_length=len(chain),
+            )
+            return reply
+        except ValueError:
+            raise
+        except Exception as exc:
+            last_reason = _record_hop_failure(hop, exc, _now_ms() - t0, chain, errors, tid)
+
+    _raise_chain_exhausted(tid, errors, last_reason, len(chain))
+    raise RuntimeError("unreachable")
+
 
 def _resolve_chain_or_routes(
     trace_id: str,
@@ -202,16 +263,14 @@ def _raise_chain_exhausted(
     )
 
 
-# ---------------------------------------------------------------------------
-# Sync completion
-# ---------------------------------------------------------------------------
-
 def _create_sync_completion(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
     *,
     trace_id: str = "",
     model_override: str | None = None,
+    forced_tool_name: str | None = None,
+    max_tokens: int | None = None,
 ):
     _require_api_key()
     cfg = get_settings()
@@ -226,20 +285,23 @@ def _create_sync_completion(
     )
 
     if legacy_routes:
-        return _try_routes_sync(legacy_routes, messages, tools, cfg, router)
+        return _try_routes_sync(legacy_routes, messages, tools, cfg, router, forced_tool_name=forced_tool_name, max_tokens=max_tokens)
 
     errors: list[str] = []
     last_reason = ""
+    create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+    if max_tokens:
+        create_kwargs["max_tokens"] = max_tokens
 
     for hop in chain:
         t0 = _now_ms()
-        client = OpenAI(api_key=hop.api_key, base_url=hop.base_url or None)
+        client = _get_sync_client(hop.api_key, hop.base_url)
         try:
             response = client.chat.completions.create(
                 model=hop.model,
-                messages=messages,
+                messages=cast(Any, messages),
                 temperature=cfg.llm_temperature,
-                **_build_create_kwargs(tools),
+                **create_kwargs,
             )
             router.mark_success(hop.api_key)
             record_route_attempt(
@@ -297,17 +359,20 @@ def _apply_model_override(
     return overridden_chain, overridden_legacy_routes
 
 
-def _try_routes_sync(routes, messages, tools, cfg, router):
+def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: str | None = None, max_tokens: int | None = None):
     """Legacy route loop for when no fallback chain is configured."""
     errors: list[str] = []
+    create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+    if max_tokens:
+        create_kwargs["max_tokens"] = max_tokens
     for route in routes:
-        client = OpenAI(api_key=route.api_key, base_url=route.base_url or None)
+        client = _get_sync_client(route.api_key, route.base_url)
         try:
             response = client.chat.completions.create(
                 model=route.model,
-                messages=messages,
+                messages=cast(Any, messages),
                 temperature=cfg.llm_temperature,
-                **_build_create_kwargs(tools),
+                **create_kwargs,
             )
             router.mark_success(route.api_key)
             return response
@@ -318,82 +383,87 @@ def _try_routes_sync(routes, messages, tools, cfg, router):
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
-# ---------------------------------------------------------------------------
-# Async streaming
-# ---------------------------------------------------------------------------
+def _consume_stream(stream: Any, *, model: str) -> LLMReply:
+    """Drain a streaming completion and return an LLMReply.
 
-async def _create_async_stream(
+    Accumulates text tokens into content or assembles tool call fragments by
+    index. Raises ValueError if the stream ends with neither content nor tool calls.
+    """
+    text_buf = ""
+    tool_call_acc: dict[int, dict[str, str]] = {}
+    finish_reason: str | None = None
+
+    for chunk in stream:
+        choice = chunk.choices[0] if chunk.choices else None
+        if choice is None:
+            continue
+        if choice.finish_reason:
+            finish_reason = choice.finish_reason
+        delta = choice.delta
+        if delta.content:
+            text_buf += delta.content
+        if delta.tool_calls:
+            for tc_delta in delta.tool_calls:
+                idx = tc_delta.index if tc_delta.index is not None else 0
+                if idx not in tool_call_acc:
+                    tool_call_acc[idx] = {"id": "", "name": "", "arguments_buf": "", "thought_signature": ""}
+                entry = tool_call_acc[idx]
+                if tc_delta.id:
+                    entry["id"] = tc_delta.id
+                if tc_delta.function:
+                    if tc_delta.function.name:
+                        entry["name"] += tc_delta.function.name
+                    if tc_delta.function.arguments:
+                        entry["arguments_buf"] += tc_delta.function.arguments
+                extra = getattr(tc_delta, "model_extra", None) or {}
+                google_extra = (extra.get("extra_content") or {}).get("google") or {}
+                if sig := google_extra.get("thought_signature"):
+                    entry["thought_signature"] += sig
+
+    if not text_buf and not tool_call_acc:
+        raise ValueError("LLM 沒有回傳內容")
+
+    if finish_reason == "tool_calls" or tool_call_acc:
+        tool_calls = [
+            LLMToolCall(
+                id=tool_call_acc[idx]["id"],
+                name=tool_call_acc[idx]["name"],
+                arguments=tool_call_acc[idx]["arguments_buf"],
+                extra_content={"thought_signature": tool_call_acc[idx]["thought_signature"]} if tool_call_acc[idx].get("thought_signature") else None,
+            )
+            for idx in sorted(tool_call_acc)
+        ]
+        return LLMReply(content="", tool_calls=tool_calls, model=model)
+
+    return LLMReply(content=text_buf.strip(), tool_calls=[], model=model)
+
+
+def _stream_routes(
+    routes: list[Any],
     messages: list[dict[str, Any]],
-    *,
-    trace_id: str = "",
-    tool_choice: str | None = None,
-):
-    _require_api_key()
-    cfg = get_settings()
-    router = get_provider_router()
-    tid = trace_id or uuid.uuid4().hex[:12]
-
-    chain, legacy_routes = _resolve_chain_or_routes(tid)
-
-    if legacy_routes:
-        return await _try_routes_async(legacy_routes, messages, cfg, router, tool_choice=tool_choice)
-
+    cfg: Any,
+    router: Any,
+    create_kwargs: dict[str, Any],
+) -> LLMReply:
+    """Legacy route loop for streaming when no fallback chain is configured."""
     errors: list[str] = []
-    last_reason = ""
-
-    for hop in chain:
-        log_event(
-            "fallback_hop_attempt",
-            trace_id=tid,
-            hop_index=hop.hop_index,
-            provider=hop.provider,
-            model=hop.model,
-        )
-        client = AsyncOpenAI(api_key=hop.api_key, base_url=hop.base_url or None)
-        try:
-            create_kwargs: dict[str, Any] = {"stream": True}
-            if tool_choice is not None:
-                create_kwargs["tool_choice"] = tool_choice
-            stream = await client.chat.completions.create(
-                model=hop.model,
-                messages=messages,
-                temperature=cfg.llm_temperature,
-                **create_kwargs,
-            )
-            router.mark_success(hop.api_key)
-            log_event(
-                "fallback_hop_success",
-                trace_id=tid,
-                hop_index=hop.hop_index,
-                provider=hop.provider,
-                model=hop.model,
-            )
-            return stream
-        except Exception as exc:
-            last_reason = _record_hop_failure(
-                hop, exc, 0.0, chain, errors, tid
-            )
-
-    _raise_chain_exhausted(tid, errors, last_reason, len(chain))
-
-
-async def _try_routes_async(routes, messages, cfg, router, *, tool_choice: str | None = None):
-    """Legacy async route loop."""
-    errors: list[str] = []
-    extra: dict[str, Any] = {"stream": True}
-    if tool_choice is not None:
-        extra["tool_choice"] = tool_choice
     for route in routes:
-        client = AsyncOpenAI(api_key=route.api_key, base_url=route.base_url or None)
+        client = _get_sync_client(route.api_key, route.base_url)
         try:
-            stream = await client.chat.completions.create(
+            reply = _consume_stream(
+                client.chat.completions.create(
+                    model=route.model,
+                    messages=cast(Any, messages),
+                    temperature=cfg.llm_temperature,
+                    stream=True,
+                    **create_kwargs,
+                ),
                 model=route.model,
-                messages=messages,
-                temperature=cfg.llm_temperature,
-                **extra,
             )
             router.mark_success(route.api_key)
-            return stream
+            return reply
+        except ValueError:
+            raise
         except Exception as exc:
             router.mark_failure(route.api_key, route.model, exc)
             errors.append(f"{route.model}: {type(exc).__name__}: {exc}")
@@ -401,17 +471,14 @@ async def _try_routes_async(routes, messages, cfg, router, *, tool_choice: str |
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _build_create_kwargs(tools: list[dict[str, Any]] | None) -> dict[str, Any]:
+def _build_create_kwargs(tools: list[dict[str, Any]] | None, *, forced_tool_name: str | None = None) -> dict[str, Any]:
     if not tools:
         return {}
-    return {
-        "tools": tools,
-        "tool_choice": "auto",
-    }
+    if forced_tool_name:
+        tool_choice: str | dict[str, Any] = {"type": "function", "function": {"name": forced_tool_name}}
+    else:
+        tool_choice = "auto"
+    return {"tools": tools, "tool_choice": tool_choice}
 
 
 def _now_ms() -> float:
@@ -421,9 +488,16 @@ def _now_ms() -> float:
 
 def _extract_tool_call_extra_content(tool_call: Any) -> dict[str, Any] | None:
     extra_content = getattr(tool_call, "extra_content", None)
-    if extra_content is not None:
-        return extra_content
+    if isinstance(extra_content, dict):
+        google = extra_content.get("google") or {}
+        if sig := google.get("thought_signature"):
+            return {"thought_signature": sig}
+        if sig := extra_content.get("thought_signature"):
+            return {"thought_signature": sig}
 
     model_extra = getattr(tool_call, "model_extra", None) or {}
-    extra = model_extra.get("extra_content")
-    return extra if isinstance(extra, dict) else None
+    google_extra = (model_extra.get("extra_content") or {}).get("google") or {}
+    if sig := google_extra.get("thought_signature"):
+        return {"thought_signature": sig}
+
+    return None

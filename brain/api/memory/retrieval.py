@@ -12,6 +12,7 @@ from infra.db import (
     vector_table_exists,
 )
 from knowledge.doc_meta import list_disabled_document_paths
+from memory.dreaming.recall_tracker import record_trace
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -37,12 +38,18 @@ def search_records(
     persona_id: str = "default",
     project_id: str = "default",
     embedding_version: str | None = None,
+    distance_cutoff: float | None = None,
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
 
     When *query_text* is provided, attempts hybrid search (vector + FTS).
     Falls back to vector-only search if hybrid is not available.
+    Results with _distance > distance_cutoff are dropped. top_k is an upper cap.
     """
+    from config import get_settings
+    cfg = get_settings()
+    cutoff = distance_cutoff if distance_cutoff is not None else cfg.rag_distance_cutoff
+
     normalized_persona = normalize_persona_id(persona_id)
     limit = max(top_k, 1)
     if not vector_table_exists(table_name, project_id, embedding_version):
@@ -61,6 +68,8 @@ def search_records(
 
     filtered: list[dict[str, Any]] = []
     for record in raw_records:
+        if record.get("_distance", 0.0) > cutoff:
+            continue
         if not _matches_persona(record, normalized_persona):
             continue
         if disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths):
@@ -69,10 +78,8 @@ def search_records(
         if len(filtered) >= limit:
             break
 
-    # Non-blocking recall trace for dreaming consolidation
     if filtered:
         try:
-            from memory.dreaming.recall_tracker import record_trace
             record_trace(
                 query=query_text or "",
                 persona_id=persona_id,
@@ -146,7 +153,13 @@ def _matches_persona(record: dict[str, Any], persona_id: str) -> bool:
 
 
 def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in record.items() if key != "vector"}
+    result = {key: value for key, value in record.items() if key != "vector"}
+    meta = parse_record_metadata(record)
+    if path := str(meta.get("path", "")).strip():
+        result["path"] = path
+    if title := str(meta.get("title", "")).strip():
+        result["title"] = title
+    return result
 
 
 def _matches_disabled_knowledge_path(record: dict[str, Any], disabled_paths: set[str]) -> bool:

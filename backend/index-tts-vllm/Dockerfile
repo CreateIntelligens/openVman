@@ -2,17 +2,21 @@
 FROM vllm/vllm-openai:v0.9.0
 
 # Set environment variables for GPU compatibility
+ENV TZ=Asia/Taipei
 ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 ENV CUDA_LAUNCH_BLOCKING=1
 ENV TORCH_CUDA_ARCH_LIST="8.9"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    tzdata \
     ffmpeg \
     build-essential \
     libsndfile1 \
     libsm6 \
     libxext6 \
+    && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && \
     rm -rf /var/lib/apt/lists/* && \
     ln -sf /usr/bin/python3 /usr/bin/python

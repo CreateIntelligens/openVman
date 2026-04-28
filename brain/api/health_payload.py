@@ -23,6 +23,15 @@ def list_workspace_documents(project_id: str = "default"):
     return _list_workspace_documents(project_id)
 
 
+def build_readiness_payload() -> dict[str, object]:
+    """Lightweight readiness check — single DB connection ping, no table scans."""
+    try:
+        get_db().table_names()  # cheapest possible lancedb probe
+        return {"status": "ready", "db": "ok"}
+    except Exception as exc:
+        return {"status": "not_ready", "db": "error", "db_error": str(exc)}
+
+
 def list_personas(project_id: str = "default"):
     from personas.personas import list_personas as _list_personas
 

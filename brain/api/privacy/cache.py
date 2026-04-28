@@ -1,4 +1,4 @@
-"""In-process LRU cache for privacy filter results."""
+"""In-process LRU cache for privacy detection counts."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import hashlib
 from collections import OrderedDict
 from threading import Lock
 
-FilterResult = tuple[str, dict[str, int]]
+FilterResult = dict[str, int]
 
 
 class PrivacyFilterCache:
@@ -24,12 +24,12 @@ class PrivacyFilterCache:
             if value is None:
                 return None
             self._store.move_to_end(key)
-            return value[0], dict(value[1])
+            return dict(value)
 
     def set(self, content: str, result: FilterResult) -> None:
         key = _cache_key(content)
         with self._lock:
-            self._store[key] = (result[0], dict(result[1]))
+            self._store[key] = dict(result)
             self._store.move_to_end(key)
             while len(self._store) > self._max_entries:
                 self._store.popitem(last=False)

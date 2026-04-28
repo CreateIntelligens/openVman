@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 import logging
 
@@ -30,62 +30,37 @@ def retrieve_context(
     query: str,
     persona_id: str = "default",
     project_id: str = "default",
-    include_knowledge: bool = True,
-    include_memories: bool = True,
 ) -> RetrievalBundle:
-    """Retrieve and rerank context from knowledge and memory tables.
+    """Retrieve and rerank context from the memories table.
 
-    Returns a RetrievalBundle with separated knowledge/memory results
-    and diagnostics for observability.
+    Returns a RetrievalBundle with memory results and diagnostics for
+    observability.  Knowledge retrieval is handled separately by the chat
+    pipeline; knowledge_results is always an empty list here.
     """
-    if not include_knowledge and not include_memories:
-        return _empty_retrieval_bundle(query)
-
     cfg = get_settings()
-    knowledge_top_k = cfg.rag_knowledge_top_k
     memory_top_k = cfg.rag_memory_top_k
     candidate_multiplier = cfg.rag_rerank_candidate_multiplier
     distance_bonus = cfg.rag_memory_distance_bonus
     decay_rate = cfg.memory_decay_rate_per_day
     importance_weight = cfg.memory_importance_weight
-    table_names = _enabled_table_names(
-        include_knowledge=include_knowledge,
-        include_memories=include_memories,
-    )
 
-    # Encode query
     embedding_route = encode_query_with_fallback(
         query,
         project_id=project_id,
-        table_names=table_names,
+        table_names=("memories",),
     )
     query_vector = embedding_route.vector
 
-    # Fetch candidates (wider than final top-k for reranking)
-    # Pass query text to enable hybrid search (vector + FTS)
-    knowledge_candidates = _search_if_enabled(
-        enabled=include_knowledge,
-        table_name="knowledge",
-        query_vector=query_vector,
-        top_k=knowledge_top_k * candidate_multiplier,
-        persona_id=persona_id,
-        query_text=query,
-        project_id=project_id,
-        embedding_version=embedding_route.version,
-    )
-    memory_candidates = _search_if_enabled(
-        enabled=include_memories,
-        table_name="memories",
-        query_vector=query_vector,
-        top_k=memory_top_k * candidate_multiplier,
-        persona_id=persona_id,
+    memory_candidates = _safe_search(
+        "memories",
+        query_vector,
+        memory_top_k * candidate_multiplier,
+        persona_id,
         query_text=query,
         project_id=project_id,
         embedding_version=embedding_route.version,
     )
 
-    # Rerank: sort by distance with memory bonus, decay, and importance
-    reranked_knowledge = _rerank_by_distance(knowledge_candidates)
     reranked_memory = _rerank_by_distance(
         memory_candidates,
         distance_bonus=distance_bonus,
@@ -97,92 +72,25 @@ def retrieve_context(
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(
-            "retrieval_distances knowledge=%s memory=%s",
-            [round(r["_effective_distance"], 3) for r in reranked_knowledge],
+            "retrieval_distances memory=%s",
             [round(r["_effective_distance"], 3) for r in reranked_memory],
         )
 
-    # Trim to final top-k with cutoff filtering
-    final_knowledge = [r for r in reranked_knowledge if r["_effective_distance"] <= cutoff][:knowledge_top_k]
     final_memory = [r for r in reranked_memory if r["_effective_distance"] <= cutoff][:memory_top_k]
 
-    # Build diagnostics
     diagnostics = _build_diagnostics(
         query=query,
         embedding_route=embedding_route,
-        knowledge_candidates=len(knowledge_candidates),
         memory_candidates=len(memory_candidates),
-        final_knowledge=final_knowledge,
         final_memory=final_memory,
     )
 
     log_event("retrieval_completed", **diagnostics)
 
     return RetrievalBundle(
-        knowledge_results=final_knowledge,
+        knowledge_results=[],
         memory_results=final_memory,
         diagnostics=diagnostics,
-    )
-
-
-def _empty_retrieval_bundle(query: str) -> RetrievalBundle:
-    """Return a logged empty bundle when all retrieval sources are disabled."""
-    diagnostics = {
-        "query_preview": query[:60],
-        "embedding_version": "",
-        "embedding_attempts": [],
-        "knowledge_candidates": 0,
-        "memory_candidates": 0,
-        "final_knowledge": 0,
-        "final_memory": 0,
-        "top_hits": [],
-    }
-    log_event("retrieval_completed", **diagnostics)
-    return RetrievalBundle(
-        knowledge_results=[],
-        memory_results=[],
-        diagnostics=diagnostics,
-    )
-
-
-def _enabled_table_names(
-    *,
-    include_knowledge: bool,
-    include_memories: bool,
-) -> tuple[str, ...]:
-    """Return the enabled retrieval table names in embedder order."""
-    return tuple(
-        table_name
-        for table_name, enabled in (
-            ("knowledge", include_knowledge),
-            ("memories", include_memories),
-        )
-        if enabled
-    )
-
-
-def _search_if_enabled(
-    *,
-    enabled: bool,
-    table_name: str,
-    query_vector: list[float],
-    top_k: int,
-    persona_id: str,
-    query_text: str,
-    project_id: str,
-    embedding_version: str | None,
-) -> list[dict[str, Any]]:
-    """Search a table only when the corresponding source is enabled."""
-    if not enabled:
-        return []
-    return _safe_search(
-        table_name,
-        query_vector,
-        top_k,
-        persona_id,
-        query_text=query_text,
-        project_id=project_id,
-        embedding_version=embedding_version,
     )
 
 
@@ -199,12 +107,16 @@ def _safe_search(
     """Search with error handling — return empty on failure."""
     try:
         return search_records(
-            table_name, query_vector, top_k, persona_id,
+            table_name=table_name,
+            query_vector=query_vector,
+            top_k=top_k,
+            persona_id=persona_id,
             query_text=query_text,
             project_id=project_id,
             embedding_version=embedding_version,
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning("retrieval search failed for %s: %s", table_name, exc)
         return []
 
 
@@ -271,21 +183,11 @@ def _build_diagnostics(
     *,
     query: str,
     embedding_route: QueryEmbeddingRoute,
-    knowledge_candidates: int,
     memory_candidates: int,
-    final_knowledge: list[dict[str, Any]],
     final_memory: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Build a diagnostics dict for logging and observability."""
     top_hits: list[dict[str, Any]] = []
-
-    for record in final_knowledge[:3]:
-        meta = parse_record_metadata(record)
-        top_hits.append({
-            "source": "knowledge",
-            "distance": record.get("_distance"),
-            "path": meta.get("path", ""),
-        })
 
     for record in final_memory[:3]:
         top_hits.append({
@@ -298,9 +200,9 @@ def _build_diagnostics(
         "query_preview": query[:60],
         "embedding_version": embedding_route.version,
         "embedding_attempts": embedding_route.attempted_versions,
-        "knowledge_candidates": knowledge_candidates,
+        "knowledge_candidates": 0,
         "memory_candidates": memory_candidates,
-        "final_knowledge": len(final_knowledge),
+        "final_knowledge": 0,
         "final_memory": len(final_memory),
         "top_hits": top_hits,
     }

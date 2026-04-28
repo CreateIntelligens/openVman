@@ -421,7 +421,9 @@ def test_websocket_drops_audio_before_client_init_and_uses_initialized_voice_sou
 
     assert len(FakeRelay.instances) == 1
     relay = FakeRelay.instances[0]
-    assert relay.voice_source == "custom"
+    # Backend no longer forwards voice_source to the relay — it's recorded on
+    # the session only, since TTS is handled by the frontend via /tts_stream.
+    assert relay.session.metadata["voice_source"] == "custom"
     assert relay.session.metadata["chat_session_id"] == "chat-123"
     assert [event["event"] for event in relay.sent_events] == ["client_audio_chunk"]
     assert relay.sent_events[0]["audio_base64"] == "ZGVm"
