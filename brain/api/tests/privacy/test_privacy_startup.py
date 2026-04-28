@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from privacy.filter import detect_llm_messages_pii
-from privacy.model import disable_privacy_filter, enable_regex_detector_for_tests
+from privacy.model import disable_privacy_filter, enable_stub_detector_for_tests
 
 
 class _Settings:
@@ -31,7 +31,7 @@ def test_model_load_failure_flag_passes_messages_through(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_startup_model_load_failure_disables_filter(monkeypatch) -> None:
-    enable_regex_detector_for_tests()
+    enable_stub_detector_for_tests()
 
     import main
     import privacy.filter as privacy_filter

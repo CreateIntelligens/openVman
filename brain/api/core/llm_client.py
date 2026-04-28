@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from threading import Lock
 from time import monotonic
@@ -15,12 +16,14 @@ from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
 from core.key_pool import classify_failure
 from core.provider_router import LLMRoute, get_provider_router
-from privacy.filter import FilterSource, PiiDetectionReport, detect_llm_messages_pii
+from privacy.filter import FilterSource, detect_llm_messages_pii
 from safety.observability import (
     record_chain_exhausted,
     record_fallback_hop,
     record_route_attempt,
 )
+
+_pii_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-scan")
 
 _CLIENT_CACHE_MAX = 32
 _SYNC_CLIENT_CACHE: "OrderedDict[tuple[str, str | None], OpenAI]" = OrderedDict()
@@ -60,7 +63,6 @@ class LLMReply:
     content: str
     tool_calls: list[LLMToolCall]
     model: str
-    pii_report: PiiDetectionReport | None = None
 
 
 def generate_chat_reply(
@@ -90,7 +92,11 @@ def generate_chat_turn(
     max_tokens: int | None = None,
 ) -> LLMReply:
     """Request one non-stream chat completion turn with fallback chain."""
-    pii_report = detect_llm_messages_pii(messages, source=privacy_source, trace_id=trace_id)
+    # PII scan runs in the background purely for audit / block-on-secret side effects;
+    # the report is no longer consumed by the chat pipeline.
+    _pii_executor.submit(
+        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
+    )
     response = _create_sync_completion(
         messages,
         tools=tools,
@@ -113,12 +119,7 @@ def generate_chat_turn(
     ]
     if not content and not tool_calls:
         raise ValueError("LLM 沒有回傳內容")
-    return LLMReply(
-        content=content,
-        tool_calls=tool_calls,
-        model=response.model,
-        pii_report=pii_report,
-    )
+    return LLMReply(content=content, tool_calls=tool_calls, model=response.model)
 
 
 def stream_chat_turn(
@@ -136,7 +137,9 @@ def stream_chat_turn(
     Identical return type and signature to generate_chat_turn — callers need no changes.
     Reuses the provider fallback chain and key-pool infrastructure.
     """
-    pii_report = detect_llm_messages_pii(messages, source=privacy_source, trace_id=trace_id)
+    _pii_executor.submit(
+        detect_llm_messages_pii, messages, source=privacy_source, trace_id=trace_id
+    )
     _require_api_key()
     cfg = get_settings()
     router = get_provider_router()
@@ -150,7 +153,7 @@ def stream_chat_turn(
         create_kwargs["max_tokens"] = max_tokens
 
     if legacy_routes:
-        return _stream_routes(legacy_routes, messages, cfg, router, create_kwargs, pii_report=pii_report)
+        return _stream_routes(legacy_routes, messages, cfg, router, create_kwargs)
 
     errors: list[str] = []
     last_reason = ""
@@ -167,7 +170,6 @@ def stream_chat_turn(
                     **create_kwargs,
                 ),
                 model=hop.model,
-                pii_report=pii_report,
             )
             router.mark_success(hop.api_key)
             record_route_attempt(
@@ -186,6 +188,7 @@ def stream_chat_turn(
             last_reason = _record_hop_failure(hop, exc, _now_ms() - t0, chain, errors, tid)
 
     _raise_chain_exhausted(tid, errors, last_reason, len(chain))
+    raise RuntimeError("unreachable")
 
 
 def _resolve_chain_or_routes(
@@ -380,7 +383,7 @@ def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: 
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
-def _consume_stream(stream: Any, *, model: str, pii_report: PiiDetectionReport | None = None) -> LLMReply:
+def _consume_stream(stream: Any, *, model: str) -> LLMReply:
     """Drain a streaming completion and return an LLMReply.
 
     Accumulates text tokens into content or assembles tool call fragments by
@@ -430,9 +433,9 @@ def _consume_stream(stream: Any, *, model: str, pii_report: PiiDetectionReport |
             )
             for idx in sorted(tool_call_acc)
         ]
-        return LLMReply(content="", tool_calls=tool_calls, model=model, pii_report=pii_report)
+        return LLMReply(content="", tool_calls=tool_calls, model=model)
 
-    return LLMReply(content=text_buf.strip(), tool_calls=[], model=model, pii_report=pii_report)
+    return LLMReply(content=text_buf.strip(), tool_calls=[], model=model)
 
 
 def _stream_routes(
@@ -441,8 +444,6 @@ def _stream_routes(
     cfg: Any,
     router: Any,
     create_kwargs: dict[str, Any],
-    *,
-    pii_report: PiiDetectionReport | None = None,
 ) -> LLMReply:
     """Legacy route loop for streaming when no fallback chain is configured."""
     errors: list[str] = []
@@ -458,7 +459,6 @@ def _stream_routes(
                     **create_kwargs,
                 ),
                 model=route.model,
-                pii_report=pii_report,
             )
             router.mark_success(route.api_key)
             return reply

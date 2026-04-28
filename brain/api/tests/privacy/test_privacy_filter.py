@@ -8,7 +8,7 @@ import pytest
 
 from privacy.exceptions import PrivacyViolationError
 from privacy.filter import detect_llm_messages_pii
-from privacy.model import enable_regex_detector_for_tests
+from privacy.model import enable_stub_detector_for_tests
 
 
 class _Settings:
@@ -30,7 +30,7 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch, **overrides: object) -> _Se
     import privacy.filter as privacy_filter
 
     monkeypatch.setattr(privacy_filter, "get_settings", lambda: settings)
-    enable_regex_detector_for_tests()
+    enable_stub_detector_for_tests()
     return settings
 
 

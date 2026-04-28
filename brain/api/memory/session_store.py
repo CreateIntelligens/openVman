@@ -115,7 +115,7 @@ class SessionStore:
         role: str,
         content: str,
         metadata: dict[str, Any] | None = None,
-    ) -> SessionState:
+    ) -> tuple[SessionState, int]:
         cfg = get_settings()
         now = utc_now_iso()
         max_messages = max(cfg.max_session_rounds * 2, 20)
@@ -126,10 +126,11 @@ class SessionStore:
             self._prune_expired_sessions_locked()
             with self._connect() as conn:
                 self._ensure_session_persona_locked(conn, session_id, persona_key, now)
-                conn.execute(
+                cursor = conn.execute(
                     "INSERT INTO messages(session_id, role, content, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
                     (session_id, role, content, now, metadata_json),
                 )
+                message_id = int(cursor.lastrowid or 0)
 
                 # Prune oldest messages beyond the limit
                 overflow_ids = [
@@ -142,7 +143,26 @@ class SessionStore:
                     placeholders = ",".join("?" for _ in overflow_ids)
                     conn.execute(f"DELETE FROM messages WHERE id IN ({placeholders})", overflow_ids)
                 conn.commit()
-                return self._load_session_locked(conn, session_id)
+                return self._load_session_locked(conn, session_id), message_id
+
+    def update_message_metadata(self, message_id: int, metadata: dict[str, Any]) -> None:
+        """Merge ``metadata`` into the existing message metadata."""
+        if message_id <= 0 or not metadata:
+            return
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT metadata FROM messages WHERE id = ?", (message_id,),
+                ).fetchone()
+                if row is None:
+                    return
+                existing = json.loads(row[0]) if row[0] else {}
+                existing.update(metadata)
+                conn.execute(
+                    "UPDATE messages SET metadata = ? WHERE id = ?",
+                    (json.dumps(existing, ensure_ascii=False), message_id),
+                )
+                conn.commit()
 
     def list_messages(
         self,

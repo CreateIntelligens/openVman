@@ -32,6 +32,7 @@ class _Span:
 
 _opf: OPF | None = None
 _runtime_disabled_reason: str | None = None
+_regex_fallback_for_tests: bool = False
 
 
 def load_privacy_filter_model() -> None:
@@ -77,11 +78,18 @@ def privacy_filter_runtime_enabled() -> bool:
     return _runtime_disabled_reason is None
 
 
-def enable_regex_detector_for_tests() -> None:
-    """Reset to regex-only mode for deterministic unit tests."""
-    global _opf, _runtime_disabled_reason
+def enable_stub_detector_for_tests() -> None:
+    """Reset to regex-only stub mode for unit tests.
+
+    Tests using this helper verify the privacy *pipeline plumbing* (routing,
+    caching, audit events) — not OPF detection accuracy.  Use the
+    ``@pytest.mark.integration`` test suite for real OPF behaviour.
+    """
+    global _opf, _runtime_disabled_reason, _regex_fallback_for_tests
     _opf = None
     _runtime_disabled_reason = None
+    _regex_fallback_for_tests = True
+
 
 
 def detect_and_mask(text: str) -> tuple[str, dict[str, int]]:
@@ -93,16 +101,15 @@ def detect_and_mask(text: str) -> tuple[str, dict[str, int]]:
 
 def _detect_spans(text: str) -> list[_Span]:
     if _opf is not None:
-        try:
-            result = _opf.redact(text)
-            return [
-                _Span(start=s.start, end=s.end, category=s.label)
-                for s in result.detected_spans
-                if s.label in PII_CATEGORIES
-            ]
-        except Exception:
-            pass
-    return _pattern_spans(text)
+        result = _opf.redact(text)
+        return [
+            _Span(start=s.start, end=s.end, category=s.label)
+            for s in result.detected_spans
+            if s.label in PII_CATEGORIES
+        ]
+    if _regex_fallback_for_tests:
+        return _pattern_spans(text)
+    return []
 
 
 # ---------------------------------------------------------------------------

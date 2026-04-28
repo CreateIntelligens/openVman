@@ -69,22 +69,6 @@ export function attachPrivacyWarningToLastUserMessage(
   ];
 }
 
-export function mergeUserPrivacyWarnings(history: ChatMessage[], current: ChatMessage[]) {
-  const warnings = current
-    .filter((message) => message.role === "user")
-    .map((message) => message.privacy_warning);
-
-  let userIndex = 0;
-  return history.map((message) => {
-    if (message.role !== "user") {
-      return message;
-    }
-    const warning = warnings[userIndex];
-    userIndex += 1;
-    return warning ? { ...message, privacy_warning: warning } : message;
-  });
-}
-
 export function parseMetadata(raw?: string) {
   if (!raw) return {};
   try {

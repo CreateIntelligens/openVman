@@ -49,10 +49,10 @@ def test_generate_chat_turn_sends_original_messages_and_returns_report(monkeypat
     monkeypatch.setattr(llm_client, "_resolve_chain_or_routes", lambda trace_id: ([], [MagicMock(model="m1", api_key="key", base_url="")]))
 
     import privacy.filter as privacy_filter
-    from privacy.model import enable_regex_detector_for_tests
+    from privacy.model import enable_stub_detector_for_tests
 
     monkeypatch.setattr(privacy_filter, "get_settings", lambda: settings)
-    enable_regex_detector_for_tests()
+    enable_stub_detector_for_tests()
 
     response = MagicMock()
     response.model = "m1"

@@ -63,6 +63,7 @@ export interface ChatResponse {
   memory_results: RetrievalResult[];
   history: ChatMessage[];
   tool_steps?: ToolStep[];
+  pii_pending?: boolean;
 }
 
 

@@ -83,7 +83,7 @@ async def chat(request: Request, payload: ChatRequest):
         result = await asyncio.to_thread(execute_generation, context)
         response_time_s = round(time.monotonic() - t0, 2)
         response = finalize_generation(
-            context, result.reply, result.tool_steps, response_time_s, result.pii_report,
+            context, result.reply, result.tool_steps, response_time_s,
         )
         response["tool_steps"] = result.tool_steps
         response["response_time_s"] = response_time_s
@@ -112,6 +112,9 @@ async def chat_history(session_id: str, project_id: str = "default", persona_id:
             rts = metadata.get("response_time_s")
             if rts is not None:
                 entry["response_time_s"] = rts
+            pw = metadata.get("privacy_warning")
+            if isinstance(pw, dict) and pw:
+                entry["privacy_warning"] = pw
         history.append(entry)
     return {"session_id": session_id, "persona_id": persona_id, "history": history}
 

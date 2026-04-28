@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -15,10 +16,11 @@ from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
 from infra.learnings import record_error_event
 from memory.memory import (
-    append_session_message,
+    append_session_message_with_id,
     archive_session_turn,
     get_or_create_session,
     list_session_messages,
+    update_session_message_metadata,
 )
 from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
 from privacy.filter import PiiDetectionReport, detect_llm_messages_pii
@@ -30,6 +32,8 @@ from protocol.message_envelope import (
     serialize_context,
 )
 from safety.guardrails import enforce_guardrails, enforce_session_limits
+
+_pii_writeback_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-writeback")
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +74,6 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
     route = route_message(normalize_to_brain_message(envelope))
     session = get_or_create_session(envelope.context.session_id, persona_id, project_id=project_id)
     prior_messages = list_session_messages(session.session_id, persona_id, project_id=project_id)
-    append_session_message(session.session_id, persona_id, "user", stored_user_message, project_id=project_id)
 
     request_ctx = serialize_context(envelope.context)
     prompt_messages = build_chat_messages(
@@ -112,21 +115,6 @@ def _pii_to_warning(report: PiiDetectionReport | None) -> dict[str, Any] | None:
     return {"categories": list(report.categories), "counts": dict(report.counts)}
 
 
-def _pii_to_warning_last_user(
-    report: PiiDetectionReport | None,
-    prompt_messages: list[dict[str, Any]],
-) -> dict[str, Any] | None:
-    """Return PII warning counts for the last user message only."""
-    if report is None or not report.per_message:
-        return None
-    per = report.per_message
-    for i, msg in reversed(list(enumerate(prompt_messages))):
-        if msg.get("role") == "user" and i < len(per) and per[i]:
-            counts = per[i]
-            return {"categories": sorted(counts), "counts": dict(counts)}
-    return None
-
-
 def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> None:
     """Run memory governance off the request hot path."""
     persona_id = context.persona_id
@@ -158,12 +146,39 @@ def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> N
         _work()
 
 
+def _scan_reply_pii(reply: str, trace_id: str) -> dict[str, Any] | None:
+    """Run OPF on a reply and return the warning dict (or None)."""
+    try:
+        report = detect_llm_messages_pii(
+            [{"role": "user", "content": reply}],
+            source="chat",
+            trace_id=trace_id,
+        )
+        return _pii_to_warning(report)
+    except Exception:
+        logger.exception("[privacy] reply PII scan failed")
+        return None
+
+
+def _patch_reply_pii_metadata(
+    future: Any, message_id: int, project_id: str,
+) -> None:
+    """Background task: wait for PII scan and write the warning to DB."""
+    try:
+        warning = future.result()
+        if warning:
+            update_session_message_metadata(
+                message_id, {"privacy_warning": warning}, project_id=project_id,
+            )
+    except Exception:
+        logger.exception("[privacy] reply PII writeback failed")
+
+
 def finalize_generation(
     context: GenerationContext,
     reply: str,
     tool_steps: list[dict[str, Any]] | None = None,
     response_time_s: float | None = None,
-    pii_report: PiiDetectionReport | None = None,
 ) -> dict[str, Any]:
     """Persist the assistant reply and return the standard API payload.
 
@@ -174,23 +189,35 @@ def finalize_generation(
     if not cleaned_reply:
         raise ValueError("LLM 沒有回傳內容")
 
-    reply_pii = detect_llm_messages_pii(
-        [{"role": "user", "content": cleaned_reply}],
-        source="chat",
-        trace_id=context.trace_id,
+    # Run user + reply PII scans in the background so they don't block the response.
+    user_pii_future = _pii_writeback_executor.submit(
+        _scan_reply_pii, context.user_message, context.trace_id,
     )
-    reply_warning = _pii_to_warning(reply_pii)
+    reply_pii_future = _pii_writeback_executor.submit(
+        _scan_reply_pii, cleaned_reply, context.trace_id,
+    )
+
+    _, user_message_id = append_session_message_with_id(
+        context.session_id, context.persona_id, "user", context.user_message,
+        project_id=context.project_id,
+    )
+    _pii_writeback_executor.submit(
+        _patch_reply_pii_metadata,
+        user_pii_future, user_message_id, context.project_id,
+    )
 
     meta: dict[str, Any] = {}
     if tool_steps:
         meta["tool_steps"] = tool_steps
     if response_time_s is not None:
         meta["response_time_s"] = response_time_s
-    if reply_warning:
-        meta["privacy_warning"] = reply_warning
-    append_session_message(
+    _, assistant_message_id = append_session_message_with_id(
         context.session_id, context.persona_id, "assistant", cleaned_reply,
         project_id=context.project_id, metadata=meta or None,
+    )
+    _pii_writeback_executor.submit(
+        _patch_reply_pii_metadata,
+        reply_pii_future, assistant_message_id, context.project_id,
     )
     archive_session_turn(
         context.session_id,
@@ -203,12 +230,20 @@ def finalize_generation(
 
     history = [_serialize_history_message(msg) for msg in context.prior_messages]
     user_entry: dict[str, Any] = {"role": "user", "content": context.user_message}
-    if warning := _pii_to_warning_last_user(pii_report, context.prompt_messages):
-        user_entry["privacy_warning"] = warning
+    # Opportunistic: include user/reply warnings if scans finished in time.
+    pii_pending = False
+    if user_pii_future.done():
+        if (warning := user_pii_future.result()) is not None:
+            user_entry["privacy_warning"] = warning
+    else:
+        pii_pending = True
     history.append(user_entry)
     assistant_entry: dict[str, Any] = {"role": "assistant", "content": cleaned_reply}
-    if reply_warning:
-        assistant_entry["privacy_warning"] = reply_warning
+    if reply_pii_future.done():
+        if (warning := reply_pii_future.result()) is not None:
+            assistant_entry["privacy_warning"] = warning
+    else:
+        pii_pending = True
     if tool_steps:
         assistant_entry["tool_steps"] = tool_steps
     if response_time_s is not None:
@@ -221,6 +256,7 @@ def finalize_generation(
         "request_context": context.request_context,
         "reply": cleaned_reply,
         "history": history,
+        "pii_pending": pii_pending,
     }
 
 
@@ -262,11 +298,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             privacy_source="chat",
             trace_id=trace_id,
         )
-        return AgentLoopResult(
-            reply=_reply_from_turn(turn),
-            tool_steps=[],
-            pii_report=turn.pii_report,
-        )
+        return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=[])
     try:
         return run_agent_loop(
             context.prompt_messages,
@@ -281,11 +313,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             privacy_source="tool",
             trace_id=trace_id,
         )
-        return AgentLoopResult(
-            reply=_reply_from_turn(turn),
-            tool_steps=exc.partial_steps,
-            pii_report=turn.pii_report,
-        )
+        return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=exc.partial_steps)
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:

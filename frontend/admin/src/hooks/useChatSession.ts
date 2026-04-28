@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchChat,
+  fetchChatHistory,
   type ActionRequest,
   type ChatMessage as ChatMessageType,
   type RetrievalResult,
@@ -8,7 +9,6 @@ import {
 import {
   addPendingExchange,
   getConversationTitle,
-  mergeUserPrivacyWarnings,
   removeEmptyAssistantDraft,
   starterPrompts,
 } from "../components/chat/helpers";
@@ -34,7 +34,34 @@ type ChatResultPayload = {
   history?: ChatMessageType[];
   tool_steps?: import("../api/chat").ToolStep[];
   response_time_s?: number;
+  pii_pending?: boolean;
 };
+
+const PII_POLL_INTERVAL_MS = 2000;
+const PII_POLL_TIMEOUT_MS = 10000;
+
+async function pollForReplyPiiWarning(
+  sessionId: string,
+  personaId: string,
+  applyHistory: (history: ChatMessageType[]) => void,
+): Promise<void> {
+  const deadline = performance.now() + PII_POLL_TIMEOUT_MS;
+  while (performance.now() < deadline) {
+    await new Promise((r) => setTimeout(r, PII_POLL_INTERVAL_MS));
+    try {
+      const { history } = await fetchChatHistory(sessionId, personaId);
+      const reversed = [...history].reverse();
+      const lastAssistant = reversed.find((m) => m.role === "assistant");
+      const lastUser = reversed.find((m) => m.role === "user");
+      if (lastAssistant?.privacy_warning || lastUser?.privacy_warning) {
+        applyHistory(history);
+        return;
+      }
+    } catch {
+      return;
+    }
+  }
+}
 
 function getLastAssistantActions(messages: ChatMessageType[]): ActionRequest[] | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -54,7 +81,7 @@ function applyChatResultToMessages(
   const pendingActions = getLastAssistantActions(current);
 
   if (payload.history) {
-    const history = mergeUserPrivacyWarnings([...payload.history], current);
+    const history = [...payload.history];
     for (let index = history.length - 1; index >= 0; index -= 1) {
       const message = history[index];
       if (message.role !== "assistant") {
@@ -307,6 +334,30 @@ export function useChatSession() {
       }
 
       applyChatResult({ ...payload, response_time_s });
+
+      if (payload.pii_pending && payload.session_id) {
+        void pollForReplyPiiWarning(
+          payload.session_id,
+          selectedPersonaId,
+          (history) => setMessages((current) => {
+            const merged = [...history];
+            // Preserve sources / action_requests / tool_steps that the chat response
+            // already attached to the latest assistant — history endpoint may lack them.
+            const last = current[current.length - 1];
+            if (last?.role === "assistant" && merged.length > 0) {
+              const idx = merged.length - 1;
+              merged[idx] = {
+                ...merged[idx],
+                sources: last.sources ?? merged[idx].sources,
+                action_requests: last.action_requests ?? merged[idx].action_requests,
+                tool_steps: last.tool_steps ?? merged[idx].tool_steps,
+                response_time_s: last.response_time_s ?? merged[idx].response_time_s,
+              };
+            }
+            return merged;
+          }),
+        );
+      }
     } catch (reason) {
       if (controller.signal.aborted) {
         showStoppedReplyNotice();
