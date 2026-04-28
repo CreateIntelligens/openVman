@@ -86,7 +86,7 @@ class BrainSettings(BaseSettings):
     rag_knowledge_top_k: int = 5
     rag_memory_top_k: int = 3
     rag_rerank_candidate_multiplier: int = 4
-    rag_distance_cutoff: float = 1.2
+    rag_distance_cutoff: float = 0.85
     rag_memory_distance_bonus: float = 0.02
     max_session_rounds: int = 100
     max_session_ttl_minutes: int = 30 * 24 * 60

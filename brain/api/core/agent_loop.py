@@ -161,7 +161,7 @@ def _assistant_tool_message(turn: LLMReply) -> dict[str, Any]:
 
 
 def _serialize_tool_call(tool_call: LLMToolCall) -> dict[str, Any]:
-    payload = {
+    payload: dict[str, Any] = {
         "id": tool_call.id,
         "type": "function",
         "function": {
@@ -170,7 +170,12 @@ def _serialize_tool_call(tool_call: LLMToolCall) -> dict[str, Any]:
         },
     }
     if tool_call.extra_content:
-        payload["extra_content"] = tool_call.extra_content
+        if sig := tool_call.extra_content.get("thought_signature"):
+            # Gemini requires thought_signature nested under extra_content.google
+            payload["extra_content"] = {"google": {"thought_signature": sig}}
+        for k, v in tool_call.extra_content.items():
+            if k != "thought_signature":
+                payload[k] = v
     return payload
 
 
@@ -181,8 +186,8 @@ def _append_tool_turns(
 ) -> None:
     working_messages.append(_assistant_tool_message(turn))
     steps = _execute_tool_calls(turn.tool_calls)
+    tool_steps.extend(steps)
     for step in steps:
-        tool_steps.append(step)
         working_messages.append(
             {
                 "role": "tool",

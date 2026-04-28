@@ -4,12 +4,23 @@ from __future__ import annotations
 
 import uuid
 from collections import OrderedDict
-from time import monotonic
 from dataclasses import dataclass
 from threading import Lock
+from time import monotonic
 from typing import Any, cast
 
 from openai import OpenAI
+
+from config import get_settings
+from core.fallback_chain import RouteHop, build_fallback_chain
+from core.key_pool import classify_failure
+from core.provider_router import LLMRoute, get_provider_router
+from privacy.filter import FilterSource, PiiDetectionReport, detect_llm_messages_pii
+from safety.observability import (
+    record_chain_exhausted,
+    record_fallback_hop,
+    record_route_attempt,
+)
 
 _CLIENT_CACHE_MAX = 32
 _SYNC_CLIENT_CACHE: "OrderedDict[tuple[str, str | None], OpenAI]" = OrderedDict()
@@ -28,17 +39,6 @@ def _get_sync_client(api_key: str, base_url: str | None) -> OpenAI:
         if len(_SYNC_CLIENT_CACHE) > _CLIENT_CACHE_MAX:
             _SYNC_CLIENT_CACHE.popitem(last=False)
         return client
-
-from config import get_settings
-from core.fallback_chain import RouteHop, build_fallback_chain
-from core.key_pool import classify_failure
-from core.provider_router import LLMRoute, get_provider_router
-from privacy.filter import FilterSource, PiiDetectionReport, detect_llm_messages_pii
-from safety.observability import (
-    record_chain_exhausted,
-    record_fallback_hop,
-    record_route_attempt,
-)
 
 
 def _require_api_key() -> None:
@@ -61,7 +61,6 @@ class LLMReply:
     tool_calls: list[LLMToolCall]
     model: str
     pii_report: PiiDetectionReport | None = None
-
 
 
 def generate_chat_reply(
@@ -287,14 +286,14 @@ def _create_sync_completion(
 
     errors: list[str] = []
     last_reason = ""
+    create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+    if max_tokens:
+        create_kwargs["max_tokens"] = max_tokens
 
     for hop in chain:
         t0 = _now_ms()
         client = _get_sync_client(hop.api_key, hop.base_url)
         try:
-            create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
-            if max_tokens:
-                create_kwargs["max_tokens"] = max_tokens
             response = client.chat.completions.create(
                 model=hop.model,
                 messages=cast(Any, messages),
@@ -360,12 +359,12 @@ def _apply_model_override(
 def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: str | None = None, max_tokens: int | None = None):
     """Legacy route loop for when no fallback chain is configured."""
     errors: list[str] = []
+    create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
+    if max_tokens:
+        create_kwargs["max_tokens"] = max_tokens
     for route in routes:
         client = _get_sync_client(route.api_key, route.base_url)
         try:
-            create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
-            if max_tokens:
-                create_kwargs["max_tokens"] = max_tokens
             response = client.chat.completions.create(
                 model=route.model,
                 messages=cast(Any, messages),
@@ -402,9 +401,9 @@ def _consume_stream(stream: Any, *, model: str, pii_report: PiiDetectionReport |
             text_buf += delta.content
         if delta.tool_calls:
             for tc_delta in delta.tool_calls:
-                idx = tc_delta.index
+                idx = tc_delta.index if tc_delta.index is not None else 0
                 if idx not in tool_call_acc:
-                    tool_call_acc[idx] = {"id": "", "name": "", "arguments_buf": ""}
+                    tool_call_acc[idx] = {"id": "", "name": "", "arguments_buf": "", "thought_signature": ""}
                 entry = tool_call_acc[idx]
                 if tc_delta.id:
                     entry["id"] = tc_delta.id
@@ -413,6 +412,10 @@ def _consume_stream(stream: Any, *, model: str, pii_report: PiiDetectionReport |
                         entry["name"] += tc_delta.function.name
                     if tc_delta.function.arguments:
                         entry["arguments_buf"] += tc_delta.function.arguments
+                extra = getattr(tc_delta, "model_extra", None) or {}
+                google_extra = (extra.get("extra_content") or {}).get("google") or {}
+                if sig := google_extra.get("thought_signature"):
+                    entry["thought_signature"] += sig
 
     if not text_buf and not tool_call_acc:
         raise ValueError("LLM 沒有回傳內容")
@@ -423,6 +426,7 @@ def _consume_stream(stream: Any, *, model: str, pii_report: PiiDetectionReport |
                 id=tool_call_acc[idx]["id"],
                 name=tool_call_acc[idx]["name"],
                 arguments=tool_call_acc[idx]["arguments_buf"],
+                extra_content={"thought_signature": tool_call_acc[idx]["thought_signature"]} if tool_call_acc[idx].get("thought_signature") else None,
             )
             for idx in sorted(tool_call_acc)
         ]
@@ -484,9 +488,16 @@ def _now_ms() -> float:
 
 def _extract_tool_call_extra_content(tool_call: Any) -> dict[str, Any] | None:
     extra_content = getattr(tool_call, "extra_content", None)
-    if extra_content is not None:
-        return extra_content
+    if isinstance(extra_content, dict):
+        google = extra_content.get("google") or {}
+        if sig := google.get("thought_signature"):
+            return {"thought_signature": sig}
+        if sig := extra_content.get("thought_signature"):
+            return {"thought_signature": sig}
 
     model_extra = getattr(tool_call, "model_extra", None) or {}
-    extra = model_extra.get("extra_content")
-    return extra if isinstance(extra, dict) else None
+    google_extra = (model_extra.get("extra_content") or {}).get("google") or {}
+    if sig := google_extra.get("thought_signature"):
+        return {"thought_signature": sig}
+
+    return None
