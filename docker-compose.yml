@@ -17,10 +17,12 @@ services:
       - ./contracts:/contracts:ro
       - hf-cache:/home/appuser/.cache/huggingface
       - opf-cache:/home/appuser/.opf
+      - triton-cache:/home/appuser/.triton
     env_file:
       - ./brain/.env
     environment:
       - HOME=/home/appuser
+      - OPF_MOE_TRITON=false
     deploy:
       resources:
         reservations:
@@ -179,6 +181,7 @@ services:
 volumes:
   hf-cache:
   opf-cache:
+  triton-cache:
   admin-node-modules:
   avatar-node-modules:
   redis-data:
