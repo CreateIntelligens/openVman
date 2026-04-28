@@ -21,7 +21,7 @@ from memory.memory import (
     list_session_messages,
 )
 from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
-from privacy.filter import PiiDetectionReport
+from privacy.filter import PiiDetectionReport, detect_llm_messages_pii
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
     MessageEnvelope,
@@ -101,6 +101,8 @@ def _serialize_history_message(msg: dict[str, Any]) -> dict[str, Any]:
         entry["tool_steps"] = steps
     if rts := msg_meta.get("response_time_s"):
         entry["response_time_s"] = rts
+    if pw := msg_meta.get("privacy_warning"):
+        entry["privacy_warning"] = pw
     return entry
 
 
@@ -108,6 +110,21 @@ def _pii_to_warning(report: PiiDetectionReport | None) -> dict[str, Any] | None:
     if report is None or not report.counts:
         return None
     return {"categories": list(report.categories), "counts": dict(report.counts)}
+
+
+def _pii_to_warning_last_user(
+    report: PiiDetectionReport | None,
+    prompt_messages: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Return PII warning counts for the last user message only."""
+    if report is None or not report.per_message:
+        return None
+    per = report.per_message
+    for i, msg in reversed(list(enumerate(prompt_messages))):
+        if msg.get("role") == "user" and i < len(per) and per[i]:
+            counts = per[i]
+            return {"categories": sorted(counts), "counts": dict(counts)}
+    return None
 
 
 def _schedule_memory_writes(context: GenerationContext, cleaned_reply: str) -> None:
@@ -157,11 +174,20 @@ def finalize_generation(
     if not cleaned_reply:
         raise ValueError("LLM 沒有回傳內容")
 
+    reply_pii = detect_llm_messages_pii(
+        [{"role": "user", "content": cleaned_reply}],
+        source="chat",
+        trace_id=context.trace_id,
+    )
+    reply_warning = _pii_to_warning(reply_pii)
+
     meta: dict[str, Any] = {}
     if tool_steps:
         meta["tool_steps"] = tool_steps
     if response_time_s is not None:
         meta["response_time_s"] = response_time_s
+    if reply_warning:
+        meta["privacy_warning"] = reply_warning
     append_session_message(
         context.session_id, context.persona_id, "assistant", cleaned_reply,
         project_id=context.project_id, metadata=meta or None,
@@ -177,10 +203,12 @@ def finalize_generation(
 
     history = [_serialize_history_message(msg) for msg in context.prior_messages]
     user_entry: dict[str, Any] = {"role": "user", "content": context.user_message}
-    if warning := _pii_to_warning(pii_report):
+    if warning := _pii_to_warning_last_user(pii_report, context.prompt_messages):
         user_entry["privacy_warning"] = warning
     history.append(user_entry)
     assistant_entry: dict[str, Any] = {"role": "assistant", "content": cleaned_reply}
+    if reply_warning:
+        assistant_entry["privacy_warning"] = reply_warning
     if tool_steps:
         assistant_entry["tool_steps"] = tool_steps
     if response_time_s is not None:

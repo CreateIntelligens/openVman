@@ -46,6 +46,27 @@ def load_privacy_filter_model() -> None:
     _opf.redact("warmup")
 
 
+def load_privacy_filter_model_cpu() -> None:
+    """Load the OPF model on CPU (fallback when GPU is unavailable)."""
+    global _opf, _runtime_disabled_reason
+    import os
+    from opf import OPF
+    # Hide GPU only for OPF init; torch caches device visibility at first use so
+    # we must set the env var before the first torch CUDA call inside OPF.
+    old = os.environ.get("CUDA_VISIBLE_DEVICES")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    try:
+        _opf = OPF(trim_whitespace=True, device="cpu")  # type: ignore[call-arg]
+        _runtime_disabled_reason = None
+        assert _opf is not None
+        _opf.redact("warmup")
+    finally:
+        if old is None:
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            os.environ["CUDA_VISIBLE_DEVICES"] = old
+
+
 def disable_privacy_filter(reason: str) -> None:
     """Disable runtime filtering after startup load failure."""
     global _runtime_disabled_reason
@@ -72,12 +93,15 @@ def detect_and_mask(text: str) -> tuple[str, dict[str, int]]:
 
 def _detect_spans(text: str) -> list[_Span]:
     if _opf is not None:
-        result = _opf.redact(text)
-        return [
-            _Span(start=s.start, end=s.end, category=s.label)
-            for s in result.detected_spans
-            if s.label in PII_CATEGORIES
-        ]
+        try:
+            result = _opf.redact(text)
+            return [
+                _Span(start=s.start, end=s.end, category=s.label)
+                for s in result.detected_spans
+                if s.label in PII_CATEGORIES
+            ]
+        except Exception:
+            pass
     return _pattern_spans(text)
 
 
