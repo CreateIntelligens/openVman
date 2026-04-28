@@ -100,8 +100,11 @@ export default function MessageMeta({
   const [refsOpen, setRefsOpen] = useState(false);
   const toggleRefs = useCallback(() => setRefsOpen((v) => !v), []);
 
-  const hasTools = toolSteps && toolSteps.length > 0;
-  const refs = useMemo(() => (hasTools ? allReferences(toolSteps) : []), [hasTools, toolSteps]);
+  const hasTools = Boolean(toolSteps?.length);
+  const refs = useMemo(
+    () => (hasTools ? allReferences(toolSteps!) : []),
+    [toolSteps],
+  );
   const hasRefs = refs.length > 0;
 
   const knowledgeSources = sources?.knowledge ?? [];
@@ -114,7 +117,7 @@ export default function MessageMeta({
   return (
     <div className="mt-2 text-xs text-slate-400 dark:text-slate-500 space-y-1.5">
 
-      {/* Row 1: References toggle + timer */}
+      {/* Single summary row */}
       <div className="flex items-center gap-2 flex-wrap">
         {hasRefs && (
           <button
@@ -132,6 +135,18 @@ export default function MessageMeta({
             <span className="material-symbols-outlined text-[10px]">{refsOpen ? "expand_less" : "expand_more"}</span>
           </button>
         )}
+        {hasTools && (
+          <>
+            <span className="material-symbols-outlined text-[11px]">build</span>
+            {toolSteps.map((s, i) => (
+              <span key={i} className="inline-flex items-center gap-1">
+                {toolLabel(s.name)}
+                {s.duration_s != null && <span className="opacity-40">{s.duration_s}s</span>}
+                {i < toolSteps.length - 1 && <span className="opacity-30">·</span>}
+              </span>
+            ))}
+          </>
+        )}
         {hasTiming && (
           <span className="inline-flex items-center gap-1">
             <span className="material-symbols-outlined text-[11px]">timer</span>
@@ -145,22 +160,6 @@ export default function MessageMeta({
         <div className="space-y-1.5 pl-0.5">
           {refs.map((item, i) => (
             <RefBadge key={i} item={item} index={i} />
-          ))}
-        </div>
-      )}
-
-      {/* Row 2: Tools used (no expand) */}
-      {hasTools && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="material-symbols-outlined text-[11px]">build</span>
-          {toolSteps.map((s, i) => (
-            <span key={i} className="inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
-              {toolLabel(s.name)}
-              {s.duration_s != null && (
-                <span className="opacity-40">{s.duration_s}s</span>
-              )}
-              {i < toolSteps.length - 1 && <span className="opacity-30">·</span>}
-            </span>
           ))}
         </div>
       )}

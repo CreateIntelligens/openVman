@@ -62,8 +62,7 @@ export default function ChatMessage({
   const timestamp = formatMessageTime(createdAt);
   const shouldRenderMarkdown = renderMarkdown ?? isAssistantMessage;
   const privacyWarning = message.privacy_warning;
-  const shouldShowPrivacyWarning = isUserMessage
-    && Boolean(privacyWarningsVisible)
+  const shouldShowPrivacyWarning = Boolean(privacyWarningsVisible)
     && hasPiiWarning(privacyWarning);
   const privacyWarningText = shouldShowPrivacyWarning
     ? formatPiiWarningSummary(privacyWarning)
@@ -132,7 +131,7 @@ export default function ChatMessage({
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{renderWithRedactions(message.content)}</p>
       )}
       {shouldShowPrivacyWarning && (
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-primary-100/90">
+        <div className="mt-4 pt-3 border-t border-amber-200/60 dark:border-amber-700/40 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
           <span className="material-symbols-outlined text-[0.95rem]">privacy_tip</span>
           <span>{`偵測到：${privacyWarningText}`}</span>
         </div>
