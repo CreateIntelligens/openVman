@@ -3,9 +3,9 @@
     <main class="kiosk-layout">
       <section class="stage-panel">
         <div class="stage-hero">
-          <h1>openVman 數位接待</h1>
+          <h1>openVman 虛擬人</h1>
           <p class="stage-panel__intro">
-            數位接待控制台，可在此與虛擬人即時互動。
+            虛擬人控制台，可在此與虛擬人即時互動。
           </p>
         </div>
 
@@ -23,17 +23,10 @@
 
       <aside class="console-column">
         <ControlBar
-          :characters="characters"
-          :current-char-id="wasm.currentCharId.value"
-          :tts-engine="settings.ttsEngine"
-          :personas="personas"
-          :current-persona-id="settings.personaId"
           :state="chat.state.value"
           :disabled="!wasm.isReady.value || wasm.isLoading.value"
           :error-message="wasm.error.value"
-          @char-change="handleCharChange"
-          @tts-change="handleTtsChange"
-          @persona-change="handlePersonaChange"
+          @open-settings="showSettings = true"
         />
 
         <ChatPanel
@@ -52,6 +45,27 @@
     <!-- Status toast notifications -->
     <StatusToast ref="statusToastRef" />
 
+    <!-- Settings modal -->
+    <SettingsModal
+      v-model:open="showSettings"
+      :characters="characters"
+      :current-char-id="wasm.currentCharId.value"
+      :tts-provider="settings.ttsProvider"
+      :tts-voice="settings.ttsVoice"
+      :tts-providers="ttsProviders"
+      :personas="personas"
+      :current-persona-id="settings.personaId"
+      :voice-mode="settings.voiceMode"
+      :state="chat.state.value"
+      :disabled="!wasm.isReady.value || wasm.isLoading.value"
+      @char-change="handleCharChange"
+      @tts-provider-change="handleTtsChange"
+      @tts-voice-change="handleTtsVoiceChange"
+      @persona-change="handlePersonaChange"
+      @voice-mode-change="handleVoiceModeChange"
+      @apply="handleSettingsApply"
+    />
+
     <!-- Fatal error overlay -->
     <ErrorOverlay
       v-if="fatalError"
@@ -68,13 +82,14 @@ import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";
 import type { PersonaSummary } from "./components/controls/ControlBar.vue";
+import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
 import { useAudioPlayer } from "./composables/useAudioPlayer";
 import { useAvatarChat } from "./composables/useAvatarChat";
 import { useAsr } from "./composables/useAsr";
 import { useMatesX } from "./composables/useMatesX";
-import { useTtsStreamer } from "./composables/useTtsStreamer";
+import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useSettingsStore } from "./stores/useSettingsStore";
 
@@ -82,6 +97,7 @@ const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
 
 const isStarted = ref(false);
 const isTyping = ref(false);
+const showSettings = ref(false);
 
 // Error overlay state (fatal errors shown full-screen)
 const fatalError = ref<{ code: string; message: string } | null>(null);
@@ -121,6 +137,7 @@ const characters = ref([
 
 const DEFAULT_PERSONA: PersonaSummary = { persona_id: "default", label: "預設" };
 const personas = ref<PersonaSummary[]>([DEFAULT_PERSONA]);
+const ttsProviders = ref<TtsProvider[]>([]);
 
 async function fetchPersonas(): Promise<void> {
   try {
@@ -134,6 +151,16 @@ async function fetchPersonas(): Promise<void> {
     if (items.length > 0) personas.value = items;
   } catch {
     // silently keep the default fallback
+  }
+}
+
+async function fetchTtsProviders(): Promise<void> {
+  try {
+    const res = await fetch("/v1/tts/providers");
+    if (!res.ok) return;
+    ttsProviders.value = await res.json();
+  } catch {
+    // silently keep empty — SettingsModal falls back to showing nothing
   }
 }
 
@@ -180,7 +207,9 @@ const ttsStreamer = useTtsStreamer({
 
 const chat = useAvatarChat({
   personaId: settings.personaId,
+  mode: settings.voiceMode,
   onAudioChunk: (data) => audio.playChunk(data),
+  onDisconnect: () => audio.flush(),
   onStopAudio: () => {
     ttsStreamer.cancel();
     audio.resetSchedule();
@@ -195,9 +224,13 @@ const chat = useAvatarChat({
     clearUnderrunTimer();
     audio.resetSchedule();
     pendingText = fullText;
-    void ttsStreamer.speak(fullText);
+    void ttsStreamer.speak(fullText, { provider: settings.ttsProvider, voice: settings.ttsVoice });
   },
   onServerError: (code, message, retryAfterMs) => {
+    if (code === 'RATE_LIMITED' && typeof retryAfterMs === 'number' && retryAfterMs > 0) {
+      statusToastRef.value?.showCountdown('已達上限，請等待', retryAfterMs);
+      return;
+    }
     if (code === 'SESSION_EXPIRED') {
       chat.reinit(settings.personaId);
     } else if (FATAL_ERROR_CODES.has(code)) {
@@ -214,15 +247,15 @@ const chat = useAvatarChat({
 });
 
 const loadingText = computed(() => {
-  if (!wasm.isReady.value) return "載入接待引擎中...";
+  if (!wasm.isReady.value) return "載入引擎中...";
   if (wasm.isLoading.value) return "切換展示角色中...";
   return "";
 });
 
 const chatPlaceholder = computed(() => {
-  if (!wasm.isReady.value) return "正在準備接待台...";
+  if (!wasm.isReady.value) return "正在準備...";
   if (wasm.isLoading.value) return "切換展示角色中...";
-  return "向數位接待員提問...";
+  return "向數位虛擬人提問...";
 });
 
 async function handleSend(text: string): Promise<void> {
@@ -267,14 +300,29 @@ async function handleCharChange(charId: string): Promise<void> {
 }
 
 function handleTtsChange(engine: string): void {
-  settings.ttsEngine = engine;
+  settings.ttsProvider = engine;
+}
+
+function handleTtsVoiceChange(voice: string): void {
+  settings.ttsVoice = voice;
 }
 
 function handlePersonaChange(personaId: string): void {
   settings.personaId = personaId;
-  if (isStarted.value) {
-    chat.reinit(personaId);
-  }
+}
+
+function handleVoiceModeChange(mode: 'live' | 'text'): void {
+  settings.voiceMode = mode;
+}
+
+async function handleSettingsApply(): Promise<void> {
+  // Apply mode change before reconnecting so connect() uses the new mode
+  chat.setMode(settings.voiceMode);
+  chat.disconnect();
+  isStarted.value = false;
+  await audio.resumeContext();
+  void chat.connect();
+  isStarted.value = true;
 }
 
 async function handleFatalRetry(): Promise<void> {
@@ -305,6 +353,7 @@ watch(() => chat.state.value, (newState) => {
 });
 
 onMounted(async () => {
+  void fetchTtsProviders();
   await fetchPersonas();
   try {
     await wasm.initWasm();

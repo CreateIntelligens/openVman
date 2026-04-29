@@ -1,70 +1,32 @@
 <template>
-  <section class="control-bar">
-    <div class="control-bar__header">
-      <div>
-        <p class="control-bar__eyebrow">Reception Console</p>
-        <h2>接待設定</h2>
-      </div>
+  <div class="control-bar">
+    <div class="control-bar__left">
+      <p class="control-bar__eyebrow">Reception Console</p>
+      <h2>openVman 控制台</h2>
+    </div>
+
+    <div class="control-bar__right">
       <div class="status-pill" :class="state">
         <span class="status-pill__dot" />
         <span>{{ stateLabel }}</span>
       </div>
+
+      <button class="settings-btn" :disabled="disabled" @click="$emit('openSettings')" title="系統設定">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        設定
+      </button>
     </div>
 
-    <div class="control-grid">
-      <label class="field-card field-card--full">
-        <span class="field-card__label">大腦人設</span>
-        <select
-          :value="currentPersonaId"
-          :disabled="disabled || state === 'THINKING' || state === 'SPEAKING'"
-          @change="$emit('personaChange', ($event.target as HTMLSelectElement).value)"
-        >
-          <option v-for="p in personas" :key="p.persona_id" :value="p.persona_id">
-            {{ p.label }}
-          </option>
-        </select>
-      </label>
-
-      <label class="field-card">
-        <span class="field-card__label">角色配置</span>
-        <select
-          :value="currentCharId ?? ''"
-          :disabled="disabled"
-          @change="$emit('charChange', ($event.target as HTMLSelectElement).value)"
-        >
-          <option v-for="c in characters" :key="c.id" :value="c.id">
-            {{ c.name }}
-          </option>
-        </select>
-      </label>
-
-      <label class="field-card">
-        <span class="field-card__label">語音引擎</span>
-        <select
-          :value="ttsEngine"
-          :disabled="disabled"
-          @change="$emit('ttsChange', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="edge">Edge TTS</option>
-          <option value="indextts">IndexTTS</option>
-        </select>
-      </label>
-    </div>
-
-    <p v-if="errorMessage" class="error-banner">
-      {{ errorMessage }}
-    </p>
-  </section>
+    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import type { AvatarState } from "../../composables/useAvatarChat";
-
-interface Character {
-  id: string
-  name: string
-}
 
 export interface PersonaSummary {
   persona_id: string
@@ -72,186 +34,140 @@ export interface PersonaSummary {
 }
 
 const props = defineProps<{
-  characters: Character[]
-  currentCharId: string | null
-  ttsEngine: string
-  personas: PersonaSummary[]
-  currentPersonaId: string
   state: AvatarState
   disabled?: boolean
   errorMessage?: string | null
 }>()
 
 defineEmits<{
-  charChange: [charId: string]
-  ttsChange: [engine: string]
-  personaChange: [personaId: string]
+  openSettings: []
 }>()
 
 const stateLabel = computed(() => {
   const map: Record<AvatarState, string> = {
     DISCONNECTED: "離線",
-    CONNECTING: "連線中",
-    IDLE: "待命中",
-    THINKING: "思考中",
-    SPEAKING: "回應中",
-    ERROR: "異常",
-  };
-  return map[props.state] ?? props.state;
-});
+    CONNECTING:   "連線中",
+    RECONNECTING: "重連中…",
+    IDLE:         "待命中",
+    THINKING:     "思考中",
+    SPEAKING:     "回應中",
+    ERROR:        "異常",
+  }
+  return map[props.state] ?? props.state
+})
 </script>
 
 <style scoped>
 .control-bar {
   display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
   border-radius: 0.75rem;
-  border: var(--hairline) solid var(--line);
+  border: 1px solid var(--line);
   background: var(--bg-soft);
-  box-shadow: var(--surface-shadow);
-  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  padding: 1rem 1.25rem;
 }
 
-.control-bar__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+.control-bar__left {
+  flex: 1;
+  min-width: 0;
 }
 
 .control-bar__eyebrow {
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.2rem;
   color: var(--text-soft);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .control-bar h2 {
   margin: 0;
   color: var(--text);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.control-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .status-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: var(--radius-pill);
-  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
   background: var(--bg);
-  border: var(--hairline) solid var(--line);
+  border: 1px solid var(--line);
   color: var(--text);
   font-size: 0.75rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .status-pill__dot {
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: var(--radius-pill);
+  border-radius: 999px;
   background: #94a3b8;
+  flex-shrink: 0;
 }
 
-.status-pill.IDLE .status-pill__dot {
-  background: #10b981;
-}
+.status-pill.IDLE .status-pill__dot        { background: #10b981; }
+.status-pill.ERROR .status-pill__dot       { background: #ef4444; }
+.status-pill.CONNECTING .status-pill__dot  { background: #f59e0b; animation: blink 1.5s infinite; }
+.status-pill.THINKING .status-pill__dot    { background: #3b82f6; animation: blink 1.5s infinite; }
+.status-pill.SPEAKING .status-pill__dot    { background: #ec4899; animation: blink 1.5s infinite; }
 
-.status-pill.CONNECTING .status-pill__dot,
-.status-pill.THINKING .status-pill__dot,
-.status-pill.SPEAKING .status-pill__dot {
-  animation: pulse 1.5s infinite;
-}
-
-.status-pill.CONNECTING .status-pill__dot {
-  background: #f59e0b;
-}
-
-.status-pill.THINKING .status-pill__dot {
-  background: #3b82f6;
-}
-
-.status-pill.SPEAKING .status-pill__dot {
-  background: #ec4899;
-}
-
-.status-pill.ERROR .status-pill__dot {
-  background: #ef4444;
-}
-
-.control-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-
-.field-card--full {
-  grid-column: 1 / -1;
-}
-
-.field-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line);
   border-radius: 0.5rem;
-  border: var(--hairline) solid var(--line);
   background: var(--bg);
-  padding: 0.75rem;
-}
-
-.field-card__label {
   color: var(--text-soft);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.field-card select {
-  height: 2.5rem;
-  border: var(--hairline) solid var(--line);
-  border-radius: 0.5rem;
-  background: var(--bg-soft);
-  color: var(--text);
-  font-size: 0.95rem;
-  padding: 0 0.75rem;
-  outline: none;
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
-
-.field-card select:focus {
+.settings-btn:hover:not(:disabled) {
+  background: var(--bg-soft);
   border-color: var(--primary);
-  box-shadow: 0 0 0 var(--focus-ring-size) rgba(14, 165, 233, 0.15);
+  color: var(--primary);
 }
-
-.field-card select:disabled {
+.settings-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .error-banner {
+  width: 100%;
   margin: 0;
   border-radius: 0.5rem;
-  padding: 0.75rem;
+  padding: 0.6rem 0.875rem;
   background: #fef2f2;
-  border: var(--hairline) solid #fee2e2;
+  border: 1px solid #fee2e2;
   color: #b91c1c;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
-@keyframes pulse {
+@keyframes blink {
   0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.1); }
-}
-
-@media (max-width: 40rem) {
-  .control-bar__header,
-  .control-grid {
-    grid-template-columns: 1fr;
-    flex-direction: column;
-  }
+  50%       { opacity: 1;   transform: scale(1.15); }
 }
 </style>

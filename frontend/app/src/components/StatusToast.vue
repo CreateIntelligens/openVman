@@ -6,6 +6,7 @@ interface ToastItem {
   message: string
   persistent: boolean
   timer?: ReturnType<typeof setTimeout>
+  intervalHandle?: ReturnType<typeof setInterval>
 }
 
 const toasts = ref<ToastItem[]>([])
@@ -21,23 +22,50 @@ function show(message: string, { persistent = false, durationMs = 4000 } = {}) {
   return id
 }
 
+function showCountdown(prefix: string, ms: number): number {
+  const id = show(prefix + " " + Math.ceil(ms / 1000) + "s", { persistent: true })
+  const startedAt = Date.now()
+  const handle = setInterval(() => {
+    const remaining = ms - (Date.now() - startedAt)
+    const idx = toasts.value.findIndex(t => t.id === id)
+    if (idx === -1) {
+      clearInterval(handle)
+      return
+    }
+    if (remaining <= 0) {
+      dismiss(id)
+      return
+    }
+    toasts.value[idx].message = prefix + " " + Math.ceil(remaining / 1000) + "s"
+  }, 1000)
+  const idx = toasts.value.findIndex(t => t.id === id)
+  if (idx !== -1) {
+    toasts.value[idx].intervalHandle = handle
+  }
+  return id
+}
+
 function dismiss(id: number) {
   const idx = toasts.value.findIndex(t => t.id === id)
   if (idx !== -1) {
     const item = toasts.value[idx]
     if (item.timer) clearTimeout(item.timer)
+    if (item.intervalHandle) clearInterval(item.intervalHandle)
     toasts.value.splice(idx, 1)
   }
 }
 
 function clear() {
-  toasts.value.forEach(t => { if (t.timer) clearTimeout(t.timer) })
+  toasts.value.forEach(t => {
+    if (t.timer) clearTimeout(t.timer)
+    if (t.intervalHandle) clearInterval(t.intervalHandle)
+  })
   toasts.value = []
 }
 
 onUnmounted(clear)
 
-defineExpose({ show, dismiss, clear })
+defineExpose({ show, showCountdown, dismiss, clear })
 </script>
 
 <template>

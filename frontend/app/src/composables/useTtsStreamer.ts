@@ -1,22 +1,24 @@
 /**
- * useTtsStreamer — streams synthesized speech from IndexTTS's /tts_stream
- * endpoint (proxied at /tts/stream), emitting PCM chunks as they arrive
- * so downstream code can play + lip-sync in real time.
+ * useTtsStreamer — synthesizes speech from the backend TTS service.
  *
- * Response format from /tts_stream:
- *   - media_type: audio/wav
- *   - payload: 44-byte WAV header followed by raw PCM (16 kHz mono Int16 LE)
- *
- * This composable:
- *   - strips the 44-byte header from the first chunk
- *   - buffers any trailing odd byte so Int16Array frames are aligned
- *   - invokes onPcmChunk(pcm) for each assembled chunk
- *   - supports cancel() to abort an in-flight request
+ * Two paths based on provider:
+ *   - provider === 'indextts': POST /tts/stream (IndexTTS streaming, low latency)
+ *     Response: audio/wav — 44-byte header + raw PCM 16 kHz mono Int16 LE, chunked
+ *   - all others (auto, edge, vibevoice…): POST /v1/audio/speech (full WAV, multi-provider)
+ *     Response: audio/wav — full file, same PCM format after header strip
  */
 
-const DEFAULT_ENDPOINT = "/tts/stream";
+const STREAM_ENDPOINT = "/tts/stream";
+const SPEECH_ENDPOINT = "/v1/audio/speech";
 const DEFAULT_CHARACTER = "hayley";
 const WAV_HEADER_BYTES = 44;
+
+export interface TtsProvider {
+  id: string;
+  name: string;
+  default_voice: string;
+  voices: string[];
+}
 
 export interface TtsStreamerOptions {
   /** Called with each PCM chunk (16 kHz mono, Int16 LE) as it arrives. */
@@ -27,21 +29,20 @@ export interface TtsStreamerOptions {
   onEnd?: () => void;
   /** Called when the request fails or is aborted with an error. */
   onError?: (err: unknown) => void;
-  /** Override the endpoint (defaults to /tts/stream). */
-  endpoint?: string;
-  /** Default character when speak() is called without one. */
+  /** Default character for IndexTTS when speak() is called without one. */
   defaultCharacter?: string;
 }
 
 export function useTtsStreamer(options: TtsStreamerOptions) {
-  const endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
   const defaultCharacter = options.defaultCharacter ?? DEFAULT_CHARACTER;
 
   let controller: AbortController | null = null;
   let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
-  async function speak(text: string, character?: string): Promise<void> {
-    // Cancel any in-flight request before starting a new one.
+  async function speak(
+    text: string,
+    opts: { character?: string; provider?: string; voice?: string } = {},
+  ): Promise<void> {
     cancel();
 
     const trimmed = text?.trim();
@@ -50,16 +51,31 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     const abort = new AbortController();
     controller = abort;
 
+    const provider = opts.provider ?? '';
+
     try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: trimmed,
-          character: character ?? defaultCharacter,
-        }),
-        signal: abort.signal,
-      });
+      let response: Response;
+
+      if (!provider || provider === 'indextts') {
+        // Streaming path: IndexTTS
+        response = await fetch(STREAM_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: trimmed, character: opts.character ?? defaultCharacter }),
+          signal: abort.signal,
+        });
+      } else {
+        // Non-streaming path: /v1/audio/speech (all providers via provider router)
+        const body: Record<string, string> = { input: trimmed };
+        if (provider !== 'auto') body.provider = provider;
+        if (opts.voice) body.voice = opts.voice;
+        response = await fetch(SPEECH_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: abort.signal,
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`TTS request failed: ${response.status} ${response.statusText}`);
@@ -73,8 +89,6 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
 
       let bytesSeen = 0;
       let firstAudioNotified = false;
-      // Carry-over: the 44-byte WAV header that may straddle chunks,
-      // and any trailing odd byte left over from an unaligned Int16 frame.
       let leftover = new Uint8Array(0);
 
       while (true) {
@@ -84,7 +98,6 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
         if (done) break;
         if (!value || value.length === 0) continue;
 
-        // Merge leftover + new chunk.
         let chunk: Uint8Array;
         if (leftover.length === 0) {
           chunk = value;
@@ -95,7 +108,6 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
           leftover = new Uint8Array(0);
         }
 
-        // Strip WAV header bytes we haven't yet consumed.
         if (bytesSeen < WAV_HEADER_BYTES) {
           const remainingHeader = WAV_HEADER_BYTES - bytesSeen;
           if (chunk.length <= remainingHeader) {
@@ -108,7 +120,6 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
 
         bytesSeen += chunk.length;
 
-        // Align to Int16 boundaries — stash any trailing odd byte.
         let usable = chunk;
         if (usable.length % 2 !== 0) {
           leftover = usable.slice(usable.length - 1);
@@ -116,8 +127,6 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
         }
         if (usable.length === 0) continue;
 
-        // Copy into a fresh aligned buffer so Int16Array alignment is safe
-        // regardless of the source ArrayBuffer's offset.
         const aligned = new Uint8Array(usable.length);
         aligned.set(usable);
         const pcm = new Int16Array(aligned.buffer);
@@ -133,7 +142,6 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
         options.onEnd?.();
       }
     } catch (err) {
-      // AbortError on cancel is expected — treat as silent.
       const isAbort =
         (err instanceof DOMException && err.name === "AbortError") ||
         (err instanceof Error && err.name === "AbortError");
@@ -148,18 +156,10 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
 
   function cancel(): void {
     if (activeReader) {
-      try {
-        void activeReader.cancel();
-      } catch {
-        /* ignore */
-      }
+      try { void activeReader.cancel(); } catch { /* ignore */ }
     }
     if (controller) {
-      try {
-        controller.abort();
-      } catch {
-        /* ignore */
-      }
+      try { controller.abort(); } catch { /* ignore */ }
       controller = null;
     }
   }

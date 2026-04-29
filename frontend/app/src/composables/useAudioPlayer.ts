@@ -14,6 +14,8 @@ interface AudioPlayerOptions {
        onPlaybackEnd?: () => void
        /** Called when the audio queue drains (last scheduled chunk has played) */
        onQueueEmpty?: () => void
+       /** Called when a chunk is dropped due to a decode/scheduling error */
+       onChunkDropped?: (reason: string) => void
 }
 
 export function useAudioPlayer(options: AudioPlayerOptions = {}) {
@@ -21,6 +23,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
 
        let audioCtx: AudioContext | null = null
        let nextStartTime = 0
+       const liveSources = new Set<AudioBufferSourceNode>()
 
        function ensureContext(): AudioContext {
               if (!audioCtx) {
@@ -43,47 +46,56 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
               const ctx = ensureContext()
               if (ctx.state === 'suspended') await ctx.resume()
 
-              // Decode input to Int16Array
-              let raw: ArrayBuffer
-              if (typeof data === 'string') {
-                     raw = base64ToArrayBuffer(data)
-              } else {
-                     raw = data
-              }
-
-              const int16 = new Int16Array(raw)
-              const float32 = new Float32Array(int16.length)
-              for (let i = 0; i < int16.length; i++) {
-                     float32[i] = int16[i] / 32768.0
-              }
-
-              // Schedule gapless playback
-              const buffer = ctx.createBuffer(1, float32.length, 16000)
-              buffer.copyToChannel(float32, 0)
-              const source = ctx.createBufferSource()
-              source.buffer = buffer
-              source.connect(ctx.destination)
-
-              const now = ctx.currentTime
-              if (nextStartTime < now) nextStartTime = now
-
-              source.start(nextStartTime)
-              isPlaying.value = true
-
-              const duration = float32.length / 16000
-              nextStartTime += duration
-
-              source.onended = () => {
-                     // If nothing else is scheduled, mark playback as done
-                     if (ctx.currentTime >= nextStartTime - 0.01) {
-                            isPlaying.value = false
-                            options.onPlaybackEnd?.()
-                            options.onQueueEmpty?.()
+              try {
+                     // Decode input to Int16Array
+                     let raw: ArrayBuffer
+                     if (typeof data === 'string') {
+                            raw = base64ToArrayBuffer(data)
+                     } else {
+                            raw = data
                      }
-              }
 
-              // Forward to WASM lip-sync
-              options.onPcmChunk?.(int16)
+                     const int16 = new Int16Array(raw)
+                     const float32 = new Float32Array(int16.length)
+                     for (let i = 0; i < int16.length; i++) {
+                            float32[i] = int16[i] / 32768.0
+                     }
+
+                     // Schedule gapless playback
+                     const buffer = ctx.createBuffer(1, float32.length, 16000)
+                     buffer.copyToChannel(float32, 0)
+                     const source = ctx.createBufferSource()
+                     source.buffer = buffer
+                     source.connect(ctx.destination)
+
+                     const now = ctx.currentTime
+                     if (nextStartTime < now) nextStartTime = now
+
+                     source.start(nextStartTime)
+                     isPlaying.value = true
+                     liveSources.add(source)
+
+                     const duration = float32.length / 16000
+                     nextStartTime += duration
+
+                     source.onended = () => {
+                            liveSources.delete(source)
+                            // If nothing else is scheduled, mark playback as done
+                            if (ctx.currentTime >= nextStartTime - 0.01) {
+                                   isPlaying.value = false
+                                   options.onPlaybackEnd?.()
+                                   options.onQueueEmpty?.()
+                            }
+                     }
+
+                     // Forward to WASM lip-sync
+                     options.onPcmChunk?.(int16)
+              } catch (err) {
+                     const reason = err instanceof Error ? err.message : String(err)
+                     console.warn('[useAudioPlayer] dropping chunk:', reason)
+                     options.onChunkDropped?.(reason)
+                     return
+              }
        }
 
        /** Stop all audio and reset scheduling */
@@ -92,6 +104,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                      audioCtx.close()
                      audioCtx = null
               }
+              liveSources.clear()
               nextStartTime = 0
               isPlaying.value = false
        }
@@ -99,6 +112,21 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
        /** Reset scheduling without closing context (for new utterance) */
        function resetSchedule(): void {
               nextStartTime = 0
+       }
+
+       /** Stop scheduled sources and reset playback state, keeping context alive */
+       function flush(): void {
+              for (const source of liveSources) {
+                     try {
+                            source.onended = null
+                            source.stop()
+                     } catch {
+                            void 0
+                     }
+              }
+              liveSources.clear()
+              nextStartTime = 0
+              isPlaying.value = false
        }
 
        onUnmounted(() => {
@@ -110,6 +138,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
               playChunk,
               stopAll,
               resetSchedule,
+              flush,
               resumeContext,
        }
 }

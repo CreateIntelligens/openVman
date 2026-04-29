@@ -3,9 +3,9 @@
     <header class="chat-panel__header">
       <div>
         <p class="chat-panel__eyebrow">Guest Dialogue</p>
-        <h3>接待對話紀錄</h3>
+        <h3>對話紀錄</h3>
       </div>
-      <span class="chat-panel__counter">{{ messages.length }} 則訊息</span>
+
     </header>
 
     <div class="chat-messages" ref="messagesRef">
@@ -16,7 +16,7 @@
         :class="msg.role"
       >
         <div class="chat-msg__meta">
-          <span class="chat-role">{{ msg.role === "user" ? "訪客" : "接待員" }}</span>
+          <span class="chat-role">{{ msg.role === "user" ? "訪客" : "虛擬人" }}</span>
           <span class="chat-time">{{ formatTime(msg.timestamp) }}</span>
         </div>
         <p v-if="msg.role === 'user'" class="chat-text">{{ msg.text }}</p>
@@ -30,7 +30,7 @@
 
       <div v-if="isThinking" class="chat-msg ai thinking">
         <div class="chat-msg__meta">
-          <span class="chat-role">接待員</span>
+          <span class="chat-role">虛擬人</span>
           <span class="chat-time">即時生成</span>
         </div>
         <div class="thinking-row">
@@ -47,7 +47,7 @@
         @toggle="emit('asr-toggle')"
       />
       <label class="composer-shell">
-        <span class="composer-label">輸入問題或接待指令</span>
+        <span class="composer-label">輸入問題</span>
         <input
           ref="inputRef"
           v-model="inputText"

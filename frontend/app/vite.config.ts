@@ -26,6 +26,12 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8200",
       },
+      "/v1": {
+        target: "http://localhost:8200",
+      },
+      "/tts": {
+        target: "http://localhost:8200",
+      },
     },
   },
   build: {

@@ -1,15 +1,18 @@
 /**
  * useAvatarChat — Vue 3 composable for WebSocket communication
- * with the openVman backend gateway.
+ * with the openVman backend gateway, with an optional text-mode fallback
+ * that uses HTTP POST /api/brain/chat for multi-provider LLM access.
  *
- * Protocol:
+ * Protocol (live mode):
  *   client_init → server_init_ack
  *   user_speak  → server_stream_chunk (audio) → server_stop_audio
  *   client_interrupt
+ *
+ * Text mode: uses /api/brain/chat (standard chat completions, any provider)
  */
 import { ref, readonly, onUnmounted } from 'vue'
 
-export type AvatarState = 'DISCONNECTED' | 'CONNECTING' | 'IDLE' | 'THINKING' | 'SPEAKING' | 'ERROR'
+export type AvatarState = 'DISCONNECTED' | 'CONNECTING' | 'RECONNECTING' | 'IDLE' | 'THINKING' | 'SPEAKING' | 'ERROR'
 
 export interface ChatMessage {
        role: 'user' | 'ai'
@@ -36,30 +39,29 @@ interface ChatOptions {
        onServerError?: (code: string, message: string, retryAfterMs?: number) => void
        /** Called when gateway_status event arrives */
        onGatewayStatus?: (plugin: string, status: string, message: string) => void
+       /** Called whenever the WebSocket disconnects (before reconnect scheduling) */
+       onDisconnect?: () => void
+       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/brain/chat */
+       mode?: 'live' | 'text'
 }
 
 function createClientId(): string {
-       if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-              return crypto.randomUUID()
-       }
+       if (crypto?.randomUUID) return crypto.randomUUID()
 
-       if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+       if (crypto?.getRandomValues) {
               const bytes = new Uint8Array(16)
               crypto.getRandomValues(bytes)
               bytes[6] = (bytes[6] & 0x0f) | 0x40
               bytes[8] = (bytes[8] & 0x3f) | 0x80
-              const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0'))
-              return [
-                     hex.slice(0, 4).join(''),
-                     hex.slice(4, 6).join(''),
-                     hex.slice(6, 8).join(''),
-                     hex.slice(8, 10).join(''),
-                     hex.slice(10, 16).join(''),
-              ].join('-')
+              const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
+              return [hex.slice(0,4), hex.slice(4,6), hex.slice(6,8), hex.slice(8,10), hex.slice(10,16)]
+                     .map(g => g.join('')).join('-')
        }
 
        return `client-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
+
+const MAX_RECONNECT_ATTEMPTS = 6
 
 export function useAvatarChat(options: ChatOptions = {}) {
        const state = ref<AvatarState>('DISCONNECTED')
@@ -69,9 +71,13 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let socket: WebSocket | null = null
        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
        let reconnectAttempt = 0
+       let lastWsUrl: string | null = null
        let clientId = createClientId()
        let currentPersonaId = options.personaId ?? 'default'
        const currentLipSyncMode = options.lipSyncMode ?? 'webgl'
+       let currentMode: 'live' | 'text' = options.mode ?? 'live'
+       // AbortController for in-flight text-mode fetch
+       let textAbortController: AbortController | null = null
        // Buffer of text chunks for the in-flight LLM utterance. Flushed to
        // `onUtteranceComplete` when `is_final=true` arrives (or on interrupt).
        let utteranceBuffer = ''
@@ -102,8 +108,14 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Connect ────────────────────────────────────────────
        function connect(url?: string): Promise<void> {
-              return new Promise((resolve, reject) => {
-                     if (socket) {
+               if (currentMode === 'text') {
+                      sessionId.value = createClientId()
+                      state.value = 'IDLE'
+                      return Promise.resolve()
+               }
+
+               return new Promise((resolve, reject) => {
+                      if (socket) {
                             resolve() // Socket already exists — resolve regardless of ready state
                             return
                      }
@@ -112,6 +124,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      const host = window.location.host
                      clientId = createClientId()
                      const wsUrl = url ?? `${protocol}://${host}/ws/${clientId}`
+                     lastWsUrl = wsUrl
 
                      state.value = 'CONNECTING'
                      socket = new WebSocket(wsUrl)
@@ -138,8 +151,15 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             socket = null
                             sessionId.value = null
                             state.value = 'DISCONNECTED'
-                            // Exponential backoff: min(1000 * 2^attempt, 30000) ms
-                            const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000)
+                            options.onDisconnect?.()
+                            if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+                                   state.value = 'ERROR'
+                                   console.warn('[AvatarChat] reconnect attempts exhausted')
+                                   return
+                            }
+                            state.value = 'RECONNECTING'
+                            const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000)
+                            const delay = baseDelay * (0.75 + Math.random() * 0.5)
                             reconnectAttempt++
                             reconnectTimer = setTimeout(() => { void connect(wsUrl).catch(console.error) }, delay)
                      }
@@ -217,27 +237,82 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Send user message ──────────────────────────────────
        function sendMessage(text: string): void {
-              if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
+               if (currentMode === 'text') {
+                      void _sendMessageText(text)
+                      return
+               }
 
-              utteranceBuffer = ''
-              messages.value.push({ role: 'user', text, timestamp: Date.now() })
-              state.value = 'THINKING'
-              sendEvent({
-                     event: 'user_speak',
-                     text,
-                     timestamp: Date.now(),
-              })
+               if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
+
+               utteranceBuffer = ''
+               messages.value.push({ role: 'user', text, timestamp: Date.now() })
+               state.value = 'THINKING'
+               sendEvent({
+                      event: 'user_speak',
+                      text,
+                      timestamp: Date.now(),
+               })
+       }
+
+       async function _sendMessageText(text: string): Promise<void> {
+               textAbortController?.abort()
+               textAbortController = new AbortController()
+
+               messages.value.push({ role: 'user', text, timestamp: Date.now() })
+               state.value = 'THINKING'
+
+               try {
+                      const res = await fetch('/api/brain/chat', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({
+                                    message: text,
+                                    persona_id: currentPersonaId,
+                                    project_id: 'default',
+                                    session_id: sessionId.value,
+                             }),
+                             signal: textAbortController.signal,
+                      })
+
+                      if (!res.ok) {
+                             const err = await res.json().catch(() => ({}))
+                             const msg = (err as Record<string, string>).error ?? `HTTP ${res.status}`
+                             options.onServerError?.('BRAIN_ERROR', msg)
+                             state.value = 'ERROR'
+                             return
+                      }
+
+                      const data = await res.json() as { reply: string; session_id: string }
+                      if (data.session_id) sessionId.value = data.session_id
+                      state.value = 'IDLE'
+                      if (data.reply?.trim()) {
+                             options.onUtteranceComplete?.(data.reply)
+                      }
+               } catch (err) {
+                      if ((err as Error).name !== 'AbortError') {
+                             console.error('[AvatarChat] text chat error:', err)
+                             state.value = 'ERROR'
+                      }
+               } finally {
+                      textAbortController = null
+               }
        }
 
        // ── Interrupt ──────────────────────────────────────────
        function interrupt(): void {
-              utteranceBuffer = ''
-              sendEvent({
-                     event: 'client_interrupt',
-                     partial_asr: '',
-                     timestamp: Date.now(),
-              })
-              options.onStopAudio?.()
+               if (currentMode === 'text') {
+                      textAbortController?.abort()
+                      textAbortController = null
+                      state.value = 'IDLE'
+                      return
+               }
+               utteranceBuffer = ''
+               sendEvent({
+                      event: 'client_interrupt',
+                      partial_asr: '',
+                      timestamp: Date.now(),
+               })
+               options.onStopAudio?.()
        }
 
        // ── Low-level send ─────────────────────────────────────
@@ -253,11 +328,26 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Disconnect ─────────────────────────────────────────
        function disconnect(): void {
-              if (reconnectTimer) clearTimeout(reconnectTimer)
-              socket?.close()
-              socket = null
-              sessionId.value = null
-              state.value = 'DISCONNECTED'
+               textAbortController?.abort()
+               textAbortController = null
+               if (reconnectTimer) clearTimeout(reconnectTimer)
+               socket?.close()
+               socket = null
+               sessionId.value = null
+               state.value = 'DISCONNECTED'
+       }
+
+       function setMode(mode: 'live' | 'text'): void {
+               currentMode = mode
+       }
+
+       function manualReconnect(): void {
+               if (reconnectTimer) {
+                      clearTimeout(reconnectTimer)
+                      reconnectTimer = null
+               }
+               reconnectAttempt = 0
+               void connect(lastWsUrl ?? undefined).catch(console.error)
        }
 
        onUnmounted(() => {
@@ -283,15 +373,17 @@ export function useAvatarChat(options: ChatOptions = {}) {
        }
 
        return {
-              state: readonly(state),
-              messages,
-              sessionId: readonly(sessionId),
-              connect,
-              disconnect,
-              sendMessage,
-              interrupt,
-              reinit,
-              beginAssistantMessage,
-              appendAssistantText,
+               state: readonly(state),
+               messages,
+               sessionId: readonly(sessionId),
+               connect,
+               disconnect,
+               sendMessage,
+               interrupt,
+               reinit,
+               setMode,
+               manualReconnect,
+               beginAssistantMessage,
+               appendAssistantText,
        }
 }
