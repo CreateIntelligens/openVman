@@ -101,16 +101,6 @@ services:
       - ./frontend/app:/app
       - avatar-node-modules:/app/node_modules
 
-  avatar-typecheck:
-    <<: *shared
-    build:
-      context: ./frontend/app
-      dockerfile: Dockerfile
-    command: sh -lc "npm run type-check:watch"
-    volumes:
-      - ./frontend/app:/app
-      - avatar-node-modules:/app/node_modules
-
   admin:
     <<: *shared
     build:
