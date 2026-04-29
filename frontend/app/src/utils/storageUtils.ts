@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   TTS_ENGINE: "avatar.tts_engine",
   CHARACTER_ID: "avatar.character_id",
+  PERSONA_ID: "avatar.persona_id",
 } as const
 
 export function readPref(key: string, fallback: string): string {

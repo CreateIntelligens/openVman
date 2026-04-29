@@ -12,6 +12,8 @@ interface AudioPlayerOptions {
        onPcmChunk?: (pcm: Int16Array) => void
        /** Called when the entire queued audio finishes playing */
        onPlaybackEnd?: () => void
+       /** Called when the audio queue drains (last scheduled chunk has played) */
+       onQueueEmpty?: () => void
 }
 
 export function useAudioPlayer(options: AudioPlayerOptions = {}) {
@@ -76,6 +78,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                      if (ctx.currentTime >= nextStartTime - 0.01) {
                             isPlaying.value = false
                             options.onPlaybackEnd?.()
+                            options.onQueueEmpty?.()
                      }
               }
 

@@ -12,6 +12,19 @@
     </div>
 
     <div class="control-grid">
+      <label class="field-card field-card--full">
+        <span class="field-card__label">大腦人設</span>
+        <select
+          :value="currentPersonaId"
+          :disabled="disabled || state === 'THINKING' || state === 'SPEAKING'"
+          @change="$emit('personaChange', ($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="p in personas" :key="p.persona_id" :value="p.persona_id">
+            {{ p.label }}
+          </option>
+        </select>
+      </label>
+
       <label class="field-card">
         <span class="field-card__label">角色配置</span>
         <select
@@ -53,10 +66,17 @@ interface Character {
   name: string
 }
 
+export interface PersonaSummary {
+  persona_id: string
+  label: string
+}
+
 const props = defineProps<{
   characters: Character[]
   currentCharId: string | null
   ttsEngine: string
+  personas: PersonaSummary[]
+  currentPersonaId: string
   state: AvatarState
   disabled?: boolean
   errorMessage?: string | null
@@ -65,6 +85,7 @@ const props = defineProps<{
 defineEmits<{
   charChange: [charId: string]
   ttsChange: [engine: string]
+  personaChange: [personaId: string]
 }>()
 
 const stateLabel = computed(() => {
@@ -164,6 +185,10 @@ const stateLabel = computed(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+}
+
+.field-card--full {
+  grid-column: 1 / -1;
 }
 
 .field-card {

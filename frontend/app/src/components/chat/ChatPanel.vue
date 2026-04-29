@@ -41,6 +41,11 @@
     </div>
 
     <div class="chat-input-bar">
+      <AsrButton
+        :is-listening="asrListening"
+        :disabled="disabled"
+        @toggle="emit('asr-toggle')"
+      />
       <label class="composer-shell">
         <span class="composer-label">輸入問題或接待指令</span>
         <input
@@ -63,6 +68,7 @@
 import { nextTick, ref, watch } from "vue";
 import type { ChatMessage } from "../../composables/useAvatarChat";
 import TypewriterText from "./TypewriterText.vue";
+import AsrButton from "./AsrButton.vue";
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -70,14 +76,17 @@ const props = defineProps<{
   placeholder?: string
   isThinking?: boolean
   isTyping?: boolean
+  asrListening?: boolean
 }>()
 
 const emit = defineEmits<{
   send: [text: string]
+  'asr-toggle': []
 }>()
 
 const inputText = ref("")
 const messagesRef = ref<HTMLDivElement>()
+const inputRef = ref<HTMLInputElement>()
 
 function handleSend(): void {
   const text = inputText.value.trim()

@@ -96,6 +96,7 @@ async def _handle_websocket_event(
 async def _handle_client_init(data: dict, session: Session, websocket: WebSocket) -> None:
     previous_voice_source = session.metadata.get("voice_source", DEFAULT_VOICE_SOURCE)
     previous_chat_session_id = str(session.metadata.get("chat_session_id", "")).strip()
+    previous_persona_id = str(session.metadata.get("persona_id", "default")).strip()
 
     await websocket.send_json(
         {
@@ -114,10 +115,17 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
     if chat_session_id:
         session.metadata["chat_session_id"] = chat_session_id
 
+    persona_id = str(capabilities.get("persona_id", "default")).strip() or "default"
+    session.metadata["persona_id"] = persona_id
+
+    project_id = str(capabilities.get("project_id", "default")).strip() or "default"
+    session.metadata["project_id"] = project_id
+
     existing_relay = getattr(session, "brain_live_relay", None)
     relay_needs_refresh = existing_relay is not None and (
         session.metadata["voice_source"] != previous_voice_source
         or chat_session_id != previous_chat_session_id
+        or persona_id != previous_persona_id
     )
     if relay_needs_refresh:
         await existing_relay.close()

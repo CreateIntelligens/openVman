@@ -28,6 +28,14 @@ interface ChatOptions {
         * utterance — use this to drive a TTS synthesis pass.
         */
        onUtteranceComplete?: (text: string) => void
+       /** Initial persona ID to use (default: "default") */
+       personaId?: string
+       /** Lip-sync mode to advertise after server_init_ack (default: "webgl") */
+       lipSyncMode?: string
+       /** Called on server_error with parsed error code, message and optional retry delay */
+       onServerError?: (code: string, message: string, retryAfterMs?: number) => void
+       /** Called when gateway_status event arrives */
+       onGatewayStatus?: (plugin: string, status: string, message: string) => void
 }
 
 function createClientId(): string {
@@ -60,25 +68,49 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        let socket: WebSocket | null = null
        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+       let reconnectAttempt = 0
+       let clientId = createClientId()
+       let currentPersonaId = options.personaId ?? 'default'
+       const currentLipSyncMode = options.lipSyncMode ?? 'webgl'
        // Buffer of text chunks for the in-flight LLM utterance. Flushed to
        // `onUtteranceComplete` when `is_final=true` arrives (or on interrupt).
        let utteranceBuffer = ''
+
+       // ── Build client_init payload ──────────────────────────
+       function _buildClientInit(): Record<string, unknown> {
+              return {
+                     event: 'client_init',
+                     client_id: clientId,
+                     protocol_version: '1.0.0',
+                     auth_token: 'openvman-admin',
+                     capabilities: {
+                            mode: 'gemini_live',
+                            project_id: 'default',
+                            surface: 'avatar',
+                            voice_source: 'custom',
+                            persona_id: currentPersonaId,
+                     },
+                     timestamp: Date.now(),
+              }
+       }
+
+       // ── Reinitialize with a new persona (safe when IDLE/DISCONNECTED) ──
+       function reinit(personaId: string): void {
+              currentPersonaId = personaId
+              sendEvent(_buildClientInit())
+       }
 
        // ── Connect ────────────────────────────────────────────
        function connect(url?: string): Promise<void> {
               return new Promise((resolve, reject) => {
                      if (socket) {
-                            if (socket.readyState === WebSocket.OPEN) {
-                                   resolve()
-                            } else {
-                                   resolve() // Assuming it's already connecting, resolve so that caller can proceed (or could reject/await)
-                            }
+                            resolve() // Socket already exists — resolve regardless of ready state
                             return
                      }
 
                      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
                      const host = window.location.host
-                     const clientId = createClientId()
+                     clientId = createClientId()
                      const wsUrl = url ?? `${protocol}://${host}/ws/${clientId}`
 
                      state.value = 'CONNECTING'
@@ -87,20 +119,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
                      socket.onopen = () => {
                             console.log('[AvatarChat] WebSocket connected')
-                            // Send client_init (openVman backend protocol)
-                            sendEvent({
-                                   event: 'client_init',
-                                   client_id: clientId,
-                                   protocol_version: '1.0.0',
-                                   auth_token: 'openvman-admin',
-                                   capabilities: {
-                                          mode: 'gemini_live',
-                                          project_id: 'default',
-                                          surface: 'avatar',
-                                          voice_source: 'custom'
-                                   },
-                                   timestamp: Date.now(),
-                            })
+                            reconnectAttempt = 0
+                            sendEvent(_buildClientInit())
                             resolve()
                      }
 
@@ -118,8 +138,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             socket = null
                             sessionId.value = null
                             state.value = 'DISCONNECTED'
-                            // Auto-reconnect after 3s
-                            reconnectTimer = setTimeout(() => { void connect(wsUrl).catch(console.error) }, 3000)
+                            // Exponential backoff: min(1000 * 2^attempt, 30000) ms
+                            const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000)
+                            reconnectAttempt++
+                            reconnectTimer = setTimeout(() => { void connect(wsUrl).catch(console.error) }, delay)
                      }
 
                      socket.onerror = (err) => {
@@ -139,6 +161,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             sessionId.value = data.session_id as string
                             state.value = 'IDLE'
                             console.log(`[AvatarChat] Session: ${sessionId.value}`)
+                            sendEvent({ event: 'set_lip_sync_mode', mode: currentLipSyncMode })
                             break
 
                      case 'server_stream_chunk': {
@@ -167,10 +190,24 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             state.value = 'IDLE'
                             break
 
-                     case 'server_error':
-                            console.error('[AvatarChat] Server error:', data.message)
-                            state.value = 'ERROR'
+                     case 'server_error': {
+                            const code = (data.error_code ?? 'UNKNOWN') as string
+                            const msg = (data.message ?? '') as string
+                            const retryAfterMs = data.retry_after_ms as number | undefined
+                            console.error('[AvatarChat] Server error:', code, msg)
+                            if (code !== 'SESSION_EXPIRED') state.value = 'ERROR'
+                            options.onServerError?.(code, msg, retryAfterMs)
                             break
+                     }
+
+                     case 'gateway_status': {
+                            const plugin = (data.plugin ?? '') as string
+                            const gStatus = (data.status ?? '') as string
+                            const gMsg = (data.message ?? '') as string
+                            console.log(`[AvatarChat] gateway_status: ${plugin} → ${gStatus}`)
+                            options.onGatewayStatus?.(plugin, gStatus, gMsg)
+                            break
+                     }
 
                      case 'ping':
                             sendRaw(JSON.stringify({ event: 'pong', timestamp: Date.now() }))
@@ -253,6 +290,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
               disconnect,
               sendMessage,
               interrupt,
+              reinit,
               beginAssistantMessage,
               appendAssistantText,
        }
