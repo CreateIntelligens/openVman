@@ -147,7 +147,7 @@ export default function KnowledgeBase() {
 
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 shrink-0">
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary text-[24px]">school</span>
+          <span className="material-symbols-outlined text-primary text-[1.5rem]">school</span>
           <h1 className="text-lg font-bold text-slate-900 dark:text-white">知識庫</h1>
           <span className="text-xs text-slate-500">{documents.length} 文件 · {indexedCount} 已索引</span>
           <div className="ml-3 flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/40 p-0.5">
@@ -179,7 +179,7 @@ export default function KnowledgeBase() {
               onClick={() => setShowSourcePanel(!showSourcePanel)}
               className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
             >
-              <span className="material-symbols-outlined text-[16px]">add</span>
+              <span className="material-symbols-outlined text-[1rem]">add</span>
               新增來源
             </button>
             <button
@@ -187,7 +187,7 @@ export default function KnowledgeBase() {
               disabled={reindexing}
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50"
             >
-              <span className={`material-symbols-outlined text-[16px] ${reindexing ? "animate-spin" : ""}`}>sync</span>
+              <span className={`material-symbols-outlined text-[1rem] ${reindexing ? "animate-spin" : ""}`}>sync</span>
               {reindexing ? "索引中..." : "重新索引"}
             </button>
           </div>
@@ -233,13 +233,13 @@ export default function KnowledgeBase() {
               className="p-1 rounded-md text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors"
               title="新增資料夾"
             >
-              <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
+              <span className="material-symbols-outlined text-[1rem]">create_new_folder</span>
             </button>
           </div>
 
           <div className="border-b border-slate-200 dark:border-slate-800/40 px-3 py-2.5">
             <div className="relative">
-              <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-slate-400 dark:text-slate-500">
+              <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[1rem] text-slate-400 dark:text-slate-500">
                 search
               </span>
               <input
@@ -269,10 +269,10 @@ export default function KnowledgeBase() {
                 }}
               />
               <button type="submit" disabled={!newFolderName.trim()} className="p-0.5 text-primary disabled:opacity-30">
-                <span className="material-symbols-outlined text-[16px]">check</span>
+                <span className="material-symbols-outlined text-[1rem]">check</span>
               </button>
               <button type="button" onClick={cancelCreateFolder} className="p-0.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
-                <span className="material-symbols-outlined text-[16px]">close</span>
+                <span className="material-symbols-outlined text-[1rem]">close</span>
               </button>
             </form>
           )}
@@ -280,11 +280,11 @@ export default function KnowledgeBase() {
           <div className="flex-1 overflow-y-auto overflow-x-hidden py-1">
             {loading && !documents.length ? (
               <div className="flex items-center justify-center py-10 text-slate-500 text-xs">
-                <span className="material-symbols-outlined animate-spin mr-1 text-[16px]">refresh</span> 載入中...
+                <span className="material-symbols-outlined animate-spin mr-1 text-[1rem]">refresh</span> 載入中...
               </div>
             ) : showSearchEmptyState ? (
               <div className="px-4 py-10 text-center text-xs text-slate-500">
-                <span className="material-symbols-outlined mb-2 text-[20px]">search_off</span>
+                <span className="material-symbols-outlined mb-2 text-[1.25rem]">search_off</span>
                 <p>沒有符合搜尋的檔案</p>
               </div>
             ) : (

@@ -29,7 +29,7 @@ export default function SkillCard({
               <p className="font-bold text-sm">{skill.name}</p>
               {skill.scope && (
                 <span
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                  className={`text-[0.5625rem] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                     skill.scope === "project"
                       ? "bg-primary/15 text-primary border border-primary/30"
                       : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
@@ -40,7 +40,7 @@ export default function SkillCard({
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 font-mono">{skill.id} v{skill.version}</p>
+            <p className="text-[0.625rem] text-slate-500 font-mono">{skill.id} v{skill.version}</p>
           </div>
         </div>
 
@@ -66,19 +66,19 @@ export default function SkillCard({
         <div className="mb-3 space-y-1">
           {skill.warnings.map((warning, index) => (
             <div key={index} className="flex items-start gap-1.5 px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-              <span className="material-symbols-outlined text-amber-400 text-[14px] mt-0.5 shrink-0">warning</span>
-              <span className="text-[11px] text-amber-600 dark:text-amber-300 leading-tight">{warning}</span>
+              <span className="material-symbols-outlined text-amber-400 text-[0.875rem] mt-0.5 shrink-0">warning</span>
+              <span className="text-[0.6875rem] text-amber-600 dark:text-amber-300 leading-tight">{warning}</span>
             </div>
           ))}
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[11px] text-slate-500">
-          <span className="material-symbols-outlined text-[14px]">handyman</span>
+        <div className="flex items-center gap-2 text-[0.6875rem] text-slate-500">
+          <span className="material-symbols-outlined text-[0.875rem]">handyman</span>
           {skill.tools.length}個工具
           <span className="text-slate-300 dark:text-slate-700 mx-1">|</span>
-          <span className="truncate font-mono max-w-[120px]" title={skill.tools.join(", ")}>
+          <span className="truncate font-mono max-w-[7.5rem]" title={skill.tools.join(", ")}>
             {skill.tools.join(", ")}
           </span>
         </div>
@@ -86,21 +86,21 @@ export default function SkillCard({
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => onEdit(skill.id)}
-            className={`flex items-center gap-1 px-2 py-1 text-[11px] border rounded-lg transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 text-[0.6875rem] border rounded-lg transition-colors ${
               isEditing
                 ? "text-primary border-primary/30 bg-primary/10"
                 : "text-slate-500 dark:text-slate-400 hover:text-primary border-slate-200 dark:border-slate-700 hover:border-primary/30"
             }`}
           >
-            <span className="material-symbols-outlined text-[14px]">edit</span>
+            <span className="material-symbols-outlined text-[0.875rem]">edit</span>
             編輯
           </button>
           <button
             onClick={() => onDelete(skill)}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-500 dark:text-slate-400 hover:text-red-400 border border-slate-200 dark:border-slate-700 hover:border-red-500/30 rounded-lg transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-slate-500 dark:text-slate-400 hover:text-red-400 border border-slate-200 dark:border-slate-700 hover:border-red-500/30 rounded-lg transition-colors"
             title="刪除"
           >
-            <span className="material-symbols-outlined text-[14px]">delete</span>
+            <span className="material-symbols-outlined text-[0.875rem]">delete</span>
           </button>
         </div>
       </div>

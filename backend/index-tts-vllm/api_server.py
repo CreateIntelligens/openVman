@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
         speaker_dict = await asyncio.to_thread(load_speakers)
         for speaker, audio_paths in speaker_dict.items():
             audio_paths_ = [os.path.join(cur_dir, p) for p in audio_paths]
-            tts.registry_speaker(speaker, audio_paths_)
+            await tts.registry_speaker(speaker, audio_paths_)
     yield
 
 app = FastAPI(lifespan=lifespan)

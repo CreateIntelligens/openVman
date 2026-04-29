@@ -39,7 +39,7 @@ export default function MemoryAddForm({
           來源
         </label>
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-[20px]">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-[1.25rem]">
             person
           </span>
           <input

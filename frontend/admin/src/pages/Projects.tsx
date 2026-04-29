@@ -108,7 +108,7 @@ export default function Projects() {
                     </p>
                   </div>
                   {project.project_id === "default" && (
-                    <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                    <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-primary">
                       Default
                     </span>
                   )}
@@ -116,11 +116,11 @@ export default function Projects() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Docs</p>
+                    <p className="text-[0.625rem] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Docs</p>
                     <p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{project.document_count}</p>
                   </div>
                   <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Personas</p>
+                    <p className="text-[0.625rem] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Personas</p>
                     <p className="mt-1 text-lg font-bold text-slate-900 dark:text-white">{project.persona_count}</p>
                   </div>
                 </div>

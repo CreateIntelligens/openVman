@@ -15,11 +15,11 @@ export default function SourceChips({ sources }: { sources: { knowledge: Retriev
     <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/40">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+        className="flex items-center gap-1.5 text-[0.6875rem] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
       >
-        <span className="material-symbols-outlined text-[14px]">source</span>
+        <span className="material-symbols-outlined text-[0.875rem]">source</span>
         {allSources.length} 筆參考來源
-        <span className={`material-symbols-outlined text-[14px] transition-transform ${expanded ? "rotate-180" : ""}`}>expand_more</span>
+        <span className={`material-symbols-outlined text-[0.875rem] transition-transform ${expanded ? "rotate-180" : ""}`}>expand_more</span>
       </button>
       {expanded && (
         <div className="mt-2 space-y-1.5">
@@ -28,7 +28,7 @@ export default function SourceChips({ sources }: { sources: { knowledge: Retriev
             const label = meta.path || item.source || "unknown";
             const isKnowledge = item.kind === "knowledge";
             return (
-              <div key={i} className="flex items-start gap-2 text-[11px]">
+              <div key={i} className="flex items-start gap-2 text-[0.6875rem]">
                 <span className={`shrink-0 rounded px-1.5 py-0.5 font-bold uppercase tracking-wider ${isKnowledge ? "bg-blue-500/10 text-blue-400 border border-blue-500/20" : "bg-purple-500/10 text-purple-400 border border-purple-500/20"}`}>
                   {isKnowledge ? "KB" : "MEM"}
                 </span>

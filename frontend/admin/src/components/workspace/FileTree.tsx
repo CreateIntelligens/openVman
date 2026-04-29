@@ -114,7 +114,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                                           className="flex w-full items-center gap-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-md transition-colors text-left group"
                                           style={{ paddingLeft: `${level * 16}px` }}
                                    >
-                                          <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 shrink-0 group-hover:text-primary transition-colors">
+                                          <span className="material-symbols-outlined text-[1rem] text-slate-400 dark:text-slate-500 shrink-0 group-hover:text-primary transition-colors">
                                                  {isExpanded ? "folder_open" : "folder"}
                                           </span>
                                           <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{node.name}</span>
@@ -144,7 +144,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                             style={{ paddingLeft: `${level * 16}px` }}
                      >
                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                                   <span className={`material-symbols-outlined text-[16px] shrink-0 ${isSelected ? "text-primary" : iconColor}`}>
+                                   <span className={`material-symbols-outlined text-[1rem] shrink-0 ${isSelected ? "text-primary" : iconColor}`}>
                                           {icon}
                                    </span>
                                    <span className={`text-sm truncate ${isSelected ? "font-semibold" : ""}`}>
@@ -155,12 +155,12 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                             {/* Badges / Labels */}
                             <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                    {doc?.is_core && (
-                                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-500">
+                                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wider text-amber-500">
                                                  core
                                           </span>
                                    )}
                                    {!doc?.is_indexable && !doc?.is_core && (
-                                          <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                          <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                                  omit
                                           </span>
                                    )}

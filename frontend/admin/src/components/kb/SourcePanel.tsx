@@ -39,7 +39,7 @@ export default function SourcePanel({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-transparent"
               }`}
             >
-              <span className="material-symbols-outlined text-[16px]">{meta.icon}</span>
+              <span className="material-symbols-outlined text-[1rem]">{meta.icon}</span>
               {meta.label}
             </button>
           );
@@ -54,7 +54,7 @@ export default function SourcePanel({
           disabled={uploading}
           className="w-full rounded-lg border border-dashed border-slate-200 dark:border-slate-700 hover:border-primary/50 bg-slate-50 dark:bg-slate-900/20 hover:bg-primary/5 transition-all py-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm text-slate-500 dark:text-slate-400"
         >
-          <span className="material-symbols-outlined text-[20px]">cloud_upload</span>
+          <span className="material-symbols-outlined text-[1.25rem]">cloud_upload</span>
           {uploading ? "上傳中..." : `選擇檔案上傳到 ${currentDir}`}
         </button>
       )}
@@ -75,7 +75,7 @@ export default function SourcePanel({
             disabled={crawling || !crawlUrlValue.trim()}
             className="bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-all disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-[16px]">{crawling ? "hourglass_top" : "download"}</span>
+            <span className="material-symbols-outlined text-[1rem]">{crawling ? "hourglass_top" : "download"}</span>
             {crawling ? "擷取中..." : "匯入"}
           </button>
         </div>
@@ -87,7 +87,7 @@ export default function SourcePanel({
           onClick={onShowNote}
           className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors"
         >
-          <span className="material-symbols-outlined text-[18px]">note_add</span>
+          <span className="material-symbols-outlined text-[1.125rem]">note_add</span>
           新增筆記
         </button>
       )}

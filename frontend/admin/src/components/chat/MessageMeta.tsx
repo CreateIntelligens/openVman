@@ -27,6 +27,7 @@ function sourceLabel(source: string | undefined): string | undefined {
 }
 
 type ToolResultItem = { text?: string; source?: string; path?: string; title?: string; score?: number };
+const EMPTY_TOOL_STEPS: ToolStep[] = [];
 
 function parseResults(result: string | undefined): ToolResultItem[] {
   if (!result) return [];
@@ -62,16 +63,16 @@ function RefBadge({ item, index }: { item: ToolResultItem; index: number }) {
         onClick={toggle}
         className={[
           "inline-flex items-center gap-1 self-start",
-          "px-2 py-0.5 rounded text-[11px] border transition-colors",
+          "px-2 py-0.5 rounded text-[0.6875rem] border transition-colors",
           open
             ? "border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
             : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400",
         ].join(" ")}
       >
         <span className="opacity-50 font-mono">[{index + 1}]</span>
-        <span className="max-w-[220px] truncate">{title}</span>
+        <span className="max-w-[13.75rem] truncate">{title}</span>
         {item.text && (
-          <span className="material-symbols-outlined text-[10px] ml-0.5">
+          <span className="material-symbols-outlined text-[0.625rem] ml-0.5">
             {open ? "expand_less" : "expand_more"}
           </span>
         )}
@@ -79,7 +80,7 @@ function RefBadge({ item, index }: { item: ToolResultItem; index: number }) {
 
       {open && item.text && (
         <div className="ml-2 pl-2 border-l border-slate-200 dark:border-slate-700">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">
+          <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">
             {item.text}
           </p>
         </div>
@@ -100,11 +101,9 @@ export default function MessageMeta({
   const [refsOpen, setRefsOpen] = useState(false);
   const toggleRefs = useCallback(() => setRefsOpen((v) => !v), []);
 
-  const hasTools = Boolean(toolSteps?.length);
-  const refs = useMemo(
-    () => (hasTools ? allReferences(toolSteps!) : []),
-    [toolSteps],
-  );
+  const visibleToolSteps = toolSteps ?? EMPTY_TOOL_STEPS;
+  const hasTools = visibleToolSteps.length > 0;
+  const refs = useMemo(() => allReferences(visibleToolSteps), [visibleToolSteps]);
   const hasRefs = refs.length > 0;
 
   const knowledgeSources = sources?.knowledge ?? [];
@@ -124,32 +123,32 @@ export default function MessageMeta({
             type="button"
             onClick={toggleRefs}
             className={[
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] transition-colors",
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[0.6875rem] transition-colors",
               refsOpen
                 ? "border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
                 : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400",
             ].join(" ")}
           >
-            <span className="material-symbols-outlined text-[11px]">library_books</span>
+            <span className="material-symbols-outlined text-[0.6875rem]">library_books</span>
             <span>參考資料 ({refs.length})</span>
-            <span className="material-symbols-outlined text-[10px]">{refsOpen ? "expand_less" : "expand_more"}</span>
+            <span className="material-symbols-outlined text-[0.625rem]">{refsOpen ? "expand_less" : "expand_more"}</span>
           </button>
         )}
         {hasTools && (
           <>
-            <span className="material-symbols-outlined text-[11px]">build</span>
-            {toolSteps.map((s, i) => (
+            <span className="material-symbols-outlined text-[0.6875rem]">build</span>
+            {visibleToolSteps.map((s, i) => (
               <span key={i} className="inline-flex items-center gap-1">
                 {toolLabel(s.name)}
                 {s.duration_s != null && <span className="opacity-40">{s.duration_s}s</span>}
-                {i < toolSteps.length - 1 && <span className="opacity-30">·</span>}
+                {i < visibleToolSteps.length - 1 && <span className="opacity-30">·</span>}
               </span>
             ))}
           </>
         )}
         {hasTiming && (
           <span className="inline-flex items-center gap-1">
-            <span className="material-symbols-outlined text-[11px]">timer</span>
+            <span className="material-symbols-outlined text-[0.6875rem]">timer</span>
             {responseTimeS}s
           </span>
         )}
@@ -168,7 +167,7 @@ export default function MessageMeta({
       {extraCitations.length > 0 && (
         <div className="flex flex-wrap gap-1 pl-0.5">
           {extraCitations.map((r, i) => (
-            <span key={i} className="inline-flex items-center px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px] text-slate-500 dark:text-slate-400 max-w-[200px] truncate">
+            <span key={i} className="inline-flex items-center px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[0.6875rem] text-slate-500 dark:text-slate-400 max-w-[12.5rem] truncate">
               {r.source ?? r.text?.slice(0, 40) ?? "—"}
             </span>
           ))}

@@ -91,7 +91,7 @@ export default function ChatMessage({
     <article
       className={`max-w-[85%] lg:max-w-[75%] rounded-2xl px-5 py-4 shadow-sm group/msg ${messageCardClassName}`}
     >
-      <div className={`mb-2 flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] font-bold ${messageMetaClassName}`}>
+      <div className={`mb-2 flex items-center gap-3 text-[0.625rem] uppercase tracking-[0.2em] font-bold ${messageMetaClassName}`}>
         <span>{isUserMessage ? "You" : "Brain"}</span>
         {timestamp && <span>{timestamp}</span>}
         {shouldShowAssistantActions && (
@@ -102,7 +102,7 @@ export default function ChatMessage({
               className={ttsButtonClassName}
               title={ttsButtonTitle}
             >
-              <span className="material-symbols-outlined text-[14px]">
+              <span className="material-symbols-outlined text-[0.875rem]">
                 {isPlaying ? "stop" : "volume_up"}
               </span>
             </button>
@@ -112,7 +112,7 @@ export default function ChatMessage({
               className="text-slate-500 hover:text-slate-900 dark:hover:text-white"
               title="Copy"
             >
-              <span className="material-symbols-outlined text-[14px]">content_copy</span>
+              <span className="material-symbols-outlined text-[0.875rem]">content_copy</span>
             </button>
           </div>
         )}
@@ -124,11 +124,11 @@ export default function ChatMessage({
           <span className="h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce" />
         </div>
       ) : shouldRenderMarkdown ? (
-        <div className="text-[15px] leading-relaxed relative z-10">
+        <div className="text-[0.9375rem] leading-relaxed relative z-10">
           <MarkdownPreview content={message.content} />
         </div>
       ) : (
-        <p className="whitespace-pre-wrap text-[15px] leading-relaxed relative z-10">{renderWithRedactions(message.content)}</p>
+        <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed relative z-10">{renderWithRedactions(message.content)}</p>
       )}
       {shouldShowPrivacyWarning && (
         <div className="mt-4 pt-3 border-t border-amber-200/60 dark:border-amber-700/40 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">

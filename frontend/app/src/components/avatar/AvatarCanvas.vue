@@ -46,10 +46,10 @@ defineEmits<{}>()
 
 .avatar-gl-hidden {
   position: absolute;
-  top: 100px;
-  left: 100px;
-  width: 180px;
-  height: 180px;
+  top: 6.25rem;
+  left: 6.25rem;
+  width: 11.25rem;
+  height: 11.25rem;
   opacity: 0.001;
   z-index: 1;
   pointer-events: none;
@@ -57,10 +57,10 @@ defineEmits<{}>()
 
 .avatar-screen-hidden {
   position: absolute;
-  bottom: -1000px;
-  right: -1000px;
-  width: 1px;
-  height: 1px;
+  bottom: -62.5rem;
+  right: -62.5rem;
+  width: 0.0625rem;
+  height: 0.0625rem;
   overflow: hidden;
 }
 
@@ -70,26 +70,26 @@ defineEmits<{}>()
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 10;
-  border-radius: 12px;
-  padding: 20px 32px;
+  border-radius: 0.75rem;
+  padding: 1.25rem 2rem;
   text-align: center;
   color: #fff;
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .avatar-overlay.loading {
   background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(0.5rem);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid rgba(255, 255, 255, 0.2);
+  width: 2rem;
+  height: 2rem;
+  border: 0.1875rem solid rgba(255, 255, 255, 0.2);
   border-top-color: #4ade80;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

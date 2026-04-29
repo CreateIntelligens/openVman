@@ -3,9 +3,9 @@
     <main class="kiosk-layout">
       <section class="stage-panel">
         <div class="stage-hero">
-          <h1>openVman 數位接待</h1>
+          <h1>openVman 虛擬人</h1>
           <p class="stage-panel__intro">
-            數位接待控制台，可在此與虛擬人即時互動。
+            虛擬人控制台，可在此與虛擬人即時互動。
           </p>
         </div>
 
@@ -23,14 +23,10 @@
 
       <aside class="console-column">
         <ControlBar
-          :characters="characters"
-          :current-char-id="wasm.currentCharId.value"
-          :tts-engine="settings.ttsEngine"
           :state="chat.state.value"
           :disabled="!wasm.isReady.value || wasm.isLoading.value"
           :error-message="wasm.error.value"
-          @char-change="handleCharChange"
-          @tts-change="handleTtsChange"
+          @open-settings="showSettings = true"
         />
 
         <ChatPanel
@@ -39,10 +35,44 @@
           :placeholder="chatPlaceholder"
           :is-thinking="chat.state.value === 'THINKING'"
           :is-typing="isTyping"
+          :asr-listening="asr.isListening.value"
           @send="handleSend"
+          @asr-toggle="handleAsrToggle"
         />
       </aside>
     </main>
+
+    <!-- Status toast notifications -->
+    <StatusToast ref="statusToastRef" />
+
+    <!-- Settings modal -->
+    <SettingsModal
+      v-model:open="showSettings"
+      :characters="characters"
+      :current-char-id="wasm.currentCharId.value"
+      :tts-provider="settings.ttsProvider"
+      :tts-voice="settings.ttsVoice"
+      :tts-providers="ttsProviders"
+      :personas="personas"
+      :current-persona-id="settings.personaId"
+      :voice-mode="settings.voiceMode"
+      :state="chat.state.value"
+      :disabled="!wasm.isReady.value || wasm.isLoading.value"
+      @char-change="handleCharChange"
+      @tts-provider-change="handleTtsChange"
+      @tts-voice-change="handleTtsVoiceChange"
+      @persona-change="handlePersonaChange"
+      @voice-mode-change="handleVoiceModeChange"
+      @apply="handleSettingsApply"
+    />
+
+    <!-- Fatal error overlay -->
+    <ErrorOverlay
+      v-if="fatalError"
+      :code="fatalError.code"
+      :message="fatalError.message"
+      @retry="handleFatalRetry"
+    />
   </div>
 </template>
 
@@ -51,15 +81,52 @@ import { computed, onMounted, ref, watch } from "vue";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";
+import type { PersonaSummary } from "./components/controls/ControlBar.vue";
+import SettingsModal from "./components/controls/SettingsModal.vue";
+import StatusToast from "./components/StatusToast.vue";
+import ErrorOverlay from "./components/ErrorOverlay.vue";
 import { useAudioPlayer } from "./composables/useAudioPlayer";
 import { useAvatarChat } from "./composables/useAvatarChat";
+import { useAsr } from "./composables/useAsr";
 import { useMatesX } from "./composables/useMatesX";
-import { useTtsStreamer } from "./composables/useTtsStreamer";
+import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useSettingsStore } from "./stores/useSettingsStore";
 
+const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
+
 const isStarted = ref(false);
 const isTyping = ref(false);
+const showSettings = ref(false);
+
+// Error overlay state (fatal errors shown full-screen)
+const fatalError = ref<{ code: string; message: string } | null>(null);
+// Ref to StatusToast component for gateway status messages
+const statusToastRef = ref<InstanceType<typeof StatusToast> | null>(null);
+
+// Audio underrun protection: tracks whether final chunk was received
+let isFinalReceived = false;
+let underrunTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearUnderrunTimer(): void {
+  if (underrunTimer !== null) {
+    clearTimeout(underrunTimer);
+    underrunTimer = null;
+  }
+}
+
+function onAudioQueueEmpty(): void {
+  if (!isFinalReceived) {
+    // Queue drained before final — start 3s watchdog
+    underrunTimer = setTimeout(() => {
+      typewriter.flush();
+      isTyping.value = false;
+      isFinalReceived = false;
+    }, 3000);
+  } else {
+    isFinalReceived = false;
+  }
+}
 
 const settings = useSettingsStore();
 
@@ -68,11 +135,41 @@ const characters = ref([
   { id: "009", name: "角色 009" },
 ]);
 
+const DEFAULT_PERSONA: PersonaSummary = { persona_id: "default", label: "預設" };
+const personas = ref<PersonaSummary[]>([DEFAULT_PERSONA]);
+const ttsProviders = ref<TtsProvider[]>([]);
+
+async function fetchPersonas(): Promise<void> {
+  try {
+    const res = await fetch("/api/personas?project_id=default");
+    if (!res.ok) return;
+    const data = await res.json();
+    const items: PersonaSummary[] = (data.personas ?? []).map((p: { persona_id: string; label: string }) => ({
+      persona_id: p.persona_id,
+      label: p.label || p.persona_id,
+    }));
+    if (items.length > 0) personas.value = items;
+  } catch {
+    // silently keep the default fallback
+  }
+}
+
+async function fetchTtsProviders(): Promise<void> {
+  try {
+    const res = await fetch("/v1/tts/providers");
+    if (!res.ok) return;
+    ttsProviders.value = await res.json();
+  } catch {
+    // silently keep empty — SettingsModal falls back to showing nothing
+  }
+}
+
 const wasm = useMatesX();
 
 const audio = useAudioPlayer({
   onPcmChunk: (pcm) => wasm.pushAudio(pcm),
   onPlaybackEnd: () => wasm.clearAudio(),
+  onQueueEmpty: onAudioQueueEmpty,
 });
 
 const typewriter = useTypewriter({
@@ -109,33 +206,56 @@ const ttsStreamer = useTtsStreamer({
 });
 
 const chat = useAvatarChat({
+  personaId: settings.personaId,
+  mode: settings.voiceMode,
   onAudioChunk: (data) => audio.playChunk(data),
+  onDisconnect: () => audio.flush(),
   onStopAudio: () => {
     ttsStreamer.cancel();
     audio.resetSchedule();
     wasm.clearAudio();
     typewriter.flush();
     isTyping.value = false;
+    clearUnderrunTimer();
+    isFinalReceived = false;
   },
   onUtteranceComplete: (fullText) => {
+    isFinalReceived = true;
+    clearUnderrunTimer();
     audio.resetSchedule();
     pendingText = fullText;
-    void ttsStreamer.speak(fullText);
+    void ttsStreamer.speak(fullText, { provider: settings.ttsProvider, voice: settings.ttsVoice });
+  },
+  onServerError: (code, message, retryAfterMs) => {
+    if (code === 'RATE_LIMITED' && typeof retryAfterMs === 'number' && retryAfterMs > 0) {
+      statusToastRef.value?.showCountdown('已達上限，請等待', retryAfterMs);
+      return;
+    }
+    if (code === 'SESSION_EXPIRED') {
+      chat.reinit(settings.personaId);
+    } else if (FATAL_ERROR_CODES.has(code)) {
+      fatalError.value = { code, message };
+    } else {
+      const suffix = retryAfterMs ? `（${Math.round(retryAfterMs / 1000)}s 後重試）` : '';
+      statusToastRef.value?.show(`${code}: ${message}${suffix}`, { persistent: false });
+    }
+  },
+  onGatewayStatus: (plugin, status, message) => {
+    const text = message || `${plugin} → ${status}`;
+    statusToastRef.value?.show(text, { persistent: status === 'degraded' });
   },
 });
 
 const loadingText = computed(() => {
-  if (!wasm.isReady.value) return "載入接待引擎中...";
+  if (!wasm.isReady.value) return "載入引擎中...";
   if (wasm.isLoading.value) return "切換展示角色中...";
   return "";
 });
 
 const chatPlaceholder = computed(() => {
-  if (!wasm.isReady.value) return "正在準備接待台...";
+  if (!wasm.isReady.value) return "正在準備...";
   if (wasm.isLoading.value) return "切換展示角色中...";
-  if (chat.state.value === "CONNECTING") return "連線中...";
-  if (chat.state.value === "DISCONNECTED") return "向數位接待員提問...";
-  return "向數位接待員提問...";
+  return "向數位虛擬人提問...";
 });
 
 async function handleSend(text: string): Promise<void> {
@@ -180,12 +300,61 @@ async function handleCharChange(charId: string): Promise<void> {
 }
 
 function handleTtsChange(engine: string): void {
-  settings.ttsEngine = engine;
+  settings.ttsProvider = engine;
 }
 
+function handleTtsVoiceChange(voice: string): void {
+  settings.ttsVoice = voice;
+}
 
+function handlePersonaChange(personaId: string): void {
+  settings.personaId = personaId;
+}
+
+function handleVoiceModeChange(mode: 'live' | 'text'): void {
+  settings.voiceMode = mode;
+}
+
+async function handleSettingsApply(): Promise<void> {
+  // Apply mode change before reconnecting so connect() uses the new mode
+  chat.setMode(settings.voiceMode);
+  chat.disconnect();
+  isStarted.value = false;
+  await audio.resumeContext();
+  void chat.connect();
+  isStarted.value = true;
+}
+
+async function handleFatalRetry(): Promise<void> {
+  fatalError.value = null;
+  await audio.resumeContext();
+  void chat.connect();
+}
+
+const asr = useAsr({
+  lang: 'zh-TW',
+  onResult: (transcript) => {
+    void handleSend(transcript);
+  },
+  onError: (error) => {
+    console.warn('[ASR]', error);
+  },
+});
+
+function handleAsrToggle(): void {
+  if (asr.isListening.value) asr.stop(); else asr.start();
+}
+
+// Pause ASR during THINKING/SPEAKING to avoid feedback loops
+watch(() => chat.state.value, (newState) => {
+  if ((newState === 'THINKING' || newState === 'SPEAKING') && asr.isListening.value) {
+    asr.pause();
+  }
+});
 
 onMounted(async () => {
+  void fetchTtsProviders();
+  await fetchPersonas();
   try {
     await wasm.initWasm();
     const firstChar = settings.characterId || characters.value[0]?.id || "001";
@@ -205,6 +374,10 @@ onMounted(async () => {
   --line: #e2e8f0;
   --primary: #0ea5e9;
   --primary-hover: #0284c7;
+  --hairline: 0.0625rem;
+  --focus-ring-size: 0.1875rem;
+  --radius-pill: 999rem;
+  --surface-shadow: 0 0.25rem 0.375rem -0.0625rem rgba(0, 0, 0, 0.05);
 }
 
 *,
@@ -273,8 +446,8 @@ body {
   border-radius: 1rem;
   padding: 1rem;
   background: var(--bg-soft);
-  border: 1px solid var(--line);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: var(--hairline) solid var(--line);
+  box-shadow: var(--surface-shadow);
 }
 
 .stage-frame {
@@ -285,7 +458,7 @@ body {
   overflow: hidden;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 68.75rem) {
   .app-shell {
     padding: 1rem;
   }

@@ -1,10 +1,14 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import checker from "vite-plugin-checker";
 
 const publicPort = Number(process.env.PORT ?? 8787);
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    checker({ vueTsc: true }),
+  ],
   server: {
     host: true,
     port: 80,
@@ -20,6 +24,12 @@ export default defineConfig({
         ws: true,
       },
       "/api": {
+        target: "http://localhost:8200",
+      },
+      "/v1": {
+        target: "http://localhost:8200",
+      },
+      "/tts": {
         target: "http://localhost:8200",
       },
     },

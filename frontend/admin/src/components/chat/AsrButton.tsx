@@ -30,9 +30,9 @@ export const AsrButton: React.FC<AsrButtonProps> = ({
                      className={`h-8 flex items-center justify-center rounded-lg transition-colors shadow-sm ${getButtonStyles()}`}
                      title={listening ? "停止語音輸入" : "語音輸入"}
               >
-                     <span className="material-symbols-outlined text-[18px]">mic</span>
+                     <span className="material-symbols-outlined text-[1.125rem]">mic</span>
                      {listening && (
-                            <span className="text-[11px] font-bold whitespace-nowrap">
+                            <span className="text-[0.6875rem] font-bold whitespace-nowrap">
                                    {speaking ? "聆聽中..." : "等待語音"}
                             </span>
                      )}

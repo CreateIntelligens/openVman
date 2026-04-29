@@ -43,11 +43,11 @@ export default function MoveModal({
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] flex flex-col mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="material-symbols-outlined text-primary text-[20px]">drive_file_move</span>
+            <span className="material-symbols-outlined text-primary text-[1.25rem]">drive_file_move</span>
             <span className="text-sm font-semibold text-slate-900 dark:text-white">移動文件</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            <span className="material-symbols-outlined text-[1.125rem]">close</span>
           </button>
         </div>
         <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800/50">
@@ -70,9 +70,9 @@ export default function MoveModal({
                 }`}
                 style={{ paddingLeft: `${20 + depth * 16}px` }}
               >
-                <span className="material-symbols-outlined text-[18px]">{isSelected ? "folder_open" : "folder"}</span>
+                <span className="material-symbols-outlined text-[1.125rem]">{isSelected ? "folder_open" : "folder"}</span>
                 <span className="text-sm truncate">{label}</span>
-                {isCurrentDir && <span className="text-[10px] text-slate-500 ml-auto shrink-0">目前位置</span>}
+                {isCurrentDir && <span className="text-[0.625rem] text-slate-500 ml-auto shrink-0">目前位置</span>}
               </button>
             );
           })}

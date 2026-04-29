@@ -33,8 +33,8 @@ export default function ToolTable({ tools, resolveSkillName }: ToolTableProps) {
                   </td>
                   {showSkillColumn && (
                     <td className="px-6 py-3 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
-                        <span className="material-symbols-outlined text-[12px]">extension</span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.625rem] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                        <span className="material-symbols-outlined text-[0.75rem]">extension</span>
                         {skillName}
                       </span>
                     </td>

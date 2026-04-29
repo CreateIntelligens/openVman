@@ -83,7 +83,7 @@ export default function GraphView() {
       failed: "失敗",
     };
     return (
-      <span className={`text-[11px] font-semibold px-2 py-1 rounded-md ${styles[state]}`}>
+      <span className={`text-[0.6875rem] font-semibold px-2 py-1 rounded-md ${styles[state]}`}>
         {labels[state]}
       </span>
     );
@@ -95,11 +95,11 @@ export default function GraphView() {
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary text-[20px]">hub</span>
+          <span className="material-symbols-outlined text-primary text-[1.25rem]">hub</span>
           <span className="text-sm font-bold text-slate-900 dark:text-white">知識圖譜</span>
           {statusBadge}
           {status?.finished_at && (
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[0.6875rem] text-slate-500">
               最後建置：{new Date(status.finished_at).toLocaleString()}
             </span>
           )}
@@ -109,7 +109,7 @@ export default function GraphView() {
           disabled={disableRebuild}
           className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50"
         >
-          <span className={`material-symbols-outlined text-[16px] ${disableRebuild ? "animate-spin" : ""}`}>
+          <span className={`material-symbols-outlined text-[1rem] ${disableRebuild ? "animate-spin" : ""}`}>
             autorenew
           </span>
           {status?.state === "building" ? "建置中…" : "重建圖譜"}
@@ -130,12 +130,12 @@ export default function GraphView() {
           <StatCard label="跨社群橋" value={summary.surprising_bridges} />
           {summary.god_nodes.length > 0 && (
             <div className="col-span-2 md:col-span-4">
-              <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">樞紐節點</div>
+              <div className="text-[0.625rem] uppercase tracking-widest text-slate-500 mb-1">樞紐節點</div>
               <div className="flex flex-wrap gap-1.5">
                 {summary.god_nodes.slice(0, 10).map((n, i) => (
                   <span
                     key={`${n}-${i}`}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20"
+                    className="text-[0.6875rem] px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20"
                   >
                     {n}
                   </span>
@@ -171,7 +171,7 @@ export default function GraphView() {
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/40 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-widest text-slate-500">{label}</div>
+      <div className="text-[0.625rem] uppercase tracking-widest text-slate-500">{label}</div>
       <div className="text-lg font-bold text-slate-900 dark:text-white">{value.toLocaleString()}</div>
     </div>
   );
@@ -180,7 +180,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
 function EmptyState({ icon, text, spin = false }: { icon: string; text: string; spin?: boolean }) {
   return (
     <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2">
-      <span className={`material-symbols-outlined text-[32px] ${spin ? "animate-spin" : ""}`}>{icon}</span>
+      <span className={`material-symbols-outlined text-[2rem] ${spin ? "animate-spin" : ""}`}>{icon}</span>
       <span className="text-sm">{text}</span>
     </div>
   );

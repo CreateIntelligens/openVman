@@ -59,7 +59,7 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
           <span className="material-symbols-outlined text-primary">edit_note</span>
           <span className="font-bold text-sm">編輯：{skillId}</span>
           {dirty && (
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded uppercase">
+            <span className="px-2 py-0.5 text-[0.625rem] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded uppercase">
               未儲存
             </span>
           )}
@@ -112,7 +112,7 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
           value={files[activeTab] ?? ""}
           onChange={(e) => handleChange(e.target.value)}
           spellCheck={false}
-          className="w-full h-[400px] p-5 bg-transparent text-slate-800 dark:text-slate-200 text-xs leading-5 font-mono resize-y outline-none border-none"
+          className="w-full h-[25rem] p-5 bg-transparent text-slate-800 dark:text-slate-200 text-xs leading-5 font-mono resize-y outline-none border-none"
           style={{ tabSize: 2 }}
         />
       )}

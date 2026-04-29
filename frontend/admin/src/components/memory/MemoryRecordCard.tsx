@@ -16,11 +16,11 @@ export default function MemoryRecordCard({ memory, onDelete }: MemoryRecordCardP
           </p>
           <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
             <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">person</span>
+              <span className="material-symbols-outlined text-[0.875rem]">person</span>
               {memory.source}
             </span>
             <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+              <span className="material-symbols-outlined text-[0.875rem]">calendar_today</span>
               {memory.date}
             </span>
             {memory.metadata && <MemoryMetaBadges metadata={memory.metadata} />}

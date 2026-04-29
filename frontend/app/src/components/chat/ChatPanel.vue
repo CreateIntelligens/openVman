@@ -3,9 +3,9 @@
     <header class="chat-panel__header">
       <div>
         <p class="chat-panel__eyebrow">Guest Dialogue</p>
-        <h3>接待對話紀錄</h3>
+        <h3>對話紀錄</h3>
       </div>
-      <span class="chat-panel__counter">{{ messages.length }} 則訊息</span>
+
     </header>
 
     <div class="chat-messages" ref="messagesRef">
@@ -16,7 +16,7 @@
         :class="msg.role"
       >
         <div class="chat-msg__meta">
-          <span class="chat-role">{{ msg.role === "user" ? "訪客" : "接待員" }}</span>
+          <span class="chat-role">{{ msg.role === "user" ? "訪客" : "虛擬人" }}</span>
           <span class="chat-time">{{ formatTime(msg.timestamp) }}</span>
         </div>
         <p v-if="msg.role === 'user'" class="chat-text">{{ msg.text }}</p>
@@ -30,7 +30,7 @@
 
       <div v-if="isThinking" class="chat-msg ai thinking">
         <div class="chat-msg__meta">
-          <span class="chat-role">接待員</span>
+          <span class="chat-role">虛擬人</span>
           <span class="chat-time">即時生成</span>
         </div>
         <div class="thinking-row">
@@ -41,8 +41,13 @@
     </div>
 
     <div class="chat-input-bar">
+      <AsrButton
+        :is-listening="asrListening"
+        :disabled="disabled"
+        @toggle="emit('asr-toggle')"
+      />
       <label class="composer-shell">
-        <span class="composer-label">輸入問題或接待指令</span>
+        <span class="composer-label">輸入問題</span>
         <input
           ref="inputRef"
           v-model="inputText"
@@ -63,6 +68,7 @@
 import { nextTick, ref, watch } from "vue";
 import type { ChatMessage } from "../../composables/useAvatarChat";
 import TypewriterText from "./TypewriterText.vue";
+import AsrButton from "./AsrButton.vue";
 
 const props = defineProps<{
   messages: ChatMessage[]
@@ -70,14 +76,17 @@ const props = defineProps<{
   placeholder?: string
   isThinking?: boolean
   isTyping?: boolean
+  asrListening?: boolean
 }>()
 
 const emit = defineEmits<{
   send: [text: string]
+  'asr-toggle': []
 }>()
 
 const inputText = ref("")
 const messagesRef = ref<HTMLDivElement>()
+const inputRef = ref<HTMLInputElement>()
 
 function handleSend(): void {
   const text = inputText.value.trim()
@@ -108,9 +117,9 @@ watch(() => props.messages.length, async () => {
   min-height: 0;
   height: 100%;
   border-radius: 0.75rem;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   background: var(--bg-soft);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--surface-shadow);
   overflow: hidden;
 }
 
@@ -119,7 +128,7 @@ watch(() => props.messages.length, async () => {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 
 .chat-panel__eyebrow {
@@ -138,10 +147,10 @@ watch(() => props.messages.length, async () => {
 }
 
 .chat-panel__counter {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.25rem 0.75rem;
   background: var(--bg);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   color: var(--text-soft);
   font-size: 0.75rem;
   font-weight: 500;
@@ -178,7 +187,7 @@ watch(() => props.messages.length, async () => {
   align-self: flex-start;
   background: var(--bg);
   color: var(--text);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-bottom-left-radius: 0.25rem;
 }
 
@@ -233,7 +242,7 @@ watch(() => props.messages.length, async () => {
 .dots span {
   width: 0.35rem;
   height: 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--text-soft);
   animation: pulse 1.5s infinite;
 }
@@ -245,7 +254,7 @@ watch(() => props.messages.length, async () => {
   display: flex;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   background: var(--bg-soft);
 }
 
@@ -262,7 +271,7 @@ watch(() => props.messages.length, async () => {
 .chat-input-bar input {
   height: 2.5rem;
   width: 100%;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 0.5rem;
   background: var(--bg-soft);
   color: var(--text);
@@ -274,7 +283,7 @@ watch(() => props.messages.length, async () => {
 
 .chat-input-bar input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 0 var(--focus-ring-size) rgba(14, 165, 233, 0.15);
 }
 
 .chat-input-bar input:disabled {
@@ -310,7 +319,7 @@ watch(() => props.messages.length, async () => {
   50% { opacity: 1; transform: scale(1.1); }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 40rem) {
   .chat-msg {
     max-width: 95%;
   }
