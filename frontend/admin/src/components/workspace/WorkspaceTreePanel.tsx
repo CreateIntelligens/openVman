@@ -21,7 +21,7 @@ export default function WorkspaceTreePanel({
   return (
     <>
       <div className="px-4 mb-3 shrink-0 relative">
-        <span className="material-symbols-outlined absolute left-7 top-1/2 -translate-y-1/2 text-slate-500 text-[16px]">search</span>
+        <span className="material-symbols-outlined absolute left-7 top-1/2 -translate-y-1/2 text-slate-500 text-[1rem]">search</span>
         <input
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -33,7 +33,7 @@ export default function WorkspaceTreePanel({
       <div className="flex-1 overflow-y-auto px-2 pb-4 select-none">
         {loading ? (
           <div className="flex items-center justify-center h-full text-slate-500 text-sm">
-            <span className="material-symbols-outlined animate-spin mr-2 text-[18px]">refresh</span> Loading...
+            <span className="material-symbols-outlined animate-spin mr-2 text-[1.125rem]">refresh</span> Loading...
           </div>
         ) : (
           <FileTree

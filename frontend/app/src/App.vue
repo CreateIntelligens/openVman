@@ -327,6 +327,10 @@ onMounted(async () => {
   --line: #e2e8f0;
   --primary: #0ea5e9;
   --primary-hover: #0284c7;
+  --hairline: 0.0625rem;
+  --focus-ring-size: 0.1875rem;
+  --radius-pill: 999rem;
+  --surface-shadow: 0 0.25rem 0.375rem -0.0625rem rgba(0, 0, 0, 0.05);
 }
 
 *,
@@ -395,8 +399,8 @@ body {
   border-radius: 1rem;
   padding: 1rem;
   background: var(--bg-soft);
-  border: 1px solid var(--line);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: var(--hairline) solid var(--line);
+  box-shadow: var(--surface-shadow);
 }
 
 .stage-frame {
@@ -407,7 +411,7 @@ body {
   overflow: hidden;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 68.75rem) {
   .app-shell {
     padding: 1rem;
   }

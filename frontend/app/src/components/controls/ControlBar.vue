@@ -107,9 +107,9 @@ const stateLabel = computed(() => {
   flex-direction: column;
   gap: 1.25rem;
   border-radius: 0.75rem;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   background: var(--bg-soft);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--surface-shadow);
   padding: 1.25rem;
 }
 
@@ -139,10 +139,10 @@ const stateLabel = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.35rem 0.75rem;
   background: var(--bg);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   color: var(--text);
   font-size: 0.75rem;
   font-weight: 500;
@@ -151,7 +151,7 @@ const stateLabel = computed(() => {
 .status-pill__dot {
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: #94a3b8;
 }
 
@@ -196,7 +196,7 @@ const stateLabel = computed(() => {
   flex-direction: column;
   gap: 0.5rem;
   border-radius: 0.5rem;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   background: var(--bg);
   padding: 0.75rem;
 }
@@ -210,7 +210,7 @@ const stateLabel = computed(() => {
 
 .field-card select {
   height: 2.5rem;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 0.5rem;
   background: var(--bg-soft);
   color: var(--text);
@@ -223,7 +223,7 @@ const stateLabel = computed(() => {
 
 .field-card select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 0 var(--focus-ring-size) rgba(14, 165, 233, 0.15);
 }
 
 .field-card select:disabled {
@@ -236,7 +236,7 @@ const stateLabel = computed(() => {
   border-radius: 0.5rem;
   padding: 0.75rem;
   background: #fef2f2;
-  border: 1px solid #fee2e2;
+  border: var(--hairline) solid #fee2e2;
   color: #b91c1c;
   font-size: 0.875rem;
   font-weight: 500;
@@ -247,7 +247,7 @@ const stateLabel = computed(() => {
   50% { opacity: 1; transform: scale(1.1); }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 40rem) {
   .control-bar__header,
   .control-grid {
     grid-template-columns: 1fr;

@@ -69,10 +69,10 @@ export default {
         "2xl": "1.25rem",
       },
       boxShadow: {
-        xs: "0 1px 1px 0 rgb(0 0 0 / 0.04)",
-        sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        md: "0 2px 6px -1px rgb(0 0 0 / 0.08)",
-        lg: "0 8px 24px -6px rgb(0 0 0 / 0.12)",
+        xs: "0 0.0625rem 0.0625rem 0 rgb(0 0 0 / 0.04)",
+        sm: "0 0.0625rem 0.125rem 0 rgb(0 0 0 / 0.05)",
+        md: "0 0.125rem 0.375rem -0.0625rem rgb(0 0 0 / 0.08)",
+        lg: "0 0.5rem 1.5rem -0.375rem rgb(0 0 0 / 0.12)",
       },
       maxWidth: {
         prose: "48rem",

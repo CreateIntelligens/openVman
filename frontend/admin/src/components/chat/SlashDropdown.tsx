@@ -7,8 +7,8 @@ interface SlashDropdownProps {
 }
 
 const SCOPE_BADGE: Record<NonNullable<SkillInfo["scope"]>, string> = {
-  project: "rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary",
-  shared: "rounded bg-surface-sunken px-1.5 py-0.5 text-[10px] font-medium text-content-muted",
+  project: "rounded bg-primary/10 px-1.5 py-0.5 text-[0.625rem] font-medium text-primary",
+  shared: "rounded bg-surface-sunken px-1.5 py-0.5 text-[0.625rem] font-medium text-content-muted",
 };
 
 function ScopeBadge({ scope }: { scope?: SkillInfo["scope"] }) {
@@ -20,7 +20,7 @@ export const SlashDropdown: React.FC<SlashDropdownProps> = ({ matches, selectedI
   if (matches.length === 0) return null;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[240px] overflow-y-auto">
+    <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[15rem] overflow-y-auto">
       {matches.map((skill, i) => (
         <button
           key={skill.id}
@@ -38,10 +38,10 @@ export const SlashDropdown: React.FC<SlashDropdownProps> = ({ matches, selectedI
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-bold font-mono">/{skill.id}</span>
-              <span className="text-[11px] text-content-muted">{skill.name}</span>
+              <span className="text-[0.6875rem] text-content-muted">{skill.name}</span>
               <ScopeBadge scope={skill.scope} />
             </div>
-            <div className="text-[11px] text-slate-500 truncate">
+            <div className="text-[0.6875rem] text-slate-500 truncate">
               {skill.description || skill.name}
             </div>
           </div>

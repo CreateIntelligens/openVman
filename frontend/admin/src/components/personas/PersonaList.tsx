@@ -18,7 +18,7 @@ export default function PersonaList({
 }: PersonaListProps) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-3 px-1 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+      <div className="flex items-center justify-between mb-3 px-1 text-[0.6875rem] font-medium text-slate-500 uppercase tracking-wider">
         <span>角色庫（{personas.length}）</span>
       </div>
       <div className="grid gap-1">

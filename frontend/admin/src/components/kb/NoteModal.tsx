@@ -20,11 +20,11 @@ export default function NoteModal({
       <div className="w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-4">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[20px]">edit_note</span>
+            <span className="material-symbols-outlined text-primary text-[1.25rem]">edit_note</span>
             <span className="text-sm font-semibold text-slate-900 dark:text-white">新增手動來源</span>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors">
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            <span className="material-symbols-outlined text-[1.125rem]">close</span>
           </button>
         </div>
         <div className="space-y-4 px-5 py-5">
@@ -43,7 +43,7 @@ export default function NoteModal({
               value={noteContent}
               onChange={(e) => setNoteContent(e.target.value)}
               placeholder="貼上整理好的知識內容..."
-              className="min-h-[260px] w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/60 px-4 py-3 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 focus:outline-none resize-y"
+              className="min-h-[16.25rem] w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950/60 px-4 py-3 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary/50 focus:outline-none resize-y"
             />
           </div>
         </div>
@@ -58,7 +58,7 @@ export default function NoteModal({
               disabled={creating || !noteTitle.trim() || !noteContent.trim()}
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-[18px]">{creating ? "sync" : "save"}</span>
+              <span className="material-symbols-outlined text-[1.125rem]">{creating ? "sync" : "save"}</span>
               {creating ? "建立中..." : "建立來源"}
             </button>
           </div>

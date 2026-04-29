@@ -80,7 +80,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
       {error && <StatusAlert type="error" message={error} />}
 
       <div>
-        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">範圍</label>
+        <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">範圍</label>
         <div className="flex gap-2">
           {([
             { value: "project", label: `專案（${projectId}）` },
@@ -103,7 +103,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
       </div>
 
       <div>
-        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">名稱</label>
+        <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">名稱</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -111,7 +111,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
           className="w-full px-3 py-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-primary/40"
         />
         {name.trim() && (
-          <p className="text-[10px] text-slate-500 mt-1 font-mono">
+          <p className="text-[0.625rem] text-slate-500 mt-1 font-mono">
             ID: {derivedId}
             {!idOverride && (
               <button onClick={() => setIdOverride(derivedId)} className="ml-2 text-primary hover:underline">
@@ -124,7 +124,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
 
       {idOverride !== "" && (
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">技能 ID</label>
+          <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">技能 ID</label>
           <input
             value={idOverride}
             onChange={(e) => setIdOverride(e.target.value)}
@@ -135,7 +135,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
       )}
 
       <div>
-        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">說明</label>
+        <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">說明</label>
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}

@@ -27,7 +27,7 @@ export default function StatusAlert({ type, message, onDismiss, autoDismiss }: S
       <p className="text-sm flex-1">{message}</p>
       {onDismiss && (
         <button onClick={onDismiss} className="opacity-60 hover:opacity-100 transition-opacity shrink-0">
-          <span className="material-symbols-outlined text-[18px]">close</span>
+          <span className="material-symbols-outlined text-[1.125rem]">close</span>
         </button>
       )}
     </div>

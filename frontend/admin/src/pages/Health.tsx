@@ -147,7 +147,7 @@ export default function Health() {
                         .sort(([, a], [, b]) => b.count - a.count)
                         .map(([key, bucket]) => (
                           <tr key={key} className="text-slate-700 dark:text-slate-300">
-                            <td className="py-2 pr-4 text-xs text-slate-500 dark:text-slate-400 truncate max-w-[240px]" title={key}>{key}</td>
+                            <td className="py-2 pr-4 text-xs text-slate-500 dark:text-slate-400 truncate max-w-[15rem]" title={key}>{key}</td>
                             <td className="py-2 pr-4 text-right font-mono">{bucket.count}</td>
                             <td className="py-2 pr-4 text-right font-mono">{bucket.avg_ms.toFixed(1)}</td>
                             <td className="py-2 text-right font-mono">{bucket.max_ms.toFixed(1)}</td>
@@ -210,13 +210,13 @@ function InfoCard({ icon, label, value, detail, status = "ok" }: {
     <div className="bg-white dark:bg-slate-900/40 border border-primary/10 rounded-xl p-6 transition-transform hover:scale-[1.02]">
       <div className="flex justify-between items-start mb-4">
         <span className="material-symbols-outlined text-primary text-3xl">{icon}</span>
-        <span className={`px-2 py-1 text-[10px] font-bold border rounded uppercase tracking-widest ${badgeConfig.classes}`}>
+        <span className={`px-2 py-1 text-[0.625rem] font-bold border rounded uppercase tracking-widest ${badgeConfig.classes}`}>
           {badgeConfig.text}
         </span>
       </div>
       <h4 className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">{label}</h4>
       <p className="text-xl font-bold truncate" title={value}>{value}</p>
-      {detail && <p className="mt-2 text-[10px] text-slate-500 truncate" title={detail}>{detail}</p>}
+      {detail && <p className="mt-2 text-[0.625rem] text-slate-500 truncate" title={detail}>{detail}</p>}
     </div>
   );
 }

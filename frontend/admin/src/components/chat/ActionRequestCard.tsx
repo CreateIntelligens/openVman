@@ -83,7 +83,7 @@ export default function ActionRequestCard({
     return (
       <div className="mt-3 rounded-lg border border-border bg-surface-raised overflow-hidden text-sm">
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-          <span className="material-symbols-outlined text-[16px] text-content-muted">hub</span>
+          <span className="material-symbols-outlined text-[1rem] text-content-muted">hub</span>
           <span className="font-medium text-content">{request.label}</span>
           {request.reason && (
             <span className="text-xs text-content-subtle truncate">{request.reason}</span>
@@ -93,7 +93,7 @@ export default function ActionRequestCard({
           src={projectUrl(request.endpoint)}
           title={request.label}
           className="w-full border-0 bg-white dark:bg-slate-950/30"
-          style={{ height: "520px" }}
+          style={{ height: "32.5rem" }}
         />
       </div>
     );
@@ -102,10 +102,10 @@ export default function ActionRequestCard({
   return (
     <div className="mt-3 rounded-lg border border-border bg-surface-raised p-3 text-sm">
       <div className="flex items-center gap-2 mb-2">
-        <span className="material-symbols-outlined text-[16px] text-content-muted">bolt</span>
+        <span className="material-symbols-outlined text-[1rem] text-content-muted">bolt</span>
         <span className="font-medium text-content">{request.label}</span>
         <span
-          className={`ml-auto rounded-sm border px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${riskClass}`}
+          className={`ml-auto rounded-sm border px-1.5 py-0.5 text-[0.625rem] uppercase tracking-wider ${riskClass}`}
         >
           {request.risk}
         </span>

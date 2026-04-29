@@ -117,9 +117,9 @@ watch(() => props.messages.length, async () => {
   min-height: 0;
   height: 100%;
   border-radius: 0.75rem;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   background: var(--bg-soft);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--surface-shadow);
   overflow: hidden;
 }
 
@@ -128,7 +128,7 @@ watch(() => props.messages.length, async () => {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: var(--hairline) solid var(--line);
 }
 
 .chat-panel__eyebrow {
@@ -147,10 +147,10 @@ watch(() => props.messages.length, async () => {
 }
 
 .chat-panel__counter {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.25rem 0.75rem;
   background: var(--bg);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   color: var(--text-soft);
   font-size: 0.75rem;
   font-weight: 500;
@@ -187,7 +187,7 @@ watch(() => props.messages.length, async () => {
   align-self: flex-start;
   background: var(--bg);
   color: var(--text);
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-bottom-left-radius: 0.25rem;
 }
 
@@ -242,7 +242,7 @@ watch(() => props.messages.length, async () => {
 .dots span {
   width: 0.35rem;
   height: 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--text-soft);
   animation: pulse 1.5s infinite;
 }
@@ -254,7 +254,7 @@ watch(() => props.messages.length, async () => {
   display: flex;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  border-top: 1px solid var(--line);
+  border-top: var(--hairline) solid var(--line);
   background: var(--bg-soft);
 }
 
@@ -271,7 +271,7 @@ watch(() => props.messages.length, async () => {
 .chat-input-bar input {
   height: 2.5rem;
   width: 100%;
-  border: 1px solid var(--line);
+  border: var(--hairline) solid var(--line);
   border-radius: 0.5rem;
   background: var(--bg-soft);
   color: var(--text);
@@ -283,7 +283,7 @@ watch(() => props.messages.length, async () => {
 
 .chat-input-bar input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 0 var(--focus-ring-size) rgba(14, 165, 233, 0.15);
 }
 
 .chat-input-bar input:disabled {
@@ -319,7 +319,7 @@ watch(() => props.messages.length, async () => {
   50% { opacity: 1; transform: scale(1.1); }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 40rem) {
   .chat-msg {
     max-width: 95%;
   }

@@ -49,7 +49,7 @@ export default function WorkspaceEditor({
     <main className="flex-1 flex flex-col min-w-0 relative bg-slate-50 dark:bg-background-dark">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/20 md:hidden shrink-0">
         <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-          <span className="material-symbols-outlined text-[16px]">folder_open</span>
+          <span className="material-symbols-outlined text-[1rem]">folder_open</span>
           <span className="font-bold">Workspace</span>
           <span className="text-xs text-slate-500">({documentsCount})</span>
         </div>
@@ -57,7 +57,7 @@ export default function WorkspaceEditor({
           onClick={onOpenSidebar}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors"
         >
-          <span className="material-symbols-outlined text-[20px]">menu</span>
+          <span className="material-symbols-outlined text-[1.25rem]">menu</span>
         </button>
       </div>
 
@@ -88,7 +88,7 @@ export default function WorkspaceEditor({
               className="flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none font-mono truncate"
             />
             {!selectedPath && draftPath && (
-              <span className="shrink-0 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+              <span className="shrink-0 rounded bg-primary/10 border border-primary/20 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-primary">
                 New
               </span>
             )}
@@ -101,7 +101,7 @@ export default function WorkspaceEditor({
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-red-500/20 text-red-400 text-xs font-semibold hover:bg-red-500/10 transition-colors"
                 title="Delete Document"
               >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
+                <span className="material-symbols-outlined text-[1rem]">delete</span>
                 Delete
               </button>
             )}
@@ -172,7 +172,7 @@ export default function WorkspaceEditor({
               disabled={saving || !canSave}
               className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/10"
             >
-              <span className="material-symbols-outlined text-[18px]">save</span>
+              <span className="material-symbols-outlined text-[1.125rem]">save</span>
               {saving ? "Saving..." : "Save"}
             </button>
           </div>

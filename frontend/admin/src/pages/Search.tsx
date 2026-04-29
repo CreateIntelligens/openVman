@@ -75,7 +75,7 @@ export default function Search() {
                 { value: "memories", label: "個人記憶" },
                 { value: "knowledge", label: "知識庫" },
               ]}
-              className="text-sm min-w-[100px]"
+              className="text-sm min-w-[6.25rem]"
             />
           </div>
           <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
@@ -85,7 +85,7 @@ export default function Search() {
               value={String(topK)}
               onChange={(v) => setTopK(Number(v))}
               options={TOP_K_OPTIONS.map((k) => ({ value: String(k), label: String(k) }))}
-              className="text-sm min-w-[60px]"
+              className="text-sm min-w-[3.75rem]"
             />
           </div>
           <button
@@ -123,14 +123,14 @@ export default function Search() {
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
-                        <span className="px-2 py-1 rounded bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                        <span className="px-2 py-1 rounded bg-primary/10 text-primary text-[0.625rem] font-bold uppercase tracking-wider">
                           {response.table}
                         </span>
                         {response.table === "memories" && <PersonaBadge metadata={item.metadata} />}
                         <span className="text-xs text-slate-500">來源：{item.source}</span>
                       </div>
-                      <div className="text-right min-w-[120px]">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter mb-1">相似度</p>
+                      <div className="text-right min-w-[7.5rem]">
+                        <p className="text-[0.625rem] text-slate-500 uppercase font-bold tracking-tighter mb-1">相似度</p>
                         {similarity != null ? (
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-2 rounded-full bg-slate-700 overflow-hidden">
@@ -176,8 +176,8 @@ function PersonaBadge({ metadata }: { metadata?: string }) {
   }
 
   return (
-    <span className="flex items-center gap-1 font-semibold text-primary/80 uppercase text-[10px] bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-      <span className="material-symbols-outlined text-[12px]">masks</span>
+    <span className="flex items-center gap-1 font-semibold text-primary/80 uppercase text-[0.625rem] bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+      <span className="material-symbols-outlined text-[0.75rem]">masks</span>
       {personaId}
     </span>
   );

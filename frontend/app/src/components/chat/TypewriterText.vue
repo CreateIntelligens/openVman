@@ -13,10 +13,10 @@ defineProps<{
 <style scoped>
 .tw-cursor {
   display: inline-block;
-  width: 2px;
+  width: 0.125rem;
   height: 1.1em;
   background: currentColor;
-  margin-left: 1px;
+  margin-left: 0.0625rem;
   vertical-align: text-bottom;
   animation: tw-blink 0.8s step-end infinite;
 }

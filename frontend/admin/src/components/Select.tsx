@@ -97,7 +97,7 @@ export default function Select({
         className="w-full flex items-center justify-between gap-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="truncate">{displayLabel}</span>
-        <span className={`material-symbols-outlined text-[16px] text-slate-400 transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""}`}>
+        <span className={`material-symbols-outlined text-[1rem] text-slate-400 transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""}`}>
           expand_more
         </span>
       </button>
@@ -106,7 +106,7 @@ export default function Select({
         <div
           ref={listRef}
           role="listbox"
-          className={`absolute z-50 w-full min-w-[120px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)] overflow-y-auto max-h-[200px] py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
+          className={`absolute z-50 w-full min-w-[7.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl dark:shadow-[0_0.5rem_1.875rem_rgba(0,0,0,0.5)] overflow-y-auto max-h-[12.5rem] py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           {options.map((option, i) => (
             <button
