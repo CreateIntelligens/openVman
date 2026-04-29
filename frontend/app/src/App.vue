@@ -222,8 +222,6 @@ const loadingText = computed(() => {
 const chatPlaceholder = computed(() => {
   if (!wasm.isReady.value) return "正在準備接待台...";
   if (wasm.isLoading.value) return "切換展示角色中...";
-  if (chat.state.value === "CONNECTING") return "連線中...";
-  if (chat.state.value === "DISCONNECTED") return "向數位接待員提問...";
   return "向數位接待員提問...";
 });
 
