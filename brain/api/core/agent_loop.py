@@ -124,7 +124,11 @@ def _run_tool_phase(
     hallucination_pattern = _build_hallucination_pattern(tools)
     hallucination_retried = False
 
-    with bind_tool_context(persona_id, project_id):
+    last_user_message = next(
+        (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
+        "",
+    )
+    with bind_tool_context(persona_id, project_id, user_message=last_user_message):
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             current_forced = forced_tool_name if iteration == 0 else None
             turn_fn = _stream_turn if iteration == 0 else _generate_turn

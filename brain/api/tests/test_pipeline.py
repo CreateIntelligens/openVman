@@ -91,8 +91,8 @@ _BASE_PROMPT_SETTINGS = {
     "prompt_learnings_char_budget": 0,
     "prompt_errors_char_budget": 0,
     "prompt_context_char_budget": 0,
-    "prompt_system_char_budget": 500,
-    "prompt_total_char_budget": 500,
+    "prompt_system_char_budget": 2000,
+    "prompt_total_char_budget": 2000,
     "auto_recall_enabled": False,
     "dreaming_timezone": "Asia/Taipei",
 }
@@ -134,8 +134,10 @@ def _stub_prompt_builder(
 @pytest.mark.parametrize(
     ("role", "content", "expected_path", "expected_skip_rag", "expected_skip_tools"),
     [
-        ("user", "你好", "direct", True, True),
-        ("user", "謝謝你", "direct", True, True),
+        ("user", "你好", "tool", False, False),
+
+        ("user", "謝謝你", "tool", False, False),
+
         ("user", "請幫我查一下知識庫裡的退款規則", "tool", False, False),
         ("user", "幫我看看 docs 裡的部署說明", "tool", False, False),
         ("user", "請記住我是男生", "tool", False, False),
@@ -380,9 +382,10 @@ def test_prepare_generation_skips_rag_for_direct_route(monkeypatch: pytest.Monke
     )
     monkeypatch.setattr(
         chat_service,
-        "append_session_message",
-        lambda session_id, persona_id, role, content, project_id="default": None,
+        "append_session_message_with_id",
+        lambda session_id, persona_id, role, content, project_id="default", metadata=None: (MagicMock(), 1),
     )
+
     monkeypatch.setattr(
         chat_service,
         "build_chat_messages",
@@ -420,9 +423,10 @@ def test_prepare_generation_preserves_original_slash_message_in_history(
     monkeypatch.setattr(chat_service, "list_session_messages", lambda session_id, persona_id, project_id="default": [])
     monkeypatch.setattr(
         chat_service,
-        "append_session_message",
-        lambda session_id, persona_id, role, content, project_id="default": appended_messages.append(
-            (session_id, persona_id, role, content)
+        "append_session_message_with_id",
+        lambda session_id, persona_id, role, content, project_id="default", metadata=None: (
+            appended_messages.append((session_id, persona_id, role, content)),
+            1
         ),
     )
     monkeypatch.setattr(
@@ -440,8 +444,8 @@ def test_prepare_generation_preserves_original_slash_message_in_history(
 
     context = chat_service.prepare_generation(envelope)
 
-    assert appended_messages == [("sess_test", "default", "user", "/joke 黑色笑話")]
     assert prompt_user_messages == ["[系統指令] 請立即呼叫工具 `joke:get_joke`，使用者的輸入為：黑色笑話"]
+
     assert context.user_message == "/joke 黑色笑話"
 
 

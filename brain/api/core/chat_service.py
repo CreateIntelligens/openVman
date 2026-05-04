@@ -174,6 +174,26 @@ def _patch_reply_pii_metadata(
         logger.exception("[privacy] reply PII writeback failed")
 
 
+def _collect_citations_from_tool_steps(tool_steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Aggregate ``citations`` across all search-tool steps, dedupe, sort by distance."""
+    by_uri: dict[str, dict[str, Any]] = {}
+    for step in tool_steps:
+        result = step.get("result") if isinstance(step, dict) else None
+        if not isinstance(result, dict):
+            continue
+        for cite in result.get("citations") or []:
+            if not isinstance(cite, dict):
+                continue
+            uri = str(cite.get("uri") or cite.get("title") or "")
+            if not uri:
+                continue
+            distance = float(cite.get("distance", 999.0))
+            existing = by_uri.get(uri)
+            if existing is None or distance < float(existing.get("distance", 999.0)):
+                by_uri[uri] = dict(cite)
+    return sorted(by_uri.values(), key=lambda c: float(c.get("distance", 999.0)))
+
+
 def finalize_generation(
     context: GenerationContext,
     reply: str,
@@ -249,6 +269,7 @@ def finalize_generation(
     if response_time_s is not None:
         assistant_entry["response_time_s"] = response_time_s
     history.append(assistant_entry)
+    citations = _collect_citations_from_tool_steps(tool_steps or [])
     return {
         "status": "ok",
         "trace_id": context.trace_id,
@@ -257,6 +278,7 @@ def finalize_generation(
         "reply": cleaned_reply,
         "history": history,
         "pii_pending": pii_pending,
+        "citations": citations,
     }
 
 

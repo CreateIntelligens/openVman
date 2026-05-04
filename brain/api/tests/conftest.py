@@ -132,6 +132,9 @@ def stub_chat_service_deps(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     fake_memory = types.ModuleType("memory.memory")
     fake_memory.append_session_message = lambda session_id, persona_id, role, content, project_id="default": None
+    fake_memory.append_session_message_with_id = lambda session_id, persona_id, role, content, project_id="default", metadata=None: (MagicMock(), 1)
+    fake_memory.update_session_message_metadata = lambda message_id, metadata, project_id="default": None
+    fake_memory.get_session_updated_at = lambda session_id, persona_id=None, project_id="default": None
     fake_memory.archive_session_turn = (
         lambda session_id, user_message, assistant_message, persona_id="default", project_id="default": None
     )

@@ -183,7 +183,7 @@ class TestToolPhaseError:
         fake_registry = MagicMock()
         fake_registry.build_openai_tools.return_value = []
         monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
-        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default", **kwargs: MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
 
         fake_cfg = MagicMock()
         fake_cfg.agent_loop_max_rounds = 2
@@ -218,7 +218,7 @@ class TestToolPhaseError:
         fake_registry = MagicMock()
         fake_registry.build_openai_tools.return_value = []
         monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
-        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default", **kwargs: MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
 
         fake_cfg = MagicMock()
         fake_cfg.agent_loop_max_rounds = 3
@@ -260,7 +260,7 @@ class TestStreamChatTurnIterationDispatch:
         fake_registry = MagicMock()
         fake_registry.build_openai_tools.return_value = []
         monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
-        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default", **kwargs: MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
 
         fake_cfg = MagicMock()
         fake_cfg.agent_loop_max_rounds = 3
@@ -301,7 +301,7 @@ class TestStreamChatTurnIterationDispatch:
         fake_registry = MagicMock()
         fake_registry.build_openai_tools.return_value = []
         monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
-        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default": MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
+        monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default", **kwargs: MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
 
         fake_cfg = MagicMock()
         fake_cfg.agent_loop_max_rounds = 3
