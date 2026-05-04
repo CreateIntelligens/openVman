@@ -13,6 +13,7 @@ logger = logging.getLogger("gateway.ingestion")
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 _md_converter: Any = None
+_docling_converter: Any = None
 _DOCLING_SUPPORTED_SUFFIXES = frozenset({".pdf", ".docx", ".pptx", ".xlsx", ".html", ".htm"})
 
 
