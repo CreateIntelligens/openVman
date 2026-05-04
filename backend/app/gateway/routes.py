@@ -117,6 +117,22 @@ def _build_markdown_target_dir(target_dir: str) -> str:
     return "/".join(["knowledge", *parts]).rstrip("/") or "knowledge/ingested"
 
 
+def _swap_extension_for_markdown(client_relative: str, markdown_filename: str) -> str:
+    """Re-attach the directory part of ``client_relative`` to a ``.md`` filename.
+
+    ``client_relative`` carries the original folder structure (e.g.
+    ``subdir/report.pdf``); ``markdown_filename`` is the converted leaf name
+    (e.g. ``report.md``). The result preserves directories so the brain stores
+    the markdown at ``subdir/report.md``.
+    """
+    if not client_relative:
+        return markdown_filename
+    parent = Path(client_relative).parent.as_posix()
+    if parent in ("", "."):
+        return markdown_filename
+    return f"{parent}/{markdown_filename}"
+
+
 async def _upload_raw_artifact(
     client: httpx.AsyncClient,
     *,
@@ -333,6 +349,7 @@ async def upload_knowledge_documents(
     files: list[UploadFile] = File(...),
     target_dir: str = Form(""),
     project_id: str = Form("default"),
+    relative_paths: list[str] = Form(default_factory=list),
 ) -> Response:
     cfg = get_tts_config()
     client = _brain_http.get()
@@ -340,9 +357,12 @@ async def upload_knowledge_documents(
     try:
         markdown_target_dir = _build_markdown_target_dir(target_dir)
         forwarded_files: list[tuple[str, tuple[str, bytes, str]]] = []
-        for upload in files:
+        forwarded_relative_paths: list[str] = []
+        for index, upload in enumerate(files):
+            client_relative = relative_paths[index] if index < len(relative_paths) else ""
             if _should_passthrough_knowledge_upload(upload):
                 forwarded = await _prepare_passthrough_upload(upload)
+                forwarded_relative_path = client_relative or (upload.filename or "")
             else:
                 forwarded = await _prepare_document_upload(
                     upload,
@@ -353,12 +373,19 @@ async def upload_knowledge_documents(
                     project_id=project_id,
                     max_bytes=cfg.markitdown_max_upload_bytes,
                 )
+                forwarded_relative_path = _swap_extension_for_markdown(client_relative, forwarded[0])
             forwarded_files.append(("files", forwarded))
+            forwarded_relative_paths.append(forwarded_relative_path)
 
+        post_data: dict[str, Any] = {
+            "target_dir": markdown_target_dir,
+            "project_id": project_id,
+            "relative_paths": forwarded_relative_paths,
+        }
         resp = await client.post(
             f"{cfg.brain_url}/brain/knowledge/upload",
             files=forwarded_files,
-            data={"target_dir": markdown_target_dir, "project_id": project_id},
+            data=post_data,
         )
         return _relay_brain_response(resp)
     except UploadTooLargeError as exc:

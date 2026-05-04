@@ -28,6 +28,39 @@ import {
 import { useProject } from "../context/ProjectContext";
 import { useStatusState } from "./useStatusState";
 
+type UploadEntry = { file: File; relativePath: string };
+
+async function collectFileSystemEntries(roots: FileSystemEntry[]): Promise<UploadEntry[]> {
+  const out: UploadEntry[] = [];
+  const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
+    if (entry.isFile) {
+      const fileEntry = entry as FileSystemFileEntry;
+      const file: File = await new Promise((resolve, reject) => fileEntry.file(resolve, reject));
+      out.push({ file, relativePath: prefix ? `${prefix}/${file.name}` : file.name });
+      return;
+    }
+    if (entry.isDirectory) {
+      const dirEntry = entry as FileSystemDirectoryEntry;
+      const reader = dirEntry.createReader();
+      const next = prefix ? `${prefix}/${entry.name}` : entry.name;
+      // readEntries returns at most 100 per call; loop until empty.
+      while (true) {
+        const batch: FileSystemEntry[] = await new Promise((resolve, reject) =>
+          reader.readEntries(resolve, reject),
+        );
+        if (!batch.length) break;
+        for (const child of batch) {
+          await walk(child, next);
+        }
+      }
+    }
+  };
+  for (const root of roots) {
+    await walk(root, "");
+  }
+  return out;
+}
+
 export function useKnowledgeBase() {
   const { projectId } = useProject();
   const [documents, setDocuments] = useState<KnowledgeDocumentSummary[]>([]);
@@ -181,12 +214,12 @@ export function useKnowledgeBase() {
     }
   }, [editContent, loadDocuments, openDocument, setErrorStatus]);
 
-  const uploadFiles = useCallback(async (files: File[]) => {
-    if (!files.length) return;
+  const uploadFiles = useCallback(async (entries: { file: File; relativePath: string }[]) => {
+    if (!entries.length) return;
     setUploading(true);
     setStatus(null);
     try {
-      const response = await uploadKnowledgeDocuments(files, currentDir);
+      const response = await uploadKnowledgeDocuments(entries, currentDir);
       setStatus({ type: "success", message: `已上傳 ${response.files.length} 個檔案。` });
       await loadDocuments();
       if (response.files[0]) {
@@ -202,7 +235,8 @@ export function useKnowledgeBase() {
   }, [currentDir, loadDocuments, openFile, setErrorStatus]);
 
   const handleFileUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    await uploadFiles(Array.from(event.target.files ?? []));
+    const files = Array.from(event.target.files ?? []);
+    await uploadFiles(files.map((file) => ({ file, relativePath: file.webkitRelativePath || file.name })));
     if (uploadInputRef.current) {
       uploadInputRef.current.value = "";
     }
@@ -370,7 +404,20 @@ export function useKnowledgeBase() {
     event.preventDefault();
     dragCounterRef.current = 0;
     setDragOver(false);
-    await uploadFiles(Array.from(event.dataTransfer.files));
+    const items = event.dataTransfer.items;
+    let entries: { file: File; relativePath: string }[] = [];
+    if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
+      const fsEntries = Array.from(items)
+        .map((item) => item.webkitGetAsEntry())
+        .filter((entry): entry is FileSystemEntry => entry !== null);
+      entries = await collectFileSystemEntries(fsEntries);
+    } else {
+      entries = Array.from(event.dataTransfer.files).map((file) => ({
+        file,
+        relativePath: file.webkitRelativePath || file.name,
+      }));
+    }
+    await uploadFiles(entries);
   }, [isFileDragEvent, uploadFiles]);
 
   return {

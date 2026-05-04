@@ -112,9 +112,17 @@ export function moveKnowledgeDocument(sourcePath: string, targetPath: string) {
   );
 }
 
-export async function uploadKnowledgeDocuments(files: File[], targetDir = "") {
+export type KnowledgeUploadEntry = { file: File; relativePath: string };
+
+export async function uploadKnowledgeDocuments(
+  entries: KnowledgeUploadEntry[],
+  targetDir = "",
+) {
   const formData = new FormData();
-  files.forEach((file) => formData.append("files", file));
+  entries.forEach(({ file, relativePath }) => {
+    formData.append("files", file);
+    formData.append("relative_paths", relativePath || file.name);
+  });
   formData.append("target_dir", targetDir);
   formData.append("project_id", getActiveProjectId());
 

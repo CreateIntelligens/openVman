@@ -27,6 +27,22 @@ from knowledge.workspace import (
 from personas.personas import is_persona_core_relative_path
 
 
+def _sanitize_relative_subpath(raw: str) -> Path:
+    """Normalize a client-supplied relative path, rejecting traversal.
+
+    Strips leading slashes and rejects any segment that is empty, ``.`` or
+    ``..`` so callers cannot escape the intended ``target_dir``.
+    """
+    cleaned = raw.strip().lstrip("/\\")
+    if not cleaned:
+        raise ValueError("relative_path 不可為空")
+    parts = Path(cleaned).parts
+    for part in parts:
+        if part in ("", ".", "..") or part.startswith(("/", "\\")):
+            raise ValueError("relative_path 不允許 .. 或絕對路徑片段")
+    return Path(*parts)
+
+
 def list_knowledge_base_directories(project_id: str = "default") -> list[str]:
     """Return all subdirectory paths under knowledge/, relative to workspace root."""
     root = ensure_workspace_scaffold(project_id)
@@ -74,18 +90,26 @@ def save_uploaded_document(
     content: bytes,
     target_dir: str = "",
     project_id: str = "default",
+    relative_path: str = "",
 ) -> dict[str, Any]:
-    """Save an uploaded file into the workspace root."""
+    """Save an uploaded file into the workspace root.
+
+    When ``relative_path`` is provided (e.g. ``subdir/a.md`` from a folder
+    upload), preserve its directory structure under ``target_dir``. Otherwise
+    fall back to the file's basename.
+    """
     safe_name = Path(filename).name
     if not safe_name:
         raise ValueError("filename 不可為空")
 
-    relative_path = Path(target_dir.strip()) / safe_name if target_dir.strip() else Path(safe_name)
-    path = resolve_workspace_document(relative_path.as_posix(), project_id)
+    sub_path = _sanitize_relative_subpath(relative_path) if relative_path else Path(safe_name)
+    base = Path(target_dir.strip()) if target_dir.strip() else Path()
+    relative_path_obj = base / sub_path
+    path = resolve_workspace_document(relative_path_obj.as_posix(), project_id)
     decoded = content.decode("utf-8-sig")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(decoded, encoding="utf-8")
-    upsert_document_meta(relative_path.as_posix(), project_id, source_type="upload")
+    upsert_document_meta(relative_path_obj.as_posix(), project_id, source_type="upload")
     return _build_document_summary(path, project_id)
 
 

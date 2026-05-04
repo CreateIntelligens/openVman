@@ -81,7 +81,11 @@ def test_text_knowledge_upload_passthroughs_utf8_files_to_brain(client: TestClie
     route_client.post.assert_awaited_once()
     post_call = route_client.post.await_args
     assert post_call.args[0] == "http://brain:8100/brain/knowledge/upload"
-    assert post_call.kwargs["data"] == {"target_dir": "knowledge/notes", "project_id": "default"}
+    assert post_call.kwargs["data"] == {
+        "target_dir": "knowledge/notes",
+        "project_id": "default",
+        "relative_paths": ["example.md"],
+    }
     field_name, uploaded = post_call.kwargs["files"][0]
     assert field_name == "files"
     assert uploaded == ("example.md", b"# hello\n", "text/markdown")
@@ -141,6 +145,12 @@ def test_pdf_knowledge_upload_converts_to_markdown_before_forwarding(client: Tes
     raw_call = route_client.post.await_args_list[0]
     assert raw_call.args[0] == "http://brain:8100/brain/knowledge/raw/upload"
     assert raw_call.kwargs["data"] == {"target_dir": "raw/ingested", "project_id": "default"}
+    markdown_call = route_client.post.await_args_list[1]
+    assert markdown_call.kwargs["data"] == {
+        "target_dir": "knowledge/ingested",
+        "project_id": "default",
+        "relative_paths": ["report.md"],
+    }
     raw_filename, raw_uploaded, raw_content_type = raw_call.kwargs["files"]["files"]
     assert raw_filename == "report.pdf"
     assert raw_uploaded == b"%PDF-1.4 fake"
@@ -195,7 +205,11 @@ def test_document_upload_normalizes_markdown_target_dir_under_knowledge(client: 
     raw_call = route_client.post.await_args_list[0]
     assert raw_call.kwargs["data"] == {"target_dir": "raw/custom", "project_id": "default"}
     markdown_call = route_client.post.await_args_list[1]
-    assert markdown_call.kwargs["data"] == {"target_dir": "knowledge/custom", "project_id": "default"}
+    assert markdown_call.kwargs["data"] == {
+        "target_dir": "knowledge/custom",
+        "project_id": "default",
+        "relative_paths": ["report.md"],
+    }
 
 
 def test_pptx_knowledge_upload_converts_to_markdown_before_forwarding(client: TestClient):

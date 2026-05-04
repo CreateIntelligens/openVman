@@ -166,7 +166,10 @@ export function useWorkspaceManager() {
     setStatus(null);
 
     try {
-      const response = await uploadKnowledgeDocuments(files, "");
+      const response = await uploadKnowledgeDocuments(
+        files.map((file) => ({ file, relativePath: file.webkitRelativePath || file.name })),
+        "",
+      );
       setStatus({
         type: "success",
         message: `已上傳 ${response.files.length} 個檔案到 workspace root。`,

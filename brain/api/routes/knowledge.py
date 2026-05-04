@@ -192,12 +192,20 @@ async def upload_knowledge_documents_route(
     files: list[UploadFile] = File(...),
     target_dir: str = Form(""),
     project_id: str = Form("default"),
+    relative_paths: list[str] = Form(default_factory=list),
 ):
     uploaded: list[dict[str, object]] = []
     try:
-        for upload in files:
+        for index, upload in enumerate(files):
+            relative_path = relative_paths[index] if index < len(relative_paths) else ""
             uploaded.append(
-                save_uploaded_document(upload.filename or "", await upload.read(), target_dir, project_id)
+                save_uploaded_document(
+                    upload.filename or "",
+                    await upload.read(),
+                    target_dir,
+                    project_id,
+                    relative_path=relative_path,
+                )
             )
     except UnicodeDecodeError as exc:
         raise HTTPException(status_code=400, detail="檔案需為 UTF-8 編碼") from exc
