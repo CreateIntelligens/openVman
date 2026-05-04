@@ -28,7 +28,9 @@ from routes.search import router as search_router
 from routes.sessions import router as sessions_router
 from routes.tools import router as tools_router
 from routes.workspace import router as workspace_router
+from safety.http_filters import SilentAccessPathsFilter, is_silent_path
 from safety.observability import get_metrics_store, log_event, log_exception
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,28 +66,8 @@ _UVICORN_LOG_CONFIG = {
     },
 }
 
-_ACCESS_LOG_SILENT_PATHS = frozenset({
-    "/brain/health",
-    "/brain/health/ready",
-    "/brain/health/detailed",
-    "/brain/metrics",
-    "/brain/metrics/prometheus",
-})
+logging.getLogger("uvicorn.access").addFilter(SilentAccessPathsFilter())
 
-
-class _SilentAccessPathsFilter(logging.Filter):
-    """Drop uvicorn access log lines for infra polling endpoints."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        args = record.args
-        # uvicorn access log: args = (client, method, path, http_version, status)
-        if not isinstance(args, tuple) or len(args) < 3:
-            return True
-        path = str(args[2]).split("?")[0]
-        return path not in _ACCESS_LOG_SILENT_PATHS
-
-
-logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())
 
 _OPENAPI_TAGS = [
     {"name": "System", "description": "Health, metrics, and identity endpoints."},
@@ -132,6 +114,7 @@ async def load_privacy_filter_if_enabled() -> None:
             await asyncio.to_thread(load_privacy_filter_model_cpu)
         except Exception as cpu_exc:
             logger.warning("Privacy Filter CPU load also failed; regex fallback will be used: %s", cpu_exc)
+
 
 
 async def cancel_task(task: asyncio.Task[None] | None) -> None:
@@ -219,12 +202,14 @@ async def metrics_middleware(request: Request, call_next):
         duration_ms = round((perf_counter() - start) * 1000, 2)
         store.increment("http_requests_total", method=method, path=path, status=status)
         store.observe("http_request_duration_ms", duration_ms, method=method, path=path)
-        if path not in _ACCESS_LOG_SILENT_PATHS:
+
+        if not is_silent_path(method, path, status):
             log_event(
                 "http_request",
                 trace_id=trace_id, method=method, path=path,
                 status=status, duration_ms=duration_ms,
             )
+
 
     return response
 

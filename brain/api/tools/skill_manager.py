@@ -112,7 +112,6 @@ class SkillManager:
 
     def _scan_dir(self, skills_dir: Path, *, scope: SkillScope, project_id: str | None) -> None:
         if not skills_dir.exists():
-            log_event("skills_dir_missing", path=str(skills_dir), scope=scope)
             return
         for skill_dir in skills_dir.iterdir():
             if skill_dir.is_dir():

@@ -76,7 +76,28 @@ _UVICORN_LOG_CONFIG = {
     },
 }
 
-_ACCESS_LOG_SILENT_PATHS = frozenset({"/api/health", "/api/health/detailed", "/healthz"})
+_ACCESS_LOG_SILENT_PATHS = frozenset({
+    "/api/health",
+    "/api/health/detailed",
+    "/healthz",
+    "/api/metrics",
+    "/metrics",
+    "/metrics/prometheus",
+    "/brain/metrics/prometheus",
+})
+
+_DASHBOARD_POLLING_PATHS = frozenset({
+    "/api/projects",
+    "/api/personas",
+    "/api/tools",
+    "/api/knowledge/documents",
+    "/api/knowledge/base/documents",
+    "/api/memories",
+    "/api/sessions",
+    "/api/chat/history",
+    "/v1/tts/providers",
+    "/api/knowledge/document",
+})
 
 
 class _SilentAccessPathsFilter(logging.Filter):
@@ -85,10 +106,19 @@ class _SilentAccessPathsFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         args = record.args
         # uvicorn access log: args = (client, method, path, http_version, status)
-        if not isinstance(args, tuple) or len(args) < 3:
+        if not isinstance(args, tuple) or len(args) < 5:
             return True
+        method = str(args[1])
         path = str(args[2]).split("?")[0]
-        return path not in _ACCESS_LOG_SILENT_PATHS
+        status = args[4]
+
+        if status == 200:
+            if path in _ACCESS_LOG_SILENT_PATHS:
+                return False
+            if method == "GET" and path in _DASHBOARD_POLLING_PATHS:
+                return False
+
+        return True
 
 
 logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())
