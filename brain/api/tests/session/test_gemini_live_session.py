@@ -428,11 +428,15 @@ async def test_gemini_live_session_search_tool_runs_in_thread(monkeypatch):
     )
 
     assert len(to_thread_calls) == 1
-    assert response == {
-        "id": "call-1",
-        "name": "search_knowledge",
-        "response": {"results": [{"text": "result"}]},
-    }
+    assert response["id"] == "call-1"
+    assert response["name"] == "search_knowledge"
+    payload = response["response"]
+    assert payload["table"] == "knowledge"
+    assert payload["queries"] == ["退款政策"]
+    assert payload["embedding_versions"] == ["bge"]
+    assert len(payload["results"]) == 1
+    assert payload["results"][0]["text"] == "result"
+    assert payload["results"][0]["matched_queries"] == ["退款政策"]
 
 
 @pytest.mark.asyncio

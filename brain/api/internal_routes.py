@@ -95,8 +95,16 @@ def _build_live_system_instruction(persona_id: str, project_id: str, session_id:
     if memory_block:
         blocks.append(memory_block)
 
-    if not blocks:
-        return ""
+    tool_rules = (
+        "工具使用規則（重要）：\n"
+        "1. 任何事實性問題（地點、規格、流程、人員、時段、價格、產品、政策、機構資訊等），"
+        "**先呼叫 search_knowledge 再回答**；不要先反問使用者「能否提供更多資訊」。\n"
+        "2. 提到過去對話、偏好或可能曾經告知的個人資訊時，呼叫 search_memory。\n"
+        "3. 多主題請拆成 queries 陣列一次送出。\n"
+        "4. 工具有命中時以工具結果為準；多次查詢仍無命中時才如實說「資料中沒有提到」。\n"
+        "5. 不要說「根據知識庫」「根據記憶」等來源標記語言，直接陳述答案。"
+    )
+    blocks.append(tool_rules)
     return (
         "你是 openVman Brain 的對話核心。以下是你的角色設定和上下文，請在即時語音對話中遵守。\n\n"
         + "\n\n".join(blocks)

@@ -16,6 +16,8 @@ import websockets
 from config import BrainSettings, get_settings
 from memory.embedder import encode_query_with_fallback
 from memory.retrieval import search_records
+from .gemini_tools import build_gemini_tool_declarations
+
 
 logger = logging.getLogger("brain.live.gemini_live")
 
@@ -117,6 +119,7 @@ class GeminiLiveSession:
         self._listener_task: asyncio.Task | None = None
         self._keepalive_task: asyncio.Task | None = None
         self._closed = False
+        self._last_user_message: str = ""
         self._chunk_counter = 0
         self._response_in_progress = False
         self._reconnecting = False
@@ -149,6 +152,8 @@ class GeminiLiveSession:
     async def send_text_turn(self, user_text: str) -> None:
         await self.ensure_connected()
         self._response_in_progress = True
+        if user_text:
+            self._last_user_message = user_text
         await self._transport.send_json(self._build_user_turn_message(user_text))
 
     async def send_realtime_input(self, audio_b64: str, mime_type: str) -> None:
@@ -292,22 +297,39 @@ class GeminiLiveSession:
         if isinstance(args, str):
             args = json.loads(args)
 
+        # Mapping of tool names to handlers
+        # Some are async, some are sync (wrapped in to_thread if needed)
+        tool_map = {
+            "search_knowledge": lambda: self._search("knowledge", args),
+            "search_memory": lambda: self._search("memories", args),
+            "get_chat_history": lambda: asyncio.to_thread(self._get_chat_history, args),
+            "save_memory": lambda: asyncio.to_thread(self._save_memory, args),
+        }
+
         try:
-            if name == "search_knowledge":
-                response = await self._search("knowledge", args)
-            elif name == "search_memory":
-                response = await self._search("memories", args)
-            elif name == "get_chat_history":
-                response = self._get_chat_history(args)
-            elif name == "save_memory":
-                response = self._save_memory(args)
-            else:
+            handler = tool_map.get(name)
+            if not handler:
                 raise ValueError(f"Unsupported Gemini Live tool: {name}")
+
+            response = await handler()
         except Exception as exc:
             logger.warning("Gemini Live tool %s failed: %s", name, exc)
             response = {"error": str(exc)}
 
+        if isinstance(response, dict) and response.get("citations"):
+            await self._emit(
+                {
+                    "event": "server_search_results",
+                    "session_id": self.relay_session_id,
+                    "tool_name": name,
+                    "queries": response.get("queries", []),
+                    "citations": response.get("citations", []),
+                    "timestamp": int(time.time() * 1000),
+                }
+            )
+
         return {"id": call_id, "name": name, "response": response}
+
 
     def _save_memory(self, args: dict[str, Any]) -> dict[str, Any]:
         from memory.embedder import encode_text
@@ -344,27 +366,50 @@ class GeminiLiveSession:
         return await asyncio.to_thread(self._search_sync, table, args)
 
     def _search_sync(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
-        query = str(args.get("query", "")).strip()
-        if not query:
-            raise ValueError("query is required")
+        from tools.search_helpers import build_citations, merge_search_results, normalize_query_list
 
-        top_k = max(1, min(int(args.get("top_k", 3)), 8))
-        embedding_route = encode_query_with_fallback(
-            query,
-            project_id=self.project_id,
-            table_names=(table,),
-        )
-        results = search_records(
-            table,
-            embedding_route.vector,
-            top_k=top_k,
-            query_text=query,
-            query_type="vector",
-            persona_id=self.persona_id,
-            project_id=self.project_id,
-            embedding_version=embedding_route.version,
-        )
-        return {"results": results}
+        queries = normalize_query_list(args)
+        fallback = (self._last_user_message or "").strip()
+        if fallback and fallback not in queries:
+            queries.append(fallback)
+        if not queries:
+            raise ValueError("queries is required")
+
+        top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
+        grouped: list[tuple[str, list[dict[str, Any]]]] = []
+        embedding_versions: list[str] = []
+        for query in queries:
+            try:
+                embedding_route = encode_query_with_fallback(
+                    query,
+                    project_id=self.project_id,
+                    table_names=(table,),
+                )
+                results = search_records(
+                    table,
+                    embedding_route.vector,
+                    top_k=top_k,
+                    query_text=query,
+                    query_type="vector",
+                    persona_id=self.persona_id,
+                    project_id=self.project_id,
+                    embedding_version=embedding_route.version,
+                )
+            except Exception as exc:
+                logger.warning("Gemini Live search failed table=%s query=%r err=%s", table, query[:60], exc)
+                continue
+            grouped.append((query, results))
+            if embedding_route.version not in embedding_versions:
+                embedding_versions.append(embedding_route.version)
+
+        merged = merge_search_results(grouped, limit=top_k)
+        return {
+            "table": table,
+            "queries": queries,
+            "embedding_versions": embedding_versions,
+            "results": merged,
+            "citations": build_citations(merged),
+        }
 
     async def _emit(self, event: dict[str, Any]) -> None:
         if self._event_sink is not None:
@@ -456,7 +501,8 @@ class GeminiLiveSession:
         if self.config.live_gemini_output_audio_transcription:
             setup["outputAudioTranscription"] = {}
         if self.config.live_gemini_tools_enabled:
-            setup["tools"] = [{"functionDeclarations": self._build_tool_declarations()}]
+            setup["tools"] = [{"functionDeclarations": build_gemini_tool_declarations()}]
+
         return setup
 
     def _build_user_turn_message(self, user_text: str) -> dict[str, Any]:
@@ -527,55 +573,7 @@ class GeminiLiveSession:
         text = transcription.get("text", "")
         return text.strip() if isinstance(text, str) else ""
 
-    def _build_tool_declarations(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "name": "search_knowledge",
-                "description": "Search the workspace knowledge base for factual context.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Semantic search query."},
-                        "top_k": {"type": "integer", "description": "Maximum results to return."},
-                    },
-                    "required": ["query"],
-                },
-            },
-            {
-                "name": "search_memory",
-                "description": "Search prior user-specific memories for relevant context.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Semantic search query."},
-                        "top_k": {"type": "integer", "description": "Maximum results to return."},
-                    },
-                    "required": ["query"],
-                },
-            },
-            {
-                "name": "save_memory",
-                "description": "Save a durable memory record. Use when the user asks you to remember something, or when the conversation reveals a long-term preference, fact, or instruction worth retaining.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "content": {"type": "string", "description": "The memory content to save as a concise statement."},
-                    },
-                    "required": ["content"],
-                },
-            },
-            {
-                "name": "get_chat_history",
-                "description": "Retrieve recent chat history from a session. Use when the user refers to a previous conversation or asks to recall what was discussed.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "session_id": {"type": "string", "description": "Session ID to retrieve history from. Omit to use current session."},
-                        "max_messages": {"type": "integer", "description": "Maximum messages to return (default 20, max 50)."},
-                    },
-                },
-            },
-        ]
+
 
 
 def _parse_sample_rate(mime_type: str) -> int:
