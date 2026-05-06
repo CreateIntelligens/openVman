@@ -138,11 +138,53 @@ export function reindexKnowledge() {
   });
 }
 
-export function crawlUrl(url: string) {
-  return post<CrawlIngestResponse>(knowledgePath("/crawl"), {
+interface FetchPageResponse {
+  status: string;
+  title: string;
+  source_url: string;
+  content: string;
+  language?: string;
+  video_id?: string;
+}
+
+function sanitizeFilename(name: string): string {
+  const cleaned = name.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned.length > 0 ? cleaned.slice(0, 120) : "untitled";
+}
+
+export async function crawlUrl(url: string): Promise<CrawlIngestResponse> {
+  const fetched = await post<FetchPageResponse>(knowledgePath("/fetch"), {
     url,
     project_id: getActiveProjectId(),
   });
+
+  const title = fetched.title || url;
+  const filename = `${sanitizeFilename(title)}.md`;
+  const markdown = `# ${title}\n\n${fetched.content}`;
+  const file = new File([markdown], filename, { type: "text/markdown" });
+
+  const uploaded = await uploadKnowledgeDocuments([{ file, relativePath: filename }]);
+  const summary = uploaded.files[0];
+  if (!summary) {
+    throw new Error("匯入成功但未取得文件資訊");
+  }
+
+  try {
+    await updateKnowledgeDocumentMeta(summary.path, {
+      source_type: "web",
+      source_url: fetched.source_url || url,
+    });
+  } catch {
+    // metadata 更新失敗不阻擋匯入流程
+  }
+
+  return {
+    status: uploaded.status,
+    title: summary.title || title,
+    source_url: fetched.source_url || url,
+    path: summary.path,
+    size: summary.size,
+  };
 }
 
 export function updateKnowledgeDocumentMeta(

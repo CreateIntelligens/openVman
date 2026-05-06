@@ -21,6 +21,7 @@ from app.gateway.crawl_adapter import CrawlResult, fetch_page
 from app.gateway.ingestion import IngestionResult, ingest_document
 from app.gateway.ingestion_youtube import (
     YouTubeTranscriptError,
+    fetch_video_metadata,
     fetch_transcript,
     is_youtube_url,
 )
@@ -302,7 +303,11 @@ class YouTubeIngestRequest(BaseModel):
     target_dir: str = ""
 
 
-async def _fetch_youtube_transcript(url: str) -> dict[str, Any] | JSONResponse:
+async def _fetch_youtube_transcript(
+    url: str,
+    *,
+    fallback_to_metadata: bool = False,
+) -> dict[str, Any] | JSONResponse:
     """Fetch YouTube transcript. Returns dict on success, JSONResponse on error."""
     trace_id = uuid.uuid4().hex
     try:
@@ -318,10 +323,42 @@ async def _fetch_youtube_transcript(url: str) -> dict[str, Any] | JSONResponse:
     except ValueError as exc:
         return _error_response(400, str(exc))
     except YouTubeTranscriptError as exc:
+        if fallback_to_metadata:
+            return await _fetch_youtube_metadata_fallback(url, str(exc))
         return _error_response(422, str(exc))
     except Exception as exc:
         logger.error("yt_transcript_failed url=%s err=%s", url, exc)
         return _error_response(500, f"YouTube 字幕擷取失敗: {exc}")
+
+
+async def _fetch_youtube_metadata_fallback(url: str, transcript_error: str) -> dict[str, Any] | JSONResponse:
+    try:
+        metadata = await asyncio.to_thread(fetch_video_metadata, url)
+    except ValueError as exc:
+        return _error_response(400, str(exc))
+    except YouTubeTranscriptError as exc:
+        return _error_response(422, transcript_error, metadata_error=str(exc))
+
+    content_lines = [
+        "這是 YouTube 影片 metadata。",
+        "此影片沒有可用字幕，search_web 無法提供逐字稿內容。",
+        f"標題：{metadata.title}",
+    ]
+    if metadata.author_name:
+        content_lines.append(f"頻道：{metadata.author_name}")
+    content_lines.append(f"字幕狀態：{transcript_error}")
+
+    return {
+        "status": "ok",
+        "title": metadata.title,
+        "source_url": metadata.source_url,
+        "video_id": metadata.video_id,
+        "author_name": metadata.author_name,
+        "language": "",
+        "transcript_available": False,
+        "transcript_error": transcript_error,
+        "content": "\n".join(content_lines),
+    }
 
 
 async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
@@ -414,7 +451,7 @@ async def upload_knowledge_documents(
 async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
     """抓取網址內容但不存入知識庫，供 agent tool 即時查詢使用。"""
     if is_youtube_url(req.url):
-        yt = await _fetch_youtube_transcript(req.url)
+        yt = await _fetch_youtube_transcript(req.url, fallback_to_metadata=True)
         return yt if isinstance(yt, JSONResponse) else JSONResponse(content=yt)
 
     result = await _safe_fetch_page(req.url)
