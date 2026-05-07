@@ -43,6 +43,16 @@ interface ChatOptions {
        onDisconnect?: () => void
        /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/brain/chat */
        mode?: 'live' | 'text'
+       /** Override text-mode chat endpoint. */
+       chatEndpoint?: string
+       /** Extra headers for text-mode requests. */
+       requestHeaders?: () => Record<string, string>
+       /** Override live-mode WebSocket URL creation. */
+       wsUrlBuilder?: (clientId: string) => string
+       /** Surface name sent in client_init capabilities. */
+       surface?: string
+       /** Project ID sent in client_init and text-mode requests. */
+       projectId?: string
 }
 
 function createClientId(): string {
@@ -74,6 +84,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let lastWsUrl: string | null = null
        let clientId = createClientId()
        let currentPersonaId = options.personaId ?? 'default'
+       const projectId = options.projectId ?? 'default'
+       const surface = options.surface ?? 'avatar'
        const currentLipSyncMode = options.lipSyncMode ?? 'webgl'
        let currentMode: 'live' | 'text' = options.mode ?? 'live'
        // AbortController for in-flight text-mode fetch
@@ -91,8 +103,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      auth_token: 'openvman-admin',
                      capabilities: {
                             mode: 'gemini_live',
-                            project_id: 'default',
-                            surface: 'avatar',
+                            project_id: projectId,
+                            surface,
                             voice_source: 'custom',
                             persona_id: currentPersonaId,
                      },
@@ -123,7 +135,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
                      const host = window.location.host
                      clientId = createClientId()
-                     const wsUrl = url ?? `${protocol}://${host}/ws/${clientId}`
+                     const wsUrl = url ?? options.wsUrlBuilder?.(clientId) ?? `${protocol}://${host}/ws/${clientId}`
                      lastWsUrl = wsUrl
 
                      state.value = 'CONNECTING'
@@ -262,13 +274,13 @@ export function useAvatarChat(options: ChatOptions = {}) {
                state.value = 'THINKING'
 
                try {
-                      const res = await fetch('/api/brain/chat', {
+                      const res = await fetch(options.chatEndpoint ?? '/api/brain/chat', {
                              method: 'POST',
-                             headers: { 'Content-Type': 'application/json' },
+                             headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
                              body: JSON.stringify({
                                     message: text,
                                     persona_id: currentPersonaId,
-                                    project_id: 'default',
+                                    project_id: projectId,
                                     session_id: sessionId.value,
                              }),
                              signal: textAbortController.signal,

@@ -27,6 +27,9 @@ backend/logs/
 # Brain data（runtime 產生的資料）
 brain/data/
 
+# Backend runtime data（embed keys、locks 等）
+backend/data/
+
 # Node
 node_modules/
 .vite/

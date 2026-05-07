@@ -13,6 +13,9 @@ const SPEECH_ENDPOINT = "/v1/audio/speech";
 const DEFAULT_CHARACTER = "hayley";
 const WAV_HEADER_BYTES = 44;
 
+type SpeakOptions = { character?: string; provider?: string; voice?: string };
+type TtsBodyBuilder = (text: string, opts: SpeakOptions) => Record<string, string>;
+
 export interface TtsProvider {
   id: string;
   name: string;
@@ -31,17 +34,55 @@ export interface TtsStreamerOptions {
   onError?: (err: unknown) => void;
   /** Default character for IndexTTS when speak() is called without one. */
   defaultCharacter?: string;
+  /** Override the streaming TTS endpoint. */
+  streamEndpoint?: string;
+  /** Override the full-file speech endpoint. */
+  speechEndpoint?: string;
+  /** Extra headers for TTS requests. */
+  requestHeaders?: () => Record<string, string>;
+  /** Decide whether a provider should use the streaming endpoint. */
+  shouldUseStream?: (provider: string) => boolean;
+  /** Build the request body for the streaming endpoint. */
+  buildStreamBody?: TtsBodyBuilder;
+  /** Build the request body for the speech endpoint. */
+  buildSpeechBody?: TtsBodyBuilder;
 }
 
 export function useTtsStreamer(options: TtsStreamerOptions) {
   const defaultCharacter = options.defaultCharacter ?? DEFAULT_CHARACTER;
+  const streamEndpoint = options.streamEndpoint ?? STREAM_ENDPOINT;
+  const speechEndpoint = options.speechEndpoint ?? SPEECH_ENDPOINT;
 
   let controller: AbortController | null = null;
   let activeReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
+  function requestHeaders(): Record<string, string> {
+    return { "Content-Type": "application/json", ...(options.requestHeaders?.() ?? {}) };
+  }
+
+  function shouldUseStream(provider: string): boolean {
+    return options.shouldUseStream?.(provider) ?? (!provider || provider === 'indextts');
+  }
+
+  function buildStreamBody(text: string, opts: SpeakOptions): Record<string, string> {
+    return options.buildStreamBody?.(text, opts) ?? {
+      text,
+      character: opts.character ?? defaultCharacter,
+    };
+  }
+
+  function buildSpeechBody(text: string, opts: SpeakOptions, provider: string): Record<string, string> {
+    if (options.buildSpeechBody) return options.buildSpeechBody(text, opts);
+
+    const body: Record<string, string> = { input: text };
+    if (provider !== 'auto') body.provider = provider;
+    if (opts.voice) body.voice = opts.voice;
+    return body;
+  }
+
   async function speak(
     text: string,
-    opts: { character?: string; provider?: string; voice?: string } = {},
+    opts: SpeakOptions = {},
   ): Promise<void> {
     cancel();
 
@@ -56,23 +97,20 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     try {
       let response: Response;
 
-      if (!provider || provider === 'indextts') {
+      if (shouldUseStream(provider)) {
         // Streaming path: IndexTTS
-        response = await fetch(STREAM_ENDPOINT, {
+        response = await fetch(streamEndpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: trimmed, character: opts.character ?? defaultCharacter }),
+          headers: requestHeaders(),
+          body: JSON.stringify(buildStreamBody(trimmed, opts)),
           signal: abort.signal,
         });
       } else {
         // Non-streaming path: /v1/audio/speech (all providers via provider router)
-        const body: Record<string, string> = { input: trimmed };
-        if (provider !== 'auto') body.provider = provider;
-        if (opts.voice) body.voice = opts.voice;
-        response = await fetch(SPEECH_ENDPOINT, {
+        response = await fetch(speechEndpoint, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          headers: requestHeaders(),
+          body: JSON.stringify(buildSpeechBody(trimmed, opts, provider)),
           signal: abort.signal,
         });
       }

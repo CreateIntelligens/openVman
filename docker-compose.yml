@@ -112,6 +112,8 @@ services:
       - ./frontend/admin:/app
       - admin-node-modules:/app/node_modules
       - ./frontend/admin/nginx:/etc/nginx/http.d
+      - ./frontend/app/dist/embed:/srv/openvman/embed:ro
+      - ./frontend/embed-loader/dist:/srv/openvman/embed-loader:ro
       - ./contracts:/contracts:ro
     depends_on:
       - api
@@ -155,6 +157,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./backend/app:/app/app
+      - ./backend/data:/app/data
       - ./backend/logs:/app/logs
     env_file:
       - ./backend/.env

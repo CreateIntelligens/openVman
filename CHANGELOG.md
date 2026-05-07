@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Public Iframe Embed Channel**: Added API-key protected `/embed/*`, `/api/embed/*`, and `/ws/embed/*` routes, the `<vman-avatar>` loader, embed admin key management, and public integration docs for third-party website embedding.
 - **Forced Tool Call Routing**: Brain pipeline can now force a specific skill invocation per request, with dynamic skill registry sync so newly registered skills become callable without restart (`pipeline.py`, `tool_registry.py`, `skill_manager.py`).
 - **Direct Chat Route**: Pure conversational messages bypass tool-instruction assembly, reducing prompt size and latency when no skills are needed (`pipeline.py`, `prompt_builder.py`).
 - **Chat Action Request Flow**: New end-to-end "action request" flow — Brain emits structured action proposals via `tools/actions.py`; admin UI renders an `ActionRequestCard` so the operator can approve/deny tool calls inline (`chat.ts`, `ChatInput.tsx`, `useChatSession.ts`).

@@ -26,6 +26,7 @@ from app.brain_proxy import router as brain_proxy_router
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
 from app.gateway import websocket as websocket_routes
+from app.gateway.auth_embed import EmbedAuthMiddleware
 from app.gateway.crawl_adapter import _http as _crawl_http
 from app.gateway.forward import _http as _forward_http
 from app.internal_routes import _http as _internal_http
@@ -36,6 +37,7 @@ from app.tts_text_cleaner import clean_for_tts
 from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
 from app.gateway.redis_pool import close_redis, get_redis
 from app.gateway.routes import router as gateway_router
+from app.gateway.routes_embed import router as embed_router
 from app.gateway.temp_storage import get_temp_storage, reset_temp_storage
 from app.gateway.worker import (
     get_api_tool_plugin,
@@ -176,6 +178,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="openVman Backend", lifespan=lifespan)
+app.add_middleware(EmbedAuthMiddleware)
 
 
 @app.middleware("http")
@@ -196,9 +199,10 @@ async def http_metrics_middleware(request: Request, call_next):
 
 app.include_router(gateway_router)
 app.include_router(internal_router)
+app.include_router(embed_router)
+app.include_router(admin_routes.router)
 app.include_router(brain_proxy_router)
 app.include_router(websocket_routes.router)
-app.include_router(admin_routes.router)
 
 
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:

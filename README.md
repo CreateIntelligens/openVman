@@ -17,6 +17,24 @@
 | 04 | [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md) | 網關 (外圍)：媒體處理 · 任務佇列 · 插件 (Camera/Web) · 臨時儲存 · 計費備援 | ✅ 已完成 |
 | -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
 
+## 對外 API Key 管理
+
+對外嵌入通道使用本地 JSON key store（預設 `backend/data/embed_keys.json`），secret 只會在建立或輪替時輸出一次；後續 `list` 僅能看到 `secret_hash`。
+
+```bash
+cd backend
+python scripts/embed_keys_cli.py create --tenant-id tenant-a --domain example.com --note "demo"
+python scripts/embed_keys_cli.py list
+python scripts/embed_keys_cli.py disable <key_id>
+python scripts/embed_keys_cli.py rotate <key_id>
+```
+
+測試或非預設部署可用 `--store /path/to/embed_keys.json` 指定 key store。對外請求以 `Authorization: Bearer <secret>` 或 iframe query string `?api_key=<secret>` 驗證，並會檢查該 key 的 domain allowlist。
+
+## 對外接入
+
+第三方網站接入流程、Web Component 屬性、postMessage v1 事件表請見 [PUBLIC_INTEGRATION_SPEC.md](./docs/PUBLIC_INTEGRATION_SPEC.md)。公開錯誤碼請見 [PUBLIC_ERROR_CODES.md](./docs/PUBLIC_ERROR_CODES.md)。
+
 
 ### AI Coding 餵檔策略
 
