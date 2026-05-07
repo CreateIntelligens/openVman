@@ -1,4 +1,4 @@
-import { parseErrorMessage } from "./common";
+import { fetchJson } from "./common";
 
 export interface TtsProvider {
   id: string;
@@ -13,12 +13,7 @@ export interface SpeechResult {
 }
 
 export async function fetchTtsProviders(): Promise<TtsProvider[]> {
-  const res = await fetch("/v1/tts/providers");
-  if (!res.ok) {
-    const msg = await parseErrorMessage(res);
-    throw new Error(msg);
-  }
-  return res.json();
+  return fetchJson<TtsProvider[]>("/v1/tts/providers");
 }
 
 export async function synthesizeSpeech(
@@ -36,8 +31,7 @@ export async function synthesizeSpeech(
     signal: opts?.signal,
   });
   if (!res.ok) {
-    const msg = await parseErrorMessage(res);
-    throw new Error(msg);
+    throw new Error(`Synthesis failed: ${res.status}`);
   }
   const audio = await res.arrayBuffer();
   const fallbackReason = res.headers.get("X-TTS-Fallback-Reason") || undefined;

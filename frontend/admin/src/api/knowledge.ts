@@ -1,4 +1,15 @@
-import { fetchJson, apiUrl, projectUrl, post, jsonRequest, knowledgePath, getActiveProjectId } from "./common";
+import {
+  apiUrl,
+  del,
+  fetchJson,
+  get,
+  getActiveProjectId,
+  knowledgePath,
+  patch,
+  post,
+  projectUrl,
+  put,
+} from "./common";
 
 export interface KnowledgeDocumentSummary {
   path: string;
@@ -63,29 +74,26 @@ export interface KnowledgeNoteResponse {
 }
 
 export async function fetchKnowledgeDocuments() {
-  return fetchJson<KnowledgeDocumentsResponse>(projectUrl(knowledgePath("/documents")));
+  return get<KnowledgeDocumentsResponse>(knowledgePath("/documents"));
 }
 
 export async function fetchKnowledgeBaseDocuments() {
-  return fetchJson<KnowledgeDocumentsResponse>(projectUrl(knowledgePath("/base/documents")));
+  return get<KnowledgeDocumentsResponse>(knowledgePath("/base/documents"));
 }
 
 export async function fetchKnowledgeDocument(path: string) {
-  return fetchJson<KnowledgeDocument>(projectUrl(knowledgePath("/document"), { path }));
+  return get<KnowledgeDocument>(knowledgePath("/document"), { path });
 }
 
 export function saveKnowledgeDocument(path: string, content: string) {
-  return jsonRequest<{ status: string; document: KnowledgeDocumentSummary }>(
-    "PUT",
+  return put<{ status: string; document: KnowledgeDocumentSummary }>(
     knowledgePath("/document"),
     { path, content, project_id: getActiveProjectId() },
   );
 }
 
 export async function deleteKnowledgeDocument(path: string) {
-  return fetchJson<{ status: string }>(projectUrl(knowledgePath("/document"), { path }), {
-    method: "DELETE",
-  });
+  return del<{ status: string }>(knowledgePath("/document"), { path });
 }
 
 export function createKnowledgeDirectory(dirPath: string) {
@@ -97,11 +105,9 @@ export function createKnowledgeDirectory(dirPath: string) {
 }
 
 export async function deleteKnowledgeDirectory(dirPath: string) {
-  return fetchJson<{ status: string; path: string }>(
-    projectUrl(knowledgePath("/directory"), { path: dirPath }),
-    {
-      method: "DELETE",
-    },
+  return del<{ status: string; path: string }>(
+    knowledgePath("/directory"),
+    { path: dirPath },
   );
 }
 
@@ -160,23 +166,17 @@ export async function crawlUrl(url: string): Promise<CrawlIngestResponse> {
 
   const title = fetched.title || url;
   const filename = `${sanitizeFilename(title)}.md`;
-  const markdown = `# ${title}\n\n${fetched.content}`;
-  const file = new File([markdown], filename, { type: "text/markdown" });
+  const file = new File([`# ${title}\n\n${fetched.content}`], filename, { type: "text/markdown" });
 
   const uploaded = await uploadKnowledgeDocuments([{ file, relativePath: filename }]);
   const summary = uploaded.files[0];
-  if (!summary) {
-    throw new Error("匯入成功但未取得文件資訊");
-  }
+  if (!summary) throw new Error("匯入成功但未取得文件資訊");
 
-  try {
-    await updateKnowledgeDocumentMeta(summary.path, {
-      source_type: "web",
-      source_url: fetched.source_url || url,
-    });
-  } catch {
-    // metadata 更新失敗不阻擋匯入流程
-  }
+  // metadata 更新失敗不阻擋匯入流程
+  updateKnowledgeDocumentMeta(summary.path, {
+    source_type: "web",
+    source_url: fetched.source_url || url,
+  }).catch(() => {});
 
   return {
     status: uploaded.status,
@@ -195,8 +195,7 @@ export function updateKnowledgeDocumentMeta(
     source_url?: string | null;
   },
 ) {
-  return jsonRequest<KnowledgeDocumentMetaResponse>(
-    "PATCH",
+  return patch<KnowledgeDocumentMetaResponse>(
     knowledgePath("/document/meta"),
     { path, project_id: getActiveProjectId(), ...metadata },
   );
@@ -234,11 +233,11 @@ export interface GraphSummary {
 }
 
 export function fetchGraphStatus() {
-  return fetchJson<GraphStatus>(projectUrl(knowledgePath("/graph/status")));
+  return get<GraphStatus>(knowledgePath("/graph/status"));
 }
 
 export function fetchGraphSummary() {
-  return fetchJson<GraphSummary>(projectUrl(knowledgePath("/graph/summary")));
+  return get<GraphSummary>(knowledgePath("/graph/summary"));
 }
 
 export function rebuildGraph() {

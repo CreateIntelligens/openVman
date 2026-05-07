@@ -95,14 +95,27 @@ export async function jsonRequest<T>(
   });
 }
 
-export async function post<T>(
-  path: string,
-  body: JsonBody,
-): Promise<T> {
+export async function post<T>(path: string, body: JsonBody): Promise<T> {
   return jsonRequest<T>("POST", path, body);
 }
 
-/** Send a request without a JSON body (useful for PATCH, DELETE). */
+export async function put<T>(path: string, body: JsonBody): Promise<T> {
+  return jsonRequest<T>("PUT", path, body);
+}
+
+export async function patch<T>(path: string, body: JsonBody): Promise<T> {
+  return jsonRequest<T>("PATCH", path, body);
+}
+
+export async function get<T>(path: string, params: QueryParams = {}): Promise<T> {
+  return fetchJson<T>(projectUrl(path, params));
+}
+
+export async function del<T>(path: string, params: QueryParams = {}): Promise<T> {
+  return fetchJson<T>(projectUrl(path, params), { method: "DELETE" });
+}
+
+/** Send a request without a JSON body (useful for DELETE). */
 export async function request<T>(method: string, path: string): Promise<T> {
   return fetchJson<T>(apiUrl(path), { method });
 }
