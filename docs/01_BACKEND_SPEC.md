@@ -119,7 +119,7 @@ async function synthesizeWithFallback(text, session) {
   throw new Error("All TTS targets failed");
 }
 ```
-> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（VibeVoice → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`。
+> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 串流走 `POST /tts/stream`。
 
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
@@ -170,8 +170,8 @@ LLM_MODEL=gpt-4o             # 預設模型名稱
 LLM_STREAM=true              # 必須為 true
 
 # === TTS 設定 ===
-TTS_VIBEVOICE_URL=http://vibevoice-serve:3000
-TTS_VIBEVOICE_REF_VOICE=taiwanese_female_friendly.wav
+TTS_INDEXTTS_URL=http://index-tts-vllm:8011
+TTS_INDEXTTS_DEFAULT_CHARACTER=hayley
 TTS_AWS_ACCESS_KEY_ID=***
 TTS_AWS_SECRET_ACCESS_KEY=***
 TTS_AWS_REGION=ap-northeast-1

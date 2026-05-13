@@ -43,9 +43,6 @@ class TTSRouterConfig(BaseSettings):
     tts_indextts_url: str = Field(default="", validation_alias="TTS_INDEXTTS_URL")
     tts_indextts_default_character: str = Field(default="", validation_alias="TTS_INDEXTTS_DEFAULT_CHARACTER")
 
-    # --- VibeVoice TTS ---
-    tts_vibevoice_url: str = Field(default="", validation_alias="TTS_VIBEVOICE_URL")
-
     # --- AWS Polly ---
     tts_aws_enabled: bool = False
     tts_aws_region: str = "ap-northeast-1"

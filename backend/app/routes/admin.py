@@ -14,7 +14,6 @@ from app.gateway.temp_storage import get_temp_storage
 from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
-from app.providers.vibevoice_adapter import VIBEVOICE_DEFAULT_SPEAKER, VIBEVOICE_SPEAKERS
 
 logger = logging.getLogger("backend")
 router = APIRouter()
@@ -154,14 +153,6 @@ async def get_tts_providers() -> JSONResponse:
             "name": "IndexTTS",
             "default_voice": cfg.tts_indextts_default_character,
             "voices": voices,
-        })
-
-    if cfg.tts_vibevoice_url:
-        providers.append({
-            "id": "vibevoice",
-            "name": "VibeVoice",
-            "default_voice": VIBEVOICE_DEFAULT_SPEAKER,
-            "voices": list(VIBEVOICE_SPEAKERS),
         })
 
     if cfg.tts_gcp_enabled:

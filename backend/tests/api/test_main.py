@@ -34,9 +34,12 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
     fake_markitdown_mod.MarkItDown = FakeMarkItDown
     monkeypatch.setitem(sys.modules, "markitdown", fake_markitdown_mod)
 
-    sys.modules.pop("app.gateway.websocket", None)
-    sys.modules.pop("app.routes.admin", None)
-    sys.modules.pop("app.main", None)
+    # Re-import app.main from scratch so the fake markitdown / config patches take.
+    # Use monkeypatch.delitem so the original module objects (or their absence) are
+    # restored on teardown — otherwise the freshly re-imported modules leak into
+    # later tests and break patch("app.routes.admin...") targeting.
+    for name in ("app.gateway.websocket", "app.routes.admin", "app.main"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
     module = importlib.import_module("app.main")
     monkeypatch.setattr(module, "_md_converter", None)
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
@@ -78,6 +81,7 @@ def test_run_server_uses_configured_dev_mode(monkeypatch):
         "host": "0.0.0.0",
         "port": 9999,
         "reload": True,
+        "log_config": module._UVICORN_LOG_CONFIG,
     }
 
 
@@ -217,7 +221,6 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         markitdown_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
-        tts_vibevoice_url="",
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
         edge_tts_enabled=True,

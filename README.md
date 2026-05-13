@@ -217,7 +217,7 @@ python scripts/embed_keys_cli.py rotate <key_id>
 | 前端 | **ONNX Runtime Web / WebGL** | 依設備能力選用高速引擎，捨棄舊版 Viseme 常數映射 |
 | 後端 | 標點符號截斷 (Punctuation Chunking) | LLM 串流 → 短句 → TTS，最小化延遲 |
 | 後端 | **智能中斷 (Smart Barge-in)** | 輕量 Guard Agent 判定插話，立即停止 ASR/TTS 任務 |
-| 後端 | VibeVoice-style zh-TW | 以台灣口音為預設，支援品牌聲線與客製化發音 (基於 Microsoft VibeVoice 0.5B/1.5B) |
+| 後端 | IndexTTS (vLLM) zh-TW | 以台灣口音為預設、低延遲串流；支援品牌聲線與客製化發音，並具備 GCP / AWS / Edge-TTS fallback |
 | 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
 | 網關 | **BullMQ + Redis 佇列** | 非同步處理多模態素材 (影像/語音) 的 CPU 密集型預處理管線 |
 | 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、Web Crawler 爬蟲等前置工具能力 |

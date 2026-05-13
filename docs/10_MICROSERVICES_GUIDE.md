@@ -18,7 +18,7 @@ graph TD
     end
     
     subgraph "Cognitive & Inference (Spokes)"
-        VibeVoice[vibevoice-serve - 語音合成]
+        IndexTTS[index-tts-vllm - 語音合成]
         Docling[docling-serve - 文件解析]
         Brain[api - 認知大腦]
     end
@@ -29,7 +29,7 @@ graph TD
     
     %% Backend is the coordinator
     Backend <-->|1. 思考請求| Brain
-    Backend <-->|2. 語音合成| VibeVoice
+    Backend <-->|2. 語音合成| IndexTTS
     Backend <-->|3. 文件解析| Docling
     Backend <-->|4. 異步任務| Redis
     
@@ -50,8 +50,8 @@ graph TD
 │                                                                          │
 │      [ AI 專業服務商 ]             [ 神經中樞 ]             [ 基礎設施 ]      │
 │     ┌──────────────┐           ┌────────────┐           ┌────────────┐   │
-│     │ vibevoice    │           │  backend   │           │   redis    │   │
-│     │   -serve     │◀─────────▶│ (FastAPI)  │◀─────────▶│ (Queue/DB) │   │
+│     │ index-tts    │           │  backend   │           │   redis    │   │
+│     │   -vllm      │◀─────────▶│ (FastAPI)  │◀─────────▶│ (Queue/DB) │   │
 │     │  (GPU 0)     │           │ (Reflexes) │           │   (RAM)    │   │
 │     └──────────────┘           └────────────┘           └────────────┘   │
 │            ▲                          │                        ▲         │
@@ -74,7 +74,7 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | **`backend`** | **神經中樞 (Center)** | FastAPI (Python) | 輕量 (CPU) |
 | **`api`** | 認知大腦 (Brain) | FastAPI, LanceDB | 中量 (CPU/GPU) |
-| **`vibevoice-serve`** | 語音合成引擎 (TTS) | VibeVoice (0.5B/1.5B) | **重型 (GPU)** |
+| **`index-tts-vllm`** | 語音合成引擎 (TTS) | IndexTTS on vLLM | **重型 (GPU)** |
 | **`docling-serve`** | 文件解析引擎 (Doc) | Docling (CPU/GPU) | **重型 (CPU/RAM)** |
 | **`admin`** | 管理後台前端 | React, Nginx | 輕量 (CPU) |
 | **`redis`** | 任務隊列與暫存 | Redis 7 | 輕量 (RAM) |
@@ -83,8 +83,8 @@ graph TD
 
 ### 4. 服務間通訊模式
 
-1.  **請求/響應 (Request/Response)**：`backend` 向 `api` 或 `vibevoice-serve` 發起同步請求。
-2.  **串流 (Streaming)**：`api` -> `backend` -> `vibevoice-serve` 的 Token-to-Audio 流式處理。
+1.  **請求/響應 (Request/Response)**：`backend` 向 `api` 或 `index-tts-vllm` 發起同步請求。
+2.  **串流 (Streaming)**：`api` -> `backend` -> `index-tts-vllm` 的 Token-to-Audio 流式處理。
 3.  **非同步任務 (Async Tasks)**：`backend` 將繁重任務（如多模態預處理）丟進 `redis` 隊列。
 
 ---

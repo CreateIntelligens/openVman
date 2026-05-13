@@ -14,6 +14,9 @@
 - **Idle Timeout Management**: Backend introduces idle-timeout handling for live sessions; frontend upgraded to `nanoid` v5.
 - **Brain Route Modularisation**: Brain HTTP surface split into dedicated modules under `brain/api/routes/` (chat / knowledge / tools / internal routes), replacing the previous monolithic router.
 
+### Removed
+- **VibeVoice TTS**: Removed the VibeVoice provider entirely — the `backend/vibevoice-serve/` service, `VibeVoiceAdapter`, the `TTS_VIBEVOICE_URL` config, the `vibevoice` provider entry in `/v1/tts/providers`, and its fallback-chain hop. The TTS fallback chain is now `IndexTTS → GCP → AWS → Edge-TTS`.
+
 ### Changed
 - **Admin Frontend Redesign**: Overhauled design tokens in `tailwind.config.js` + `index.css`; all semantic colours now expose RGB channels so Tailwind opacity modifiers (`bg-primary/20`, etc.) render correctly. Sidebar, TTS controls, and skill management views updated to the new tokens.
 - **TTS Controls Relocation**: Moved TTS provider/voice controls into the chat input bar; `identity.emoji` field removed from persona schema.

@@ -64,34 +64,6 @@ services:
               count: 1
               capabilities: [gpu]
 
-  # vibevoice-serve: (封存 — 如需啟用請取消註解)
-  #   <<: *shared
-  #   build:
-  #     context: ./backend/vibevoice-serve
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - VIBEVOICE_MODEL_PATH=${VIBEVOICE_MODEL_PATH:-bezzam/VibeVoice-1.5B-hf}
-  #     - VIBEVOICE_DEFAULT_SPEAKER=${VIBEVOICE_DEFAULT_SPEAKER:-0}
-  #     - HF_TOKEN=${HF_TOKEN:-}
-  #   volumes:
-  #     - ./backend/vibevoice-serve/app:/app
-  #     - hf-cache:/root/.cache/huggingface
-  #   ports:
-  #     - "3000"
-  #   healthcheck:
-  #     test: ["CMD", "python", "-c", "import urllib.request, json, sys; res=json.loads(urllib.request.urlopen('http://localhost:3000/health').read()); sys.exit(0 if res.get('status') == 'ok' else 1)"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 30
-  #     start_period: 60s
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
-
   avatar:
     <<: *shared
     build:
@@ -164,7 +136,6 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TTS_INDEXTTS_URL=http://index-tts-vllm:8011
-      # - TTS_VIBEVOICE_URL=http://vibevoice-serve:3000  # 封存
     depends_on:
       api:
         condition: service_started

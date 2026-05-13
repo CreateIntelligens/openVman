@@ -4,7 +4,7 @@
  * Two paths based on provider:
  *   - provider === 'indextts': POST /tts/stream (IndexTTS streaming, low latency)
  *     Response: audio/wav — 44-byte header + raw PCM 16 kHz mono Int16 LE, chunked
- *   - all others (auto, edge, vibevoice…): POST /v1/audio/speech (full WAV, multi-provider)
+ *   - all others (auto, edge, gcp, aws…): POST /v1/audio/speech (full WAV, multi-provider)
  *     Response: audio/wav — full file, same PCM format after header strip
  */
 

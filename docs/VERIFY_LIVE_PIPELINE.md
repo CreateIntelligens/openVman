@@ -5,7 +5,7 @@ This guide explains how to verify the end-to-end live voice interaction flow.
 ## 1. Environment Setup
 Ensure all services are running:
 ```bash
-docker compose up -d redis vibevoice-serve api backend admin
+docker compose up -d
 ```
 
 ## 2. Manual Smoke Test (The "Happy Path")

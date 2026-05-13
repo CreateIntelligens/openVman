@@ -19,14 +19,14 @@
 ### 2. 關鍵時序圖 (Sequence Diagrams)
 
 #### 2.1 即時對話流 (Conversational Flow)
-展示即時語音閉環。Backend 透過 `LiveVoicePipeline` 呼叫 Brain REST API 取得完整回覆，切句後依序送 VibeVoice TTS 合成。
+展示即時語音閉環。Backend 透過 `LiveVoicePipeline` 呼叫 Brain REST API 取得完整回覆，切句後依序送 TTS 合成（`TTSRouterService`：IndexTTS → GCP → AWS → Edge-TTS）。
 
 ```mermaid
 sequenceDiagram
     participant F as Frontend
     participant B as Backend (Nervous System)
     participant BR as Brain
-    participant T as VibeVoice-Serve
+    participant T as TTS Router (IndexTTS / fallback)
 
     F->>B: WS: client_init (Handshake)
     B-->>F: WS: server_init_ack

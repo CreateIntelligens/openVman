@@ -122,12 +122,8 @@ def _classify_http_provider_error(exc: Exception, error_class: type) -> str:
 
 def classify_indextts_error(exc: Exception) -> str:
     from app.providers.indextts_adapter import IndexTTSHTTPError
+
     return _classify_http_provider_error(exc, IndexTTSHTTPError)
-
-
-def classify_vibevoice_error(exc: Exception) -> str:
-    from app.providers.vibevoice_adapter import VibeVoiceHTTPError
-    return _classify_http_provider_error(exc, VibeVoiceHTTPError)
 
 
 def classify_edge_tts_error(exc: Exception) -> str:

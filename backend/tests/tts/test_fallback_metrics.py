@@ -14,7 +14,7 @@ from app.service import TTSRouterService
 
 def _make_config() -> TTSRouterConfig:
     return TTSRouterConfig(
-        tts_index_url="",
+        tts_indextts_url="",
         tts_aws_enabled=True,
         tts_aws_region="ap-northeast-1",
         tts_aws_access_key_id="key",
@@ -127,7 +127,7 @@ class TestFallbackMetrics:
         evt = route_events[0]
         assert evt["target"] == "gcp-tts"
         assert evt["result"] == "success"
-        assert "latency_ms" in evt
+        assert "latency_s" in evt
 
     def test_fallback_hop_event_contains_from_to(self):
         svc = TTSRouterService(_make_config())
