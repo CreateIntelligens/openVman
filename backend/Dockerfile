@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Stage 1: Builder
 FROM python:3.11-slim AS builder
 
@@ -6,17 +7,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+ENV PATH="/opt/venv/bin:$PATH" \
+    VIRTUAL_ENV=/opt/venv
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel uv
 
 # Heavy packages pinned separately so requirements.txt changes don't bust this cache layer
-RUN pip install --no-cache-dir \
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install \
     "docling>=2.0.0" \
     "markitdown[all]>=0.1,<1"
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install -r requirements.txt
 
 # Stage 2: Runner
 FROM python:3.11-slim
