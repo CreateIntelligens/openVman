@@ -237,7 +237,7 @@ ws.onclose = () => { reconnect(); };
     * **文件視角**：開啟全螢幕 Markdown 編輯器（左側原始碼，右側即時渲染）。
 
 #### 12.2 通用 Markdown 策略 (Universal Markdown Strategy)
-前端僅負責編輯 `.md` 文件。即使上傳的是 PDF、DOCX、PPTX 或 XLSX，後端也會先保留原始檔於 `workspace/raw/`，再透過 Docling-first 轉換管線生成 Markdown 文件提供前端編輯，確保 AI 讀取的資料格式具備最高的一致性。
+前端僅負責編輯 `.md` 文件。即使上傳的是 PDF、DOCX、PPTX 或 XLSX，後端也會先保留原始檔於 `workspace/raw/`；PDF 會先嘗試 pdf-inspector text-based fast path，其餘文件或 fallback 再透過 Docling / MarkItDown 轉換管線生成 Markdown 文件提供前端編輯，確保 AI 讀取的資料格式具備最高的一致性。
 
 #### 12.3 狀態反饋
 檔案右側會顯示「已索引 (Indexed)」或「處理中 (Processing)」的燈號，數據來源於 WebSocket 的 `gateway_status`。

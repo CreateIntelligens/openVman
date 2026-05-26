@@ -2,17 +2,48 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from app.config import TTSRouterConfig, get_tts_config
 
+_ORIGINAL_ENV: dict[str, str] = {}
+_ENV_KEYS_TO_CLEAR = (
+    "ENV",
+    "BACKEND_PORT",
+    "TTS_INDEXTTS_URL",
+    "TTS_AWS_ENABLED",
+    "TTS_EDGE_SAMPLE_RATE",
+    "MARKITDOWN_MAX_UPLOAD_BYTES",
+    "DOCLING_SERVE_URL",
+    "DOCLING_TIMEOUT_MS",
+    "DOCLING_FALLBACK_TO_MARKITDOWN",
+    "PDF_INSPECTOR_ENABLED",
+    "PDF_INSPECTOR_MIN_CONFIDENCE",
+    "PDF_INSPECTOR_MIN_MARKDOWN_CHARS",
+    "PDF_REPAIR_ENABLED",
+    "PDF_REPAIR_TIMEOUT_MS",
+    "UVICORN_RELOAD",
+)
+
 
 def setup_function():
     get_tts_config.cache_clear()
+    _ORIGINAL_ENV.clear()
+
+    for key in _ENV_KEYS_TO_CLEAR:
+        value = os.environ.pop(key, None)
+        if value is not None:
+            _ORIGINAL_ENV[key] = value
 
 
 def teardown_function():
     get_tts_config.cache_clear()
+
+    for key in _ENV_KEYS_TO_CLEAR:
+        os.environ.pop(key, None)
+    os.environ.update(_ORIGINAL_ENV)
+    _ORIGINAL_ENV.clear()
 
 
 def test_settings_can_load_from_env_file(tmp_path: Path):
@@ -29,6 +60,11 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
                 "DOCLING_SERVE_URL=http://docling-serve:5001",
                 "DOCLING_TIMEOUT_MS=9999",
                 "DOCLING_FALLBACK_TO_MARKITDOWN=false",
+                "PDF_INSPECTOR_ENABLED=false",
+                "PDF_INSPECTOR_MIN_CONFIDENCE=0.9",
+                "PDF_INSPECTOR_MIN_MARKDOWN_CHARS=25",
+                "PDF_REPAIR_ENABLED=false",
+                "PDF_REPAIR_TIMEOUT_MS=20000",
             ]
         ),
         encoding="utf-8",
@@ -43,6 +79,11 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
     assert config.docling_serve_url == "http://docling-serve:5001"
     assert config.docling_timeout_ms == 9999
     assert config.docling_fallback_to_markitdown is False
+    assert config.pdf_inspector_enabled is False
+    assert config.pdf_inspector_min_confidence == 0.9
+    assert config.pdf_inspector_min_markdown_chars == 25
+    assert config.pdf_repair_enabled is False
+    assert config.pdf_repair_timeout_ms == 20000
     assert config.backend_port == 9999
     assert config.is_dev is True
 

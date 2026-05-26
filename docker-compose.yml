@@ -131,6 +131,10 @@ services:
       - ./backend/app:/app/app
       - ./backend/data:/app/data
       - ./backend/logs:/app/logs
+      - ./backend/tests:/app/tests
+      - ./backend/Dockerfile:/app/Dockerfile
+      - ./backend/requirements.txt:/app/requirements.txt
+      - ./backend/scripts:/app/scripts
     env_file:
       - ./backend/.env
     environment:

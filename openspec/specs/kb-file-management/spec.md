@@ -14,7 +14,7 @@ The system SHALL allow users to upload files into the currently selected directo
 - **THEN** the knowledge management UI continues to expose Markdown as the primary editable document form
 
 #### Scenario: Upload conversion failure for office documents
-- **WHEN** the user uploads a PDF, DOCX, PPTX, or XLSX file and the Docling-based ingestion pipeline fails
+- **WHEN** the user uploads a PDF, DOCX, PPTX, or XLSX file and the document conversion pipeline fails
 - **THEN** the system surfaces a clear upload failure instead of pretending the file was indexed successfully
 
 ### Requirement: Directory Navigation

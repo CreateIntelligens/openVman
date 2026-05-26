@@ -2,8 +2,35 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-25
+
 ### Added
-- **Public Iframe Embed Channel**: Added API-key protected `/embed/*`, `/api/embed/*`, and `/ws/embed/*` routes, the `<vman-avatar>` loader, embed admin key management, and public integration docs for third-party website embedding.
+- **Vue 3 Migration**: Migrated the frontend application (`frontend/app`) from React to Vue 3 for improved reactivity, performance, and structure.
+- **Privacy Filter & Egress Scanning**: Added a privacy filter service featuring real-time egress scanning, CPU/CUDA fallback support, and warning event notification for PII detection in both user inputs and LLM responses.
+- **Prometheus & Grafana Observability**: Integrated Prometheus and Grafana for monitoring backend services, performance tracking, and health status dashboard.
+- **Public Iframe Embed Channel**: Implemented API-key protected routes (`/embed/*`, `/api/embed/*`, `/ws/embed/*`), the `<vman-avatar>` loader, and administrative key management.
+- **Gemini Live Upgrades**: Added support for Gemini thought signatures, multi-query tool search citations, improved tool grounding, and display of tool call duration/references in message metadata.
+- **Active Memory Recall**: Integrated active memory recall to enhance contextual retrieval.
+- **Multi-Provider TTS Support**: Hardened avatar reconnect UX, extracted the settings modal, and added multi-provider TTS backup configurations.
+
+### Removed
+- **VibeVoice TTS**: Fully removed the VibeVoice provider, its dedicated Docker service, adapters, and configuration files, prioritizing the fallback chain `IndexTTS → GCP → AWS → Edge-TTS`.
+- **Embed Page**: Removed the legacy standalone Embed page in favor of the new iframe embed channel.
+
+### Changed / Refactored
+- **TTS Synthesis Relocation**: Moved TTS synthesis from the backend relay directly to the frontend stream endpoint.
+- **Streamlined Chat API**: Replaced the streaming chat API with a synchronous response endpoint and streaming chat turn with first-iteration dispatch.
+- **Rem-Based Frontend Sizing**: Converted all layout dimensions from pixel (`px`) to relative (`rem`) units in the frontend to enhance responsive design.
+- **Helper Centralization**: Refactored and centralized admin API helpers for cleaner codebase organization.
+- **Backend Dockerfiles**: `brain/api` and `backend` Dockerfiles use `uv` with BuildKit cache mounts for dependency installs, significantly reducing rebuild time.
+
+### Fixed
+- **UI Recovery & Reconnection**: Fixed admin UI recovery issues after backend reconnection and added user recovery controls.
+- **Initialization & Configuration**: Fixed `docling` converter cache initialization and set the `Asia/Taipei` timezone in service Dockerfiles.
+
+## [0.9.1] - 2026-04-22
+
+### Added
 - **Forced Tool Call Routing**: Brain pipeline can now force a specific skill invocation per request, with dynamic skill registry sync so newly registered skills become callable without restart (`pipeline.py`, `tool_registry.py`, `skill_manager.py`).
 - **Direct Chat Route**: Pure conversational messages bypass tool-instruction assembly, reducing prompt size and latency when no skills are needed (`pipeline.py`, `prompt_builder.py`).
 - **Chat Action Request Flow**: New end-to-end "action request" flow — Brain emits structured action proposals via `tools/actions.py`; admin UI renders an `ActionRequestCard` so the operator can approve/deny tool calls inline (`chat.ts`, `ChatInput.tsx`, `useChatSession.ts`).
@@ -14,13 +41,10 @@
 - **Idle Timeout Management**: Backend introduces idle-timeout handling for live sessions; frontend upgraded to `nanoid` v5.
 - **Brain Route Modularisation**: Brain HTTP surface split into dedicated modules under `brain/api/routes/` (chat / knowledge / tools / internal routes), replacing the previous monolithic router.
 
-### Removed
-- **VibeVoice TTS**: Removed the VibeVoice provider entirely — the `backend/vibevoice-serve/` service, `VibeVoiceAdapter`, the `TTS_VIBEVOICE_URL` config, the `vibevoice` provider entry in `/v1/tts/providers`, and its fallback-chain hop. The TTS fallback chain is now `IndexTTS → GCP → AWS → Edge-TTS`.
-
 ### Changed
 - **Admin Frontend Redesign**: Overhauled design tokens in `tailwind.config.js` + `index.css`; all semantic colours now expose RGB channels so Tailwind opacity modifiers (`bg-primary/20`, etc.) render correctly. Sidebar, TTS controls, and skill management views updated to the new tokens.
 - **TTS Controls Relocation**: Moved TTS provider/voice controls into the chat input bar; `identity.emoji` field removed from persona schema.
-- **Backend Dockerfiles**: `brain/api` and `backend` Dockerfiles use `uv` with BuildKit cache mounts for dependency installs, significantly reducing rebuild time.
+- **Brain API Dockerfile**: Rewritten as multi-stage `builder → runner` with `uv` dependency caching, significantly reducing image size and rebuild time.
 - **SSE Finalisation Ordering**: `server.done` SSE event is now emitted before `finalize()` completes, preventing client races that blocked the live relay.
 
 ### Added (earlier)

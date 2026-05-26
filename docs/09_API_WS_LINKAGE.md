@@ -72,7 +72,7 @@ sequenceDiagram
     A->>B: POST /api/knowledge/upload
     B->>BR: POST /brain/knowledge/raw/upload
     B->>B: 分類、保存原始檔與標準化
-    Note over B: .md/.txt/.csv 直通；其他格式先經 Docling 轉為 .md
+    Note over B: .md/.txt/.csv 直通；PDF 先嘗試 pdf-inspector fast path，其他格式或 fallback 經 Docling 轉為 .md
     B->>BR: POST /brain/knowledge/upload
     BR->>BR: LanceDB Re-indexing
     BR-->>B: 上傳結果 / reindex 已排程

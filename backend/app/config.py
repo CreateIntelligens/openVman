@@ -83,6 +83,26 @@ class TTSRouterConfig(BaseSettings):
         default=True,
         validation_alias="DOCLING_FALLBACK_TO_MARKITDOWN",
     )
+    pdf_inspector_enabled: bool = Field(
+        default=True,
+        validation_alias="PDF_INSPECTOR_ENABLED",
+    )
+    pdf_inspector_min_confidence: float = Field(
+        default=0.85,
+        validation_alias="PDF_INSPECTOR_MIN_CONFIDENCE",
+    )
+    pdf_inspector_min_markdown_chars: int = Field(
+        default=10,
+        validation_alias="PDF_INSPECTOR_MIN_MARKDOWN_CHARS",
+    )
+    pdf_repair_enabled: bool = Field(
+        default=True,
+        validation_alias="PDF_REPAIR_ENABLED",
+    )
+    pdf_repair_timeout_ms: int = Field(
+        default=120000,
+        validation_alias="PDF_REPAIR_TIMEOUT_MS",
+    )
 
     # --- TTS Cache ---
     tts_cache_enabled: bool = Field(default=True, validation_alias="TTS_CACHE_ENABLED")

@@ -19,7 +19,6 @@ graph TD
     
     subgraph "Cognitive & Inference (Spokes)"
         IndexTTS[index-tts-vllm - 語音合成]
-        Docling[docling-serve - 文件解析]
         Brain[api - 認知大腦]
     end
     
@@ -30,11 +29,10 @@ graph TD
     %% Backend is the coordinator
     Backend <-->|1. 思考請求| Brain
     Backend <-->|2. 語音合成| IndexTTS
-    Backend <-->|3. 文件解析| Docling
-    Backend <-->|4. 異步任務| Redis
+    Backend <-->|3. 異步任務| Redis
     
     %% Cross-service data flow
-    Docling -.->|Markdown 產出| Brain
+    Backend -.->|pdf-inspector / Docling 轉 Markdown| Brain
     Frontend -.->|API 設定| Backend
 ```
 
@@ -57,11 +55,11 @@ graph TD
 │            ▲                          │                        ▲         │
 │            │           ┌──────────────┴──────────────┐         │         │
 │            │           ▼                             ▼         │         │
-│     ┌──────────────┐   ┌────────────┐         ┌────────────┐   │         │
-│     │   docling    │   │    api     │         │   admin    │   │         │
-│     │   -serve     │   │(Brain Core)│         │ (Frontend) │   │         │
-│     │   (CPU)      │   │  (GPU 1)   │         │   (CPU)    │   │         │
-│     └──────────────┘   └────────────┘         └────────────┘   │         │
+│            │   ┌────────────┐                 ┌────────────┐   │         │
+│            │   │    api     │                 │   admin    │   │         │
+│            │   │(Brain Core)│                 │ (Frontend) │   │         │
+│            │   │  (GPU 1)   │                 │   (CPU)    │   │         │
+│            │   └────────────┘                 └────────────┘   │         │
 │                                                                        │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -75,9 +73,10 @@ graph TD
 | **`backend`** | **神經中樞 (Center)** | FastAPI (Python) | 輕量 (CPU) |
 | **`api`** | 認知大腦 (Brain) | FastAPI, LanceDB | 中量 (CPU/GPU) |
 | **`index-tts-vllm`** | 語音合成引擎 (TTS) | IndexTTS on vLLM | **重型 (GPU)** |
-| **`docling-serve`** | 文件解析引擎 (Doc) | Docling (CPU/GPU) | **重型 (CPU/RAM)** |
 | **`admin`** | 管理後台前端 | React, Nginx | 輕量 (CPU) |
 | **`redis`** | 任務隊列與暫存 | Redis 7 | 輕量 (RAM) |
+
+文件解析不是獨立 compose service。PDF 上傳時由 `backend` container 內的 `pdf-inspector` 先判斷是否可走 text-based fast path；不適合 fast path 的 PDF，以及 DOCX / PPTX / XLSX，會交由 Python Docling 套件 in-process 轉成 Markdown，失敗時依設定 fallback 到 MarkItDown。
 
 ---
 
