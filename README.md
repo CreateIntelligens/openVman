@@ -1,7 +1,7 @@
 # openVman — 虛擬人系統架構總覽 (Architecture Index)
 
-> **版本**：v0.10.0
-> **最後更新**：2026-05-25
+> **版本**：v0.10.1
+> **最後更新**：2026-05-28
 > **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
 
 ---
@@ -15,7 +15,9 @@
 | 02 | [02_FRONTEND_SPEC.md](./docs/02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
 | 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
 | 04 | [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md) | 網關 (外圍)：媒體處理 · 任務佇列 · 插件 (Camera/Web) · 臨時儲存 · 計費備援 | ✅ 已完成 |
+| 05 | [avatar-embed/README.md](./docs/avatar-embed/README.md) | 外部嵌入：Web Component · postMessage 協定 · API Key 管理 · 公開錯誤碼 | ✅ 已完成 |
 | -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
+
 
 ## 對外 API Key 管理
 
@@ -33,7 +35,8 @@ python scripts/embed_keys_cli.py rotate <key_id>
 
 ## 對外接入
 
-第三方網站接入流程、Web Component 屬性、postMessage v1 事件表請見 [PUBLIC_INTEGRATION_SPEC.md](./docs/PUBLIC_INTEGRATION_SPEC.md)。公開錯誤碼請見 [PUBLIC_ERROR_CODES.md](./docs/PUBLIC_ERROR_CODES.md)。
+第三方網站接入流程、Web Component 屬性、postMessage v1 事件表與公開錯誤碼請參閱 [虛擬人外部嵌入整合指南 (docs/avatar-embed/README.md)](./docs/avatar-embed/README.md)。
+
 
 
 ### AI Coding 餵檔策略
@@ -260,6 +263,7 @@ python scripts/embed_keys_cli.py rotate <key_id>
 - ✅ **Knowledge Graph (graphify)**：內建 graphify 技能與 graph HTTP endpoints，Admin 知識庫新增 Graph 視覺化分頁
 - ✅ **Unified Admin Navigation**：以 NavigationContext 集中管理路由/分頁狀態，整合 AppSidebar、ChatSidebar 與各頁面；設計 token 改以 RGB channel 暴露，完整支援 Tailwind opacity modifier
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
+- ✅ **動態 Gemini 模型探索與容錯鏈 (Dynamic Fallback Chain)**：支援透過 Gemini SDK 自動探索所有可用生成模型並進行 Pro -> Flash -> Flash-Lite 語意化排序，具備 10 分鐘快取與靜態安全網降級機制
 - ✅ 完整的錯誤處理、斷線重連、優雅關機機制
 - ✅ Token 預算管理 + 安全防護 (Guardrails)
 

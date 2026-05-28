@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- **Dynamic Gemini Model Discovery**: Implemented a dynamic model discovery service (`model_discovery.py`) using the `google-genai` SDK to query, filter (for `generateContent` actions), and sort available models dynamically (Pro -> Flash -> Flash-Lite -> Others) with a thread-safe 10-minute TTL cache.
+- **Dynamic Fallback Chain Generation**: Overhauled fallback chain generation (`models_config.py` and `fallback_chain.py`) to lazily initialize a Gemini client and dynamically expand Gemini provider hops into the dynamically discovered model list.
+- **Fallback Graceful Degradation**: Added graceful degradation safety net that falls back to static `FALLBACK_MODELS` if dynamic API discovery fails due to network or credential errors.
+- **Dynamic Model Fallback Testing**: Added comprehensive pytest coverage for dynamic discovery, sorting logic, graceful degradation on error, and fallback chain integration (`test_llm_fallback_chain.py`).
+
 ## [0.10.0] - 2026-05-25
 
 ### Added

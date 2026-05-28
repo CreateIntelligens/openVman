@@ -1,4 +1,5 @@
-# Public Embed Integration Spec
+# openVman 虛擬人外部嵌入整合指南 (Virtual Avatar Embed Integration Guide)
+
 
 ## Overview
 
