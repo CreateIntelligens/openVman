@@ -387,3 +387,78 @@ class TestFallbackExecution:
         event_types = [e["event"] for e in events]
         assert "fallback_chain_built" in event_types
         assert "llm_route_attempt" in event_types
+
+
+class TestDynamicModelDiscoveryAndFallback:
+    def test_dynamic_fallback_chain_success(self, monkeypatch):
+        # Setup mocks
+        from core.models_config import fallback_chain
+        from google.genai.types import Model
+
+        # Mock client and its models.list()
+        mock_client = MagicMock()
+        mock_client._api_client = MagicMock()
+        mock_client._api_client.api_key = "test_key_dynamic"
+
+        # Mock model objects with supported_actions
+        m1 = Model(name="models/gemini-2.0-flash", supported_actions=["generateContent"])
+        m2 = Model(name="models/gemini-1.5-pro", supported_actions=["generateContent"])
+        m3 = Model(name="models/gemini-3.1-flash-lite-preview", supported_actions=["generateContent"])
+        m4 = Model(name="models/gemini-embedding-001", supported_actions=["embedContent"])
+        mock_client.models.list.return_value = [m1, m2, m3, m4]
+
+        # Call fallback_chain
+        chain = fallback_chain("gemini-2.5-flash", client=mock_client)
+
+        # Expected: primary model first, then sorted models: Pro -> Flash -> Flash-Lite
+        # 1.5-pro (Pro) -> 2.0-flash (Flash) -> 3.1-flash-lite-preview (Flash-Lite)
+        # Gemini-2.5-flash is primary, so it's first.
+        assert chain == [
+            "gemini-2.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash",
+            "gemini-3.1-flash-lite-preview",
+        ]
+
+    def test_fallback_chain_graceful_degradation_on_error(self, monkeypatch):
+        from core.models_config import fallback_chain, FALLBACK_MODELS
+
+        # Mock client that raises an error
+        mock_client = MagicMock()
+        mock_client.models.list.side_effect = Exception("API quota exceeded")
+
+        # Call fallback_chain
+        chain = fallback_chain("gemini-2.5-flash", client=mock_client)
+
+        # Expected: falls back to FALLBACK_MODELS
+        expected = ["gemini-2.5-flash"] + [m for m in FALLBACK_MODELS if m != "gemini-2.5-flash"]
+        assert chain == expected
+
+    def test_build_fallback_chain_with_client(self, monkeypatch):
+        # We want to test build_fallback_chain integration when client is passed
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(
+            monkeypatch,
+            chain="gemini:gemini-2.5-flash,groq:llama-3.3-70b",
+            gemini_key="gk",
+            groq_key="grk",
+        )
+
+        from google.genai.types import Model
+        mock_client = MagicMock()
+        mock_client._api_client = MagicMock()
+        mock_client._api_client.api_key = "gk"
+        m1 = Model(name="models/gemini-1.5-pro", supported_actions=["generateContent"])
+        mock_client.models.list.return_value = [m1]
+
+        hops = fc.build_fallback_chain("trace-dynamic", client=mock_client)
+
+        # Expected: gemini:gemini-2.5-flash, gemini:gemini-1.5-pro, groq:llama-3.3-70b
+        assert len(hops) == 3
+        assert hops[0].provider == "gemini"
+        assert hops[0].model == "gemini-2.5-flash"
+        assert hops[1].provider == "gemini"
+        assert hops[1].model == "gemini-1.5-pro"
+        assert hops[2].provider == "groq"
+        assert hops[2].model == "llama-3.3-70b"
+

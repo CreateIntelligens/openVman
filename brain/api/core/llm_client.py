@@ -145,7 +145,8 @@ def stream_chat_turn(
     router = get_provider_router()
     tid = trace_id or uuid.uuid4().hex[:12]
 
-    chain, legacy_routes = _resolve_chain_or_routes(tid)
+    gemini_client = _get_gemini_client()
+    chain, legacy_routes = _resolve_chain_or_routes(tid, client=gemini_client)
     chain, legacy_routes = _apply_model_override(chain, legacy_routes, model_override)
 
     create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
@@ -191,15 +192,29 @@ def stream_chat_turn(
     raise RuntimeError("unreachable")
 
 
+def _get_gemini_client() -> Any:
+    """Helper to lazily initialize the Gemini client if config supports it."""
+    try:
+        from google import genai
+        cfg = get_settings()
+        gemini_key = cfg.resolve_api_key_for_provider("gemini")
+        if gemini_key:
+            return genai.Client(api_key=gemini_key)
+    except Exception:
+        pass
+    return None
+
+
 def _resolve_chain_or_routes(
     trace_id: str,
+    client: Any | None = None,
 ) -> tuple[list[RouteHop], list[LLMRoute]]:
     """Resolve the fallback chain; fall back to legacy routes if empty.
 
     Returns (chain, legacy_routes) where exactly one list is non-empty.
     Raises RuntimeError if neither source has available routes.
     """
-    chain = build_fallback_chain(trace_id)
+    chain = build_fallback_chain(trace_id, client=client)
     if chain:
         return chain, []
 
@@ -277,7 +292,8 @@ def _create_sync_completion(
     router = get_provider_router()
     tid = trace_id or uuid.uuid4().hex[:12]
 
-    chain, legacy_routes = _resolve_chain_or_routes(tid)
+    gemini_client = _get_gemini_client()
+    chain, legacy_routes = _resolve_chain_or_routes(tid, client=gemini_client)
     chain, legacy_routes = _apply_model_override(
         chain,
         legacy_routes,
