@@ -74,6 +74,8 @@ export default function Chat() {
     asrListening,
     asrSupported,
     toggleAsr,
+    whisperStatus,
+    whisperProgress,
     vadSpeaking,
     handleActionConfirmed,
     handleActionCancelled,
@@ -378,6 +380,8 @@ export default function Chat() {
             ttsFallbackToast={ttsFallbackToast}
             asrListening={asrListening}
             asrSupported={asrSupported}
+            whisperStatus={whisperStatus}
+            whisperProgress={whisperProgress}
             vadSpeaking={vadSpeaking}
             privacyWarningsVisible={privacyWarningsVisible}
             onInputChange={handleInputChange}

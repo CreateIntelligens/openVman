@@ -21,6 +21,8 @@ function renderChatInput(overrides: Partial<ComponentProps<typeof ChatInput>> = 
     asrListening: false,
     asrSupported: true,
     vadSpeaking: false,
+    whisperStatus: "idle",
+    whisperProgress: 0,
     privacyWarningsVisible: true,
     onInputChange: vi.fn(),
     onSubmit: vi.fn(),

@@ -57,3 +57,6 @@ graphify-out/cache/
 # OS
 .DS_Store
 Thumbs.db
+
+# Whisper ASR model assets
+frontend/admin/public/models/

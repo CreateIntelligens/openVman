@@ -1,7 +1,8 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const streamChatMock = vi.fn();
+const fetchChatMock = vi.fn();
+const fetchChatHistoryMock = vi.fn();
 const prefetchTtsMock = vi.fn();
 const playTtsMock = vi.fn();
 const stopAudioMock = vi.fn();
@@ -20,11 +21,12 @@ const setSlashIndexMock = vi.fn();
 const setSlashOpenMock = vi.fn();
 const pickSlashMock = vi.fn();
 const handleInputChangeMock = vi.fn();
-const toggleAsrMock = vi.fn();
-const restartAsrMock = vi.fn();
+const transcribeMock = vi.fn();
+const ensureLoadedMock = vi.fn();
 
 vi.mock("../api", () => ({
-  streamChat: (...args: unknown[]) => streamChatMock(...args),
+  fetchChat: (...args: unknown[]) => fetchChatMock(...args),
+  fetchChatHistory: (...args: unknown[]) => fetchChatHistoryMock(...args),
   starterPrompts: [],
 }));
 
@@ -84,18 +86,19 @@ vi.mock("./useChatHistory", async () => {
   };
 });
 
-vi.mock("./useSpeechRecognition", () => ({
-  useSpeechRecognition: () => ({
-    listening: false,
-    supported: true,
-    toggle: toggleAsrMock,
-    restart: restartAsrMock,
+vi.mock("./useWhisper", () => ({
+  useWhisper: () => ({
+    status: "ready",
+    loadProgress: 1.0,
+    transcribe: transcribeMock,
+    ensureLoaded: ensureLoadedMock,
   }),
 }));
 
 vi.mock("./useVad", () => ({
   useVad: () => ({
     speaking: false,
+    supported: true,
   }),
 }));
 
@@ -127,29 +130,13 @@ describe("useChatSession TTS prefetch", () => {
   });
 
   it("prefetches the finished assistant reply after streaming completes", async () => {
-    streamChatMock.mockImplementation(
-      async (
-        _message: string,
-        _personaId: string,
-        _sessionId: string | undefined,
-        handlers: {
-          onDone?: (payload: {
-            session_id: string;
-            reply: string;
-            knowledge_results: [];
-            memory_results: [];
-          }) => void;
-        },
-      ) => {
-        await Promise.resolve();
-        handlers.onDone?.({
-          session_id: "sess-1",
-          reply: "助手最終回覆",
-          knowledge_results: [],
-          memory_results: [],
-        });
-      },
-    );
+    fetchChatMock.mockResolvedValue({
+      session_id: "sess-1",
+      reply: "助手最終回覆",
+      knowledge_results: [],
+      memory_results: [],
+      history: [],
+    });
 
     const { result } = renderHook(() => useChatSession());
 
@@ -162,29 +149,13 @@ describe("useChatSession TTS prefetch", () => {
   });
 
   it("does not prefetch when the final reply is empty", async () => {
-    streamChatMock.mockImplementation(
-      async (
-        _message: string,
-        _personaId: string,
-        _sessionId: string | undefined,
-        handlers: {
-          onDone?: (payload: {
-            session_id: string;
-            reply: string;
-            knowledge_results: [];
-            memory_results: [];
-          }) => void;
-        },
-      ) => {
-        await Promise.resolve();
-        handlers.onDone?.({
-          session_id: "sess-1",
-          reply: "",
-          knowledge_results: [],
-          memory_results: [],
-        });
-      },
-    );
+    fetchChatMock.mockResolvedValue({
+      session_id: "sess-1",
+      reply: "",
+      knowledge_results: [],
+      memory_results: [],
+      history: [],
+    });
 
     const { result } = renderHook(() => useChatSession());
 
@@ -199,12 +170,11 @@ describe("useChatSession TTS prefetch", () => {
   it("auto-clears the stopped reply notice after a short delay", async () => {
     vi.useFakeTimers();
 
-    streamChatMock.mockImplementation(
+    fetchChatMock.mockImplementation(
       (
         _message: string,
         _personaId: string,
         _sessionId: string | undefined,
-        _handlers: unknown,
         signal?: AbortSignal,
       ) => new Promise<void>((_resolve, reject) => {
         signal?.addEventListener(
@@ -238,50 +208,45 @@ describe("useChatSession TTS prefetch", () => {
   });
 
   it("stores backend pii warnings on the latest user message and keeps them after done history", async () => {
-    streamChatMock.mockImplementation(
-      async (
-        _message: string,
-        _personaId: string,
-        _sessionId: string | undefined,
-        handlers: {
-          onPiiWarning?: (payload: {
-            categories: string[];
-            counts: Record<string, number>;
-          }) => void;
-          onDone?: (payload: {
-            session_id: string;
-            reply: string;
-            knowledge_results: [];
-            memory_results: [];
-            history: Array<{ role: string; content: string }>;
-          }) => void;
-        },
-      ) => {
-        await Promise.resolve();
-        handlers.onPiiWarning?.({
-          categories: ["private_phone"],
-          counts: { private_phone: 1 },
-        });
-        handlers.onDone?.({
-          session_id: "sess-1",
-          reply: "助手最終回覆",
-          knowledge_results: [],
-          memory_results: [],
-          history: [
-            { role: "user", content: "使用者問題" },
-            { role: "assistant", content: "助手最終回覆" },
-          ],
-        });
-      },
-    );
+    vi.useFakeTimers();
+
+    fetchChatMock.mockResolvedValue({
+      session_id: "sess-1",
+      reply: "助手最終回覆",
+      knowledge_results: [],
+      memory_results: [],
+      pii_pending: true,
+      history: [
+        { role: "user", content: "使用者問題" },
+        { role: "assistant", content: "助手最終回覆" },
+      ],
+    });
+
+    fetchChatHistoryMock.mockResolvedValue({
+      session_id: "sess-1",
+      persona_id: "default",
+      history: [
+        { role: "user", content: "使用者問題", privacy_warning: { categories: ["private_phone"], counts: { private_phone: 1 } } },
+        { role: "assistant", content: "助手最終回覆" },
+      ],
+    });
 
     const { result } = renderHook(() => useChatSession());
 
-    await act(async () => {
-      await result.current.submit("使用者問題");
+    let submitPromise: Promise<void> | undefined;
+    act(() => {
+      submitPromise = result.current.submit("使用者問題");
     });
 
-    await waitFor(() => expect(result.current.messages[0].privacy_warning?.counts.private_phone).toBe(1));
+    await act(async () => {
+      await submitPromise;
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(result.current.messages[0].privacy_warning?.counts.private_phone).toBe(1);
   });
 
   it("defaults privacy warnings to visible and persists toggle changes", () => {

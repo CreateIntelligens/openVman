@@ -16,7 +16,7 @@ import {
   readPrivacyWarningsVisible,
   writePrivacyWarningsVisible,
 } from "../components/chat/privacyWarnings";
-import { useSpeechRecognition } from "./useSpeechRecognition";
+import { useWhisper } from "./useWhisper";
 import { useVad } from "./useVad";
 import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
@@ -222,37 +222,64 @@ export function useChatSession() {
     writePrivacyWarningsVisible(privacyWarningsVisible);
   }, [privacyWarningsVisible]);
 
-  // --- ASR & VAD ---
-  const asrBaseRef = useRef("");
-  const { listening: asrListening, supported: asrSupported, toggle: toggleAsr, restart: restartAsr } = useSpeechRecognition(
-    useCallback((transcript: string) => {
-      setInput(asrBaseRef.current + transcript);
-    }, []),
-  );
-  const prevAsrListening = useRef(false);
-  useEffect(() => {
-    if (asrListening && !prevAsrListening.current) {
-      asrBaseRef.current = input;
-    }
-    prevAsrListening.current = asrListening;
-  }, [asrListening, input]);
+  // --- ASR & VAD (Whisper & Silero) ---
+  const [asrListening, setAsrListening] = useState(false);
+  const { status: whisperStatus, loadProgress: whisperProgress, transcribe } = useWhisper({
+    enabled: asrListening,
+  });
 
+  const toggleAsr = useCallback(() => {
+    setAsrListening((prev) => !prev);
+  }, []);
+
+  // Handle Whisper loading/initialization errors
+  useEffect(() => {
+    if (whisperStatus === "error") {
+      setError("語音模型載入失敗");
+      setAsrListening(false);
+    }
+  }, [whisperStatus, setError]);
+
+  const pendingTranscriptionRef = useRef<Promise<string> | null>(null);
   const inputRef = useRef(input);
   inputRef.current = input;
   const submitRef = useRef<(value?: string) => Promise<void>>();
-  const restartAsrRef = useRef(restartAsr);
-  restartAsrRef.current = restartAsr;
 
-  const { speaking: vadSpeaking } = useVad({
+  const handleAudio = useCallback((audio: Float32Array) => {
+    const promise = transcribe(audio);
+    pendingTranscriptionRef.current = promise;
+
+    const clearIfCurrent = () => {
+      if (pendingTranscriptionRef.current === promise) {
+        pendingTranscriptionRef.current = null;
+        return true;
+      }
+      return false;
+    };
+
+    promise.then((text) => {
+      if (clearIfCurrent() && text) {
+        setInput((prev) => prev + text);
+      }
+    }).catch(clearIfCurrent);
+  }, [transcribe]);
+
+  const { speaking: vadSpeaking, supported: vadSupported } = useVad({
     enabled: asrListening,
-    onSpeechCommit: useCallback(() => {
+    onAudio: handleAudio,
+    onSpeechCommit: useCallback(async () => {
+      // Ensure any active transcription completes before sending
+      if (pendingTranscriptionRef.current) {
+        await pendingTranscriptionRef.current;
+      }
       const text = inputRef.current.trim();
       if (text) {
-        submitRef.current?.(text);
-        restartAsrRef.current();
+        await submitRef.current?.(text);
       }
     }, []),
   });
+
+  const asrSupported = vadSupported;
 
   // --- Coordination ---
   const conversationTitle = getConversationTitle(loadingHistory, sending);
@@ -448,6 +475,8 @@ export function useChatSession() {
     asrListening,
     asrSupported,
     toggleAsr,
+    whisperStatus,
+    whisperProgress,
     vadSpeaking,
     handleActionConfirmed,
     handleActionCancelled,
