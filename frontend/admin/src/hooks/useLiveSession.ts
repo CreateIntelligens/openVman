@@ -6,8 +6,10 @@ import type {
   ServerEvent,
   ServerStopAudioEvent,
   ServerStreamChunkEvent,
+  UserTranscriptionEvent,
 } from "@contracts/generated/typescript/protocol-contracts";
 import { DEFAULT_VOICE_SOURCE, type VoiceSource } from "./liveSessionProtocol";
+import { useVad } from "./useVad";
 import {
   closeLiveAudioContext,
   ensureLiveAudioContext,
@@ -53,6 +55,7 @@ const MAX_LIVE_MESSAGES = 200;
 const IDLE_TIMEOUT_MS = 3 * 60 * 1000;      // 3 min: no user activity while in live mode
 const DISABLED_TIMEOUT_MS = 1 * 60 * 1000;  // 1 min: mode switched away, grace period before disconnect
 const trimLiveMessages = (messages: LiveMessage[]) => messages.length > MAX_LIVE_MESSAGES ? messages.slice(-MAX_LIVE_MESSAGES) : messages;
+const appendLiveMessage = (messages: LiveMessage[], message: LiveMessage) => trimLiveMessages([...messages, message]);
 
 export function useLiveSession({
   enabled,
@@ -64,6 +67,7 @@ export function useLiveSession({
 }: LiveSessionOptions): LiveSessionResult {
   const [wsState, setWsState] = useState<LiveWsState>("disconnected");
   const [micActive, setMicActive] = useState(false);
+  const [vadEnabled, setVadEnabled] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState("");
@@ -175,6 +179,15 @@ export function useLiveSession({
       handleStreamChunk(event as ServerStreamChunkEvent);
       return;
     }
+    if (event.event === "user_transcription") {
+      const transcriptionEvent = event as UserTranscriptionEvent;
+      setLiveMessages((prev) => appendLiveMessage(prev, {
+        role: "user",
+        text: transcriptionEvent.text,
+        timestamp: transcriptionEvent.timestamp || Date.now(),
+      }));
+      return;
+    }
     if (event.event === "server_stop_audio") {
       const stopEvent = event as ServerStopAudioEvent;
       stopPlayback();
@@ -220,6 +233,7 @@ export function useLiveSession({
     setWsState("disconnected");
     setLiveMessages([]);
     seededRef.current = false;
+    setVadEnabled(false);
   }, [clearTimers, stopMicrophone, stopPlayback]);
 
   const resetIdleTimer = useCallback(() => {
@@ -321,19 +335,29 @@ export function useLiveSession({
     setError("");
   }, [ensureAudioContext, requestMicPermission, resetIdleTimer, sendClientEvent, stopMicrophone, stopPlayback]);
 
-  const toggleMicrophone = useCallback(async () => {
-    if (micActiveRef.current) {
+  useVad({
+    enabled: vadEnabled && wsState === "connected",
+    onSpeechStart: () => {
+      if (mediaRecorderRef.current) return;
+      void startMicrophone();
+    },
+    onSpeechCommit: () => {
       stopMicrophone();
-      return;
-    }
-    try {
-      await startMicrophone();
-    } catch (reason) {
-      console.error("Failed to start live microphone:", reason);
-      setError(reason instanceof Error ? reason.message : String(reason));
+    },
+  });
+
+  const toggleMicrophone = useCallback(async () => {
+    if (vadEnabled) {
+      setVadEnabled(false);
       stopMicrophone(false);
+    } else {
+      if (wsStateRef.current !== "connected") {
+        setError("Live 模式尚未連線");
+        return;
+      }
+      setVadEnabled(true);
     }
-  }, [startMicrophone, stopMicrophone]);
+  }, [vadEnabled, stopMicrophone]);
   const sendText = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return false;
@@ -350,7 +374,7 @@ export function useLiveSession({
       cancelAnimationFrame(flushRafRef.current);
       flushPendingText();
     }
-    setLiveMessages((prev) => trimLiveMessages([...prev, { role: "user", text: trimmed, timestamp: Date.now() }]));
+    setLiveMessages((prev) => appendLiveMessage(prev, { role: "user", text: trimmed, timestamp: Date.now() }));
     return true;
   }, [flushPendingText, sendClientEvent]);
 
@@ -378,7 +402,7 @@ export function useLiveSession({
 
   return {
     wsState,
-    micActive,
+    micActive: vadEnabled,
     isPlaying,
     error,
     sessionId,

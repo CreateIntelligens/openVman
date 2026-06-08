@@ -84,8 +84,14 @@ class ServerStopAudioEvent(GeneratedProtocolModel):
     timestamp: int
     reason: str | None = Field(default=None)
 
+class UserTranscriptionEvent(GeneratedProtocolModel):
+    event: Literal['user_transcription']
+    text: str
+    session_id: str = Field(min_length=1)
+    timestamp: int | None = Field(default=None)
+
 ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientAudioEndEvent | SetLipSyncModeEvent, Field(discriminator='event')]
-ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent, Field(discriminator='event')]
+ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | UserTranscriptionEvent, Field(discriminator='event')]
 ProtocolEvent = ClientEvent | ServerEvent
 
 CLIENT_EVENT_ADAPTER = TypeAdapter(ClientEvent)
@@ -111,5 +117,6 @@ __all__ = [
     "ServerStreamChunkEvent",
     "SetLipSyncModeEvent",
     "UserSpeakEvent",
+    "UserTranscriptionEvent",
     "VisemeFrame",
 ]

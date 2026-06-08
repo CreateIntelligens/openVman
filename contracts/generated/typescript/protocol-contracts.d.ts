@@ -4,9 +4,9 @@ export const PROTOCOL_NAME = "openvman-core";
 export const DEFAULT_PROTOCOL_VERSION = "1.0.0";
 
 export type ProtocolDirection = "client_to_server" | "server_to_client";
-export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "client_audio_chunk" | "client_audio_end" | "set_lip_sync_mode" | "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio";
+export type ProtocolEventName = "client_init" | "user_speak" | "client_interrupt" | "client_audio_chunk" | "client_audio_end" | "set_lip_sync_mode" | "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio" | "user_transcription";
 export type ClientEventName = "client_init" | "user_speak" | "client_interrupt" | "client_audio_chunk" | "client_audio_end" | "set_lip_sync_mode";
-export type ServerEventName = "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio";
+export type ServerEventName = "server_stream_chunk" | "server_error" | "server_init_ack" | "server_stop_audio" | "user_transcription";
 
 export interface ContractEventEntry {
   direction: ProtocolDirection;
@@ -101,6 +101,13 @@ export interface ServerStopAudioEvent {
   reason?: string;
 }
 
+export interface UserTranscriptionEvent {
+  event: "user_transcription";
+  text: string;
+  session_id: string;
+  timestamp?: number;
+}
+
 export type ClientEvent = ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientAudioEndEvent | SetLipSyncModeEvent;
-export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent;
+export type ServerEvent = ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | UserTranscriptionEvent;
 export type ProtocolEvent = ClientEvent | ServerEvent;

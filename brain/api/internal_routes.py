@@ -66,6 +66,7 @@ def _build_live_session(
         client_id=client_id,
         persona_id=persona_id,
         project_id=project_id,
+        session_id=session_id,
         system_instruction=_build_live_system_instruction(persona_id, project_id, session_id=session_id),
         event_sink=event_sink,
     )
@@ -213,6 +214,7 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
         "args": {"client_id": relay_session_id, "persona_id": "default", "project_id": "default"},
         "session_id": relay_session_id,
         "assistant_text_buf": [],
+        "user_text_buf": [],
         "client_disconnected": False,
     }
 
@@ -224,6 +226,9 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
                 state["assistant_text_buf"].append(text)
             if event.get("is_final"):
                 _flush_assistant_turn(state)
+        elif event.get("event") == "user_transcription":
+            if text := str(event.get("text") or "").strip():
+                state["user_text_buf"].append(text)
         try:
             await websocket.send_json(event)
         except (WebSocketDisconnect, RuntimeError):
@@ -262,6 +267,7 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
     live = state["live_session"]
 
     if event == "user_speak" and (text := str(payload.get("text", "")).strip()):
+        state["user_text_buf"].append(text)
         _save_user_message(state, text)
         await live.send_text_turn(text)
     elif event == "client_interrupt":
@@ -297,16 +303,39 @@ def _save_user_message(state: dict[str, Any], text: str) -> None:
     append_session_message(state["session_id"], args["persona_id"], "user", text, project_id=args["project_id"])
 
 
-def _flush_assistant_turn(state: dict[str, Any]) -> None:
-    buf = state["assistant_text_buf"]
-    if not buf:
+def _consume_text_buffer(state: dict[str, Any], key: str) -> str:
+    text = "".join(state.get(key, [])).strip()
+    state[key] = []
+    return text
+
+
+def _archive_live_turn(state: dict[str, Any], user_text: str, assistant_text: str) -> None:
+    if not user_text:
         return
-    full_text = "".join(buf).strip()
-    state["assistant_text_buf"] = []
+
+    args = state["args"]
+    try:
+        from memory.memory import archive_session_turn
+
+        archive_session_turn(
+            session_id=state["session_id"],
+            user_message=user_text,
+            assistant_message=assistant_text,
+            persona_id=args["persona_id"],
+            project_id=args["project_id"],
+        )
+    except Exception as exc:
+        logger.error("Failed to archive session turn in live mode: %s", exc)
+
+
+def _flush_assistant_turn(state: dict[str, Any]) -> None:
+    full_text = _consume_text_buffer(state, "assistant_text_buf")
     if not full_text:
         return
+
     args = state["args"]
     append_session_message(state["session_id"], args["persona_id"], "assistant", full_text, project_id=args["project_id"])
+    _archive_live_turn(state, _consume_text_buffer(state, "user_text_buf"), full_text)
 
 
 # ---------------------------------------------------------------------------

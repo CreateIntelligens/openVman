@@ -42,6 +42,10 @@
     "server_stop_audio": {
       "direction": "server_to_client",
       "schema": "server_stop_audio.schema.json"
+    },
+    "user_transcription": {
+      "direction": "server_to_client",
+      "schema": "user_transcription.schema.json"
     }
   }
 }

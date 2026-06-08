@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openvman://protocol/v1/user_transcription",
+  "title": "User Transcription Event",
+  "type": "object",
+  "additionalProperties": false,
+  "x-direction": "server_to_client",
+  "x-contract-version": "1.0.0",
+  "properties": {
+    "event": {
+      "const": "user_transcription"
+    },
+    "text": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "event",
+    "text",
+    "session_id"
+  ]
+}

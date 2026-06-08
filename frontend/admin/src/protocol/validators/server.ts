@@ -4,6 +4,7 @@ import type {
   ServerStopAudioEvent,
   ServerStreamChunkEvent,
   SetLipSyncModeEvent,
+  UserTranscriptionEvent,
   VisemeFrame,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
@@ -16,6 +17,7 @@ import {
   serverStopAudioSchema,
   serverStreamChunkSchema,
   setLipSyncModeSchema,
+  userTranscriptionSchema,
 } from "./schema";
 import {
   assertShape,
@@ -119,6 +121,17 @@ export function validateServerInitAck(record: Record<string, unknown>, version: 
     status,
     message: expectOptionalNonEmptyString(record.message, version, "message", eventName),
     timestamp: expectNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
+  };
+}
+
+export function validateUserTranscription(record: Record<string, unknown>, version: string): UserTranscriptionEvent {
+  const eventName = "user_transcription";
+  assertShape(record, userTranscriptionSchema, version, eventName);
+  return {
+    event: eventName,
+    text: expectString(record.text, version, "text", eventName),
+    session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
+    timestamp: expectOptionalNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
   };
 }
 

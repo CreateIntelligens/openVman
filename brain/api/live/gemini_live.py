@@ -102,6 +102,7 @@ class GeminiLiveSession:
         client_id: str,
         persona_id: str = "default",
         project_id: str = "default",
+        session_id: str = "",
         system_instruction: str = "",
         config: BrainSettings | None = None,
         transport_factory: Any | None = None,
@@ -111,6 +112,7 @@ class GeminiLiveSession:
         self.client_id = client_id
         self.persona_id = persona_id
         self.project_id = project_id
+        self.session_id = session_id or relay_session_id
         self._system_instruction = system_instruction
         self.config = config or get_settings()
         self._transport_factory = transport_factory or (lambda cfg: GeminiLiveWebSocketTransport(cfg))
@@ -230,6 +232,11 @@ class GeminiLiveSession:
                         continue
                     break
 
+                input_transcription = message.get("inputTranscription")
+                if isinstance(input_transcription, dict):
+                    await self._handle_input_transcription(input_transcription)
+                    continue
+
                 tool_call = message.get("toolCall")
                 if isinstance(tool_call, dict):
                     await self._handle_tool_call(tool_call)
@@ -275,6 +282,40 @@ class GeminiLiveSession:
             if transport is not None and self._transport is transport:
                 self._transport = None
                 await transport.close()
+
+    async def _handle_input_transcription(self, input_transcription: dict[str, Any]) -> None:
+        text = str(input_transcription.get("text", "")).strip()
+        if not text:
+            return
+
+        logger.info("Gemini Live user transcription (session %s): %s", self.session_id, text)
+        await self._save_input_transcription(text)
+        await self._emit_user_transcription(text)
+
+    async def _save_input_transcription(self, text: str) -> None:
+        try:
+            from memory.memory import append_session_message
+
+            await asyncio.to_thread(
+                append_session_message,
+                self.session_id,
+                self.persona_id,
+                "user",
+                text,
+                project_id=self.project_id,
+            )
+        except Exception as exc:
+            logger.error("Failed to save user speech in Gemini Live: %s", exc)
+
+    async def _emit_user_transcription(self, text: str) -> None:
+        await self._emit(
+            {
+                "event": "user_transcription",
+                "text": text,
+                "session_id": self.relay_session_id,
+                "timestamp": int(time.time() * 1000),
+            }
+        )
 
     async def _handle_tool_call(self, tool_call: dict[str, Any]) -> None:
         function_calls = tool_call.get("functionCalls") or []
@@ -500,6 +541,7 @@ class GeminiLiveSession:
             }
         if self.config.live_gemini_output_audio_transcription:
             setup["outputAudioTranscription"] = {}
+        setup["inputAudioTranscription"] = {}
         if self.config.live_gemini_tools_enabled:
             setup["tools"] = [{"functionDeclarations": build_gemini_tool_declarations()}]
 
