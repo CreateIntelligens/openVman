@@ -73,7 +73,7 @@ class TTSRouterConfig(BaseSettings):
         validation_alias="TTS_EDGE_MAX_TEXT_LENGTH",
     )
     markitdown_max_upload_bytes: int = Field(
-        default=10 * 1024 * 1024,
+        default=100 * 1024 * 1024,
         validation_alias="MARKITDOWN_MAX_UPLOAD_BYTES",
     )
     docling_serve_url: str = Field(default="", validation_alias="DOCLING_SERVE_URL")
@@ -113,6 +113,10 @@ class TTSRouterConfig(BaseSettings):
     gateway_temp_ttl_min: int = 30
     gateway_temp_dir_max_mb: int = 2048
     gateway_max_file_size_mb: int = 100
+    gateway_convert_to_traditional: bool = Field(
+        default=True,
+        validation_alias="GATEWAY_CONVERT_TO_TRADITIONAL",
+    )
 
     # --- Gateway: Media Processing ---
     media_processing_timeout_ms: int = 5000

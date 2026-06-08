@@ -272,6 +272,8 @@ class IngestionResult:
 
 
 def _to_ingestion_result(content: str, *, page_count: int | None = None) -> IngestionResult:
+    from app.utils.chinese import convert_to_traditional
+    content = convert_to_traditional(content)
     return IngestionResult(
         content_type="document_content",
         content=content,

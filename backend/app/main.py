@@ -408,7 +408,9 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
         )
         logger.info("Converting file: %s (%d bytes)", file.filename, total_bytes)
         result = _get_md_converter().convert(tmp_path)
-        return JSONResponse(content={"markdown": result.text_content, "page_count": None})
+        from app.utils.chinese import convert_to_traditional
+        markdown = convert_to_traditional(result.text_content or "")
+        return JSONResponse(content={"markdown": markdown, "page_count": None})
     except UploadTooLargeError as exc:
         limit_mb = exc.limit_bytes / (1024 * 1024)
         return upload_failed_response(
