@@ -1,8 +1,22 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const { transformSync } = require("esbuild");
 
-const { fetchHealth, fetchProjects } = require("./api");
+require.extensions[".ts"] = (module, filename) => {
+  const source = fs.readFileSync(filename, "utf8");
+  const { code } = transformSync(source, {
+    format: "cjs",
+    loader: "ts",
+    sourcemap: "inline",
+    target: "es2020",
+  });
+  module._compile(code, filename);
+};
 
-async function testFetchHealthPrefersFriendlyMessage() {
+const { fetchHealth } = require("./api/metrics.ts");
+const { fetchProjects } = require("./api/projects.ts");
+
+async function testFetchHealthIncludesBackendErrorDetail() {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
     new Response(
@@ -20,7 +34,7 @@ async function testFetchHealthPrefersFriendlyMessage() {
   try {
     await assert.rejects(
       () => fetchHealth(),
-      (error) => error instanceof Error && error.message === "檔案上傳失敗",
+      (error) => error instanceof Error && error.message === "檔案上傳失敗：storage_quota_exceeded",
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -47,7 +61,7 @@ async function testFetchProjectsUsesApiBase() {
 }
 
 async function main() {
-  await testFetchHealthPrefersFriendlyMessage();
+  await testFetchHealthIncludesBackendErrorDetail();
   await testFetchProjectsUsesApiBase();
 }
 
