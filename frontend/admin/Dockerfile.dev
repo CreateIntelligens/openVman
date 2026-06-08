@@ -1,0 +1,31 @@
+# ─────────────────────────────────────────────────────────────
+# Development image for the admin frontend (hot-reload).
+#   - nginx (edge proxy) runs as root to bind :80 and proxy /admin/
+#     to the Vite dev server on :5173
+#   - the Vite dev server is dropped to the unprivileged "node" user
+#     (see supervisord.conf: user=node) so any files it writes to the
+#     bind-mounted /app — including dist/ — are owned by uid 1000,
+#     never root.
+# Source is bind-mounted in via docker-compose; this image only
+# provides the toolchain + process supervisor.
+# For production, see Dockerfile (multi-stage builder → runner).
+# ─────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+ENV TZ=Asia/Taipei
+RUN apk add --no-cache tzdata nginx supervisor
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml ./
+# Ensure the node_modules volume is owned by the unprivileged user so the
+# Vite dev server (user=node) can install/build without root.
+RUN corepack enable \
+    && pnpm install --frozen-lockfile \
+    && chown -R node:node /app
+
+COPY nginx/ /etc/nginx/http.d/
+COPY supervisord.conf /etc/supervisord.conf
+
+EXPOSE 80 5173
+
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]
