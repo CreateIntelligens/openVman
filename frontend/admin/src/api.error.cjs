@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 
-const { fetchHealth, fetchProjects } = require("./api.ts");
+const { fetchHealth, fetchProjects } = require("./api");
 
 async function testFetchHealthPrefersFriendlyMessage() {
   const originalFetch = globalThis.fetch;
