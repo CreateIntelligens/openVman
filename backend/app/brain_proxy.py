@@ -49,6 +49,7 @@ _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Create Persona"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas", "methods": ["DELETE"], "tags": _TAG_PERSONAS, "summary": "Delete Persona"},
     {"path": f"{_PUBLIC_API_PREFIX}/personas/clone", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Clone Persona"},
+    {"path": f"{_PUBLIC_API_PREFIX}/personas/avatar", "methods": ["POST"], "tags": _TAG_PERSONAS, "summary": "Bind Persona Avatar"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat", "methods": ["POST"], "tags": _TAG_CHAT, "summary": "Chat"},
     {"path": f"{_PUBLIC_API_PREFIX}/chat/history", "methods": ["GET"], "tags": _TAG_CHAT, "summary": "Chat History"},
     {"path": f"{_PUBLIC_API_PREFIX}/embed", "methods": ["POST"], "tags": _TAG_SEARCH, "summary": "Embed Text"},

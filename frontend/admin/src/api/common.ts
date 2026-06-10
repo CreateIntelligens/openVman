@@ -10,6 +10,7 @@ export const PERSONAS_PATH = "/personas";
 export const KNOWLEDGE_PATH = "/knowledge";
 export const MEMORIES_PATH = "/memories";
 export const SESSIONS_PATH = "/sessions";
+export const AVATAR_PATH = "/avatar";
 
 // ---------------------------------------------------------------------------
 // Active Project

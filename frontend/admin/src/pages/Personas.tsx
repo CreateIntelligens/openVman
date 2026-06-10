@@ -7,6 +7,9 @@ import {
        fetchKnowledgeDocument,
        PersonaSummary,
        saveKnowledgeDocument,
+       fetchAvatarCharacters,
+       setPersonaAvatar,
+       AvatarCharacter,
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
 import ConfirmModal from "../components/ConfirmModal";
@@ -27,6 +30,7 @@ export default function Personas() {
        const [templateSourceId, setTemplateSourceId] = useState("");
 
        const [selectedPersona, setSelectedPersona] = useState<PersonaSummary | null>(null);
+       const [avatarChars, setAvatarChars] = useState<AvatarCharacter[]>([]);
 
        // Document Editor State
        const [selectedPath, setSelectedPath] = useState("");
@@ -179,6 +183,25 @@ export default function Personas() {
               // eslint-disable-next-line react-hooks/exhaustive-deps
        }, [projectId]);
 
+       useEffect(() => {
+              fetchAvatarCharacters()
+                     .then((r) => setAvatarChars(r.characters))
+                     .catch(() => setAvatarChars([]));
+       }, []);
+
+       const onBindAvatar = async (personaId: string, charId: string) => {
+              try {
+                     await setPersonaAvatar(personaId, charId || null);
+                     setStatus({ type: "success", message: "已更新虛擬人綁定" });
+                     await loadPersonas(personaId);
+              } catch (error) {
+                     setStatus({
+                            type: "error",
+                            message: getErrorMessage(error),
+                     });
+              }
+       };
+
        // Default persona uses workspace-root paths; others use personas/<id>/
        const docPrefix = selectedPersona?.is_default ? "" : `personas/${selectedPersona?.persona_id}/`;
        const coreDocs = selectedPersona
@@ -252,21 +275,28 @@ export default function Personas() {
                             )}
 
                             {selectedPersona ? (
-                                   <PersonaEditor
-                                          title={selectedPersona.label || selectedPersona.persona_id}
-                                          selectedPath={selectedPath}
-                                          draftContent={draftContent}
-                                          coreDocs={coreDocs}
-                                          editorMode={editorMode}
-                                          loadingDocument={loadingDocument}
-                                          saving={saving}
-                                          hasUnsavedChanges={hasUnsavedChanges}
-                                          onEditorModeChange={setEditorMode}
-                                          onOpenDocument={openDocument}
-                                          onDraftContentChange={setDraftContent}
-                                          onDiscard={() => setDraftContent(loadedContent)}
-                                          onSave={saveDocument}
-                                   />
+                                   <>
+                                          <PersonaAvatarSelector
+                                                 characters={avatarChars}
+                                                 persona={selectedPersona}
+                                                 onBind={onBindAvatar}
+                                          />
+                                          <PersonaEditor
+                                                 title={selectedPersona.label || selectedPersona.persona_id}
+                                                 selectedPath={selectedPath}
+                                                 draftContent={draftContent}
+                                                 coreDocs={coreDocs}
+                                                 editorMode={editorMode}
+                                                 loadingDocument={loadingDocument}
+                                                 saving={saving}
+                                                 hasUnsavedChanges={hasUnsavedChanges}
+                                                 onEditorModeChange={setEditorMode}
+                                                 onOpenDocument={openDocument}
+                                                 onDraftContentChange={setDraftContent}
+                                                 onDiscard={() => setDraftContent(loadedContent)}
+                                                 onSave={saveDocument}
+                                          />
+                                   </>
                             ) : <PersonaEmptyState />}
                      </main>
 
@@ -279,6 +309,38 @@ export default function Personas() {
                             onConfirm={confirmDeletePersona}
                             onCancel={() => setDeletePersonaTarget(null)}
                      />
+              </div>
+       );
+}
+
+function getErrorMessage(error: unknown): string {
+       return error instanceof Error ? error.message : String(error);
+}
+
+function PersonaAvatarSelector({
+       characters,
+       persona,
+       onBind,
+}: {
+       characters: AvatarCharacter[];
+       persona: PersonaSummary;
+       onBind: (personaId: string, charId: string) => void;
+}) {
+       return (
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800/60">
+                     <span className="text-sm text-slate-600 dark:text-slate-400">虛擬人角色：</span>
+                     <select
+                            className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
+                            value={persona.avatar_char_id ?? ""}
+                            onChange={(event) => onBind(persona.persona_id, event.target.value)}
+                     >
+                            <option value="">（未綁定）</option>
+                            {characters.map((character) => (
+                                   <option key={character.char_id} value={character.char_id}>
+                                          {character.char_id} — {character.label}
+                                   </option>
+                            ))}
+                     </select>
               </div>
        );
 }

@@ -7,12 +7,14 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from time import monotonic
 
 import httpx
 from fastapi import FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
@@ -32,6 +34,7 @@ from app.gateway.forward import _http as _forward_http
 from app.internal_routes import _http as _internal_http
 from app.internal_routes import router as internal_router
 from app.routes import admin as admin_routes
+from app.routes import avatar as avatar_routes
 from app.error_payloads import upload_failed_response
 from app.tts_text_cleaner import clean_for_tts
 from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
@@ -197,12 +200,32 @@ async def http_metrics_middleware(request: Request, call_next):
     return response
 
 
+def _mount_avatar_assets(app_instance: FastAPI) -> None:
+    avatar_assets_dir = Path(get_tts_config().avatar_assets_dir)
+    try:
+        avatar_assets_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        # The configured dir may not be writable at import time outside the
+        # container (local dev / CI). Don't crash import; StaticFiles below is
+        # mounted with check_dir=False so it tolerates a missing directory and
+        # the dir is created at runtime where the volume is writable.
+        logger.warning("avatar assets dir not preparable at import: %s", exc)
+
+    app_instance.mount(
+        "/assets",
+        StaticFiles(directory=str(avatar_assets_dir), check_dir=False),
+        name="avatar-assets",
+    )
+
+
 app.include_router(gateway_router)
 app.include_router(internal_router)
 app.include_router(embed_router)
 app.include_router(admin_routes.router)
+app.include_router(avatar_routes.router)
 app.include_router(brain_proxy_router)
 app.include_router(websocket_routes.router)
+_mount_avatar_assets(app)
 
 
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:

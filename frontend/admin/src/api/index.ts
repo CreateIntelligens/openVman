@@ -9,3 +9,4 @@ export * from "./tts";
 export * from "./sessions";
 export * from "./metrics";
 export * from "./embedKeys";
+export * from "./avatar";

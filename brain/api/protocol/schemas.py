@@ -37,6 +37,12 @@ class PersonaCloneRequest(BaseModel):
     project_id: str = Field("default", description="Project ID")
 
 
+class PersonaAvatarRequest(BaseModel):
+    persona_id: str = Field(..., description="Persona to bind")
+    avatar_char_id: str | None = Field(None, description="Avatar char_id, or null to clear")
+    project_id: str = Field("default", description="Project this persona belongs to")
+
+
 class ProtocolValidateRequest(BaseModel):
     direction: str = Field(..., pattern="^(client_to_server|server_to_client)$")
     payload: dict[str, Any]

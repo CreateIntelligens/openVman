@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 from pathlib import Path
 from typing import Any
 
 from knowledge import workspace
+
+AVATAR_META_FILENAME = "AVATAR.json"
 
 PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
     "soul": "SOUL.md",
@@ -189,7 +192,42 @@ def _build_persona_summary(
         "path": soul_path.relative_to(ws).as_posix(),
         "preview": _read_preview(soul_path),
         "is_default": is_default,
+        "avatar_char_id": _read_avatar_char_id(persona_id, project_id, is_default=is_default),
     }
+
+
+def _read_avatar_char_id(persona_id: str, project_id: str, *, is_default: bool) -> str | None:
+    meta_path = _avatar_meta_path(persona_id, project_id, is_default=is_default)
+    if not meta_path.exists():
+        return None
+    try:
+        data = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    value = data.get("avatar_char_id")
+    return value if isinstance(value, str) and value else None
+
+
+def set_persona_avatar(persona_id: str, char_id: str | None, project_id: str = "default") -> dict[str, Any]:
+    normalized = normalize_persona_id(persona_id)
+    if normalized == "default":
+        ws = workspace.get_workspace_root(project_id)
+        ws.mkdir(parents=True, exist_ok=True)
+    else:
+        persona_dir = get_persona_directory(normalized, project_id)
+        if not (persona_dir / "SOUL.md").exists():
+            raise ValueError("persona 不存在")
+
+    meta_path = _avatar_meta_path(normalized, project_id, is_default=normalized == "default")
+    cleaned = char_id.strip() if (char_id and char_id.strip()) else None
+    meta_path.write_text(json.dumps({"avatar_char_id": cleaned}, ensure_ascii=False), encoding="utf-8")
+    return {"status": "ok", "persona_id": normalized, "avatar_char_id": cleaned}
+
+
+def _avatar_meta_path(persona_id: str, project_id: str, *, is_default: bool) -> Path:
+    if is_default:
+        return workspace.get_workspace_root(project_id) / AVATAR_META_FILENAME
+    return get_persona_directory(persona_id, project_id) / AVATAR_META_FILENAME
 
 
 def _build_persona_files(label: str) -> dict[str, str]:

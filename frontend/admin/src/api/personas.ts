@@ -6,6 +6,7 @@ export interface PersonaSummary {
   path: string;
   preview: string;
   is_default: boolean;
+  avatar_char_id?: string | null;
 }
 
 export interface PersonasResponse {
@@ -49,4 +50,15 @@ export function clonePersona(sourcePersonaId: string, targetPersonaId: string) {
     target_persona_id: targetPersonaId,
     project_id: getActiveProjectId(),
   });
+}
+
+export function setPersonaAvatar(personaId: string, avatarCharId: string | null) {
+  return post<{ status: string; persona_id: string; avatar_char_id: string | null }>(
+    personaPath("/avatar"),
+    {
+      persona_id: personaId,
+      avatar_char_id: avatarCharId,
+      project_id: getActiveProjectId(),
+    },
+  );
 }

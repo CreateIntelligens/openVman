@@ -76,6 +76,14 @@ class TTSRouterConfig(BaseSettings):
         default=100 * 1024 * 1024,
         validation_alias="MARKITDOWN_MAX_UPLOAD_BYTES",
     )
+    avatar_assets_dir: str = Field(
+        default="/data/avatar",
+        validation_alias="AVATAR_ASSETS_DIR",
+    )
+    avatar_max_upload_bytes: int = Field(
+        default=100 * 1024 * 1024,
+        validation_alias="AVATAR_MAX_UPLOAD_BYTES",
+    )
     docling_serve_url: str = Field(default="", validation_alias="DOCLING_SERVE_URL")
     docling_timeout_ms: int = Field(default=5000, validation_alias="DOCLING_TIMEOUT_MS")
     docling_api_key: str = Field(default="", validation_alias="DOCLING_API_KEY")
