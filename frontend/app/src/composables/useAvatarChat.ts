@@ -1,14 +1,14 @@
 /**
  * useAvatarChat — Vue 3 composable for WebSocket communication
  * with the openVman backend gateway, with an optional text-mode fallback
- * that uses HTTP POST /api/brain/chat for multi-provider LLM access.
+ * that uses HTTP POST /api/chat for multi-provider LLM access.
  *
  * Protocol (live mode):
  *   client_init → server_init_ack
  *   user_speak  → server_stream_chunk (audio) → server_stop_audio
  *   client_interrupt
  *
- * Text mode: uses /api/brain/chat (standard chat completions, any provider)
+ * Text mode: uses /api/chat (standard chat completions, any provider)
  */
 import { ref, readonly, onUnmounted } from 'vue'
 
@@ -41,7 +41,7 @@ interface ChatOptions {
        onGatewayStatus?: (plugin: string, status: string, message: string) => void
        /** Called whenever the WebSocket disconnects (before reconnect scheduling) */
        onDisconnect?: () => void
-       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/brain/chat */
+       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/chat */
        mode?: 'live' | 'text'
        /** Override text-mode chat endpoint. */
        chatEndpoint?: string
@@ -72,6 +72,7 @@ function createClientId(): string {
 }
 
 const MAX_RECONNECT_ATTEMPTS = 6
+export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/chat'
 
 export function useAvatarChat(options: ChatOptions = {}) {
        const state = ref<AvatarState>('DISCONNECTED')
@@ -274,7 +275,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                state.value = 'THINKING'
 
                try {
-                      const res = await fetch(options.chatEndpoint ?? '/api/brain/chat', {
+                      const res = await fetch(options.chatEndpoint ?? DEFAULT_TEXT_CHAT_ENDPOINT, {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
                              body: JSON.stringify({

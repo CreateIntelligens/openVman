@@ -4,17 +4,20 @@
  * Two paths based on provider:
  *   - provider === 'indextts': POST /tts/stream (IndexTTS streaming, low latency)
  *     Response: audio/wav — 44-byte header + raw PCM 16 kHz mono Int16 LE, chunked
- *   - all others (auto, edge, gcp, aws…): POST /v1/audio/speech (full WAV, multi-provider)
- *     Response: audio/wav — full file, same PCM format after header strip
+ *   - all others (auto, edge, gcp, aws…): POST /v1/audio/speech (full file, multi-provider)
+ *     Response: provider-native audio. Encoded formats are decoded to 16 kHz mono PCM.
  */
 
 const STREAM_ENDPOINT = "/tts/stream";
 const SPEECH_ENDPOINT = "/v1/audio/speech";
 const DEFAULT_CHARACTER = "hayley";
 const WAV_HEADER_BYTES = 44;
+const PCM_SAMPLE_RATE = 16000;
+const PCM_CHUNK_SAMPLES = 4096;
 
 type SpeakOptions = { character?: string; provider?: string; voice?: string };
 type TtsBodyBuilder = (text: string, opts: SpeakOptions) => Record<string, string>;
+type ByteArray = Uint8Array<ArrayBufferLike>;
 
 export interface TtsProvider {
   id: string;
@@ -95,85 +98,33 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     const provider = opts.provider ?? '';
 
     try {
-      let response: Response;
-
-      if (shouldUseStream(provider)) {
-        // Streaming path: IndexTTS
-        response = await fetch(streamEndpoint, {
+      const useStream = shouldUseStream(provider);
+      const response = await fetch(
+        useStream ? streamEndpoint : speechEndpoint,
+        {
           method: "POST",
           headers: requestHeaders(),
-          body: JSON.stringify(buildStreamBody(trimmed, opts)),
+          body: JSON.stringify(
+            useStream
+              ? buildStreamBody(trimmed, opts)
+              : buildSpeechBody(trimmed, opts, provider),
+          ),
           signal: abort.signal,
-        });
-      } else {
-        // Non-streaming path: /v1/audio/speech (all providers via provider router)
-        response = await fetch(speechEndpoint, {
-          method: "POST",
-          headers: requestHeaders(),
-          body: JSON.stringify(buildSpeechBody(trimmed, opts, provider)),
-          signal: abort.signal,
-        });
-      }
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`TTS request failed: ${response.status} ${response.statusText}`);
       }
-      if (!response.body) {
-        throw new Error("TTS response has no body");
-      }
 
-      const reader = response.body.getReader();
-      activeReader = reader;
+      const emitPcmChunk = createPcmEmitter(options);
 
-      let bytesSeen = 0;
-      let firstAudioNotified = false;
-      let leftover = new Uint8Array(0);
-
-      while (true) {
-        if (abort.signal.aborted) break;
-
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value || value.length === 0) continue;
-
-        let chunk: Uint8Array;
-        if (leftover.length === 0) {
-          chunk = value;
-        } else {
-          chunk = new Uint8Array(leftover.length + value.length);
-          chunk.set(leftover, 0);
-          chunk.set(value, leftover.length);
-          leftover = new Uint8Array(0);
-        }
-
-        if (bytesSeen < WAV_HEADER_BYTES) {
-          const remainingHeader = WAV_HEADER_BYTES - bytesSeen;
-          if (chunk.length <= remainingHeader) {
-            bytesSeen += chunk.length;
-            continue;
-          }
-          chunk = chunk.subarray(remainingHeader);
-          bytesSeen += remainingHeader;
-        }
-
-        bytesSeen += chunk.length;
-
-        let usable = chunk;
-        if (usable.length % 2 !== 0) {
-          leftover = usable.slice(usable.length - 1);
-          usable = usable.subarray(0, usable.length - 1);
-        }
-        if (usable.length === 0) continue;
-
-        const aligned = new Uint8Array(usable.length);
-        aligned.set(usable);
-        const pcm = new Int16Array(aligned.buffer);
-
-        if (!firstAudioNotified) {
-          firstAudioNotified = true;
-          options.onFirstAudio?.();
-        }
-        await options.onPcmChunk(pcm);
+      if (useStream) {
+        await streamPcmResponse(response, abort.signal, emitPcmChunk, (reader) => {
+          activeReader = reader;
+        });
+      } else {
+        await emitSpeechResponseChunks(response, abort.signal, emitPcmChunk);
       }
 
       if (!abort.signal.aborted) {
@@ -203,4 +154,248 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
   }
 
   return { speak, cancel };
+}
+
+function createPcmEmitter(options: TtsStreamerOptions): (pcm: Int16Array) => Promise<void> {
+  let firstAudioNotified = false;
+
+  return async (pcm: Int16Array): Promise<void> => {
+    if (pcm.length === 0) return;
+    if (!firstAudioNotified) {
+      firstAudioNotified = true;
+      options.onFirstAudio?.();
+    }
+    await options.onPcmChunk(pcm);
+  };
+}
+
+async function streamPcmResponse(
+  response: Response,
+  signal: AbortSignal,
+  emitPcmChunk: (pcm: Int16Array) => Promise<void>,
+  setActiveReader: (reader: ReadableStreamDefaultReader<Uint8Array>) => void,
+): Promise<void> {
+  if (!response.body) {
+    throw new Error("TTS response has no body");
+  }
+
+  const reader = response.body.getReader();
+  setActiveReader(reader);
+
+  let headerBytesSeen = 0;
+  let leftover: ByteArray = new Uint8Array(0);
+
+  while (!signal.aborted) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value || value.length === 0) continue;
+
+    const withLeftover = concatBytes(leftover, value);
+    leftover = new Uint8Array(0);
+
+    const stripped = stripInitialWavHeader(withLeftover, headerBytesSeen);
+    headerBytesSeen = stripped.headerBytesSeen;
+
+    const chunk = stripped.bytes;
+    if (chunk.length === 0) continue;
+
+    const aligned = evenLengthBytes(chunk);
+    leftover = aligned.leftover;
+    if (aligned.usable.length === 0) continue;
+
+    await emitPcmChunk(int16ArrayFromBytes(aligned.usable));
+  }
+}
+
+async function emitSpeechResponseChunks(
+  response: Response,
+  signal: AbortSignal,
+  emitPcmChunk: (pcm: Int16Array) => Promise<void>,
+): Promise<void> {
+  const contentType = response.headers.get("Content-Type") ?? "";
+  const audioBytes = await response.arrayBuffer();
+  if (signal.aborted) return;
+
+  const pcmChunks = audioResponseNeedsDecode(contentType)
+    ? await decodeEncodedAudioBytes(audioBytes)
+    : pcmChunksFromAudioBytes(new Uint8Array(audioBytes), contentType);
+
+  for (const pcm of pcmChunks) {
+    if (signal.aborted) break;
+    await emitPcmChunk(pcm);
+  }
+}
+
+function concatBytes(leftover: ByteArray, value: ByteArray): ByteArray {
+  if (leftover.length === 0) return value;
+
+  const merged = new Uint8Array(leftover.length + value.length);
+  merged.set(leftover, 0);
+  merged.set(value, leftover.length);
+  return merged;
+}
+
+function stripInitialWavHeader(
+  bytes: ByteArray,
+  headerBytesSeen: number,
+): { bytes: ByteArray; headerBytesSeen: number } {
+  if (headerBytesSeen >= WAV_HEADER_BYTES) {
+    return { bytes, headerBytesSeen };
+  }
+
+  const remainingHeaderBytes = WAV_HEADER_BYTES - headerBytesSeen;
+  const consumed = Math.min(bytes.length, remainingHeaderBytes);
+  const nextHeaderBytesSeen = headerBytesSeen + consumed;
+
+  if (bytes.length <= remainingHeaderBytes) {
+    return { bytes: new Uint8Array(0), headerBytesSeen: nextHeaderBytesSeen };
+  }
+  return { bytes: bytes.subarray(remainingHeaderBytes), headerBytesSeen: nextHeaderBytesSeen };
+}
+
+function evenLengthBytes(bytes: ByteArray): { usable: ByteArray; leftover: ByteArray } {
+  if (bytes.length % 2 === 0) {
+    return { usable: bytes, leftover: new Uint8Array(0) };
+  }
+
+  return {
+    usable: bytes.subarray(0, bytes.length - 1),
+    leftover: bytes.slice(bytes.length - 1),
+  };
+}
+
+function int16ArrayFromBytes(bytes: ByteArray): Int16Array {
+  const aligned = new Uint8Array(bytes.length);
+  aligned.set(bytes);
+  return new Int16Array(aligned.buffer);
+}
+
+export function audioResponseNeedsDecode(contentType: string): boolean {
+  const type = normalizeContentType(contentType);
+  if (!type.startsWith("audio/")) return false;
+  return !isWavContentType(type) && !isRawPcmContentType(type);
+}
+
+export function pcmChunksFromAudioBytes(bytes: Uint8Array, contentType: string): Int16Array[] {
+  const type = normalizeContentType(contentType);
+  let pcmBytes = bytes;
+
+  if (isWavContentType(type) || looksLikeWav(bytes)) {
+    pcmBytes = bytes.subarray(wavDataOffset(bytes));
+  }
+
+  if (pcmBytes.length % 2 !== 0) {
+    pcmBytes = pcmBytes.subarray(0, pcmBytes.length - 1);
+  }
+  if (pcmBytes.length === 0) return [];
+
+  const aligned = new Uint8Array(pcmBytes.length);
+  aligned.set(pcmBytes);
+  return splitPcmChunks(new Int16Array(aligned.buffer));
+}
+
+export function decodedAudioBufferToPcmChunks(
+  audioBuffer: AudioBuffer,
+  targetSampleRate = PCM_SAMPLE_RATE,
+): Int16Array[] {
+  if (audioBuffer.length === 0 || audioBuffer.sampleRate <= 0) return [];
+
+  const channelCount = Math.max(1, audioBuffer.numberOfChannels);
+  const channels = Array.from({ length: channelCount }, (_, index) => (
+    audioBuffer.getChannelData(Math.min(index, audioBuffer.numberOfChannels - 1))
+  ));
+  const targetLength = Math.max(1, Math.round(audioBuffer.length * targetSampleRate / audioBuffer.sampleRate));
+  const pcm = new Int16Array(targetLength);
+
+  for (let i = 0; i < targetLength; i++) {
+    const sourcePos = i * audioBuffer.sampleRate / targetSampleRate;
+    const lower = Math.min(Math.floor(sourcePos), audioBuffer.length - 1);
+    const upper = Math.min(lower + 1, audioBuffer.length - 1);
+    const ratio = sourcePos - lower;
+    let mixed = 0;
+
+    for (const channel of channels) {
+      mixed += channel[lower] + (channel[upper] - channel[lower]) * ratio;
+    }
+    mixed /= channels.length;
+
+    pcm[i] = floatToInt16(mixed);
+  }
+
+  return splitPcmChunks(pcm);
+}
+
+async function decodeEncodedAudioBytes(audioBytes: ArrayBuffer): Promise<Int16Array[]> {
+  const ctx = createDecodeAudioContext();
+  try {
+    const decoded = await ctx.decodeAudioData(audioBytes.slice(0));
+    return decodedAudioBufferToPcmChunks(decoded);
+  } finally {
+    try {
+      await ctx.close();
+    } catch {
+      void 0;
+    }
+  }
+}
+
+function createDecodeAudioContext(): AudioContext {
+  const AudioContextCtor = window.AudioContext
+    || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) {
+    throw new Error("目前瀏覽器不支援 AudioContext");
+  }
+  return new AudioContextCtor();
+}
+
+function normalizeContentType(contentType: string): string {
+  return contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+function isWavContentType(type: string): boolean {
+  return type === "audio/wav" || type === "audio/wave" || type === "audio/x-wav";
+}
+
+function isRawPcmContentType(type: string): boolean {
+  return type === "audio/pcm" || type === "audio/l16" || type === "audio/x-raw";
+}
+
+function looksLikeWav(bytes: Uint8Array): boolean {
+  return ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WAVE";
+}
+
+function wavDataOffset(bytes: Uint8Array): number {
+  if (!looksLikeWav(bytes) || bytes.length < WAV_HEADER_BYTES) return Math.min(WAV_HEADER_BYTES, bytes.length);
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 12;
+
+  while (offset + 8 <= bytes.length) {
+    const chunkId = ascii(bytes, offset, offset + 4);
+    const chunkSize = view.getUint32(offset + 4, true);
+    const dataStart = offset + 8;
+    if (chunkId === "data") return dataStart;
+    offset = dataStart + chunkSize + (chunkSize % 2);
+  }
+
+  return WAV_HEADER_BYTES;
+}
+
+function ascii(bytes: Uint8Array, start: number, end: number): string {
+  return String.fromCharCode(...bytes.subarray(start, end));
+}
+
+function splitPcmChunks(samples: Int16Array, chunkSamples = PCM_CHUNK_SAMPLES): Int16Array[] {
+  const chunks: Int16Array[] = [];
+  for (let offset = 0; offset < samples.length; offset += chunkSamples) {
+    chunks.push(samples.slice(offset, offset + chunkSamples));
+  }
+  return chunks;
+}
+
+function floatToInt16(sample: number): number {
+  const clamped = Math.max(-1, Math.min(1, sample));
+  return clamped < 0
+    ? Math.round(clamped * 32768)
+    : Math.round(clamped * 32767);
 }

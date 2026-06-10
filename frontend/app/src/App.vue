@@ -86,6 +86,7 @@ import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
 import { useAudioPlayer } from "./composables/useAudioPlayer";
+import { useAvatarCatalog } from "./composables/useAvatarCatalog";
 import { useAvatarChat } from "./composables/useAvatarChat";
 import { useAsr } from "./composables/useAsr";
 import { useMatesX } from "./composables/useMatesX";
@@ -130,14 +131,25 @@ function onAudioQueueEmpty(): void {
 
 const settings = useSettingsStore();
 
-const characters = ref([
+const fallbackCharacters = [
   { id: "008", name: "角色 008" },
   { id: "009", name: "角色 009" },
-]);
+];
 
 const DEFAULT_PERSONA: PersonaSummary = { persona_id: "default", label: "預設" };
 const personas = ref<PersonaSummary[]>([DEFAULT_PERSONA]);
 const ttsProviders = ref<TtsProvider[]>([]);
+const avatarCatalog = useAvatarCatalog();
+
+const characters = computed(() => {
+  const loaded = avatarCatalog.characters.value
+    .filter((c) => c.has_video && c.has_data)
+    .map((c) => ({
+      id: c.char_id,
+      name: c.label && c.label !== c.char_id ? c.label : `角色 ${c.char_id}`,
+    }));
+  return loaded.length > 0 ? loaded : fallbackCharacters;
+});
 
 async function fetchPersonas(): Promise<void> {
   try {
@@ -345,6 +357,13 @@ function handleAsrToggle(): void {
   if (asr.isListening.value) asr.stop(); else asr.start();
 }
 
+function pickInitialCharacter(): string {
+  const saved = settings.characterId.trim();
+  if (saved) return saved;
+  if (characters.value.some((c) => c.id === "008")) return "008";
+  return characters.value[0]?.id || "001";
+}
+
 // Pause ASR during THINKING/SPEAKING to avoid feedback loops
 watch(() => chat.state.value, (newState) => {
   if ((newState === 'THINKING' || newState === 'SPEAKING') && asr.isListening.value) {
@@ -355,9 +374,10 @@ watch(() => chat.state.value, (newState) => {
 onMounted(async () => {
   void fetchTtsProviders();
   await fetchPersonas();
+  await avatarCatalog.load();
   try {
     await wasm.initWasm();
-    const firstChar = settings.characterId || characters.value[0]?.id || "001";
+    const firstChar = pickInitialCharacter();
     await wasm.loadCharacter(firstChar);
   } catch (e) {
     console.error("[App] WASM init or char load failed:", e);

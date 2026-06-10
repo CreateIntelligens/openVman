@@ -23,6 +23,11 @@ const pickSlashMock = vi.fn();
 const handleInputChangeMock = vi.fn();
 const transcribeMock = vi.fn();
 const ensureLoadedMock = vi.fn();
+let vadSupportedMock = true;
+let latestVadOptions: {
+  onSpeechStart?: () => void;
+  onAudio?: (audio: Float32Array) => void;
+} | null = null;
 
 vi.mock("../api", () => ({
   fetchChat: (...args: unknown[]) => fetchChatMock(...args),
@@ -96,10 +101,16 @@ vi.mock("./useWhisper", () => ({
 }));
 
 vi.mock("./useVad", () => ({
-  useVad: () => ({
-    speaking: false,
-    supported: true,
-  }),
+  useVad: (options: {
+    onSpeechStart?: () => void;
+    onAudio?: (audio: Float32Array) => void;
+  }) => {
+    latestVadOptions = options;
+    return {
+      speaking: false,
+      supported: vadSupportedMock,
+    };
+  },
 }));
 
 vi.mock("./useSlashAutocomplete", () => ({
@@ -122,6 +133,8 @@ import { useChatSession } from "./useChatSession";
 describe("useChatSession TTS prefetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vadSupportedMock = true;
+    latestVadOptions = null;
     window.localStorage.clear();
   });
 
@@ -261,6 +274,54 @@ describe("useChatSession TTS prefetch", () => {
     });
 
     expect(window.localStorage.getItem("chat.privacy_warning_visible")).toBe("false");
+  });
+
+  it("turns off ASR after 10 seconds without voice activity", () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useChatSession());
+
+    act(() => {
+      result.current.toggleAsr();
+    });
+
+    expect(result.current.asrListening).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(9999);
+    });
+    expect(result.current.asrListening).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.asrListening).toBe(false);
+  });
+
+  it("resets the ASR idle timeout when VAD detects speech activity", () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useChatSession());
+
+    act(() => {
+      result.current.toggleAsr();
+    });
+    expect(result.current.asrListening).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(9000);
+      latestVadOptions?.onSpeechStart?.();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(9999);
+    });
+    expect(result.current.asrListening).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.asrListening).toBe(false);
   });
 
 });

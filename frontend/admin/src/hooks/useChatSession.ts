@@ -25,6 +25,7 @@ import { useInputHistory } from "./useInputHistory";
 
 const STOP_REPLY_NOTICE = "已停止回覆";
 const STOP_REPLY_NOTICE_MS = 2500;
+const ASR_IDLE_TIMEOUT_MS = 10000;
 
 type ChatResultPayload = {
   session_id: string;
@@ -224,6 +225,23 @@ export function useChatSession() {
 
   // --- ASR & VAD (Whisper & Silero) ---
   const [asrListening, setAsrListening] = useState(false);
+  const asrIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearAsrIdleTimer = useCallback(() => {
+    if (asrIdleTimerRef.current) {
+      clearTimeout(asrIdleTimerRef.current);
+      asrIdleTimerRef.current = null;
+    }
+  }, []);
+  const scheduleAsrIdleTimeout = useCallback(() => {
+    clearAsrIdleTimer();
+    asrIdleTimerRef.current = setTimeout(() => {
+      asrIdleTimerRef.current = null;
+      setAsrListening(false);
+    }, ASR_IDLE_TIMEOUT_MS);
+  }, [clearAsrIdleTimer]);
+  const markAsrActivity = useCallback(() => {
+    if (asrListening) scheduleAsrIdleTimeout();
+  }, [asrListening, scheduleAsrIdleTimeout]);
   const { status: whisperStatus, loadProgress: whisperProgress, transcribe } = useWhisper({
     enabled: asrListening,
   });
@@ -240,12 +258,22 @@ export function useChatSession() {
     }
   }, [whisperStatus, setError]);
 
+  useEffect(() => {
+    if (!asrListening) {
+      clearAsrIdleTimer();
+      return;
+    }
+    scheduleAsrIdleTimeout();
+    return clearAsrIdleTimer;
+  }, [asrListening, whisperStatus, scheduleAsrIdleTimeout, clearAsrIdleTimer]);
+
   const pendingTranscriptionRef = useRef<Promise<string> | null>(null);
   const inputRef = useRef(input);
   inputRef.current = input;
   const submitRef = useRef<(value?: string) => Promise<void>>();
 
   const handleAudio = useCallback((audio: Float32Array) => {
+    markAsrActivity();
     const promise = transcribe(audio);
     pendingTranscriptionRef.current = promise;
 
@@ -262,11 +290,12 @@ export function useChatSession() {
         setInput((prev) => prev + text);
       }
     }).catch(clearIfCurrent);
-  }, [transcribe]);
+  }, [markAsrActivity, transcribe]);
 
   const { speaking: vadSpeaking, supported: vadSupported } = useVad({
     enabled: asrListening,
     onAudio: handleAudio,
+    onSpeechStart: markAsrActivity,
     onSpeechCommit: useCallback(async () => {
       // Ensure any active transcription completes before sending
       if (pendingTranscriptionRef.current) {
@@ -280,6 +309,10 @@ export function useChatSession() {
   });
 
   const asrSupported = vadSupported;
+
+  useEffect(() => {
+    if (asrListening && !vadSupported) setAsrListening(false);
+  }, [asrListening, vadSupported]);
 
   // --- Coordination ---
   const conversationTitle = getConversationTitle(loadingHistory, sending);
