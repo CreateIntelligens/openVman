@@ -20,6 +20,7 @@ COPY package.json pnpm-lock.yaml ./
 # Ensure the node_modules volume is owned by the unprivileged user so the
 # Vite dev server (user=node) can install/build without root.
 RUN corepack enable \
+    && corepack prepare pnpm@9.15.4 --activate \
     && pnpm install --frozen-lockfile \
     && chown -R node:node /app
 

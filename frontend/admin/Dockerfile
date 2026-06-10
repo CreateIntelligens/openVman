@@ -18,7 +18,7 @@ WORKDIR /app
 
 # Install dependencies first (better layer caching)
 COPY frontend/admin/package.json frontend/admin/pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile
 
 # Shared contracts live outside frontend/admin; the Vite/TS alias
 # "@contracts" resolves to ../../contracts, so they must sit one
