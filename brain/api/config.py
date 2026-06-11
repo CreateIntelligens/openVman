@@ -88,6 +88,11 @@ class BrainSettings(BaseSettings):
     rag_rerank_candidate_multiplier: int = 4
     rag_distance_cutoff: float = 0.85
     rag_memory_distance_bonus: float = 0.02
+    rag_rrf_k: int = 60
+    rag_dedup_similarity_threshold: float = 0.95
+    rag_query_expansion_enabled: bool = False
+    rag_query_expansion_max_terms: int = 3
+    rag_query_expansion_model: str = ""
     max_session_rounds: int = 100
     max_session_ttl_minutes: int = 30 * 24 * 60
     session_db_path: str = "/data/projects/default/sessions.db"

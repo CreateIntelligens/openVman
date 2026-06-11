@@ -35,6 +35,7 @@ async def search(request: Request, payload: SearchRequest):
 
     try:
         enforce_guardrails("search", query, envelope.context)
+        expansion_terms = _maybe_expand_query(query, payload, envelope.context.trace_id)
         embedding_route = encode_query_with_fallback(
             query,
             project_id=envelope.context.project_id,
@@ -49,6 +50,7 @@ async def search(request: Request, payload: SearchRequest):
             persona_id=envelope.context.persona_id,
             project_id=envelope.context.project_id,
             embedding_version=embedding_route.version,
+            expansion_terms=expansion_terms,
         )
     except ValueError as exc:
         get_metrics_store().increment("guardrail_blocks_total", action="search")
@@ -58,9 +60,30 @@ async def search(request: Request, payload: SearchRequest):
     return {
         "trace_id": envelope.context.trace_id,
         "query": query,
+        "expansion_terms": expansion_terms,
         "table": payload.table,
         "embedding_version": embedding_route.version,
         "embedding_attempts": embedding_route.attempted_versions,
         "results": results,
     }
+
+
+def _maybe_expand_query(query: str, payload: SearchRequest, trace_id: str) -> list[str]:
+    """payload.expand 或全域開關開啟、且為 hybrid 查詢時,做 LLM 語意擴展。"""
+    from config import get_settings
+
+    cfg = get_settings()
+    if payload.query_type != "hybrid":
+        return []
+    if not (payload.expand or cfg.rag_query_expansion_enabled):
+        return []
+
+    from memory.query_expansion import expand_query
+
+    return expand_query(
+        query,
+        max_terms=cfg.rag_query_expansion_max_terms,
+        model=cfg.rag_query_expansion_model or None,
+        trace_id=trace_id,
+    )
 

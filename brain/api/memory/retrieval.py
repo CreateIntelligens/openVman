@@ -1,4 +1,4 @@
-"""語意檢索與結果整理 — 支援 vector-only 與 hybrid (vector + FTS) 搜索。"""
+"""語意檢索與結果整理 — 支援 vector-only 與 hybrid (vector + FTS, RRF 融合) 搜索。"""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from infra.db import (
 )
 from knowledge.doc_meta import list_disabled_document_paths
 from memory.dreaming.recall_tracker import record_trace
+from memory.embedder import encode_text
+from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -39,12 +41,20 @@ def search_records(
     project_id: str = "default",
     embedding_version: str | None = None,
     distance_cutoff: float | None = None,
+    expansion_terms: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
 
-    When *query_text* is provided, attempts hybrid search (vector + FTS).
-    Falls back to vector-only search if hybrid is not available.
-    Results with _distance > distance_cutoff are dropped. top_k is an upper cap.
+    When *query_text* is provided, attempts hybrid search: vector 與 FTS
+    各自檢索後以 RRF 融合,並輸出 min-max 正規化的 _score ∈ [0, 1]
+    (越高越相關)。FTS 不可用時退回 vector-only。
+
+    *expansion_terms*(語意擴展詞,通常由 memory.query_expansion 產生)
+    每個詞會額外跑 vector + FTS 檢索,所有名次表一起進 RRF 融合。
+
+    Results with _distance > distance_cutoff are dropped (FTS-only 命中
+    沒有 _distance,不受 cutoff 影響)。候選會先做去重(exact text +
+    embedding 餘弦相似度)。top_k is an upper cap.
     """
     from config import get_settings
     cfg = get_settings()
@@ -64,19 +74,25 @@ def search_records(
         query_text=query_text or "",
         query_type=query_type,
         limit=search_limit,
+        rrf_k=cfg.rag_rrf_k,
+        expansion_terms=expansion_terms or [],
+        embedding_version=embedding_version,
     )
 
-    filtered: list[dict[str, Any]] = []
-    for record in raw_records:
-        if record.get("_distance", 0.0) > cutoff:
-            continue
-        if not _matches_persona(record, normalized_persona):
-            continue
-        if disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths):
-            continue
-        filtered.append(_strip_vector(record))
-        if len(filtered) >= limit:
-            break
+    # 先過濾再去重:省去對淘汰紀錄的餘弦比對,也避免被過濾掉的
+    # 紀錄壓掉 persona 看得到的近似紀錄
+    visible = [
+        record
+        for record in raw_records
+        if record.get("_distance", 0.0) <= cutoff
+        and _matches_persona(record, normalized_persona)
+        and not (disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths))
+    ]
+    deduped = deduplicate(
+        visible,
+        similarity_threshold=cfg.rag_dedup_similarity_threshold,
+    )
+    filtered = [_strip_vector(record) for record in deduped[:limit]]
 
     if filtered:
         try:
@@ -99,12 +115,25 @@ def _safe_search(
     query_text: str = "",
     query_type: str = "vector",
     limit: int = 10,
+    rrf_k: int = 60,
+    expansion_terms: list[str] | None = None,
+    embedding_version: str | None = None,
 ) -> list[dict[str, Any]]:
     """Execute search with fallback and error handling."""
     try:
         if query_type == "hybrid":
-            return _hybrid_search(table, query_vector, query_text, limit)
-        return _search_to_records(table.search(query_vector).limit(limit))
+            return _hybrid_search(
+                table,
+                query_vector,
+                query_text,
+                limit,
+                rrf_k,
+                expansion_terms or [],
+                embedding_version,
+            )
+        return _normalize_vector_results(
+            _search_to_records(table.search(query_vector).limit(limit))
+        )
     except Exception as exc:
         logger.warning("Search failed for %s: %s", table, exc)
         return []
@@ -115,25 +144,58 @@ def _hybrid_search(
     query_vector: list[float],
     query_text: str,
     limit: int,
+    rrf_k: int,
+    expansion_terms: list[str],
+    embedding_version: str | None,
 ) -> list[dict[str, Any]]:
-    """Try hybrid search (vector + FTS), fall back to vector-only."""
-    if query_text:
-        try:
-            # LanceDB hybrid search: combines vector and FTS
-            # Make sure FTS index exists before calling this
-            result = (
-                table.search(query_vector, query_type="hybrid")
-                .text(query_text)
-                .limit(limit)
-            )
-            records = _search_to_records(result)
-            if records:
-                return records
-        except Exception as exc:
-            logger.debug("hybrid search failed or unavailable, falling back to vector: %s", exc)
+    """Hybrid search:原文與擴展詞各跑 vector + FTS,所有名次表一次 RRF 融合。
 
-    # Vector-only fallback
-    return _search_to_records(table.search(query_vector).limit(limit))
+    只剩原文 vector 一路時退回 vector-only(仍輸出正規化 _score)。
+    """
+    vector_records = _search_to_records(table.search(query_vector).limit(limit))
+
+    ranked_lists: list[list[dict[str, Any]]] = [vector_records]
+    if fts_records := _try_fts_search(table, query_text, limit):
+        ranked_lists.append(fts_records)
+
+    for term in expansion_terms:
+        if term_vector := _try_encode(term, embedding_version):
+            if term_records := _search_to_records(table.search(term_vector).limit(limit)):
+                ranked_lists.append(term_records)
+        if term_fts := _try_fts_search(table, term, limit):
+            ranked_lists.append(term_fts)
+
+    if len(ranked_lists) == 1:
+        return _normalize_vector_results(vector_records)
+
+    fused = rrf_fuse(ranked_lists, k=rrf_k)
+    return min_max_normalize(fused, source_field="_rrf_score", out_field="_score")[:limit]
+
+
+def _try_fts_search(table: Any, query_text: str, limit: int) -> list[dict[str, Any]]:
+    """FTS 檢索;index 不存在或失敗時回空 list。"""
+    if not query_text:
+        return []
+    try:
+        # 需要先建立 FTS index(infra.db.ensure_fts_index)
+        return _search_to_records(table.search(query_text, query_type="fts").limit(limit))
+    except Exception as exc:
+        logger.debug("FTS search failed or unavailable for %r: %s", query_text, exc)
+        return []
+
+
+def _try_encode(term: str, embedding_version: str | None) -> list[float] | None:
+    """編碼擴展詞;失敗時回 None 並略過該詞。"""
+    try:
+        return encode_text(term, embedding_version)
+    except Exception as exc:
+        logger.debug("expansion term encode failed for %r: %s", term, exc)
+        return None
+
+
+def _normalize_vector_results(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """vector-only 結果以 _distance 反向 min-max 正規化出 _score。"""
+    return min_max_normalize(records, source_field="_distance", out_field="_score", invert=True)
 
 
 def _search_to_records(search_result: Any) -> list[dict[str, Any]]:

@@ -14,8 +14,6 @@ from threading import Lock
 from time import monotonic
 from typing import Any
 
-import numpy as np
-
 from config import get_settings
 from infra.db import (
     get_db,
@@ -26,6 +24,7 @@ from infra.db import (
 )
 from knowledge.workspace import ensure_workspace_scaffold, get_archive_paths, get_core_documents, get_workspace_root
 from memory.embedder import get_embedder
+from memory.fusion import cosine_similarity as _cosine_similarity
 from memory.importance import score_importance
 from personas.personas import normalize_persona_id
 from safety.observability import log_event
@@ -472,17 +471,6 @@ def _find_merge_drops(
                 older_idx, _ = _merge_memory_pair(idx_a, records[idx_a], idx_b, records[idx_b])
                 drops.add(older_idx)
     return drops
-
-
-def _cosine_similarity(vec_a: Any, vec_b: Any) -> float:
-    a = np.asarray(vec_a, dtype=np.float32)
-    b = np.asarray(vec_b, dtype=np.float32)
-    dot = np.dot(a, b)
-    norm_a = np.linalg.norm(a)
-    norm_b = np.linalg.norm(b)
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return float(dot / (norm_a * norm_b))
 
 
 def _merge_memory_pair(

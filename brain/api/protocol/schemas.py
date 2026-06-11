@@ -67,6 +67,7 @@ class SearchRequest(BaseModel):
     table: str = Field("memories", pattern="^(knowledge|memories)$")
     top_k: int = 5
     query_type: str = Field("vector", pattern="^(vector|hybrid)$")
+    expand: bool = Field(False, description="以 LLM 語意擴展查詢(最多 N 個詞)後多路檢索")
     project_id: str = "default"
     persona_id: str = "default"
 
