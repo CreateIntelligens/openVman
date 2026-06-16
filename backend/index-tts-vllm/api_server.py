@@ -75,6 +75,14 @@ async def lifespan(app: FastAPI):
         for speaker, audio_paths in speaker_dict.items():
             audio_paths_ = [os.path.join(cur_dir, p) for p in audio_paths]
             await tts.registry_speaker(speaker, audio_paths_)
+        # 預熱：跑一次合成把 GPU kernel 熱起來，避免第一個請求承擔冷啟成本。
+        first_speaker = next(iter(speaker_dict), None)
+        if first_speaker is not None:
+            try:
+                await tts.infer_with_ref_audio_embed(first_speaker, "預熱")
+                print(f"[warmup] TTS synthesis warmup done (speaker={first_speaker})")
+            except Exception as ex:
+                print(f"[warmup] TTS warmup skipped: {ex}")
     yield
 
 app = FastAPI(lifespan=lifespan)

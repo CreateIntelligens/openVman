@@ -88,12 +88,38 @@ _OPENAPI_TAGS = [
 # Startup & Lifespan
 # ---------------------------------------------------------------------------
 
+def _warmup_retrieval_path() -> None:
+    """真正跑一次 encode + search，預熱 CUDA kernel 與 LanceDB 查詢路徑。
+
+    僅建立 embedder/table 物件並不會觸發第一次 forward pass 的 kernel 編譯
+    成本（實測冷啟 embed ~8s、search ~1.7s，熱啟後皆 <60ms）。這裡實際呼叫
+    一次檢索把整條 hot path 熱起來，避免第一個使用者請求承擔該成本。
+    """
+    from memory.embedder import encode_query_with_fallback
+    from memory.retrieval import search_records
+
+    route = encode_query_with_fallback("warmup", project_id="default", table_names=("knowledge",))
+    search_records(
+        table_name="knowledge",
+        query_vector=route.vector,
+        top_k=1,
+        query_text="warmup",
+        query_type="hybrid",
+        project_id="default",
+        embedding_version=route.version,
+    )
+
+
 async def warmup_resources() -> None:
     """背景預熱重資源，避免第一個請求承擔初始化成本。"""
     logger.info("背景預熱開始...")
     ensure_workspace_scaffold("default")
     await asyncio.to_thread(get_embedder)
     await asyncio.to_thread(ensure_tables, "default")
+    try:
+        await asyncio.to_thread(_warmup_retrieval_path)
+    except Exception as exc:  # 預熱失敗不應阻擋服務啟動
+        logger.warning("檢索路徑預熱失敗（不影響啟動）: %s", exc)
     await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
     logger.info("背景預熱完成")
 
