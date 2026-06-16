@@ -37,7 +37,12 @@ def _get_sync_client(api_key: str, base_url: str | None) -> OpenAI:
         if client is not None:
             _SYNC_CLIENT_CACHE.move_to_end(key)
             return client
-        client = OpenAI(api_key=api_key, base_url=base_url or None)
+        client = OpenAI(
+            api_key=api_key,
+            base_url=base_url or None,
+            timeout=get_settings().llm_request_timeout_seconds,
+            max_retries=0,
+        )
         _SYNC_CLIENT_CACHE[key] = client
         if len(_SYNC_CLIENT_CACHE) > _CLIENT_CACHE_MAX:
             _SYNC_CLIENT_CACHE.popitem(last=False)

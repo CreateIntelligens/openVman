@@ -35,10 +35,12 @@ def build_fallback_chain(trace_id: str, client: Any | None = None) -> list[Route
 
     from core.models_config import fallback_chain
 
-    # Expand the chain_spec if there are gemini models
+    # Expand the chain_spec if there are gemini models. When model discovery is
+    # disabled, the chain is used exactly as configured (no auto-expansion of
+    # every available Gemini model into the chain).
     expanded_spec: list[tuple[str, str]] = []
     for provider, model in chain_spec:
-        if provider == "gemini":
+        if provider == "gemini" and not cfg.llm_disable_model_discovery:
             gemini_models = fallback_chain(model, client=client)
             for m in gemini_models:
                 expanded_spec.append((provider, m))

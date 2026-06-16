@@ -37,7 +37,7 @@ class BrainSettings(BaseSettings):
     llm_provider: str = "gemini"
     llm_api_key: str = ""
     llm_api_keys: str = ""
-    llm_model: str = "gemini-3.1-flash-lite-preview"
+    llm_model: str = "gemini-3.1-flash-lite"
     llm_fallback_model: str = ""
     llm_base_url: str = ""
     llm_temperature: float = 0.3
@@ -45,6 +45,8 @@ class BrainSettings(BaseSettings):
     llm_key_long_cooldown_seconds: int = 300
     llm_fallback_chain: str = ""
     llm_max_fallback_hops: int = 4
+    llm_disable_model_discovery: bool = False
+    llm_request_timeout_seconds: float = 20.0
     prompt_system_char_budget: int = 100000
     prompt_total_char_budget: int = 150000
     prompt_context_char_budget: int = 20000

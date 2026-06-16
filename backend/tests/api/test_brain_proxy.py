@@ -104,3 +104,56 @@ def test_gateway_brain_proxy_returns_502_when_upstream_disconnects(client: TestC
 
     assert response.status_code == 502
     assert response.json() == {"error": "brain upstream disconnected"}
+
+
+def test_gateway_brain_proxy_returns_504_on_timeout(client: TestClient):
+    mock_client = MagicMock()
+    mock_client.build_request = MagicMock(return_value="request")
+    mock_client.send = AsyncMock(side_effect=httpx.ReadTimeout("Request timed out."))
+
+    with (
+        patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
+    ):
+        response = client.get("/api/health")
+
+    assert response.status_code == 504
+    assert response.json() == {"error": "brain request timeout"}
+
+
+def test_gateway_brain_proxy_returns_504_on_read_body_timeout(client: TestClient):
+    upstream = MagicMock()
+    upstream.status_code = 200
+    upstream.headers = {"content-type": "application/json"}
+    upstream.aread = AsyncMock(side_effect=httpx.ReadTimeout("Read timed out during body read."))
+    upstream.aclose = AsyncMock()
+    upstream.aiter_bytes = MagicMock()
+
+    mock_client = MagicMock()
+    mock_client.build_request = MagicMock(return_value="request")
+    mock_client.send = AsyncMock(return_value=upstream)
+
+    with (
+        patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
+    ):
+        response = client.get("/api/health")
+
+    assert response.status_code == 504
+    assert response.json() == {"error": "brain request timeout"}
+    upstream.aclose.assert_called_once()
+
+
+def test_gateway_brain_proxy_returns_502_on_generic_request_error(client: TestClient):
+    mock_client = MagicMock()
+    mock_client.build_request = MagicMock(return_value="request")
+    mock_client.send = AsyncMock(side_effect=httpx.RequestError("Some request error."))
+
+    with (
+        patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
+    ):
+        response = client.get("/api/health")
+
+    assert response.status_code == 502
+    assert response.json() == {"error": "brain request error"}

@@ -135,6 +135,36 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
             ),
             stream=True,
         )
+        content_type = upstream.headers.get("content-type", "")
+        resp_headers = _filter_headers(upstream.headers)
+
+        # SSE / streaming responses — forward chunks via StreamingResponse.
+        if "text/event-stream" in content_type:
+            return StreamingResponse(
+                _stream_upstream_bytes(upstream),
+                status_code=upstream.status_code,
+                media_type="text/event-stream",
+                headers=resp_headers,
+            )
+
+        # Non-streaming: read full body, close stream, return plain Response.
+        try:
+            content = await upstream.aread()
+        finally:
+            await upstream.aclose()
+
+        return Response(
+            content=content,
+            status_code=upstream.status_code,
+            media_type=content_type or "application/json",
+            headers=resp_headers,
+        )
+    except httpx.TimeoutException as exc:
+        logger.warning("brain request timeout path=%s error=%s", path, exc)
+        return JSONResponse(
+            content={"error": "brain request timeout"},
+            status_code=504,
+        )
     except httpx.ConnectError:
         logger.warning("brain unreachable at %s", get_tts_config().brain_url)
         return JSONResponse(
@@ -153,29 +183,12 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
             content={"error": "brain upstream read error"},
             status_code=502,
         )
-
-    content_type = upstream.headers.get("content-type", "")
-    resp_headers = _filter_headers(upstream.headers)
-
-    # SSE / streaming responses — forward chunks via StreamingResponse.
-    if "text/event-stream" in content_type:
-        return StreamingResponse(
-            _stream_upstream_bytes(upstream),
-            status_code=upstream.status_code,
-            media_type="text/event-stream",
-            headers=resp_headers,
+    except httpx.RequestError as exc:
+        logger.warning("brain request error path=%s error=%s", path, exc)
+        return JSONResponse(
+            content={"error": "brain request error"},
+            status_code=502,
         )
-
-    # Non-streaming: read full body, close stream, return plain Response.
-    content = await upstream.aread()
-    await upstream.aclose()
-
-    return Response(
-        content=content,
-        status_code=upstream.status_code,
-        media_type=content_type or "application/json",
-        headers=resp_headers,
-    )
 
 
 def _request_brain_path(request: Request) -> str:

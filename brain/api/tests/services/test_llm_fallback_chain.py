@@ -69,6 +69,7 @@ def _stub_config(
     gemini_key: str = "",
     groq_key: str = "",
     openai_key: str = "",
+    disable_discovery: bool = False,
 ):
     fake_cfg = MagicMock()
     fake_cfg.llm_provider = primary_provider
@@ -80,6 +81,7 @@ def _stub_config(
     fake_cfg.llm_temperature = 0.3
     fake_cfg.llm_fallback_chain = chain
     fake_cfg.llm_max_fallback_hops = max_hops
+    fake_cfg.llm_disable_model_discovery = disable_discovery
     fake_cfg.llm_key_cooldown_seconds = 60
     fake_cfg.llm_key_long_cooldown_seconds = 300
     fake_cfg.gemini_api_key = gemini_key
@@ -403,7 +405,7 @@ class TestDynamicModelDiscoveryAndFallback:
         # Mock model objects with supported_actions
         m1 = Model(name="models/gemini-2.0-flash", supported_actions=["generateContent"])
         m2 = Model(name="models/gemini-1.5-pro", supported_actions=["generateContent"])
-        m3 = Model(name="models/gemini-3.1-flash-lite-preview", supported_actions=["generateContent"])
+        m3 = Model(name="models/gemini-3.1-flash-lite", supported_actions=["generateContent"])
         m4 = Model(name="models/gemini-embedding-001", supported_actions=["embedContent"])
         mock_client.models.list.return_value = [m1, m2, m3, m4]
 
@@ -411,13 +413,13 @@ class TestDynamicModelDiscoveryAndFallback:
         chain = fallback_chain("gemini-2.5-flash", client=mock_client)
 
         # Expected: primary model first, then sorted models: Pro -> Flash -> Flash-Lite
-        # 1.5-pro (Pro) -> 2.0-flash (Flash) -> 3.1-flash-lite-preview (Flash-Lite)
+        # 1.5-pro (Pro) -> 2.0-flash (Flash) -> 3.1-flash-lite (Flash-Lite)
         # Gemini-2.5-flash is primary, so it's first.
         assert chain == [
             "gemini-2.5-flash",
             "gemini-1.5-pro",
             "gemini-2.0-flash",
-            "gemini-3.1-flash-lite-preview",
+            "gemini-3.1-flash-lite",
         ]
 
     def test_fallback_chain_graceful_degradation_on_error(self, monkeypatch):
@@ -461,4 +463,32 @@ class TestDynamicModelDiscoveryAndFallback:
         assert hops[1].model == "gemini-1.5-pro"
         assert hops[2].provider == "groq"
         assert hops[2].model == "llama-3.3-70b"
+
+    def test_build_fallback_chain_discovery_disabled(self, monkeypatch):
+        # When discovery is disabled, the chain is used exactly as configured:
+        # the gemini entry is NOT expanded into every available model.
+        fc, _, _ = _stub_deps(monkeypatch)
+        _stub_config(
+            monkeypatch,
+            chain="gemini:gemini-2.5-flash,groq:llama-3.3-70b",
+            gemini_key="gk",
+            groq_key="grk",
+            disable_discovery=True,
+        )
+
+        from google.genai.types import Model
+        mock_client = MagicMock()
+        mock_client._api_client = MagicMock()
+        mock_client._api_client.api_key = "gk"
+        mock_client.models.list.return_value = [
+            Model(name="models/gemini-1.5-pro", supported_actions=["generateContent"])
+        ]
+
+        hops = fc.build_fallback_chain("trace-no-discovery", client=mock_client)
+
+        assert [(h.provider, h.model) for h in hops] == [
+            ("gemini", "gemini-2.5-flash"),
+            ("groq", "llama-3.3-70b"),
+        ]
+        mock_client.models.list.assert_not_called()
 
