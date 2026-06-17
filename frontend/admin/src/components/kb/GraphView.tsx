@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   fetchGraphStatus,
   fetchGraphSummary,
@@ -10,7 +11,7 @@ import {
 
 type LoadState = "idle" | "loading" | "error";
 
-export default function GraphView() {
+export default function GraphView(): ReactNode {
   const [status, setStatus] = useState<GraphStatus | null>(null);
   const [summary, setSummary] = useState<GraphSummary | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("loading");
@@ -124,13 +125,13 @@ export default function GraphView() {
 
       {status?.state === "ready" && summary && (
         <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
-          <StatCard label="節點" value={summary.nodes} />
-          <StatCard label="關係" value={summary.edges} />
-          <StatCard label="社群" value={summary.communities} />
-          <StatCard label="跨社群橋" value={summary.surprising_bridges} />
+          <StatCard label="Nodes" value={summary.nodes} />
+          <StatCard label="Edges" value={summary.edges} />
+          <StatCard label="Communities" value={summary.communities} />
+          <StatCard label="Bridges" value={summary.surprising_bridges} />
           {summary.god_nodes.length > 0 && (
             <div className="col-span-2 md:col-span-4">
-              <div className="text-[0.625rem] uppercase tracking-widest text-slate-500 mb-1">樞紐節點</div>
+              <div className="text-[0.625rem] uppercase tracking-widest text-slate-500 mb-1">Hubs</div>
               <div className="flex flex-wrap gap-1.5">
                 {summary.god_nodes.slice(0, 10).map((n, i) => (
                   <span
@@ -147,28 +148,50 @@ export default function GraphView() {
       )}
 
       <div className="flex-1 min-h-0 overflow-hidden bg-white dark:bg-slate-950/30">
-        {loadState === "loading" ? (
-          <EmptyState icon="refresh" text="載入中…" spin />
-        ) : status?.state === "absent" ? (
-          <EmptyState icon="hub" text="尚未建立圖譜，點擊上方「重建圖譜」開始" />
-        ) : status?.state === "building" ? (
-          <EmptyState icon="autorenew" text="圖譜建置中，完成後會自動顯示" spin />
-        ) : status?.state === "failed" ? (
-          <EmptyState icon="error" text={status.error ?? "建置失敗"} />
-        ) : status?.state === "ready" ? (
-          <iframe
-            key={htmlKey}
-            src={graphHtmlUrl()}
-            title="knowledge-graph"
-            className="w-full h-full border-0"
-          />
-        ) : null}
+        <GraphContent loadState={loadState} status={status} htmlKey={htmlKey} />
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+interface GraphContentProps {
+  loadState: LoadState;
+  status: GraphStatus | null;
+  htmlKey: number;
+}
+
+function GraphContent({ loadState, status, htmlKey }: GraphContentProps): ReactNode {
+  if (loadState === "loading") {
+    return <EmptyState icon="refresh" text="載入中…" spin />;
+  }
+
+  switch (status?.state) {
+    case "absent":
+      return <EmptyState icon="hub" text="尚未建立圖譜，點擊上方「重建圖譜」開始" />;
+    case "building":
+      return <EmptyState icon="autorenew" text="圖譜建置中，完成後會自動顯示" spin />;
+    case "failed":
+      return <EmptyState icon="error" text={status.error ?? "建置失敗"} />;
+    case "ready":
+      return (
+        <iframe
+          key={htmlKey}
+          src={graphHtmlUrl()}
+          title="knowledge-graph"
+          className="w-full h-full border-0"
+        />
+      );
+    default:
+      return null;
+  }
+}
+
+interface StatCardProps {
+  label: string;
+  value: number;
+}
+
+function StatCard({ label, value }: StatCardProps): ReactNode {
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/40 px-3 py-2">
       <div className="text-[0.625rem] uppercase tracking-widest text-slate-500">{label}</div>
@@ -177,7 +200,13 @@ function StatCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-function EmptyState({ icon, text, spin = false }: { icon: string; text: string; spin?: boolean }) {
+interface EmptyStateProps {
+  icon: string;
+  text: string;
+  spin?: boolean;
+}
+
+function EmptyState({ icon, text, spin = false }: EmptyStateProps): ReactNode {
   return (
     <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2">
       <span className={`material-symbols-outlined text-[2rem] ${spin ? "animate-spin" : ""}`}>{icon}</span>

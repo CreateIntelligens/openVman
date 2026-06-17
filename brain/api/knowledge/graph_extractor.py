@@ -10,14 +10,17 @@ from __future__ import annotations
 import json
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from core.llm_client import generate_chat_turn
+
+_T = TypeVar("_T")
 
 ALLOWED_FILE_TYPES = {"code", "document", "image", "paper", "rationale"}
 DEFAULT_CHUNK_SIZE = 6
 DEFAULT_MAX_ROUNDS = 3
 FILE_CONTENT_LIMIT = 6000
+GLOBAL_LINK_BATCH = 120
 
 EXTRACT_PROMPT = """Extract a knowledge graph fragment from the files below.
 Output ONLY valid JSON. No markdown fences. No explanation.
@@ -31,6 +34,10 @@ REQUIREMENTS:
   prevents, references, conceptually_related_to, semantically_similar_to.
 - Confidence: EXTRACTED (explicit in text) -> confidence_score 1.0;
   INFERRED 0.6-0.9; AMBIGUOUS 0.1-0.3.
+- Be aggressive with INFERRED edges: if two concepts are medically or
+  semantically related (shared cause, same body part, one is a complication
+  or treatment of the other) connect them even when the text does not say so
+  explicitly. Prefer an INFERRED edge over leaving a concept isolated.
 - file_type must be one of: document, paper, image, rationale.
 
 Schema (exactly these keys):
@@ -58,6 +65,29 @@ Labels:
 __LABELS__
 """
 
+GLOBAL_LINK_PROMPT = """Below is the full list of concepts extracted from a
+knowledge base, each as `id\tlabel`. Concepts came from different files and were
+never compared against each other. Find cross-concept relationships that span
+DIFFERENT topics — a concept that is a cause, complication, treatment, risk
+factor, or close semantic match of another.
+
+Rules:
+- Only connect concepts that are genuinely related; do not invent links.
+- Use ONLY ids from the list. Never introduce a new id.
+- These are inferences, so confidence is INFERRED (0.6-0.9).
+- Relation vocabulary: causes, treats, symptom_of, risk_factor_for, related_to,
+  prevents, conceptually_related_to, semantically_similar_to.
+- Skip pairs already obviously within the same topic; focus on cross-topic links.
+
+Output ONLY valid JSON, no fences, schema:
+{"edges":[{"source":"id","target":"id","relation":"...","confidence":"INFERRED","confidence_score":0.75,"weight":1.0}]}
+
+If there is nothing to add, output {"edges": []}.
+
+Concepts:
+__NODES__
+"""
+
 
 def _strip_fences(text: str) -> str:
     text = text.strip()
@@ -68,6 +98,16 @@ def _strip_fences(text: str) -> str:
         if text.rstrip().endswith("```"):
             text = text.rstrip()[: -3]
     return text.strip()
+
+
+def _load_json_object(text: str) -> dict[str, Any] | None:
+    try:
+        parsed = json.loads(_strip_fences(text))
+    except json.JSONDecodeError:
+        return None
+    if isinstance(parsed, dict):
+        return parsed
+    return None
 
 
 def _read_file(path: Path, limit: int = FILE_CONTENT_LIMIT) -> str:
@@ -81,7 +121,7 @@ def _norm_label(label: str) -> str:
     return unicodedata.normalize("NFKC", label).strip().lower()
 
 
-def _chunk(seq: list[Path], size: int) -> list[list[Path]]:
+def _chunk(seq: list[_T], size: int) -> list[list[_T]]:
     return [seq[i : i + size] for i in range(0, len(seq), size)]
 
 
@@ -112,10 +152,10 @@ def _llm_extract(chunk: list[Path], workspace_root: Path, feedback: str = "") ->
         [{"role": "user", "content": prompt}],
         privacy_source="graph_extractor",
     )
-    try:
-        return json.loads(_strip_fences(reply.content))
-    except json.JSONDecodeError:
+    parsed = _load_json_object(reply.content)
+    if parsed is None:
         return {"nodes": [], "edges": [], "hyperedges": []}
+    return parsed
 
 
 def _validate_chunk(frag: dict[str, Any], chunk: list[Path], workspace_root: Path) -> list[str]:
@@ -230,9 +270,8 @@ def _resolve_synonyms(
         [{"role": "user", "content": prompt}],
         privacy_source="graph_extractor",
     )
-    try:
-        parsed = json.loads(_strip_fences(reply.content))
-    except json.JSONDecodeError:
+    parsed = _load_json_object(reply.content)
+    if parsed is None:
         return nodes, edges, []
 
     groups = parsed.get("groups") or []
@@ -285,6 +324,54 @@ def _drop_dangling(
     return kept, len(edges) - len(kept)
 
 
+def _link_global(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ask the LLM for cross-topic edges over concept batches.
+
+    Per-chunk extraction never sees concepts from other chunks, so cross-file
+    relationships are missed and many nodes end up isolated. This pass feeds the
+    id/label list back to the model in batches and collects INFERRED edges whose
+    endpoints both exist. Returns only valid (non-dangling) new edges.
+    """
+    if len(nodes) < 2:
+        return []
+
+    node_ids = {n["id"] for n in nodes}
+    new_edges: list[dict[str, Any]] = []
+    for batch in _chunk(nodes, GLOBAL_LINK_BATCH):
+        listing = "\n".join(f"{n['id']}\t{n['label']}" for n in batch)
+        prompt = GLOBAL_LINK_PROMPT.replace("__NODES__", listing)
+        reply = generate_chat_turn(
+            [{"role": "user", "content": prompt}],
+            privacy_source="graph_extractor",
+        )
+        frag = _load_json_object(reply.content)
+        if frag is None:
+            continue
+
+        for edge in frag.get("edges", []):
+            source_id = edge.get("source")
+            target_id = edge.get("target")
+            if (
+                source_id not in node_ids
+                or target_id not in node_ids
+                or source_id == target_id
+            ):
+                continue
+
+            new_edges.append(
+                {
+                    "source": source_id,
+                    "target": target_id,
+                    "relation": edge.get("relation", "related_to"),
+                    "confidence": "INFERRED",
+                    "confidence_score": edge.get("confidence_score", 0.7),
+                    "source_file": "__global_link__",
+                    "weight": edge.get("weight", 1.0),
+                }
+            )
+    return new_edges
+
+
 def extract_semantic(
     files: list[Path],
     workspace_root: Path,
@@ -318,7 +405,10 @@ def extract_semantic(
     all_nodes = _clamp_file_types(all_nodes)
     nodes, edges = _canonicalize_by_label(all_nodes, all_edges)
     nodes, edges, groups = _resolve_synonyms(nodes, edges)
-    edges = _dedup_edges(edges)
+    # Global linking pass: connect cross-topic concepts the per-chunk extraction
+    # never compared. Runs on canonical ids so endpoints resolve correctly.
+    global_edges = _link_global(nodes)
+    edges = _dedup_edges(edges + global_edges)
     edges, dropped = _drop_dangling(edges, nodes)
 
     return {
@@ -328,6 +418,7 @@ def extract_semantic(
         "_harness": {
             "chunks": chunks_report,
             "merged_synonym_groups": groups,
+            "global_link_edges": len(global_edges),
             "dropped_dangling": dropped,
         },
     }
