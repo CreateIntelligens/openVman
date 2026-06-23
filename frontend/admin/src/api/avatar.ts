@@ -52,3 +52,12 @@ export async function renameAvatarCharacter(charId: string, newCharId: string) {
   });
   return parseJson<AvatarMutationResponse>(res);
 }
+
+export async function updateAvatarCharacterLabel(charId: string, label: string) {
+  const res = await fetch(apiUrl(itemPath(AVATAR_PATH, charId)), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label }),
+  });
+  return parseJson<AvatarMutationResponse>(res);
+}

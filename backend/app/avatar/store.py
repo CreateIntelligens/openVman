@@ -110,6 +110,17 @@ class AvatarStore:
             self._touch_meta(dst)
         return self._summary(dst)
 
+    def update_label(self, char_id: str, label: str) -> dict[str, Any]:
+        cid = normalize_char_id(char_id)
+        path = self._dir(cid)
+        if not path.is_dir():
+            raise CharacterNotFound(f"角色不存在：{cid}")
+        meta = self._read_meta(path)
+        meta["label"] = label.strip()
+        meta["updated_at"] = _now()
+        self._write_meta(path, meta)
+        return self._summary(path)
+
     def _summary(self, path: Path) -> dict[str, Any]:
         meta = self._read_meta(path)
         video = path / VIDEO_FILENAME

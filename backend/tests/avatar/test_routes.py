@@ -110,6 +110,17 @@ def test_rename(client):
     assert ids == ["008b"]
 
 
+def test_update_label(client):
+    _upload(client, char_id="008", label="角色八")
+    r = client.patch("/api/avatar/008", json={"label": "新的名字"})
+    assert r.status_code == 200
+    assert r.json()["character"]["char_id"] == "008"
+    assert r.json()["character"]["label"] == "新的名字"
+    chars = client.get("/api/avatar").json()["characters"]
+    assert chars[0]["char_id"] == "008"
+    assert chars[0]["label"] == "新的名字"
+
+
 def test_rename_conflict(client):
     _upload(client, char_id="008")
     _upload(client, char_id="009")

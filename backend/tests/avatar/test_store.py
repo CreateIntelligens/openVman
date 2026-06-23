@@ -70,6 +70,14 @@ def test_rename(store):
     assert ids == ["008b"]
 
 
+def test_update_label_keeps_character_id(store):
+    _make_char(store, char_id="008", label="角色八")
+    updated = store.update_label("008", "新的名字")
+    assert updated["char_id"] == "008"
+    assert updated["label"] == "新的名字"
+    assert store.get_character("008")["label"] == "新的名字"
+
+
 def test_rename_missing_raises(store):
     with pytest.raises(CharacterNotFound):
         store.rename_character("nope", "x")

@@ -63,4 +63,24 @@ describe("Avatar page", () => {
     expect(window.localStorage.getItem("avatar.character_id")).toBe("010");
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
   });
+
+  it("renames the display label without changing character id", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({
+      characters: [
+        { char_id: "010", label: "角色十", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z" },
+      ],
+    });
+    vi.spyOn(api, "updateAvatarCharacterLabel").mockResolvedValue({
+      status: "ok",
+      character: { char_id: "010", label: "新的名字", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z" },
+    });
+    vi.spyOn(window, "prompt").mockReturnValue("新的名字");
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: /rename/i }));
+
+    expect(api.updateAvatarCharacterLabel).toHaveBeenCalledWith("010", "新的名字");
+    await waitFor(() => expect(screen.getByText("新的名字")).toBeTruthy());
+    expect(screen.getByText("010")).toBeTruthy();
+  });
 });

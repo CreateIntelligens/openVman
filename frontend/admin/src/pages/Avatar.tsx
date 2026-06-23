@@ -3,7 +3,7 @@ import {
   AvatarCharacter,
   deleteAvatarCharacter,
   fetchAvatarCharacters,
-  renameAvatarCharacter,
+  updateAvatarCharacterLabel,
   uploadAvatarCharacter,
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
@@ -98,16 +98,16 @@ export default function Avatar() {
     }
   };
 
-  const handleRename = async (charId: string) => {
-    const newId = window.prompt("Enter the new character ID", charId);
-    const trimmedNewId = newId?.trim();
-    if (!trimmedNewId || trimmedNewId === charId) return;
+  const handleRename = async (character: AvatarCharacter) => {
+    const newLabel = window.prompt("Enter the display name", character.label);
+    const trimmedNewLabel = newLabel?.trim();
+    if (!trimmedNewLabel || trimmedNewLabel === character.label) return;
 
     setStatus(null);
     try {
-      const res = await renameAvatarCharacter(charId, trimmedNewId);
-      setCharacters((prev) => prev.map((c) => (c.char_id === charId ? res.character : c)));
-      setStatus({ type: "success", message: `Renamed to ${trimmedNewId}` });
+      const res = await updateAvatarCharacterLabel(character.char_id, trimmedNewLabel);
+      setCharacters((prev) => prev.map((c) => (c.char_id === character.char_id ? res.character : c)));
+      setStatus({ type: "success", message: `Renamed to ${trimmedNewLabel}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
@@ -225,7 +225,7 @@ export default function Avatar() {
                   Try
                 </button>
                 <button
-                  onClick={() => handleRename(c.char_id)}
+                  onClick={() => handleRename(c)}
                   className="flex-1 rounded border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 py-1 transition-colors"
                 >
                   Rename

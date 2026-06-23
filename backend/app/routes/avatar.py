@@ -46,6 +46,10 @@ class RenameRequest(BaseModel):
     new_char_id: str = Field(..., min_length=1)
 
 
+class UpdateLabelRequest(BaseModel):
+    label: str = Field(..., min_length=1)
+
+
 def _normalize_char_id_or_400(char_id: str) -> str:
     try:
         return normalize_char_id(char_id)
@@ -133,6 +137,19 @@ async def delete_character(char_id: str):
     except CharacterNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"status": "ok", "char_id": cid}
+
+
+@router.patch("/api/avatar/{char_id}", summary="更新 Avatar 角色顯示名稱")
+async def update_character_label(char_id: str, payload: UpdateLabelRequest):
+    cid = _normalize_char_id_or_400(char_id)
+    label = payload.label.strip()
+    if not label:
+        raise HTTPException(status_code=400, detail="label 不可為空")
+    try:
+        character = get_store().update_label(cid, label)
+    except CharacterNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"status": "ok", "character": character}
 
 
 @router.post("/api/avatar/{char_id}/rename", summary="重命名 Avatar 角色")

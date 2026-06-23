@@ -4,6 +4,7 @@ import {
   uploadAvatarCharacter,
   deleteAvatarCharacter,
   renameAvatarCharacter,
+  updateAvatarCharacterLabel,
 } from "./avatar";
 
 afterEach(() => vi.restoreAllMocks());
@@ -50,5 +51,14 @@ describe("avatar api", () => {
     const [url, init] = f.mock.calls[0];
     expect(url).toBe("/api/avatar/008/rename");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({ new_char_id: "009" });
+  });
+
+  it("updateAvatarCharacterLabel PATCHes display name", async () => {
+    const f = mockFetch({ status: "ok", character: { char_id: "008", label: "新的名字" } });
+    await updateAvatarCharacterLabel("008", "新的名字");
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("/api/avatar/008");
+    expect((init as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ label: "新的名字" });
   });
 });
