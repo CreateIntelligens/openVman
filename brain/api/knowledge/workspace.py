@@ -16,7 +16,12 @@ ALLOWED_CODE_SUFFIXES = {
     ".toml", ".ini", ".cfg", ".vue", ".svelte",
 }
 ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
-EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/")
+# Excluded from the vector index because they are derivatives or process logs,
+# not source knowledge — embedding them double-indexes the corpus and adds noise:
+#   graphify-out/  derived graph artefacts + the Obsidian vault
+#   dreaming/      REM/Deep/Light process reports (consolidated memories already
+#                  live in the memories table; the reports are meta logs)
+EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/", "graphify-out/", "dreaming/")
 WORKSPACE_TEMPLATES = {
     "SOUL.md": """# 核心人格設定 (SOUL)
 

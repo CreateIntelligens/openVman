@@ -16,8 +16,9 @@ from graphify.analyze import god_nodes, surprising_connections
 from graphify.build import build_from_json
 from graphify.cluster import cluster, score_all
 from graphify.detect import detect
-from graphify.export import to_html, to_json
+from graphify.export import to_canvas, to_html, to_json, to_obsidian
 from graphify.extract import collect_files, extract as ast_extract
+from infra.db import get_db
 from knowledge.graph_extractor import extract_semantic
 from knowledge.workspace import ensure_workspace_scaffold, get_workspace_root
 
@@ -66,6 +67,70 @@ def _run_ast_extraction(code_paths: list[Path]) -> dict[str, Any]:
     return ast_extract(files)
 
 
+NOTE_GRAPH_TABLE = "note_graph"
+
+
+def _source_files_for_node(node: dict[str, Any]) -> list[str]:
+    files = node.get("source_files") or []
+    if not files and node.get("source_file"):
+        files = [node["source_file"]]
+    return [file for file in files if file]
+
+
+def _origin_for_source(source_file: str) -> str:
+    """Classify a node's origin from its source path for traceability."""
+    if "graphify-out/_sources/memories" in source_file or source_file.startswith("memory://"):
+        return "memory"
+    if source_file.startswith("dreaming/"):
+        return "dreaming"
+    return "knowledge"
+
+
+def _build_note_graph_table(
+    merged: dict[str, Any], project_id: str
+) -> int:
+    """Persist a file-level adjacency table into LanceDB for Graph RAG.
+
+    Each row is one source file plus the list of related files (one hop away in
+    the concept graph) and the relations that connect them. Retrieval can join a
+    vector hit's ``metadata.path`` against ``source_file`` here to pull in
+    related documents without re-embedding anything. Stored as a plain
+    structured table (no vectors), overwritten on every rebuild.
+    """
+    # Canonical nodes can appear in several files, so include every recorded
+    # source path rather than only the node's primary ``source_file``.
+    id_to_files = {node["id"]: _source_files_for_node(node) for node in merged.get("nodes", [])}
+    # file -> {neighbour_file -> set(relations)}
+    adjacency: dict[str, dict[str, set[str]]] = {}
+    for e in merged.get("edges", []):
+        rel = e.get("relation", "related_to")
+        for src_file in id_to_files.get(e.get("source"), []):
+            for tgt_file in id_to_files.get(e.get("target"), []):
+                if not src_file or not tgt_file or src_file == tgt_file:
+                    continue
+                adjacency.setdefault(src_file, {}).setdefault(tgt_file, set()).add(rel)
+                adjacency.setdefault(tgt_file, {}).setdefault(src_file, set()).add(rel)
+
+    rows = [
+        {
+            "source_file": src,
+            "related_files": sorted(neighbours),
+            "relations": sorted(
+                relation
+                for neighbour_relations in neighbours.values()
+                for relation in neighbour_relations
+            ),
+        }
+        for src, neighbours in adjacency.items()
+    ]
+    if not rows:
+        return 0
+
+    db = get_db(project_id)
+    db.create_table(NOTE_GRAPH_TABLE, data=rows, mode="overwrite")
+    return len(rows)
+
+
 def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
     """Rebuild the knowledge graph for a project.
 
@@ -86,6 +151,9 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
         for kind in ("document", "paper")
         for f in detection.get("files", {}).get(kind, [])
     ]
+    # Only knowledge-base content feeds the concept graph. Dream reports and the
+    # memories DB are deliberately excluded — they produced noisy, out-of-place
+    # nodes. Memories that matter should be saved into knowledge/ to appear here.
 
     ast_fragment = _run_ast_extraction(code_paths)
     semantic_fragment = extract_semantic(doc_paths, workspace_root)
@@ -95,6 +163,7 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
     for node in semantic_fragment.get("nodes", []):
         if node.get("id") in seen_ids:
             continue
+        node["origin"] = _origin_for_source(str(node.get("source_file", "")))
         merged_nodes.append(node)
         seen_ids.add(node["id"])
     merged = {
@@ -131,9 +200,29 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
             community_labels=community_labels,
         )
 
+    # Obsidian vault: one note per node with [[links]] + a canvas, so the same
+    # graph can be browsed in Obsidian (graph view, backlinks) not just the HTML.
+    vault_dir = out_dir / "obsidian"
+    to_obsidian(
+        graph,
+        communities,
+        str(vault_dir),
+        community_labels=community_labels,
+        cohesion=cohesion,
+    )
+    to_canvas(
+        graph,
+        communities,
+        str(vault_dir / "graph.canvas"),
+        community_labels=community_labels,
+    )
+
+    note_graph_rows = _build_note_graph_table(merged, project_id)
+
     summary = {
         "project_id": project_id,
         "built_at": _now_iso(),
+        "note_graph_files": note_graph_rows,
         "nodes": graph.number_of_nodes(),
         "edges": graph.number_of_edges(),
         "communities": len(communities),
@@ -144,6 +233,7 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
         "cohesion": {str(k): v for k, v in cohesion.items()},
         "harness": semantic_fragment.get("_harness", {}),
         "output_dir": str(out_dir),
+        "obsidian_dir": str(vault_dir),
     }
     (out_dir / "summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"

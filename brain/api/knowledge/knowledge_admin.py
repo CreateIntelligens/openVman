@@ -15,6 +15,7 @@ from knowledge.doc_meta import (
     upsert_document_meta,
 )
 from knowledge.workspace import (
+    ALLOWED_DOCUMENT_SUFFIXES,
     get_core_documents,
     ensure_workspace_scaffold,
     is_indexable_document,
@@ -298,3 +299,34 @@ def _build_document_summary(
         "enabled": document_meta["enabled"],
         "created_at": document_meta["created_at"],
     }
+
+
+def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
+    """Promote staged files from raw/ into knowledge/ (the 'commit' step).
+
+    raw/ is a staging area (uploads land there un-indexed). Committing moves
+    document-type files into knowledge/ preserving their sub-path, after which
+    the caller triggers reindex + graph rebuild so they enter RAG and the
+    concept graph. Non-document artifacts are left in raw/.
+    """
+    root = ensure_workspace_scaffold(project_id)
+    raw_root = root / "raw"
+    if not raw_root.exists():
+        return {"committed": [], "skipped": []}
+
+    committed: list[str] = []
+    skipped: list[str] = []
+    for src in sorted(p for p in raw_root.rglob("*") if p.is_file()):
+        rel_in_raw = src.relative_to(raw_root)
+        if src.suffix.lower() not in ALLOWED_DOCUMENT_SUFFIXES:
+            skipped.append(rel_in_raw.as_posix())
+            continue
+        target_rel = Path("knowledge") / rel_in_raw
+        dest = resolve_workspace_document(target_rel.as_posix(), project_id)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(src.read_text(encoding="utf-8-sig"), encoding="utf-8")
+        upsert_document_meta(target_rel.as_posix(), project_id, source_type="upload")
+        src.unlink()
+        committed.append(target_rel.as_posix())
+
+    return {"committed": committed, "skipped": skipped}

@@ -144,6 +144,21 @@ export function reindexKnowledge() {
   });
 }
 
+export interface KnowledgeCommitResponse {
+  status: string;
+  project_id: string;
+  committed?: string[];
+  skipped?: string[];
+  graph?: string;
+}
+
+/** Promote staged raw/ files into the knowledge base, then reindex + rebuild graph. */
+export function commitRawKnowledge() {
+  return post<KnowledgeCommitResponse>(knowledgePath("/raw/commit"), {
+    project_id: getActiveProjectId(),
+  });
+}
+
 interface FetchPageResponse {
   status: string;
   title: string;

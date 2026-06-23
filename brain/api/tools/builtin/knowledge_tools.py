@@ -56,13 +56,59 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
             logger.warning("search_one failed table=%s query=%r err=%s", table_name, query[:60], exc)
 
     merged = merge_search_results(grouped, limit=top_k)
+
+    # 3. Graph RAG: pull in chunks from files one hop away in the concept graph,
+    #    so related concepts the query didn't lexically match still reach the LLM.
+    #    Only for the knowledge table (note_graph is built from knowledge docs).
+    related: list[dict[str, Any]] = []
+    if table_name == "knowledge":
+        related = _expand_via_graph(merged, project_id)
+
     return {
         "table": table_name,
         "queries": queries,
         "embedding_versions": sorted(list(embedding_versions)),
         "results": merged,
-        "citations": build_citations(merged),
+        "related": related,
+        "citations": build_citations(merged + related),
     }
+
+
+def _fetch_chunks_by_file(file_path: str, limit: int, project_id: str) -> list[dict[str, Any]]:
+    """Fetch up to *limit* knowledge chunks belonging to a workspace file.
+
+    Promotes ``path``/``title`` out of metadata so the records match the shape
+    of vector-search hits (needed by ``build_citations``).
+    """
+    from infra.db import get_knowledge_table, parse_record_metadata
+
+    table = get_knowledge_table(project_id)
+    safe = file_path.replace("'", "''")
+    rows = table.search().where(f"metadata LIKE '%{safe}%'").limit(limit).to_list()
+
+    records: list[dict[str, Any]] = []
+    for row in rows:
+        meta = parse_record_metadata(row)
+        if meta.get("path") != file_path:
+            continue  # LIKE can match substrings; confirm exact path
+        record = {key: value for key, value in row.items() if key != "vector"}
+        record["path"] = meta.get("path", "")
+        record["title"] = meta.get("title", "")
+        records.append(record)
+    return records
+
+
+def _expand_via_graph(hits: list[dict[str, Any]], project_id: str) -> list[dict[str, Any]]:
+    from knowledge.graph_rag import expand_with_graph
+
+    def fetch_project_chunks(file_path: str, limit: int) -> list[dict[str, Any]]:
+        return _fetch_chunks_by_file(file_path, limit, project_id)
+
+    try:
+        return expand_with_graph(hits, project_id, fetch_project_chunks)
+    except Exception as exc:
+        logger.warning("graph expansion failed: %s", exc)
+        return []
 
 
 def _get_document(args: dict[str, Any]) -> dict[str, Any]:

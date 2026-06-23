@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -19,7 +20,10 @@ _T = TypeVar("_T")
 ALLOWED_FILE_TYPES = {"code", "document", "image", "paper", "rationale"}
 DEFAULT_CHUNK_SIZE = 6
 DEFAULT_MAX_ROUNDS = 3
-FILE_CONTENT_LIMIT = 6000
+# Per-segment character budget fed to the LLM. Long files are split into
+# multiple segments of this size (see ``_build_sources``) instead of being
+# truncated, so the whole document is extracted, not just its opening.
+SEGMENT_SIZE = 6000
 GLOBAL_LINK_BATCH = 120
 
 EXTRACT_PROMPT = """Extract a knowledge graph fragment from the files below.
@@ -110,11 +114,63 @@ def _load_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
-def _read_file(path: Path, limit: int = FILE_CONTENT_LIMIT) -> str:
-    try:
-        return path.read_text(encoding="utf-8", errors="replace")[:limit]
-    except OSError as exc:
-        return f"[read error: {exc}]"
+@dataclass(frozen=True)
+class _Source:
+    """One unit of content fed to extraction: a whole short file, or one
+    segment of a long file. ``path`` is always the real file path so node
+    ``source_file`` tagging, validation, and origin classification are
+    unchanged regardless of how the file was split."""
+
+    path: Path
+    text: str
+    segment: int = 1  # 1-based segment index
+    total_segments: int = 1
+
+
+def _split_text(text: str, size: int = SEGMENT_SIZE) -> list[str]:
+    """Split text into <=size-char segments on paragraph/line boundaries.
+
+    Greedily packs whole paragraphs (then lines, then a hard cut) so concepts
+    that span a few lines stay within one segment instead of being severed.
+    """
+    if len(text) <= size:
+        return [text]
+    segments: list[str] = []
+    buf = ""
+    for para in text.split("\n\n"):
+        block = para if not buf else f"{buf}\n\n{para}"
+        if len(block) <= size:
+            buf = block
+            continue
+        if buf:
+            segments.append(buf)
+            buf = ""
+        # ``para`` alone still too big: fall back to line-then-hard splits.
+        while len(para) > size:
+            cut = para.rfind("\n", 0, size)
+            cut = cut if cut > 0 else size
+            segments.append(para[:cut])
+            para = para[cut:].lstrip("\n")
+        buf = para
+    if buf:
+        segments.append(buf)
+    return segments
+
+
+def _build_sources(files: list[Path]) -> list[_Source]:
+    """Read each file in full and split long ones into ``_Source`` segments."""
+    sources: list[_Source] = []
+    for path in files:
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            sources.append(_Source(path, f"[read error: {exc}]"))
+            continue
+        parts = _split_text(text)
+        total = len(parts)
+        for i, part in enumerate(parts, start=1):
+            sources.append(_Source(path, part, segment=i, total_segments=total))
+    return sources
 
 
 def _norm_label(label: str) -> str:
@@ -132,10 +188,31 @@ def _relative(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
-def _llm_extract(chunk: list[Path], workspace_root: Path, feedback: str = "") -> dict[str, Any]:
-    file_list = "\n".join(f"- {_relative(f, workspace_root)}" for f in chunk)
+def _unique_paths(chunk: list[_Source]) -> list[_Source]:
+    """One _Source per distinct file (first segment), preserving order."""
+    seen: set[Path] = set()
+    out: list[_Source] = []
+    for s in chunk:
+        if s.path in seen:
+            continue
+        seen.add(s.path)
+        out.append(s)
+    return out
+
+
+def _segment_header(src: _Source, workspace_root: Path) -> str:
+    rel = _relative(src.path, workspace_root)
+    if src.total_segments > 1:
+        return f"{rel} (part {src.segment}/{src.total_segments})"
+    return rel
+
+
+def _llm_extract(chunk: list[_Source], workspace_root: Path, feedback: str = "") -> dict[str, Any]:
+    file_list = "\n".join(
+        f"- {_relative(s.path, workspace_root)}" for s in _unique_paths(chunk)
+    )
     contents = "\n\n".join(
-        f"=== {_relative(f, workspace_root)} ===\n{_read_file(f)}" for f in chunk
+        f"=== {_segment_header(s, workspace_root)} ===\n{s.text}" for s in chunk
     )
     feedback_block = (
         f"PREVIOUS ATTEMPT HAD ISSUES (fix all of these):\n{feedback}\n"
@@ -158,14 +235,14 @@ def _llm_extract(chunk: list[Path], workspace_root: Path, feedback: str = "") ->
     return parsed
 
 
-def _validate_chunk(frag: dict[str, Any], chunk: list[Path], workspace_root: Path) -> list[str]:
+def _validate_chunk(frag: dict[str, Any], chunk: list[_Source], workspace_root: Path) -> list[str]:
     issues: list[str] = []
     nodes = frag.get("nodes", [])
     edges = frag.get("edges", [])
 
     sources = {n.get("source_file", "") for n in nodes}
-    for f in chunk:
-        rel = _relative(f, workspace_root)
+    for s in _unique_paths(chunk):
+        rel = _relative(s.path, workspace_root)
         if rel not in sources:
             issues.append(
                 f"MISSING_TOPIC_NODE: '{rel}' has no node. "
@@ -205,7 +282,7 @@ def _clamp_file_types(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _extract_chunk_with_harness(
-    chunk: list[Path],
+    chunk: list[_Source],
     workspace_root: Path,
     max_rounds: int,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -396,7 +473,11 @@ def extract_semantic(
     all_nodes: list[dict[str, Any]] = []
     all_edges: list[dict[str, Any]] = []
 
-    for idx, chunk in enumerate(_chunk(files, chunk_size), start=1):
+    # Read + segment long files first, then chunk over segments. A chunk holds
+    # up to ``chunk_size`` segments (each <= SEGMENT_SIZE chars), so a long book
+    # is extracted across several calls instead of being truncated to its head.
+    sources = _build_sources(files)
+    for idx, chunk in enumerate(_chunk(sources, chunk_size), start=1):
         frag, report = _extract_chunk_with_harness(chunk, workspace_root, max_rounds)
         chunks_report.append({"chunk": idx, "rounds": report})
         all_nodes.extend(frag.get("nodes", []))

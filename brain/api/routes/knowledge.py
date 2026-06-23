@@ -17,6 +17,7 @@ from knowledge.graph import (
 from knowledge.workspace import get_workspace_root
 from knowledge.indexer import rebuild_knowledge_index, rename_document_records
 from knowledge.knowledge_admin import (
+    commit_raw_documents,
     create_workspace_directory,
     delete_workspace_directory,
     delete_workspace_document,
@@ -185,6 +186,42 @@ async def upload_knowledge_raw_documents_route(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok", "files": uploaded}
+
+
+@router.post("/knowledge/raw/commit", summary="採納 raw 區檔案進知識庫並重建索引與圖譜")
+async def commit_knowledge_raw_route(payload: AdminActionRequest):
+    """The 'commit' step: promote staged raw/ files into knowledge/, rebuild the
+    vector index synchronously, then rebuild the concept graph in the background.
+    """
+    pid = payload.project_id
+    try:
+        result = await asyncio.to_thread(commit_raw_documents, pid)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover
+        log_exception("knowledge_commit_error", exc, project_id=pid)
+        raise HTTPException(status_code=500, detail="採納失敗") from exc
+
+    if not result["committed"]:
+        return {"status": "nothing_to_commit", "project_id": pid, **result}
+
+    # RAG index: synchronous (incremental, fast). Graph: background (slow).
+    index_result = await asyncio.to_thread(rebuild_knowledge_index, pid)
+    log_event("knowledge_commit", project_id=pid, committed=len(result["committed"]))
+
+    existing = _graph_inflight.get(pid)
+    if not (existing and not existing.done()):
+        task = asyncio.create_task(_run_graph_rebuild(pid))
+        _graph_inflight[pid] = task
+
+    return {
+        "status": "ok",
+        "project_id": pid,
+        "committed": result["committed"],
+        "skipped": result["skipped"],
+        "indexed": index_result,
+        "graph": "building",
+    }
 
 
 @router.post("/knowledge/upload", summary="上傳實體檔案至知識庫")

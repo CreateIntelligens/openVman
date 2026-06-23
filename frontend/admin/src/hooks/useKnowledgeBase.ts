@@ -9,6 +9,7 @@ import {
   fetchKnowledgeDocument,
   moveKnowledgeDocument,
   reindexKnowledge,
+  commitRawKnowledge,
   saveKnowledgeDocument,
   updateKnowledgeDocumentMeta,
   uploadKnowledgeDocuments,
@@ -29,6 +30,11 @@ import { useProject } from "../context/ProjectContext";
 import { useStatusState } from "./useStatusState";
 
 type UploadEntry = { file: File; relativePath: string };
+
+function rawUploadTargetFor(currentDir: string): string {
+  const relativeDir = currentDir.replace(/^knowledge(\/|$)/, "");
+  return relativeDir ? `raw/${relativeDir}` : "raw";
+}
 
 async function collectFileSystemEntries(roots: FileSystemEntry[]): Promise<UploadEntry[]> {
   const out: UploadEntry[] = [];
@@ -67,6 +73,7 @@ export function useKnowledgeBase() {
   const [serverDirs, setServerDirs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const { status, setStatus, setErrorStatus } = useStatusState();
   const [search, setSearch] = useState("");
@@ -219,20 +226,18 @@ export function useKnowledgeBase() {
     setUploading(true);
     setStatus(null);
     try {
-      const response = await uploadKnowledgeDocuments(entries, currentDir);
-      setStatus({ type: "success", message: `已上傳 ${response.files.length} 個檔案。` });
+      const response = await uploadKnowledgeDocuments(entries, rawUploadTargetFor(currentDir));
+      setStatus({
+        type: "success",
+        message: `已上傳 ${response.files.length} 個檔案至暫存區，點「採納上傳」納入知識庫。`,
+      });
       await loadDocuments();
-      if (response.files[0]) {
-        setSelectedPath(response.files[0].path);
-        setRightPane("file");
-        await openFile(response.files[0].path);
-      }
     } catch (error) {
       setErrorStatus(error);
     } finally {
       setUploading(false);
     }
-  }, [currentDir, loadDocuments, openFile, setErrorStatus]);
+  }, [currentDir, loadDocuments, setErrorStatus]);
 
   const handleFileUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -253,6 +258,25 @@ export function useKnowledgeBase() {
       setErrorStatus(error);
     } finally {
       setReindexing(false);
+    }
+  }, [loadDocuments, setErrorStatus]);
+
+  const handleCommit = useCallback(async () => {
+    setCommitting(true);
+    setStatus(null);
+    try {
+      const response = await commitRawKnowledge();
+      if (response.status === "nothing_to_commit") {
+        setStatus({ type: "success", message: "raw 區沒有可採納的文件。" });
+      } else {
+        const n = response.committed?.length ?? 0;
+        setStatus({ type: "success", message: `已採納 ${n} 份文件，正在重建索引與圖譜。` });
+        await loadDocuments();
+      }
+    } catch (error) {
+      setErrorStatus(error);
+    } finally {
+      setCommitting(false);
     }
   }, [loadDocuments, setErrorStatus]);
 
@@ -425,6 +449,7 @@ export function useKnowledgeBase() {
     serverDirs,
     loading,
     reindexing,
+    committing,
     uploading,
     status,
     search,
@@ -472,6 +497,7 @@ export function useKnowledgeBase() {
     handleSave,
     handleFileUpload,
     handleReindex,
+    handleCommit,
     handleCrawl,
     handleDeleteConfirm,
     handleMove,

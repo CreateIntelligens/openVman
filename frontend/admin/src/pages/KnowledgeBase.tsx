@@ -18,6 +18,7 @@ export default function KnowledgeBase() {
     serverDirs,
     loading,
     reindexing,
+    committing,
     uploading,
     status,
     search,
@@ -65,6 +66,7 @@ export default function KnowledgeBase() {
     handleSave,
     handleFileUpload,
     handleReindex,
+    handleCommit,
     handleCrawl,
     handleDeleteConfirm,
     handleMove,
@@ -181,6 +183,15 @@ export default function KnowledgeBase() {
             >
               <span className="material-symbols-outlined text-[1rem]">add</span>
               新增來源
+            </button>
+            <button
+              onClick={handleCommit}
+              disabled={committing}
+              title="採納 raw 區的上傳檔案進知識庫，並重建索引與圖譜"
+              className="flex items-center gap-1.5 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-all disabled:opacity-50"
+            >
+              <span className={`material-symbols-outlined text-[1rem] ${committing ? "animate-spin" : ""}`}>library_add</span>
+              {committing ? "採納中..." : "採納上傳"}
             </button>
             <button
               onClick={handleReindex}
