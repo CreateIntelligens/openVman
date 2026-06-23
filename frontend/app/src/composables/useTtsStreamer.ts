@@ -3,8 +3,9 @@
  *
  * Two paths based on provider:
  *   - provider === 'indextts': POST /tts/stream (IndexTTS streaming, low latency)
+ *   - provider === 'auto' + IndexTTS is available: POST /tts/stream
  *     Response: audio/wav — 44-byte header + raw PCM 16 kHz mono Int16 LE, chunked
- *   - all others (auto, edge, gcp, aws…): POST /v1/audio/speech (full file, multi-provider)
+ *   - all others (edge, gcp, aws…): POST /v1/audio/speech (full file, multi-provider)
  *     Response: provider-native audio. Encoded formats are decoded to 16 kHz mono PCM.
  */
 
@@ -45,6 +46,8 @@ export interface TtsStreamerOptions {
   requestHeaders?: () => Record<string, string>;
   /** Decide whether a provider should use the streaming endpoint. */
   shouldUseStream?: (provider: string) => boolean;
+  /** Available backend TTS providers, used to route auto mode to IndexTTS streaming. */
+  ttsProviders?: () => TtsProvider[];
   /** Build the request body for the streaming endpoint. */
   buildStreamBody?: TtsBodyBuilder;
   /** Build the request body for the speech endpoint. */
@@ -63,14 +66,38 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     return { "Content-Type": "application/json", ...(options.requestHeaders?.() ?? {}) };
   }
 
+  function getTtsProviders(): TtsProvider[] {
+    return options.ttsProviders?.() ?? [];
+  }
+
+  function getIndexTtsProvider(): TtsProvider | undefined {
+    return getTtsProviders().find((candidate) => normalizedProvider(candidate.id) === "indextts");
+  }
+
   function shouldUseStream(provider: string): boolean {
-    return options.shouldUseStream?.(provider) ?? (!provider || provider === 'indextts');
+    if (options.shouldUseStream) return options.shouldUseStream(provider);
+
+    const normalized = normalizedProvider(provider);
+    if (!normalized || normalized === "indextts") return true;
+    if (normalized === "auto") return Boolean(getIndexTtsProvider());
+    return false;
+  }
+
+  function resolveStreamCharacter(opts: SpeakOptions): string {
+    if (opts.character) return opts.character;
+
+    const provider = normalizedProvider(opts.provider ?? "");
+    const indexProvider = getIndexTtsProvider();
+    if (provider === "auto") {
+      return indexProvider?.default_voice || defaultCharacter;
+    }
+    return opts.voice || indexProvider?.default_voice || defaultCharacter;
   }
 
   function buildStreamBody(text: string, opts: SpeakOptions): Record<string, string> {
     return options.buildStreamBody?.(text, opts) ?? {
       text,
-      character: opts.character ?? defaultCharacter,
+      character: resolveStreamCharacter(opts),
     };
   }
 
@@ -119,10 +146,11 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
 
       const emitPcmChunk = createPcmEmitter(options);
 
-      if (useStream) {
+      const contentType = response.headers.get("Content-Type") ?? "";
+      if (useStream && streamResponseCanEmitPcm(contentType)) {
         await streamPcmResponse(response, abort.signal, emitPcmChunk, (reader) => {
           activeReader = reader;
-        });
+        }, streamResponseHasWavHeader(contentType));
       } else {
         await emitSpeechResponseChunks(response, abort.signal, emitPcmChunk);
       }
@@ -174,6 +202,7 @@ async function streamPcmResponse(
   signal: AbortSignal,
   emitPcmChunk: (pcm: Int16Array) => Promise<void>,
   setActiveReader: (reader: ReadableStreamDefaultReader<Uint8Array>) => void,
+  stripWavHeader = true,
 ): Promise<void> {
   if (!response.body) {
     throw new Error("TTS response has no body");
@@ -182,7 +211,7 @@ async function streamPcmResponse(
   const reader = response.body.getReader();
   setActiveReader(reader);
 
-  let headerBytesSeen = 0;
+  let headerBytesSeen = stripWavHeader ? 0 : WAV_HEADER_BYTES;
   let leftover: ByteArray = new Uint8Array(0);
 
   while (!signal.aborted) {
@@ -213,6 +242,7 @@ async function emitSpeechResponseChunks(
   emitPcmChunk: (pcm: Int16Array) => Promise<void>,
 ): Promise<void> {
   const contentType = response.headers.get("Content-Type") ?? "";
+  assertAudioContentType(contentType);
   const audioBytes = await response.arrayBuffer();
   if (signal.aborted) return;
 
@@ -348,8 +378,29 @@ function createDecodeAudioContext(): AudioContext {
   return new AudioContextCtor();
 }
 
+function normalizedProvider(provider: string): string {
+  return provider.trim().toLowerCase();
+}
+
 function normalizeContentType(contentType: string): string {
   return contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+function assertAudioContentType(contentType: string): void {
+  const type = normalizeContentType(contentType);
+  if (type && !type.startsWith("audio/")) {
+    throw new Error(`TTS response is not audio: ${type}`);
+  }
+}
+
+function streamResponseCanEmitPcm(contentType: string): boolean {
+  const type = normalizeContentType(contentType);
+  return !type || isWavContentType(type) || isRawPcmContentType(type);
+}
+
+function streamResponseHasWavHeader(contentType: string): boolean {
+  const type = normalizeContentType(contentType);
+  return !type || isWavContentType(type);
 }
 
 function isWavContentType(type: string): boolean {

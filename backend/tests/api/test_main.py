@@ -288,6 +288,82 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
     assert response.headers["X-TTS-Cache-Hit"] == "true"
 
 
+def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    error_response = types.SimpleNamespace(
+        status_code=503,
+        headers={"content-type": "text/plain"},
+        closed=False,
+    )
+
+    async def _read_error_body():
+        return b"stream unavailable"
+
+    async def _close_error_response():
+        error_response.closed = True
+
+    error_response.aread = _read_error_body
+    error_response.aclose = _close_error_response
+
+    class FakeAsyncClient:
+        instances: list["FakeAsyncClient"] = []
+
+        def __init__(self, *args, **kwargs):
+            self.closed = False
+            self.requests: list[object] = []
+            type(self).instances.append(self)
+
+        def build_request(self, method: str, url: str, *, json: dict[str, str]):
+            request = types.SimpleNamespace(method=method, url=url, json=json)
+            self.requests.append(request)
+            return request
+
+        async def send(self, request, *, stream: bool = False):
+            assert request.method == "POST"
+            assert request.url == "http://index-tts-vllm:8011/tts_stream"
+            assert request.json == {"text": "你好", "character": "hayley"}
+            assert stream is True
+            return error_response
+
+        async def aclose(self):
+            self.closed = True
+
+    class FakeService:
+        def __init__(self):
+            self.requests: list[object] = []
+
+        def synthesize(self, request, provider=""):
+            self.requests.append(request)
+            return types.SimpleNamespace(
+                result=types.SimpleNamespace(
+                    audio_bytes=b"fallback-wav",
+                    content_type="audio/wav",
+                )
+            )
+
+    fake_service = FakeService()
+    monkeypatch.setattr(module.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+        tts_indextts_url="http://index-tts-vllm:8011",
+        tts_indextts_default_character="hayley",
+    ))
+
+    client = TestClient(module.app)
+    response = client.post("/tts/stream", json={"text": "你好", "character": "hayley"})
+
+    assert response.status_code == 200
+    assert response.content == b"fallback-wav"
+    assert response.headers["content-type"].startswith("audio/wav")
+    assert len(FakeAsyncClient.instances) == 1
+    assert FakeAsyncClient.instances[0].closed is True
+    assert error_response.closed is True
+    assert len(fake_service.requests) == 1
+    assert fake_service.requests[0].text == "你好"
+    assert fake_service.requests[0].voice_hint == "hayley"
+
+
 class FakeRelay:
     instances: list["FakeRelay"] = []
 

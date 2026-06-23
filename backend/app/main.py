@@ -375,6 +375,56 @@ class TtsStreamRequest(BaseModel):
     character: str = ""
 
 
+async def _proxy_indextts_stream(
+    *,
+    indextts_stream_url: str,
+    text: str,
+    character: str,
+) -> StreamingResponse | None:
+    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
+    try:
+        request = client.build_request(
+            "POST",
+            indextts_stream_url,
+            json={"text": text, "character": character},
+        )
+        resp = await client.send(request, stream=True)
+    except Exception as exc:
+        await client.aclose()
+        logger.error("tts_stream proxy error: %s", exc)
+        return None
+
+    if resp.status_code >= 400:
+        detail = ""
+        try:
+            detail = (await resp.aread()).decode("utf-8", errors="replace")[:500]
+        finally:
+            await resp.aclose()
+            await client.aclose()
+        logger.warning(
+            "tts_stream indextts error status=%s detail=%s",
+            resp.status_code,
+            detail,
+        )
+        return None
+
+    async def _proxy_stream() -> AsyncIterator[bytes]:
+        try:
+            async for chunk in resp.aiter_bytes(chunk_size=4096):
+                if chunk:
+                    yield chunk
+        except Exception as exc:
+            logger.error("tts_stream proxy read error: %s", exc)
+        finally:
+            await resp.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        _proxy_stream(),
+        media_type=resp.headers.get("content-type", "audio/wav") or "audio/wav",
+    )
+
+
 @app.post("/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
 async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
     cfg = get_tts_config()
@@ -387,31 +437,18 @@ async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
     # Primary: proxy stream directly from IndexTTS
     if cfg.tts_indextts_url:
         indextts_stream_url = cfg.tts_indextts_url.rstrip("/") + "/tts_stream"
-
-        async def _proxy_stream() -> AsyncIterator[bytes]:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0)) as client:
-                try:
-                    async with client.stream(
-                        "POST",
-                        indextts_stream_url,
-                        json={"text": cleaned, "character": character},
-                    ) as resp:
-                        if resp.status_code >= 400:
-                            logger.warning(
-                                "tts_stream indextts error status=%s", resp.status_code
-                            )
-                            return
-                        async for chunk in resp.aiter_bytes(chunk_size=4096):
-                            yield chunk
-                except Exception as exc:
-                    logger.error("tts_stream proxy error: %s", exc)
-
-        return StreamingResponse(_proxy_stream(), media_type="audio/wav")
+        proxied = await _proxy_indextts_stream(
+            indextts_stream_url=indextts_stream_url,
+            text=cleaned,
+            character=character,
+        )
+        if proxied is not None:
+            return proxied
 
     # Fallback: buffer with service chain
     svc = _get_service()
     try:
-        output = svc.synthesize(SynthesizeRequest(text=cleaned, voice_hint=""))
+        output = svc.synthesize(SynthesizeRequest(text=cleaned, voice_hint=character))
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
