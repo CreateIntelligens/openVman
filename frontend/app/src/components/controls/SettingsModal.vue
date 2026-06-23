@@ -13,6 +13,13 @@ export interface PersonaSummary {
   label: string
 }
 
+export interface ProjectSummary {
+  project_id: string
+  label: string
+  document_count?: number
+  persona_count?: number
+}
+
 const props = defineProps<{
   open: boolean
   characters: Character[]
@@ -20,8 +27,11 @@ const props = defineProps<{
   ttsProvider: string
   ttsVoice: string
   ttsProviders: TtsProvider[]
+  projects: ProjectSummary[]
+  currentProjectId: string
   personas: PersonaSummary[]
   currentPersonaId: string
+  personasLoading?: boolean
   voiceMode?: 'live' | 'text'
   state: AvatarState
   disabled?: boolean
@@ -32,28 +42,43 @@ const emit = defineEmits<{
   charChange: [charId: string]
   ttsProviderChange: [provider: string]
   ttsVoiceChange: [voice: string]
+  projectChange: [projectId: string]
+  projectPreviewChange: [projectId: string]
   personaChange: [personaId: string]
   voiceModeChange: [mode: 'live' | 'text']
   apply: []
 }>()
 
 // Local draft state — doesn't commit until "套用"
+const draftProjectId = ref(props.currentProjectId)
 const draftPersonaId = ref(props.currentPersonaId)
 const draftCharId = ref(props.currentCharId ?? '')
 const draftTtsProvider = ref(props.ttsProvider)
 const draftTtsVoice = ref(props.ttsVoice)
-const draftVoiceMode = ref<'live' | 'text'>(props.voiceMode ?? 'live')
+const draftVoiceMode = ref<'live' | 'text'>(props.voiceMode ?? 'text')
+
+function pickPersonaId(preferred: string): string {
+  if (props.personas.some((p) => p.persona_id === preferred)) return preferred
+  return props.personas.find((p) => p.persona_id === 'default')?.persona_id
+    ?? props.personas[0]?.persona_id
+    ?? 'default'
+}
 
 // Sync draft when modal opens
 watch(() => props.open, (open) => {
   if (open) {
+    draftProjectId.value = props.currentProjectId
     draftPersonaId.value = props.currentPersonaId
     draftCharId.value = props.currentCharId ?? ''
     draftTtsProvider.value = props.ttsProvider
     draftTtsVoice.value = props.ttsVoice
-    draftVoiceMode.value = props.voiceMode ?? 'live'
+    draftVoiceMode.value = props.voiceMode ?? 'text'
   }
 })
+
+watch(() => props.personas, () => {
+  draftPersonaId.value = pickPersonaId(draftPersonaId.value)
+}, { deep: true })
 
 // When provider changes, reset voice to that provider's default
 watch(draftTtsProvider, (id) => {
@@ -65,34 +90,55 @@ const activeTtsProvider = computed(() =>
   props.ttsProviders.find(p => p.id === draftTtsProvider.value)
 )
 const showVoicePicker = computed(() =>
-  draftTtsProvider.value !== 'auto' &&
-  activeTtsProvider.value &&
-  activeTtsProvider.value.voices.length > 0
+  draftTtsProvider.value !== 'auto' && Boolean(activeTtsProvider.value?.voices.length)
+)
+const projectDisabled = computed(() => Boolean(props.disabled) || props.projects.length === 0)
+const personaDisabled = computed(() =>
+  Boolean(props.disabled) || Boolean(props.personasLoading) || !draftProjectId.value
 )
 
 const isDirty = computed(() =>
+  draftProjectId.value !== props.currentProjectId ||
   draftPersonaId.value !== props.currentPersonaId ||
   draftCharId.value !== (props.currentCharId ?? '') ||
   draftTtsProvider.value !== props.ttsProvider ||
   draftTtsVoice.value !== props.ttsVoice ||
-  draftVoiceMode.value !== (props.voiceMode ?? 'live')
+  draftVoiceMode.value !== (props.voiceMode ?? 'text')
 )
+const applyDisabled = computed(() => Boolean(props.disabled) || Boolean(props.personasLoading))
 
-function applyAndClose() {
-  if (draftPersonaId.value !== props.currentPersonaId)      emit('personaChange', draftPersonaId.value)
-  if (draftCharId.value !== (props.currentCharId ?? ''))    emit('charChange', draftCharId.value)
-  if (draftTtsProvider.value !== props.ttsProvider)         emit('ttsProviderChange', draftTtsProvider.value)
-  if (draftTtsVoice.value !== props.ttsVoice)               emit('ttsVoiceChange', draftTtsVoice.value)
-  if (draftVoiceMode.value !== (props.voiceMode ?? 'live')) emit('voiceModeChange', draftVoiceMode.value)
+function handleProjectDraftChange(): void {
+  emit('projectPreviewChange', draftProjectId.value)
+}
+
+function applyAndClose(): void {
+  if (draftProjectId.value !== props.currentProjectId) {
+    emit('projectChange', draftProjectId.value)
+  }
+  if (draftPersonaId.value !== props.currentPersonaId) {
+    emit('personaChange', draftPersonaId.value)
+  }
+  if (draftCharId.value !== (props.currentCharId ?? '')) {
+    emit('charChange', draftCharId.value)
+  }
+  if (draftTtsProvider.value !== props.ttsProvider) {
+    emit('ttsProviderChange', draftTtsProvider.value)
+  }
+  if (draftTtsVoice.value !== props.ttsVoice) {
+    emit('ttsVoiceChange', draftTtsVoice.value)
+  }
+  if (draftVoiceMode.value !== (props.voiceMode ?? 'text')) {
+    emit('voiceModeChange', draftVoiceMode.value)
+  }
   if (isDirty.value) emit('apply')
   emit('update:open', false)
 }
 
-function close() {
+function close(): void {
   emit('update:open', false)
 }
 
-function onKeydown(e: KeyboardEvent) {
+function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') close()
 }
 
@@ -112,8 +158,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
           <div class="modal-body">
             <div class="field-card field-card--full">
-              <span class="field-card__label">大腦人設</span>
-              <select v-model="draftPersonaId" :disabled="disabled">
+              <span class="field-card__label">大腦/知識庫</span>
+              <select v-model="draftProjectId" :disabled="projectDisabled" @change="handleProjectDraftChange">
+                <option v-for="p in projects" :key="p.project_id" :value="p.project_id">
+                  {{ p.label || p.project_id }}
+                </option>
+              </select>
+            </div>
+
+            <div class="field-card field-card--full">
+              <span class="field-card__label">人設</span>
+              <select v-model="draftPersonaId" :disabled="personaDisabled">
                 <option v-for="p in personas" :key="p.persona_id" :value="p.persona_id">
                   {{ p.label }}
                 </option>
@@ -170,7 +225,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
           <div class="modal-footer">
             <button class="btn-cancel" @click="close">取消</button>
-            <button class="btn-apply" :class="{ 'btn-apply--dirty': isDirty }" @click="applyAndClose">
+            <button
+              class="btn-apply"
+              :class="{ 'btn-apply--dirty': isDirty }"
+              :disabled="applyDisabled"
+              @click="applyAndClose"
+            >
               {{ isDirty ? '套用並重新連線' : '關閉' }}
             </button>
           </div>
@@ -276,6 +336,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .btn-apply:hover { background: var(--primary-hover); }
 .btn-apply--dirty {
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);
+}
+.btn-apply:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .field-row {

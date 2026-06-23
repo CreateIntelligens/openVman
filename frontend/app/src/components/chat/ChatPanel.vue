@@ -112,6 +112,7 @@ watch(() => props.messages.length, async () => {
 
 <style scoped>
 .chat-panel {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -129,6 +130,11 @@ watch(() => props.messages.length, async () => {
   justify-content: space-between;
   padding: 1rem 1.25rem;
   border-bottom: var(--hairline) solid var(--line);
+}
+
+.chat-panel__header,
+.chat-input-bar {
+  flex-shrink: 0;
 }
 
 .chat-panel__eyebrow {
@@ -320,6 +326,20 @@ watch(() => props.messages.length, async () => {
 }
 
 @media (max-width: 40rem) {
+  .chat-panel {
+    flex: none;
+    height: auto;
+  }
+
+  .chat-messages {
+    flex: none;
+    max-height: 40svh;
+  }
+
+  .chat-messages:empty {
+    padding-block: 0;
+  }
+
   .chat-msg {
     max-width: 95%;
   }

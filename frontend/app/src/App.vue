@@ -53,14 +53,19 @@
       :tts-provider="settings.ttsProvider"
       :tts-voice="settings.ttsVoice"
       :tts-providers="ttsProviders"
+      :projects="projects"
+      :current-project-id="settings.projectId"
       :personas="personas"
       :current-persona-id="settings.personaId"
+      :personas-loading="personasLoading"
       :voice-mode="settings.voiceMode"
       :state="chat.state.value"
       :disabled="!wasm.isReady.value || wasm.isLoading.value"
       @char-change="handleCharChange"
       @tts-provider-change="handleTtsChange"
       @tts-voice-change="handleTtsVoiceChange"
+      @project-preview-change="handleProjectPreviewChange"
+      @project-change="handleProjectChange"
       @persona-change="handlePersonaChange"
       @voice-mode-change="handleVoiceModeChange"
       @apply="handleSettingsApply"
@@ -136,10 +141,21 @@ const fallbackCharacters = [
   { id: "009", name: "角色 009" },
 ];
 
+interface ProjectSummary {
+  project_id: string;
+  label: string;
+  document_count?: number;
+  persona_count?: number;
+}
+
+const DEFAULT_PROJECT: ProjectSummary = { project_id: "default", label: "預設" };
 const DEFAULT_PERSONA: PersonaSummary = { persona_id: "default", label: "預設" };
+const projects = ref<ProjectSummary[]>([DEFAULT_PROJECT]);
 const personas = ref<PersonaSummary[]>([DEFAULT_PERSONA]);
+const personasLoading = ref(false);
 const ttsProviders = ref<TtsProvider[]>([]);
 const avatarCatalog = useAvatarCatalog();
+let personaRequestId = 0;
 
 const characters = computed(() => {
   const loaded = avatarCatalog.characters.value
@@ -151,18 +167,65 @@ const characters = computed(() => {
   return loaded.length > 0 ? loaded : fallbackCharacters;
 });
 
-async function fetchPersonas(): Promise<void> {
+function pickFallbackProjectId(items: ProjectSummary[]): string {
+  return items.find((p) => p.project_id === "default")?.project_id
+    ?? items[0]?.project_id
+    ?? DEFAULT_PROJECT.project_id;
+}
+
+function pickFallbackPersonaId(items: PersonaSummary[], preferredId: string): string {
+  if (items.some((p) => p.persona_id === preferredId)) return preferredId;
+  return items.find((p) => p.persona_id === "default")?.persona_id
+    ?? items[0]?.persona_id
+    ?? DEFAULT_PERSONA.persona_id;
+}
+
+async function fetchProjects(): Promise<void> {
   try {
-    const res = await fetch("/api/personas?project_id=default");
+    const res = await fetch("/api/projects");
     if (!res.ok) return;
     const data = await res.json();
+    const items: ProjectSummary[] = (data.projects ?? []).map((p: ProjectSummary) => ({
+      project_id: p.project_id,
+      label: p.label || p.project_id,
+      document_count: p.document_count,
+      persona_count: p.persona_count,
+    }));
+    projects.value = items.length > 0 ? items : [DEFAULT_PROJECT];
+    if (!projects.value.some((p) => p.project_id === settings.projectId)) {
+      settings.projectId = pickFallbackProjectId(projects.value);
+    }
+  } catch {
+    projects.value = [DEFAULT_PROJECT];
+  }
+}
+
+async function fetchPersonas(
+  projectId = settings.projectId,
+  options: { syncSelected?: boolean } = {},
+): Promise<void> {
+  const targetProjectId = projectId || DEFAULT_PROJECT.project_id;
+  const requestId = ++personaRequestId;
+  personasLoading.value = true;
+
+  try {
+    const res = await fetch(`/api/personas?project_id=${encodeURIComponent(targetProjectId)}`);
+    if (!res.ok || requestId !== personaRequestId) return;
+    const data = await res.json();
+    if (requestId !== personaRequestId) return;
     const items: PersonaSummary[] = (data.personas ?? []).map((p: { persona_id: string; label: string }) => ({
       persona_id: p.persona_id,
       label: p.label || p.persona_id,
     }));
-    if (items.length > 0) personas.value = items;
+    const nextPersonas = items.length > 0 ? items : [DEFAULT_PERSONA];
+    personas.value = nextPersonas;
+    if (options.syncSelected ?? targetProjectId === settings.projectId) {
+      settings.personaId = pickFallbackPersonaId(nextPersonas, settings.personaId);
+    }
   } catch {
-    // silently keep the default fallback
+    if (requestId === personaRequestId) personas.value = [DEFAULT_PERSONA];
+  } finally {
+    if (requestId === personaRequestId) personasLoading.value = false;
   }
 }
 
@@ -198,6 +261,7 @@ const typewriter = useTypewriter({
 let pendingText = "";
 
 const ttsStreamer = useTtsStreamer({
+  ttsProviders: () => ttsProviders.value,
   onFirstAudio: () => {
     typewriter.start(pendingText);
     pendingText = "";
@@ -218,6 +282,7 @@ const ttsStreamer = useTtsStreamer({
 });
 
 const chat = useAvatarChat({
+  projectId: settings.projectId,
   personaId: settings.personaId,
   mode: settings.voiceMode,
   onAudioChunk: (data) => audio.playChunk(data),
@@ -244,6 +309,8 @@ const chat = useAvatarChat({
       return;
     }
     if (code === 'SESSION_EXPIRED') {
+      chat.setProject(settings.projectId);
+      chat.setPersona(settings.personaId);
       chat.reinit(settings.personaId);
     } else if (FATAL_ERROR_CODES.has(code)) {
       fatalError.value = { code, message };
@@ -319,6 +386,14 @@ function handleTtsVoiceChange(voice: string): void {
   settings.ttsVoice = voice;
 }
 
+function handleProjectPreviewChange(projectId: string): void {
+  void fetchPersonas(projectId, { syncSelected: false });
+}
+
+function handleProjectChange(projectId: string): void {
+  settings.projectId = projectId;
+}
+
 function handlePersonaChange(personaId: string): void {
   settings.personaId = personaId;
 }
@@ -328,7 +403,10 @@ function handleVoiceModeChange(mode: 'live' | 'text'): void {
 }
 
 async function handleSettingsApply(): Promise<void> {
+  await fetchPersonas(settings.projectId, { syncSelected: true });
   // Apply mode change before reconnecting so connect() uses the new mode
+  chat.setProject(settings.projectId);
+  chat.setPersona(settings.personaId);
   chat.setMode(settings.voiceMode);
   chat.disconnect();
   isStarted.value = false;
@@ -340,6 +418,8 @@ async function handleSettingsApply(): Promise<void> {
 async function handleFatalRetry(): Promise<void> {
   fatalError.value = null;
   await audio.resumeContext();
+  chat.setProject(settings.projectId);
+  chat.setPersona(settings.personaId);
   void chat.connect();
 }
 
@@ -371,9 +451,14 @@ watch(() => chat.state.value, (newState) => {
   }
 });
 
+watch(showSettings, () => {
+  void fetchPersonas(settings.projectId, { syncSelected: true });
+});
+
 onMounted(async () => {
   void fetchTtsProviders();
-  await fetchPersonas();
+  await fetchProjects();
+  await fetchPersonas(settings.projectId);
   await avatarCatalog.load();
   try {
     await wasm.initWasm();
@@ -420,11 +505,24 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+@media (max-width: 68.75rem) {
+  html, body, #app {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+}
 </style>
 
 <style scoped>
 .app-shell {
-  height: 100vh;
+  height: 100dvh;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -446,9 +544,10 @@ body {
   gap: 1rem;
 }
 
-.stage-panel__header h1 {
+.stage-hero h1 {
   margin: 0 0 0.5rem;
   font-size: 1.75rem;
+  line-height: 1.15;
   font-weight: 600;
   color: var(--text);
 }
@@ -480,10 +579,56 @@ body {
 
 @media (max-width: 68.75rem) {
   .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
     padding: 1rem;
   }
+
   .kiosk-layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex: initial;
+    flex-direction: column;
+    gap: 0.875rem;
+    min-height: auto;
+  }
+
+  .stage-panel {
+    flex: none;
+    gap: 0.625rem;
+  }
+
+  .stage-hero h1 {
+    margin-bottom: 0.25rem;
+    font-size: 1.2rem;
+  }
+
+  .stage-panel__intro {
+    font-size: 0.8rem;
+  }
+
+  .stage-card {
+    flex: none;
+    height: clamp(16rem, 48svh, 28rem);
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+  }
+
+  .console-column {
+    flex: none;
+    min-height: 0;
+    height: auto;
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 68.75rem) and (max-height: 36rem) {
+  .stage-panel__intro {
+    display: none;
+  }
+
+  .stage-card {
+    height: clamp(14rem, 44svh, 22rem);
   }
 }
 </style>

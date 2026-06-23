@@ -85,7 +85,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let lastWsUrl: string | null = null
        let clientId = createClientId()
        let currentPersonaId = options.personaId ?? 'default'
-       const projectId = options.projectId ?? 'default'
+       let currentProjectId = options.projectId ?? 'default'
        const surface = options.surface ?? 'avatar'
        const currentLipSyncMode = options.lipSyncMode ?? 'webgl'
        let currentMode: 'live' | 'text' = options.mode ?? 'live'
@@ -104,7 +104,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      auth_token: 'openvman-admin',
                      capabilities: {
                             mode: 'gemini_live',
-                            project_id: projectId,
+                            project_id: currentProjectId,
                             surface,
                             voice_source: 'custom',
                             persona_id: currentPersonaId,
@@ -117,6 +117,14 @@ export function useAvatarChat(options: ChatOptions = {}) {
        function reinit(personaId: string): void {
               currentPersonaId = personaId
               sendEvent(_buildClientInit())
+       }
+
+       function setProject(projectId: string): void {
+              currentProjectId = projectId
+       }
+
+       function setPersona(personaId: string): void {
+              currentPersonaId = personaId
        }
 
        // ── Connect ────────────────────────────────────────────
@@ -281,7 +289,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                              body: JSON.stringify({
                                     message: text,
                                     persona_id: currentPersonaId,
-                                    project_id: projectId,
+                                    project_id: currentProjectId,
                                     session_id: sessionId.value,
                              }),
                              signal: textAbortController.signal,
@@ -395,6 +403,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
                interrupt,
                reinit,
                setMode,
+               setProject,
+               setPersona,
                manualReconnect,
                beginAssistantMessage,
                appendAssistantText,
