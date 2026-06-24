@@ -49,6 +49,23 @@ def fingerprint_document(path: Path) -> str:
     return _fingerprint_document(path)
 
 
+def has_stale_documents(project_id: str = "default") -> bool:
+    """Return True if the vector index is out of date with the workspace.
+
+    Compares the current indexable documents' fingerprints against the saved
+    index state. Any added, changed, or removed document makes the index stale.
+    Used to decide whether a graph rebuild must first reindex so the graph is
+    never built on top of an embedding index that lags the files.
+    """
+    workspace_root = ensure_workspace_scaffold(project_id)
+    current = {
+        path.relative_to(workspace_root).as_posix(): _fingerprint_document(path)
+        for path in iter_indexable_documents(project_id)
+    }
+    previous = _load_index_state(project_id).get("documents", {})
+    return current != previous
+
+
 def rebuild_knowledge_index(project_id: str = "default") -> dict[str, Any]:
     """Incrementally rebuild the knowledge table from indexable workspace documents."""
     workspace_root = ensure_workspace_scaffold(project_id)

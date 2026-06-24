@@ -15,7 +15,11 @@ from knowledge.graph import (
     rebuild_project_graph,
 )
 from knowledge.workspace import get_workspace_root
-from knowledge.indexer import rebuild_knowledge_index, rename_document_records
+from knowledge.indexer import (
+    has_stale_documents,
+    rebuild_knowledge_index,
+    rename_document_records,
+)
 from knowledge.knowledge_admin import (
     commit_raw_documents,
     create_workspace_directory,
@@ -51,6 +55,12 @@ async def _background_reindex(project_id: str) -> None:
         log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
         return
     log_event("knowledge_reindex_auto", project_id=project_id, **result)
+    # Keep the concept graph in sync with the vector index: any content change
+    # that triggers a reindex (upload, delete, note, edit, move) should also
+    # rebuild the graph so deleted documents don't leave orphan nodes/edges.
+    # Reuse the in-flight registry so rapid successive changes coalesce instead
+    # of spawning parallel (LLM-heavy) rebuilds.
+    _schedule_graph_rebuild(project_id)
 
 
 async def _background_rename_document(source_path: str, target_path: str, project_id: str) -> None:
@@ -209,10 +219,7 @@ async def commit_knowledge_raw_route(payload: AdminActionRequest):
     index_result = await asyncio.to_thread(rebuild_knowledge_index, pid)
     log_event("knowledge_commit", project_id=pid, committed=len(result["committed"]))
 
-    existing = _graph_inflight.get(pid)
-    if not (existing and not existing.done()):
-        task = asyncio.create_task(_run_graph_rebuild(pid))
-        _graph_inflight[pid] = task
+    _schedule_graph_rebuild(pid)
 
     return {
         "status": "ok",
@@ -279,6 +286,20 @@ async def reindex_knowledge_route(payload: AdminActionRequest):
 _graph_inflight: dict[str, asyncio.Task] = {}
 
 
+def _schedule_graph_rebuild(project_id: str) -> bool:
+    """Start a background graph rebuild unless one is already in flight.
+
+    Returns True if a new rebuild was scheduled, False if an existing one is
+    still running (callers can surface "already_building" to the client).
+    """
+    existing = _graph_inflight.get(project_id)
+    if existing and not existing.done():
+        return False
+    task = asyncio.create_task(_run_graph_rebuild(project_id))
+    _graph_inflight[project_id] = task
+    return True
+
+
 async def _run_graph_rebuild(project_id: str) -> None:
     from datetime import datetime, timezone
 
@@ -287,6 +308,13 @@ async def _run_graph_rebuild(project_id: str) -> None:
     started_at = datetime.now(timezone.utc).isoformat()
     _write_status(project_id, {"state": "building", "project_id": project_id, "started_at": started_at})
     try:
+        # Never build the graph on top of a stale embedding index: graph
+        # expansion fetches neighbour files' chunks from the vector store, so an
+        # index lagging the files would let the graph point at content that
+        # can't be retrieved. Reindex first (incremental, near-noop if current).
+        if await asyncio.to_thread(has_stale_documents, project_id):
+            await asyncio.to_thread(rebuild_knowledge_index, project_id)
+            log_event("knowledge_reindex_before_graph", project_id=project_id)
         summary = await asyncio.to_thread(rebuild_project_graph, project_id)
     except FileNotFoundError as exc:
         _write_status(project_id, {"state": "failed", "project_id": project_id, "error": str(exc), "started_at": started_at})
@@ -324,11 +352,8 @@ async def _run_graph_rebuild(project_id: str) -> None:
 @router.post("/knowledge/graph/rebuild", summary="在背景重建專案知識圖譜", status_code=202)
 async def rebuild_knowledge_graph_route(payload: AdminActionRequest):
     pid = payload.project_id
-    existing = _graph_inflight.get(pid)
-    if existing and not existing.done():
+    if not _schedule_graph_rebuild(pid):
         return {"status": "already_building", "project_id": pid}
-    task = asyncio.create_task(_run_graph_rebuild(pid))
-    _graph_inflight[pid] = task
     return {"status": "building", "project_id": pid}
 
 
