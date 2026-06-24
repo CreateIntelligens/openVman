@@ -8,10 +8,16 @@ graphify's own AST extractor and do not pass through here.
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
+
+# Obsidian-style explicit wikilink: [[Target]], [[Target|Alias]],
+# [[Target#Heading]] or [[folder/Target]]. We only care about the target file
+# reference, so alias (after |) and heading (after #) are stripped.
+_WIKILINK_RE = re.compile(r"\[\[([^\[\]|#]+)(?:[|#][^\[\]]*)?\]\]")
 
 from core.llm_client import generate_chat_turn
 
@@ -449,6 +455,99 @@ def _link_global(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return new_edges
 
 
+def _topic_node_by_source(nodes: list[dict[str, Any]]) -> dict[str, str]:
+    """Map each source file to its primary (topic) node id.
+
+    Extraction guarantees every file has at least one node, and the first node
+    emitted for a file is its main-topic node. Building this map lets explicit
+    wikilinks resolve to a real, canonicalized node id. A node may carry
+    multiple ``source_files`` after synonym merging, so every listed source is
+    indexed — first writer wins, matching emission order.
+    """
+    mapping: dict[str, str] = {}
+    for node in nodes:
+        for src in _source_files(node):
+            mapping.setdefault(src, node["id"])
+    return mapping
+
+
+def _source_files(node: dict[str, Any]) -> list[str]:
+    files = node.get("source_files") or []
+    if not files and node.get("source_file"):
+        files = [node["source_file"]]
+    return files
+
+
+def _resolve_wikilink_target(raw: str, source_map: dict[str, str]) -> str | None:
+    """Resolve a wikilink target string to a topic node id, or None.
+
+    Obsidian links omit the extension and often the folder. Match against known
+    source paths by basename (with/without ``.md``) so ``[[Refund Policy]]``
+    finds ``knowledge/policies/Refund Policy.md``.
+    """
+    target = raw.strip()
+    if not target:
+        return None
+    candidates = {target, f"{target}.md"}
+    stem = target.rsplit("/", 1)[-1]
+    candidates |= {stem, f"{stem}.md"}
+    for src, node_id in source_map.items():
+        src_name = src.rsplit("/", 1)[-1]
+        if src in candidates or src_name in candidates:
+            return node_id
+    return None
+
+
+def _link_wikilinks(
+    nodes: list[dict[str, Any]],
+    files: list[Path],
+    workspace_root: Path,
+) -> list[dict[str, Any]]:
+    """Turn explicit Obsidian ``[[wikilinks]]`` into deterministic edges.
+
+    Unlike LLM extraction, a wikilink is an author-declared relationship, so
+    these edges are EXTRACTED (confidence 1.0). Each ``[[B]]`` in file A becomes
+    ``A_topic --references--> B_topic`` where both endpoints are the files'
+    canonicalized topic nodes. Targets that don't resolve to a known node
+    (e.g. links to non-knowledge files) are skipped.
+    """
+    source_map = _topic_node_by_source(nodes)
+    if not source_map:
+        return []
+
+    edges: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for path in files:
+        rel = _relative(path, workspace_root)
+        source_id = source_map.get(rel) or source_map.get(rel.rsplit("/", 1)[-1])
+        if source_id is None:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for match in _WIKILINK_RE.finditer(text):
+            target_id = _resolve_wikilink_target(match.group(1), source_map)
+            if target_id is None or target_id == source_id:
+                continue
+            key = (source_id, target_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            edges.append(
+                {
+                    "source": source_id,
+                    "target": target_id,
+                    "relation": "references",
+                    "confidence": "EXTRACTED",
+                    "confidence_score": 1.0,
+                    "source_file": rel,
+                    "weight": 1.0,
+                }
+            )
+    return edges
+
+
 def extract_semantic(
     files: list[Path],
     workspace_root: Path,
@@ -489,7 +588,11 @@ def extract_semantic(
     # Global linking pass: connect cross-topic concepts the per-chunk extraction
     # never compared. Runs on canonical ids so endpoints resolve correctly.
     global_edges = _link_global(nodes)
-    edges = _dedup_edges(edges + global_edges)
+    # Explicit Obsidian wikilinks: author-declared edges (EXTRACTED, 1.0).
+    # Placed before LLM/global edges in the dedup input so the deterministic
+    # high-confidence edge wins over any LLM-inferred duplicate of the same pair.
+    wikilink_edges = _link_wikilinks(nodes, files, workspace_root)
+    edges = _dedup_edges(wikilink_edges + edges + global_edges)
     edges, dropped = _drop_dangling(edges, nodes)
 
     return {
@@ -500,6 +603,7 @@ def extract_semantic(
             "chunks": chunks_report,
             "merged_synonym_groups": groups,
             "global_link_edges": len(global_edges),
+            "wikilink_edges": len(wikilink_edges),
             "dropped_dangling": dropped,
         },
     }
