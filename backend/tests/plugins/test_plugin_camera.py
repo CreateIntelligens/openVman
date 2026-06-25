@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -49,6 +49,45 @@ class TestCameraLivePlugin:
         assert result["description"] == "一張快照"
 
     @pytest.mark.asyncio
+    async def test_single_snapshot_can_forward_observation_to_brain(self, plugin):
+        snapshot = {
+            "type": "camera_snapshot",
+            "session_id": "s1",
+            "description": "有人靠近櫃台",
+        }
+
+        with (
+            patch.object(plugin, "_single_snapshot", new_callable=AsyncMock, return_value=snapshot),
+            patch("app.gateway.plugins.camera_live.forward_to_brain", new_callable=AsyncMock, return_value=True) as mock_forward,
+        ):
+            result = await plugin.execute({
+                "session_id": "s1",
+                "camera_url": "http://cam/snapshot",
+                "action": "snapshot",
+                "forward": True,
+                "trace_id": "trace-camera-1",
+                "project_id": "store-a",
+                "persona_id": "clerk",
+            })
+
+        assert result["forwarded"] is True
+        mock_forward.assert_awaited_once_with(
+            trace_id="trace-camera-1",
+            session_id="s1",
+            enriched_context=[
+                {
+                    "type": "camera_snapshot",
+                    "content": "有人靠近櫃台",
+                    "source": "camera_live",
+                    "camera_url": "http://cam/snapshot",
+                }
+            ],
+            media_refs=[{"camera_url": "http://cam/snapshot", "mime_type": "image/jpeg"}],
+            project_id="store-a",
+            persona_id="clerk",
+        )
+
+    @pytest.mark.asyncio
     async def test_start_creates_task(self, plugin):
         with patch.object(plugin, "_snapshot_loop", new_callable=AsyncMock):
             result = await plugin.execute({
@@ -62,6 +101,35 @@ class TestCameraLivePlugin:
 
         # Cleanup
         await plugin.cleanup("s2")
+
+    @pytest.mark.asyncio
+    async def test_snapshot_loop_forwards_each_observation(self, plugin):
+        snapshot = {
+            "type": "camera_snapshot",
+            "session_id": "s2",
+            "description": "畫面中有人",
+            "mime_type": "image/jpeg",
+            "person_detected": False,
+            "gender": "不確定",
+            "age_approx": "不確定",
+            "age_group": "不確定",
+        }
+
+        with (
+            patch.object(plugin, "_single_snapshot", new_callable=AsyncMock, return_value=snapshot),
+            patch.object(plugin, "_forward_snapshot", new_callable=AsyncMock, return_value=True) as mock_forward,
+            patch("app.gateway.plugins.camera_live.asyncio.sleep", new_callable=AsyncMock, side_effect=asyncio.CancelledError),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await plugin._snapshot_loop("http://cam/snapshot", "s2", "store-a", "clerk")
+
+        mock_forward.assert_awaited_once_with(
+            snapshot,
+            camera_url="http://cam/snapshot",
+            trace_id=ANY,
+            project_id="store-a",
+            persona_id="clerk",
+        )
 
     @pytest.mark.asyncio
     async def test_start_already_running(self, plugin):

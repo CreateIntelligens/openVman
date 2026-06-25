@@ -16,6 +16,8 @@ export default function FileView({
   onDelete,
   onMove,
   onToggleEnabled,
+  onRenormalize,
+  renormalizing,
 }: {
   document: KnowledgeDocument | null;
   editContent: string;
@@ -28,6 +30,8 @@ export default function FileView({
   onDelete: (path: string) => void;
   onMove: (path: string) => void;
   onToggleEnabled: (doc: KnowledgeDocumentSummary) => void;
+  onRenormalize?: (path: string) => void;
+  renormalizing?: boolean;
 }) {
   const showsUploadNotice = document ? isUploadDerivedKnowledgeFile(document) : false;
 
@@ -80,6 +84,21 @@ export default function FileView({
                 <span className="material-symbols-outlined text-[1rem]">delete</span>
               </button>
             </>
+          )}
+          {onRenormalize && (
+            <button
+              onClick={() => {
+                if (window.confirm("此操作會用 AI 重新整理並覆寫原文件，且需要數十秒。確定嗎？")) {
+                  onRenormalize(document.path);
+                }
+              }}
+              disabled={renormalizing}
+              title="用 AI 重新整理並覆寫此文件，再重建索引與圖譜"
+              className="flex items-center gap-1 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-all disabled:opacity-50"
+            >
+              <span className={`material-symbols-outlined text-[0.875rem] ${renormalizing ? "animate-spin" : ""}`}>auto_fix_high</span>
+              {renormalizing ? "重新整理中..." : "重新整理"}
+            </button>
           )}
           <button
             onClick={onSave}

@@ -159,6 +159,21 @@ export function commitRawKnowledge() {
   });
 }
 
+export interface KnowledgeRenormalizeResponse {
+  status: string;
+  project_id: string;
+  document: { path: string; [k: string]: unknown };
+  graph?: string;
+}
+
+/** Re-run LLM normalization over an existing knowledge document, in place. */
+export function renormalizeKnowledgeDocument(path: string) {
+  return post<KnowledgeRenormalizeResponse>(knowledgePath("/renormalize"), {
+    path,
+    project_id: getActiveProjectId(),
+  });
+}
+
 interface FetchPageResponse {
   status: string;
   title: string;

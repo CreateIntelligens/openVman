@@ -19,6 +19,7 @@ export default function KnowledgeBase() {
     loading,
     reindexing,
     committing,
+    renormalizing,
     uploading,
     status,
     search,
@@ -67,6 +68,7 @@ export default function KnowledgeBase() {
     handleFileUpload,
     handleReindex,
     handleCommit,
+    handleRenormalize,
     handleCrawl,
     handleDeleteConfirm,
     handleMove,
@@ -342,6 +344,8 @@ export default function KnowledgeBase() {
               onDelete={(path) => setDeleteTarget({ type: "file", value: path })}
               onMove={(path) => setMovingPath(path)}
               onToggleEnabled={handleToggleEnabled}
+              onRenormalize={handleRenormalize}
+              renormalizing={renormalizing}
             />
           ) : null}
         </div>

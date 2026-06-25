@@ -15,7 +15,6 @@ from knowledge.doc_meta import (
     upsert_document_meta,
 )
 from knowledge.workspace import (
-    ALLOWED_DOCUMENT_SUFFIXES,
     get_core_documents,
     ensure_workspace_scaffold,
     is_indexable_document,
@@ -84,6 +83,35 @@ def save_workspace_document(relative_path: str, content: str, project_id: str = 
     path.write_text(content, encoding="utf-8")
     touch_document_meta(path.relative_to(ensure_workspace_scaffold(project_id)).as_posix(), project_id)
     return _build_document_summary(path, project_id)
+
+
+def renormalize_workspace_document(relative_path: str, project_id: str = "default") -> dict[str, Any]:
+    """Re-run LLM normalization over an existing knowledge/ document, in place.
+
+    For documents that were committed before the normalization pipeline existed
+    (e.g. a raw OCR dump). Reads the current file, cleans it into tidy Markdown,
+    and overwrites the original. The caller should trigger reindex + graph
+    rebuild afterwards so the cleaned content re-enters RAG and the graph.
+
+    Raises ``ValueError`` if normalization produces empty output, leaving the
+    original file untouched (never replace good content with nothing).
+    """
+    from knowledge.normalizer import normalize_to_markdown
+
+    path = resolve_workspace_document(relative_path, project_id)
+    if not path.exists():
+        raise FileNotFoundError("找不到指定文件")
+
+    original = path.read_text(encoding="utf-8-sig")
+    cleaned = normalize_to_markdown(original)
+    if not cleaned:
+        raise ValueError("整理結果為空，已保留原文件")
+
+    path.write_text(cleaned, encoding="utf-8")
+    touch_document_meta(
+        path.relative_to(ensure_workspace_scaffold(project_id)).as_posix(), project_id
+    )
+    return _build_document_summary(path, project_id, content=cleaned)
 
 
 def save_uploaded_document(
@@ -304,11 +332,19 @@ def _build_document_summary(
 def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
     """Promote staged files from raw/ into knowledge/ (the 'commit' step).
 
-    raw/ is a staging area (uploads land there un-indexed). Committing moves
-    document-type files into knowledge/ preserving their sub-path, after which
-    the caller triggers reindex + graph rebuild so they enter RAG and the
-    concept graph. Non-document artifacts are left in raw/.
+    raw/ is a staging area (uploads land there un-indexed). Committing now runs
+    each file through the *normalization pipeline*: convert any supported format
+    to text (docx/xlsx/pdf/csv/md/txt), then LLM-clean it into tidy Obsidian
+    Markdown, writing the result as a ``.md`` under knowledge/ preserving its
+    sub-path. The caller then triggers reindex + graph rebuild so the cleaned
+    docs enter RAG and the concept graph.
+
+    Files whose format cannot be converted are left untouched in raw/ and
+    reported under ``skipped`` (the user can see they did not enter the base).
     """
+    from knowledge.converters import SUPPORTED_SUFFIXES, convert_to_text
+    from knowledge.normalizer import normalize_to_markdown
+
     root = ensure_workspace_scaffold(project_id)
     raw_root = root / "raw"
     if not raw_root.exists():
@@ -318,13 +354,26 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
     skipped: list[str] = []
     for src in sorted(p for p in raw_root.rglob("*") if p.is_file()):
         rel_in_raw = src.relative_to(raw_root)
-        if src.suffix.lower() not in ALLOWED_DOCUMENT_SUFFIXES:
+        if src.suffix.lower() not in SUPPORTED_SUFFIXES:
             skipped.append(rel_in_raw.as_posix())
             continue
-        target_rel = Path("knowledge") / rel_in_raw
+
+        text = convert_to_text(src)
+        if not text:
+            # Unsupported in practice / extraction failed: leave it in raw/.
+            skipped.append(rel_in_raw.as_posix())
+            continue
+
+        cleaned = normalize_to_markdown(text)
+        if not cleaned:
+            skipped.append(rel_in_raw.as_posix())
+            continue
+
+        # Output is always markdown regardless of the source format.
+        target_rel = (Path("knowledge") / rel_in_raw).with_suffix(".md")
         dest = resolve_workspace_document(target_rel.as_posix(), project_id)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(src.read_text(encoding="utf-8-sig"), encoding="utf-8")
+        dest.write_text(cleaned, encoding="utf-8")
         upsert_document_meta(target_rel.as_posix(), project_id, source_type="upload")
         src.unlink()
         committed.append(target_rel.as_posix())

@@ -73,6 +73,7 @@ graph TD
 | **`backend`** | **神經中樞 (Center)** | FastAPI (Python) | 輕量 (CPU) |
 | **`api`** | 認知大腦 (Brain) | FastAPI, LanceDB | 中量 (CPU/GPU) |
 | **`index-tts-vllm`** | 語音合成引擎 (TTS) | IndexTTS on vLLM | **重型 (GPU)** |
+| **`vlm`** | 視覺辨識眼睛 (optional) | Qwen2.5-VL via vLLM | **重型 (GPU)** |
 | **`admin`** | 管理後台前端 | React, Nginx | 輕量 (CPU) |
 | **`redis`** | 任務隊列與暫存 | Redis 7 | 輕量 (RAM) |
 
@@ -85,6 +86,40 @@ graph TD
 1.  **請求/響應 (Request/Response)**：`backend` 向 `api` 或 `index-tts-vllm` 發起同步請求。
 2.  **串流 (Streaming)**：`api` -> `backend` -> `index-tts-vllm` 的 Token-to-Audio 流式處理。
 3.  **非同步任務 (Async Tasks)**：`backend` 將繁重任務（如多模態預處理）丟進 `redis` 隊列。
+4.  **視覺觀察 (Vision Observation)**：`backend` 的 camera/media gateway 呼叫 OpenAI-compatible VLM，將短描述透過 `/internal/enrich` 注入 `api` session context。
+
+---
+
+### 4.1 本地 VLM 眼睛 (Optional)
+
+`vlm` service 預設不啟動，需手動開啟 profile：
+
+```bash
+docker compose --profile vlm up -d vlm
+```
+
+預設模型為 `Qwen/Qwen2.5-VL-3B-Instruct`，對 backend 暴露內部 OpenAI-compatible endpoint。這個預設刻意避開 `vllm/vllm-openai:latest`，因為新版 image 可能要求比目前 Driver 560 / CUDA 12.6 更高的 CUDA runtime。
+
+```env
+VISION_LLM_API_KEY=local-vlm
+VISION_LLM_BASE_URL=http://vlm:8000/v1
+VISION_LLM_MODEL=openvman-vlm
+```
+
+這個服務只負責「眼睛」：辨識相機快照或圖片，產生短 observation，交給既有 Brain 決定是否回話。不要把 VLM 當成主大腦或 TTS；Brain、persona、RAG、tool calling 仍由 `api` 負責。
+
+如果顯存不足，先暫停 TTS 服務釋放 GPU：
+
+```bash
+docker compose stop index-tts-vllm
+docker compose --profile vlm up -d vlm
+```
+
+恢復 TTS：
+
+```bash
+docker compose up -d index-tts-vllm
+```
 
 ---
 

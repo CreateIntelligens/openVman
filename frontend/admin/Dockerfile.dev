@@ -13,7 +13,7 @@
 FROM node:20-alpine
 
 ENV TZ=Asia/Taipei
-RUN apk add --no-cache tzdata nginx supervisor
+RUN apk add --no-cache tzdata nginx openssl supervisor
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
@@ -24,9 +24,11 @@ RUN corepack enable \
     && pnpm install --frozen-lockfile \
     && chown -R node:node /app
 
-COPY nginx/ /etc/nginx/http.d/
+COPY nginx/default.conf nginx/proxy-params.conf nginx/websocket.conf /etc/nginx/http.d/
+COPY docker/ensure-https-cert.sh /usr/local/bin/ensure-https-cert
 COPY supervisord.conf /etc/supervisord.conf
+RUN chmod +x /usr/local/bin/ensure-https-cert
 
-EXPOSE 80 5173
+EXPOSE 80 443 5173
 
 CMD ["supervisord", "-c", "/etc/supervisord.conf"]

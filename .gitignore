@@ -5,6 +5,11 @@ bug-report/
 # 環境變數（含 API Key，絕對不進 git）
 .env
 
+# Local TLS certificates for the nginx edge proxy
+infra/nginx/certs/*
+!infra/nginx/certs/.gitkeep
+!infra/nginx/certs/README.md
+
 # Runtime
 supervisord.pid
 

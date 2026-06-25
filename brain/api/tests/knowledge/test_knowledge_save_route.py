@@ -24,11 +24,13 @@ def _load_knowledge_routes_module():
     )
     _stub_module(
         "knowledge.indexer",
+        has_stale_documents=lambda *args, **kwargs: False,
         rebuild_knowledge_index=lambda *args, **kwargs: {"status": "ok"},
         rename_document_records=lambda *args, **kwargs: None,
     )
     _stub_module(
         "knowledge.knowledge_admin",
+        commit_raw_documents=lambda *args, **kwargs: {"committed": [], "skipped": []},
         create_workspace_directory=lambda *args, **kwargs: {},
         delete_workspace_directory=lambda *args, **kwargs: {},
         delete_workspace_document=lambda *args, **kwargs: None,
@@ -37,6 +39,7 @@ def _load_knowledge_routes_module():
         list_workspace_documents=lambda *args, **kwargs: [],
         move_workspace_document=lambda *args, **kwargs: {},
         read_workspace_document=lambda *args, **kwargs: {},
+        renormalize_workspace_document=lambda *args, **kwargs: {},
         save_uploaded_artifact=lambda *args, **kwargs: {},
         save_uploaded_document=lambda *args, **kwargs: {},
         save_workspace_note=lambda *args, **kwargs: {},

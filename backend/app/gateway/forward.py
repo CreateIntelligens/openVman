@@ -19,6 +19,8 @@ async def forward_to_brain(
     session_id: str,
     enriched_context: list[dict[str, Any]],
     media_refs: list[dict[str, Any]] | None = None,
+    project_id: str = "default",
+    persona_id: str = "default",
 ) -> bool:
     """POST enriched context to Backend's /internal/enrich endpoint.
 
@@ -33,6 +35,8 @@ async def forward_to_brain(
         "session_id": session_id,
         "enriched_context": enriched_context,
         "media_refs": media_refs or [],
+        "project_id": project_id,
+        "persona_id": persona_id,
     }
 
     headers = {INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token}

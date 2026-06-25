@@ -121,6 +121,11 @@ class KnowledgeNoteCreateRequest(BaseModel):
         return value
 
 
+class KnowledgeDocumentActionRequest(BaseModel):
+    path: str = Field(..., description="Relative path in workspace")
+    project_id: str = "default"
+
+
 class AdminActionRequest(BaseModel):
     project_id: str = "default"
 

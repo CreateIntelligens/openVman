@@ -39,6 +39,8 @@ class TestForwardToBrain:
                 session_id="s1",
                 enriched_context=[{"type": "image_description", "content": "test"}],
                 media_refs=[{"path": "/tmp/test.jpg"}],
+                project_id="store-a",
+                persona_id="clerk",
             )
 
         assert ok is True
@@ -47,6 +49,8 @@ class TestForwardToBrain:
         assert call_args[0][0] == "http://127.0.0.1:8200/internal/enrich"
         assert call_args[1]["json"]["trace_id"] == "t1"
         assert call_args[1]["json"]["session_id"] == "s1"
+        assert call_args[1]["json"]["project_id"] == "store-a"
+        assert call_args[1]["json"]["persona_id"] == "clerk"
         assert call_args[1]["headers"]["X-Internal-Token"] == "test-token"
 
     @pytest.mark.asyncio
@@ -85,3 +89,5 @@ class TestForwardToBrain:
         assert ok is True
         payload = mock_client.post.call_args[1]["json"]
         assert payload["media_refs"] == []
+        assert payload["project_id"] == "default"
+        assert payload["persona_id"] == "default"

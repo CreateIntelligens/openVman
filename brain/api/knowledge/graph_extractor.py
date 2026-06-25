@@ -14,14 +14,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
 
+from core.llm_client import generate_chat_turn
+
+_T = TypeVar("_T")
+
 # Obsidian-style explicit wikilink: [[Target]], [[Target|Alias]],
 # [[Target#Heading]] or [[folder/Target]]. We only care about the target file
 # reference, so alias (after |) and heading (after #) are stripped.
 _WIKILINK_RE = re.compile(r"\[\[([^\[\]|#]+)(?:[|#][^\[\]]*)?\]\]")
-
-from core.llm_client import generate_chat_turn
-
-_T = TypeVar("_T")
 
 ALLOWED_FILE_TYPES = {"code", "document", "image", "paper", "rationale"}
 DEFAULT_CHUNK_SIZE = 6
@@ -478,22 +478,21 @@ def _source_files(node: dict[str, Any]) -> list[str]:
     return files
 
 
-def _resolve_wikilink_target(raw: str, source_map: dict[str, str]) -> str | None:
-    """Resolve a wikilink target string to a topic node id, or None.
+def _resolve_node_id(reference: str, node_by_key: dict[str, str]) -> str | None:
+    """Resolve a source path or wikilink target to a topic node id, or None.
 
-    Obsidian links omit the extension and often the folder. Match against known
-    source paths by basename (with/without ``.md``) so ``[[Refund Policy]]``
-    finds ``knowledge/policies/Refund Policy.md``.
+    Obsidian links omit the extension and often the folder, so ``node_by_key``
+    indexes each source under its full path and bare basename (with/without
+    ``.md``). Matching ``[[Refund Policy]]`` against that index finds
+    ``knowledge/policies/Refund Policy.md`` in O(1).
     """
-    target = raw.strip()
-    if not target:
+    ref = reference.strip()
+    if not ref:
         return None
-    candidates = {target, f"{target}.md"}
-    stem = target.rsplit("/", 1)[-1]
-    candidates |= {stem, f"{stem}.md"}
-    for src, node_id in source_map.items():
-        src_name = src.rsplit("/", 1)[-1]
-        if src in candidates or src_name in candidates:
+    stem = ref.rsplit("/", 1)[-1]
+    for key in (ref, f"{ref}.md", stem, f"{stem}.md"):
+        node_id = node_by_key.get(key)
+        if node_id is not None:
             return node_id
     return None
 
@@ -515,11 +514,18 @@ def _link_wikilinks(
     if not source_map:
         return []
 
+    # Index every source under full path and bare basename once, so each
+    # wikilink resolves with O(1) dict lookups instead of an O(files) scan.
+    node_by_key: dict[str, str] = {}
+    for src, node_id in source_map.items():
+        node_by_key.setdefault(src, node_id)
+        node_by_key.setdefault(src.rsplit("/", 1)[-1], node_id)
+
     edges: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for path in files:
         rel = _relative(path, workspace_root)
-        source_id = source_map.get(rel) or source_map.get(rel.rsplit("/", 1)[-1])
+        source_id = _resolve_node_id(rel, node_by_key)
         if source_id is None:
             continue
         try:
@@ -527,7 +533,7 @@ def _link_wikilinks(
         except OSError:
             continue
         for match in _WIKILINK_RE.finditer(text):
-            target_id = _resolve_wikilink_target(match.group(1), source_map)
+            target_id = _resolve_node_id(match.group(1), node_by_key)
             if target_id is None or target_id == source_id:
                 continue
             key = (source_id, target_id)

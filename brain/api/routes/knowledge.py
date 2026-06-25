@@ -30,6 +30,7 @@ from knowledge.knowledge_admin import (
     list_workspace_documents,
     move_workspace_document,
     read_workspace_document,
+    renormalize_workspace_document,
     save_uploaded_artifact,
     save_uploaded_document,
     save_workspace_document,
@@ -38,6 +39,7 @@ from knowledge.knowledge_admin import (
 )
 from protocol.schemas import (
     AdminActionRequest,
+    KnowledgeDocumentActionRequest,
     KnowledgeDocumentMetaPatchRequest,
     KnowledgeDocumentMoveRequest,
     KnowledgeDocumentPutRequest,
@@ -196,6 +198,37 @@ async def upload_knowledge_raw_documents_route(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok", "files": uploaded}
+
+
+@router.post("/knowledge/renormalize", summary="重新整理既有知識文件並重建索引與圖譜")
+async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionRequest):
+    """Re-run LLM normalization over an existing knowledge/ document (in place),
+    then reindex and rebuild the graph so the cleaned content re-enters RAG.
+    """
+    pid = payload.project_id
+    try:
+        document = await asyncio.to_thread(
+            renormalize_workspace_document, payload.path, pid
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover
+        log_exception("knowledge_renormalize_error", exc, project_id=pid)
+        raise HTTPException(status_code=500, detail="整理失敗") from exc
+
+    index_result = await asyncio.to_thread(rebuild_knowledge_index, pid)
+    log_event("knowledge_renormalize", project_id=pid, path=payload.path)
+    _schedule_graph_rebuild(pid)
+
+    return {
+        "status": "ok",
+        "project_id": pid,
+        "document": document,
+        "indexed": index_result,
+        "graph": "building",
+    }
 
 
 @router.post("/knowledge/raw/commit", summary="採納 raw 區檔案進知識庫並重建索引與圖譜")

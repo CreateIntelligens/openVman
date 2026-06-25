@@ -16,8 +16,11 @@ export default defineConfig({
     port: 80,
     strictPort: true,
     allowedHosts: true,
+    // Page is served over HTTPS via the nginx edge proxy, so HMR must use wss
+    // or the browser blocks it as mixed content. clientPort is the public
+    // HTTPS port (8787), since that's the origin the browser actually loaded.
     hmr: {
-      protocol: "ws",
+      protocol: "wss",
       clientPort: publicPort,
     },
     proxy: {

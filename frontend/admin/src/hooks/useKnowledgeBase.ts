@@ -10,6 +10,7 @@ import {
   moveKnowledgeDocument,
   reindexKnowledge,
   commitRawKnowledge,
+  renormalizeKnowledgeDocument,
   saveKnowledgeDocument,
   updateKnowledgeDocumentMeta,
   uploadKnowledgeDocuments,
@@ -74,6 +75,7 @@ export function useKnowledgeBase() {
   const [loading, setLoading] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [renormalizing, setRenormalizing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const { status, setStatus, setErrorStatus } = useStatusState();
   const [search, setSearch] = useState("");
@@ -280,6 +282,24 @@ export function useKnowledgeBase() {
     }
   }, [loadDocuments, setErrorStatus]);
 
+  const handleRenormalize = useCallback(async (path: string) => {
+    setRenormalizing(true);
+    setStatus(null);
+    try {
+      const response = await renormalizeKnowledgeDocument(path);
+      setStatus({
+        type: "success",
+        message: `已重新整理「${response.document.path}」，正在重建索引與圖譜。`,
+      });
+      await loadDocuments();
+      await openFile(response.document.path);
+    } catch (error) {
+      setErrorStatus(error);
+    } finally {
+      setRenormalizing(false);
+    }
+  }, [loadDocuments, openFile, setErrorStatus]);
+
   const handleCrawl = useCallback(async () => {
     const url = crawlUrlValue.trim();
     if (!url) return;
@@ -450,6 +470,7 @@ export function useKnowledgeBase() {
     loading,
     reindexing,
     committing,
+    renormalizing,
     uploading,
     status,
     search,
@@ -498,6 +519,7 @@ export function useKnowledgeBase() {
     handleFileUpload,
     handleReindex,
     handleCommit,
+    handleRenormalize,
     handleCrawl,
     handleDeleteConfirm,
     handleMove,

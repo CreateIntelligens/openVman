@@ -64,6 +64,53 @@ services:
               count: 1
               capabilities: [gpu]
 
+  vlm:
+    <<: *shared
+    profiles: ["vlm"]
+    image: ${VLM_IMAGE:-vllm/vllm-openai:v0.11.0}
+    command:
+      - --model
+      - ${VLM_MODEL:-Qwen/Qwen3-VL-4B-Instruct-FP8}
+      - --served-model-name
+      - ${VLM_SERVED_MODEL:-openvman-vlm}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --max-model-len
+      - ${VLM_MAX_MODEL_LEN:-1024}
+      - --max-num-seqs
+      - ${VLM_MAX_NUM_SEQS:-1}
+      - --max-num-batched-tokens
+      - ${VLM_MAX_NUM_BATCHED_TOKENS:-512}
+      - --gpu-memory-utilization
+      - ${VLM_GPU_MEMORY_UTILIZATION:-0.62}
+      - --enforce-eager
+      - --limit-mm-per-prompt
+      - '{"image":1}'
+      - --mm-processor-kwargs
+      - '{"max_pixels":262144}'
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - HF_HOME=/root/.cache/huggingface
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    shm_size: 8g
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request, sys; urllib.request.urlopen('http://localhost:8000/v1/models', timeout=2).read(); sys.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 30
+      start_period: 180s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   avatar:
     <<: *shared
     build:
@@ -79,18 +126,21 @@ services:
       context: ./frontend/admin
       dockerfile: Dockerfile.dev
     ports:
-      - "${PORT:-8787}:80"
+      - "${PORT:-8786}:80"
+      - "${HTTPS_PORT:-8787}:443"
     volumes:
       - ./frontend/admin:/app
       - admin-node-modules:/app/node_modules
-      - ./frontend/admin/nginx:/etc/nginx/http.d
+      - ./frontend/admin/nginx/default.conf:/etc/nginx/http.d/default.conf:ro
+      - ./frontend/admin/nginx/proxy-params.conf:/etc/nginx/http.d/proxy-params.conf:ro
+      - ./frontend/admin/nginx/websocket.conf:/etc/nginx/http.d/websocket.conf:ro
+      - ./infra/nginx/certs:/etc/nginx/certs
       - ./frontend/app/dist/embed:/srv/openvman/embed:ro
       - ./frontend/embed-loader/dist:/srv/openvman/embed-loader:ro
       - ./contracts:/contracts:ro
     depends_on:
       - api
       - backend
-      - index-tts-vllm
       - avatar
 
   redis:
@@ -145,8 +195,6 @@ services:
     depends_on:
       api:
         condition: service_started
-      index-tts-vllm:
-        condition: service_healthy
 
 volumes:
   hf-cache:

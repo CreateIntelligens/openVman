@@ -61,6 +61,8 @@
 | `api-tool` | `api_id`, `params` | `tool_result` | 代理外部系統串接 |
 | `web-crawler` | `url` | `crawl_result` | 網頁爬取與知識入庫 |
 
+`camera-live` 的長跑模式會將每次 VLM 描述轉成短 observation，透過 `/internal/enrich` 注入對應 Brain session；單次 `snapshot` 模式預設只回傳結果，帶 `forward: true` 時才注入 Brain。
+
 ### 5. 增強訊息轉發 (Enrichment Forwarding)
 處理完媒體或插件任務後，Gateway 必須組裝 `UserInputEnriched` 封包並發送至 Backend：
 * **URL**: `POST ${BACKEND_INTERNAL_URL}/internal/enrich`
