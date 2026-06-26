@@ -2,8 +2,8 @@ import { useState } from "react";
 import AppSidebar from "./components/app/AppSidebar";
 import OfflineBanner from "./components/app/OfflineBanner";
 import TopBar, { MobileNavDrawer } from "./components/app/TopBar";
-import { allTabs, components, type Tab } from "./components/app/navigation";
-import { BackendHealthProvider, useBackendHealth } from "./context/BackendHealthContext";
+import { components, type Tab } from "./components/app/navigation";
+import { BackendHealthProvider } from "./context/BackendHealthContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -17,7 +17,7 @@ function AppContent() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { projectId, setProjectId, projects, loadingProjects } = useProject();
   const { theme, toggleTheme } = useTheme();
-  const { recoveryCounter } = useBackendHealth();
+  const ActiveComponent = components[active];
 
   const switchTab = (tab: Tab) => {
     setActive(tab);
@@ -59,21 +59,9 @@ function AppContent() {
         />
 
         <div className="relative h-full min-h-0 flex-1 overflow-hidden">
-          {allTabs.map((tab) => {
-            const Component = components[tab.key];
-            const isActive = active === tab.key;
-            const remountKey = isActive
-              ? `${tab.key}-${projectId}`
-              : `${tab.key}-${projectId}-${recoveryCounter}`;
-            return (
-              <div
-                key={remountKey}
-                className={`h-full w-full ${isActive ? "" : "hidden"}`}
-              >
-                <Component />
-              </div>
-            );
-          })}
+          <div key={`${active}-${projectId}`} className="h-full w-full">
+            <ActiveComponent />
+          </div>
         </div>
       </main>
     </div>

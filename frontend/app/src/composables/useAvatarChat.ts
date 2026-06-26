@@ -45,6 +45,8 @@ interface ChatOptions {
        mode?: 'live' | 'text'
        /** Override text-mode chat endpoint. */
        chatEndpoint?: string
+       /** Override text-mode vision describe endpoint. */
+       visionEndpoint?: string
        /** Extra headers for text-mode requests. */
        requestHeaders?: () => Record<string, string>
        /** Override live-mode WebSocket URL creation. */
@@ -73,6 +75,7 @@ function createClientId(): string {
 
 const MAX_RECONNECT_ATTEMPTS = 6
 export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/chat'
+export const DEFAULT_VISION_ENDPOINT = '/api/vision/describe'
 
 export function useAvatarChat(options: ChatOptions = {}) {
        const state = ref<AvatarState>('DISCONNECTED')
@@ -91,6 +94,9 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let currentMode: 'live' | 'text' = options.mode ?? 'live'
        // AbortController for in-flight text-mode fetch
        let textAbortController: AbortController | null = null
+       // 視覺管道每秒一幀；後端兩段 LLM 可能超過 1 秒。此旗標在前一幀
+       // 仍在處理時丟棄新幀，避免堆疊請求（與後端 VLM busy 保護同精神）。
+       let visionInFlight = false
        // Buffer of text chunks for the in-flight LLM utterance. Flushed to
        // `onUtteranceComplete` when `is_final=true` arrives (or on interrupt).
        let utteranceBuffer = ''
@@ -319,6 +325,63 @@ export function useAvatarChat(options: ChatOptions = {}) {
                }
        }
 
+       // ── Visual input (AI 的眼睛) ───────────────────────────
+       // 攝影機畫面是一條獨立的輸入管道：每秒一幀，由後端 VLM 轉成中性
+       // 視覺描述餵給 AI。不推 user bubble、不翻 THINKING——AI 是否/如何
+       // 反應完全自行決定。
+       function sendVisualInput(
+              frameBase64: string,
+              mimeType: string,
+              timestamp: number,
+       ): void {
+              if (currentMode === 'text') {
+                     void _sendVisualInputText(frameBase64, mimeType, timestamp)
+                     return
+              }
+
+              if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
+              sendEvent({
+                     event: 'client_video_frame',
+                     frame_base64: frameBase64,
+                     mime_type: mimeType,
+                     timestamp,
+              })
+       }
+
+       async function _sendVisualInputText(
+              frameBase64: string,
+              mimeType: string,
+              timestamp: number,
+       ): Promise<void> {
+              if (visionInFlight) return
+              visionInFlight = true
+              try {
+                     const res = await fetch(options.visionEndpoint ?? DEFAULT_VISION_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
+                            body: JSON.stringify({
+                                   frame_base64: frameBase64,
+                                   mime_type: mimeType,
+                                   timestamp,
+                                   persona_id: currentPersonaId,
+                                   project_id: currentProjectId,
+                                   session_id: sessionId.value,
+                            }),
+                     })
+                     if (!res.ok) return
+                     const data = await res.json() as { reply?: string; session_id?: string }
+                     if (data.session_id) sessionId.value = data.session_id
+                     if (data.reply?.trim()) {
+                            options.onUtteranceComplete?.(data.reply)
+                     }
+              } catch (err) {
+                     // 視覺管道失敗靜默記 log，不打斷使用者
+                     console.warn('[AvatarChat] vision describe failed:', err)
+              } finally {
+                     visionInFlight = false
+              }
+       }
+
        // ── Interrupt ──────────────────────────────────────────
        function interrupt(): void {
                if (currentMode === 'text') {
@@ -400,6 +463,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                connect,
                disconnect,
                sendMessage,
+               sendVisualInput,
                interrupt,
                reinit,
                setMode,

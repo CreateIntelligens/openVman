@@ -1,4 +1,5 @@
 import type {
+  ServerCameraFrameStatusEvent,
   ServerErrorEvent,
   ServerInitAckEvent,
   ServerStopAudioEvent,
@@ -8,10 +9,12 @@ import type {
   VisemeFrame,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
+  allowedCameraFrameStatuses,
   allowedInitAckStatuses,
   allowedLipSyncModes,
   allowedServerErrorCodes,
   allowedVisemeValues,
+  serverCameraFrameStatusSchema,
   serverErrorSchema,
   serverInitAckSchema,
   serverStopAudioSchema,
@@ -76,6 +79,35 @@ export function validateServerStopAudio(record: Record<string, unknown>, version
     session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
     timestamp: expectNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
     reason: expectOptionalNonEmptyString(record.reason, version, "reason", eventName),
+  };
+}
+
+export function validateServerCameraFrameStatus(
+  record: Record<string, unknown>,
+  version: string,
+): ServerCameraFrameStatusEvent {
+  const eventName = "server_camera_frame_status";
+  assertShape(record, serverCameraFrameStatusSchema, version, eventName);
+  const status = expectEnumValue(
+    record.status,
+    allowedCameraFrameStatuses,
+    version,
+    eventName,
+    "status",
+  );
+
+  return {
+    event: eventName,
+    session_id: expectNonEmptyString(record.session_id, version, "session_id", eventName),
+    status,
+    timestamp: expectNonNegativeInteger(record.timestamp, version, eventName, "timestamp"),
+    frame_timestamp: expectOptionalNonNegativeInteger(
+      record.frame_timestamp,
+      version,
+      eventName,
+      "frame_timestamp",
+    ),
+    message: expectOptionalNonEmptyString(record.message, version, "message", eventName),
   };
 }
 

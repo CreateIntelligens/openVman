@@ -1,4 +1,8 @@
 import { reactive, watch } from "vue"
+import {
+  normalizeAvatarBackgroundFit,
+  normalizeAvatarBackgroundId,
+} from "../types/avatarBackground"
 import { STORAGE_KEYS, readPref, writePref } from "../utils/storageUtils"
 
 const state = reactive({
@@ -8,6 +12,9 @@ const state = reactive({
   personaId: readPref(STORAGE_KEYS.PERSONA_ID, "default"),
   voiceMode: readPref(STORAGE_KEYS.VOICE_MODE, "text") as 'live' | 'text',
   ttsVoice: readPref(STORAGE_KEYS.TTS_VOICE, ""),
+  backgroundId: normalizeAvatarBackgroundId(readPref(STORAGE_KEYS.BACKGROUND_ID, "dark")),
+  backgroundUrl: readPref(STORAGE_KEYS.BACKGROUND_URL, ""),
+  backgroundFit: normalizeAvatarBackgroundFit(readPref(STORAGE_KEYS.BACKGROUND_FIT, "cover")),
 })
 
 watch(() => state.ttsProvider, (v) => writePref(STORAGE_KEYS.TTS_ENGINE, v))
@@ -16,6 +23,9 @@ watch(() => state.projectId, (v) => writePref(STORAGE_KEYS.PROJECT_ID, v))
 watch(() => state.personaId, (v) => writePref(STORAGE_KEYS.PERSONA_ID, v))
 watch(() => state.voiceMode, (v) => writePref(STORAGE_KEYS.VOICE_MODE, v))
 watch(() => state.ttsVoice, (v) => writePref(STORAGE_KEYS.TTS_VOICE, v))
+watch(() => state.backgroundId, (v) => writePref(STORAGE_KEYS.BACKGROUND_ID, v))
+watch(() => state.backgroundUrl, (v) => writePref(STORAGE_KEYS.BACKGROUND_URL, v))
+watch(() => state.backgroundFit, (v) => writePref(STORAGE_KEYS.BACKGROUND_FIT, v))
 
 export function useSettingsStore() {
   return state

@@ -61,6 +61,7 @@ def validate_client_event(
     | UserSpeakEvent
     | ClientInterruptEvent
     | ClientAudioChunkEvent
+    | ClientVideoFrameEvent
     | ClientAudioEndEvent
 ):
     return _validate_event_payload(
@@ -272,6 +273,7 @@ from openvman_contracts.protocol_contracts import (  # noqa: E402
     ClientAudioEndEvent,
     ClientInitEvent,
     ClientInterruptEvent,
+    ClientVideoFrameEvent,
     ProtocolDirection,
     ServerErrorEvent,
     ServerInitAckEvent,

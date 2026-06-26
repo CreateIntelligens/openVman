@@ -155,17 +155,17 @@ def test_search_records_returns_matching_persona_and_global_records(monkeypatch:
     records = [
         {
             "text": "global",
-            "vector": [0.1],
+            "vector": [1.0, 0.0, 0.0],
             "metadata": json.dumps({"persona_id": "global"}),
         },
         {
             "text": "doctor",
-            "vector": [0.2],
+            "vector": [0.0, 1.0, 0.0],
             "metadata": json.dumps({"persona_id": "doctor"}),
         },
         {
             "text": "other",
-            "vector": [0.3],
+            "vector": [0.0, 0.0, 1.0],
             "metadata": json.dumps({"persona_id": "sales"}),
         },
     ]
@@ -190,7 +190,7 @@ def test_search_records_returns_matching_persona_and_global_records(monkeypatch:
         lambda _table_name, project_id="default", embedding_version=None: FakeTable(),
     )
 
-    result = retrieval.search_records("knowledge", [0.1], 2, persona_id="doctor")
+    result = retrieval.search_records("knowledge", [1.0, 0.0, 0.0], 2, persona_id="doctor")
 
     assert [item["text"] for item in result] == ["global", "doctor"]
 
@@ -203,12 +203,12 @@ def test_search_records_excludes_disabled_knowledge_paths(monkeypatch: pytest.Mo
     records = [
         {
             "text": "enabled",
-            "vector": [0.1],
+            "vector": [1.0, 0.0],
             "metadata": json.dumps({"persona_id": "global", "path": "knowledge/enabled.md"}),
         },
         {
             "text": "disabled",
-            "vector": [0.2],
+            "vector": [0.0, 1.0],
             "metadata": json.dumps({"persona_id": "global", "path": "knowledge/disabled.md"}),
         },
     ]
@@ -239,7 +239,7 @@ def test_search_records_excludes_disabled_knowledge_paths(monkeypatch: pytest.Mo
         raising=False,
     )
 
-    result = retrieval.search_records("knowledge", [0.1], 3, persona_id="doctor")
+    result = retrieval.search_records("knowledge", [1.0, 0.0], 3, persona_id="doctor")
 
     assert [item["text"] for item in result] == ["enabled"]
 

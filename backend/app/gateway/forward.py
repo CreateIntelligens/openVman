@@ -49,5 +49,10 @@ async def forward_to_brain(
         logger.info("forward_ok trace_id=%s status=%d", trace_id, response.status_code)
         return True
     except Exception as exc:
-        logger.error("forward_failed trace_id=%s err=%s", trace_id, exc)
+        logger.error(
+            "forward_failed trace_id=%s err_type=%s err=%r",
+            trace_id,
+            type(exc).__name__,
+            exc,
+        )
         return False

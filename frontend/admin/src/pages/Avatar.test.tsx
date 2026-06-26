@@ -83,4 +83,88 @@ describe("Avatar page", () => {
     await waitFor(() => expect(screen.getByText("新的名字")).toBeTruthy());
     expect(screen.getByText("010")).toBeTruthy();
   });
+
+  it("loads backgrounds from a dedicated Avatar tab", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({
+      backgrounds: [
+        {
+          background_id: "clinic",
+          label: "診間背景",
+          url: "/backgrounds/clinic/image.png",
+          mime_type: "image/png",
+          size_bytes: 2048,
+          updated_at: "2026-06-08T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Backgrounds" }));
+
+    expect(await screen.findByText("診間背景")).toBeTruthy();
+    expect(api.fetchAvatarBackgrounds).toHaveBeenCalledOnce();
+  });
+
+  it("uploads a background image from the background tab", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({ backgrounds: [] });
+    vi.spyOn(api, "uploadAvatarBackground").mockResolvedValue({
+      status: "ok",
+      background: {
+        background_id: "clinic",
+        label: "診間背景",
+        url: "/backgrounds/clinic/image.png",
+        mime_type: "image/png",
+        size_bytes: 2048,
+        updated_at: "2026-06-08T00:00:00Z",
+      },
+    });
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Backgrounds" }));
+    fireEvent.change(await screen.findByPlaceholderText("Background ID"), {
+      target: { value: "clinic" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Display name"), {
+      target: { value: "診間背景" },
+    });
+    fireEvent.change(screen.getByLabelText(/Image/), {
+      target: { files: [new File(["image"], "clinic.png", { type: "image/png" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Upload background" }));
+
+    await waitFor(() => {
+      expect(api.uploadAvatarBackground).toHaveBeenCalledWith({
+        backgroundId: "clinic",
+        label: "診間背景",
+        image: expect.any(File),
+      });
+    });
+  });
+
+  it("can open the avatar app with the selected background", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({
+      backgrounds: [
+        {
+          background_id: "clinic",
+          label: "診間背景",
+          url: "/backgrounds/clinic/image.png",
+          mime_type: "image/png",
+          size_bytes: 2048,
+          updated_at: "2026-06-08T00:00:00Z",
+        },
+      ],
+    });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Backgrounds" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use clinic" }));
+
+    expect(window.localStorage.getItem("avatar.background_id")).toBe("uploaded:clinic");
+    expect(window.localStorage.getItem("avatar.background_url")).toBe("/backgrounds/clinic/image.png");
+    expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
+  });
 });

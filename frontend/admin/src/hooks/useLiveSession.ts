@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ClientAudioEndEvent,
+  ClientVideoFrameEvent,
   ClientEvent,
   ClientInterruptEvent,
+  ServerCameraFrameStatusEvent,
   ServerEvent,
   ServerStopAudioEvent,
   ServerStreamChunkEvent,
@@ -10,6 +12,7 @@ import type {
 } from "@contracts/generated/typescript/protocol-contracts";
 import { DEFAULT_VOICE_SOURCE, type VoiceSource } from "./liveSessionProtocol";
 import { useVad } from "./useVad";
+import { useWebcamCapture } from "./useWebcamCapture";
 import {
   closeLiveAudioContext,
   ensureLiveAudioContext,
@@ -33,6 +36,9 @@ type LiveSessionOptions = {
 type LiveSessionResult = {
   wsState: LiveWsState;
   micActive: boolean;
+  cameraActive: boolean;
+  cameraStatus: string;
+  cameraStream: MediaStream | null;
   isPlaying: boolean;
   error: string;
   sessionId: string;
@@ -43,6 +49,9 @@ type LiveSessionResult = {
   startMicrophone: () => Promise<void>;
   stopMicrophone: () => void;
   toggleMicrophone: () => Promise<void>;
+  startCamera: () => Promise<void>;
+  stopCamera: () => void;
+  toggleCamera: () => Promise<void>;
   sendText: (text: string) => boolean;
   clearError: () => void;
 };
@@ -56,6 +65,13 @@ const IDLE_TIMEOUT_MS = 3 * 60 * 1000;      // 3 min: no user activity while in 
 const DISABLED_TIMEOUT_MS = 1 * 60 * 1000;  // 1 min: mode switched away, grace period before disconnect
 const trimLiveMessages = (messages: LiveMessage[]) => messages.length > MAX_LIVE_MESSAGES ? messages.slice(-MAX_LIVE_MESSAGES) : messages;
 const appendLiveMessage = (messages: LiveMessage[], message: LiveMessage) => trimLiveMessages([...messages, message]);
+const cameraStatusLabels: Record<ServerCameraFrameStatusEvent["status"], string> = {
+  received: "後端已收到影像幀",
+  busy: "VLM 忙碌，已丟棄一幀",
+  processed: "VLM 已分析影像",
+  error: "影像分析失敗",
+  invalid: "影像格式錯誤",
+};
 
 export function useLiveSession({
   enabled,
@@ -70,6 +86,7 @@ export function useLiveSession({
   const [vadEnabled, setVadEnabled] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState("");
+  const [cameraStatus, setCameraStatus] = useState("");
   const [sessionId, setSessionId] = useState("");
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
 
@@ -106,6 +123,26 @@ export function useLiveSession({
   const clearError = useCallback(() => setError(""), []);
   const ensureAudioContext = useCallback(() => ensureLiveAudioContext(audioContextRef), []);
   const sendClientEvent = useCallback((payload: ClientEvent) => managerRef.current?.sendEvent(payload) ?? false, []);
+  const handleCameraFrame = useCallback((frameBase64: string, mimeType: string, timestamp: number) => {
+    const videoFrameEvent: ClientVideoFrameEvent = {
+      event: "client_video_frame",
+      frame_base64: frameBase64,
+      mime_type: mimeType,
+      timestamp,
+    };
+    setCameraStatus(sendClientEvent(videoFrameEvent) ? "影像幀已送出" : "影像幀送出失敗");
+  }, [sendClientEvent]);
+  const {
+    active: cameraActive,
+    error: cameraError,
+    start: startCameraCapture,
+    stop: stopCameraCapture,
+    stream: webcamStream,
+  } = useWebcamCapture({ onFrame: handleCameraFrame });
+  const stopCamera = useCallback(() => {
+    stopCameraCapture();
+    setCameraStatus("");
+  }, [stopCameraCapture]);
   const stopPlayback = useCallback(() => {
     stopLivePlayback(
       {
@@ -175,6 +212,11 @@ export function useLiveSession({
   }, [appendAssistantText]);
   const handleServerEvent = useCallback((event: ServerEvent) => {
     resetIdleTimerRef.current();
+    if (event.event === "server_camera_frame_status") {
+      const cameraEvent = event as ServerCameraFrameStatusEvent;
+      setCameraStatus(cameraEvent.message || cameraStatusLabels[cameraEvent.status]);
+      return;
+    }
     if (event.event === "server_stream_chunk") {
       handleStreamChunk(event as ServerStreamChunkEvent);
       return;
@@ -196,13 +238,14 @@ export function useLiveSession({
   }, [handleStreamChunk, stopPlayback]);
 
   if (!managerRef.current) {
-    managerRef.current = new LiveWebSocketManager({ clientId, projectId, voiceSource, chatSessionId });
+    managerRef.current = new LiveWebSocketManager({ clientId, projectId, voiceSource, chatSessionId, chatMode: enabled ? "live" : "text" });
   }
 
   useEffect(() => {
     managerRef.current?.setCallbacks({
       onDisconnected: () => {
         stopMicrophone(false);
+        stopCamera();
         stopPlayback();
       },
       onError: setError,
@@ -210,8 +253,8 @@ export function useLiveSession({
       onSessionIdChange: setSessionId,
       onStateChange: setWsState,
     });
-    managerRef.current?.updateConfig({ clientId, projectId, voiceSource, chatSessionId });
-  }, [chatSessionId, clientId, handleServerEvent, projectId, stopMicrophone, stopPlayback, voiceSource]);
+    managerRef.current?.updateConfig({ clientId, projectId, voiceSource, chatSessionId, chatMode: enabled ? "live" : "text" });
+  }, [chatSessionId, clientId, handleServerEvent, projectId, stopCamera, stopMicrophone, stopPlayback, voiceSource, enabled]);
 
   const clearTimers = useCallback(() => {
     if (idleTimerRef.current !== null) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
@@ -222,6 +265,7 @@ export function useLiveSession({
     clearTimers();
     managerRef.current?.disconnect();
     stopMicrophone(false);
+    stopCamera();
     stopPlayback();
     closeLiveAudioContext(audioContextRef, nextPlaybackTimeRef);
     if (flushRafRef.current) {
@@ -234,7 +278,8 @@ export function useLiveSession({
     setLiveMessages([]);
     seededRef.current = false;
     setVadEnabled(false);
-  }, [clearTimers, stopMicrophone, stopPlayback]);
+    setCameraStatus("");
+  }, [clearTimers, stopCamera, stopMicrophone, stopPlayback]);
 
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current);
@@ -358,6 +403,27 @@ export function useLiveSession({
       setVadEnabled(true);
     }
   }, [vadEnabled, stopMicrophone]);
+
+  const startCamera = useCallback(async () => {
+    resetIdleTimerRef.current();
+    try {
+      setCameraStatus("鏡頭啟動中");
+      await startCameraCapture();
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "無法存取攝影機");
+      setCameraStatus("");
+    }
+  }, [startCameraCapture]);
+
+  const toggleCamera = useCallback(async () => {
+    if (cameraActive) {
+      stopCamera();
+      return;
+    }
+    await startCamera();
+  }, [cameraActive, startCamera, stopCamera]);
+
   const sendText = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return false;
@@ -379,23 +445,28 @@ export function useLiveSession({
   }, [flushPendingText, sendClientEvent]);
 
   useEffect(() => {
-    if (enabled) {
+    if (cameraError) setError(cameraError);
+  }, [cameraError]);
+  const shouldConnect = enabled || cameraActive;
+  useEffect(() => {
+    if (shouldConnect) {
       if (disabledTimerRef.current !== null) { clearTimeout(disabledTimerRef.current); disabledTimerRef.current = null; }
       connect();
     } else {
       if (idleTimerRef.current !== null) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
       disabledTimerRef.current = setTimeout(doDisconnect, DISABLED_TIMEOUT_MS);
     }
-  }, [connect, doDisconnect, enabled]);
+  }, [connect, doDisconnect, shouldConnect]);
   useEffect(() => {
     const changed = voiceSource !== initialVoiceSourceRef.current;
     initialVoiceSourceRef.current = voiceSource;
     if (!changed || !enabled) return;
     setError("");
     stopMicrophone(false);
+    stopCamera();
     stopPlayback();
     managerRef.current?.restart();
-  }, [enabled, stopMicrophone, stopPlayback, voiceSource]);
+  }, [enabled, stopCamera, stopMicrophone, stopPlayback, voiceSource]);
   useEffect(() => () => {
     managerRef.current?.dispose();
   }, []);
@@ -403,6 +474,9 @@ export function useLiveSession({
   return {
     wsState,
     micActive: vadEnabled,
+    cameraActive,
+    cameraStatus,
+    cameraStream: cameraActive ? webcamStream : null,
     isPlaying,
     error,
     sessionId,
@@ -413,6 +487,9 @@ export function useLiveSession({
     startMicrophone,
     stopMicrophone: () => stopMicrophone(),
     toggleMicrophone,
+    startCamera,
+    stopCamera,
+    toggleCamera,
     sendText,
     clearError,
   };

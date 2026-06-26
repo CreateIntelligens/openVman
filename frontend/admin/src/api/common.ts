@@ -11,6 +11,7 @@ export const KNOWLEDGE_PATH = "/knowledge";
 export const MEMORIES_PATH = "/memories";
 export const SESSIONS_PATH = "/sessions";
 export const AVATAR_PATH = "/avatar";
+export const AVATAR_BACKGROUNDS_PATH = "/backgrounds";
 
 // ---------------------------------------------------------------------------
 // Active Project

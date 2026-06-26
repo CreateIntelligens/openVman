@@ -243,7 +243,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
             "id": "edge-tts",
             "name": "Edge TTS",
             "default_voice": "zh-TW-HsiaoChenNeural",
-            "voices": ["zh-TW-HsiaoChenNeural"],
+            "voices": ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "zh-CN-XiaoyiNeural"],
         },
     ]
 

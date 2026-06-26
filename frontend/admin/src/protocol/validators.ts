@@ -8,6 +8,7 @@ import {
   validateClientAudioEnd,
   validateClientInit,
   validateClientInterrupt,
+  validateClientVideoFrame,
   validateUserSpeak,
 } from "./validators/client";
 import { DEFAULT_PROTOCOL_VERSION, manifest } from "./validators/schema";
@@ -19,6 +20,7 @@ import {
   ProtocolValidationError,
 } from "./validators/shared";
 import {
+  validateServerCameraFrameStatus,
   validateServerError,
   validateServerInitAck,
   validateServerStopAudio,
@@ -72,6 +74,8 @@ function validateEvent(
       return validateClientInterrupt(record, version);
     case "client_audio_chunk":
       return validateClientAudioChunk(record, version);
+    case "client_video_frame":
+      return validateClientVideoFrame(record, version);
     case "client_audio_end":
       return validateClientAudioEnd(record, version);
     case "set_lip_sync_mode":
@@ -84,6 +88,8 @@ function validateEvent(
       return validateServerInitAck(record, version);
     case "server_stop_audio":
       return validateServerStopAudio(record, version);
+    case "server_camera_frame_status":
+      return validateServerCameraFrameStatus(record, version);
     case "user_transcription":
       return validateUserTranscription(record, version);
     default:

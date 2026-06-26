@@ -209,22 +209,28 @@ def finalize_generation(
     if not cleaned_reply:
         raise ValueError("LLM 沒有回傳內容")
 
-    # Run user + reply PII scans in the background so they don't block the response.
-    user_pii_future = _pii_writeback_executor.submit(
-        _scan_reply_pii, context.user_message, context.trace_id,
+    ephemeral_user = bool(
+        context.request_context.get("metadata", {}).get("ephemeral_user_message")
     )
+
     reply_pii_future = _pii_writeback_executor.submit(
         _scan_reply_pii, cleaned_reply, context.trace_id,
     )
 
-    _, user_message_id = append_session_message_with_id(
-        context.session_id, context.persona_id, "user", context.user_message,
-        project_id=context.project_id,
-    )
-    _pii_writeback_executor.submit(
-        _patch_reply_pii_metadata,
-        user_pii_future, user_message_id, context.project_id,
-    )
+    if not ephemeral_user:
+        user_pii_future = _pii_writeback_executor.submit(
+            _scan_reply_pii, context.user_message, context.trace_id,
+        )
+        _, user_message_id = append_session_message_with_id(
+            context.session_id, context.persona_id, "user", context.user_message,
+            project_id=context.project_id,
+        )
+        _pii_writeback_executor.submit(
+            _patch_reply_pii_metadata,
+            user_pii_future, user_message_id, context.project_id,
+        )
+    else:
+        user_pii_future = None
 
     meta: dict[str, Any] = {}
     if tool_steps:
@@ -239,23 +245,24 @@ def finalize_generation(
         _patch_reply_pii_metadata,
         reply_pii_future, assistant_message_id, context.project_id,
     )
-    archive_session_turn(
-        context.session_id,
-        context.user_message,
-        cleaned_reply,
-        context.persona_id,
-        project_id=context.project_id,
-    )
+    if not ephemeral_user:
+        archive_session_turn(
+            context.session_id,
+            context.user_message,
+            cleaned_reply,
+            context.persona_id,
+            project_id=context.project_id,
+        )
     _schedule_memory_writes(context, cleaned_reply)
 
     history = [_serialize_history_message(msg) for msg in context.prior_messages]
     user_entry: dict[str, Any] = {"role": "user", "content": context.user_message}
     # Opportunistic: include user/reply warnings if scans finished in time.
     pii_pending = False
-    if user_pii_future.done():
+    if user_pii_future is not None and user_pii_future.done():
         if (warning := user_pii_future.result()) is not None:
             user_entry["privacy_warning"] = warning
-    else:
+    elif user_pii_future is not None:
         pii_pending = True
     history.append(user_entry)
     assistant_entry: dict[str, Any] = {"role": "assistant", "content": cleaned_reply}

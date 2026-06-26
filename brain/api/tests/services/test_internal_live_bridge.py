@@ -80,6 +80,41 @@ def test_internal_live_bridge_routes_text_audio_and_close():
     assert fake_session.close_calls == 1
 
 
+def test_internal_live_bridge_ephemeral_user_speak_not_persisted():
+    """視覺脈絡以 ephemeral user_speak 餵入 live，餵給 AI 但不落歷史。"""
+    fake_session = FakeLiveSession()
+
+    with (
+        patch("internal_routes._build_live_session", return_value=fake_session),
+        patch(
+            "internal_routes.get_or_create_session",
+            return_value=type("Session", (), {"session_id": "relay-1"})(),
+        ),
+        patch("internal_routes.append_session_message") as append_msg,
+    ):
+        with _client() as client:
+            with client.websocket_connect("/brain/internal/live/relay-1") as websocket:
+                websocket.send_json(
+                    {
+                        "event": "relay_init",
+                        "client_id": "client-1",
+                        "persona_id": "persona-1",
+                        "project_id": "project-1",
+                    }
+                )
+                websocket.send_json(
+                    {
+                        "event": "user_speak",
+                        "text": "[視覺事件] 畫面中出現一位訪客。",
+                        "ephemeral": True,
+                    }
+                )
+
+    # 餵給 AI（送出 text turn），但不存歷史
+    assert fake_session.text_turns == ["[視覺事件] 畫面中出現一位訪客。"]
+    append_msg.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_internal_live_bridge_event_sink_ignores_disconnected_websocket(monkeypatch):
     import internal_routes

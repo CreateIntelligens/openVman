@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
+import binascii
 import logging
-import time
 import uuid
 from typing import Any
 
@@ -17,7 +16,19 @@ from app.gateway.forward import forward_to_brain
 
 logger = logging.getLogger("gateway.plugin.camera_live")
 
-_UNKNOWN = "不確定"
+INVALID_FRAME_MESSAGE = "影像資料格式錯誤"
+
+
+class InvalidFrameError(ValueError):
+    """Raised when a client-pushed frame is not valid base64."""
+
+
+def decode_frame_base64(frame_base64: str) -> bytes:
+    """Decode a base64 client frame, raising InvalidFrameError on bad input."""
+    try:
+        return base64.b64decode(frame_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise InvalidFrameError(INVALID_FRAME_MESSAGE) from exc
 
 
 class CameraLivePlugin:
@@ -28,6 +39,8 @@ class CameraLivePlugin:
     def __init__(self) -> None:
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._states: dict[str, dict[str, Any]] = {}
+        self._vision_client: Any = None
+        self._vision_client_key: tuple[str, str] | None = None
 
     async def execute(self, params: dict[str, Any]) -> dict[str, Any]:
         """Start or query camera live stream for a session.
@@ -81,6 +94,45 @@ class CameraLivePlugin:
             logger.info("camera_cleanup session_id=%s", session_id)
         self._states.pop(session_id, None)
 
+    async def describe_frame(
+        self,
+        image_bytes: bytes,
+        mime_type: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        """Detect visual events on a frame; fire only on event edges.
+
+        攝影機是 AI 的眼睛。本方法用 VLM 做結構化判讀，交給 per-session
+        狀態機，只有事件邊緣（首次出現）才回報 events。busy 保護確保
+        推理不排隊。
+        """
+        from app.gateway.plugins.vision_events import (
+            detect_edges,
+            format_fired_events,
+        )
+
+        state = self._state_for_session(session_id)
+        if state["analyzing"]:
+            return {"status": "busy", "session_id": session_id}
+
+        state["analyzing"] = True
+        try:
+            b64 = base64.b64encode(image_bytes).decode("utf-8")
+            detection = await self._detect_events(b64, mime_type)
+            new_events_state, fired = detect_edges(state["events"], detection)
+            state["events"] = new_events_state
+
+            return {
+                "status": "processed",
+                "session_id": session_id,
+                "events": format_fired_events(fired),
+            }
+        except Exception as exc:
+            logger.warning("camera_describe_frame_err session_id=%s err=%s", session_id, exc)
+            return {"status": "error", "session_id": session_id, "error": str(exc)}
+        finally:
+            state["analyzing"] = False
+
     async def _snapshot_loop(
         self,
         camera_url: str,
@@ -89,48 +141,11 @@ class CameraLivePlugin:
         persona_id: str = "default",
     ) -> None:
         interval = get_tts_config().camera_snapshot_interval_sec
-
-        state = self._states[session_id] = {
-            "consecutive_person_frames": 0,
-            "consecutive_empty_frames": 0,
-            "greeted": False,
-        }
+        self._state_for_session(session_id)
 
         while True:
             try:
                 result = await self._single_snapshot(camera_url, session_id)
-                person_detected = result["person_detected"]
-                gender = result["gender"]
-                age_approx = result["age_approx"]
-                age_group = result["age_group"]
-
-                logger.info(
-                    "camera_live session=%s detected=%s gender=%s age=%s",
-                    session_id,
-                    person_detected,
-                    gender,
-                    age_approx,
-                )
-
-                if person_detected:
-                    state["consecutive_person_frames"] += 1
-                    state["consecutive_empty_frames"] = 0
-
-                    if state["consecutive_person_frames"] >= 2 and not state["greeted"]:
-                        state["greeted"] = True
-                        logger.info("Triggering proactive greeting for session=%s", session_id)
-                        await self._trigger_greeting(
-                            session_id,
-                            gender=gender,
-                            age_approx=age_approx,
-                            age_group=age_group,
-                        )
-                else:
-                    state["consecutive_empty_frames"] += 1
-                    if state["consecutive_empty_frames"] >= 2:
-                        state["consecutive_person_frames"] = 0
-                        state["greeted"] = False
-
                 forwarded = await self._forward_snapshot(
                     result,
                     camera_url=camera_url,
@@ -139,9 +154,8 @@ class CameraLivePlugin:
                     persona_id=persona_id,
                 )
                 logger.info(
-                    "camera_snapshot session_id=%s result_type=%s forwarded=%s",
+                    "camera_snapshot session_id=%s forwarded=%s",
                     session_id,
-                    result.get("type"),
                     forwarded,
                 )
             except asyncio.CancelledError:
@@ -151,33 +165,6 @@ class CameraLivePlugin:
 
             await asyncio.sleep(interval)
 
-    async def _trigger_greeting(
-        self,
-        session_id: str,
-        gender: str,
-        age_approx: str,
-        age_group: str,
-    ) -> None:
-        """Find the active websocket session and inject a user_speak event to trigger an LLM greeting."""
-        try:
-            from app.gateway.websocket import _session_manager
-            session = _session_manager.get_session(session_id)
-            if session and session.brain_live_relay:
-                prompt = (
-                    f"（系統提示：相機偵測到一位新訪客出現在你面前並停留了幾秒。對方是一位大約 {age_approx} 的{gender}（{age_group}）。"
-                    "請親切地主動向他打招呼，開啟話題，詢問需要什麼幫助！）"
-                )
-                await session.brain_live_relay.send_event({
-                    "event": "user_speak",
-                    "text": prompt,
-                    "timestamp": int(time.time() * 1000)
-                })
-                logger.info("Successfully sent greeting trigger to session=%s", session_id)
-            else:
-                logger.warning("Cannot trigger greeting: session or brain_live_relay not found for session_id=%s", session_id)
-        except Exception as exc:
-            logger.error("Failed to trigger greeting for session_id=%s: %s", session_id, exc)
-
     async def _single_snapshot(self, camera_url: str, session_id: str) -> dict[str, Any]:
         """Fetch a single snapshot and describe it via Vision LLM."""
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -185,24 +172,31 @@ class CameraLivePlugin:
             resp.raise_for_status()
             image_bytes = resp.content
 
-        b64 = base64.b64encode(image_bytes).decode("utf-8")
         content_type = resp.headers.get("content-type", "image/jpeg")
 
-        description_raw = await self._describe_image(b64, content_type)
-        analysis = _parse_vlm_analysis(description_raw)
+        return await self._analyze_image_bytes(image_bytes, content_type, session_id)
+
+    async def _analyze_image_bytes(
+        self,
+        image_bytes: bytes,
+        mime_type: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        b64 = base64.b64encode(image_bytes).decode("utf-8")
+        description = await self._describe_image(b64, mime_type)
 
         return {
             "type": "camera_snapshot",
             "session_id": session_id,
-            "mime_type": content_type,
-            **analysis,
+            "mime_type": mime_type,
+            "description": description.strip(),
         }
 
     async def _forward_snapshot(
         self,
         snapshot: dict[str, Any],
         *,
-        camera_url: str,
+        camera_url: str | None,
         trace_id: str,
         project_id: str,
         persona_id: str,
@@ -211,48 +205,56 @@ class CameraLivePlugin:
         if not description or "Vision LLM 未設定" in description:
             return False
 
+        enriched_context = {
+            "type": "camera_snapshot",
+            "content": description,
+            "source": self.id,
+        }
+        media_refs: list[dict[str, Any]] = []
+        if camera_url:
+            enriched_context["camera_url"] = camera_url
+            media_refs.append({
+                "camera_url": camera_url,
+                "mime_type": str(snapshot.get("mime_type") or "image/jpeg"),
+            })
+
         return await forward_to_brain(
             trace_id=trace_id,
             session_id=str(snapshot.get("session_id") or ""),
-            enriched_context=[
-                {
-                    "type": "camera_snapshot",
-                    "content": description,
-                    "source": self.id,
-                    "camera_url": camera_url,
-                }
-            ],
-            media_refs=[{"camera_url": camera_url, "mime_type": str(snapshot.get("mime_type") or "image/jpeg")}],
+            enriched_context=[enriched_context],
+            media_refs=media_refs,
             project_id=project_id,
             persona_id=persona_id,
         )
 
-    async def _describe_image(self, b64_data: str, mime_type: str) -> str:
-        """Call Vision LLM to describe the snapshot."""
+    def _get_vision_client(self) -> Any:
+        """Return a pooled AsyncOpenAI client, rebuilt only when credentials change.
+
+        Called once per frame on the hot path; constructing a new client each
+        time would force a fresh connection pool + TLS handshake to the VLM.
+        """
         from openai import AsyncOpenAI
 
         cfg = get_tts_config()
         if not cfg.vision_llm_api_key:
+            return None
+
+        key = (cfg.vision_llm_api_key, cfg.vision_llm_base_url or "")
+        if self._vision_client is None or self._vision_client_key != key:
+            client_kwargs: dict[str, Any] = {"api_key": cfg.vision_llm_api_key}
+            if cfg.vision_llm_base_url:
+                client_kwargs["base_url"] = cfg.vision_llm_base_url
+            self._vision_client = AsyncOpenAI(**client_kwargs)
+            self._vision_client_key = key
+        return self._vision_client
+
+    async def _complete_vision(self, prompt: str, b64_data: str, mime_type: str) -> str:
+        """Single Vision LLM completion for a text prompt + one image."""
+        client = self._get_vision_client()
+        if client is None:
             return "（Vision LLM 未設定）"
 
-        client_kwargs: dict[str, Any] = {"api_key": cfg.vision_llm_api_key}
-        if cfg.vision_llm_base_url:
-            client_kwargs["base_url"] = cfg.vision_llm_base_url
-
-        prompt = (
-            "你是一個相機監控分析助手。請詳細分析這張相機快照，判斷畫面中是否有人（包含近處、遠處或剛進入畫面的人）。\n"
-            "請嚴格以 JSON 格式回答。回答時「絕對不能」包含任何 markdown 標記（如 ```json 或 ```）或額外的說明文字，只輸出合法的 JSON 字串。\n\n"
-            "JSON 格式規範如下：\n"
-            "{\n"
-            '  "person_detected": true/false (只要畫面中有人就填 true，否則填 false),\n'
-            '  "gender": "男性" / "女性" / "不確定" (若有多人，描述最顯眼或最前面的那位),\n'
-            '  "age_approx": "大約的年齡，例如 25 歲 / 8 歲 / 65 歲，無法確定填不確定",\n'
-            '  "age_group": "兒童" / "青少年" / "青年" / "中年" / "老年" / "不確定",\n'
-            '  "description": "簡短的場景與人物描述"\n'
-            "}"
-        )
-
-        client = AsyncOpenAI(**client_kwargs)
+        cfg = get_tts_config()
         response = await client.chat.completions.create(
             model=cfg.vision_llm_model,
             messages=[
@@ -271,36 +273,43 @@ class CameraLivePlugin:
         )
         return response.choices[0].message.content or ""
 
+    async def _describe_image(self, b64_data: str, mime_type: str) -> str:
+        """Call Vision LLM for a neutral description (legacy/snapshot path)."""
+        prompt = (
+            "你是數位虛擬人的「眼睛」。請用繁體中文簡短、客觀地描述這張畫面看到的內容："
+            "有沒有人、人的大致外觀與動作、場景與物件。只做中性描述，"
+            "不要給任何建議或指令，也不要決定要不要打招呼。"
+        )
+        return await self._complete_vision(prompt, b64_data, mime_type)
 
-def _parse_vlm_analysis(description_raw: str) -> dict[str, Any]:
-    """Parse the VLM's JSON reply into structured detection fields.
+    async def _detect_events(self, b64_data: str, mime_type: str) -> dict[str, bool]:
+        """Structured event detection: returns {event_key: bool} or {} on error."""
+        from app.gateway.plugins.vision_events import (
+            build_detection_prompt,
+            parse_detection,
+        )
 
-    The prompt asks for a strict JSON object, but VLMs still wrap it in ```
-    fences or emit prose on a bad turn. On any parse failure every field
-    degrades to its default ("no person / 不確定"), keeping the raw text as the
-    description so nothing is lost.
-    """
-    defaults: dict[str, Any] = {
-        "description": description_raw,
-        "person_detected": False,
-        "gender": _UNKNOWN,
-        "age_approx": _UNKNOWN,
-        "age_group": _UNKNOWN,
-    }
+        try:
+            raw = await self._complete_vision(
+                build_detection_prompt(),
+                b64_data,
+                mime_type,
+            )
+        except Exception as exc:
+            logger.warning("vision_detect_events_err err=%s", exc)
+            return {}
+        return parse_detection(raw)
 
-    json_text = description_raw.strip()
-    if json_text.startswith("```"):
-        json_text = json_text.split("\n", 1)[-1]
-        if json_text.rstrip().endswith("```"):
-            json_text = json_text.rstrip()[:-3]
+    def _state_for_session(self, session_id: str) -> dict[str, Any]:
+        from app.gateway.plugins.vision_events import new_event_state
 
-    try:
-        analysis = json.loads(json_text)
-    except json.JSONDecodeError:
-        return defaults
-    if not isinstance(analysis, dict):
-        return defaults
-    return {key: analysis.get(key, default) for key, default in defaults.items()}
+        existing = self._states.get(session_id)
+        if existing is None:
+            existing = {"analyzing": False, "events": new_event_state()}
+            self._states[session_id] = existing
+        elif "events" not in existing:
+            existing["events"] = new_event_state()
+        return existing
 
 
 def _as_bool(value: Any) -> bool:

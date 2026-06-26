@@ -45,7 +45,9 @@ interface ChatInputProps {
   onPrivacyWarningsVisibleChange: (visible: boolean) => void;
   liveWsState: "connecting" | "connected" | "disconnected";
   liveMicActive: boolean;
+  liveCameraActive: boolean;
   onLiveToggleMic: () => void;
+  onLiveToggleCamera: () => void;
 }
 
 export default function ChatInput(props: ChatInputProps) {
@@ -83,7 +85,9 @@ export default function ChatInput(props: ChatInputProps) {
     onPrivacyWarningsVisibleChange,
     liveWsState,
     liveMicActive,
+    liveCameraActive,
     onLiveToggleMic,
+    onLiveToggleCamera,
   } = props;
 
   const slashEnabled = mode === "text";
@@ -106,11 +110,17 @@ export default function ChatInput(props: ChatInputProps) {
     : "向 Brain 發送訊息...（輸入 / 查看指令）";
   const liveMicLabel = liveMicActive ? "錄音中" : "麥克風";
   const liveMicTitle = liveMicActive ? "停止錄音" : "開始語音輸入";
+  const liveCameraLabel = liveCameraActive ? "關鏡頭" : "開鏡頭";
+  const liveCameraIcon = liveCameraActive ? "videocam_off" : "videocam";
   let liveMicButtonClassName = "cursor-not-allowed border border-border bg-surface-sunken text-content-subtle";
   if (liveMicActive) {
     liveMicButtonClassName = "bg-danger text-content-inverse hover:opacity-90";
   } else if (liveConnected) {
     liveMicButtonClassName = "border border-border bg-surface-raised text-content hover:bg-surface-sunken";
+  }
+  let liveCameraButtonClassName = "border border-border bg-surface-raised text-content hover:bg-surface-sunken";
+  if (liveCameraActive) {
+    liveCameraButtonClassName = "bg-primary text-content-inverse hover:opacity-90";
   }
   const hasSlashMatches = slashEnabled && slashOpen && slashMatches.length > 0;
 
@@ -232,6 +242,16 @@ export default function ChatInput(props: ChatInputProps) {
               )}
             </div>
             <div className="flex gap-2 pointer-events-auto">
+              <button
+                onClick={onLiveToggleCamera}
+                aria-label={liveCameraLabel}
+                className={`flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${liveCameraButtonClassName}`}
+                title={liveCameraLabel}
+              >
+                <span className="material-symbols-outlined text-[1.125rem]">{liveCameraIcon}</span>
+                <span className="whitespace-nowrap">{liveCameraLabel}</span>
+              </button>
+
               {mode === "text" && (
                 <AsrButton
                   supported={asrSupported}

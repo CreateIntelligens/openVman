@@ -5,6 +5,9 @@ export const STORAGE_KEYS = {
   PERSONA_ID: "avatar.persona_id",
   VOICE_MODE: "avatar.voice_mode",
   TTS_VOICE: "avatar.tts_voice",
+  BACKGROUND_ID: "avatar.background_id",
+  BACKGROUND_URL: "avatar.background_url",
+  BACKGROUND_FIT: "avatar.background_fit",
 } as const
 
 export function readPref(key: string, fallback: string): string {

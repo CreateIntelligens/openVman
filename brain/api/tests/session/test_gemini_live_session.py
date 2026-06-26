@@ -27,6 +27,7 @@ def _load_module():
         live_gemini_output_audio_transcription=True,
         live_gemini_tools_enabled=True,
         live_gemini_thinking_level="",
+        live_gemini_context_compression=True,
     )
     for mod_name in ("config", "memory.embedder", "memory.retrieval"):
         _saved_modules.setdefault(mod_name, sys.modules.get(mod_name))
@@ -124,7 +125,10 @@ async def test_gemini_live_session_reuses_transport_across_text_turns():
     assert emitted == []
     assert transport.connect_calls == 1
     assert transport.close_calls == 1
-    assert transport.sent_messages[0]["setup"]["model"] == "models/gemini-3.1-flash-live-preview"
+    setup = transport.sent_messages[0]["setup"]
+    assert setup["model"] == "models/gemini-3.1-flash-live-preview"
+    # Compression lifts the 2-min/15-min session cap that otherwise triggers 1008.
+    assert setup["contextWindowCompression"] == {"slidingWindow": {}}
     assert transport.sent_messages[1]["realtimeInput"]["text"] == "你好"
     assert transport.sent_messages[2]["realtimeInput"]["text"] == "再說一次"
 
@@ -160,7 +164,8 @@ async def test_gemini_live_session_sends_realtime_input_and_turn_complete():
             }
         }
     }
-    assert transport.sent_messages[2] == {"realtimeInput": {"audioStreamEnd": True}}
+    assert transport.sent_messages[2] == {
+        "realtimeInput": {"audioStreamEnd": True}}
 
 
 @pytest.mark.asyncio
@@ -340,7 +345,8 @@ async def test_gemini_live_session_emits_stream_chunks_with_session_id():
     )
 
     session._transport = transport
-    session._reconnect = lambda _reason: asyncio.sleep(0, result=False)  # type: ignore[method-assign]
+    session._reconnect = lambda _reason: asyncio.sleep(
+        0, result=False)  # type: ignore[method-assign]
     await session._listen()
 
     assert emitted[0]["event"] == "server_stream_chunk"
@@ -369,7 +375,8 @@ async def test_gemini_live_session_emits_final_empty_chunk_with_session_id():
 
     session._transport = transport
     session._response_in_progress = True
-    session._reconnect = lambda _reason: asyncio.sleep(0, result=False)  # type: ignore[method-assign]
+    session._reconnect = lambda _reason: asyncio.sleep(
+        0, result=False)  # type: ignore[method-assign]
     await session._listen()
 
     assert emitted == [
@@ -387,7 +394,8 @@ async def test_gemini_live_session_emits_final_empty_chunk_with_session_id():
 @pytest.mark.asyncio
 async def test_gemini_live_session_setup_timeout_raises_runtime_error(monkeypatch):
     module, fake_config = _load_module()
-    monkeypatch.setattr(module, "_SETUP_COMPLETE_TIMEOUT_SECONDS", 0.01, raising=False)
+    monkeypatch.setattr(
+        module, "_SETUP_COMPLETE_TIMEOUT_SECONDS", 0.01, raising=False)
     transport = HangingSetupTransport()
     session = module.GeminiLiveSession(
         relay_session_id="relay-timeout",
@@ -404,7 +412,8 @@ async def test_gemini_live_session_setup_timeout_raises_runtime_error(monkeypatc
 @pytest.mark.asyncio
 async def test_gemini_live_session_search_tool_runs_in_thread(monkeypatch):
     module, fake_config = _load_module()
-    to_thread_calls: list[tuple[object, tuple[object, ...], dict[str, object]]] = []
+    to_thread_calls: list[tuple[object,
+                                tuple[object, ...], dict[str, object]]] = []
 
     async def _fake_to_thread(func, *args, **kwargs):
         to_thread_calls.append((func, args, kwargs))
@@ -473,3 +482,37 @@ async def test_gemini_live_session_listener_cleanup_preserves_newer_transport():
     assert second.close_calls == 0
     replacement_listener.cancel()
     await asyncio.gather(replacement_listener, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_input_transcription_skips_visual_context():
+    """視覺脈絡轉錄不得存入 session message，避免進入記憶。"""
+    module, fake_config = _load_module()
+    import types as _types
+
+    saved: list[tuple] = []
+
+    fake_memory = _types.SimpleNamespace(
+        append_session_message=lambda *a, **kw: saved.append((a, kw))
+    )
+    import sys as _sys
+    _sys.modules["memory.memory"] = fake_memory
+
+    transport = FakeTransport()
+
+    async def _sink(event: dict) -> None:
+        pass
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-vis",
+        client_id="client-vis",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=_sink,
+    )
+
+    await session._handle_input_transcription({"text": "[視覺事件] 畫面中出現一位訪客。"})
+    assert saved == [], "視覺脈絡不應被存入 session message"
+
+    await session._handle_input_transcription({"text": "你好"})
+    assert len(saved) == 1, "正常語音轉錄應被儲存"

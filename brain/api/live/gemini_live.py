@@ -287,6 +287,9 @@ class GeminiLiveSession:
         text = str(input_transcription.get("text", "")).strip()
         if not text:
             return
+        # 視覺脈絡由 routes_vision ephemeral 路徑注入，不是真實語音，不存歷史
+        if text.startswith("[視覺事件]"):
+            return
 
         logger.info("Gemini Live user transcription (session %s): %s", self.session_id, text)
         await self._save_input_transcription(text)
@@ -544,6 +547,12 @@ class GeminiLiveSession:
         setup["inputAudioTranscription"] = {}
         if self.config.live_gemini_tools_enabled:
             setup["tools"] = [{"functionDeclarations": build_gemini_tool_declarations()}]
+
+        # Without compression Gemini Live caps a session at 15 min (audio) or
+        # 2 min (audio+video), then drops the socket with 1008. A sliding
+        # window lifts that cap so video sessions survive past ~2 min.
+        if self.config.live_gemini_context_compression:
+            setup["contextWindowCompression"] = {"slidingWindow": {}}
 
         return setup
 

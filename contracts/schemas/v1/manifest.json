@@ -19,6 +19,10 @@
       "direction": "client_to_server",
       "schema": "client_audio_chunk.schema.json"
     },
+    "client_video_frame": {
+      "direction": "client_to_server",
+      "schema": "client_video_frame.schema.json"
+    },
     "client_audio_end": {
       "direction": "client_to_server",
       "schema": "client_audio_end.schema.json"
@@ -42,6 +46,10 @@
     "server_stop_audio": {
       "direction": "server_to_client",
       "schema": "server_stop_audio.schema.json"
+    },
+    "server_camera_frame_status": {
+      "direction": "server_to_client",
+      "schema": "server_camera_frame_status.schema.json"
     },
     "user_transcription": {
       "direction": "server_to_client",

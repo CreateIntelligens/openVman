@@ -513,5 +513,6 @@ export function useChatSession() {
     vadSpeaking,
     handleActionConfirmed,
     handleActionCancelled,
+    setMessages,
   };
 }

@@ -1,4 +1,11 @@
-import { apiUrl, fetchJson, itemPath, AVATAR_PATH, parseJson } from "./common";
+import {
+  apiUrl,
+  fetchJson,
+  itemPath,
+  AVATAR_BACKGROUNDS_PATH,
+  AVATAR_PATH,
+  parseJson,
+} from "./common";
 
 export interface AvatarCharacter {
   char_id: string;
@@ -16,6 +23,24 @@ export interface AvatarListResponse {
 export interface AvatarMutationResponse {
   status: string;
   character: AvatarCharacter;
+}
+
+export interface AvatarBackground {
+  background_id: string;
+  label: string;
+  url: string;
+  mime_type: string;
+  size_bytes: number;
+  updated_at: string;
+}
+
+export interface AvatarBackgroundListResponse {
+  backgrounds: AvatarBackground[];
+}
+
+export interface AvatarBackgroundMutationResponse {
+  status: string;
+  background: AvatarBackground;
 }
 
 export async function fetchAvatarCharacters() {
@@ -60,4 +85,39 @@ export async function updateAvatarCharacterLabel(charId: string, label: string) 
     body: JSON.stringify({ label }),
   });
   return parseJson<AvatarMutationResponse>(res);
+}
+
+export async function fetchAvatarBackgrounds() {
+  return fetchJson<AvatarBackgroundListResponse>(apiUrl(AVATAR_BACKGROUNDS_PATH));
+}
+
+export interface UploadBackgroundArgs {
+  backgroundId: string;
+  label: string;
+  image: File;
+}
+
+export async function uploadAvatarBackground(args: UploadBackgroundArgs) {
+  const form = new FormData();
+  form.append("background_id", args.backgroundId);
+  form.append("label", args.label);
+  form.append("image", args.image);
+  const res = await fetch(apiUrl(AVATAR_BACKGROUNDS_PATH), { method: "POST", body: form });
+  return parseJson<AvatarBackgroundMutationResponse>(res);
+}
+
+export async function deleteAvatarBackground(backgroundId: string) {
+  const res = await fetch(apiUrl(itemPath(AVATAR_BACKGROUNDS_PATH, backgroundId)), {
+    method: "DELETE",
+  });
+  return parseJson<{ status: string; background_id: string }>(res);
+}
+
+export async function updateAvatarBackgroundLabel(backgroundId: string, label: string) {
+  const res = await fetch(apiUrl(itemPath(AVATAR_BACKGROUNDS_PATH, backgroundId)), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label }),
+  });
+  return parseJson<AvatarBackgroundMutationResponse>(res);
 }

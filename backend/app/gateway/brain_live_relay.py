@@ -62,6 +62,7 @@ class BrainLiveRelay:
         self._listener_task: asyncio.Task[None] | None = None
         self._closed = False
         self._connect_lock = asyncio.Lock()
+        self._accumulated_text = ""
 
     async def ensure_connected(self) -> None:
         if self._ws is not None:
@@ -120,11 +121,23 @@ class BrainLiveRelay:
                 # Gemini audio would cause double playback.
                 if payload.get("event") == "server_stream_chunk" and payload.get("audio_base64"):
                     payload = {**payload, "audio_base64": ""}
-                await self._event_sink(payload)
+
+                if payload.get("event") == "server_stream_chunk":
+                    chunk_text = payload.get("text") or ""
+                    self._accumulated_text += chunk_text
+                    if payload.get("is_final"):
+                        logger.info("[LIVE CHAT] AI Reply: %r", self._accumulated_text)
+                        self._accumulated_text = ""
+                elif payload.get("event") == "user_transcription":
+                    user_text = payload.get("text") or ""
+                    logger.info("[LIVE CHAT] User (ASR): %r", user_text)
+
+                if not await self._emit_to_client(payload):
+                    break
         except websockets.ConnectionClosed:
             if not self._closed and self._event_sink is not None:
                 logger.warning("brain live relay disconnected for session=%s", self.session.session_id)
-                await self._event_sink(
+                await self._emit_to_client(
                     {
                         "event": "server_error",
                         "error_code": "INTERNAL_ERROR",
@@ -134,6 +147,21 @@ class BrainLiveRelay:
                 )
         finally:
             self._ws = None
+
+    async def _emit_to_client(self, payload: dict[str, Any]) -> bool:
+        if self._event_sink is None:
+            return True
+        try:
+            await self._event_sink(payload)
+        except RuntimeError as exc:
+            self._closed = True
+            logger.debug(
+                "brain live relay client sink closed session=%s err=%s",
+                self.session.session_id,
+                exc,
+            )
+            return False
+        return True
 
     async def _send_json(self, payload: dict[str, Any]) -> None:
         if self._ws is None:

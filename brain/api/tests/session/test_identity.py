@@ -56,7 +56,7 @@ def test_parse_identity_extracts_fields_from_markdown(workspace_tmp: Path):
     ):
         result = parse_identity("default", None)
 
-    assert result == {"name": "小V", "theme": "professional"}
+    assert result == {"name": "小V", "emoji": "", "theme": "professional"}
 
 
 def test_parse_identity_partial_fields_use_defaults(workspace_tmp: Path):
@@ -72,7 +72,7 @@ def test_parse_identity_partial_fields_use_defaults(workspace_tmp: Path):
         result = parse_identity("default", None)
 
     # emoji outside 基本資訊 section should NOT be picked up
-    assert result == {"name": "Alice", "theme": "default"}
+    assert result == {"name": "Alice", "emoji": "", "theme": "default"}
 
 
 def test_parse_identity_persona_override(workspace_tmp: Path):

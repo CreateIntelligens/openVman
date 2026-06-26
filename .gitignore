@@ -13,6 +13,10 @@ infra/nginx/certs/*
 # Runtime
 supervisord.pid
 
+# Avatar uploads and runtime media
+data/avatar/
+data/backgrounds/
+
 # Python
 __pycache__/
 **/.pytest_cache/

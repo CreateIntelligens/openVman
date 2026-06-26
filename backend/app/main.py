@@ -35,11 +35,14 @@ from app.internal_routes import _http as _internal_http
 from app.internal_routes import router as internal_router
 from app.routes import admin as admin_routes
 from app.routes import avatar as avatar_routes
+from app.routes import backgrounds as background_routes
 from app.error_payloads import upload_failed_response
 from app.tts_text_cleaner import clean_for_tts
 from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
 from app.gateway.redis_pool import close_redis, get_redis
 from app.gateway.routes import router as gateway_router
+from app.gateway.routes_vision import _http as _vision_http
+from app.gateway.routes_vision import router as vision_router
 from app.gateway.routes_embed import router as embed_router
 from app.gateway.temp_storage import get_temp_storage, reset_temp_storage
 from app.gateway.worker import (
@@ -174,7 +177,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        clients = [_brain_proxy_http, _internal_http, _forward_http, _crawl_http, _health_http]
+        clients = [_brain_proxy_http, _internal_http, _forward_http, _crawl_http, _health_http, _vision_http]
         await asyncio.gather(*(c.close() for c in clients), admin_routes.close_http())
         await _shutdown_gateway_resources()
         logger.info("backend shutdown complete")
@@ -200,29 +203,53 @@ async def http_metrics_middleware(request: Request, call_next):
     return response
 
 
-def _mount_avatar_assets(app_instance: FastAPI) -> None:
-    avatar_assets_dir = Path(get_tts_config().avatar_assets_dir)
+def _mount_static_assets(
+    app_instance: FastAPI,
+    *,
+    route_path: str,
+    directory: str,
+    name: str,
+) -> None:
+    asset_dir = Path(directory)
     try:
-        avatar_assets_dir.mkdir(parents=True, exist_ok=True)
+        asset_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         # The configured dir may not be writable at import time outside the
         # container (local dev / CI). Don't crash import; StaticFiles below is
         # mounted with check_dir=False so it tolerates a missing directory and
         # the dir is created at runtime where the volume is writable.
-        logger.warning("avatar assets dir not preparable at import: %s", exc)
+        logger.warning("%s dir not preparable at import: %s", name, exc)
 
     app_instance.mount(
-        "/assets",
-        StaticFiles(directory=str(avatar_assets_dir), check_dir=False),
+        route_path,
+        StaticFiles(directory=str(asset_dir), check_dir=False),
+        name=name,
+    )
+
+
+def _mount_avatar_assets(app_instance: FastAPI) -> None:
+    cfg = get_tts_config()
+    _mount_static_assets(
+        app_instance,
+        route_path="/assets",
+        directory=cfg.avatar_assets_dir,
         name="avatar-assets",
+    )
+    _mount_static_assets(
+        app_instance,
+        route_path="/backgrounds",
+        directory=cfg.avatar_backgrounds_dir,
+        name="avatar-backgrounds",
     )
 
 
 app.include_router(gateway_router)
+app.include_router(vision_router)
 app.include_router(internal_router)
 app.include_router(embed_router)
 app.include_router(admin_routes.router)
 app.include_router(avatar_routes.router)
+app.include_router(background_routes.router)
 app.include_router(brain_proxy_router)
 app.include_router(websocket_routes.router)
 _mount_avatar_assets(app)

@@ -64,6 +64,7 @@ class BrainSettings(BaseSettings):
     live_gemini_output_audio_transcription: bool = True
     live_gemini_tools_enabled: bool = True
     live_gemini_thinking_level: str = ""
+    live_gemini_context_compression: bool = True
 
     # === Embedding 設定 ===
     embedding_active_version: str = "bge"
@@ -141,7 +142,8 @@ class BrainSettings(BaseSettings):
     agent_loop_max_rounds: int = 6
     tool_call_timeout_seconds: int = 30
     tool_document_char_limit: int = 4000
-    forced_tool_model_override: str = ""   # e.g. "gemini-2.0-flash-lite" for faster forced tool calls
+    # e.g. "gemini-2.0-flash-lite" for faster forced tool calls
+    forced_tool_model_override: str = ""
     forced_tool_max_tokens: int = 200
 
     # === Web Search ===
@@ -208,7 +210,7 @@ class BrainSettings(BaseSettings):
         keys = [k.strip() for k in self.llm_api_keys.split(",") if k.strip()]
         if self.llm_api_key.strip():
             keys.append(self.llm_api_key.strip())
-        
+
         if not keys:
             if specific_key := self.resolve_api_key_for_provider(self.llm_provider):
                 keys.append(specific_key)
@@ -239,7 +241,7 @@ class BrainSettings(BaseSettings):
                 provider, model = entry.split(":", 1)
                 if provider.strip() and model.strip():
                     pairs.append((provider.strip(), model.strip()))
-        
+
         return pairs or [(self.llm_provider, self.llm_model)]
 
     _BASE_URL_DEFAULTS: dict[str, str] = {
@@ -277,7 +279,7 @@ class BrainSettings(BaseSettings):
                 if stripped := k.strip():
                     return stripped
             return self.llm_api_key.strip()
-        
+
         return ""
 
     @property
@@ -299,7 +301,8 @@ class BrainSettings(BaseSettings):
         self,
         version: str | None = None,
     ) -> EmbeddingBackend:
-        resolved_version = self._normalize_embedding_version(version or self.embedding_active_version)
+        resolved_version = self._normalize_embedding_version(
+            version or self.embedding_active_version)
         if resolved_version == "bge":
             return EmbeddingBackend(
                 version="bge",
@@ -322,7 +325,8 @@ class BrainSettings(BaseSettings):
             model=getattr(self, model_attr),
             api_key=getattr(self, key_attr),
             base_url=base_url,
-            dimensions=self._normalize_embedding_dimensions(getattr(self, dims_attr)),
+            dimensions=self._normalize_embedding_dimensions(
+                getattr(self, dims_attr)),
             use_fp16=False,
             device="api",
             multimodal=False,

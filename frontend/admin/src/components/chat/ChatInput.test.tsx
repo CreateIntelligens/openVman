@@ -38,7 +38,9 @@ function renderChatInput(overrides: Partial<ComponentProps<typeof ChatInput>> = 
     onPrivacyWarningsVisibleChange: vi.fn(),
     liveWsState: "connected",
     liveMicActive: false,
+    liveCameraActive: false,
     onLiveToggleMic: vi.fn(),
+    onLiveToggleCamera: vi.fn(),
     ...overrides,
   };
 
@@ -79,6 +81,14 @@ describe("ChatInput", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "顯示隱私警告" }));
 
     expect(props.onPrivacyWarningsVisibleChange).toHaveBeenCalledWith(false);
+  });
+
+  it("renders the live camera toggle and forwards clicks", () => {
+    const props = renderChatInput({ mode: "live" });
+
+    fireEvent.click(screen.getByRole("button", { name: "開鏡頭" }));
+
+    expect(props.onLiveToggleCamera).toHaveBeenCalledTimes(1);
   });
 
 });

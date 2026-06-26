@@ -172,11 +172,14 @@ async def get_tts_providers() -> JSONResponse:
         })
 
     if cfg.edge_tts_enabled:
+        voices = ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "zh-CN-XiaoyiNeural"]
+        if cfg.edge_tts_voice not in voices:
+            voices.insert(0, cfg.edge_tts_voice)
         providers.append({
             "id": "edge-tts",
             "name": "Edge TTS",
             "default_voice": cfg.edge_tts_voice,
-            "voices": [cfg.edge_tts_voice],
+            "voices": voices,
         })
 
     return JSONResponse(content=providers)

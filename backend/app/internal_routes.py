@@ -19,7 +19,7 @@ router = APIRouter(tags=["Internal"])
 
 INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 
-_http = SharedAsyncClient(read=30)
+_http = SharedAsyncClient(read=8)
 
 
 class InternalEnrichRequest(BaseModel):
@@ -54,9 +54,25 @@ async def internal_enrich(
             result.get("stored_count"),
         )
         return result
-    except httpx.ConnectError:
+    except httpx.TimeoutException as exc:
+        logger.warning(
+            "brain_enrich_timeout trace_id=%s url=%s err=%r",
+            payload.trace_id,
+            brain_url,
+            exc,
+        )
+        raise HTTPException(status_code=504, detail="brain enrich timeout") from exc
+    except httpx.ConnectError as exc:
         logger.warning("brain unreachable at %s", brain_url)
-        raise HTTPException(status_code=502, detail="brain service unavailable")
+        raise HTTPException(status_code=502, detail="brain service unavailable") from exc
+    except httpx.RequestError as exc:
+        logger.warning(
+            "brain_enrich_request_error trace_id=%s url=%s err=%r",
+            payload.trace_id,
+            brain_url,
+            exc,
+        )
+        raise HTTPException(status_code=502, detail="brain service unavailable") from exc
     except httpx.HTTPStatusError as exc:
         logger.error(
             "brain_enrich_error trace_id=%s status=%d",

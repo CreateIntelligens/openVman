@@ -264,7 +264,7 @@ def iter_knowledge_documents(project_id: str = "default") -> list[Path]:
 # Identity parsing
 # ---------------------------------------------------------------------------
 
-_IDENTITY_DEFAULTS = {"name": "", "theme": "default"}
+_IDENTITY_DEFAULTS = {"name": "", "emoji": "", "theme": "default"}
 _IDENTITY_KEYS = frozenset(_IDENTITY_DEFAULTS.keys())
 _FIELD_RE = re.compile(r"^-\s+(\w+)\s*:\s*(.+)$")
 

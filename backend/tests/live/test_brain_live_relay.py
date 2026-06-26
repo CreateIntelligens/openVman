@@ -82,6 +82,28 @@ async def test_brain_live_relay_forwards_non_chunk_events_unchanged():
 
 
 @pytest.mark.asyncio
+async def test_brain_live_relay_stops_when_client_event_sink_is_closed():
+    session = Session(client_id="client-closed")
+    sink_calls = 0
+
+    async def sink(_payload: dict[str, object]) -> None:
+        nonlocal sink_calls
+        sink_calls += 1
+        raise RuntimeError('WebSocket is not connected. Need to call "accept" first.')
+
+    relay = BrainLiveRelay(session, event_sink=sink)
+    relay._ws = FakeWebSocket(
+        relay,
+        [json.dumps({"event": "server_stop_audio", "session_id": session.session_id})],
+    )
+
+    await relay._listen()
+
+    assert sink_calls == 1
+    assert relay._ws is None
+
+
+@pytest.mark.asyncio
 async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send():
     session = Session(client_id="client-concurrent")
     websocket = ConnectableFakeWebSocket()

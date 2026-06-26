@@ -38,3 +38,30 @@ test("text chat mode keeps the Standard label", () => {
   assert.match(source, /<strong>Standard<\/strong>/);
   assert.doesNotMatch(source, /<strong>預設<\/strong>/);
 });
+
+test("settings modal exposes stage background controls", () => {
+  assert.match(source, /backgroundId:\s*AvatarBackgroundId/);
+  assert.match(source, /backgroundUrl:\s*string/);
+  assert.match(source, /backgroundFit:\s*AvatarBackgroundFit/);
+  assert.match(source, /backgrounds:\s*AvatarBackgroundSummary\[\]/);
+  assert.match(source, /backgroundChange:\s*\[\s*backgroundId:\s*AvatarBackgroundId,\s*backgroundUrl:\s*string,\s*backgroundFit:\s*AvatarBackgroundFit,\s*\]/);
+  assert.match(source, /draftBackgroundId/);
+  assert.match(source, /draftBackgroundUrl/);
+  assert.match(source, /draftBackgroundFit/);
+  assert.match(source, />背景</);
+  assert.match(source, />顯示方式</);
+  assert.match(source, /v-for="option in backgroundOptions"/);
+  assert.match(source, /v-for="option in backgroundFitOptions"/);
+  assert.match(source, /v-model="draftBackgroundId"/);
+  assert.match(source, /v-model="draftBackgroundFit"/);
+  assert.match(source, /uploaded:\$\{background\.background_id\}/);
+  assert.match(source, /resolvedDraftBackgroundUrl/);
+});
+
+test("background changes apply without forcing chat reconnect", () => {
+  assert.match(source, /const needsReconnect = computed/);
+  assert.match(source, /const isBackgroundDirty = computed/);
+  assert.match(source, /if \(needsReconnect\.value\) emit\('apply'\)/);
+  assert.match(source, /const applyLabel = computed/);
+  assert.doesNotMatch(source, /{{ isDirty \? '套用並重新連線' : '關閉' }}/);
+});

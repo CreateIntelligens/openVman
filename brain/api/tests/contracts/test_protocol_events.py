@@ -95,6 +95,23 @@ def test_validate_client_event_accepts_client_audio_chunk_payload():
     assert event.mime_type == "audio/pcm;rate=16000"
 
 
+def test_validate_client_event_accepts_client_video_frame_payload():
+    protocol_events = _protocol_events()
+
+    event = protocol_events.validate_client_event(
+        {
+            "event": "client_video_frame",
+            "frame_base64": "UklGRi0AAABXQVZFZm10",
+            "mime_type": "image/jpeg",
+            "timestamp": 1710123457,
+        }
+    )
+
+    assert event.event == "client_video_frame"
+    assert event.frame_base64 == "UklGRi0AAABXQVZFZm10"
+    assert event.mime_type == "image/jpeg"
+
+
 def test_validate_client_event_accepts_client_audio_end_payload():
     protocol_events = _protocol_events()
 

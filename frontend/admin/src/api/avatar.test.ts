@@ -5,6 +5,10 @@ import {
   deleteAvatarCharacter,
   renameAvatarCharacter,
   updateAvatarCharacterLabel,
+  fetchAvatarBackgrounds,
+  uploadAvatarBackground,
+  deleteAvatarBackground,
+  updateAvatarBackgroundLabel,
 } from "./avatar";
 
 afterEach(() => vi.restoreAllMocks());
@@ -60,5 +64,39 @@ describe("avatar api", () => {
     expect(url).toBe("/api/avatar/008");
     expect((init as RequestInit).method).toBe("PATCH");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({ label: "新的名字" });
+  });
+
+  it("fetchAvatarBackgrounds GETs /api/backgrounds", async () => {
+    const f = mockFetch({ backgrounds: [{ background_id: "clinic" }] });
+    const res = await fetchAvatarBackgrounds();
+    expect(f).toHaveBeenCalledWith("/api/backgrounds", undefined);
+    expect(res.backgrounds[0].background_id).toBe("clinic");
+  });
+
+  it("uploadAvatarBackground POSTs multipart", async () => {
+    const f = mockFetch({ status: "ok", background: { background_id: "clinic" } });
+    const image = new File([new Uint8Array([0x89])], "clinic.png");
+    await uploadAvatarBackground({ backgroundId: "clinic", label: "診間", image });
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("/api/backgrounds");
+    expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).body).toBeInstanceOf(FormData);
+  });
+
+  it("deleteAvatarBackground DELETEs by id", async () => {
+    const f = mockFetch({ status: "ok", background_id: "clinic" });
+    await deleteAvatarBackground("clinic");
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("/api/backgrounds/clinic");
+    expect((init as RequestInit).method).toBe("DELETE");
+  });
+
+  it("updateAvatarBackgroundLabel PATCHes display name", async () => {
+    const f = mockFetch({ status: "ok", background: { background_id: "clinic", label: "新的診間" } });
+    await updateAvatarBackgroundLabel("clinic", "新的診間");
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("/api/backgrounds/clinic");
+    expect((init as RequestInit).method).toBe("PATCH");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ label: "新的診間" });
   });
 });

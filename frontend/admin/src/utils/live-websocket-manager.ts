@@ -15,6 +15,7 @@ type LiveWebSocketConfig = {
   projectId: string;
   voiceSource?: VoiceSource;
   chatSessionId?: string;
+  chatMode?: "text" | "live";
 };
 
 type LiveWebSocketCallbacks = {
@@ -34,7 +35,7 @@ function buildWebSocketUrl(clientId: string): string {
 
 export class LiveWebSocketManager {
   private callbacks: LiveWebSocketCallbacks = {};
-  private config: Required<Pick<LiveWebSocketConfig, "clientId" | "projectId" | "voiceSource">> & Pick<LiveWebSocketConfig, "chatSessionId">;
+  private config: Required<Pick<LiveWebSocketConfig, "clientId" | "projectId" | "voiceSource" | "chatMode">> & Pick<LiveWebSocketConfig, "chatSessionId">;
   private manualDisconnect = false;
   private reconnectGeneration = 0;
   private reconnectTimer: number | null = null;
@@ -46,6 +47,7 @@ export class LiveWebSocketManager {
       projectId: config.projectId,
       voiceSource: config.voiceSource ?? DEFAULT_VOICE_SOURCE,
       chatSessionId: config.chatSessionId,
+      chatMode: config.chatMode ?? "live",
     };
     if (callbacks) {
       this.callbacks = callbacks;
@@ -62,6 +64,7 @@ export class LiveWebSocketManager {
       projectId: config.projectId,
       voiceSource: config.voiceSource ?? DEFAULT_VOICE_SOURCE,
       chatSessionId: config.chatSessionId,
+      chatMode: config.chatMode ?? "live",
     };
   }
 
@@ -86,6 +89,7 @@ export class LiveWebSocketManager {
         projectId: this.config.projectId,
         voiceSource: this.config.voiceSource,
         sessionId: this.config.chatSessionId,
+        chatMode: this.config.chatMode,
       });
       this.sendEvent(initEvent);
     };

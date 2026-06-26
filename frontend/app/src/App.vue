@@ -16,6 +16,13 @@
               :height="800"
               :show-loading="wasm.isLoading.value"
               :loading-text="loadingText"
+              :background-id="settings.backgroundId"
+              :custom-background-url="settings.backgroundUrl"
+              :background-fit="settings.backgroundFit"
+            />
+            <CameraPreview
+              :stream="webcam.stream.value"
+              :active="webcam.active.value"
             />
           </div>
         </div>
@@ -26,7 +33,9 @@
           :state="chat.state.value"
           :disabled="!wasm.isReady.value || wasm.isLoading.value"
           :error-message="wasm.error.value"
+          :camera-active="webcam.active.value"
           @open-settings="showSettings = true"
+          @toggle-camera="handleToggleCamera"
         />
 
         <ChatPanel
@@ -59,6 +68,10 @@
       :current-persona-id="settings.personaId"
       :personas-loading="personasLoading"
       :voice-mode="settings.voiceMode"
+      :background-id="settings.backgroundId"
+      :background-url="settings.backgroundUrl"
+      :background-fit="settings.backgroundFit"
+      :backgrounds="backgrounds"
       :state="chat.state.value"
       :disabled="!wasm.isReady.value || wasm.isLoading.value"
       @char-change="handleCharChange"
@@ -68,6 +81,7 @@
       @project-change="handleProjectChange"
       @persona-change="handlePersonaChange"
       @voice-mode-change="handleVoiceModeChange"
+      @background-change="handleBackgroundChange"
       @apply="handleSettingsApply"
     />
 
@@ -84,6 +98,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
+import CameraPreview from "./components/avatar/CameraPreview.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";
 import type { PersonaSummary } from "./components/controls/ControlBar.vue";
@@ -97,7 +112,9 @@ import { useAsr } from "./composables/useAsr";
 import { useMatesX } from "./composables/useMatesX";
 import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
+import { useWebcamCapture } from "./composables/useWebcamCapture";
 import { useSettingsStore } from "./stores/useSettingsStore";
+import type { AvatarBackgroundFit, AvatarBackgroundId } from "./types/avatarBackground";
 
 const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
 
@@ -148,10 +165,17 @@ interface ProjectSummary {
   persona_count?: number;
 }
 
+interface AvatarBackgroundSummary {
+  background_id: string;
+  label: string;
+  url: string;
+}
+
 const DEFAULT_PROJECT: ProjectSummary = { project_id: "default", label: "預設" };
 const DEFAULT_PERSONA: PersonaSummary = { persona_id: "default", label: "預設" };
 const projects = ref<ProjectSummary[]>([DEFAULT_PROJECT]);
 const personas = ref<PersonaSummary[]>([DEFAULT_PERSONA]);
+const backgrounds = ref<AvatarBackgroundSummary[]>([]);
 const personasLoading = ref(false);
 const ttsProviders = ref<TtsProvider[]>([]);
 const avatarCatalog = useAvatarCatalog();
@@ -236,6 +260,17 @@ async function fetchTtsProviders(): Promise<void> {
     ttsProviders.value = await res.json();
   } catch {
     // silently keep empty — SettingsModal falls back to showing nothing
+  }
+}
+
+async function fetchBackgrounds(): Promise<void> {
+  try {
+    const res = await fetch("/api/backgrounds");
+    if (!res.ok) return;
+    const data = await res.json();
+    backgrounds.value = data.backgrounds ?? [];
+  } catch {
+    backgrounds.value = [];
   }
 }
 
@@ -402,6 +437,16 @@ function handleVoiceModeChange(mode: 'live' | 'text'): void {
   settings.voiceMode = mode;
 }
 
+function handleBackgroundChange(
+  backgroundId: AvatarBackgroundId,
+  backgroundUrl: string,
+  backgroundFit: AvatarBackgroundFit,
+): void {
+  settings.backgroundId = backgroundId;
+  settings.backgroundUrl = backgroundUrl;
+  settings.backgroundFit = backgroundFit;
+}
+
 async function handleSettingsApply(): Promise<void> {
   await fetchPersonas(settings.projectId, { syncSelected: true });
   // Apply mode change before reconnecting so connect() uses the new mode
@@ -437,6 +482,33 @@ function handleAsrToggle(): void {
   if (asr.isListening.value) asr.stop(); else asr.start();
 }
 
+const webcam = useWebcamCapture({
+  onFrame: (base64, mimeType, timestamp) => {
+    chat.sendVisualInput(base64, mimeType, timestamp);
+  },
+});
+
+async function handleToggleCamera(): Promise<void> {
+  if (webcam.active.value) {
+    webcam.stop();
+    return;
+  }
+  try {
+    // Ensure a session exists so live frames have somewhere to go.
+    if (!isStarted.value) {
+      await audio.resumeContext();
+      await chat.connect();
+      isStarted.value = true;
+    }
+    await webcam.start();
+  } catch {
+    statusToastRef.value?.show(
+      webcam.error.value || "無法開啟攝影機",
+      { persistent: false },
+    );
+  }
+}
+
 function pickInitialCharacter(): string {
   const saved = settings.characterId.trim();
   if (saved) return saved;
@@ -453,10 +525,12 @@ watch(() => chat.state.value, (newState) => {
 
 watch(showSettings, () => {
   void fetchPersonas(settings.projectId, { syncSelected: true });
+  void fetchBackgrounds();
 });
 
 onMounted(async () => {
   void fetchTtsProviders();
+  void fetchBackgrounds();
   await fetchProjects();
   await fetchPersonas(settings.projectId);
   await avatarCatalog.load();

@@ -174,6 +174,7 @@ services:
 
   backend:
     <<: *shared
+    user: "${UID:-1000}:${GID:-1000}"
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -185,13 +186,15 @@ services:
       - ./backend/Dockerfile:/app/Dockerfile
       - ./backend/requirements.txt:/app/requirements.txt
       - ./backend/scripts:/app/scripts
-      - avatar-assets:/data/avatar
+      - ./data/avatar:/data/avatar
+      - ./data/backgrounds:/data/backgrounds
     env_file:
       - ./backend/.env
     environment:
       - REDIS_URL=redis://redis:6379
       - TTS_INDEXTTS_URL=http://index-tts-vllm:8011
       - AVATAR_ASSETS_DIR=/data/avatar
+      - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
     depends_on:
       api:
         condition: service_started
@@ -202,7 +205,6 @@ volumes:
   triton-cache:
   admin-node-modules:
   avatar-node-modules:
-  avatar-assets:
   redis-data:
   prometheus-data:
   grafana-data:

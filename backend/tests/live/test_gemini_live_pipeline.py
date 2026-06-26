@@ -164,7 +164,8 @@ async def test_gemini_live_pipeline_executes_search_tool_calls_and_returns_tool_
                     "name": "search_knowledge",
                     "response": {
                         "results": [
-                            {"text": "七天內可退款", "source": "policy.md", "date": "2026-04-07"},
+                            {"text": "七天內可退款", "source": "policy.md",
+                                "date": "2026-04-07"},
                         ]
                     },
                 }

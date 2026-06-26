@@ -43,6 +43,12 @@ class ClientAudioChunkEvent(GeneratedProtocolModel):
     mime_type: str = Field(min_length=1)
     timestamp: int = Field(ge=0)
 
+class ClientVideoFrameEvent(GeneratedProtocolModel):
+    event: Literal['client_video_frame']
+    frame_base64: str = Field(min_length=1)
+    mime_type: str = Field(min_length=1)
+    timestamp: int = Field(ge=0)
+
 class ClientAudioEndEvent(GeneratedProtocolModel):
     event: Literal['client_audio_end']
     timestamp: int = Field(ge=0)
@@ -84,14 +90,22 @@ class ServerStopAudioEvent(GeneratedProtocolModel):
     timestamp: int
     reason: str | None = Field(default=None)
 
+class ServerCameraFrameStatusEvent(GeneratedProtocolModel):
+    event: Literal['server_camera_frame_status']
+    session_id: str = Field(min_length=1)
+    status: Literal['received', 'busy', 'processed', 'error', 'invalid']
+    timestamp: int = Field(ge=0)
+    frame_timestamp: int | None = Field(default=None, ge=0)
+    message: str | None = Field(default=None, min_length=1)
+
 class UserTranscriptionEvent(GeneratedProtocolModel):
     event: Literal['user_transcription']
     text: str
     session_id: str = Field(min_length=1)
     timestamp: int | None = Field(default=None)
 
-ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientAudioEndEvent | SetLipSyncModeEvent, Field(discriminator='event')]
-ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | UserTranscriptionEvent, Field(discriminator='event')]
+ClientEvent = Annotated[ClientInitEvent | UserSpeakEvent | ClientInterruptEvent | ClientAudioChunkEvent | ClientVideoFrameEvent | ClientAudioEndEvent | SetLipSyncModeEvent, Field(discriminator='event')]
+ServerEvent = Annotated[ServerStreamChunkEvent | ServerErrorEvent | ServerInitAckEvent | ServerStopAudioEvent | ServerCameraFrameStatusEvent | UserTranscriptionEvent, Field(discriminator='event')]
 ProtocolEvent = ClientEvent | ServerEvent
 
 CLIENT_EVENT_ADAPTER = TypeAdapter(ClientEvent)
@@ -104,12 +118,14 @@ __all__ = [
     "ClientAudioEndEvent",
     "ClientInitEvent",
     "ClientInterruptEvent",
+    "ClientVideoFrameEvent",
     "DEFAULT_PROTOCOL_VERSION",
     "GeneratedProtocolModel",
     "PROTOCOL_NAME",
     "ProtocolDirection",
     "ProtocolEvent",
     "SERVER_EVENT_ADAPTER",
+    "ServerCameraFrameStatusEvent",
     "ServerErrorEvent",
     "ServerEvent",
     "ServerInitAckEvent",

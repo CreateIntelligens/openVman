@@ -3,6 +3,7 @@ import type {
   ClientAudioEndEvent,
   ClientInitEvent,
   ClientInterruptEvent,
+  ClientVideoFrameEvent,
   UserSpeakEvent,
 } from "@contracts/generated/typescript/protocol-contracts";
 import {
@@ -10,6 +11,7 @@ import {
   clientAudioEndSchema,
   clientInitSchema,
   clientInterruptSchema,
+  clientVideoFrameSchema,
   userSpeakSchema,
 } from "./schema";
 import {
@@ -66,6 +68,16 @@ export function validateClientAudioChunk(record: Record<string, unknown>, versio
     sample_rate: sampleRate,
     mime_type: expectNonEmptyString(record.mime_type, version, "mime_type", "client_audio_chunk"),
     timestamp: expectNonNegativeInteger(record.timestamp, version, "client_audio_chunk", "timestamp"),
+  };
+}
+
+export function validateClientVideoFrame(record: Record<string, unknown>, version: string): ClientVideoFrameEvent {
+  assertShape(record, clientVideoFrameSchema, version, "client_video_frame");
+  return {
+    event: "client_video_frame",
+    frame_base64: expectNonEmptyString(record.frame_base64, version, "frame_base64", "client_video_frame"),
+    mime_type: expectNonEmptyString(record.mime_type, version, "mime_type", "client_video_frame"),
+    timestamp: expectNonNegativeInteger(record.timestamp, version, "client_video_frame", "timestamp"),
   };
 }
 

@@ -79,6 +79,7 @@ export default function Chat() {
     vadSpeaking,
     handleActionConfirmed,
     handleActionCancelled,
+    setMessages,
   } = useChatSession();
   const liveClientIdRef = useRef<string>("");
   if (!liveClientIdRef.current) {
@@ -97,7 +98,42 @@ export default function Chat() {
     chatSessionId: sessionId,
     initialMessages: liveInitialMessages,
   });
-  const { clearError: liveClearError, sendText: liveSendText, toggleMicrophone: liveToggleMic } = liveSession;
+  const {
+    clearError: liveClearError,
+    sendText: liveSendText,
+    toggleCamera: liveToggleCamera,
+    toggleMicrophone: liveToggleMic,
+  } = liveSession;
+
+  const setVideoRef = useCallback((el: HTMLVideoElement | null) => {
+    if (el && liveSession.cameraStream) {
+      el.srcObject = liveSession.cameraStream;
+    }
+  }, [liveSession.cameraStream]);
+
+  // Sync live messages to text messages when in text mode
+  const lastSyncedTimestampRef = useRef<number>(0);
+  useEffect(() => {
+    if (mode !== "text" || !liveSession.liveMessages.length) return;
+
+    const lastLiveMsg = liveSession.liveMessages[liveSession.liveMessages.length - 1];
+    if (lastLiveMsg.timestamp > lastSyncedTimestampRef.current) {
+      lastSyncedTimestampRef.current = lastLiveMsg.timestamp;
+
+      // Only sync if the last message in text messages is not already the same content
+      const lastTextMsg = messages[messages.length - 1];
+      if (!lastTextMsg || lastTextMsg.content !== lastLiveMsg.text) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: lastLiveMsg.role,
+            content: lastLiveMsg.text,
+            created_at: new Date(lastLiveMsg.timestamp).toISOString(),
+          },
+        ]);
+      }
+    }
+  }, [liveSession.liveMessages, mode, messages, setMessages]);
 
   const liveStatusLabel = liveSession.wsState === "connecting"
     ? "連線中"
@@ -156,6 +192,7 @@ export default function Chat() {
   const handleSlashClose = useCallback(() => setSlashOpen(false), [setSlashOpen]);
   const handleDismissFallbackToast = useCallback(() => setTtsFallbackToast(""), [setTtsFallbackToast]);
   const handleLiveToggleMic = useCallback(() => { void liveToggleMic(); }, [liveToggleMic]);
+  const handleLiveToggleCamera = useCallback(() => { void liveToggleCamera(); }, [liveToggleCamera]);
 
   useEffect(() => {
     if (!sending) return;
@@ -235,15 +272,24 @@ export default function Chat() {
                   <div className="flex items-center gap-3">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${liveStatusTone} ${liveSession.wsState === "connecting" ? "animate-pulse" : ""}`} />
                     <span className="text-sm font-medium text-content">{liveStatusLabel}</span>
-                    <div className="flex items-center gap-4 text-xs text-content-muted">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-content-muted">
                       <span className="flex items-center gap-1.5">
                         <span className={`h-1.5 w-1.5 rounded-full ${liveSession.micActive ? "bg-danger animate-pulse" : "bg-border-strong"}`} />
                         {liveSession.micActive ? "聆聽中" : "待命"}
                       </span>
                       <span className="flex items-center gap-1.5">
+                        <span className={`h-1.5 w-1.5 rounded-full ${liveSession.cameraActive ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
+                        {liveSession.cameraActive ? "鏡頭中" : "鏡頭關閉"}
+                      </span>
+                      <span className="flex items-center gap-1.5">
                         <span className={`h-1.5 w-1.5 rounded-full ${liveSession.isPlaying ? "bg-primary animate-pulse" : "bg-border-strong"}`} />
                         {liveSession.isPlaying ? "回覆中" : "靜音"}
                       </span>
+                      {liveSession.cameraStatus && (
+                        <span className="max-w-full truncate text-content-muted">
+                          {liveSession.cameraStatus}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -399,10 +445,39 @@ export default function Chat() {
             onPrivacyWarningsVisibleChange={setPrivacyWarningsVisible}
             liveWsState={liveSession.wsState}
             liveMicActive={liveSession.micActive}
+            liveCameraActive={liveSession.cameraActive}
             onLiveToggleMic={handleLiveToggleMic}
+            onLiveToggleCamera={handleLiveToggleCamera}
           />
         </div>
 
+        {/* Floating Webcam Preview */}
+        {liveSession.cameraActive && (
+          <div className="absolute right-4 bottom-24 z-50 w-64 overflow-hidden rounded-xl border border-border bg-surface-raised shadow-lg backdrop-blur-md">
+            <div className="flex items-center justify-between bg-surface-sunken/80 px-3 py-2 text-xs font-medium text-content border-b border-border">
+              <span className="flex items-center gap-1.5 truncate max-w-[180px]">
+                <span className={`h-2 w-2 rounded-full bg-primary ${liveSession.cameraStatus ? 'animate-ping' : 'animate-pulse'}`} />
+                {liveSession.cameraStatus || "本機攝影機畫面"}
+              </span>
+              <button
+                onClick={handleLiveToggleCamera}
+                className="text-content-subtle hover:text-content transition-colors flex items-center justify-center"
+                title="關閉攝影機"
+              >
+                <span className="material-symbols-outlined text-[1rem]">close</span>
+              </button>
+            </div>
+            <div className="relative aspect-video w-full bg-black">
+              <video
+                ref={setVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="h-full w-full object-cover scale-x-[-1]"
+              />
+            </div>
+          </div>
+        )}
       </main>
 
       <ConfirmModal

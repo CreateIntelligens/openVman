@@ -14,6 +14,7 @@ type ClientInitPayload = {
     surface: "admin";
     voice_source: VoiceSource;
     session_id?: string;
+    chat_mode: "text" | "live";
   };
   timestamp: number;
 };
@@ -24,6 +25,7 @@ type BuildClientInitPayloadOptions = {
   voiceSource?: VoiceSource;
   sessionId?: string;
   timestamp?: number;
+  chatMode?: "text" | "live";
 };
 
 export function buildClientInitPayload({
@@ -32,12 +34,14 @@ export function buildClientInitPayload({
   voiceSource = DEFAULT_VOICE_SOURCE,
   sessionId,
   timestamp = Date.now(),
+  chatMode = "live",
 }: BuildClientInitPayloadOptions): ClientInitPayload {
   const capabilities: ClientInitPayload["capabilities"] = {
     mode: "gemini_live",
     project_id: projectId,
     surface: "admin",
     voice_source: voiceSource,
+    chat_mode: chatMode,
   };
   if (sessionId) {
     capabilities.session_id = sessionId;

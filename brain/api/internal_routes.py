@@ -267,9 +267,13 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
     live = state["live_session"]
 
     if event == "user_speak" and (text := str(payload.get("text", "")).strip()):
-        state["user_text_buf"].append(text)
-        _save_user_message(state, text)
-        await live.send_text_turn(text)
+        # ephemeral=True 的視覺脈絡只餵給 AI，不落歷史（避免污染對話）。
+        if payload.get("ephemeral"):
+            await live.send_text_turn(text)
+        else:
+            state["user_text_buf"].append(text)
+            _save_user_message(state, text)
+            await live.send_text_turn(text)
     elif event == "client_interrupt":
         await live.request_stop()
     elif event == "client_audio_chunk" and (audio := str(payload.get("audio_base64", "")).strip()):

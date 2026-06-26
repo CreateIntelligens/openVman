@@ -1,5 +1,10 @@
 <template>
   <div class="avatar-canvas">
+    <div
+      class="avatar-background"
+      :class="backgroundClass"
+      :style="backgroundStyle"
+    />
     <!-- Main rendering canvas required by the DHLiveMini2 runtime -->
     <canvas id="canvas_video" class="avatar-display" :width="width" :height="height" />
     <!-- WebGL canvas required by WASM engine -->
@@ -16,12 +21,72 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed } from "vue"
+import {
+  isUploadedAvatarBackgroundId,
+  type AvatarBackgroundFit,
+  type AvatarBackgroundId,
+} from "../../types/avatarBackground"
+
+const props = withDefaults(defineProps<{
   width?: number
   height?: number
   showLoading?: boolean
   loadingText?: string
-}>()
+  backgroundId?: AvatarBackgroundId
+  backgroundFit?: AvatarBackgroundFit
+  customBackgroundUrl?: string
+}>(), {
+  width: 800,
+  height: 800,
+  showLoading: false,
+  loadingText: "",
+  backgroundId: "dark",
+  backgroundFit: "cover",
+  customBackgroundUrl: "",
+})
+
+const backgroundClass = computed(() =>
+  isUploadedAvatarBackgroundId(props.backgroundId)
+    ? "avatar-background--custom"
+    : `avatar-background--${props.backgroundId}`
+)
+
+const backgroundStyle = computed(() => {
+  const url = props.customBackgroundUrl.trim()
+  if (
+    props.backgroundId !== "custom" &&
+    !isUploadedAvatarBackgroundId(props.backgroundId)
+  ) return {}
+  if (url.length === 0) return {}
+  return {
+    backgroundImage: `url(${JSON.stringify(url)})`,
+    ...backgroundFitStyle(props.backgroundFit),
+  }
+})
+
+function backgroundFitStyle(fit: AvatarBackgroundFit): Record<string, string> {
+  switch (fit) {
+    case "repeat":
+      return {
+        backgroundPosition: "top left",
+        backgroundRepeat: "repeat",
+        backgroundSize: "auto",
+      }
+    case "contain":
+      return {
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "contain",
+      }
+    default:
+      return {
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }
+  }
+}
 
 defineEmits<{}>()
 </script>
@@ -38,7 +103,42 @@ defineEmits<{}>()
   overflow: hidden;
 }
 
+.avatar-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.avatar-background--dark {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(47, 65, 88, 0.92) 0%, rgba(9, 14, 20, 0) 54%),
+    linear-gradient(180deg, #121722 0%, #06080d 100%);
+}
+
+.avatar-background--clinic {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(135deg, #dbeafe 0%, #f8fafc 48%, #d1fae5 100%);
+}
+
+.avatar-background--studio {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(250, 204, 21, 0.28) 0%, rgba(250, 204, 21, 0) 34%),
+    radial-gradient(circle at 18% 78%, rgba(20, 184, 166, 0.35) 0%, rgba(20, 184, 166, 0) 36%),
+    linear-gradient(145deg, #16110f 0%, #243042 52%, #101820 100%);
+}
+
+.avatar-background--custom {
+  background-color: #0a0a0f;
+}
+
 .avatar-display {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   object-fit: contain;

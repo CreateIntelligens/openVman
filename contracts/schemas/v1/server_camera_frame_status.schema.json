@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openvman://protocol/v1/server_camera_frame_status",
+  "title": "Server Camera Frame Status Event",
+  "type": "object",
+  "additionalProperties": false,
+  "x-direction": "server_to_client",
+  "x-contract-version": "1.0.0",
+  "properties": {
+    "event": {
+      "const": "server_camera_frame_status"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "received",
+        "busy",
+        "processed",
+        "error",
+        "invalid"
+      ]
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "frame_timestamp": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "event",
+    "session_id",
+    "status",
+    "timestamp"
+  ]
+}

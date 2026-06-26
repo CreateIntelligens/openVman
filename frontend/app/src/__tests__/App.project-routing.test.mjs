@@ -28,3 +28,22 @@ test("chat composable is configured with the selected project and persona before
 test("TTS streamer can inspect available providers for auto streaming", () => {
   assert.match(source, /ttsProviders:\s*\(\) => ttsProviders\.value/);
 });
+
+test("avatar stage background is wired through settings", () => {
+  assert.match(source, /:background-id="settings\.backgroundId"/);
+  assert.match(source, /:custom-background-url="settings\.backgroundUrl"/);
+  assert.match(source, /:background-fit="settings\.backgroundFit"/);
+  assert.match(source, /:backgrounds="backgrounds"/);
+  assert.match(source, /:background-url="settings\.backgroundUrl"/);
+  assert.match(source, /@background-change="handleBackgroundChange"/);
+  assert.match(source, /function handleBackgroundChange\(\s*backgroundId:\s*AvatarBackgroundId,\s*backgroundUrl:\s*string,\s*backgroundFit:\s*AvatarBackgroundFit,\s*\):\s*void/);
+  assert.match(source, /settings\.backgroundId = backgroundId/);
+  assert.match(source, /settings\.backgroundUrl = backgroundUrl/);
+  assert.match(source, /settings\.backgroundFit = backgroundFit/);
+});
+
+test("avatar frontend loads uploaded backgrounds for settings", () => {
+  assert.match(source, /fetch\("\/api\/backgrounds"\)/);
+  assert.match(source, /backgrounds\.value = data\.backgrounds \?\? \[\]/);
+  assert.match(source, /void fetchBackgrounds\(\)/);
+});

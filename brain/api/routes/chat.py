@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any, NoReturn
 
@@ -27,6 +28,8 @@ from protocol.protocol_events import ProtocolValidationError
 from protocol.schemas import ChatRequest
 from safety.observability import get_metrics_store, log_event, log_exception
 from tools.skill_manager import get_skill_manager
+
+logger = logging.getLogger("brain.chat")
 
 router = APIRouter(prefix="/brain", tags=["Chat"])
 
@@ -79,6 +82,8 @@ def _handle_generation_error(exc: Exception, action: str, request: Request) -> N
 async def chat(request: Request, payload: ChatRequest):
     try:
         t0 = time.monotonic()
+        logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
+
         context = await asyncio.to_thread(_prepare_chat_context, request, payload)
         result = await asyncio.to_thread(execute_generation, context)
         response_time_s = round(time.monotonic() - t0, 2)
@@ -88,6 +93,8 @@ async def chat(request: Request, payload: ChatRequest):
         response["tool_steps"] = result.tool_steps
         response["response_time_s"] = response_time_s
         _log_generation_success(context, len(result.tool_steps))
+
+        logger.info("[CHAT] AI Reply: %r (Time: %ss)", result.reply, response_time_s)
         return response
     except Exception as exc:
         _handle_generation_error(exc, "chat", request)

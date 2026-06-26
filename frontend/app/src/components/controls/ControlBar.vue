@@ -11,6 +11,26 @@
         <span>{{ stateLabel }}</span>
       </div>
 
+      <button
+        class="camera-btn"
+        :class="{ 'camera-btn--active': cameraActive }"
+        :disabled="disabled || cameraDisabled"
+        @click="$emit('toggleCamera')"
+        :title="cameraActive ? '關閉攝影機' : '開啟攝影機'"
+        :aria-label="cameraActive ? '關閉攝影機' : '開啟攝影機'"
+      >
+        <svg v-if="cameraActive" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 10v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h2"/>
+          <path d="m23 7-7 5 7 5z"/>
+          <line x1="2" y1="2" x2="22" y2="22"/>
+        </svg>
+        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m23 7-7 5 7 5z"/>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+        {{ cameraActive ? '關鏡頭' : '開鏡頭' }}
+      </button>
+
       <button class="settings-btn" :disabled="disabled" @click="$emit('openSettings')" title="系統設定">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
@@ -37,10 +57,13 @@ const props = defineProps<{
   state: AvatarState
   disabled?: boolean
   errorMessage?: string | null
+  cameraActive?: boolean
+  cameraDisabled?: boolean
 }>()
 
 defineEmits<{
   openSettings: []
+  toggleCamera: []
 }>()
 
 const stateLabel = computed(() => {
@@ -128,6 +151,41 @@ const stateLabel = computed(() => {
 .status-pill.CONNECTING .status-pill__dot  { background: #f59e0b; animation: blink 1.5s infinite; }
 .status-pill.THINKING .status-pill__dot    { background: #3b82f6; animation: blink 1.5s infinite; }
 .status-pill.SPEAKING .status-pill__dot    { background: #ec4899; animation: blink 1.5s infinite; }
+
+.camera-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.camera-btn:hover:not(:disabled) {
+  background: var(--bg-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.camera-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.camera-btn--active:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  color: #fff;
+}
+.camera-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .settings-btn {
   display: inline-flex;

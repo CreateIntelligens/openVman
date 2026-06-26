@@ -3,16 +3,19 @@ import clientInitSchemaJson from "@contracts/schemas/v1/client_init.schema.json"
 import userSpeakSchemaJson from "@contracts/schemas/v1/user_speak.schema.json";
 import clientInterruptSchemaJson from "@contracts/schemas/v1/client_interrupt.schema.json";
 import clientAudioChunkSchemaJson from "@contracts/schemas/v1/client_audio_chunk.schema.json";
+import clientVideoFrameSchemaJson from "@contracts/schemas/v1/client_video_frame.schema.json";
 import clientAudioEndSchemaJson from "@contracts/schemas/v1/client_audio_end.schema.json";
 import serverStreamChunkSchemaJson from "@contracts/schemas/v1/server_stream_chunk.schema.json";
 import serverErrorSchemaJson from "@contracts/schemas/v1/server_error.schema.json";
 import serverInitAckSchemaJson from "@contracts/schemas/v1/server_init_ack.schema.json";
 import setLipSyncModeSchemaJson from "@contracts/schemas/v1/set_lip_sync_mode.schema.json";
 import serverStopAudioSchemaJson from "@contracts/schemas/v1/server_stop_audio.schema.json";
+import serverCameraFrameStatusSchemaJson from "@contracts/schemas/v1/server_camera_frame_status.schema.json";
 import userTranscriptionSchemaJson from "@contracts/schemas/v1/user_transcription.schema.json";
 import type {
   ContractManifest,
   ProtocolEventName,
+  ServerCameraFrameStatusEvent,
   ServerErrorEvent,
   ServerInitAckEvent,
   SetLipSyncModeEvent,
@@ -35,12 +38,14 @@ export const schemaRegistry = {
   user_speak: userSpeakSchemaJson as EventSchema,
   client_interrupt: clientInterruptSchemaJson as EventSchema,
   client_audio_chunk: clientAudioChunkSchemaJson as EventSchema,
+  client_video_frame: clientVideoFrameSchemaJson as EventSchema,
   client_audio_end: clientAudioEndSchemaJson as EventSchema,
   server_stream_chunk: serverStreamChunkSchemaJson as EventSchema,
   server_error: serverErrorSchemaJson as EventSchema,
   server_init_ack: serverInitAckSchemaJson as EventSchema,
   set_lip_sync_mode: setLipSyncModeSchemaJson as EventSchema,
   server_stop_audio: serverStopAudioSchemaJson as EventSchema,
+  server_camera_frame_status: serverCameraFrameStatusSchemaJson as EventSchema,
   user_transcription: userTranscriptionSchemaJson as EventSchema,
 } satisfies Record<ProtocolEventName, EventSchema>;
 
@@ -48,18 +53,21 @@ export const clientInitSchema = schemaRegistry.client_init;
 export const userSpeakSchema = schemaRegistry.user_speak;
 export const clientInterruptSchema = schemaRegistry.client_interrupt;
 export const clientAudioChunkSchema = schemaRegistry.client_audio_chunk;
+export const clientVideoFrameSchema = schemaRegistry.client_video_frame;
 export const clientAudioEndSchema = schemaRegistry.client_audio_end;
 export const serverStreamChunkSchema = schemaRegistry.server_stream_chunk;
 export const serverErrorSchema = schemaRegistry.server_error;
 export const serverInitAckSchema = schemaRegistry.server_init_ack;
 export const setLipSyncModeSchema = schemaRegistry.set_lip_sync_mode;
 export const serverStopAudioSchema = schemaRegistry.server_stop_audio;
+export const serverCameraFrameStatusSchema = schemaRegistry.server_camera_frame_status;
 export const userTranscriptionSchema = schemaRegistry.user_transcription;
 
 export const allowedServerErrorCodes = readEnum(serverErrorSchema, "error_code") as ServerErrorEvent["error_code"][];
 export const allowedVisemeValues = readEnum(serverStreamChunkSchema, "visemes", "value") as VisemeFrame["value"][];
 export const allowedInitAckStatuses = readEnum(serverInitAckSchema, "status") as ServerInitAckEvent["status"][];
 export const allowedLipSyncModes = readEnum(setLipSyncModeSchema, "mode") as SetLipSyncModeEvent["mode"][];
+export const allowedCameraFrameStatuses = readEnum(serverCameraFrameStatusSchema, "status") as ServerCameraFrameStatusEvent["status"][];
 
 export const DEFAULT_PROTOCOL_VERSION = manifest.version;
 
