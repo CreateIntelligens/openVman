@@ -138,6 +138,24 @@ export async function uploadKnowledgeDocuments(
   });
 }
 
+export async function uploadRawKnowledgeDocuments(
+  entries: KnowledgeUploadEntry[],
+  targetDir = "raw",
+) {
+  const formData = new FormData();
+  entries.forEach(({ file, relativePath }) => {
+    formData.append("files", file);
+    formData.append("relative_paths", relativePath || file.name);
+  });
+  formData.append("target_dir", targetDir);
+  formData.append("project_id", getActiveProjectId());
+
+  return fetchJson<KnowledgeUploadResponse>(apiUrl(knowledgePath("/raw/upload")), {
+    method: "POST",
+    body: formData,
+  });
+}
+
 export function reindexKnowledge() {
   return post<KnowledgeReindexResponse>(knowledgePath("/reindex"), {
     project_id: getActiveProjectId(),
@@ -162,7 +180,7 @@ export function commitRawKnowledge() {
 export interface KnowledgeRenormalizeResponse {
   status: string;
   project_id: string;
-  document: { path: string; [k: string]: unknown };
+  document: { path: string; backup_path?: string; [k: string]: unknown };
   graph?: string;
 }
 
@@ -170,6 +188,32 @@ export interface KnowledgeRenormalizeResponse {
 export function renormalizeKnowledgeDocument(path: string) {
   return post<KnowledgeRenormalizeResponse>(knowledgePath("/renormalize"), {
     path,
+    project_id: getActiveProjectId(),
+  });
+}
+
+export interface KnowledgeNormalizationPreviewResponse {
+  status: string;
+  project_id: string;
+  path: string;
+  title: string;
+  extension: string;
+  content: string;
+  size: number;
+  preview: string;
+}
+
+export function previewRenormalizedKnowledgeDocument(path: string) {
+  return post<KnowledgeNormalizationPreviewResponse>(knowledgePath("/renormalize/preview"), {
+    path,
+    project_id: getActiveProjectId(),
+  });
+}
+
+export function applyRenormalizedKnowledgeDocument(path: string, content: string) {
+  return post<KnowledgeRenormalizeResponse>(knowledgePath("/renormalize/apply"), {
+    path,
+    content,
     project_id: getActiveProjectId(),
   });
 }

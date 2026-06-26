@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import {
+  applyRenormalizedKnowledgeDocument,
   crawlUrl as apiCrawlUrl,
   createKnowledgeDirectory,
   createKnowledgeNote,
@@ -10,11 +11,12 @@ import {
   moveKnowledgeDocument,
   reindexKnowledge,
   commitRawKnowledge,
-  renormalizeKnowledgeDocument,
+  previewRenormalizedKnowledgeDocument,
   saveKnowledgeDocument,
   updateKnowledgeDocumentMeta,
-  uploadKnowledgeDocuments,
+  uploadRawKnowledgeDocuments,
   type KnowledgeDocument,
+  type KnowledgeNormalizationPreviewResponse,
   type KnowledgeDocumentSummary,
 } from "../api";
 import {
@@ -76,6 +78,8 @@ export function useKnowledgeBase() {
   const [reindexing, setReindexing] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [renormalizing, setRenormalizing] = useState(false);
+  const [previewingNormalization, setPreviewingNormalization] = useState(false);
+  const [normalizationPreview, setNormalizationPreview] = useState<KnowledgeNormalizationPreviewResponse | null>(null);
   const [uploading, setUploading] = useState(false);
   const { status, setStatus, setErrorStatus } = useStatusState();
   const [search, setSearch] = useState("");
@@ -228,7 +232,7 @@ export function useKnowledgeBase() {
     setUploading(true);
     setStatus(null);
     try {
-      const response = await uploadKnowledgeDocuments(entries, rawUploadTargetFor(currentDir));
+      const response = await uploadRawKnowledgeDocuments(entries, rawUploadTargetFor(currentDir));
       setStatus({
         type: "success",
         message: `已上傳 ${response.files.length} 個檔案至暫存區，點「採納上傳」納入知識庫。`,
@@ -283,14 +287,36 @@ export function useKnowledgeBase() {
   }, [loadDocuments, setErrorStatus]);
 
   const handleRenormalize = useCallback(async (path: string) => {
+    setPreviewingNormalization(true);
+    setStatus(null);
+    try {
+      const response = await previewRenormalizedKnowledgeDocument(path);
+      setNormalizationPreview(response);
+    } catch (error) {
+      setErrorStatus(error);
+    } finally {
+      setPreviewingNormalization(false);
+    }
+  }, [setErrorStatus]);
+
+  const closeNormalizationPreview = useCallback(() => {
+    setNormalizationPreview(null);
+  }, []);
+
+  const handleApplyNormalizationPreview = useCallback(async () => {
+    if (!normalizationPreview) return;
     setRenormalizing(true);
     setStatus(null);
     try {
-      const response = await renormalizeKnowledgeDocument(path);
+      const response = await applyRenormalizedKnowledgeDocument(
+        normalizationPreview.path,
+        normalizationPreview.content,
+      );
       setStatus({
         type: "success",
-        message: `已重新整理「${response.document.path}」，正在重建索引與圖譜。`,
+        message: `已重新整理「${response.document.path}」，正在重建索引與圖譜。備份：${response.document.backup_path ?? "已建立"}`,
       });
+      setNormalizationPreview(null);
       await loadDocuments();
       await openFile(response.document.path);
     } catch (error) {
@@ -298,7 +324,7 @@ export function useKnowledgeBase() {
     } finally {
       setRenormalizing(false);
     }
-  }, [loadDocuments, openFile, setErrorStatus]);
+  }, [loadDocuments, normalizationPreview, openFile, setErrorStatus]);
 
   const handleCrawl = useCallback(async () => {
     const url = crawlUrlValue.trim();
@@ -471,6 +497,7 @@ export function useKnowledgeBase() {
     reindexing,
     committing,
     renormalizing,
+    previewingNormalization,
     uploading,
     status,
     search,
@@ -494,6 +521,7 @@ export function useKnowledgeBase() {
     noteContent,
     creatingNote,
     dragOver,
+    normalizationPreview,
     uploadInputRef,
     filteredTree,
     visibleExpandedDirs,
@@ -520,6 +548,7 @@ export function useKnowledgeBase() {
     handleReindex,
     handleCommit,
     handleRenormalize,
+    handleApplyNormalizationPreview,
     handleCrawl,
     handleDeleteConfirm,
     handleMove,
@@ -528,6 +557,7 @@ export function useKnowledgeBase() {
     handleCreateFolderSubmit,
     cancelCreateFolder,
     closeNoteModal,
+    closeNormalizationPreview,
     closeFileView,
     updateEditContent,
     handleDragEnter,

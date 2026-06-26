@@ -30,6 +30,7 @@ def _load_knowledge_routes_module():
     )
     _stub_module(
         "knowledge.knowledge_admin",
+        apply_workspace_document_normalization=lambda *args, **kwargs: {},
         commit_raw_documents=lambda *args, **kwargs: {"committed": [], "skipped": []},
         create_workspace_directory=lambda *args, **kwargs: {},
         delete_workspace_directory=lambda *args, **kwargs: {},
@@ -38,6 +39,7 @@ def _load_knowledge_routes_module():
         list_knowledge_base_documents=lambda *args, **kwargs: [],
         list_workspace_documents=lambda *args, **kwargs: [],
         move_workspace_document=lambda *args, **kwargs: {},
+        preview_workspace_document_normalization=lambda *args, **kwargs: {},
         read_workspace_document=lambda *args, **kwargs: {},
         renormalize_workspace_document=lambda *args, **kwargs: {},
         save_uploaded_artifact=lambda *args, **kwargs: {},

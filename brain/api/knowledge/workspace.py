@@ -21,7 +21,8 @@ ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
 #   graphify-out/  derived graph artefacts + the Obsidian vault
 #   dreaming/      REM/Deep/Light process reports (consolidated memories already
 #                  live in the memories table; the reports are meta logs)
-EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/", "graphify-out/", "dreaming/")
+#   .normalization-backups/  recovery copies for AI document cleanup
+EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/", ".normalization-backups/", "graphify-out/", "dreaming/")
 WORKSPACE_TEMPLATES = {
     "SOUL.md": """# 核心人格設定 (SOUL)
 
@@ -119,7 +120,16 @@ def ensure_workspace_scaffold(project_id: str = "default") -> Path:
     """Ensure the workspace root, core docs, and support directories exist."""
     ws = get_workspace_root(project_id)
     ws.mkdir(parents=True, exist_ok=True)
-    for subdir in ("memory", "personas", "knowledge", "raw", ".learnings", "archive/errors", "archive/memory"):
+    for subdir in (
+        "memory",
+        "personas",
+        "knowledge",
+        "raw",
+        ".learnings",
+        ".normalization-backups",
+        "archive/errors",
+        "archive/memory",
+    ):
         (ws / subdir).mkdir(parents=True, exist_ok=True)
 
     _migrate_learnings_layout(ws)

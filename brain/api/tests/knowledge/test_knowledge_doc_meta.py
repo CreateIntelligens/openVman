@@ -137,6 +137,28 @@ def test_uploaded_artifact_is_saved_under_raw_without_doc_meta(
     assert payload["knowledge/ingested/faq.md"]["source_type"] == "upload"
 
 
+def test_uploaded_artifact_preserves_relative_subpath(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    artifact = knowledge_admin.save_uploaded_artifact(
+        "report.docx",
+        b"docx bytes",
+        target_dir="raw/imported",
+        relative_path="clinic/reports/report.docx",
+    )
+
+    assert artifact["path"] == "raw/imported/clinic/reports/report.docx"
+    saved = root / "raw" / "imported" / "clinic" / "reports" / "report.docx"
+    assert saved.read_bytes() == b"docx bytes"
+
+
 def test_move_and_delete_document_sync_meta(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     root = _configure_workspace(monkeypatch, tmp_path)
     _stub_knowledge_admin_deps(monkeypatch)

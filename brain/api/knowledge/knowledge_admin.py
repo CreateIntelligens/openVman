@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from knowledge.indexer import fingerprint_document, load_index_state
 from knowledge.doc_meta import (
     delete_document_meta,
     get_document_meta,
@@ -14,15 +13,16 @@ from knowledge.doc_meta import (
     touch_document_meta,
     upsert_document_meta,
 )
+from knowledge.indexer import fingerprint_document, load_index_state
 from knowledge.workspace import (
-    get_core_documents,
     ensure_workspace_scaffold,
+    get_core_documents,
+    get_workspace_root,
     is_indexable_document,
     iter_knowledge_documents,
     iter_workspace_documents,
     resolve_workspace_artifact,
     resolve_workspace_document,
-    get_workspace_root,
 )
 from personas.personas import is_persona_core_relative_path
 
@@ -85,6 +85,73 @@ def save_workspace_document(relative_path: str, content: str, project_id: str = 
     return _build_document_summary(path, project_id)
 
 
+def _write_normalization_backup(
+    relative_path: str,
+    content: str,
+    project_id: str,
+) -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    backup_base = (Path(".normalization-backups") / relative_path).as_posix()
+    backup_rel = f"{backup_base}.{timestamp}.bak"
+    backup_path = resolve_workspace_artifact(backup_rel, project_id)
+    backup_path.parent.mkdir(parents=True, exist_ok=True)
+    backup_path.write_text(content, encoding="utf-8")
+    return backup_rel
+
+
+def preview_workspace_document_normalization(
+    relative_path: str,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    from knowledge.normalizer import normalize_to_markdown
+
+    path = resolve_workspace_document(relative_path, project_id)
+    if not path.exists():
+        raise FileNotFoundError("找不到指定文件")
+
+    original = path.read_text(encoding="utf-8-sig")
+    cleaned = normalize_to_markdown(original)
+    if not cleaned:
+        raise ValueError("整理結果為空，已保留原文件")
+
+    workspace_relative = path.relative_to(
+        ensure_workspace_scaffold(project_id)
+    ).as_posix()
+    return {
+        "path": workspace_relative,
+        "title": path.stem,
+        "extension": path.suffix.lower(),
+        "content": cleaned,
+        "size": len(cleaned.encode("utf-8")),
+        "preview": " ".join(cleaned.split())[:140],
+    }
+
+
+def apply_workspace_document_normalization(
+    relative_path: str,
+    content: str,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    path = resolve_workspace_document(relative_path, project_id)
+    if not path.exists():
+        raise FileNotFoundError("找不到指定文件")
+
+    cleaned = content.strip()
+    if not cleaned:
+        raise ValueError("整理結果為空，已保留原文件")
+
+    workspace_relative = path.relative_to(
+        ensure_workspace_scaffold(project_id)
+    ).as_posix()
+    original = path.read_text(encoding="utf-8-sig")
+    backup_path = _write_normalization_backup(workspace_relative, original, project_id)
+    path.write_text(cleaned, encoding="utf-8")
+    touch_document_meta(workspace_relative, project_id)
+    summary = _build_document_summary(path, project_id, content=cleaned)
+    summary["backup_path"] = backup_path
+    return summary
+
+
 def renormalize_workspace_document(relative_path: str, project_id: str = "default") -> dict[str, Any]:
     """Re-run LLM normalization over an existing knowledge/ document, in place.
 
@@ -107,11 +174,7 @@ def renormalize_workspace_document(relative_path: str, project_id: str = "defaul
     if not cleaned:
         raise ValueError("整理結果為空，已保留原文件")
 
-    path.write_text(cleaned, encoding="utf-8")
-    touch_document_meta(
-        path.relative_to(ensure_workspace_scaffold(project_id)).as_posix(), project_id
-    )
-    return _build_document_summary(path, project_id, content=cleaned)
+    return apply_workspace_document_normalization(relative_path, cleaned, project_id)
 
 
 def save_uploaded_document(
@@ -147,20 +210,23 @@ def save_uploaded_artifact(
     content: bytes,
     target_dir: str = "raw",
     project_id: str = "default",
+    relative_path: str = "",
 ) -> dict[str, Any]:
     """Save a binary artifact into the workspace without indexing it."""
     safe_name = Path(filename).name
     if not safe_name:
         raise ValueError("filename 不可為空")
 
-    relative_path = Path(target_dir.strip()) / safe_name if target_dir.strip() else Path(safe_name)
-    path = resolve_workspace_artifact(relative_path.as_posix(), project_id)
+    sub_path = _sanitize_relative_subpath(relative_path) if relative_path else Path(safe_name)
+    base = Path(target_dir.strip()) if target_dir.strip() else Path()
+    relative_path_obj = base / sub_path
+    path = resolve_workspace_artifact(relative_path_obj.as_posix(), project_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content)
 
     stat = path.stat()
     return {
-        "path": relative_path.as_posix(),
+        "path": relative_path_obj.as_posix(),
         "title": path.stem,
         "extension": path.suffix.lower(),
         "size": stat.st_size,

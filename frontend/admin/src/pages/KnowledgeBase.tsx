@@ -6,6 +6,7 @@ import FileView from "../components/kb/FileView";
 import GraphView from "../components/kb/GraphView";
 import MoveModal from "../components/kb/MoveModal";
 import NoteModal from "../components/kb/NoteModal";
+import NormalizationPreviewModal from "../components/kb/NormalizationPreviewModal";
 import SourcePanel from "../components/kb/SourcePanel";
 import TreeView from "../components/kb/TreeView";
 import type { TreeNode } from "../components/kb/helpers";
@@ -20,6 +21,7 @@ export default function KnowledgeBase() {
     reindexing,
     committing,
     renormalizing,
+    previewingNormalization,
     uploading,
     status,
     search,
@@ -43,6 +45,7 @@ export default function KnowledgeBase() {
     noteContent,
     creatingNote,
     dragOver,
+    normalizationPreview,
     uploadInputRef,
     filteredTree,
     visibleExpandedDirs,
@@ -69,6 +72,7 @@ export default function KnowledgeBase() {
     handleReindex,
     handleCommit,
     handleRenormalize,
+    handleApplyNormalizationPreview,
     handleCrawl,
     handleDeleteConfirm,
     handleMove,
@@ -77,6 +81,7 @@ export default function KnowledgeBase() {
     handleCreateFolderSubmit,
     cancelCreateFolder,
     closeNoteModal,
+    closeNormalizationPreview,
     closeFileView,
     updateEditContent,
     handleDragEnter,
@@ -345,7 +350,7 @@ export default function KnowledgeBase() {
               onMove={(path) => setMovingPath(path)}
               onToggleEnabled={handleToggleEnabled}
               onRenormalize={handleRenormalize}
-              renormalizing={renormalizing}
+              renormalizing={renormalizing || previewingNormalization}
             />
           ) : null}
         </div>
@@ -382,6 +387,16 @@ export default function KnowledgeBase() {
           creating={creatingNote}
           onClose={closeNoteModal}
           onCreate={handleCreateNote}
+        />
+      )}
+
+      {normalizationPreview && (
+        <NormalizationPreviewModal
+          path={normalizationPreview.path}
+          content={normalizationPreview.content}
+          applying={renormalizing}
+          onApply={handleApplyNormalizationPreview}
+          onClose={closeNormalizationPreview}
         />
       )}
     </div>

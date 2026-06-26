@@ -21,6 +21,7 @@ from knowledge.indexer import (
     rename_document_records,
 )
 from knowledge.knowledge_admin import (
+    apply_workspace_document_normalization,
     commit_raw_documents,
     create_workspace_directory,
     delete_workspace_directory,
@@ -29,6 +30,7 @@ from knowledge.knowledge_admin import (
     list_knowledge_base_documents,
     list_workspace_documents,
     move_workspace_document,
+    preview_workspace_document_normalization,
     read_workspace_document,
     renormalize_workspace_document,
     save_uploaded_artifact,
@@ -188,16 +190,75 @@ async def upload_knowledge_raw_documents_route(
     files: list[UploadFile] = File(...),
     target_dir: str = Form("raw"),
     project_id: str = Form("default"),
+    relative_paths: list[str] = Form(default_factory=list),
 ):
     uploaded: list[dict[str, object]] = []
     try:
-        for upload in files:
+        for index, upload in enumerate(files):
+            relative_path = (
+                relative_paths[index] if index < len(relative_paths) else ""
+            )
             uploaded.append(
-                save_uploaded_artifact(upload.filename or "", await upload.read(), target_dir, project_id)
+                save_uploaded_artifact(
+                    upload.filename or "",
+                    await upload.read(),
+                    target_dir,
+                    project_id,
+                    relative_path=relative_path,
+                )
             )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "ok", "files": uploaded}
+
+
+@router.post("/knowledge/renormalize/preview", summary="預覽既有知識文件整理結果")
+async def preview_renormalize_knowledge_document_route(
+    payload: KnowledgeDocumentActionRequest,
+):
+    pid = payload.project_id
+    try:
+        document = await asyncio.to_thread(
+            preview_workspace_document_normalization, payload.path, pid
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover
+        log_exception("knowledge_renormalize_preview_error", exc, project_id=pid)
+        raise HTTPException(status_code=500, detail="整理預覽失敗") from exc
+    return {"status": "ok", "project_id": pid, **document}
+
+
+@router.post("/knowledge/renormalize/apply", summary="套用預覽整理結果並重建索引與圖譜")
+async def apply_renormalize_knowledge_document_route(
+    payload: KnowledgeDocumentPutRequest,
+):
+    pid = payload.project_id
+    try:
+        document = await asyncio.to_thread(
+            apply_workspace_document_normalization, payload.path, payload.content, pid
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover
+        log_exception("knowledge_renormalize_apply_error", exc, project_id=pid)
+        raise HTTPException(status_code=500, detail="套用整理失敗") from exc
+
+    index_result = await asyncio.to_thread(rebuild_knowledge_index, pid)
+    log_event("knowledge_renormalize_apply", project_id=pid, path=payload.path)
+    _schedule_graph_rebuild(pid)
+
+    return {
+        "status": "ok",
+        "project_id": pid,
+        "document": document,
+        "indexed": index_result,
+        "graph": "building",
+    }
 
 
 @router.post("/knowledge/renormalize", summary="重新整理既有知識文件並重建索引與圖譜")
@@ -460,4 +521,3 @@ async def graph_html_route(project_id: str = "default"):
     else:
         html += _GRAPH_HTML_OVERRIDES
     return HTMLResponse(html)
-
