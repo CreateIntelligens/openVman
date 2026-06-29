@@ -64,10 +64,10 @@ function formatSize(bytes: number): string {
 
 function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {
   return [
-    "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+    "px-3 py-1.5 text-sm font-medium transition-all duration-200 rounded-md",
     tab === activeTab
-      ? "border-blue-600 text-blue-600 dark:text-blue-400"
-      : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200",
+      ? "bg-white text-slate-800 shadow-sm border border-slate-200/60 dark:border-slate-800/60 dark:bg-slate-900 dark:text-slate-100"
+      : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-900/50",
   ].join(" ");
 }
 
@@ -90,9 +90,15 @@ export default function Avatar() {
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
 
+  const [selectedVideoName, setSelectedVideoName] = useState<string>("");
+  const [selectedDataName, setSelectedDataName] = useState<string>("");
+  const [selectedImageName, setSelectedImageName] = useState<string>("");
+
   function resetUploadForm(): void {
     setUploadCharId("");
     setUploadLabel("");
+    setSelectedVideoName("");
+    setSelectedDataName("");
     if (videoRef.current) videoRef.current.value = "";
     if (dataRef.current) dataRef.current.value = "";
   }
@@ -100,6 +106,7 @@ export default function Avatar() {
   function resetBackgroundUploadForm(): void {
     setUploadBackgroundId("");
     setUploadBackgroundLabel("");
+    setSelectedImageName("");
     if (imageRef.current) imageRef.current.value = "";
   }
 
@@ -276,7 +283,7 @@ export default function Avatar() {
 
       {status && <StatusAlert type={status.type} message={status.message} />}
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex w-fit rounded-lg bg-slate-100 p-1 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/30">
         <button
           type="button"
           onClick={() => handleTabChange("characters")}
@@ -316,19 +323,51 @@ export default function Avatar() {
                 className={inputClassName}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="text-xs text-slate-500 dark:text-slate-400">
-                Video (.webm)
-                <input ref={videoRef} type="file" accept=".webm" className="ml-2 text-xs" />
-              </label>
-              <label className="text-xs text-slate-500 dark:text-slate-400">
-                Data (.gz)
-                <input ref={dataRef} type="file" accept=".gz" className="ml-2 text-xs" />
-              </label>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Video (.webm):</span>
+                <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded border border-dashed text-xs cursor-pointer transition-all ${
+                  selectedVideoName
+                    ? "border-blue-500 bg-blue-50/30 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400"
+                    : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}>
+                  <span className="material-symbols-outlined text-sm">movie</span>
+                  <span className="max-w-[12rem] truncate">{selectedVideoName || "Select WebM"}</span>
+                  <input
+                    ref={videoRef}
+                    type="file"
+                    accept=".webm"
+                    className="hidden"
+                    aria-label="Video"
+                    onChange={(e) => setSelectedVideoName(e.target.files?.[0]?.name || "")}
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Data (.gz):</span>
+                <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded border border-dashed text-xs cursor-pointer transition-all ${
+                  selectedDataName
+                    ? "border-blue-500 bg-blue-50/30 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400"
+                    : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}>
+                  <span className="material-symbols-outlined text-sm">settings_zip</span>
+                  <span className="max-w-[12rem] truncate">{selectedDataName || "Select GZ data"}</span>
+                  <input
+                    ref={dataRef}
+                    type="file"
+                    accept=".gz"
+                    className="hidden"
+                    aria-label="Data"
+                    onChange={(e) => setSelectedDataName(e.target.files?.[0]?.name || "")}
+                  />
+                </label>
+              </div>
+
               <button
                 onClick={handleUpload}
                 disabled={uploading}
-                className="ml-auto rounded bg-blue-600 px-4 py-1.5 text-sm text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                className="ml-auto rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 shadow-sm"
               >
                 {uploading ? "Uploading…" : "Upload"}
               </button>
@@ -422,20 +461,31 @@ export default function Avatar() {
                 className={inputClassName}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="text-xs text-slate-500 dark:text-slate-400">
-                Image (.png, .jpg, .webp)
-                <input
-                  ref={imageRef}
-                  type="file"
-                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-                  className="ml-2 text-xs"
-                />
-              </label>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Image (.png, .jpg, .webp):</span>
+                <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded border border-dashed text-xs cursor-pointer transition-all ${
+                  selectedImageName
+                    ? "border-blue-500 bg-blue-50/30 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400"
+                    : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}>
+                  <span className="material-symbols-outlined text-sm">image</span>
+                  <span className="max-w-[15rem] truncate">{selectedImageName || "Select background image"}</span>
+                  <input
+                    ref={imageRef}
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    aria-label="Image"
+                    onChange={(e) => setSelectedImageName(e.target.files?.[0]?.name || "")}
+                  />
+                </label>
+              </div>
+
               <button
                 onClick={handleBackgroundUpload}
                 disabled={backgroundUploading}
-                className="ml-auto rounded bg-blue-600 px-4 py-1.5 text-sm text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                className="ml-auto rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 shadow-sm"
               >
                 {backgroundUploading ? "Uploading…" : "Upload background"}
               </button>
