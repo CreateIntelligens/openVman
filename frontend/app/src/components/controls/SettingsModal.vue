@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import CustomSelect from './CustomSelect.vue'
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
 import {
@@ -149,6 +150,27 @@ const activeTtsProvider = computed(() =>
 const showVoicePicker = computed(() =>
   draftTtsProvider.value !== 'auto' && Boolean(activeTtsProvider.value?.voices.length)
 )
+
+const projectOptions = computed(() =>
+  props.projects.map((p) => ({ value: p.project_id, label: p.label || p.project_id }))
+)
+
+const personaOptions = computed(() =>
+  props.personas.map((p) => ({ value: p.persona_id, label: p.label }))
+)
+
+const characterOptions = computed(() =>
+  props.characters.map((c) => ({ value: c.id, label: c.name }))
+)
+
+const ttsProviderOptions = computed(() =>
+  props.ttsProviders.map((p) => ({ value: p.id, label: p.name }))
+)
+
+const ttsVoiceOptions = computed(() => {
+  if (!activeTtsProvider.value) return []
+  return activeTtsProvider.value.voices.map((v) => ({ value: v, label: v }))
+})
 const projectDisabled = computed(() => Boolean(props.disabled) || props.projects.length === 0)
 const personaDisabled = computed(() =>
   Boolean(props.disabled) || Boolean(props.personasLoading) || !draftProjectId.value
@@ -249,44 +271,49 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           <div class="modal-body">
             <div class="field-card field-card--full">
               <span class="field-card__label">大腦/知識庫</span>
-              <select v-model="draftProjectId" :disabled="projectDisabled" @change="handleProjectDraftChange">
-                <option v-for="p in projects" :key="p.project_id" :value="p.project_id">
-                  {{ p.label || p.project_id }}
-                </option>
-              </select>
+              <CustomSelect
+                v-model="draftProjectId"
+                :options="projectOptions"
+                :disabled="projectDisabled"
+                @change="handleProjectDraftChange"
+              />
             </div>
 
             <div class="field-card field-card--full">
               <span class="field-card__label">人設</span>
-              <select v-model="draftPersonaId" :disabled="personaDisabled">
-                <option v-for="p in personas" :key="p.persona_id" :value="p.persona_id">
-                  {{ p.label }}
-                </option>
-              </select>
+              <CustomSelect
+                v-model="draftPersonaId"
+                :options="personaOptions"
+                :disabled="personaDisabled"
+              />
             </div>
 
             <div class="field-row">
               <div class="field-card">
                 <span class="field-card__label">角色配置</span>
-                <select v-model="draftCharId" :disabled="disabled">
-                  <option v-for="c in characters" :key="c.id" :value="c.id">
-                    {{ c.name }}
-                  </option>
-                </select>
+                <CustomSelect
+                  v-model="draftCharId"
+                  :options="characterOptions"
+                  :disabled="disabled"
+                />
               </div>
 
               <div class="field-card">
                 <span class="field-card__label">語音引擎</span>
-                <select v-model="draftTtsProvider" :disabled="disabled">
-                  <option v-for="p in ttsProviders" :key="p.id" :value="p.id">{{ p.name }}</option>
-                </select>
+                <CustomSelect
+                  v-model="draftTtsProvider"
+                  :options="ttsProviderOptions"
+                  :disabled="disabled"
+                />
               </div>
 
               <div v-if="showVoicePicker" class="field-card">
                 <span class="field-card__label">聲音</span>
-                <select v-model="draftTtsVoice" :disabled="disabled">
-                  <option v-for="v in activeTtsProvider!.voices" :key="v" :value="v">{{ v }}</option>
-                </select>
+                <CustomSelect
+                  v-model="draftTtsVoice"
+                  :options="ttsVoiceOptions"
+                  :disabled="disabled"
+                />
               </div>
             </div>
 
@@ -520,28 +547,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   color: var(--text-soft);
   font-size: 0.75rem;
   font-weight: 600;
-}
-
-.field-card select {
-  height: 2.5rem;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: var(--bg-soft);
-  color: var(--text);
-  font-size: 0.95rem;
-  padding: 0 0.75rem;
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  width: 100%;
-}
-.field-card select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
-}
-.field-card select:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .background-options {
