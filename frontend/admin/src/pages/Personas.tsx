@@ -329,18 +329,24 @@ function PersonaAvatarSelector({
        return (
               <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800/60">
                      <span className="text-sm text-slate-600 dark:text-slate-400">虛擬人角色：</span>
-                     <select
-                            className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-slate-800 dark:text-slate-200"
-                            value={persona.avatar_char_id ?? ""}
-                            onChange={(event) => onBind(persona.persona_id, event.target.value)}
-                     >
-                            <option value="">（未綁定）</option>
-                            {characters.map((character) => (
-                                   <option key={character.char_id} value={character.char_id}>
-                                          {character.char_id} — {character.label}
-                                   </option>
-                            ))}
-                     </select>
+                     <div className="relative inline-block">
+                            <select
+                                   className="appearance-none rounded-md border border-slate-200 dark:border-slate-700 px-3 pr-8 py-1 text-sm text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer min-w-[8rem]"
+                                   style={{ backgroundColor: "var(--color-surface-raised)" }}
+                                   value={persona.avatar_char_id ?? ""}
+                                   onChange={(event) => onBind(persona.persona_id, event.target.value)}
+                            >
+                                   <option value="">（未綁定）</option>
+                                   {characters.map((character) => (
+                                          <option key={character.char_id} value={character.char_id}>
+                                                 {character.label || character.char_id}
+                                          </option>
+                                   ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-slate-500 dark:text-slate-400">
+                                   <span className="material-symbols-outlined text-base leading-none">keyboard_arrow_down</span>
+                            </div>
+                     </div>
               </div>
        );
 }
