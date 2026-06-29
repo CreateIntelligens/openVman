@@ -7,9 +7,13 @@ import ChatMessage from "../components/chat/ChatMessage";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import { useProject } from "../context/ProjectContext";
 import { useChatSession } from "../hooks/useChatSession";
+import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useLiveSession, type LiveMessage } from "../hooks/useLiveSession";
 import { DEFAULT_VOICE_SOURCE, type VoiceSource } from "../hooks/liveSessionProtocol";
 
+const CHAT_MODES = ["text", "live"] as const;
+type ChatMode = (typeof CHAT_MODES)[number];
+const VOICE_SOURCES = ["gemini", "custom"] as const satisfies readonly VoiceSource[];
 const VOICE_SOURCE_OPTIONS: ReadonlyArray<{ value: VoiceSource; label: string }> = [
   { value: "gemini", label: "Gemini 語音" },
   { value: "custom", label: "自訂語音" },
@@ -20,8 +24,16 @@ function createLiveClientId(projectId: string): string {
 }
 
 export default function Chat() {
-  const [mode, setMode] = useState<"text" | "live">("text");
-  const [voiceSource, setVoiceSource] = useState<VoiceSource>(DEFAULT_VOICE_SOURCE);
+  const [mode, setMode] = useLocalStorageState<ChatMode>(
+    "admin.chat.mode",
+    "text",
+    CHAT_MODES,
+  );
+  const [voiceSource, setVoiceSource] = useLocalStorageState<VoiceSource>(
+    "admin.chat.voice_source",
+    DEFAULT_VOICE_SOURCE,
+    VOICE_SOURCES,
+  );
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const { projectId } = useProject();
   const {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchSkillFiles, updateSkillFiles } from "../../api";
+import { useLocalStorageState } from "../../hooks/useLocalStorageState";
 import StatusAlert from "../StatusAlert";
 import { filesChanged, SKILL_EDITOR_TABS, type SkillEditorTab } from "./helpers";
 
@@ -13,7 +14,11 @@ interface SkillEditorProps {
 
 export default function SkillEditor({ skillId, scope, projectId, onClose, onSaved }: SkillEditorProps) {
   const [files, setFiles] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<SkillEditorTab>("skill.yaml");
+  const [activeTab, setActiveTab] = useLocalStorageState<SkillEditorTab>(
+    "admin.tools.skill_editor_tab",
+    "skill.yaml",
+    SKILL_EDITOR_TABS,
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);

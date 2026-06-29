@@ -20,6 +20,7 @@ import {
   type KnowledgeDocumentSummary,
 } from "../api";
 import {
+  SOURCE_MODES,
   buildTree,
   collectFolderPaths,
   countFiles,
@@ -29,7 +30,16 @@ import {
   type RightPane,
   type SourceMode,
 } from "../components/kb/helpers";
+import {
+  createEmptyQaRow,
+  hasIncompleteQaRows,
+  hasUsableQaRow,
+  qaRowsToMarkdown,
+  type QaRow,
+} from "../components/kb/qaMarkdown";
 import { useProject } from "../context/ProjectContext";
+import { validateUploadFiles } from "../utils/uploadLimits";
+import { useLocalStorageState } from "./useLocalStorageState";
 import { useStatusState } from "./useStatusState";
 
 type UploadEntry = { file: File; relativePath: string };
@@ -37,6 +47,16 @@ type UploadEntry = { file: File; relativePath: string };
 function rawUploadTargetFor(currentDir: string): string {
   const relativeDir = currentDir.replace(/^knowledge(\/|$)/, "");
   return relativeDir ? `raw/${relativeDir}` : "raw";
+}
+
+function defaultQaTitle(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  const mm = pad(date.getMonth() + 1);
+  const dd = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const min = pad(date.getMinutes());
+  return `QA-${yyyy}-${mm}-${dd}-${hh}${min}`;
 }
 
 async function collectFileSystemEntries(roots: FileSystemEntry[]): Promise<UploadEntry[]> {
@@ -96,13 +116,22 @@ export function useKnowledgeBase() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [showSourcePanel, setShowSourcePanel] = useState(false);
-  const [activeSourceMode, setActiveSourceMode] = useState<SourceMode>("upload");
+  const [activeSourceMode, setActiveSourceMode] = useLocalStorageState<SourceMode>(
+    "admin.knowledge.source_mode",
+    "upload",
+    SOURCE_MODES,
+  );
   const [crawlUrlValue, setCrawlUrlValue] = useState("");
   const [crawling, setCrawling] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
   const [creatingNote, setCreatingNote] = useState(false);
+  const [showQaModal, setShowQaModal] = useState(false);
+  const [qaTitle, setQaTitle] = useState("");
+  const [qaTargetDir, setQaTargetDir] = useState("");
+  const [qaRows, setQaRows] = useState<QaRow[]>([createEmptyQaRow()]);
+  const [creatingQa, setCreatingQa] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   const dragCounterRef = useRef(0);
@@ -116,6 +145,20 @@ export function useKnowledgeBase() {
     setShowNoteModal(false);
     setNoteTitle("");
     setNoteContent("");
+  }, []);
+
+  const openQaModal = useCallback(() => {
+    setQaTitle(defaultQaTitle());
+    setQaTargetDir("");
+    setQaRows([createEmptyQaRow()]);
+    setShowQaModal(true);
+  }, []);
+
+  const closeQaModal = useCallback(() => {
+    setShowQaModal(false);
+    setQaTitle("");
+    setQaTargetDir("");
+    setQaRows([createEmptyQaRow()]);
   }, []);
 
   const loadDocuments = useCallback(async () => {
@@ -145,6 +188,12 @@ export function useKnowledgeBase() {
   const visibleExpandedDirs = useMemo(
     () => (hasActiveSearch ? new Set(collectFolderPaths(filteredTree)) : expandedDirs),
     [expandedDirs, filteredTree, hasActiveSearch],
+  );
+  const qaDirectoryOptions = useMemo(
+    () => collectFolderPaths(tree)
+      .filter((path) => path !== "knowledge")
+      .map((path) => path.replace(/^knowledge\//, "")),
+    [tree],
   );
 
   const currentDir = useMemo(() => {
@@ -229,6 +278,11 @@ export function useKnowledgeBase() {
 
   const uploadFiles = useCallback(async (entries: { file: File; relativePath: string }[]) => {
     if (!entries.length) return;
+    const sizeError = validateUploadFiles(entries.map((entry) => entry.file));
+    if (sizeError) {
+      setStatus({ type: "error", message: sizeError });
+      return;
+    }
     setUploading(true);
     setStatus(null);
     try {
@@ -243,7 +297,7 @@ export function useKnowledgeBase() {
     } finally {
       setUploading(false);
     }
-  }, [currentDir, loadDocuments, setErrorStatus]);
+  }, [currentDir, loadDocuments, setErrorStatus, setStatus]);
 
   const handleFileUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -421,6 +475,28 @@ export function useKnowledgeBase() {
     }
   }, [closeNoteModal, loadDocuments, noteContent, noteTitle, openFile, setErrorStatus]);
 
+  const handleCreateQa = useCallback(async () => {
+    if (!qaTitle.trim() || !hasUsableQaRow(qaRows) || hasIncompleteQaRows(qaRows)) return;
+    setCreatingQa(true);
+    setStatus(null);
+    try {
+      const result = await createKnowledgeNote(
+        qaTitle.trim(),
+        qaRowsToMarkdown(qaRows),
+        qaTargetDir.trim(),
+      );
+      setStatus({ type: "success", message: `已建立 QA 來源「${result.document.title}」` });
+      closeQaModal();
+      await loadDocuments();
+      setSelectedPath(result.path);
+      await openFile(result.path);
+    } catch (error) {
+      setErrorStatus(error);
+    } finally {
+      setCreatingQa(false);
+    }
+  }, [closeQaModal, loadDocuments, openFile, qaRows, qaTargetDir, qaTitle, setErrorStatus, setStatus]);
+
   const handleCreateFolderSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!newFolderName.trim()) return;
@@ -520,11 +596,17 @@ export function useKnowledgeBase() {
     noteTitle,
     noteContent,
     creatingNote,
+    showQaModal,
+    qaTitle,
+    qaTargetDir,
+    qaRows,
+    creatingQa,
     dragOver,
     normalizationPreview,
     uploadInputRef,
     filteredTree,
     visibleExpandedDirs,
+    qaDirectoryOptions,
     hasActiveSearch,
     currentDir,
     indexedCount,
@@ -541,6 +623,9 @@ export function useKnowledgeBase() {
     setShowNoteModal,
     setNoteTitle,
     setNoteContent,
+    setQaTitle,
+    setQaTargetDir,
+    setQaRows,
     toggleExpand,
     handleTreeSelect,
     handleSave,
@@ -554,9 +639,12 @@ export function useKnowledgeBase() {
     handleMove,
     handleToggleEnabled,
     handleCreateNote,
+    handleCreateQa,
     handleCreateFolderSubmit,
     cancelCreateFolder,
     closeNoteModal,
+    openQaModal,
+    closeQaModal,
     closeNormalizationPreview,
     closeFileView,
     updateEditContent,

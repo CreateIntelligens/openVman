@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   applyRenormalizedKnowledgeDocument,
+  createKnowledgeNote,
   previewRenormalizedKnowledgeDocument,
   uploadRawKnowledgeDocuments,
 } from "./knowledge";
@@ -72,6 +73,27 @@ describe("knowledge api", () => {
       path: "knowledge/ocr.md",
       content: "# Clean",
       project_id: "default",
+    });
+  });
+
+  it("sends target_dir when creating a note in a knowledge directory", async () => {
+    const f = mockFetch({
+      status: "ok",
+      path: "knowledge/faq/FAQ.md",
+      size: 12,
+      document: { path: "knowledge/faq/FAQ.md" },
+    });
+
+    await createKnowledgeNote("FAQ", "## Q\n\nA", "faq");
+
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("/api/knowledge/note");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      title: "FAQ",
+      content: "## Q\n\nA",
+      project_id: "default",
+      target_dir: "faq",
     });
   });
 });

@@ -7,11 +7,16 @@ import GraphView from "../components/kb/GraphView";
 import MoveModal from "../components/kb/MoveModal";
 import NoteModal from "../components/kb/NoteModal";
 import NormalizationPreviewModal from "../components/kb/NormalizationPreviewModal";
+import QaModal from "../components/kb/QaModal";
 import SourcePanel from "../components/kb/SourcePanel";
 import TreeView from "../components/kb/TreeView";
 import type { TreeNode } from "../components/kb/helpers";
 import { isUploadDerivedKnowledgeFile } from "../components/kb/helpers";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
+import { useLocalStorageState } from "../hooks/useLocalStorageState";
+
+const KNOWLEDGE_TABS = ["documents", "graph"] as const;
+type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number];
 
 export default function KnowledgeBase() {
   const {
@@ -44,11 +49,17 @@ export default function KnowledgeBase() {
     noteTitle,
     noteContent,
     creatingNote,
+    showQaModal,
+    qaTitle,
+    qaTargetDir,
+    qaRows,
+    creatingQa,
     dragOver,
     normalizationPreview,
     uploadInputRef,
     filteredTree,
     visibleExpandedDirs,
+    qaDirectoryOptions,
     hasActiveSearch,
     currentDir,
     indexedCount,
@@ -65,6 +76,9 @@ export default function KnowledgeBase() {
     setShowNoteModal,
     setNoteTitle,
     setNoteContent,
+    setQaTitle,
+    setQaTargetDir,
+    setQaRows,
     toggleExpand,
     handleTreeSelect,
     handleSave,
@@ -78,9 +92,12 @@ export default function KnowledgeBase() {
     handleMove,
     handleToggleEnabled,
     handleCreateNote,
+    handleCreateQa,
     handleCreateFolderSubmit,
     cancelCreateFolder,
     closeNoteModal,
+    openQaModal,
+    closeQaModal,
     closeNormalizationPreview,
     closeFileView,
     updateEditContent,
@@ -90,7 +107,11 @@ export default function KnowledgeBase() {
   } = useKnowledgeBase();
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"documents" | "graph">("documents");
+  const [activeTab, setActiveTab] = useLocalStorageState<KnowledgeTab>(
+    "admin.knowledge.active_tab",
+    "documents",
+    KNOWLEDGE_TABS,
+  );
   const { pendingToken, consumeSubView } = useNavigation();
   useEffect(() => {
     const view = consumeSubView("KnowledgeBase");
@@ -234,6 +255,7 @@ export default function KnowledgeBase() {
           crawling={crawling}
           onCrawl={handleCrawl}
           onShowNote={() => setShowNoteModal(true)}
+          onShowQa={openQaModal}
         />
       )}
 
@@ -387,6 +409,21 @@ export default function KnowledgeBase() {
           creating={creatingNote}
           onClose={closeNoteModal}
           onCreate={handleCreateNote}
+        />
+      )}
+
+      {showQaModal && (
+        <QaModal
+          qaTitle={qaTitle}
+          setQaTitle={setQaTitle}
+          qaTargetDir={qaTargetDir}
+          setQaTargetDir={setQaTargetDir}
+          directoryOptions={qaDirectoryOptions}
+          qaRows={qaRows}
+          setQaRows={setQaRows}
+          creating={creatingQa}
+          onClose={closeQaModal}
+          onCreate={handleCreateQa}
         />
       )}
 

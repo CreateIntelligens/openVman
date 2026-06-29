@@ -12,9 +12,11 @@ import {
   uploadAvatarCharacter,
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
+import { useLocalStorageState } from "../hooks/useLocalStorageState";
 
 type Status = { type: "success" | "error"; message: string } | null;
-type AssetTab = "characters" | "backgrounds";
+const ASSET_TABS = ["characters", "backgrounds"] as const;
+type AssetTab = (typeof ASSET_TABS)[number];
 
 const AVATAR_CHARACTER_STORAGE_KEY = "avatar.character_id";
 const AVATAR_BACKGROUND_ID_STORAGE_KEY = "avatar.background_id";
@@ -72,13 +74,18 @@ function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {
 }
 
 export default function Avatar() {
-  const [activeTab, setActiveTab] = useState<AssetTab>("characters");
+  const [activeTab, setActiveTab] = useLocalStorageState<AssetTab>(
+    "admin.avatar.assets_tab",
+    "characters",
+    ASSET_TABS,
+  );
   const [characters, setCharacters] = useState<AvatarCharacter[]>([]);
   const [backgrounds, setBackgrounds] = useState<AvatarBackground[]>([]);
   const [loading, setLoading] = useState(false);
   const [backgroundsLoading, setBackgroundsLoading] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const backgroundsLoaded = useRef(false);
+  const backgroundsLoadingRef = useRef(false);
 
   const [uploadCharId, setUploadCharId] = useState("");
   const [uploadLabel, setUploadLabel] = useState("");
@@ -124,6 +131,8 @@ export default function Avatar() {
   }
 
   async function loadBackgrounds(): Promise<void> {
+    if (backgroundsLoadingRef.current) return;
+    backgroundsLoadingRef.current = true;
     setBackgroundsLoading(true);
     setStatus(null);
     try {
@@ -133,6 +142,7 @@ export default function Avatar() {
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     } finally {
+      backgroundsLoadingRef.current = false;
       setBackgroundsLoading(false);
     }
   }
@@ -141,11 +151,14 @@ export default function Avatar() {
     void load();
   }, []);
 
-  function handleTabChange(tab: AssetTab): void {
-    setActiveTab(tab);
-    if (tab === "backgrounds" && !backgroundsLoaded.current) {
+  useEffect(() => {
+    if (activeTab === "backgrounds" && !backgroundsLoaded.current) {
       void loadBackgrounds();
     }
+  }, [activeTab]);
+
+  function handleTabChange(tab: AssetTab): void {
+    setActiveTab(tab);
   }
 
   async function handleUpload(): Promise<void> {

@@ -10,9 +10,12 @@ import {
   type KnowledgeDocumentSummary,
 } from "../api";
 import { useProject } from "../context/ProjectContext";
+import { validateUploadFiles } from "../utils/uploadLimits";
+import { useLocalStorageState } from "./useLocalStorageState";
 import { useStatusState } from "./useStatusState";
 
 type EditorMode = "edit" | "preview" | "split";
+const EDITOR_MODES: readonly EditorMode[] = ["edit", "split", "preview"];
 
 const emptyDraft = {
   path: "",
@@ -34,7 +37,11 @@ export function useWorkspaceManager() {
   const [syncing, setSyncing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [docSearch, setDocSearch] = useState("");
-  const [editorMode, setEditorMode] = useState<EditorMode>("edit");
+  const [editorMode, setEditorMode] = useLocalStorageState<EditorMode>(
+    "admin.workspace.editor_mode",
+    "edit",
+    EDITOR_MODES,
+  );
   const [dragOver, setDragOver] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState("");
@@ -162,6 +169,12 @@ export function useWorkspaceManager() {
       return;
     }
 
+    const sizeError = validateUploadFiles(files);
+    if (sizeError) {
+      setStatus({ type: "error", message: sizeError });
+      return;
+    }
+
     setUploading(true);
     setStatus(null);
 
@@ -180,7 +193,7 @@ export function useWorkspaceManager() {
     } finally {
       setUploading(false);
     }
-  }, [loadDocuments, setErrorStatus]);
+  }, [loadDocuments, setErrorStatus, setStatus]);
 
   const handleFileUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     await uploadFiles(Array.from(event.target.files ?? []));

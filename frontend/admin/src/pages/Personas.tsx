@@ -18,8 +18,10 @@ import PersonaEditor from "../components/personas/PersonaEditor";
 import PersonaEmptyState from "../components/personas/PersonaEmptyState";
 import PersonaList from "../components/personas/PersonaList";
 import { useProject } from "../context/ProjectContext";
+import { useLocalStorageState } from "../hooks/useLocalStorageState";
 
 type EditorMode = "edit" | "preview" | "split";
+const EDITOR_MODES: readonly EditorMode[] = ["edit", "split", "preview"];
 type Status = { type: "success" | "error"; message: string } | null;
 
 export default function Personas() {
@@ -45,7 +47,11 @@ export default function Personas() {
        const [cloningPersona, setCloningPersona] = useState(false);
        const [deletingPersonaId, setDeletingPersonaId] = useState("");
 
-       const [editorMode, setEditorMode] = useState<EditorMode>("edit");
+       const [editorMode, setEditorMode] = useLocalStorageState<EditorMode>(
+              "admin.personas.editor_mode",
+              "edit",
+              EDITOR_MODES,
+       );
        const [deletePersonaTarget, setDeletePersonaTarget] = useState<PersonaSummary | null>(null);
 
        const hasUnsavedChanges = draftContent !== loadedContent;

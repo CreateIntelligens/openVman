@@ -1,9 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Avatar from "./Avatar";
 import * as api from "../api";
 
-afterEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+afterEach(() => {
+  window.localStorage.clear();
+  vi.restoreAllMocks();
+});
 
 describe("Avatar page", () => {
   it("renders character list", async () => {
@@ -101,6 +108,28 @@ describe("Avatar page", () => {
 
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("button", { name: "Backgrounds" }));
+
+    expect(await screen.findByText("診間背景")).toBeTruthy();
+    expect(api.fetchAvatarBackgrounds).toHaveBeenCalledOnce();
+  });
+
+  it("restores the persisted background tab and loads backgrounds", async () => {
+    window.localStorage.setItem("admin.avatar.assets_tab", "backgrounds");
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({
+      backgrounds: [
+        {
+          background_id: "clinic",
+          label: "診間背景",
+          url: "/backgrounds/clinic/image.png",
+          mime_type: "image/png",
+          size_bytes: 2048,
+          updated_at: "2026-06-08T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<Avatar />);
 
     expect(await screen.findByText("診間背景")).toBeTruthy();
     expect(api.fetchAvatarBackgrounds).toHaveBeenCalledOnce();

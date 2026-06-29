@@ -16,13 +16,19 @@ import MaintenancePanel from "../components/memory/MaintenancePanel";
 import MemoryPagination from "../components/memory/MemoryPagination";
 import MemoryRecordCard from "../components/memory/MemoryRecordCard";
 import { useProject } from "../context/ProjectContext";
+import { useLocalStorageState } from "../hooks/useLocalStorageState";
 
-type Tab = "browse" | "add";
+const MEMORY_TABS = ["browse", "add"] as const;
+type Tab = (typeof MEMORY_TABS)[number];
 type Status = { type: "success" | "error"; message: string } | null;
 
 export default function Memory() {
   const { projectId } = useProject();
-  const [activeTab, setActiveTab] = useState<Tab>("browse");
+  const [activeTab, setActiveTab] = useLocalStorageState<Tab>(
+    "admin.memory.active_tab",
+    "browse",
+    MEMORY_TABS,
+  );
 
   // Browse state
   const [memories, setMemories] = useState<Awaited<ReturnType<typeof fetchMemories>>["memories"]>([]);

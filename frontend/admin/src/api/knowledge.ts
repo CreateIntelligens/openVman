@@ -275,11 +275,12 @@ export function updateKnowledgeDocumentMeta(
   );
 }
 
-export function createKnowledgeNote(title: string, content: string) {
+export function createKnowledgeNote(title: string, content: string, targetDir = "") {
   return post<KnowledgeNoteResponse>(knowledgePath("/note"), {
     title,
     content,
     project_id: getActiveProjectId(),
+    target_dir: targetDir,
   });
 }
 
@@ -292,6 +293,7 @@ export interface GraphStatus {
   edges?: number;
   communities?: number;
   error?: string;
+  stale?: boolean;
 }
 
 export interface GraphSummary {

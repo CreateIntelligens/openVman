@@ -11,6 +11,28 @@ import {
 
 type LoadState = "idle" | "loading" | "error";
 
+const STALE_BUILDING_MS = 30 * 60 * 1000;
+const STALE_BUILDING_ERROR = "圖譜建置逾時未完成（背景任務可能已中斷），請重新建置。";
+
+function parseStatusTime(value: string | undefined): number | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function normalizeGraphStatus(status: GraphStatus | null): GraphStatus | null {
+  if (status?.state !== "building") return status;
+  const startedAt = parseStatusTime(status.started_at);
+  if (startedAt === null) return status;
+  if (Date.now() - startedAt <= STALE_BUILDING_MS) return status;
+  return {
+    ...status,
+    state: "failed",
+    stale: true,
+    error: status.error ?? STALE_BUILDING_ERROR,
+  };
+}
+
 export default function GraphView(): ReactNode {
   const [status, setStatus] = useState<GraphStatus | null>(null);
   const [summary, setSummary] = useState<GraphSummary | null>(null);
@@ -41,21 +63,23 @@ export default function GraphView(): ReactNode {
     }
   }, []);
 
+  const displayStatus = useMemo(() => normalizeGraphStatus(status), [status]);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   useEffect(() => {
-    if (status?.state !== "building") return;
+    if (displayStatus?.state !== "building") return;
     const id = window.setInterval(refresh, 3000);
     return () => window.clearInterval(id);
-  }, [status?.state, refresh]);
+  }, [displayStatus?.state, refresh]);
 
   useEffect(() => {
-    if (status?.state === "ready") {
+    if (displayStatus?.state === "ready") {
       setHtmlKey((k) => k + 1);
     }
-  }, [status?.state, status?.finished_at]);
+  }, [displayStatus?.state, displayStatus?.finished_at]);
 
   const handleRebuild = useCallback(async () => {
     setRebuilding(true);
@@ -70,7 +94,7 @@ export default function GraphView(): ReactNode {
   }, [refresh]);
 
   const statusBadge = useMemo(() => {
-    const state = status?.state ?? "absent";
+    const state = displayStatus?.state ?? "absent";
     const styles: Record<string, string> = {
       absent: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
       building: "bg-amber-100 text-amber-800 dark:bg-amber-800/30 dark:text-amber-300",
@@ -88,9 +112,9 @@ export default function GraphView(): ReactNode {
         {labels[state]}
       </span>
     );
-  }, [status?.state]);
+  }, [displayStatus?.state]);
 
-  const disableRebuild = rebuilding || status?.state === "building";
+  const disableRebuild = rebuilding || displayStatus?.state === "building";
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -99,9 +123,9 @@ export default function GraphView(): ReactNode {
           <span className="material-symbols-outlined text-primary text-[1.25rem]">hub</span>
           <span className="text-sm font-bold text-slate-900 dark:text-white">知識圖譜</span>
           {statusBadge}
-          {status?.finished_at && (
+          {displayStatus?.finished_at && (
             <span className="text-[0.6875rem] text-slate-500">
-              最後建置：{new Date(status.finished_at).toLocaleString()}
+              最後建置：{new Date(displayStatus.finished_at).toLocaleString()}
             </span>
           )}
         </div>
@@ -113,7 +137,7 @@ export default function GraphView(): ReactNode {
           <span className={`material-symbols-outlined text-[1rem] ${disableRebuild ? "animate-spin" : ""}`}>
             autorenew
           </span>
-          {status?.state === "building" ? "建置中…" : "重建圖譜"}
+          {displayStatus?.state === "building" ? "建置中…" : "重建圖譜"}
         </button>
       </div>
 
@@ -123,7 +147,7 @@ export default function GraphView(): ReactNode {
         </div>
       )}
 
-      {status?.state === "ready" && summary && (
+      {displayStatus?.state === "ready" && summary && (
         <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
           <StatCard label="Nodes" value={summary.nodes} />
           <StatCard label="Edges" value={summary.edges} />
@@ -148,7 +172,7 @@ export default function GraphView(): ReactNode {
       )}
 
       <div className="flex-1 min-h-0 overflow-hidden bg-white dark:bg-slate-950/30">
-        <GraphContent loadState={loadState} status={status} htmlKey={htmlKey} />
+        <GraphContent loadState={loadState} status={displayStatus} htmlKey={htmlKey} />
       </div>
     </div>
   );

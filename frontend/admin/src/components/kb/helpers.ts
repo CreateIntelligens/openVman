@@ -2,7 +2,7 @@ import type { KnowledgeDocumentSummary } from "../../api";
 
 /* ── Types ── */
 
-export type SourceMode = "upload" | "web" | "manual";
+export type SourceMode = "upload" | "web" | "manual" | "qa";
 export type DeleteTarget = { type: "file" | "dir"; value: string } | null;
 export type RightPane = "folder" | "file";
 
@@ -16,11 +16,12 @@ export interface TreeNode {
 
 /* ── Constants ── */
 
-export const SOURCE_MODES: SourceMode[] = ["upload", "web", "manual"];
+export const SOURCE_MODES: SourceMode[] = ["upload", "web", "manual", "qa"];
 export const SOURCE_MODE_COPY: Record<SourceMode, string> = {
   upload: "上傳本地檔案到目前資料夾。",
   web: "貼網址後擷取頁面內容。",
   manual: "直接貼上筆記或整理好的內容，存成可索引來源。",
+  qa: "用多列 Q&A 建立帶 heading 的 Markdown 來源。",
 };
 
 /* ── Formatters ── */
@@ -47,6 +48,8 @@ export function getSourceMeta(sourceType: SourceMode) {
       return { icon: "language", label: "網頁", chipClass: "border-sky-500/30 bg-sky-500/10 text-sky-300" };
     case "manual":
       return { icon: "edit_note", label: "手動", chipClass: "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-300" };
+    case "qa":
+      return { icon: "quiz", label: "QA", chipClass: "border-amber-500/30 bg-amber-500/10 text-amber-300" };
     default:
       return { icon: "upload_file", label: "上傳", chipClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" };
   }
