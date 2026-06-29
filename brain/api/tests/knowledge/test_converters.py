@@ -28,6 +28,43 @@ def test_csv_emits_col_value_lines(tmp_path: Path):
     assert lines[1] == "星期: 週二 ｜ 上午: 休診 ｜ 下午: 14:00-18:00"
 
 
+def test_qa_csv_emits_heading_per_row(tmp_path: Path):
+    """A Q&A CSV becomes one ## heading per question, so each row can form its
+    own graph sub-node instead of collapsing into a single file-level topic."""
+    csv_path = tmp_path / "faq.csv"
+    csv_path.write_text(
+        "index,q,a,img\n"
+        "001,什麼是五十肩？,肩關節囊發炎沾黏。,\n"
+        "002,為什麼叫五十肩？,好發於中年。,\n",
+        encoding="utf-8",
+    )
+
+    result = converters.convert_to_text(csv_path)
+
+    assert result is not None
+    assert "## 什麼是五十肩？" in result
+    assert "肩關節囊發炎沾黏。" in result
+    assert "## 為什麼叫五十肩？" in result
+    # The two FAQs must be separated into distinct heading blocks.
+    assert result.index("## 什麼是五十肩？") < result.index("## 為什麼叫五十肩？")
+
+
+def test_qa_csv_with_chinese_headers(tmp_path: Path):
+    """Q&A detection also handles 問題/回答 column names."""
+    csv_path = tmp_path / "faq2.csv"
+    csv_path.write_text(
+        "問題,回答,圖片 (Image),連結 (URL)\n"
+        "什麼是五十肩？,肩關節囊發炎。,,\n",
+        encoding="utf-8",
+    )
+
+    result = converters.convert_to_text(csv_path)
+
+    assert result is not None
+    assert "## 什麼是五十肩？" in result
+    assert "肩關節囊發炎。" in result
+
+
 def test_txt_passthrough(tmp_path: Path):
     txt_path = tmp_path / "note.txt"
     content = "第一行\n第二行\n"

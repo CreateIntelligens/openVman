@@ -23,6 +23,12 @@ logger = logging.getLogger("brain.knowledge.converters")
 _PAIR_SEP = " ｜ "
 _KV_SEP = ": "
 
+# Q&A column aliases. A CSV whose header carries a question + answer column is a
+# FAQ table: each row is rendered as its own ``## question`` heading block so it
+# can form a distinct graph sub-node instead of collapsing into one file topic.
+_QA_QUESTION_ALIASES = ("q", "question", "問題", "问题", "題目", "题目")
+_QA_ANSWER_ALIASES = ("a", "answer", "答案", "回答", "回覆", "解答", "說明")
+
 
 def _row_to_line(header: list[str], row: Sequence[object]) -> str:
     """Render one table row as ``col: val ｜ col: val`` using header names.
@@ -45,14 +51,49 @@ def _convert_text(path: Path) -> str:
     return path.read_text(encoding="utf-8-sig")
 
 
+def _qa_column_indices(header: list[str]) -> tuple[int, int] | None:
+    """Return (question_index, answer_index) if the header is a FAQ table."""
+    q_index = a_index = None
+    for index, name in enumerate(header):
+        key = name.strip().lower()
+        if q_index is None and any(alias in key for alias in _QA_QUESTION_ALIASES):
+            q_index = index
+        elif a_index is None and any(alias in key for alias in _QA_ANSWER_ALIASES):
+            a_index = index
+    if q_index is None or a_index is None:
+        return None
+    return q_index, a_index
+
+
+def _convert_qa_csv(rows: list[list[str]], q_index: int, a_index: int) -> str:
+    """Render a FAQ CSV as ``## question`` heading blocks, one per row."""
+    blocks: list[str] = []
+    for row in rows:
+        question = row[q_index].strip() if q_index < len(row) else ""
+        answer = row[a_index].strip() if a_index < len(row) else ""
+        if not question and not answer:
+            continue
+        heading = question or "未命名問題"
+        blocks.append(f"## {heading}\n\n{answer}" if answer else f"## {heading}")
+    return "\n\n".join(blocks)
+
+
 def _convert_csv(path: Path) -> str:
-    """Render a CSV as one ``col: val ｜ ...`` line per data row."""
+    """Render a CSV as text.
+
+    FAQ tables (question + answer columns) become ``## question`` heading blocks
+    so each row is a distinct, individually-retrievable section. Other tables
+    fall back to one ``col: val ｜ ...`` line per row.
+    """
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.reader(handle)
         rows = list(reader)
     if not rows:
         return ""
     header = [str(cell).strip() for cell in rows[0]]
+    qa_indices = _qa_column_indices(header)
+    if qa_indices is not None:
+        return _convert_qa_csv(rows[1:], *qa_indices)
     lines = [_row_to_line(header, row) for row in rows[1:]]
     return "\n".join(line for line in lines if line)
 

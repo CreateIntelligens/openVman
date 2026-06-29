@@ -562,6 +562,113 @@ class TestQAChunkMetadata:
         assert "chunk_index" in meta
         assert "char_count" in meta
 
+    def test_qa_chunks_with_various_jtai_prefixes(
+        self, monkeypatch, tmp_path
+    ):
+        """QA markdown chunks should match different Q&A prefix styles."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        styles = [
+            ("問：什麼是糖尿病？\n答：一種慢性代謝疾病。\n", "什麼是糖尿病？"),
+            ("問題1: 什麼是糖尿病？\n回答: 一種慢性代謝疾病。\n", "什麼是糖尿病？"),
+            ("Question: 什麼是糖尿病？\nAnswer: 一種慢性代謝疾病。\n", "什麼是糖尿病？"),
+            ("Q1  什麼是糖尿病？\nA  一種慢性代謝疾病。\n", "什麼是糖尿病？"),
+        ]
+
+        for i, (md, expected_q) in enumerate(styles):
+            doc = ws / f"faq_{i}.md"
+            doc.write_text(md, encoding="utf-8")
+            chunks = indexer._extract_text_chunks(doc)
+            assert len(chunks) == 1, f"Failed style {i}: {md}"
+            meta = chunks[0].metadata
+            assert meta["kind"] == "qa_markdown"
+            assert meta["question"] == expected_q
+
+
+# ---------------------------------------------------------------------------
+# 優化點 1: mixed-document chunking (prose + FAQ in one file)
+# ---------------------------------------------------------------------------
+
+
+class TestMixedDocumentChunking:
+    def test_prose_before_faq_produces_both_chunk_kinds(
+        self, monkeypatch, tmp_path
+    ):
+        """A file with concept prose then a FAQ yields both kinds."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        md = (
+            "# 糖尿病概論\n"
+            "糖尿病是一種慢性代謝疾病，特徵是長期血糖偏高。\n"
+            "成因包括胰島素分泌不足或細胞對胰島素反應不良。\n\n"
+            "# 常見問答\n"
+            "Q: 糖尿病可以根治嗎？\n"
+            "A: 目前無法根治，但可透過飲食與藥物控制。\n"
+        )
+        doc = ws / "diabetes.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        kinds = {c.metadata["kind"] for c in chunks}
+        assert "qa_markdown" in kinds
+        assert "freeform_markdown" in kinds
+
+    def test_prose_before_faq_is_not_dropped(self, monkeypatch, tmp_path):
+        """The concept prose must survive, not be swallowed by the FAQ."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        md = (
+            "胰島素分泌不足是糖尿病的主要成因之一。\n\n"
+            "Q: 糖尿病可以根治嗎？\n"
+            "A: 目前無法根治。\n"
+        )
+        doc = ws / "diabetes2.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        all_text = "\n".join(c.text for c in chunks)
+        assert "胰島素分泌不足是糖尿病的主要成因" in all_text
+
+    def test_pure_qa_file_still_qa_only(self, monkeypatch, tmp_path):
+        """A file that is entirely Q&A keeps producing only qa_markdown."""
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        md = "Q: 什麼是糖尿病？\nA: 一種慢性代謝疾病。\n"
+        doc = ws / "faq_only.md"
+        doc.write_text(md, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        assert {c.metadata["kind"] for c in chunks} == {"qa_markdown"}
+
+    def test_converted_faq_csv_md_splits_per_question_heading(
+        self, monkeypatch, tmp_path
+    ):
+        """A FAQ CSV converted to ## headings yields one chunk per question with
+        no content dropped — each question can become its own graph sub-node."""
+        from knowledge.converters import convert_to_text
+
+        indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+
+        csv_path = ws / "faq.csv"
+        csv_path.write_text(
+            "問題,回答\n"
+            "什麼是五十肩？,肩關節囊發炎沾黏。\n"
+            "為什麼叫五十肩？,好發於中年族群。\n",
+            encoding="utf-8",
+        )
+        md_text = convert_to_text(csv_path)
+        doc = ws / "五十肩.md"
+        doc.write_text(md_text, encoding="utf-8")
+
+        chunks = indexer._extract_text_chunks(doc)
+        headings = [tuple(c.metadata["heading_path"]) for c in chunks]
+        assert ("什麼是五十肩？",) in headings
+        assert ("為什麼叫五十肩？",) in headings
+
+        all_text = "\n".join(c.text for c in chunks)
+        assert "肩關節囊發炎沾黏。" in all_text
+        assert "好發於中年族群。" in all_text
+
 
 # ---------------------------------------------------------------------------
 # CLI reindex script tests

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 import math
 import re
@@ -28,8 +29,24 @@ from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
 
 _IMAGE_MARKDOWN_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-_QUESTION_RE = re.compile(r"^Q\s*\d*\s*[：: ]?\s*(.+)$", re.IGNORECASE)
-_ANSWER_RE = re.compile(r"^A\s*[：: ]?\s*(.+)$", re.IGNORECASE)
+
+_CSV_FIELD_ALIASES: dict[str, list[str]] = {
+    "q": ["q", "question", "問題", "问题", "題目", "题目", "項目", "项目"],
+    "a": ["a", "answer", "答案", "回答", "回覆", "解答", "說明", "内容", "內容"],
+    "img": ["img", "image", "圖片", "图片"],
+    "url": ["url", "link", "網址", "网址", "連結", "链接"],
+    "index": ["index", "i", "順序", "id"],
+}
+
+_QUESTION_RE = re.compile(
+    r"^(?:question|問題|问题|題目|题目|項目|项目|問|Q)\s*\d*\s*[：:.\s]?\s*(.+)$",
+    re.IGNORECASE,
+)
+_ANSWER_RE = re.compile(
+    r"^(?:answer|答案|回答|回覆|解答|說明|说明|内容|內容|答|A)\s*\d*\s*[：:.\s]?\s*(.+)$",
+    re.IGNORECASE,
+)
+_MIN_QA_PAIRS_FOR_DETECTION = 1
 
 
 @dataclass(slots=True)
@@ -133,19 +150,77 @@ def _extract_text_chunks(path: Path, workspace_root: Path | None = None) -> list
 
     cleaned = _clean_text(content)
 
-    # Strip headings for QA detection (QA docs don't use heading structure)
-    stripped = re.sub(r"^#{1,6}\s*", "", cleaned, flags=re.MULTILINE)
-    qa_chunks = _extract_markdown_qa_chunks(
-        stripped,
-        title,
-        relative_path,
-        fingerprint,
-        persona_id,
-    )
-    if qa_chunks:
-        return qa_chunks
+    # Mixed documents are common: concept prose first, a FAQ at the end. Split
+    # into QA vs freeform regions so each is chunked appropriately, instead of
+    # forcing the whole file through QA mode (which drops the prose) the moment
+    # one Q&A pair appears.
+    chunks: list[ChunkSpec] = []
+    for kind, region in _partition_qa_and_freeform(cleaned):
+        if kind == "qa":
+            stripped = re.sub(r"^#{1,6}\s*", "", region, flags=re.MULTILINE)
+            chunks.extend(
+                _extract_markdown_qa_chunks(
+                    stripped, title, relative_path, fingerprint, persona_id
+                )
+            )
+        else:
+            chunks.extend(
+                _chunk_by_headings(region, title, relative_path, fingerprint, persona_id)
+            )
 
-    return _chunk_by_headings(cleaned, title, relative_path, fingerprint, persona_id)
+    _renumber_chunk_indices(chunks)
+    return chunks
+
+
+def _partition_qa_and_freeform(content: str) -> list[tuple[str, str]]:
+    """Split markdown into ordered ("qa"|"free", text) regions.
+
+    A QA region starts at the first ``Q`` line and runs through its answer and
+    continuation lines; a heading line closes it back to freeform so prose under
+    later headings stays freeform. Empty regions are dropped.
+    """
+    regions: list[tuple[str, list[str]]] = []
+
+    def _append(kind: str, line: str) -> None:
+        if regions and regions[-1][0] == kind:
+            regions[-1][1].append(line)
+        else:
+            regions.append((kind, [line]))
+
+    in_qa = False
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if _HEADING_LEVEL_RE.match(line):
+            in_qa = False
+            _append("free", raw_line)
+            continue
+        if line and _match_question(line):
+            in_qa = True
+        _append("qa" if in_qa else "free", raw_line)
+
+    return [
+        (kind, "\n".join(lines))
+        for kind, lines in regions
+        if "\n".join(lines).strip()
+    ]
+
+
+def _renumber_chunk_indices(chunks: list[ChunkSpec]) -> None:
+    """Make chunk_index/chunk_id contiguous across mixed regions."""
+    for index, chunk in enumerate(chunks):
+        chunk.metadata["chunk_index"] = index
+        path = chunk.metadata.get("path", "")
+        chunk.metadata["chunk_id"] = f"{path}::{index}"
+
+
+def _match_question(line: str) -> str | None:
+    m = _QUESTION_RE.match(line)
+    return m.group(1).strip() if m else None
+
+
+def _match_answer(line: str) -> str | None:
+    m = _ANSWER_RE.match(line)
+    return m.group(1).strip() if m else None
 
 
 def _extract_markdown_qa_chunks(
@@ -188,22 +263,25 @@ def _extract_markdown_qa_chunks(
         if not line:
             continue
 
-        question_match = _QUESTION_RE.match(line)
-        if question_match:
+        q_text = _match_question(line)
+        if q_text:
             _flush_qa()
-            question = question_match.group(1).strip()
+            question = q_text
             answer_lines = []
             continue
 
-        answer_match = _ANSWER_RE.match(line)
-        if answer_match:
-            answer_lines.append(answer_match.group(1).strip())
+        a_text = _match_answer(line)
+        if a_text:
+            answer_lines.append(a_text)
             continue
 
         if question:
             answer_lines.append(line)
 
     _flush_qa()
+
+    if len(chunks) < _MIN_QA_PAIRS_FOR_DETECTION:
+        return []
     return chunks
 
 
@@ -638,43 +716,74 @@ def _chunk_paragraphs(
     return chunks
 
 
+def _normalize_csv_fieldname(raw: str) -> str:
+    key = raw.strip().lower()
+    for canonical, aliases in _CSV_FIELD_ALIASES.items():
+        if key in aliases:
+            return canonical
+    for canonical, aliases in _CSV_FIELD_ALIASES.items():
+        if any(len(alias) >= 2 and alias in key for alias in aliases):
+            return canonical
+    return raw.strip()
+
+
 def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[ChunkSpec]:
-    chunks: list[ChunkSpec] = []
     ws = workspace_root or ensure_workspace_scaffold()
     relative_path = path.relative_to(ws).as_posix()
     title = path.stem
     fingerprint = _fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
 
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        for row_number, row in enumerate(reader, start=2):
-            question = _pick_first(row, "q", "question", "Q", "題目")
-            answer = _pick_first(row, "a", "answer", "A", "答案")
-            if not question and not answer:
-                continue
+    text_content = path.read_text(encoding="utf-8-sig")
+    reader = csv.DictReader(io.StringIO(text_content))
+    if reader.fieldnames is None:
+        return []
 
-            text = _format_qa_chunk(title, question or "未命名問題", [answer or ""])
-            chunks.append(
-                ChunkSpec(
-                    text=text,
-                    metadata={
-                        "path": relative_path,
-                        "title": title,
-                        "heading_path": [],
-                        "chunk_index": row_number,
-                        "kind": "qa_csv",
-                        "question": question,
-                        "persona_id": persona_id,
-                        "row_number": row_number,
-                        "row_index": _pick_first(row, "index", "id"),
-                        "image": _pick_first(row, "img", "image"),
-                        "fingerprint": fingerprint,
-                        "chunk_id": f"{relative_path}::{row_number}",
-                        "char_count": len(text),
-                    },
-                )
+    alias_map: dict[str, str] = {}
+    for raw_field in reader.fieldnames:
+        canonical = _normalize_csv_fieldname(raw_field)
+        if canonical not in alias_map:
+            alias_map[canonical] = raw_field
+
+    has_q = "q" in alias_map
+    has_a = "a" in alias_map
+    if not has_q and not has_a:
+        return []
+
+    q_field = alias_map.get("q", "")
+    a_field = alias_map.get("a", "")
+    img_field = alias_map.get("img", "")
+    index_field = alias_map.get("index", "")
+
+    chunks: list[ChunkSpec] = []
+    reader = csv.DictReader(io.StringIO(text_content))
+    for row_number, row in enumerate(reader, start=2):
+        question = (row.get(q_field) or "").strip() if q_field else ""
+        answer = (row.get(a_field) or "").strip() if a_field else ""
+        if not question and not answer:
+            continue
+
+        text = _format_qa_chunk(title, question or "未命名問題", [answer or ""])
+        chunks.append(
+            ChunkSpec(
+                text=text,
+                metadata={
+                    "path": relative_path,
+                    "title": title,
+                    "heading_path": [],
+                    "chunk_index": row_number,
+                    "kind": "qa_csv",
+                    "question": question,
+                    "persona_id": persona_id,
+                    "row_number": row_number,
+                    "row_index": (row.get(index_field) or "").strip() if index_field else "",
+                    "image": (row.get(img_field) or "").strip() if img_field else "",
+                    "fingerprint": fingerprint,
+                    "chunk_id": f"{relative_path}::{row_number}",
+                    "char_count": len(text),
+                },
             )
+        )
 
     return chunks
 
