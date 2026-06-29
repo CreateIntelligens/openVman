@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import hashlib
-import io
 import json
 import math
 import re
@@ -23,6 +23,7 @@ from infra.db import (
     parse_record_metadata,
     resolve_vector_table_name,
 )
+from infra.pipeline import CheckpointStore, PipelineConfig, run_pipeline
 from infra.project_context import resolve_embedding_index_state_path
 from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold, iter_indexable_documents
 from memory.embedder import get_embedder
@@ -86,54 +87,207 @@ def has_stale_documents(project_id: str = "default") -> bool:
 def rebuild_knowledge_index(project_id: str = "default") -> dict[str, Any]:
     """Incrementally rebuild the knowledge table from indexable workspace documents."""
     workspace_root = ensure_workspace_scaffold(project_id)
-    documents = iter_indexable_documents(project_id)
-    current_fingerprints = {
-        path.relative_to(workspace_root).as_posix(): _fingerprint_document(path)
-        for path in documents
-    }
-    state = _load_index_state(project_id)
-    existing_records = _load_existing_knowledge_records(project_id)
-    reusable_records = _collect_reusable_records(existing_records, current_fingerprints)
-    reusable_paths = {
-        str(parse_record_metadata(record).get("path", "")).strip()
-        for record in reusable_records
-    }
-    previous_docs = state.get("documents", {})
-    changed_paths = [
-        path
-        for path in documents
-        for rel in [path.relative_to(workspace_root).as_posix()]
-        if previous_docs.get(rel) != current_fingerprints[rel] or rel not in reusable_paths
-    ]
-    removed_paths = sorted(set(state.get("documents", {})) - set(current_fingerprints))
+    store = CheckpointStore(resolve_embedding_index_state_path(project_id))
+    live_fingerprints = _current_document_fingerprints(project_id, workspace_root)
+    table_exists = _knowledge_table_exists(project_id)
+    if table_exists:
+        _ensure_knowledge_table_schema(project_id)
 
-    chunk_specs: list[ChunkSpec] = []
-    for path in changed_paths:
-        if path.suffix.lower() == ".csv":
-            chunk_specs.extend(_extract_csv_chunks(path, workspace_root))
-            continue
-        chunk_specs.extend(_extract_text_chunks(path, workspace_root))
-
-    records = reusable_records + _build_knowledge_records(chunk_specs)
-    if not records:
-        records = _build_placeholder_records()
-    get_db(project_id).create_table(
-        resolve_vector_table_name("knowledge"),
-        data=records,
-        mode="overwrite",
+    stats = asyncio.run(
+        run_pipeline(
+            _IndexItemSource(project_id, workspace_root, store, force_all=not table_exists),
+            _IndexWorker(workspace_root),
+            _IndexSink(project_id, workspace_root, store),
+            PipelineConfig(batch_size=100, concurrency=2),
+        )
     )
+    removed_paths = _prune_removed_documents(project_id, store, set(live_fingerprints))
+    if live_fingerprints:
+        _delete_placeholder_record(project_id)
+    elif _safe_knowledge_chunk_count(project_id) == 0:
+        _replace_knowledge_table(project_id, _build_placeholder_records())
+
     ensure_fts_index("knowledge", project_id)
-    _save_index_state(current_fingerprints, project_id)
+    chunk_count = _safe_knowledge_chunk_count(project_id)
+    if chunk_count is None or (chunk_count == 0 and stats.results > 0):
+        chunk_count = max(stats.results, len(live_fingerprints))
 
     return {
         "status": "ok",
         "workspace_root": str(workspace_root),
-        "document_count": len(documents),
-        "chunk_count": len(records),
-        "changed_documents": len(changed_paths),
-        "reused_chunks": len(reusable_records),
+        "document_count": len(live_fingerprints),
+        "chunk_count": chunk_count,
+        "changed_documents": stats.items,
+        "reused_chunks": max(chunk_count - stats.results, 0),
         "removed_documents": len(removed_paths),
     }
+
+
+def _current_document_fingerprints(project_id: str, workspace_root: Path) -> dict[str, str]:
+    return {
+        path.relative_to(workspace_root).as_posix(): _fingerprint_document(path)
+        for path in iter_indexable_documents(project_id)
+    }
+
+
+class _IndexItemSource:
+    def __init__(
+        self,
+        project_id: str,
+        workspace_root: Path,
+        store: CheckpointStore,
+        *,
+        force_all: bool = False,
+    ) -> None:
+        self._project_id = project_id
+        self._workspace_root = workspace_root
+        self._store = store
+        self._force_all = force_all
+
+    def pending(self):
+        done = {} if self._force_all else self._store.load()
+        for path in iter_indexable_documents(self._project_id):
+            relative_path = path.relative_to(self._workspace_root).as_posix()
+            fingerprint = _fingerprint_document(path)
+            if self._force_all or done.get(relative_path) != fingerprint:
+                yield path
+
+
+class _IndexWorker:
+    def __init__(self, workspace_root: Path) -> None:
+        self._workspace_root = workspace_root
+
+    async def process_batch(self, paths: list[Path]) -> list[dict[str, Any]]:
+        def _work() -> list[dict[str, Any]]:
+            chunk_specs: list[ChunkSpec] = []
+            for path in paths:
+                if path.suffix.lower() == ".csv":
+                    chunk_specs.extend(_extract_csv_chunks(path, self._workspace_root))
+                else:
+                    chunk_specs.extend(_extract_text_chunks(path, self._workspace_root))
+            return _build_knowledge_records(chunk_specs)
+
+        return _work()
+
+
+class _IndexSink:
+    def __init__(
+        self,
+        project_id: str,
+        workspace_root: Path,
+        store: CheckpointStore,
+    ) -> None:
+        self._project_id = project_id
+        self._workspace_root = workspace_root
+        self._store = store
+
+    def flush(self, records: list[dict[str, Any]]) -> None:
+        if not records:
+            return
+        table, created = _ensure_knowledge_table(self._project_id, records)
+        if created:
+            return
+        table.merge_insert("chunk_id").when_matched_update_all().when_not_matched_insert_all().execute(records)
+
+    def commit_checkpoint(self, paths: list[Path]) -> None:
+        self._store.commit(
+            {
+                path.relative_to(self._workspace_root).as_posix(): _fingerprint_document(path)
+                for path in paths
+            }
+        )
+
+
+def _knowledge_table_name() -> str:
+    return resolve_vector_table_name("knowledge")
+
+
+def _knowledge_table_exists(project_id: str) -> bool:
+    return _knowledge_table_name() in set(get_db(project_id).table_names())
+
+
+def _open_knowledge_table(project_id: str):
+    return get_db(project_id).open_table(_knowledge_table_name())
+
+
+def _replace_knowledge_table(project_id: str, records: list[dict[str, Any]]):
+    return get_db(project_id).create_table(
+        _knowledge_table_name(),
+        data=records,
+        mode="overwrite",
+    )
+
+
+def _ensure_knowledge_table(
+    project_id: str,
+    initial_records: list[dict[str, Any]],
+):
+    if not _knowledge_table_exists(project_id):
+        table = _replace_knowledge_table(project_id, initial_records)
+        if table is None and _knowledge_table_exists(project_id):
+            table = _open_knowledge_table(project_id)
+        return table, True
+    _ensure_knowledge_table_schema(project_id)
+    return _open_knowledge_table(project_id), False
+
+
+def _ensure_knowledge_table_schema(project_id: str) -> None:
+    table = _open_knowledge_table(project_id)
+    schema = getattr(table, "schema", None)
+    names = set(getattr(schema, "names", []) or [])
+    if names and {"path", "chunk_id"}.issubset(names):
+        return
+
+    records = []
+    for record in table.to_arrow().to_pylist():
+        metadata = parse_record_metadata(record)
+        records.append(
+            {
+                **record,
+                "path": str(record.get("path") or metadata.get("path", "")),
+                "chunk_id": str(record.get("chunk_id") or metadata.get("chunk_id", "")),
+            }
+        )
+    _replace_knowledge_table(project_id, records or _build_placeholder_records())
+
+
+def _safe_knowledge_chunk_count(project_id: str) -> int | None:
+    if not _knowledge_table_exists(project_id):
+        return 0
+    try:
+        count = _open_knowledge_table(project_id).count_rows()
+    except Exception:
+        return None
+    return count if isinstance(count, int) else None
+
+
+def _lance_string(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _delete_records_where(project_id: str, field: str, value: str) -> None:
+    if not _knowledge_table_exists(project_id):
+        return
+    _open_knowledge_table(project_id).delete(f"{field} = {_lance_string(value)}")
+
+
+def _delete_placeholder_record(project_id: str) -> None:
+    _delete_records_where(project_id, "chunk_id", "__placeholder__")
+
+
+def _prune_removed_documents(
+    project_id: str,
+    store: CheckpointStore,
+    live_keys: set[str],
+) -> list[str]:
+    removed_paths = store.prune(live_keys)
+    if not removed_paths:
+        return []
+    for relative_path in removed_paths:
+        _delete_records_where(project_id, "path", relative_path)
+    remaining = {key: value for key, value in store.load().items() if key in live_keys}
+    _save_index_state(remaining, project_id)
+    return removed_paths
 
 
 def _extract_text_chunks(path: Path, workspace_root: Path | None = None) -> list[ChunkSpec]:
@@ -734,56 +888,58 @@ def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[
     fingerprint = _fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
 
-    text_content = path.read_text(encoding="utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text_content))
-    if reader.fieldnames is None:
-        return []
-
-    alias_map: dict[str, str] = {}
-    for raw_field in reader.fieldnames:
-        canonical = _normalize_csv_fieldname(raw_field)
-        if canonical not in alias_map:
-            alias_map[canonical] = raw_field
-
-    has_q = "q" in alias_map
-    has_a = "a" in alias_map
-    if not has_q and not has_a:
-        return []
-
-    q_field = alias_map.get("q", "")
-    a_field = alias_map.get("a", "")
-    img_field = alias_map.get("img", "")
-    index_field = alias_map.get("index", "")
-
     chunks: list[ChunkSpec] = []
-    reader = csv.DictReader(io.StringIO(text_content))
-    for row_number, row in enumerate(reader, start=2):
-        question = (row.get(q_field) or "").strip() if q_field else ""
-        answer = (row.get(a_field) or "").strip() if a_field else ""
-        if not question and not answer:
-            continue
+    with path.open("r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.reader(fh)
+        try:
+            header = next(reader)
+        except StopIteration:
+            return []
 
-        text = _format_qa_chunk(title, question or "未命名問題", [answer or ""])
-        chunks.append(
-            ChunkSpec(
-                text=text,
-                metadata={
-                    "path": relative_path,
-                    "title": title,
-                    "heading_path": [],
-                    "chunk_index": row_number,
-                    "kind": "qa_csv",
-                    "question": question,
-                    "persona_id": persona_id,
-                    "row_number": row_number,
-                    "row_index": (row.get(index_field) or "").strip() if index_field else "",
-                    "image": (row.get(img_field) or "").strip() if img_field else "",
-                    "fingerprint": fingerprint,
-                    "chunk_id": f"{relative_path}::{row_number}",
-                    "char_count": len(text),
-                },
+        alias_map: dict[str, int] = {}
+        for index, raw_field in enumerate(header):
+            canonical = _normalize_csv_fieldname(raw_field)
+            if canonical not in alias_map:
+                alias_map[canonical] = index
+
+        if "q" not in alias_map and "a" not in alias_map:
+            return []
+
+        q_index = alias_map.get("q")
+        a_index = alias_map.get("a")
+        img_index = alias_map.get("img")
+        row_id_index = alias_map.get("index")
+
+        def _cell(row: list[str], index: int | None) -> str:
+            return row[index].strip() if index is not None and index < len(row) else ""
+
+        for row_number, row in enumerate(reader, start=2):
+            question = _cell(row, q_index)
+            answer = _cell(row, a_index)
+            if not question and not answer:
+                continue
+
+            text = _format_qa_chunk(title, question or "未命名問題", [answer or ""])
+            chunks.append(
+                ChunkSpec(
+                    text=text,
+                    metadata={
+                        "path": relative_path,
+                        "title": title,
+                        "heading_path": [],
+                        "chunk_index": row_number,
+                        "kind": "qa_csv",
+                        "question": question,
+                        "persona_id": persona_id,
+                        "row_number": row_number,
+                        "row_index": _cell(row, row_id_index),
+                        "image": _cell(row, img_index),
+                        "fingerprint": fingerprint,
+                        "chunk_id": f"{relative_path}::{row_number}",
+                        "char_count": len(text),
+                    },
+                )
             )
-        )
 
     return chunks
 
@@ -803,6 +959,8 @@ def _build_knowledge_records(chunk_specs: list[ChunkSpec]) -> list[dict[str, Any
                 "vector": normalize_vector(vector),
                 "source": "workspace",
                 "date": date.today().isoformat(),
+                "path": str(chunk.metadata.get("path", "")),
+                "chunk_id": str(chunk.metadata.get("chunk_id", "")),
                 "metadata": json.dumps(chunk.metadata, ensure_ascii=False),
             }
         )
@@ -817,6 +975,8 @@ def _build_placeholder_records() -> list[dict[str, Any]]:
             "vector": normalize_vector(get_embedder().encode(["知識庫目前沒有內容。"])[0]),
             "source": "system",
             "date": date.today().isoformat(),
+            "path": "",
+            "chunk_id": "__placeholder__",
             "metadata": json.dumps({"placeholder": True}, ensure_ascii=False),
         }
     ]
@@ -935,7 +1095,14 @@ def rename_document_records(old_path: str, new_path: str, project_id: str = "def
             old_chunk_id = str(metadata.get("chunk_id", ""))
             if old_chunk_id.startswith(old_path + "::"):
                 metadata["chunk_id"] = new_path + "::" + old_chunk_id[len(old_path) + 2:]
-            updated.append({**record, "metadata": json.dumps(metadata, ensure_ascii=False)})
+            updated.append(
+                {
+                    **record,
+                    "path": new_path,
+                    "chunk_id": str(metadata.get("chunk_id", "")),
+                    "metadata": json.dumps(metadata, ensure_ascii=False),
+                }
+            )
         else:
             updated.append(record)
 

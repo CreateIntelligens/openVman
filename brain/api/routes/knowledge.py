@@ -356,7 +356,12 @@ async def upload_knowledge_documents_route(
 @router.post("/knowledge/note", summary="建立知識筆記")
 async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
     try:
-        document = save_workspace_note(payload.title, payload.content, payload.project_id)
+        document = save_workspace_note(
+            payload.title,
+            payload.content,
+            payload.project_id,
+            payload.target_dir,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     asyncio.create_task(_background_reindex(payload.project_id))

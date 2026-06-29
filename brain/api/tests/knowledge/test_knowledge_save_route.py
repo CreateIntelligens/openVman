@@ -109,3 +109,59 @@ def test_save_knowledge_document_route_schedules_background_reindex(monkeypatch)
     }
     assert scheduled["project_id"] == "default"
     assert "task" in scheduled
+
+
+def test_create_note_route_passes_target_dir(monkeypatch):
+    knowledge_routes = _load_knowledge_routes_module()
+    captured: dict[str, object] = {}
+
+    class FakeAwaitable:
+        def __await__(self):
+            if False:
+                yield
+            return None
+
+    def fake_background_reindex(project_id: str):
+        captured["reindex_project_id"] = project_id
+        return FakeAwaitable()
+
+    def fake_create_task(task: object):
+        captured["task"] = task
+        return SimpleNamespace()
+
+    def fake_save_workspace_note(
+        title: str,
+        content: str,
+        project_id: str,
+        target_dir: str,
+    ):
+        captured["note"] = {
+            "title": title,
+            "content": content,
+            "project_id": project_id,
+            "target_dir": target_dir,
+        }
+        return {"path": "knowledge/faq/FAQ.md", "size": 12}
+
+    monkeypatch.setattr(knowledge_routes, "save_workspace_note", fake_save_workspace_note)
+    monkeypatch.setattr(knowledge_routes, "_background_reindex", fake_background_reindex)
+    monkeypatch.setattr(knowledge_routes.asyncio, "create_task", fake_create_task)
+
+    payload = knowledge_routes.KnowledgeNoteCreateRequest(
+        title="FAQ",
+        content="## Q\n\nA",
+        project_id="default",
+        target_dir="faq",
+    )
+
+    response = asyncio.run(knowledge_routes.create_knowledge_note_route(payload))
+
+    assert captured["note"] == {
+        "title": "FAQ",
+        "content": "## Q\n\nA",
+        "project_id": "default",
+        "target_dir": "faq",
+    }
+    assert response["path"] == "knowledge/faq/FAQ.md"
+    assert captured["reindex_project_id"] == "default"
+    assert "task" in captured

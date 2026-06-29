@@ -89,6 +89,46 @@ def test_manual_note_writes_manual_meta(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert payload["knowledge/notes/我的筆記.md"]["source_type"] == "manual"
 
 
+def test_manual_note_can_target_knowledge_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    document = knowledge_admin.save_workspace_note(
+        "常見問題",
+        "這是一段筆記",
+        target_dir="faq/customer",
+    )
+
+    assert document["path"] == "knowledge/faq/customer/常見問題.md"
+    assert document["source_type"] == "manual"
+    assert (root / "knowledge" / "faq" / "customer" / "常見問題.md").exists()
+
+    payload = json.loads((root / ".doc_meta.json").read_text(encoding="utf-8"))
+    assert payload["knowledge/faq/customer/常見問題.md"]["source_type"] == "manual"
+
+
+@pytest.mark.parametrize("target_dir", ["../outside", "/absolute"])
+def test_manual_note_rejects_invalid_target_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    target_dir: str,
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    with pytest.raises(ValueError, match="target_dir"):
+        knowledge_admin.save_workspace_note("常見問題", "這是一段筆記", target_dir=target_dir)
+
+
 def test_uploaded_html_document_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     _configure_workspace(monkeypatch, tmp_path)
     _stub_knowledge_admin_deps(monkeypatch)

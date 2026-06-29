@@ -12,19 +12,37 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import asyncio
+from collections.abc import Iterator
 from graphify.analyze import god_nodes, surprising_connections
 from graphify.build import build_from_json
 from graphify.cluster import cluster, score_all
 from graphify.detect import detect
 from graphify.export import to_canvas, to_html, to_json, to_obsidian
 from graphify.extract import collect_files, extract as ast_extract
+from infra.datetime_utils import ensure_utc
 from infra.db import get_db
-from knowledge.graph_extractor import extract_semantic
+from infra.pipeline import CheckpointStore, run_pipeline, PipelineConfig
+from infra.project_context import resolve_project_context
+from knowledge.graph_extractor import (
+    postprocess_fragments,
+    _extract_one_file,
+    LLM_CONCURRENCY,
+    _relative,
+)
 from knowledge.workspace import ensure_workspace_scaffold, get_workspace_root
+
 
 GRAPH_SUBDIR = "graphify-out"
 MAX_HTML_NODES = 5000
 STATUS_FILENAME = "status.json"
+
+# A "building" status older than this is treated as orphaned: the background
+# rebuild task was lost (e.g. the process restarted mid-build) before it could
+# write a terminal status, leaving status.json stuck. Without this the frontend
+# polls "building" forever. Generous enough to cover a full reindex + LLM
+# extraction on a large project.
+STALE_BUILDING_SECONDS = 30 * 60
 
 
 def _now_iso() -> str:
@@ -40,11 +58,42 @@ def _write_status(project_id: str, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _parse_iso(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return ensure_utc(datetime.fromisoformat(value))
+    except ValueError:
+        return None
+
+
+def _demote_if_stale(status: dict[str, Any]) -> dict[str, Any]:
+    """Surface an orphaned 'building' status as 'failed' so callers stop waiting.
+
+    Does not rewrite status.json: the next rebuild overwrites it, and leaving the
+    file untouched keeps this read-only loader free of side effects.
+    """
+    if status.get("state") != "building":
+        return status
+    started = _parse_iso(status.get("started_at"))
+    if started is None:
+        return status
+    age = (datetime.now(timezone.utc) - started).total_seconds()
+    if age <= STALE_BUILDING_SECONDS:
+        return status
+    return {
+        **status,
+        "state": "failed",
+        "stale": True,
+        "error": "圖譜建置逾時未完成（背景任務可能已中斷），請重新建置。",
+    }
+
+
 def load_project_status(project_id: str = "default") -> dict[str, Any]:
     path = _status_path(project_id)
     if not path.exists():
         return {"state": "absent", "project_id": project_id}
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _demote_if_stale(json.loads(path.read_text(encoding="utf-8")))
 
 
 class EmptyGraphError(RuntimeError):
@@ -151,7 +200,114 @@ def _build_note_graph_table(
     return len(rows)
 
 
+def _graph_checkpoint_path(project_id: str) -> Path:
+    return resolve_project_context(project_id).project_root / "graph_index_state.json"
+
+
+def _fragment_cache_path(project_id: str, rel_path: str) -> Path:
+    safe_name = rel_path.replace("/", "_") + ".json"
+    return _graph_dir(project_id) / "fragments" / safe_name
+
+
+class _GraphItemSource:
+    def __init__(self, project_id: str, store: CheckpointStore) -> None:
+        self.project_id = project_id
+        self.store = store
+        self.workspace_root = get_workspace_root(project_id)
+        self.knowledge_dir = self.workspace_root / "knowledge"
+
+    def pending(self) -> Iterator[Path]:
+        if not self.knowledge_dir.exists():
+            return
+        detection = detect(self.knowledge_dir)
+        doc_paths = sorted([
+            Path(f)
+            for kind in ("document", "paper")
+            for f in detection.get("files", {}).get(kind, [])
+        ])
+        from knowledge.indexer import fingerprint_document
+
+        done = self.store.load()
+        for path in doc_paths:
+            rel = _relative(path, self.workspace_root)
+            fp = fingerprint_document(path)
+            if done.get(rel) != fp:
+                yield path
+
+
+class _GraphWorker:
+    def __init__(self, workspace_root: Path, llm_sem: asyncio.Semaphore) -> None:
+        self.workspace_root = workspace_root
+        self.llm_sem = llm_sem
+
+    async def process_batch(self, items: list[Path]) -> list[tuple[Path, dict[str, Any]]]:
+        async def _extract_task(path: Path) -> tuple[Path, dict[str, Any]]:
+            async with self.llm_sem:
+                frag = await asyncio.to_thread(_extract_one_file, path, self.workspace_root)
+                return path, frag
+
+        return await asyncio.gather(*(_extract_task(p) for p in items))
+
+
+class _GraphSink:
+    def __init__(self, project_id: str, store: CheckpointStore) -> None:
+        self.project_id = project_id
+        self.store = store
+        self.workspace_root = get_workspace_root(project_id)
+        self.fragments_dir = _graph_dir(project_id) / "fragments"
+        self.fragments_dir.mkdir(parents=True, exist_ok=True)
+
+    def flush(self, results: list[tuple[Path, dict[str, Any]]]) -> None:
+        for path, frag in results:
+            rel = _relative(path, self.workspace_root)
+            cache_file = _fragment_cache_path(self.project_id, rel)
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            cache_file.write_text(
+                json.dumps(frag, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+
+    def commit_checkpoint(self, done_items: list[Path]) -> None:
+        from knowledge.indexer import fingerprint_document
+
+        done = {}
+        for path in done_items:
+            rel = _relative(path, self.workspace_root)
+            fp = fingerprint_document(path)
+            done[rel] = fp
+        self.store.commit(done)
+
+    def collected_fragments(self, doc_paths: list[Path]) -> dict[str, Any]:
+        """Aggregate every doc's cached fragment.
+
+        Reads from the fragment cache (not ``self.collected``) on purpose: the
+        pipeline only re-extracts changed docs, so unchanged docs skipped this
+        run are absent from ``self.collected`` but still belong in the graph.
+        ``doc_paths`` is passed in by the caller, which already ran ``detect``.
+        """
+        nodes = []
+        edges = []
+        hyperedges = []
+
+        for path in doc_paths:
+            rel = _relative(path, self.workspace_root)
+            cache_file = _fragment_cache_path(self.project_id, rel)
+            if cache_file.exists():
+                try:
+                    frag = json.loads(cache_file.read_text(encoding="utf-8"))
+                    nodes.extend(frag.get("nodes", []))
+                    edges.extend(frag.get("edges", []))
+                    hyperedges.extend(frag.get("hyperedges", []))
+                except Exception:
+                    pass
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "hyperedges": hyperedges,
+        }
+
+
 def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
+
     """Rebuild the knowledge graph for a project.
 
     Reads the project's workspace ``knowledge/`` directory, runs AST extraction
@@ -165,18 +321,42 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
         raise FileNotFoundError(f"workspace knowledge/ 不存在: {knowledge_dir}")
 
     detection = detect(knowledge_dir)
-    code_paths = [Path(f) for f in detection.get("files", {}).get("code", [])]
-    doc_paths = [
+    code_paths = sorted([Path(f) for f in detection.get("files", {}).get("code", [])])
+    doc_paths = sorted([
         Path(f)
         for kind in ("document", "paper")
         for f in detection.get("files", {}).get(kind, [])
-    ]
+    ])
     # Only knowledge-base content feeds the concept graph. Dream reports and the
     # memories DB are deliberately excluded — they produced noisy, out-of-place
     # nodes. Memories that matter should be saved into knowledge/ to appear here.
 
     ast_fragment = _run_ast_extraction(code_paths)
-    semantic_fragment = extract_semantic(doc_paths, workspace_root)
+
+    store = CheckpointStore(_graph_checkpoint_path(project_id))
+    stale_keys = store.prune({_relative(p, workspace_root) for p in doc_paths})
+    for key in stale_keys:
+        cache_file = _fragment_cache_path(project_id, key)
+        if cache_file.exists():
+            try:
+                cache_file.unlink()
+            except OSError:
+                pass
+
+    llm_sem = asyncio.Semaphore(LLM_CONCURRENCY)
+    source = _GraphItemSource(project_id, store)
+    worker = _GraphWorker(workspace_root, llm_sem)
+    sink = _GraphSink(project_id, store)
+
+    asyncio.run(run_pipeline(source, worker, sink, PipelineConfig(batch_size=5, concurrency=3)))
+    fragments = sink.collected_fragments(doc_paths)
+
+    semantic_fragment = postprocess_fragments(
+        fragments.get("nodes", []),
+        fragments.get("edges", []),
+        doc_paths,
+        workspace_root,
+    )
 
     seen_ids = {n["id"] for n in ast_fragment.get("nodes", [])}
     merged_nodes = list(ast_fragment.get("nodes", []))

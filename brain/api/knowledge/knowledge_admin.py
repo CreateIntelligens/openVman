@@ -236,8 +236,24 @@ def save_uploaded_artifact(
     }
 
 
-def save_workspace_note(title: str, content: str, project_id: str = "default") -> dict[str, Any]:
-    """Create a manual note under knowledge/notes."""
+def _resolve_note_parent(target_dir: str) -> Path:
+    cleaned = target_dir.strip()
+    if not cleaned:
+        return Path("knowledge") / "notes"
+
+    relative = Path(cleaned)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("target_dir 必須是 knowledge 內的相對路徑")
+    return Path("knowledge") / relative
+
+
+def save_workspace_note(
+    title: str,
+    content: str,
+    project_id: str = "default",
+    target_dir: str = "",
+) -> dict[str, Any]:
+    """Create a manual note under the default notes directory or target directory."""
     cleaned_title = title.strip()
     cleaned_content = content.strip()
     if not cleaned_title:
@@ -251,7 +267,7 @@ def save_workspace_note(title: str, content: str, project_id: str = "default") -
     if not filename.lower().endswith(".md"):
         filename = f"{filename}.md"
 
-    relative_path = Path("knowledge") / "notes" / filename
+    relative_path = _resolve_note_parent(target_dir) / filename
     path = resolve_workspace_document(relative_path.as_posix(), project_id)
     if path.exists():
         raise ValueError("文件已存在")

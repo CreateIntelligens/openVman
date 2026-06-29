@@ -183,6 +183,29 @@ def _norm_label(label: str) -> str:
     return unicodedata.normalize("NFKC", label).strip().lower()
 
 
+_HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
+
+
+def _uncovered_headings(source_text: str, node_labels: list[str]) -> list[str]:
+    """Return heading texts not represented by any extracted node label.
+
+    A heading counts as covered if its normalized text is a substring of any
+    normalized node label (so '黑毛' is covered by a '黑毛魚' node). Drives the
+    extraction round loop to re-extract sections a weak model skipped.
+    """
+    headings = [m.group(1).strip() for m in _HEADING_RE.finditer(source_text)]
+    norm_labels = [_norm_label(lbl) for lbl in node_labels]
+    missing: list[str] = []
+    for h in headings:
+        nh = _norm_label(h)
+        if not nh:
+            continue
+        if not any(nh in nl for nl in norm_labels):
+            missing.append(h)
+    return missing
+
+
+
 def _chunk(seq: list[_T], size: int) -> list[list[_T]]:
     return [seq[i : i + size] for i in range(0, len(seq), size)]
 
@@ -274,7 +297,22 @@ def _validate_chunk(frag: dict[str, Any], chunk: list[_Source], workspace_root: 
                 f"ID_COLLISION: id '{nid}' used for both '{by_id[nid]}' and '{lbl}'."
             )
         by_id[nid] = lbl
+
+    # 覆蓋率:每個來源檔的 heading 都應有對應節點,否則回灌 feedback 再抽一輪。
+    labels_by_source: dict[str, list[str]] = {}
+    for n in nodes:
+        labels_by_source.setdefault(n.get("source_file", ""), []).append(n.get("label", ""))
+    for s in _unique_paths(chunk):
+        rel = _relative(s.path, workspace_root)
+        source_text = "\n".join(seg.text for seg in chunk if seg.path == s.path)
+        missing = _uncovered_headings(source_text, labels_by_source.get(rel, []))
+        if missing:
+            issues.append(
+                "MISSING_HEADING_COVERAGE: 以下章節尚無對應節點,請為每個補上節點: "
+                + ", ".join(missing)
+            )
     return issues
+
 
 
 def _clamp_file_types(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -554,6 +592,45 @@ def _link_wikilinks(
     return edges
 
 
+def postprocess_fragments(
+    all_nodes: list[dict[str, Any]],
+    all_edges: list[dict[str, Any]],
+    files: list[Path],
+    workspace_root: Path,
+) -> dict[str, Any]:
+    """Canonicalize + link + dedup raw extracted nodes/edges into a fragment.
+
+    Shared by :func:`extract_semantic` (in-process chunking) and the pipelined
+    graph rebuild (fragments read back from cache), so the two paths can never
+    drift on how raw extraction output is turned into the final graph.
+    """
+    all_nodes = _clamp_file_types(all_nodes)
+    nodes, edges = _canonicalize_by_label(all_nodes, all_edges)
+    nodes, edges, groups = _resolve_synonyms(nodes, edges)
+    # Global linking pass: connect cross-topic concepts the per-chunk extraction
+    # never compared. Runs on canonical ids so endpoints resolve correctly.
+    global_edges = _link_global(nodes)
+    # Explicit Obsidian wikilinks: author-declared edges (EXTRACTED, 1.0).
+    # Placed before LLM/global edges in the dedup input so the deterministic
+    # high-confidence edge wins over any LLM-inferred duplicate of the same pair.
+    wikilink_edges = _link_wikilinks(nodes, files, workspace_root)
+    edges = _dedup_edges(wikilink_edges + edges + global_edges)
+    edges, dropped = _drop_dangling(edges, nodes)
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "hyperedges": [],
+        "_harness": {
+            "chunks": [],
+            "merged_synonym_groups": groups,
+            "global_link_edges": len(global_edges),
+            "wikilink_edges": len(wikilink_edges),
+            "dropped_dangling": dropped,
+        },
+    }
+
+
 def extract_semantic(
     files: list[Path],
     workspace_root: Path,
@@ -588,28 +665,33 @@ def extract_semantic(
         all_nodes.extend(frag.get("nodes", []))
         all_edges.extend(frag.get("edges", []))
 
-    all_nodes = _clamp_file_types(all_nodes)
-    nodes, edges = _canonicalize_by_label(all_nodes, all_edges)
-    nodes, edges, groups = _resolve_synonyms(nodes, edges)
-    # Global linking pass: connect cross-topic concepts the per-chunk extraction
-    # never compared. Runs on canonical ids so endpoints resolve correctly.
-    global_edges = _link_global(nodes)
-    # Explicit Obsidian wikilinks: author-declared edges (EXTRACTED, 1.0).
-    # Placed before LLM/global edges in the dedup input so the deterministic
-    # high-confidence edge wins over any LLM-inferred duplicate of the same pair.
-    wikilink_edges = _link_wikilinks(nodes, files, workspace_root)
-    edges = _dedup_edges(wikilink_edges + edges + global_edges)
-    edges, dropped = _drop_dangling(edges, nodes)
+    fragment = postprocess_fragments(all_nodes, all_edges, files, workspace_root)
+    fragment["_harness"]["chunks"] = chunks_report
+    return fragment
 
+
+LLM_CONCURRENCY = 5
+
+
+def _extract_one_file(
+    path: Path,
+    workspace_root: Path,
+    max_rounds: int = DEFAULT_MAX_ROUNDS,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> dict[str, Any]:
+    """Extract a knowledge graph fragment from a single file."""
+    sources = _build_sources([path])
+    nodes = []
+    edges = []
+    hyperedges = []
+    for chunk in _chunk(sources, chunk_size):
+        frag, _ = _extract_chunk_with_harness(chunk, workspace_root, max_rounds)
+        nodes.extend(frag.get("nodes", []))
+        edges.extend(frag.get("edges", []))
+        hyperedges.extend(frag.get("hyperedges", []))
     return {
         "nodes": nodes,
         "edges": edges,
-        "hyperedges": [],
-        "_harness": {
-            "chunks": chunks_report,
-            "merged_synonym_groups": groups,
-            "global_link_edges": len(global_edges),
-            "wikilink_edges": len(wikilink_edges),
-            "dropped_dangling": dropped,
-        },
+        "hyperedges": hyperedges,
     }
+

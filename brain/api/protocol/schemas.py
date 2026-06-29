@@ -112,6 +112,7 @@ class KnowledgeNoteCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, description="Note title")
     content: str = Field(..., min_length=1, description="Note content")
     project_id: str = "default"
+    target_dir: str = ""
 
     @field_validator("title", "content")
     @classmethod

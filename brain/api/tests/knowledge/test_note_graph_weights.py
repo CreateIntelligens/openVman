@@ -19,6 +19,21 @@ if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
 
+@pytest.fixture(autouse=True)
+def _restore_graph_modules():
+    """Undo this file's stub-and-reimport of knowledge.graph.
+
+    ``_load_graph`` reimports knowledge.graph with knowledge.graph_extractor
+    stubbed to no-op lambdas. monkeypatch restores graph_extractor, but the
+    freshly imported knowledge.graph stays in sys.modules bound to those stubs,
+    poisoning later tests (e.g. _GraphWorker._extract_one_file becomes a no-op).
+    Drop both after each test so the next importer gets the real modules.
+    """
+    yield
+    for name in ("knowledge.graph", "knowledge.graph_extractor"):
+        sys.modules.pop(name, None)
+
+
 class _CapturingDB:
     def __init__(self):
         self.tables: dict[str, list[dict]] = {}
@@ -37,7 +52,12 @@ def _load_graph(monkeypatch, db: _CapturingDB):
         "graphify.detect": ["detect"],
         "graphify.export": ["to_canvas", "to_html", "to_json", "to_obsidian"],
         "graphify.extract": ["collect_files", "extract"],
-        "knowledge.graph_extractor": ["extract_semantic"],
+        "knowledge.graph_extractor": [
+            "postprocess_fragments",
+            "_extract_one_file",
+            "LLM_CONCURRENCY",
+            "_relative",
+        ],
     }
     for mod, names in stub_symbols.items():
         stub = types.ModuleType(mod)
