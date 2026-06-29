@@ -12,7 +12,7 @@ def _search_one(
     top_k: int,
     persona_id: str,
     project_id: str,
-) -> tuple[list[dict[str, Any]], str]:
+) -> tuple[list[dict[str, Any]], str, list[float]]:
     from memory.embedder import encode_query_with_fallback
     from memory.retrieval import search_records
 
@@ -30,7 +30,7 @@ def _search_one(
         project_id=project_id,
         embedding_version=embedding_route.version,
     )
-    return results, embedding_route.version
+    return results, embedding_route.version, embedding_route.vector
 
 def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 1. Prepare queries: deduplicated list starting with explicit queries, falling back to user message
@@ -47,11 +47,14 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 2. Execute searches and collect unique embedding versions
     grouped: list[tuple[str, list[dict[str, Any]]]] = []
     embedding_versions: set[str] = set()
+    primary_vector: list[float] | None = None
     for query in queries:
         try:
-            records, version = _search_one(table_name, query, top_k, persona_id, project_id)
+            records, version, vector = _search_one(table_name, query, top_k, persona_id, project_id)
             grouped.append((query, records))
             embedding_versions.add(version)
+            if primary_vector is None:
+                primary_vector = vector
         except Exception as exc:
             logger.warning("search_one failed table=%s query=%r err=%s", table_name, query[:60], exc)
 
@@ -60,9 +63,11 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 3. Graph RAG: pull in chunks from files one hop away in the concept graph,
     #    so related concepts the query didn't lexically match still reach the LLM.
     #    Only for the knowledge table (note_graph is built from knowledge docs).
+    #    The primary query vector ranks each neighbour's chunks so the most
+    #    relevant segment surfaces, not the file's opening.
     related: list[dict[str, Any]] = []
     if table_name == "knowledge":
-        related = _expand_via_graph(merged, project_id)
+        related = _expand_via_graph(merged, project_id, primary_vector)
 
     return {
         "table": table_name,
@@ -74,17 +79,25 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _fetch_chunks_by_file(file_path: str, limit: int, project_id: str) -> list[dict[str, Any]]:
+def _fetch_chunks_by_file(
+    file_path: str,
+    limit: int,
+    project_id: str,
+    query_vector: list[float] | None = None,
+) -> list[dict[str, Any]]:
     """Fetch up to *limit* knowledge chunks belonging to a workspace file.
 
-    Promotes ``path``/``title`` out of metadata so the records match the shape
-    of vector-search hits (needed by ``build_citations``).
+    When *query_vector* is given, chunks are ranked by vector similarity to the
+    query so the neighbour file's most relevant segments surface — not blindly
+    its opening segments. Promotes ``path``/``title`` out of metadata so the
+    records match the shape of vector-search hits (needed by ``build_citations``).
     """
     from infra.db import get_knowledge_table, parse_record_metadata
 
     table = get_knowledge_table(project_id)
     safe = file_path.replace("'", "''")
-    rows = table.search().where(f"metadata LIKE '%{safe}%'").limit(limit).to_list()
+    search = table.search(query_vector) if query_vector is not None else table.search()
+    rows = search.where(f"metadata LIKE '%{safe}%'").limit(limit).to_list()
 
     records: list[dict[str, Any]] = []
     for row in rows:
@@ -98,11 +111,15 @@ def _fetch_chunks_by_file(file_path: str, limit: int, project_id: str) -> list[d
     return records
 
 
-def _expand_via_graph(hits: list[dict[str, Any]], project_id: str) -> list[dict[str, Any]]:
+def _expand_via_graph(
+    hits: list[dict[str, Any]],
+    project_id: str,
+    query_vector: list[float] | None = None,
+) -> list[dict[str, Any]]:
     from knowledge.graph_rag import expand_with_graph
 
     def fetch_project_chunks(file_path: str, limit: int) -> list[dict[str, Any]]:
-        return _fetch_chunks_by_file(file_path, limit, project_id)
+        return _fetch_chunks_by_file(file_path, limit, project_id, query_vector)
 
     try:
         return expand_with_graph(hits, project_id, fetch_project_chunks)
