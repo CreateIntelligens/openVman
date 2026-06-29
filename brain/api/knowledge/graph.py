@@ -86,6 +86,32 @@ def _origin_for_source(source_file: str) -> str:
     return "knowledge"
 
 
+def _primary_relation(relations: set[str]) -> str:
+    """Pick the relation that should drive ranking. ``references`` (user-written
+    wikilinks) outranks LLM-inferred relations."""
+    if "references" in relations:
+        return "references"
+    return sorted(relations)[0] if relations else "related_to"
+
+
+def _note_graph_row(
+    src: str,
+    neighbours: dict[str, set[str]],
+    neighbour_scores: dict[str, float],
+) -> dict[str, Any]:
+    """One adjacency row with weight arrays aligned to ``related_files`` order."""
+    related = sorted(neighbours)
+    return {
+        "source_file": src,
+        "related_files": related,
+        "relations": sorted(
+            relation for rels in neighbours.values() for relation in rels
+        ),
+        "neighbour_relations": [_primary_relation(neighbours[f]) for f in related],
+        "neighbour_confidence": [neighbour_scores.get(f, 0.0) for f in related],
+    }
+
+
 def _build_note_graph_table(
     merged: dict[str, Any], project_id: str
 ) -> int:
@@ -102,27 +128,21 @@ def _build_note_graph_table(
     id_to_files = {node["id"]: _source_files_for_node(node) for node in merged.get("nodes", [])}
     # file -> {neighbour_file -> set(relations)}
     adjacency: dict[str, dict[str, set[str]]] = {}
+    # file -> {neighbour_file -> max confidence_score} (Graph RAG ranks on this)
+    confidence: dict[str, dict[str, float]] = {}
     for e in merged.get("edges", []):
         rel = e.get("relation", "related_to")
+        score = float(e.get("confidence_score", 0.0) or 0.0)
         for src_file in id_to_files.get(e.get("source"), []):
             for tgt_file in id_to_files.get(e.get("target"), []):
                 if not src_file or not tgt_file or src_file == tgt_file:
                     continue
-                adjacency.setdefault(src_file, {}).setdefault(tgt_file, set()).add(rel)
-                adjacency.setdefault(tgt_file, {}).setdefault(src_file, set()).add(rel)
+                for a, b in ((src_file, tgt_file), (tgt_file, src_file)):
+                    adjacency.setdefault(a, {}).setdefault(b, set()).add(rel)
+                    prev = confidence.setdefault(a, {}).get(b, 0.0)
+                    confidence[a][b] = max(prev, score)
 
-    rows = [
-        {
-            "source_file": src,
-            "related_files": sorted(neighbours),
-            "relations": sorted(
-                relation
-                for neighbour_relations in neighbours.values()
-                for relation in neighbour_relations
-            ),
-        }
-        for src, neighbours in adjacency.items()
-    ]
+    rows = [_note_graph_row(src, neighbours, confidence[src]) for src, neighbours in adjacency.items()]
     if not rows:
         return 0
 
