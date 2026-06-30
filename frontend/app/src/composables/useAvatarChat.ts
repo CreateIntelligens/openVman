@@ -94,12 +94,14 @@ export function useAvatarChat(options: ChatOptions = {}) {
        let currentMode: 'live' | 'text' = options.mode ?? 'live'
        // AbortController for in-flight text-mode fetch
        let textAbortController: AbortController | null = null
+       let textRequestId = 0
        // 視覺管道每秒一幀；後端兩段 LLM 可能超過 1 秒。此旗標在前一幀
        // 仍在處理時丟棄新幀，避免堆疊請求（與後端 VLM busy 保護同精神）。
        let visionInFlight = false
        // Buffer of text chunks for the in-flight LLM utterance. Flushed to
        // `onUtteranceComplete` when `is_final=true` arrives (or on interrupt).
        let utteranceBuffer = ''
+       let responsePlaybackActive = false
 
        // ── Build client_init payload ──────────────────────────
        function _buildClientInit(): Record<string, unknown> {
@@ -213,6 +215,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
                      case 'server_stream_chunk': {
                             state.value = 'SPEAKING'
+                            responsePlaybackActive = true
                             if (data.audio_base64) {
                                    const bin = atob(data.audio_base64 as string)
                                    const bytes = new Uint8Array(bin.length)
@@ -234,6 +237,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
                      case 'server_stop_audio':
                             options.onStopAudio?.()
+                            responsePlaybackActive = false
                             state.value = 'IDLE'
                             break
 
@@ -264,26 +268,31 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Send user message ──────────────────────────────────
        function sendMessage(text: string): void {
+               const trimmed = text.trim()
+               if (!trimmed) return
+
+               stopActiveResponse()
+
                if (currentMode === 'text') {
-                      void _sendMessageText(text)
+                      void _sendMessageText(trimmed)
                       return
                }
 
                if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
 
-               utteranceBuffer = ''
-               messages.value.push({ role: 'user', text, timestamp: Date.now() })
+               messages.value.push({ role: 'user', text: trimmed, timestamp: Date.now() })
                state.value = 'THINKING'
                sendEvent({
                       event: 'user_speak',
-                      text,
+                      text: trimmed,
                       timestamp: Date.now(),
                })
        }
 
        async function _sendMessageText(text: string): Promise<void> {
-               textAbortController?.abort()
-               textAbortController = new AbortController()
+               const requestId = ++textRequestId
+               const abort = new AbortController()
+               textAbortController = abort
 
                messages.value.push({ role: 'user', text, timestamp: Date.now() })
                state.value = 'THINKING'
@@ -298,8 +307,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                                     project_id: currentProjectId,
                                     session_id: sessionId.value,
                              }),
-                             signal: textAbortController.signal,
+                             signal: abort.signal,
                       })
+
+                      if (requestId !== textRequestId || abort.signal.aborted) return
 
                       if (!res.ok) {
                              const err = await res.json().catch(() => ({}))
@@ -310,9 +321,11 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       }
 
                       const data = await res.json() as { reply: string; session_id: string }
+                      if (requestId !== textRequestId || abort.signal.aborted) return
                       if (data.session_id) sessionId.value = data.session_id
                       state.value = 'IDLE'
                       if (data.reply?.trim()) {
+                             responsePlaybackActive = true
                              options.onUtteranceComplete?.(data.reply)
                       }
                } catch (err) {
@@ -321,7 +334,9 @@ export function useAvatarChat(options: ChatOptions = {}) {
                              state.value = 'ERROR'
                       }
                } finally {
-                      textAbortController = null
+                      if (textAbortController === abort) {
+                             textAbortController = null
+                      }
                }
        }
 
@@ -372,6 +387,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      const data = await res.json() as { reply?: string; session_id?: string }
                      if (data.session_id) sessionId.value = data.session_id
                      if (data.reply?.trim()) {
+                            responsePlaybackActive = true
                             options.onUtteranceComplete?.(data.reply)
                      }
               } catch (err) {
@@ -384,19 +400,41 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Interrupt ──────────────────────────────────────────
        function interrupt(): void {
+               stopActiveResponse()
+               state.value = 'IDLE'
+       }
+
+       function stopActiveResponse(): void {
+               const shouldStopLocal =
+                      responsePlaybackActive
+                      || Boolean(textAbortController)
+                      || state.value === 'THINKING'
+                      || state.value === 'SPEAKING'
+                      || utteranceBuffer.length > 0
+
+               utteranceBuffer = ''
+               responsePlaybackActive = false
+               if (shouldStopLocal) options.onStopAudio?.()
+
                if (currentMode === 'text') {
+                      textRequestId += 1
                       textAbortController?.abort()
                       textAbortController = null
-                      state.value = 'IDLE'
                       return
                }
-               utteranceBuffer = ''
-               sendEvent({
-                      event: 'client_interrupt',
-                      partial_asr: '',
-                      timestamp: Date.now(),
-               })
-               options.onStopAudio?.()
+
+               if (
+                      socket
+                      && socket.readyState === WebSocket.OPEN
+                      && sessionId.value
+                      && (state.value === 'THINKING' || state.value === 'SPEAKING')
+               ) {
+                      sendEvent({
+                             event: 'client_interrupt',
+                             partial_asr: '',
+                             timestamp: Date.now(),
+                      })
+               }
        }
 
        // ── Low-level send ─────────────────────────────────────
@@ -412,6 +450,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Disconnect ─────────────────────────────────────────
        function disconnect(): void {
+               textRequestId += 1
                textAbortController?.abort()
                textAbortController = null
                if (reconnectTimer) clearTimeout(reconnectTimer)

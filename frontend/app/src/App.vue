@@ -324,9 +324,10 @@ const chat = useAvatarChat({
   onDisconnect: () => audio.flush(),
   onStopAudio: () => {
     ttsStreamer.cancel();
-    audio.resetSchedule();
+    audio.flush();
     wasm.clearAudio();
     typewriter.flush();
+    pendingText = "";
     isTyping.value = false;
     clearUnderrunTimer();
     isFinalReceived = false;

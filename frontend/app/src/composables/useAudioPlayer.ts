@@ -23,6 +23,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
 
        let audioCtx: AudioContext | null = null
        let nextStartTime = 0
+       let playbackGeneration = 0
        const liveSources = new Set<AudioBufferSourceNode>()
 
        function ensureContext(): AudioContext {
@@ -43,8 +44,10 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
         * @param data  Raw PCM bytes (Int16, 16 kHz mono) or base64 string
         */
        async function playChunk(data: ArrayBuffer | string): Promise<void> {
+              const generation = playbackGeneration
               const ctx = ensureContext()
               if (ctx.state === 'suspended') await ctx.resume()
+              if (generation !== playbackGeneration || audioCtx !== ctx) return
 
               try {
                      // Decode input to Int16Array
@@ -100,6 +103,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
 
        /** Stop all audio and reset scheduling */
        function stopAll(): void {
+              playbackGeneration += 1
               if (audioCtx) {
                      audioCtx.close()
                      audioCtx = null
@@ -116,6 +120,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
 
        /** Stop scheduled sources and reset playback state, keeping context alive */
        function flush(): void {
+              playbackGeneration += 1
               for (const source of liveSources) {
                      try {
                             source.onended = null
