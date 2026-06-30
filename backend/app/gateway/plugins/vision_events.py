@@ -28,7 +28,10 @@ EVENT_DEFINITIONS: list[EventDefinition] = [
     EventDefinition(
         key="person",
         name="person_appeared",
-        question="畫面中是否有人？",
+        question=(
+            "畫面中是否有一個人正面朝向鏡頭、看得到臉部？"
+            "（只拍到背影、側臉、或僅手腳、身體局部而看不到正面臉部，算否）"
+        ),
         context_text="[視覺事件] 畫面中出現一位訪客。",
     ),
     EventDefinition(
