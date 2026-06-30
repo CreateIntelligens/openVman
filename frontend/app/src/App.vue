@@ -1,14 +1,17 @@
 <template>
   <div class="app-shell">
     <main class="kiosk-layout">
-      <section class="stage-panel">
-        <div class="stage-hero">
-          <h1>openVman 虛擬人</h1>
-          <p class="stage-panel__intro">
-            虛擬人控制台，可在此與虛擬人即時互動。
-          </p>
-        </div>
+      <ControlBar
+        class="control-area"
+        :state="chat.state.value"
+        :disabled="!wasm.isReady.value || wasm.isLoading.value"
+        :error-message="wasm.error.value"
+        :camera-active="webcam.active.value"
+        @open-settings="showSettings = true"
+        @toggle-camera="handleToggleCamera"
+      />
 
+      <section class="stage-panel">
         <div class="stage-card">
           <div class="stage-frame">
             <AvatarCanvas
@@ -28,27 +31,17 @@
         </div>
       </section>
 
-      <aside class="console-column">
-        <ControlBar
-          :state="chat.state.value"
-          :disabled="!wasm.isReady.value || wasm.isLoading.value"
-          :error-message="wasm.error.value"
-          :camera-active="webcam.active.value"
-          @open-settings="showSettings = true"
-          @toggle-camera="handleToggleCamera"
-        />
-
-        <ChatPanel
-          :messages="chat.messages.value"
-          :disabled="!wasm.isReady.value || wasm.isLoading.value || chat.state.value === 'CONNECTING'"
-          :placeholder="chatPlaceholder"
-          :is-thinking="chat.state.value === 'THINKING'"
-          :is-typing="isTyping"
-          :asr-listening="asr.isListening.value"
-          @send="handleSend"
-          @asr-toggle="handleAsrToggle"
-        />
-      </aside>
+      <ChatPanel
+        class="chat-area"
+        :messages="chat.messages.value"
+        :disabled="!wasm.isReady.value || wasm.isLoading.value || chat.state.value === 'CONNECTING'"
+        :placeholder="chatPlaceholder"
+        :is-thinking="chat.state.value === 'THINKING'"
+        :is-typing="isTyping"
+        :asr-listening="asr.isListening.value"
+        @send="handleSend"
+        @asr-toggle="handleAsrToggle"
+      />
     </main>
 
     <!-- Status toast notifications -->
@@ -581,7 +574,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-@media (max-width: 68.75rem) {
+@media (max-width: 48rem) {
   html, body, #app {
     height: auto;
     min-height: 100%;
@@ -606,31 +599,30 @@ body {
 .kiosk-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(24rem, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "stage controls"
+    "stage chat";
   gap: 1.5rem;
   flex: 1;
   min-height: 0;
 }
 
-.stage-panel,
-.console-column {
+.stage-panel {
+  grid-area: stage;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-.stage-hero h1 {
-  margin: 0 0 0.5rem;
-  font-size: 1.75rem;
-  line-height: 1.15;
-  font-weight: 600;
-  color: var(--text);
+.control-area {
+  grid-area: controls;
 }
 
-.stage-panel__intro {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.95rem;
+.chat-area {
+  grid-area: chat;
+  min-height: 0;
 }
 
 .stage-card {
@@ -654,10 +646,54 @@ body {
 
 @media (max-width: 68.75rem) {
   .app-shell {
+    height: 100dvh;
+    overflow: hidden;
+    padding: 1rem;
+  }
+
+  .kiosk-layout {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.875rem;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .control-area {
+    order: 1;
+    flex: none;
+  }
+
+  .stage-panel {
+    order: 2;
+    flex: 0 1 48%;
+    min-height: 0;
+    gap: 0.625rem;
+  }
+
+  .stage-card {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+  }
+
+  .chat-area {
+    order: 3;
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 48rem) {
+  .app-shell {
     height: auto;
     min-height: 100dvh;
     overflow: visible;
-    padding: 1rem;
   }
 
   .kiosk-layout {
@@ -666,20 +702,12 @@ body {
     flex-direction: column;
     gap: 0.875rem;
     min-height: auto;
+    overflow: visible;
   }
 
   .stage-panel {
     flex: none;
     gap: 0.625rem;
-  }
-
-  .stage-hero h1 {
-    margin-bottom: 0.25rem;
-    font-size: 1.2rem;
-  }
-
-  .stage-panel__intro {
-    font-size: 0.8rem;
   }
 
   .stage-card {
@@ -689,19 +717,21 @@ body {
     border-radius: 0.75rem;
   }
 
-  .console-column {
+  .chat-area {
     flex: none;
     min-height: 0;
     height: auto;
-    gap: 0.75rem;
+    overflow: visible;
   }
 }
 
 @media (max-width: 68.75rem) and (max-height: 36rem) {
-  .stage-panel__intro {
-    display: none;
+  .stage-panel {
+    flex-basis: 44%;
   }
+}
 
+@media (max-width: 48rem) and (max-height: 36rem) {
   .stage-card {
     height: clamp(14rem, 44svh, 22rem);
   }

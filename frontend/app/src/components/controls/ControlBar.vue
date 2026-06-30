@@ -1,8 +1,7 @@
 <template>
   <div class="control-bar">
     <div class="control-bar__left">
-      <p class="control-bar__eyebrow">Reception Console</p>
-      <h2>openVman 控制台</h2>
+      <h2>openVman console</h2>
     </div>
 
     <div class="control-bar__right">
@@ -96,15 +95,6 @@ const stateLabel = computed(() => {
 .control-bar__left {
   flex: 1;
   min-width: 0;
-}
-
-.control-bar__eyebrow {
-  margin: 0 0 0.2rem;
-  color: var(--text-soft);
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .control-bar h2 {

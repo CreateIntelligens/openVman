@@ -39,12 +39,15 @@ test("chat chrome does not shrink when messages grow", () => {
   );
 });
 
-test("mobile chat collapses when empty and caps the message viewport when populated", () => {
-  const mobileMarker = "@media (max-width: 40rem) {";
+test("stacked RWD chat caps the message viewport instead of growing the page", () => {
+  const mobileMarker = "@media (max-width: 48rem) {";
 
   assert.match(cssBlockAfter(mobileMarker, ".chat-panel"), /flex:\s*none;/);
   assert.match(cssBlockAfter(mobileMarker, ".chat-panel"), /height:\s*auto;/);
   assert.match(cssBlockAfter(mobileMarker, ".chat-messages"), /flex:\s*none;/);
   assert.match(cssBlockAfter(mobileMarker, ".chat-messages"), /max-height:\s*40svh;/);
-  assert.match(cssBlockAfter(mobileMarker, ".chat-messages:empty"), /padding-block:\s*0;/);
+  assert.match(
+    cssBlockAfter(mobileMarker, ".chat-messages:has(.chat-messages__content:empty)"),
+    /padding-block:\s*0;/,
+  );
 });

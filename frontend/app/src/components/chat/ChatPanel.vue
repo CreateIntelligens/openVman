@@ -327,7 +327,7 @@ useStickToBottom(messagesRef, contentRef)
   50% { opacity: 1; transform: scale(1.1); }
 }
 
-@media (max-width: 40rem) {
+@media (max-width: 48rem) {
   .chat-panel {
     flex: none;
     height: auto;
