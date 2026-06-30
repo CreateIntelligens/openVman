@@ -9,6 +9,7 @@
     </header>
 
     <div class="chat-messages" ref="messagesRef">
+      <div class="chat-messages__content" ref="contentRef">
       <div
         v-for="(msg, i) in messages"
         :key="i"
@@ -38,6 +39,7 @@
           <span class="dots"><span /><span /><span /></span>
         </div>
       </div>
+      </div>
     </div>
 
     <div class="chat-input-bar">
@@ -65,8 +67,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from "vue";
+import { ref } from "vue";
 import type { ChatMessage } from "../../composables/useAvatarChat";
+import { useStickToBottom } from "../../composables/useStickToBottom";
 import TypewriterText from "./TypewriterText.vue";
 import AsrButton from "./AsrButton.vue";
 
@@ -86,6 +89,7 @@ const emit = defineEmits<{
 
 const inputText = ref("")
 const messagesRef = ref<HTMLDivElement>()
+const contentRef = ref<HTMLDivElement>()
 const inputRef = ref<HTMLInputElement>()
 
 function handleSend(): void {
@@ -102,12 +106,7 @@ function formatTime(timestamp: number): string {
   })
 }
 
-watch(() => props.messages.length, async () => {
-  await nextTick()
-  if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
-  }
-})
+useStickToBottom(messagesRef, contentRef)
 </script>
 
 <style scoped>
@@ -167,6 +166,9 @@ watch(() => props.messages.length, async () => {
   min-height: 0;
   overflow-y: auto;
   padding: 1.25rem;
+}
+
+.chat-messages__content {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -336,7 +338,7 @@ watch(() => props.messages.length, async () => {
     max-height: 40svh;
   }
 
-  .chat-messages:empty {
+  .chat-messages:has(.chat-messages__content:empty) {
     padding-block: 0;
   }
 

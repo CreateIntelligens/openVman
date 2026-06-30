@@ -16,19 +16,21 @@
       </div>
 
       <div class="dialogue-strip" ref="messagesRef" aria-live="polite">
-        <p
-          v-for="(message, index) in chat.messages.value"
-          :key="index"
-          class="dialogue-line"
-          :class="message.role"
-        >
-          <span>{{ message.role === "user" ? "訪客" : "虛擬人" }}</span>
-          {{ message.text }}
-        </p>
-        <p v-if="chat.state.value === 'THINKING'" class="dialogue-line ai muted">
-          <span>虛擬人</span>
-          正在整理回覆
-        </p>
+        <div class="dialogue-strip__content" ref="contentRef">
+          <p
+            v-for="(message, index) in chat.messages.value"
+            :key="index"
+            class="dialogue-line"
+            :class="message.role"
+          >
+            <span>{{ message.role === "user" ? "訪客" : "虛擬人" }}</span>
+            {{ message.text }}
+          </p>
+          <p v-if="chat.state.value === 'THINKING'" class="dialogue-line ai muted">
+            <span>虛擬人</span>
+            正在整理回覆
+          </p>
+        </div>
       </div>
 
       <form class="composer" @submit.prevent="handleComposerSubmit">
@@ -47,13 +49,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
 import AvatarCanvas from "../components/avatar/AvatarCanvas.vue";
 import { useAudioPlayer } from "../composables/useAudioPlayer";
 import { useAvatarChat } from "../composables/useAvatarChat";
 import { useMatesX } from "../composables/useMatesX";
 import { useTtsStreamer } from "../composables/useTtsStreamer";
 import { useTypewriter } from "../composables/useTypewriter";
+import { useStickToBottom } from "../composables/useStickToBottom";
 
 type AuthState = "checking" | "authorized" | "unauthorized" | "forbidden";
 type VmanEnvelope = {
@@ -78,6 +81,7 @@ const isStarted = ref(false);
 const isTyping = ref(false);
 const shellRef = ref<HTMLElement | null>(null);
 const messagesRef = ref<HTMLElement | null>(null);
+const contentRef = ref<HTMLElement | null>(null);
 const hostOrigin = ref<string | null>(null);
 const handshakeReady = computed(() => hostOrigin.value !== null);
 const avatarReady = ref(false);
@@ -258,9 +262,10 @@ async function speakText(text: string): Promise<void> {
 
 function stopCurrentSpeech(): void {
   ttsStreamer.cancel();
-  audio.resetSchedule();
+  audio.flush();
   wasm.clearAudio();
   typewriter.flush();
+  pendingText = "";
   isTyping.value = false;
   postToHost("speaking", { state: "stop" });
 }
@@ -360,13 +365,8 @@ function reportResize(): void {
   });
 }
 
-watch(() => chat.messages.value.length, async () => {
-  await nextTick();
-  if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
-  }
-  reportResize();
-});
+// 內容變高時自動捲到底，並把高度回報給 host iframe（rAF-coalesced）。
+useStickToBottom(messagesRef, contentRef, { onResize: reportResize });
 
 onMounted(() => {
   window.addEventListener("message", handleHostMessage);
@@ -455,11 +455,14 @@ onUnmounted(() => {
   max-height: 9rem;
   overflow-y: auto;
   padding: 0.75rem;
+  border-top: 1px solid var(--embed-line);
+  background: var(--embed-panel);
+}
+
+.dialogue-strip__content {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  border-top: 1px solid var(--embed-line);
-  background: var(--embed-panel);
 }
 
 .dialogue-line {
