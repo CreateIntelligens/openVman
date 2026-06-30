@@ -1,10 +1,10 @@
 import base64
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.gateway.plugins.vision_events import EVENT_DEFINITION_BY_KEY
 from app.gateway.routes_vision import router
 
 app = FastAPI()
@@ -12,6 +12,7 @@ app.include_router(router)
 client = TestClient(app)
 
 _B64 = base64.b64encode(b"\xff\xd8\xff\xe0jpeg").decode()
+_FEMALE_CONTEXT = EVENT_DEFINITION_BY_KEY["female"].context_text
 
 
 def test_no_event_returns_empty_reply_and_skips_brain():
@@ -29,8 +30,8 @@ def test_fired_event_calls_brain_with_context_text():
     cam = MagicMock()
     cam.describe_frame = AsyncMock(return_value={
         "status": "processed",
-        "events": [{"key": "person", "name": "person_appeared",
-                    "context_text": "[視覺事件] 畫面中出現一位訪客。"}],
+        "events": [{"key": "female", "name": "female_appeared",
+                    "context_text": _FEMALE_CONTEXT}],
     })
     with patch("app.gateway.routes_vision.get_camera_plugin", return_value=cam):
         with patch("app.gateway.routes_vision._generate_reply",
@@ -38,19 +39,17 @@ def test_fired_event_calls_brain_with_context_text():
             resp = client.post("/api/vision/describe", json={"frame_base64": _B64})
     assert resp.json()["reply"] == "你好！"
     args = gen.await_args.args
-    assert "出現一位訪客" in args[1]
+    assert "美女" in args[1]
+    assert "不要詢問" in args[1]
 
 
 def test_generate_reply_uses_vision_text_session_id_when_none():
     """前端未傳 session_id 時，brain POST body 的 session_id 應為 "vision-text" 而非 None。"""
-    import httpx
-    from unittest.mock import AsyncMock as AM
-
     cam = MagicMock()
     cam.describe_frame = AsyncMock(return_value={
         "status": "processed",
-        "events": [{"key": "person", "name": "person_appeared",
-                    "context_text": "[視覺事件] 畫面中出現一位訪客。"}],
+        "events": [{"key": "female", "name": "female_appeared",
+                    "context_text": _FEMALE_CONTEXT}],
     })
 
     posted_bodies: list[dict] = []

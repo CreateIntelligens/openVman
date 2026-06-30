@@ -282,10 +282,10 @@ class TestVisionEventDetection:
         with patch.object(
             plugin, "_complete_vision",
             new_callable=AsyncMock,
-            return_value='{"person": true, "fire": false}',
+            return_value='{"female": true, "male": false, "fire": false}',
         ):
             result = await plugin._detect_events("b64", "image/jpeg")
-        assert result == {"person": True, "fire": False}
+        assert result == {"female": True, "male": False, "fire": False}
 
     @pytest.mark.asyncio
     async def test_detect_events_returns_empty_on_vlm_error(self, plugin):
@@ -298,19 +298,22 @@ class TestVisionEventDetection:
 
     @pytest.mark.asyncio
     async def test_describe_frame_fires_person_event_on_edge(self, plugin):
+        from app.gateway.plugins.vision_events import _CONFIRM_DEFAULT
+
         with patch.object(
             plugin, "_detect_events",
             new_callable=AsyncMock,
-            return_value={"person": True, "fire": False},
+            return_value={"female": True, "male": False, "fire": False},
         ):
-            # confirm_frames default 2 → first frame no event, second fires
-            r1 = await plugin.describe_frame(b"x", "image/jpeg", "sess-evt")
-            r2 = await plugin.describe_frame(b"x", "image/jpeg", "sess-evt")
+            results = [
+                await plugin.describe_frame(b"x", "image/jpeg", "sess-evt")
+                for _ in range(_CONFIRM_DEFAULT)
+            ]
 
-        assert r1["status"] == "processed"
-        assert r1["events"] == []
-        assert [e["key"] for e in r2["events"]] == ["person"]
-        assert r2["events"][0]["context_text"].startswith("[視覺事件]")
+        assert all(r["status"] == "processed" for r in results)
+        assert all(r["events"] == [] for r in results[:-1])
+        assert [e["key"] for e in results[-1]["events"]] == ["female"]
+        assert results[-1]["events"][0]["context_text"].startswith("[視覺")
 
     @pytest.mark.asyncio
     async def test_describe_frame_no_event_when_detection_empty(self, plugin):

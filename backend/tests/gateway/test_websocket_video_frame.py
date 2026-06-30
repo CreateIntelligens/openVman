@@ -7,10 +7,13 @@ from unittest.mock import ANY, AsyncMock
 import pytest
 
 from app.gateway import websocket as websocket_routes
+from app.gateway.plugins.vision_events import EVENT_DEFINITION_BY_KEY
+
+_FEMALE_CONTEXT = EVENT_DEFINITION_BY_KEY["female"].context_text
 
 
 @pytest.mark.asyncio
-async def test_handle_client_video_frame_describes_and_feeds_neutral_visual_message(monkeypatch):
+async def test_handle_client_video_frame_feeds_visual_greeting_message(monkeypatch):
     plugin = types.SimpleNamespace(
         describe_frame=AsyncMock(
             return_value={
@@ -18,9 +21,9 @@ async def test_handle_client_video_frame_describes_and_feeds_neutral_visual_mess
                 "session_id": "session-video",
                 "events": [
                     {
-                        "key": "person",
-                        "name": "person_appeared",
-                        "context_text": "[視覺事件] 畫面中出現一位訪客。",
+                        "key": "female",
+                        "name": "female_appeared",
+                        "context_text": _FEMALE_CONTEXT,
                     }
                 ],
             }
@@ -55,12 +58,11 @@ async def test_handle_client_video_frame_describes_and_feeds_neutral_visual_mess
 
     sent = relay.send_event.await_args.args[0]
     assert sent["event"] == "user_speak"
-    assert sent["text"] == "[視覺事件] 畫面中出現一位訪客。"
+    assert sent["text"] == _FEMALE_CONTEXT
     # 視覺脈絡走 live 也不可落歷史：必須帶 ephemeral 旗標
     assert sent["ephemeral"] is True
-    # 視覺管道餵入中性脈絡，禁止任何行為指令
-    for banned in ("打招呼", "歡迎", "問他", "需要什麼幫助"):
-        assert banned not in sent["text"]
+    assert "美女" in sent["text"]
+    assert "不要詢問" in sent["text"]
 
     assert websocket.send_json.await_args_list[1].args[0] == {
         "event": "server_camera_frame_status",

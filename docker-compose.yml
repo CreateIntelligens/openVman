@@ -90,10 +90,11 @@ services:
       - '{"image":1}'
       - --mm-processor-kwargs
       - '{"max_pixels":262144}'
+      - --mm-processor-cache-gb
+      - "0.5"
     environment:
       - HF_TOKEN=${HF_TOKEN:-}
       - HF_HOME=/root/.cache/huggingface
-      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     volumes:
       - hf-cache:/root/.cache/huggingface
     shm_size: 8g
