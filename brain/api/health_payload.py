@@ -24,12 +24,22 @@ def list_workspace_documents(project_id: str = "default"):
 
 
 def build_readiness_payload() -> dict[str, object]:
-    """Lightweight readiness check — single DB connection ping, no table scans."""
+    """Readiness check — DB ping plus background warmup completion.
+
+    背景預熱（embedder 載入 + knowledge/memories 檢索路徑暖機）完成前回報
+    not_ready，讓 readiness probe / 反向代理擋下流量，避免第一個檢索請求
+    承擔冷啟成本。
+    """
+    from warmup_state import is_warmup_done
+
     try:
         get_db().table_names()  # cheapest possible lancedb probe
-        return {"status": "ready", "db": "ok"}
     except Exception as exc:
         return {"status": "not_ready", "db": "error", "db_error": str(exc)}
+
+    if not is_warmup_done():
+        return {"status": "not_ready", "db": "ok", "warmup": "pending"}
+    return {"status": "ready", "db": "ok", "warmup": "done"}
 
 
 def list_personas(project_id: str = "default"):

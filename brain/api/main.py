@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 
 from config import API_INTERNAL_PORT, get_settings
 from infra.db import ensure_tables, get_db
+from infra.project_admin import list_projects
 from internal_routes import router as internal_router
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import get_embedder
@@ -30,6 +31,7 @@ from routes.tools import router as tools_router
 from routes.workspace import router as workspace_router
 from safety.http_filters import SilentAccessPathsFilter, is_silent_path
 from safety.observability import get_metrics_store, log_event, log_exception
+from warmup_state import mark_warmup_done
 
 
 logging.basicConfig(
@@ -88,39 +90,79 @@ _OPENAPI_TAGS = [
 # Startup & Lifespan
 # ---------------------------------------------------------------------------
 
-def _warmup_retrieval_path() -> None:
+def _warmup_project_ids() -> list[str]:
+    project_ids = ["default"]
+    seen = {"default"}
+    try:
+        projects = list_projects()
+    except Exception as exc:
+        logger.warning("專案預熱清單讀取失敗（僅預熱 default）: %s", exc)
+        return project_ids
+
+    for project in projects:
+        project_id = str(project.get("project_id", "")).strip()
+        if not project_id or project_id in seen:
+            continue
+        document_count = int(project.get("document_count") or 0)
+        if not project.get("has_lancedb") and document_count <= 0:
+            continue
+        project_ids.append(project_id)
+        seen.add(project_id)
+    return project_ids
+
+
+_WARMUP_TABLES = ("knowledge", "memories")
+
+
+def _warmup_retrieval_path(project_id: str = "default") -> None:
     """真正跑一次 encode + search，預熱 CUDA kernel 與 LanceDB 查詢路徑。
 
     僅建立 embedder/table 物件並不會觸發第一次 forward pass 的 kernel 編譯
     成本（實測冷啟 embed ~8s、search ~1.7s，熱啟後皆 <60ms）。這裡實際呼叫
     一次檢索把整條 hot path 熱起來，避免第一個使用者請求承擔該成本。
+
+    knowledge 與 memories 各自有獨立的 LanceDB 查詢路徑與 FTS 索引；search_memory
+    走的是 memories 表，若只暖 knowledge，第一個「我是誰」這類記憶查詢仍會冷啟。
+    因此兩個表都要暖。
     """
     from memory.embedder import encode_query_with_fallback
     from memory.retrieval import search_records
 
-    route = encode_query_with_fallback("warmup", project_id="default", table_names=("knowledge",))
-    search_records(
-        table_name="knowledge",
-        query_vector=route.vector,
-        top_k=1,
-        query_text="warmup",
-        query_type="hybrid",
-        project_id="default",
-        embedding_version=route.version,
-    )
+    for table_name in _WARMUP_TABLES:
+        try:
+            route = encode_query_with_fallback(
+                "warmup", project_id=project_id, table_names=(table_name,)
+            )
+            search_records(
+                table_name=table_name,
+                query_vector=route.vector,
+                top_k=1,
+                query_text="warmup",
+                query_type="hybrid",
+                project_id=project_id,
+                embedding_version=route.version,
+            )
+        except Exception as exc:  # 單一表預熱失敗不應阻擋其他表
+            logger.warning(
+                "檢索路徑預熱失敗（project=%s table=%s，不影響啟動）: %s",
+                project_id,
+                table_name,
+                exc,
+            )
 
 
 async def warmup_resources() -> None:
     """背景預熱重資源，避免第一個請求承擔初始化成本。"""
     logger.info("背景預熱開始...")
-    ensure_workspace_scaffold("default")
+    project_ids = _warmup_project_ids()
     await asyncio.to_thread(get_embedder)
-    await asyncio.to_thread(ensure_tables, "default")
-    try:
-        await asyncio.to_thread(_warmup_retrieval_path)
-    except Exception as exc:  # 預熱失敗不應阻擋服務啟動
-        logger.warning("檢索路徑預熱失敗（不影響啟動）: %s", exc)
+    for project_id in project_ids:
+        ensure_workspace_scaffold(project_id)
+        await asyncio.to_thread(ensure_tables, project_id)
+        # _warmup_retrieval_path 內部已逐表吞掉預熱失敗、不會 raise。
+        await asyncio.to_thread(_warmup_retrieval_path, project_id)
     await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
+    mark_warmup_done()
     logger.info("背景預熱完成")
 
 
