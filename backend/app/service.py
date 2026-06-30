@@ -54,6 +54,11 @@ class TTSRouterService:
         self._gcp = GCPTTSAdapter(self._config)
         self._edge = EdgeTTSAdapter(self._config)
 
+    @property
+    def edge_adapter(self) -> EdgeTTSAdapter:
+        """Edge-TTS adapter, exposed for the streaming fallback path."""
+        return self._edge
+
     def build_chain(self) -> list[RouteTarget]:
         """Build the ordered fallback chain based on config."""
         return [

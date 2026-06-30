@@ -144,16 +144,19 @@ async def get_tts_providers() -> JSONResponse:
     ]
 
     if cfg.tts_indextts_url:
-        voices = _prepend_default_voice(
-            await _fetch_indextts_voices(cfg.tts_indextts_url),
-            cfg.tts_indextts_default_character,
-        )
-        providers.append({
-            "id": "indextts",
-            "name": "IndexTTS",
-            "default_voice": cfg.tts_indextts_default_character,
-            "voices": voices,
-        })
+        # 探測 IndexTTS 健康狀態：抓不到 voices（容器掛掉/不可達）就不顯示，
+        # 避免選單列出一個會 502 的 provider。auto 仍由 backend fallback 處理。
+        fetched_voices = await _fetch_indextts_voices(cfg.tts_indextts_url)
+        if fetched_voices:
+            providers.append({
+                "id": "indextts",
+                "name": "IndexTTS",
+                "default_voice": cfg.tts_indextts_default_character,
+                "voices": _prepend_default_voice(
+                    fetched_voices,
+                    cfg.tts_indextts_default_character,
+                ),
+            })
 
     if cfg.tts_gcp_enabled:
         providers.append({

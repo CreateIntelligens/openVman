@@ -248,6 +248,40 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
     ]
 
 
+def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
+    """IndexTTS 不可達（抓不到 voices）時，provider list 不應顯示 indextts。"""
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    class FakeClient:
+        async def get(self, url: str, timeout=None):
+            raise ConnectionError("index-tts-vllm unreachable")
+
+    async def _fake_close() -> None:
+        return None
+
+    module.admin_routes._health_http = types.SimpleNamespace(
+        get=lambda: FakeClient(),
+        close=_fake_close,
+    )
+    monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+        tts_indextts_url="http://index-tts-vllm:8011",
+        tts_indextts_default_character="hayley",
+        tts_gcp_enabled=False,
+        tts_aws_enabled=False,
+        edge_tts_enabled=True,
+        edge_tts_voice="zh-TW-HsiaoChenNeural",
+    ))
+
+    client = TestClient(module.app)
+    response = client.get("/v1/tts/providers")
+
+    assert response.status_code == 200
+    ids = [p["id"] for p in response.json()]
+    assert "indextts" not in ids
+    assert ids == ["auto", "edge-tts"]
+
+
 def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
@@ -331,6 +365,8 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
     class FakeService:
         def __init__(self):
             self.requests: list[object] = []
+            # Edge disabled → fallback 走 buffered service chain（本測試的情境）。
+            self.edge_adapter = types.SimpleNamespace(enabled=False)
 
         def synthesize(self, request, provider=""):
             self.requests.append(request)
@@ -362,6 +398,48 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
     assert len(fake_service.requests) == 1
     assert fake_service.requests[0].text == "你好"
     assert fake_service.requests[0].voice_hint == "hayley"
+
+
+def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    async def _edge_stream(request):
+        yield b"edge-1"
+        yield b"edge-2"
+
+    captured: dict[str, object] = {}
+
+    class FakeService:
+        def __init__(self):
+            self.synthesize_called = False
+            self.edge_adapter = types.SimpleNamespace(
+                enabled=True,
+                synthesize_stream=lambda request: (
+                    captured.setdefault("request", request),
+                    _edge_stream(request),
+                )[1],
+            )
+
+        def synthesize(self, request, provider=""):
+            self.synthesize_called = True
+            raise AssertionError("buffered synthesize 不應被呼叫")
+
+    fake_service = FakeService()
+    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    # 無 IndexTTS → 直接進 fallback；Edge enabled → 走 streaming。
+    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+        tts_indextts_url="",
+        tts_indextts_default_character="hayley",
+    ))
+
+    client = TestClient(module.app)
+    response = client.post("/tts/stream", json={"text": "你好", "character": "hayley"})
+
+    assert response.status_code == 200
+    assert response.content == b"edge-1edge-2"
+    assert response.headers["content-type"].startswith("audio/mpeg")
+    assert fake_service.synthesize_called is False
 
 
 class FakeRelay:

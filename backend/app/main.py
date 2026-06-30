@@ -472,8 +472,19 @@ async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
         if proxied is not None:
             return proxied
 
-    # Fallback: buffer with service chain
     svc = _get_service()
+
+    # Fallback streaming: Edge-TTS 邊合成邊吐，避免等整句。
+    # 清掉 voice_hint：character 是 IndexTTS 的角色名，跨 provider 不通用，
+    # 讓 Edge 用自身預設 voice（與 service.py fallback 的 replace(voice_hint="")一致）。
+    edge = svc.edge_adapter
+    if edge.enabled:
+        stream = edge.synthesize_stream(
+            SynthesizeRequest(text=cleaned, voice_hint="")
+        )
+        return StreamingResponse(stream, media_type="audio/mpeg")
+
+    # Fallback (buffered): 其餘 provider 仍走 service chain 一次性回傳。
     try:
         output = svc.synthesize(SynthesizeRequest(text=cleaned, voice_hint=character))
     except RuntimeError as exc:
