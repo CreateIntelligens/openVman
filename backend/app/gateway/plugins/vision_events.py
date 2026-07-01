@@ -22,29 +22,24 @@ class EventDefinition:
 
 EventSlot = dict[str, int | bool]
 EventState = dict[str, EventSlot]
-
-
-def _greeting_event(key: str, gender: str, pronoun: str, term: str) -> EventDefinition:
-    """以性別差異參數化打招呼事件，避免 female/male 兩份近乎相同的文案複製。"""
-    return EventDefinition(
-        key=key,
-        name=f"{key}_appeared",
-        question=(
-            f"畫面中是否有{gender}，且看得到臉部（正面才算，五官不清楚沒關係）？"
-            "（只拍到背影、或僅手腳、身體局部而完全看不到臉，算否）"
-        ),
-        context_text=(
-            f"[視覺打招呼] 畫面中出現一位{gender}訪客。"
-            "這是 kiosk 主動打招呼觸發，不是使用者提問。"
-            f"請只用一句自然親切的開場招呼，稱呼{pronoun}為「{term}」。"
-            f"不要詢問{pronoun}在哪裡，不要提海釣或釣場安全。"
-        ),
-    )
+VisualState = dict[str, str | int | bool]
 
 
 EVENT_DEFINITIONS: list[EventDefinition] = [
-    _greeting_event("female", "女性", "她", "美女"),
-    _greeting_event("male", "男性", "他", "帥哥"),
+    EventDefinition(
+        key="person",
+        name="person_appeared",
+        question=(
+            "畫面中是否有真實來賓本人，且看得到臉部（正面才算，五官不清楚沒關係）？"
+            "（螢幕、照片、影片、虛擬人物、海報、鏡面反射不算；"
+            "只拍到背影、或僅手腳、身體局部而完全看不到臉，算否）"
+        ),
+        context_text=(
+            "[視覺打招呼] 畫面中出現一位訪客。"
+            "這是 kiosk 主動打招呼觸發，不是使用者提問。"
+            "請只用一句自然親切的開場招呼。"
+        ),
+    ),
     EventDefinition(
         key="fire",
         name="fire_detected",
@@ -90,7 +85,7 @@ def parse_detection(raw: str) -> dict[str, bool]:
 
 
 _CONFIRM_DEFAULT = 3
-_RELEASE_DEFAULT = 10
+_RELEASE_DEFAULT = 5
 
 
 def new_event_state() -> EventState:
@@ -153,3 +148,43 @@ def format_fired_events(fired_keys: list[str]) -> list[dict[str, str]]:
             }
         )
     return events
+
+
+def format_visual_state(
+    state: EventState,
+    *,
+    event_key: str = "person",
+    confirm_frames: int = _CONFIRM_DEFAULT,
+    release_frames: int = _RELEASE_DEFAULT,
+) -> VisualState:
+    slot = state.get(event_key, {"active": False, "true_streak": 0})
+    active = bool(slot.get("active"))
+    true_streak = min(int(slot.get("true_streak") or 0), confirm_frames)
+    false_streak = min(int(slot.get("false_streak") or 0), release_frames)
+
+    if active and false_streak > 0:
+        signal_state = "detecting"
+        color = "yellow"
+        label = f"離場確認 {false_streak}/{release_frames}"
+    elif active:
+        signal_state = "locked"
+        color = "red"
+        label = "已觸發"
+    elif true_streak > 0:
+        signal_state = "detecting"
+        color = "yellow"
+        label = f"辨識中 {true_streak}/{confirm_frames}"
+    else:
+        signal_state = "clear"
+        color = "green"
+        label = "無人"
+
+    return {
+        "event_key": event_key,
+        "state": signal_state,
+        "color": color,
+        "label": label,
+        "active": active,
+        "true_streak": true_streak,
+        "confirm_frames": confirm_frames,
+    }

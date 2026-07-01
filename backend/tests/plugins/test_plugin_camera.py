@@ -108,7 +108,19 @@ class TestCameraLivePlugin:
 
         result = await plugin.describe_frame(b"x", "image/jpeg", "sess-busy")
 
-        assert result == {"status": "busy", "session_id": "sess-busy"}
+        assert result == {
+            "status": "busy",
+            "session_id": "sess-busy",
+            "visual_state": {
+                "event_key": "person",
+                "state": "clear",
+                "color": "green",
+                "label": "無人",
+                "active": False,
+                "true_streak": 0,
+                "confirm_frames": 3,
+            },
+        }
 
     @pytest.mark.asyncio
     async def test_describe_frame_drops_new_frame_while_session_is_busy(self, plugin):
@@ -129,7 +141,9 @@ class TestCameraLivePlugin:
             release.set()
             processed = await first
 
-        assert busy == {"status": "busy", "session_id": "session-busy"}
+        assert busy["status"] == "busy"
+        assert busy["session_id"] == "session-busy"
+        assert busy["visual_state"]["state"] == "clear"
         assert processed["status"] == "processed"
 
     @pytest.mark.asyncio
@@ -282,10 +296,10 @@ class TestVisionEventDetection:
         with patch.object(
             plugin, "_complete_vision",
             new_callable=AsyncMock,
-            return_value='{"female": true, "male": false, "fire": false}',
+            return_value='{"person": true, "fire": false}',
         ):
             result = await plugin._detect_events("b64", "image/jpeg")
-        assert result == {"female": True, "male": False, "fire": False}
+        assert result == {"person": True, "fire": False}
 
     @pytest.mark.asyncio
     async def test_detect_events_returns_empty_on_vlm_error(self, plugin):
@@ -303,7 +317,7 @@ class TestVisionEventDetection:
         with patch.object(
             plugin, "_detect_events",
             new_callable=AsyncMock,
-            return_value={"female": True, "male": False, "fire": False},
+            return_value={"person": True, "fire": False},
         ):
             results = [
                 await plugin.describe_frame(b"x", "image/jpeg", "sess-evt")
@@ -312,7 +326,11 @@ class TestVisionEventDetection:
 
         assert all(r["status"] == "processed" for r in results)
         assert all(r["events"] == [] for r in results[:-1])
-        assert [e["key"] for e in results[-1]["events"]] == ["female"]
+        assert results[0]["visual_state"]["state"] == "detecting"
+        assert results[0]["visual_state"]["label"] == f"辨識中 1/{_CONFIRM_DEFAULT}"
+        assert results[-1]["visual_state"]["state"] == "locked"
+        assert results[-1]["visual_state"]["color"] == "red"
+        assert [e["key"] for e in results[-1]["events"]] == ["person"]
         assert results[-1]["events"][0]["context_text"].startswith("[視覺")
 
     @pytest.mark.asyncio
@@ -323,3 +341,31 @@ class TestVisionEventDetection:
             r = await plugin.describe_frame(b"x", "image/jpeg", "sess-none")
         assert r["status"] == "processed"
         assert r["events"] == []
+        assert r["visual_state"]["state"] == "clear"
+
+    @pytest.mark.asyncio
+    async def test_reset_session_events_allows_same_session_to_fire_again(self, plugin):
+        from app.gateway.plugins.vision_events import _CONFIRM_DEFAULT
+
+        with patch.object(
+            plugin,
+            "_detect_events",
+            new_callable=AsyncMock,
+            return_value={"person": True, "fire": False},
+        ):
+            first = [
+                await plugin.describe_frame(b"x", "image/jpeg", "sess-reset")
+                for _ in range(_CONFIRM_DEFAULT)
+            ]
+            still_active = await plugin.describe_frame(b"x", "image/jpeg", "sess-reset")
+
+            plugin.reset_session_events("sess-reset")
+
+            second = [
+                await plugin.describe_frame(b"x", "image/jpeg", "sess-reset")
+                for _ in range(_CONFIRM_DEFAULT)
+            ]
+
+        assert [event["key"] for event in first[-1]["events"]] == ["person"]
+        assert still_active["events"] == []
+        assert [event["key"] for event in second[-1]["events"]] == ["person"]

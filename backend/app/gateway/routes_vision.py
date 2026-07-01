@@ -8,6 +8,7 @@ describe_frame 判斷是否有語意事件（人出現、物體消失等）。
 from __future__ import annotations
 
 import logging
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -24,6 +25,10 @@ router = APIRouter(tags=["Vision"])
 _http = SharedAsyncClient(read=30)
 
 
+def _vision_session_id(session_id: str | None) -> str:
+    return (session_id or "").strip() or f"vision-{uuid4().hex}"
+
+
 class VisionDescribeRequest(BaseModel):
     frame_base64: str = Field(..., min_length=1, description="Base64 JPEG frame")
     mime_type: str = Field("image/jpeg", description="Frame MIME type")
@@ -31,6 +36,10 @@ class VisionDescribeRequest(BaseModel):
     persona_id: str = Field("default")
     project_id: str = Field("default")
     session_id: str | None = Field(None)
+
+
+class VisionResetRequest(BaseModel):
+    session_id: str = Field(..., min_length=1)
 
 
 @router.post("/api/vision/describe", summary="視覺事件（text 模式）")
@@ -41,26 +50,43 @@ async def vision_describe(payload: VisionDescribeRequest) -> dict[str, object]:
         logger.warning("vision_describe_decode_err err=%s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    session_id = payload.session_id or ""
+    session_id = _vision_session_id(payload.session_id)
     result = await get_camera_plugin().describe_frame(
         image_bytes,
         payload.mime_type,
-        session_id or "vision-text",
+        session_id,
     )
 
+    visual_state = result.get("visual_state")
     events = result.get("events") or []
     if result.get("status") != "processed" or not events:
-        return {"reply": "", "session_id": session_id}
+        return {"reply": "", "session_id": session_id, "visual_state": visual_state}
 
     context_text = str(events[0].get("context_text") or "").strip()
     if not context_text:
-        return {"reply": "", "session_id": session_id}
+        return {"reply": "", "session_id": session_id, "visual_state": visual_state}
 
-    reply = await _generate_reply(payload, context_text)
-    return {"reply": reply, "session_id": session_id}
+    reply = await _generate_reply(payload, context_text, session_id)
+    return {"reply": reply, "session_id": session_id, "visual_state": visual_state}
 
 
-async def _generate_reply(payload: VisionDescribeRequest, context_text: str) -> str:
+@router.post("/api/vision/reset", summary="重置視覺事件狀態（text 模式）")
+async def vision_reset(payload: VisionResetRequest) -> dict[str, object]:
+    session_id = payload.session_id.strip()
+    camera = get_camera_plugin()
+    camera.reset_session_events(session_id)
+    return {
+        "status": "reset",
+        "session_id": session_id,
+        "visual_state": camera.session_visual_state(session_id),
+    }
+
+
+async def _generate_reply(
+    payload: VisionDescribeRequest,
+    context_text: str,
+    session_id: str,
+) -> str:
     """把中性視覺脈絡當一則 ephemeral 訊息送進 brain chat（不落歷史），回傳 AI 回覆。"""
     cfg = get_tts_config()
     client = _http.get()
@@ -71,7 +97,7 @@ async def _generate_reply(payload: VisionDescribeRequest, context_text: str) -> 
                 "message": context_text,
                 "persona_id": payload.persona_id,
                 "project_id": payload.project_id,
-                "session_id": payload.session_id or "vision-text",
+                "session_id": session_id,
                 "metadata": {"ephemeral_user_message": True},
             },
         )

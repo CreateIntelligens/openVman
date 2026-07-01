@@ -94,6 +94,15 @@ class CameraLivePlugin:
             logger.info("camera_cleanup session_id=%s", session_id)
         self._states.pop(session_id, None)
 
+    def reset_session_events(self, session_id: str) -> None:
+        from app.gateway.plugins.vision_events import new_event_state
+
+        state = self._states.get(session_id)
+        if state is None:
+            self._states[session_id] = {"analyzing": False, "events": new_event_state()}
+            return
+        state["events"] = new_event_state()
+
     async def describe_frame(
         self,
         image_bytes: bytes,
@@ -109,11 +118,16 @@ class CameraLivePlugin:
         from app.gateway.plugins.vision_events import (
             detect_edges,
             format_fired_events,
+            format_visual_state,
         )
 
         state = self._state_for_session(session_id)
         if state["analyzing"]:
-            return {"status": "busy", "session_id": session_id}
+            return {
+                "status": "busy",
+                "session_id": session_id,
+                "visual_state": self.session_visual_state(session_id),
+            }
 
         state["analyzing"] = True
         try:
@@ -126,10 +140,16 @@ class CameraLivePlugin:
                 "status": "processed",
                 "session_id": session_id,
                 "events": format_fired_events(fired),
+                "visual_state": format_visual_state(new_events_state),
             }
         except Exception as exc:
             logger.warning("camera_describe_frame_err session_id=%s err=%s", session_id, exc)
-            return {"status": "error", "session_id": session_id, "error": str(exc)}
+            return {
+                "status": "error",
+                "session_id": session_id,
+                "error": str(exc),
+                "visual_state": self.session_visual_state(session_id),
+            }
         finally:
             state["analyzing"] = False
 
@@ -310,6 +330,17 @@ class CameraLivePlugin:
         elif "events" not in existing:
             existing["events"] = new_event_state()
         return existing
+
+    def session_visual_state(self, session_id: str) -> dict[str, str | int | bool]:
+        from app.gateway.plugins.vision_events import format_visual_state, new_event_state
+
+        state = self._states.get(session_id)
+        if state is None:
+            return format_visual_state(new_event_state())
+        events = state.get("events")
+        if not isinstance(events, dict):
+            events = new_event_state()
+        return format_visual_state(events)
 
 
 def _as_bool(value: Any) -> bool:

@@ -91,6 +91,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
         await session.cancel_all_tasks()
         if session.brain_live_relay is not None:
             await session.brain_live_relay.close()
+        try:
+            await get_camera_plugin().cleanup(session.session_id)
+        except Exception as exc:
+            logger.warning("camera_cleanup_failed session_id=%s err=%s", session.session_id, exc)
         _session_manager.remove_session(session.session_id)
         set_active_sessions(len(_session_manager.active_sessions))
 
@@ -124,6 +128,8 @@ async def _handle_websocket_event(
         await _handle_client_audio_event(data, session, websocket)
     elif event == "client_video_frame":
         await _handle_client_video_frame(data, session, websocket)
+    elif event == "client_camera_reset":
+        _handle_client_camera_reset(session)
     elif event:
         logger.warning("Unhandled WebSocket event: %s", event)
 
@@ -302,13 +308,19 @@ async def _handle_client_video_frame(data: dict, session: Session, websocket: We
 
     status = _camera_frame_status(result)
     message = str(result.get("error") or "") if isinstance(result, dict) else ""
+    visual_state = result.get("visual_state") if isinstance(result, dict) else None
     await _send_camera_frame_status(
         websocket,
         session.session_id,
         status,
         frame_timestamp=frame_timestamp,
         message=message or None,
+        visual_state=visual_state if isinstance(visual_state, dict) else None,
     )
+
+
+def _handle_client_camera_reset(session: Session) -> None:
+    get_camera_plugin().reset_session_events(session.session_id)
 
 
 def _client_frame_timestamp(value: object) -> int | None:
@@ -333,6 +345,7 @@ async def _send_camera_frame_status(
     *,
     frame_timestamp: int | None,
     message: str | None = None,
+    visual_state: dict[str, object] | None = None,
 ) -> None:
     payload: dict[str, object] = {
         "event": "server_camera_frame_status",
@@ -344,6 +357,8 @@ async def _send_camera_frame_status(
         payload["frame_timestamp"] = frame_timestamp
     if message:
         payload["message"] = message
+    if visual_state:
+        payload["visual_state"] = visual_state
     try:
         await websocket.send_json(payload)
     except RuntimeError as exc:

@@ -28,6 +28,7 @@
             <CameraPreview
               :stream="webcam.stream.value"
               :active="webcam.active.value"
+              :visual-state="chat.visualState.value"
             />
           </div>
         </div>
@@ -488,6 +489,7 @@ const webcam = useWebcamCapture({
 
 async function handleToggleCamera(): Promise<void> {
   if (webcam.active.value) {
+    void chat.resetVisualInput();
     webcam.stop();
     return;
   }
@@ -498,6 +500,7 @@ async function handleToggleCamera(): Promise<void> {
       await chat.connect();
       isStarted.value = true;
     }
+    await chat.resetVisualInput();
     await webcam.start();
   } catch {
     statusToastRef.value?.show(

@@ -29,6 +29,14 @@ test("TTS streamer can inspect available providers for auto streaming", () => {
   assert.match(source, /ttsProviders:\s*\(\) => ttsProviders\.value/);
 });
 
+test("camera start resets backend visual event state before capturing frames", () => {
+  assert.match(
+    source,
+    /await chat\.resetVisualInput\(\)[\s\S]*?await webcam\.start\(\)/,
+  );
+  assert.match(source, /:visual-state="chat\.visualState\.value"/);
+});
+
 test("avatar stage background is wired through settings", () => {
   assert.match(source, /:background-id="settings\.backgroundId"/);
   assert.match(source, /:custom-background-url="settings\.backgroundUrl"/);

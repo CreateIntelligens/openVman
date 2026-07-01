@@ -35,3 +35,23 @@ async def test_websocket_endpoint_treats_closed_receive_runtimeerror_as_disconne
     assert websocket.accepted is True
     assert disconnects == ["client"]
     assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_websocket_endpoint_cleans_camera_state_on_disconnect(monkeypatch):
+    cleaned_sessions: list[str] = []
+
+    class CameraPlugin:
+        async def cleanup(self, session_id: str) -> None:
+            cleaned_sessions.append(session_id)
+
+    monkeypatch.setattr(websocket_routes, "_session_manager", SessionManager())
+    monkeypatch.setattr(websocket_routes, "record_ws_disconnect", lambda reason: None)
+    monkeypatch.setattr(websocket_routes, "record_ws_error", lambda error_type: None)
+    monkeypatch.setattr(websocket_routes, "set_active_sessions", lambda _count: None)
+    monkeypatch.setattr(websocket_routes, "get_camera_plugin", lambda: CameraPlugin())
+
+    websocket = DisconnectedReceiveWebSocket()
+    await websocket_routes.websocket_endpoint(websocket, "client-closed")
+
+    assert len(cleaned_sessions) == 1

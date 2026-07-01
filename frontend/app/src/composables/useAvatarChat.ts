@@ -13,6 +13,18 @@
 import { ref, readonly, onUnmounted } from 'vue'
 
 export type AvatarState = 'DISCONNECTED' | 'CONNECTING' | 'RECONNECTING' | 'IDLE' | 'THINKING' | 'SPEAKING' | 'ERROR'
+export type VisualSignalState = 'clear' | 'detecting' | 'locked'
+export type VisualSignalColor = 'green' | 'yellow' | 'red'
+
+export interface VisualState {
+       event_key: string
+       state: VisualSignalState
+       color: VisualSignalColor
+       label: string
+       active: boolean
+       true_streak: number
+       confirm_frames: number
+}
 
 export interface ChatMessage {
        role: 'user' | 'ai'
@@ -47,6 +59,8 @@ interface ChatOptions {
        chatEndpoint?: string
        /** Override text-mode vision describe endpoint. */
        visionEndpoint?: string
+       /** Override text-mode vision reset endpoint. */
+       visionResetEndpoint?: string
        /** Extra headers for text-mode requests. */
        requestHeaders?: () => Record<string, string>
        /** Override live-mode WebSocket URL creation. */
@@ -76,11 +90,45 @@ function createClientId(): string {
 const MAX_RECONNECT_ATTEMPTS = 6
 export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/chat'
 export const DEFAULT_VISION_ENDPOINT = '/api/vision/describe'
+export const DEFAULT_VISION_RESET_ENDPOINT = '/api/vision/reset'
+
+const DEFAULT_VISUAL_STATE: VisualState = {
+       event_key: 'person',
+       state: 'clear',
+       color: 'green',
+       label: '無人',
+       active: false,
+       true_streak: 0,
+       confirm_frames: 3,
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+       return typeof value === 'object' && value !== null
+}
+
+function normalizeVisualState(value: unknown): VisualState | null {
+       if (!isRecord(value)) return null
+       const state = value.state
+       const color = value.color
+       if (state !== 'clear' && state !== 'detecting' && state !== 'locked') return null
+       if (color !== 'green' && color !== 'yellow' && color !== 'red') return null
+
+       return {
+              event_key: typeof value.event_key === 'string' ? value.event_key : 'person',
+              state,
+              color,
+              label: typeof value.label === 'string' ? value.label : DEFAULT_VISUAL_STATE.label,
+              active: Boolean(value.active),
+              true_streak: typeof value.true_streak === 'number' ? value.true_streak : 0,
+              confirm_frames: typeof value.confirm_frames === 'number' ? value.confirm_frames : 3,
+       }
+}
 
 export function useAvatarChat(options: ChatOptions = {}) {
        const state = ref<AvatarState>('DISCONNECTED')
        const messages = ref<ChatMessage[]>([])
        const sessionId = ref<string | null>(null)
+       const visualState = ref<VisualState>({ ...DEFAULT_VISUAL_STATE })
 
        let socket: WebSocket | null = null
        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -102,6 +150,15 @@ export function useAvatarChat(options: ChatOptions = {}) {
        // `onUtteranceComplete` when `is_final=true` arrives (or on interrupt).
        let utteranceBuffer = ''
        let responsePlaybackActive = false
+
+       function resetVisualState(): void {
+              visualState.value = { ...DEFAULT_VISUAL_STATE }
+       }
+
+       function applyVisualState(value: unknown): void {
+              const next = normalizeVisualState(value)
+              if (next) visualState.value = next
+       }
 
        // ── Build client_init payload ──────────────────────────
        function _buildClientInit(): Record<string, unknown> {
@@ -260,6 +317,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             break
                      }
 
+                     case 'server_camera_frame_status':
+                            applyVisualState(data.visual_state)
+                            break
+
                      case 'ping':
                             sendRaw(JSON.stringify({ event: 'pong', timestamp: Date.now() }))
                             break
@@ -384,8 +445,9 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             }),
                      })
                      if (!res.ok) return
-                     const data = await res.json() as { reply?: string; session_id?: string }
+                     const data = await res.json() as { reply?: string; session_id?: string; visual_state?: unknown }
                      if (data.session_id) sessionId.value = data.session_id
+                     applyVisualState(data.visual_state)
                      if (data.reply?.trim()) {
                             responsePlaybackActive = true
                             options.onUtteranceComplete?.(data.reply)
@@ -395,6 +457,37 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      console.warn('[AvatarChat] vision describe failed:', err)
               } finally {
                      visionInFlight = false
+              }
+       }
+
+       async function resetVisualInput(): Promise<void> {
+              visionInFlight = false
+              resetVisualState()
+              if (currentMode === 'text') {
+                     await _resetVisualInputText()
+                     return
+              }
+
+              if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
+              sendEvent({
+                     event: 'client_camera_reset',
+                     timestamp: Date.now(),
+              })
+       }
+
+       async function _resetVisualInputText(): Promise<void> {
+              if (!sessionId.value) return
+              try {
+                     const res = await fetch(options.visionResetEndpoint ?? DEFAULT_VISION_RESET_ENDPOINT, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
+                            body: JSON.stringify({ session_id: sessionId.value }),
+                     })
+                     if (!res.ok) return
+                     const data = await res.json() as { visual_state?: unknown }
+                     applyVisualState(data.visual_state)
+              } catch (err) {
+                     console.warn('[AvatarChat] vision reset failed:', err)
               }
        }
 
@@ -457,6 +550,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                socket?.close()
                socket = null
                sessionId.value = null
+               resetVisualState()
                state.value = 'DISCONNECTED'
        }
 
@@ -499,10 +593,12 @@ export function useAvatarChat(options: ChatOptions = {}) {
                state: readonly(state),
                messages,
                sessionId: readonly(sessionId),
+               visualState: readonly(visualState),
                connect,
                disconnect,
                sendMessage,
                sendVisualInput,
+               resetVisualInput,
                interrupt,
                reinit,
                setMode,
