@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ immersive }">
     <main class="kiosk-layout">
       <ControlBar
         class="control-area"
@@ -7,8 +7,10 @@
         :disabled="!wasm.isReady.value || wasm.isLoading.value"
         :error-message="wasm.error.value"
         :camera-active="webcam.active.value"
+        :immersive="immersive"
         @open-settings="showSettings = true"
         @toggle-camera="handleToggleCamera"
+        @toggle-immersive="handleToggleImmersive"
       />
 
       <section class="stage-panel">
@@ -39,6 +41,7 @@
         :is-thinking="chat.state.value === 'THINKING'"
         :is-typing="isTyping"
         :asr-listening="asr.isListening.value"
+        :compact="immersive"
         @send="handleSend"
         @asr-toggle="handleAsrToggle"
       />
@@ -89,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import CameraPreview from "./components/avatar/CameraPreview.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
@@ -114,6 +117,7 @@ const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
 const isStarted = ref(false);
 const isTyping = ref(false);
 const showSettings = ref(false);
+const immersive = ref(false);
 
 // Error overlay state (fatal errors shown full-screen)
 const fatalError = ref<{ code: string; message: string } | null>(null);
@@ -503,6 +507,28 @@ async function handleToggleCamera(): Promise<void> {
   }
 }
 
+async function handleToggleImmersive(): Promise<void> {
+  if (immersive.value) {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => {});
+    }
+    immersive.value = false;
+    return;
+  }
+  immersive.value = true;
+  try {
+    await document.documentElement.requestFullscreen();
+  } catch (e) {
+    console.warn("[App] requestFullscreen failed:", e);
+  }
+}
+
+function handleFullscreenChange(): void {
+  if (!document.fullscreenElement) {
+    immersive.value = false;
+  }
+}
+
 function pickInitialCharacter(): string {
   const saved = settings.characterId.trim();
   if (saved) return saved;
@@ -523,6 +549,7 @@ watch(showSettings, () => {
 });
 
 onMounted(async () => {
+  document.addEventListener("fullscreenchange", handleFullscreenChange);
   void fetchTtsProviders();
   void fetchBackgrounds();
   await fetchProjects();
@@ -535,6 +562,10 @@ onMounted(async () => {
   } catch (e) {
     console.error("[App] WASM init or char load failed:", e);
   }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("fullscreenchange", handleFullscreenChange);
 });
 </script>
 
@@ -642,6 +673,85 @@ body {
   border-radius: 0.5rem;
   background: #000;
   overflow: hidden;
+}
+
+/* Immersive mode: avatar fills the entire viewport, other panels float on top */
+.app-shell.immersive {
+  padding: 0;
+}
+
+.app-shell.immersive .kiosk-layout {
+  position: relative;
+  display: block;
+  height: 100%;
+}
+
+.app-shell.immersive .stage-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.app-shell.immersive .stage-card {
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.app-shell.immersive .stage-frame {
+  border-radius: 0;
+}
+
+.app-shell.immersive .control-area {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(0.5rem);
+  -webkit-backdrop-filter: blur(0.5rem);
+}
+
+.app-shell.immersive .chat-area {
+  position: absolute;
+  left: 50%;
+  bottom: 1.5rem;
+  z-index: 2;
+  width: min(32rem, calc(100% - 2rem));
+  max-height: 30%;
+  transform: translateX(-50%);
+}
+
+.app-shell.immersive .chat-area :deep(.chat-msg) {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(0.5rem);
+  -webkit-backdrop-filter: blur(0.5rem);
+  color: #fff;
+  border: none;
+}
+
+.app-shell.immersive .chat-area :deep(.chat-msg.user) {
+  background: rgba(14, 165, 233, 0.75);
+}
+
+.app-shell.immersive .chat-area :deep(.chat-role),
+.app-shell.immersive .chat-area :deep(.chat-time) {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.app-shell.immersive .chat-area :deep(.chat-input-bar input) {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(0.5rem);
+  -webkit-backdrop-filter: blur(0.5rem);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.app-shell.immersive .chat-area :deep(.chat-input-bar input::placeholder) {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 @media (max-width: 68.75rem) {

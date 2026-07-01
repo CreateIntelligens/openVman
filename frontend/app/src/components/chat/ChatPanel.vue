@@ -1,6 +1,6 @@
 <template>
-  <section class="chat-panel">
-    <header class="chat-panel__header">
+  <section class="chat-panel" :class="{ 'chat-panel--compact': compact }">
+    <header v-if="!compact" class="chat-panel__header">
       <div>
         <p class="chat-panel__eyebrow">Guest Dialogue</p>
         <h3>對話紀錄</h3>
@@ -11,7 +11,7 @@
     <div class="chat-messages" ref="messagesRef">
       <div class="chat-messages__content" ref="contentRef">
       <div
-        v-for="(msg, i) in messages"
+        v-for="(msg, i) in visibleMessages"
         :key="i"
         class="chat-msg"
         :class="msg.role"
@@ -24,7 +24,7 @@
         <p v-else class="chat-text">
           <TypewriterText
             :text="msg.text"
-            :is-typing="isTyping && i === messages.length - 1"
+            :is-typing="isTyping && msg === messages[messages.length - 1]"
           />
         </p>
       </div>
@@ -67,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { ChatMessage } from "../../composables/useAvatarChat";
 import { useStickToBottom } from "../../composables/useStickToBottom";
 import TypewriterText from "./TypewriterText.vue";
@@ -80,6 +80,7 @@ const props = defineProps<{
   isThinking?: boolean
   isTyping?: boolean
   asrListening?: boolean
+  compact?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -91,6 +92,21 @@ const inputText = ref("")
 const messagesRef = ref<HTMLDivElement>()
 const contentRef = ref<HTMLDivElement>()
 const inputRef = ref<HTMLInputElement>()
+
+// Compact mode shows only the current single exchange (last user + last ai reply),
+// not the full conversation history.
+const visibleMessages = computed(() => {
+  if (!props.compact) return props.messages
+  let lastUserIdx = -1
+  for (let i = props.messages.length - 1; i >= 0; i--) {
+    if (props.messages[i].role === "user") {
+      lastUserIdx = i
+      break
+    }
+  }
+  if (lastUserIdx === -1) return props.messages.slice(-1)
+  return props.messages.slice(lastUserIdx)
+})
 
 function handleSend(): void {
   const text = inputText.value.trim()
@@ -325,6 +341,32 @@ useStickToBottom(messagesRef, contentRef)
 @keyframes pulse {
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.1); }
+}
+
+.chat-panel--compact {
+  height: auto;
+  max-height: 16rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.chat-panel--compact .chat-messages {
+  padding: 0 0 0.5rem;
+}
+
+.chat-panel--compact .chat-messages__content {
+  gap: 0.5rem;
+}
+
+.chat-panel--compact .chat-msg {
+  max-width: 100%;
+}
+
+.chat-panel--compact .chat-input-bar {
+  border-top: none;
+  padding: 0;
+  background: transparent;
 }
 
 @media (max-width: 48rem) {

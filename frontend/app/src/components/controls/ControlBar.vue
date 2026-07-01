@@ -5,11 +5,6 @@
     </div>
 
     <div class="control-bar__right">
-      <div class="status-pill" :class="state">
-        <span class="status-pill__dot" />
-        <span>{{ stateLabel }}</span>
-      </div>
-
       <button
         class="camera-btn"
         :class="{ 'camera-btn--active': cameraActive }"
@@ -37,6 +32,28 @@
         </svg>
         設定
       </button>
+
+      <button
+        class="immersive-btn"
+        :class="{ 'immersive-btn--active': immersive }"
+        @click="$emit('toggleImmersive')"
+        :title="immersive ? '結束全螢幕' : '全螢幕'"
+        :aria-label="immersive ? '結束全螢幕' : '全螢幕'"
+      >
+        <svg v-if="!immersive" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+          <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+          <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+          <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+        </svg>
+        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3v3a2 2 0 0 1-2 2H3"/>
+          <path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+          <path d="M3 16h3a2 2 0 0 1 2 2v3"/>
+          <path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+        </svg>
+        {{ immersive ? '結束全螢幕' : '全螢幕' }}
+      </button>
     </div>
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
@@ -44,7 +61,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import type { AvatarState } from "../../composables/useAvatarChat";
 
 export interface PersonaSummary {
@@ -52,31 +68,20 @@ export interface PersonaSummary {
   label: string
 }
 
-const props = defineProps<{
+defineProps<{
   state: AvatarState
   disabled?: boolean
   errorMessage?: string | null
   cameraActive?: boolean
   cameraDisabled?: boolean
+  immersive?: boolean
 }>()
 
 defineEmits<{
   openSettings: []
   toggleCamera: []
+  toggleImmersive: []
 }>()
-
-const stateLabel = computed(() => {
-  const map: Record<AvatarState, string> = {
-    DISCONNECTED: "離線",
-    CONNECTING:   "連線中",
-    RECONNECTING: "重連中…",
-    IDLE:         "待命中",
-    THINKING:     "思考中",
-    SPEAKING:     "回應中",
-    ERROR:        "異常",
-  }
-  return map[props.state] ?? props.state
-})
 </script>
 
 <style scoped>
@@ -113,34 +118,6 @@ const stateLabel = computed(() => {
   gap: 0.75rem;
   flex-shrink: 0;
 }
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-radius: 999px;
-  padding: 0.3rem 0.75rem;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  color: var(--text);
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.status-pill__dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  background: #94a3b8;
-  flex-shrink: 0;
-}
-
-.status-pill.IDLE .status-pill__dot        { background: #10b981; }
-.status-pill.ERROR .status-pill__dot       { background: #ef4444; }
-.status-pill.CONNECTING .status-pill__dot  { background: #f59e0b; animation: blink 1.5s infinite; }
-.status-pill.THINKING .status-pill__dot    { background: #3b82f6; animation: blink 1.5s infinite; }
-.status-pill.SPEAKING .status-pill__dot    { background: #ec4899; animation: blink 1.5s infinite; }
 
 .camera-btn {
   display: inline-flex;
@@ -202,6 +179,37 @@ const stateLabel = computed(() => {
   cursor: not-allowed;
 }
 
+.immersive-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.immersive-btn:hover {
+  background: var(--bg-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.immersive-btn--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.immersive-btn--active:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+  color: #fff;
+}
+
 .error-banner {
   width: 100%;
   margin: 0;
@@ -214,8 +222,4 @@ const stateLabel = computed(() => {
   font-weight: 500;
 }
 
-@keyframes blink {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50%       { opacity: 1;   transform: scale(1.15); }
-}
 </style>

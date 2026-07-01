@@ -287,9 +287,10 @@ async def _handle_client_video_frame(data: dict, session: Session, websocket: We
         return
 
     events = result.get("events") or []
-    if result.get("status") == "processed" and events and session.brain_live_relay is not None:
+    if result.get("status") == "processed" and events:
         context_text = str(events[0].get("context_text") or "").strip()
         if context_text:
+            await _ensure_brain_relay(session, websocket)
             await session.brain_live_relay.send_event(
                 {
                     "event": "user_speak",

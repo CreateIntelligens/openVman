@@ -1,6 +1,15 @@
 # 02_FRONTEND_SPEC.md
 ## 前端實作指南 (Frontend Implementation Spec)
 
+> **現況總覽補充（2026-07-01）**
+> 本文件保留原始規格內容，以下為對照目前程式碼後的補充說明，標記哪些章節仍是設計願景、哪些已被實際實作取代。逐節補充見各章節末尾的「現況更新」區塊。
+>
+> 重點落差：
+> - 第 1、2、4、5、8、14 節描述的「三引擎插拔渲染架構」（`LipSyncManager` / `Wav2LipStrategy` / `DinetStrategy` / `WebGLStrategy` / `manifest.json`）**未曾實作**，實際前端採用單一的 DHLiveMini2 WASM engine（見 `frontend/app/src/composables/useMatesX.ts`、`components/avatar/AvatarCanvas.vue`）。
+> - 第 13 節描述的媒體上傳走 HTTP multipart POST，但實作走的是 **WebSocket 傳 base64**（`useAvatarChat.ts` 的 `sendVisualInput` / `client_video_frame`），方向相反。
+> - 第 12 節提到的 `/admin/knowledge` 是**概念性描述**，實際 `frontend/admin` 沒有路由系統，是靠 tab 狀態 + localStorage 切換頁面。
+> - 第 6、7、9、10、11、12.5 節與現況大致相符，僅部分細節有出入，各節內文已個別註記。
+
 ### 1. 技術棧與核心目標 (Tech Stack & Goals)
 * **核心技術**：HTML5 `<video>`、`<canvas>`、WebGL (Three.js/PixiJS)、Web Audio API、WebSockets。
 * **渲染架構**：從單一的覆蓋，升級為支援三大渲染引擎的插拔式架構 (Pluggable Rendering Engines)。
@@ -9,6 +18,8 @@
   * **[2] DH_live / DINet 引擎 (邊緣運算 CSR)**：高畫質口腔細節修復，低算力 (39 Mflops)，適合客戶端 ONNX 推論。
   * **[3] WebGL + .ktx2 引擎 (純 CSR 終端渲染)**：參數驅動 2.5D/3D 狀態機，伺服器零渲染壓力，主攻寫實派機台展場。
 * **唯一對時標準**：`VideoSyncManager` (以 `audio/video.currentTime` 為主基準)。嚴禁使用 `setTimeout` 控制。
+
+> **現況更新（2026-07-01）**：全 repo 搜尋不到 `LipSyncManager`、`Wav2LipStrategy`、`DinetStrategy`、`WebGLStrategy`、`VideoSyncManager`。實際渲染方案是單一的 DHLiveMini2 WASM engine，由 `useMatesX.ts` 載入模型並驅動 `AvatarCanvas.vue` 的 canvas 繪製，沒有可插拔的多引擎切換機制。此節屬於未實作的設計願景。
 
 ### 2. DOM 結構與圖層疊加 (DOM Structure & Layering)
 畫面由底層影片與上層畫布疊加而成。必須確保大小一致且絕對定位對齊。
@@ -29,6 +40,8 @@
 </div>
 
 ```
+
+> **現況更新（2026-07-01）**：`AvatarCanvas.vue` 實際結構是 `#canvas_video`（DHLiveMini2 主渲染畫布）、`#canvas_gl`（WASM engine 需要的隱藏 WebGL canvas）、`#screen`（WASM engine 需要的隱藏 div），並沒有 `#idle-video`、`#mouth-canvas`、`#webgl-canvas`、`#tap-to-start` 這些元素。實際互動起點是輸入框送出訊息時才 resume `AudioContext`，不是獨立的「點擊開始」遮罩。
 
 ### 3. 音訊與播放佇列管理 (Audio Queue Management)
 
@@ -85,6 +98,8 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 ```
 
+> **現況更新（2026-07-01）**：`useAudioPlayer.ts` 確實有音訊播放佇列與 chunk 解碼邏輯，符合第 3 節精神。但第 4 節描述的 `VideoSyncManager`、以 `requestAnimationFrame` 驅動的 `renderLoop`、`generateLipSyncFrame` 皆不存在——對嘴動畫完全由 DHLiveMini2 WASM engine 內部處理，前端只負責把解碼後的 PCM 音訊塞給 WASM（`wasm.pushAudio`），沒有獨立的 JS 對嘴渲染迴圈。
+
 ### 5. 三大核心渲染策略與前端引擎 (Core Rendering Strategies)
 
 前端現在設計為一個「多引擎」架構 (`LipSyncManager`)，專注於攻破以下三條技術路線：
@@ -102,11 +117,15 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
    * **原理**：丟棄像素生成，完全依賴預備好的 `.ktx2` 超高壓圖片素材與 3D 網格 (Mesh) 參數。收到語音時間戳後，前端的三維引擎 (Three.js/PixiJS) 即時切換貼圖並拉扯頂點 (Blendshapes)。
    * **優勢**：完全無神經網路的計算開銷，伺服器零渲染負擔，完美支援無限路多設備併發（尤適合展場機台 Kiosk），畫質寫實無瑕疵。
 
+> **現況更新（2026-07-01）**：三個策略類別（`Wav2LipStrategy`/`DinetStrategy`/`WebGLStrategy`）均未實作，`.ktx2`、ONNX 推論、Blendshapes 也都沒有對應程式碼。此節與第 14 節描述的協定（`SET_LIP_SYNC_MODE`）在程式碼裡只剩極簡骨架，詳見第 14 節補充。
+
 ### 6. ASR 與語音輸入 (Speech Recognition)
 
 * 使用瀏覽器原生的 `SpeechRecognition` 或 `webkitSpeechRecognition` API。
 * 當 `onresult` 觸發，拿到 final 辨識結果後，透過 WebSocket 送出 `{"event": "user_speak", "text": "..."}`。
 * 在送出文字的同時，停止 ASR 聆聽，並發送 `client_interrupt`（如果當前正在播放聲音），立即清空播放佇列，狀態切換為 `THINKING`。
+
+> **現況更新（2026-07-01）**：行為精神相符，但實作分層不同：`useAsr.ts` 只負責瀏覽器語音辨識本身並透過 callback 回傳文字，實際送出訊息、interrupt、狀態切換是由 `useAvatarChat.ts` 的 `sendMessage()` / `stopActiveResponse()` 處理，並非單一模組完成。
 
 ### 7. 狀態機控制 (State Transitions)
 
@@ -114,6 +133,8 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 * **THINKING** -> **SPEAKING**：觸發時機為 `audioQueue` 開始播放第一個 Chunk。行為：啟動 `renderLoop` 的對嘴繪製。
 * **SPEAKING** -> **IDLE**：觸發時機為收到 `is_final: true` 且 `audioQueue` 播放完畢。行為：清空 Canvas，停止繪製。
 * **任何狀態** -> **ERROR**：收到 `server_error` 時，暫停播放、在畫面上疊加錯誤提示。若 `retry_after_ms` 存在，倒數後自動恢復為 IDLE。
+
+> **現況更新（2026-07-01）**：`useAvatarChat.ts` 的 `AvatarState` 實際為 `DISCONNECTED | CONNECTING | RECONNECTING | IDLE | THINKING | SPEAKING | ERROR`，比規格多出連線相關的三個狀態。`SPEAKING → IDLE` 實際觸發時機是後端送出 `server_stop_audio` 事件，而非規格所述「`is_final` + 佇列播完」。`retry_after_ms` 倒數後自動恢復 IDLE 的邏輯目前**未實作**——只是把 `retry_after_ms` 透傳給呼叫端的 callback（見 `App.vue` 的 `onServerError`），沒有內建計時器自動恢復。
 
 ### 8. 素材清單與定位 (Asset Manifest)
 
@@ -149,6 +170,8 @@ assets/
 * `mouth_size`：嘴型圖片的繪製尺寸 (px)。
 * Canvas 繪製時，使用 `ctx.drawImage(sprite, offset.x, offset.y, size.w, size.h)`。
 
+> **現況更新（2026-07-01）**：全 repo 搜尋不到 `manifest.json`、`mouth_offset`、`mouth_size`，這是舊版「canvas 貼圖對嘴」方案的文件殘留。目前 DHLiveMini2 WASM engine 有自己的模型資料格式（見 `useMatesX.ts` 載入角色資料的方式），不使用此節描述的 manifest 結構。
+
 ### 9. 響應式設計 (Responsive Design)
 
 Avatar 容器需要適配多種螢幕尺寸：
@@ -183,6 +206,8 @@ function resizeAvatar() {
 window.addEventListener('resize', resizeAvatar);
 ```
 
+> **現況更新（2026-07-01）**：實作手法與規格不同。目前 `App.vue`/`AvatarCanvas.vue` 靠 CSS media queries + flex/grid 佈局（`.avatar-canvas` 用 `width:100%; height:100%; object-fit:contain` 填滿容器），沒有規格描述的 JS 動態計算 px 並手動設定 `container.style.width/height` 的做法，也沒有固定 1080×1920 基準尺寸的概念。全螢幕（immersive）模式另外實作了虛擬人鋪滿 + 浮動控制列/對話框的版面，屬於本節精神的延伸但形式不同。
+
 ### 10. 斷線恢復與弱網策略 (Reconnection & Fallback)
 
 WebSocket 連線不穩定時，前端必須自動恢復：
@@ -212,6 +237,8 @@ ws.onclose = () => { reconnect(); };
   方案 B：插入短暫閉嘴等待新 chunk 抵達
 ```
 
+> **現況更新（2026-07-01）**：10.2 的「方案 A」已實作——`App.vue` 的 `onAudioQueueEmpty()` 在佇列播完但 `isFinalReceived` 為 false 時，會啟動 3 秒 `underrunTimer`，逾時後 flush typewriter 並結束 `isTyping`，行為與規格描述一致。10.1 的 exponential backoff 重連機制存在於 WebSocket 連線邏輯中，細節（delay 公式、`RECONNECTING` 狀態顯示）與規格大致相符，但尚未逐行核對是否完全採用相同的 `1000 * 2^n` 公式與 30 秒上限。
+
 ### 11. 錯誤處理與使用者提示 (Error Display)
 
 收到 `server_error` 時的前端行為規範：
@@ -225,6 +252,8 @@ ws.onclose = () => { reconnect(); };
 | `SESSION_EXPIRED` | 自動重新發送 `client_init` | 自動恢復 |
 | `GATEWAY_TIMEOUT` | 浮動提示「插件服務回應逾時」 | 顯示提示 |
 | `UPLOAD_FAILED` | 紅色提示「檔案上傳失敗」 | 顯示提示 |
+
+> **現況更新（2026-07-01）**：`App.vue` 的 `onServerError` handler 確實存在，但對七個 `error_code` 多數沒有做規格表格裡的差異化畫面——大部分走同一條「toast + `retry_after_ms` 秒數提示」的籠統路徑（`statusToastRef.value?.show(...)`）。目前有特殊處理的只有：`RATE_LIMITED`（倒數 toast）、`SESSION_EXPIRED`（重新 `reinit`）、`BRAIN_UNAVAILABLE`/`AUTH_FAILED`（列入 `FATAL_ERROR_CODES`，觸發 `ErrorOverlay.vue` 全螢幕遮罩）。`TTS_TIMEOUT`、`LLM_OVERLOAD`、`GATEWAY_TIMEOUT`、`UPLOAD_FAILED` 目前沒有規格描述的專屬文案與圖示，只落入通用 toast 分支。
 
 ### 12. 知識庫管理面板 (Knowledge Base Admin Panel)
 
@@ -245,6 +274,8 @@ ws.onclose = () => { reconnect(); };
 #### 12.4 知識圖譜視圖 (Graph View)
 知識庫頁面新增 **Graph** 分頁，呼叫 Brain `/graph` endpoint 取得由 `graphify` skill 產出的節點/關係資料，在 Admin UI 中以互動式圖形呈現實體與關聯。此視圖與檔案/紀錄分頁並列，作為非結構化知識的視覺化檢索入口。
 
+> **現況更新（2026-07-01）**：`frontend/admin/src/pages/KnowledgeBase.tsx`（Tree + FileView）與 `components/kb/GraphView.tsx`（呼叫 `/graph/status`、`/graph/rebuild`）都已實作，12.1-12.4 的功能點大致到位。但 **`/admin/knowledge` 這個 URL 路徑實際不存在**——`frontend/admin` 沒有路由套件，頁面切換是靠 `components/app/navigation.ts` 的 tab 狀態 + localStorage，而非規格暗示的獨立路由頁面。
+
 ### 12.5 Admin 對話控制台 (Admin Chat Console)
 
 `/admin/chat` 提供與 Brain 互動的對話控制台，與知識庫面板共用同一套 `NavigationContext` 路由/分頁狀態。控制台包含下列能力：
@@ -256,6 +287,8 @@ ws.onclose = () => { reconnect(); };
 * **統一導覽 (`NavigationContext`)**：`AppSidebar`、`ChatSidebar`、各頁面共享單一導覽狀態，切換角色 (persona)、載入歷史 session、建立新對話都透過同一份 context 管理。
 * **設計 Token (RGB channels)**：`tailwind.config.js` 與 `index.css` 將語意色 (`primary`、`surface`、`danger` 等) 以 `R G B` 三通道形式暴露，讓 Tailwind 透明度修飾符 (`bg-primary/20` 等) 能夠正確運算。
 
+> **現況更新（2026-07-01）**：`/admin/chat` 的功能點（`SlashDropdown`、`useInputHistory`、`ActionRequestCard`、`NavigationContext`、`AppSidebar`、`ChatSidebar`）皆已實作且已接線，是本文件所有章節中與實作最貼近的一節。唯一落差：RGB channel 設計 token 只存在於 `frontend/admin`（有 `tailwind.config.js`）；`frontend/app`（虛擬人主前端）是純 CSS Vue app，沒有 Tailwind，兩個前端**不共用**設計系統，與規格暗示的統一 token 不符。
+
 ### 13. 媒體上傳工作流 (Media Upload Workflow)
 
 當使用者選取檔案（圖片/影片/文件）時，前端不透過 WebSocket 發送二進位資料，而是透過標準 HTTP POST 上傳至 Gateway：
@@ -264,6 +297,8 @@ ws.onclose = () => { reconnect(); };
 2. **Payload**: `multipart/form-data` (欄位名：`file`)
 3. **Response**: 取得 `job_id` 並記錄在前端狀態中。
 4. **Enrichment**: Gateway 處理完後會通知 Backend，Backend 再透過 WebSocket 發送 `gateway_status` 通知前端處理進度。
+
+> **現況更新（2026-07-01）**：與規格方向相反。`/uploads`、`multipart/form-data`、`GATEWAY_URL` 在兩個前端目錄都搜尋不到。實際攝影機影像走的是 **WebSocket 傳 base64**：`useAvatarChat.ts` 的 `sendVisualInput()` 組成 `client_video_frame` 事件連同 `frame_base64` 送出（`frontend/admin` 的 `useLiveSession.ts` 也是同樣模式），並非本節描述的 HTTP POST 上傳流程。若要落實此節，需要新增獨立的 HTTP 上傳端點與前端呼叫邏輯。
 
 ### 13. 網關狀態監控 (Gateway Status Monitoring)
 
@@ -303,3 +338,5 @@ ws.onmessage = (msg) => {
   │(2D卷積生成) │  │(高畫質邊緣推論)│ │(純CSR狀態機)    │
   └────────────┘  └──────────────┘ └───────────────┘
 ```
+
+> **現況更新（2026-07-01）**：`LipSyncManager` 與三個策略類別完全不存在，硬體偵測（`navigator.gpu`）、無縫動態降級皆未實作。協定層面只剩極簡骨架：大寫字面 `SET_LIP_SYNC_MODE` 搜尋不到，但底層以 snake_case `set_lip_sync_mode` 存在於 `useAvatarChat.ts`；不過 `currentLipSyncMode` 是**寫死的預設值 `'webgl'`**，沒有依硬體能力動態選擇或切換的邏輯。此節整體仍是設計願景，尚未落地。

@@ -74,6 +74,62 @@ async def test_handle_client_video_frame_feeds_visual_greeting_message(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_handle_client_video_frame_creates_relay_when_missing(monkeypatch):
+    """重連後 brain_live_relay 尚未建立時，攝影機打招呼事件仍須送達。
+
+    根因：_handle_client_video_frame 曾只在 relay 已存在時才轉發事件，
+    與 _handle_user_speak / _handle_client_audio_event 不同，兩者都會先
+    呼叫 _ensure_brain_relay。使用者若重連後只被攝影機看到、還沒開口，
+    relay 為 None，打招呼事件就被靜默丟棄。
+    """
+    plugin = types.SimpleNamespace(
+        describe_frame=AsyncMock(
+            return_value={
+                "status": "processed",
+                "session_id": "session-video",
+                "events": [
+                    {
+                        "key": "female",
+                        "name": "female_appeared",
+                        "context_text": _FEMALE_CONTEXT,
+                    }
+                ],
+            }
+        )
+    )
+    session = types.SimpleNamespace(
+        session_id="session-video",
+        metadata={"project_id": "store-a", "persona_id": "clerk"},
+        brain_live_relay=None,
+    )
+    websocket = types.SimpleNamespace(send_json=AsyncMock())
+
+    created_relay = types.SimpleNamespace(send_event=AsyncMock())
+
+    async def fake_ensure_brain_relay(sess, ws):
+        sess.brain_live_relay = created_relay
+
+    monkeypatch.setattr(websocket_routes, "get_camera_plugin", lambda: plugin)
+    monkeypatch.setattr(websocket_routes, "_ensure_brain_relay", fake_ensure_brain_relay)
+
+    await websocket_routes._handle_client_video_frame(
+        {
+            "event": "client_video_frame",
+            "frame_base64": base64.b64encode(b"jpeg-bytes").decode("ascii"),
+            "mime_type": "image/jpeg",
+            "timestamp": 1710123456,
+        },
+        session,
+        websocket,
+    )
+
+    sent = created_relay.send_event.await_args.args[0]
+    assert sent["event"] == "user_speak"
+    assert sent["text"] == _FEMALE_CONTEXT
+    assert sent["ephemeral"] is True
+
+
+@pytest.mark.asyncio
 async def test_handle_client_video_frame_busy_does_not_feed_relay(monkeypatch):
     plugin = types.SimpleNamespace(
         describe_frame=AsyncMock(return_value={"status": "busy", "session_id": "session-video"})
