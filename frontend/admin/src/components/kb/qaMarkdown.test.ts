@@ -4,6 +4,7 @@ import {
   createEmptyQaRow,
   hasIncompleteQaRows,
   hasUsableQaRow,
+  parseQaMarkdown,
   qaRowsToMarkdown,
 } from "./qaMarkdown";
 
@@ -61,5 +62,27 @@ describe("hasUsableQaRow", () => {
 
   it("全空為 false", () => {
     expect(hasUsableQaRow([createEmptyQaRow()])).toBe(false);
+  });
+});
+
+describe("parseQaMarkdown", () => {
+  it("與 qaRowsToMarkdown 互為反向", () => {
+    const rows = [
+      { question: "Q1", answer: "A1" },
+      { question: "Q2", answer: "A2\n多行內容" },
+    ];
+    expect(parseQaMarkdown(qaRowsToMarkdown(rows))).toEqual(rows);
+  });
+
+  it("沒有 heading 時回傳空陣列", () => {
+    expect(parseQaMarkdown("純文字，沒有問答格式")).toEqual([]);
+  });
+
+  it("最後一筆答案抓到內容結尾", () => {
+    const parsed = parseQaMarkdown("## Q1\n\nA1\n\n## Q2\n\nA2");
+    expect(parsed).toEqual([
+      { question: "Q1", answer: "A1" },
+      { question: "Q2", answer: "A2" },
+    ]);
   });
 });

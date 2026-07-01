@@ -12,10 +12,11 @@ import SourcePanel from "../components/kb/SourcePanel";
 import TreeView from "../components/kb/TreeView";
 import type { TreeNode } from "../components/kb/helpers";
 import { isUploadDerivedKnowledgeFile } from "../components/kb/helpers";
+import QaNodeWorkspace from "../components/kb/qa/QaNodeWorkspace";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 
-const KNOWLEDGE_TABS = ["documents", "graph"] as const;
+const KNOWLEDGE_TABS = ["documents", "qa_node_tree", "graph"] as const;
 type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number];
 
 export default function KnowledgeBase() {
@@ -115,7 +116,7 @@ export default function KnowledgeBase() {
   const { pendingToken, consumeSubView } = useNavigation();
   useEffect(() => {
     const view = consumeSubView("KnowledgeBase");
-    if (view === "graph" || view === "documents") {
+    if (view === "graph" || view === "documents" || view === "qa_node_tree") {
       setActiveTab(view);
     }
   }, [pendingToken, consumeSubView]);
@@ -192,6 +193,16 @@ export default function KnowledgeBase() {
               文件
             </button>
             <button
+              onClick={() => setActiveTab("qa_node_tree")}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                activeTab === "qa_node_tree"
+                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
+                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+              }`}
+            >
+              問答樹
+            </button>
+            <button
               onClick={() => setActiveTab("graph")}
               className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 activeTab === "graph"
@@ -241,6 +252,8 @@ export default function KnowledgeBase() {
 
       {activeTab === "graph" ? (
         <GraphView />
+      ) : activeTab === "qa_node_tree" ? (
+        <QaNodeWorkspace />
       ) : (
       <>
       {showSourcePanel && (

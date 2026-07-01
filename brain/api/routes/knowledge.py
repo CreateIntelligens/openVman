@@ -28,6 +28,7 @@ from knowledge.knowledge_admin import (
     delete_workspace_document,
     list_knowledge_base_directories,
     list_knowledge_base_documents,
+    list_qa_entries,
     list_workspace_documents,
     move_workspace_document,
     preview_workspace_document_normalization,
@@ -96,6 +97,12 @@ async def list_knowledge_base_documents_route(project_id: str = "default"):
         "document_count": len(documents),
         "directories": directories,
     }
+
+
+@router.get("/knowledge/qa", summary="取得所有已啟用 QA 來源的問答清單")
+async def list_knowledge_qa_route(project_id: str = "default"):
+    entries = list_qa_entries(project_id)
+    return {"entries": entries, "count": len(entries)}
 
 
 @router.get("/knowledge/document", summary="讀取單一知識文件")

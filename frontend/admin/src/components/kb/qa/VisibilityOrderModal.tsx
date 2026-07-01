@@ -1,0 +1,251 @@
+import { useEffect, useState } from "react";
+
+import type { QaNode } from "../../../hooks/useQaNodes";
+
+type NodeUpdate = { label?: string; hidden?: boolean };
+type NodeAction = Promise<unknown>;
+
+interface VisibilityOrderModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  parentNode: QaNode | null;
+  nodesTree: QaNode[];
+  onUpdateNode: (id: string, updates: NodeUpdate) => NodeAction;
+  onReorderNode: (id: string, siblingIdsOrdered: string[]) => NodeAction;
+  onRefresh: () => NodeAction;
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+export default function VisibilityOrderModal({
+  isOpen,
+  onClose,
+  parentNode,
+  nodesTree,
+  onUpdateNode,
+  onReorderNode,
+  onRefresh,
+}: VisibilityOrderModalProps) {
+  const [localNodes, setLocalNodes] = useState<QaNode[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const list = parentNode ? parentNode.children ?? [] : nodesTree;
+      setLocalNodes([...list]);
+      setError(null);
+    }
+  }, [isOpen, parentNode, nodesTree]);
+
+  if (!isOpen) return null;
+
+  const moveLocalNode = (index: number, offset: -1 | 1) => {
+    const targetIndex = index + offset;
+    if (targetIndex < 0 || targetIndex >= localNodes.length) return;
+
+    const updated = [...localNodes];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+    setLocalNodes(updated);
+  };
+
+  const handleMoveUp = (index: number) => {
+    moveLocalNode(index, -1);
+  };
+
+  const handleMoveDown = (index: number) => {
+    moveLocalNode(index, 1);
+  };
+
+  const handleToggleHidden = (index: number) => {
+    const updated = [...localNodes];
+    updated[index] = {
+      ...updated[index],
+      hidden: !updated[index].hidden,
+    };
+    setLocalNodes(updated);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const originalNodes = parentNode ? parentNode.children ?? [] : nodesTree;
+      const originalMap = new Map(originalNodes.map((n) => [n.node_id, n]));
+
+      for (const node of localNodes) {
+        const original = originalMap.get(node.node_id);
+        if (original && original.hidden !== node.hidden) {
+          await onUpdateNode(node.node_id, { hidden: node.hidden });
+        }
+      }
+
+      const finalIdsOrdered = localNodes.map((n) => n.node_id);
+      const originalIds = originalNodes.map((n) => n.node_id);
+      const hasOrderChanged = finalIdsOrdered.some((id, idx) => id !== originalIds[idx]);
+
+      if (hasOrderChanged && finalIdsOrdered.length > 0) {
+        await onReorderNode(finalIdsOrdered[0], finalIdsOrdered);
+      }
+
+      await onRefresh();
+      onClose();
+    } catch (error: unknown) {
+      setError(errorMessage(error, "儲存變更失敗，請重試。"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[1.5rem]">
+              sort
+            </span>
+            <div>
+              <span className="text-base font-semibold text-slate-900 dark:text-white">
+                批次調整可見性與順序
+              </span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                於父節點：{parentNode ? parentNode.label : "根節點目錄"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[1.25rem]">close</span>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm dark:bg-red-950/20 dark:border-red-900 dark:text-red-400">
+              {error}
+            </div>
+          )}
+
+          {localNodes.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 dark:text-slate-500">
+              該層級下尚無任何子節點。
+            </div>
+          ) : (
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    <th className="py-3 px-4">原始順序</th>
+                    <th className="py-3 px-4">識別 ID</th>
+                    <th className="py-3 px-4">節點名稱</th>
+                    <th className="py-3 px-4">顯示狀態</th>
+                    <th className="py-3 px-4 text-right">順序調整</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
+                  {localNodes.map((node, idx) => (
+                    <tr
+                      key={node.node_id}
+                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 text-slate-700 dark:text-slate-300 transition-colors"
+                    >
+                      <td className="py-3.5 px-4 text-xs font-mono text-slate-400">
+                        {idx + 1}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-xs">
+                        {node.node_id}
+                      </td>
+                      <td className="py-3.5 px-4 font-medium">
+                        {node.label}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <button
+                          onClick={() => handleToggleHidden(idx)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                            node.hidden
+                              ? "bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400"
+                              : "bg-green-50 hover:bg-green-100 text-green-700 dark:bg-green-950/30 dark:hover:bg-green-950/60 dark:text-green-400"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[1rem]">
+                            {node.hidden ? "visibility_off" : "visibility"}
+                          </span>
+                          {node.hidden ? "已隱藏" : "顯示中"}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleMoveUp(idx)}
+                            disabled={idx === 0}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                            title="上移"
+                          >
+                            <span className="material-symbols-outlined text-[1.25rem]">
+                              arrow_upward
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleMoveDown(idx)}
+                            disabled={idx === localNodes.length - 1}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                            title="下移"
+                          >
+                            <span className="material-symbols-outlined text-[1.25rem]">
+                              arrow_downward
+                            </span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            disabled={saving}
+          >
+            取消
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || localNodes.length === 0}
+            className="px-5 py-2 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-md shadow-blue-500/10"
+          >
+            {saving ? (
+              <>
+                <span className="material-symbols-outlined text-[1.1rem] animate-spin">
+                  sync
+                </span>
+                儲存中...
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-[1.1rem]">save</span>
+                儲存變更
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

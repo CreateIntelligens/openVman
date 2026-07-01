@@ -10,7 +10,6 @@ import {
   addPendingExchange,
   getConversationTitle,
   removeEmptyAssistantDraft,
-  starterPrompts,
 } from "../components/chat/helpers";
 import {
   readPrivacyWarningsVisible,
@@ -22,6 +21,7 @@ import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
 import { useInputHistory } from "./useInputHistory";
+import { useStarterPrompts } from "./useStarterPrompts";
 
 const STOP_REPLY_NOTICE = "已停止回覆";
 const STOP_REPLY_NOTICE_MS = 2500;
@@ -204,6 +204,7 @@ export function useChatSession() {
   } = useSlashAutocomplete(input, setInput);
 
   const { push: pushHistory, seed: seedHistory, onKeyDown: onHistoryKeyDown } = useInputHistory();
+  const starterPrompts = useStarterPrompts();
 
   useEffect(() => {
     if (sending) return;

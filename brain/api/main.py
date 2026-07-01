@@ -21,6 +21,7 @@ from memory.memory_governance import maybe_run_memory_maintenance
 from routes.chat import router as chat_router
 from routes.health import router as health_router
 from routes.knowledge import router as knowledge_router
+from routes.knowledge_qa import router as knowledge_qa_router
 from routes.memory import router as memory_router
 from routes.personas import router as personas_router
 from routes.projects import router as projects_router
@@ -244,6 +245,7 @@ for router in (
     memory_router,
     sessions_router,
     knowledge_router,
+    knowledge_qa_router,
     workspace_router,
     protocol_router,
 ):

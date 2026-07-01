@@ -37,6 +37,7 @@ def _load_knowledge_routes_module():
         delete_workspace_document=lambda *args, **kwargs: None,
         list_knowledge_base_directories=lambda *args, **kwargs: [],
         list_knowledge_base_documents=lambda *args, **kwargs: [],
+        list_qa_entries=lambda *args, **kwargs: [],
         list_workspace_documents=lambda *args, **kwargs: [],
         move_workspace_document=lambda *args, **kwargs: {},
         preview_workspace_document_normalization=lambda *args, **kwargs: {},

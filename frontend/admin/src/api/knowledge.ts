@@ -22,7 +22,7 @@ export interface KnowledgeDocumentSummary {
   is_indexable: boolean;
   is_indexed: boolean;
   preview: string;
-  source_type: "upload" | "web" | "manual";
+  source_type: "upload" | "web" | "manual" | "qa";
   source_url: string | null;
   enabled: boolean;
   created_at: string;
@@ -62,8 +62,23 @@ export interface KnowledgeDocumentMetaResponse {
   status: string;
   path: string;
   enabled: boolean;
-  source_type: "upload" | "web" | "manual";
+  source_type: "upload" | "web" | "manual" | "qa";
   source_url: string | null;
+}
+
+export interface KnowledgeQaEntry {
+  path: string;
+  question: string;
+  answer: string;
+}
+
+export interface KnowledgeQaEntriesResponse {
+  entries: KnowledgeQaEntry[];
+  count: number;
+}
+
+export function fetchKnowledgeQaEntries() {
+  return get<KnowledgeQaEntriesResponse>(knowledgePath("/qa"));
 }
 
 export interface KnowledgeNoteResponse {
@@ -265,7 +280,7 @@ export function updateKnowledgeDocumentMeta(
   path: string,
   metadata: {
     enabled?: boolean;
-    source_type?: "upload" | "web" | "manual";
+    source_type?: "upload" | "web" | "manual" | "qa";
     source_url?: string | null;
   },
 ) {

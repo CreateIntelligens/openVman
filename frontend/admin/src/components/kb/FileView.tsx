@@ -1,6 +1,7 @@
 import type { KnowledgeDocument, KnowledgeDocumentSummary } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
 import { formatSize, formatDate, isUploadDerivedKnowledgeFile } from "./helpers";
+import QaEntriesView from "./QaEntriesView";
 import StatusDot from "./StatusDot";
 import SourceBadge from "./SourceBadge";
 
@@ -34,6 +35,7 @@ export default function FileView({
   renormalizing?: boolean;
 }) {
   const showsUploadNotice = document ? isUploadDerivedKnowledgeFile(document) : false;
+  const isQaDocument = document?.source_type === "qa";
 
   if (loading) {
     return (
@@ -139,11 +141,17 @@ export default function FileView({
         {/* Right: Live Preview */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
-            <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">預覽</span>
+            <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">
+              {isQaDocument ? "問答清單" : "預覽"}
+            </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 prose-container">
-            <MarkdownPreview content={editContent} />
-          </div>
+          {isQaDocument ? (
+            <QaEntriesView content={editContent} />
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4 prose-container">
+              <MarkdownPreview content={editContent} />
+            </div>
+          )}
         </div>
       </div>
 

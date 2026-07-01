@@ -8,7 +8,7 @@ export const defaultPersona: PersonaSummary = {
   is_default: true,
 };
 
-export const starterPrompts = [
+export const fallbackStarterPrompts = [
   "你好，請介紹一下你的功能",
   "幫我查詢目前的知識庫內容",
   "說明你能處理哪些類型的問題",

@@ -14,10 +14,10 @@ from knowledge.doc_meta import (
     upsert_document_meta,
 )
 from knowledge.indexer import fingerprint_document, load_index_state
+from knowledge.qa_csv import parse_qa_markdown
 from knowledge.workspace import (
     ensure_workspace_scaffold,
     get_core_documents,
-    get_workspace_root,
     is_indexable_document,
     iter_knowledge_documents,
     iter_workspace_documents,
@@ -409,6 +409,31 @@ def _build_document_summary(
         "enabled": document_meta["enabled"],
         "created_at": document_meta["created_at"],
     }
+
+
+def _parse_qa_markdown(content: str, relative_path: str) -> list[dict[str, str]]:
+    """Return ``{path, question, answer}`` QA entries for a markdown source.
+
+    Thin adapter over the shared :func:`knowledge.qa_csv.parse_qa_markdown`
+    parser; drops the img/url metadata the flat entry list does not need.
+    """
+    return [
+        {"path": relative_path, "question": entry["q"], "answer": entry["a"]}
+        for entry in parse_qa_markdown(content)
+    ]
+
+
+def list_qa_entries(project_id: str = "default") -> list[dict[str, str]]:
+    """Return every question/answer pair from enabled QA-sourced documents."""
+    entries: list[dict[str, str]] = []
+    for path in iter_knowledge_documents(project_id):
+        relative_path = path.relative_to(ensure_workspace_scaffold(project_id)).as_posix()
+        meta = get_document_meta(relative_path, project_id)
+        if meta["source_type"] != "qa" or not meta["enabled"]:
+            continue
+        content = path.read_text(encoding="utf-8-sig")
+        entries.extend(_parse_qa_markdown(content, relative_path))
+    return entries
 
 
 def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
