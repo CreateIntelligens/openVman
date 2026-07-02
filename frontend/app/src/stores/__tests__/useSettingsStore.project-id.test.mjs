@@ -32,6 +32,13 @@ test("avatar settings persist stage background preferences", () => {
   assert.match(storeSource, /watch\(\(\) => state\.backgroundFit,\s*\(v\) => writePref\(STORAGE_KEYS\.BACKGROUND_FIT,\s*v\)\)/);
 });
 
+test("avatar settings persist camera preview scale", () => {
+  assert.match(storageSource, /CAMERA_PREVIEW_SCALE:\s*"avatar\.camera_preview_scale"/);
+  assert.match(storeSource, /function normalizeCameraPreviewScale\(value: string\): number/);
+  assert.match(storeSource, /cameraPreviewScale:\s*normalizeCameraPreviewScale\(readPref\(STORAGE_KEYS\.CAMERA_PREVIEW_SCALE,\s*"1"\)\)/);
+  assert.match(storeSource, /watch\(\(\) => state\.cameraPreviewScale,\s*\(v\) => writePref\(STORAGE_KEYS\.CAMERA_PREVIEW_SCALE,\s*String\(v\)\)\)/);
+});
+
 test("avatar settings accept uploaded background ids", () => {
   assert.match(backgroundTypeSource, /type UploadedAvatarBackgroundId = `uploaded:\$\{string\}`/);
   assert.match(backgroundTypeSource, /isUploadedAvatarBackgroundId/);

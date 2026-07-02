@@ -18,6 +18,15 @@ function cssBlockAfter(marker, selector) {
   return source.slice(bodyStart + 1, bodyEnd);
 }
 
+function cssBlock(selector) {
+  const start = source.indexOf(`${selector} {`);
+  assert.notEqual(start, -1, `missing CSS block for ${selector}`);
+  const bodyStart = source.indexOf("{", start);
+  const bodyEnd = source.indexOf("\n}", bodyStart);
+  assert.notEqual(bodyEnd, -1, `missing CSS block end for ${selector}`);
+  return source.slice(bodyStart + 1, bodyEnd);
+}
+
 const kioskStackedMarker = "@media (max-width: 68.75rem) {\n  .app-shell";
 const phoneGlobalMarker = "@media (max-width: 48rem) {\n  html, body, #app";
 const phoneScopedMarker = "@media (max-width: 48rem) {\n  .app-shell";
@@ -49,6 +58,25 @@ test("desktop layout keeps avatar left and controls with chat on the right", () 
   assert.match(cssBlockAfter(".stage-panel", ".stage-panel"), /grid-area:\s*stage;/);
   assert.match(cssBlockAfter(".control-area", ".control-area"), /grid-area:\s*controls;/);
   assert.match(cssBlockAfter(".chat-area", ".chat-area"), /grid-area:\s*chat;/);
+});
+
+test("immersive camera mode moves the chat panel left and enlarges camera preview", () => {
+  assert.match(source, /:style="cameraPreviewStyle"/);
+  assert.match(source, /'camera-active':\s*webcam\.active\.value/);
+  assert.match(source, /:camera-preview-scale="settings\.cameraPreviewScale"/);
+  assert.match(source, /@camera-preview-scale-change="handleCameraPreviewScaleChange"/);
+  assert.match(
+    cssBlock(".app-shell.immersive.camera-active .chat-area"),
+    /left:\s*clamp\(1rem,\s*6vw,\s*6rem\);/,
+  );
+  assert.match(
+    cssBlock(".app-shell.immersive.camera-active .chat-area"),
+    /transform:\s*none;/,
+  );
+  assert.match(
+    cssBlock(".app-shell.immersive.camera-active .stage-frame :deep(.camera-preview)"),
+    /width:\s*clamp\(calc\(15rem \* var\(--camera-preview-scale,\s*1\)\),\s*calc\(30vw \* var\(--camera-preview-scale,\s*1\)\),\s*calc\(28rem \* var\(--camera-preview-scale,\s*1\)\)\);/,
+  );
 });
 
 test("kiosk RWD stacks the layout while keeping the page viewport locked", () => {

@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   BACKGROUND_ID: "avatar.background_id",
   BACKGROUND_URL: "avatar.background_url",
   BACKGROUND_FIT: "avatar.background_fit",
+  CAMERA_PREVIEW_SCALE: "avatar.camera_preview_scale",
 } as const
 
 export function readPref(key: string, fallback: string): string {

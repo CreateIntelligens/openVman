@@ -25,6 +25,23 @@
         {{ cameraActive ? '關鏡頭' : '開鏡頭' }}
       </button>
 
+      <label
+        v-if="cameraActive && immersive"
+        class="camera-size-control"
+        title="鏡頭大小"
+      >
+        <span>鏡頭大小</span>
+        <input
+          type="range"
+          min="0.85"
+          max="1.35"
+          step="0.05"
+          :value="cameraPreviewScale ?? 1"
+          aria-label="調整鏡頭大小"
+          @input="handleCameraPreviewScaleInput"
+        />
+      </label>
+
       <button class="settings-btn" :disabled="disabled" @click="$emit('openSettings')" title="系統設定">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
@@ -75,13 +92,21 @@ defineProps<{
   cameraActive?: boolean
   cameraDisabled?: boolean
   immersive?: boolean
+  cameraPreviewScale?: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   openSettings: []
   toggleCamera: []
   toggleImmersive: []
+  cameraPreviewScaleChange: [scale: number]
 }>()
+
+function handleCameraPreviewScaleInput(event: Event): void {
+  const target = event.target as HTMLInputElement | null
+  if (!target) return
+  emit("cameraPreviewScaleChange", Number(target.value))
+}
 </script>
 
 <style scoped>
@@ -152,6 +177,26 @@ defineEmits<{
 .camera-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.camera-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 9rem;
+  padding: 0.35rem 0.7rem;
+  border: var(--hairline) solid rgba(15, 23, 42, 0.12);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.45);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.camera-size-control input {
+  width: 6rem;
+  accent-color: var(--primary);
 }
 
 .settings-btn {

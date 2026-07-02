@@ -1,5 +1,9 @@
 <template>
-  <div class="app-shell" :class="{ immersive }">
+  <div
+    class="app-shell"
+    :class="{ immersive, 'camera-active': webcam.active.value }"
+    :style="cameraPreviewStyle"
+  >
     <main class="kiosk-layout">
       <ControlBar
         class="control-area"
@@ -8,9 +12,11 @@
         :error-message="wasm.error.value"
         :camera-active="webcam.active.value"
         :immersive="immersive"
+        :camera-preview-scale="settings.cameraPreviewScale"
         @open-settings="showSettings = true"
         @toggle-camera="handleToggleCamera"
         @toggle-immersive="handleToggleImmersive"
+        @camera-preview-scale-change="handleCameraPreviewScaleChange"
       />
 
       <section class="stage-panel">
@@ -371,6 +377,10 @@ const chatPlaceholder = computed(() => {
   return "向數位虛擬人提問...";
 });
 
+const cameraPreviewStyle = computed<Record<string, string>>(() => ({
+  "--camera-preview-scale": String(settings.cameraPreviewScale),
+}));
+
 async function handleSend(text: string): Promise<void> {
   if (!isStarted.value) {
     try {
@@ -479,6 +489,10 @@ const asr = useAsr({
 
 function handleAsrToggle(): void {
   if (asr.isListening.value) asr.stop(); else asr.start();
+}
+
+function handleCameraPreviewScaleChange(scale: number): void {
+  settings.cameraPreviewScale = scale;
 }
 
 const webcam = useWebcamCapture({
@@ -728,6 +742,18 @@ body {
   transform: translateX(-50%);
 }
 
+.app-shell.immersive.camera-active .chat-area {
+  left: clamp(1rem, 6vw, 6rem);
+  width: min(34rem, 56vw, calc(100% - 2rem));
+  transform: none;
+}
+
+.app-shell.immersive.camera-active .stage-frame :deep(.camera-preview) {
+  right: clamp(1rem, 3vw, 2.5rem);
+  bottom: clamp(1rem, 3dvh, 2.5rem);
+  width: clamp(calc(15rem * var(--camera-preview-scale, 1)), calc(30vw * var(--camera-preview-scale, 1)), calc(28rem * var(--camera-preview-scale, 1)));
+}
+
 .app-shell.immersive .chat-area :deep(.chat-msg) {
   background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(0.5rem);
@@ -835,6 +861,17 @@ body {
     min-height: 0;
     height: auto;
     overflow: visible;
+  }
+
+  .app-shell.immersive.camera-active .chat-area {
+    left: 1rem;
+    width: min(28rem, calc(100% - 2rem));
+  }
+
+  .app-shell.immersive.camera-active .stage-frame :deep(.camera-preview) {
+    top: clamp(5rem, 16svh, 7rem);
+    bottom: auto;
+    width: clamp(calc(10.5rem * var(--camera-preview-scale, 1)), calc(42vw * var(--camera-preview-scale, 1)), calc(14rem * var(--camera-preview-scale, 1)));
   }
 }
 

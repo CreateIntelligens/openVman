@@ -12,3 +12,12 @@ test("control bar presents one merged virtual human console title", () => {
   assert.doesNotMatch(source, /Reception Console/);
   assert.doesNotMatch(source, /control-bar__eyebrow/);
 });
+
+test("immersive camera mode exposes a camera size slider", () => {
+  assert.match(source, /cameraPreviewScale\?:\s*number/);
+  assert.match(source, /cameraPreviewScaleChange:\s*\[scale:\s*number\]/);
+  assert.match(source, /v-if="cameraActive && immersive"/);
+  assert.match(source, /type="range"/);
+  assert.match(source, /min="0\.85"/);
+  assert.match(source, /max="1\.35"/);
+});
