@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -54,17 +55,27 @@ def list_knowledge_base_directories(project_id: str = "default") -> list[str]:
     )
 
 
+def _list_document_summaries(paths: Iterable[Path], project_id: str) -> list[dict[str, Any]]:
+    """Build summaries with per-list shared index/QA-reference state."""
+    from knowledge.qa_nodes import referenced_source_paths
+
+    index_state = load_index_state(project_id)
+    qa_paths = referenced_source_paths(project_id)
+    return [
+        _build_document_summary(path, project_id, index_state=index_state, qa_referenced_paths=qa_paths)
+        for path in paths
+    ]
+
+
 def list_knowledge_base_documents(project_id: str = "default") -> list[dict[str, Any]]:
     """Return documents under the workspace knowledge/ directory."""
-    index_state = load_index_state(project_id)
-    return [_build_document_summary(path, project_id, index_state=index_state) for path in iter_knowledge_documents(project_id)]
+    return _list_document_summaries(iter_knowledge_documents(project_id), project_id)
 
 
 def list_workspace_documents(project_id: str = "default") -> list[dict[str, Any]]:
     """Return editable documents under the workspace."""
     ensure_workspace_scaffold(project_id)
-    index_state = load_index_state(project_id)
-    return [_build_document_summary(path, project_id, index_state=index_state) for path in iter_workspace_documents(project_id)]
+    return _list_document_summaries(iter_workspace_documents(project_id), project_id)
 
 
 def read_workspace_document(relative_path: str, project_id: str = "default") -> dict[str, Any]:
@@ -373,6 +384,7 @@ def _build_document_summary(
     project_id: str = "default",
     content: str | None = None,
     index_state: dict[str, str] | None = None,
+    qa_referenced_paths: set[str] | None = None,
 ) -> dict[str, Any]:
     root = ensure_workspace_scaffold(project_id)
     relative_path = path.relative_to(root)
@@ -393,6 +405,17 @@ def _build_document_summary(
             is_indexed = stored_fp == fingerprint_document(path)
     document_meta = get_document_meta(relative_text, project_id)
 
+    qa_attached = False
+    if document_meta["source_type"] == "qa":
+        from knowledge.qa_nodes import referenced_source_paths
+
+        paths = (
+            qa_referenced_paths
+            if qa_referenced_paths is not None
+            else referenced_source_paths(project_id)
+        )
+        qa_attached = relative_text in paths
+
     return {
         "path": relative_text,
         "title": path.stem,
@@ -408,6 +431,7 @@ def _build_document_summary(
         "source_url": document_meta["source_url"],
         "enabled": document_meta["enabled"],
         "created_at": document_meta["created_at"],
+        "qa_attached": qa_attached,
     }
 
 
@@ -451,6 +475,7 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
     """
     from knowledge.converters import SUPPORTED_SUFFIXES, convert_to_text
     from knowledge.normalizer import normalize_to_markdown
+    from knowledge.qa_csv import is_qa_csv
 
     root = ensure_workspace_scaffold(project_id)
     raw_root = root / "raw"
@@ -465,13 +490,20 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
             skipped.append(rel_in_raw.as_posix())
             continue
 
+        is_qa = src.suffix.lower() == ".csv" and is_qa_csv(src.read_bytes())
+
         text = convert_to_text(src)
         if not text:
             # Unsupported in practice / extraction failed: leave it in raw/.
             skipped.append(rel_in_raw.as_posix())
             continue
 
-        cleaned = normalize_to_markdown(text)
+        if is_qa:
+            # QA CSV conversion already emits structured per-question markdown
+            # with qa_metadata comments; LLM cleaning would mangle them.
+            cleaned = text
+        else:
+            cleaned = normalize_to_markdown(text)
         if not cleaned:
             skipped.append(rel_in_raw.as_posix())
             continue
@@ -481,7 +513,9 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
         dest = resolve_workspace_document(target_rel.as_posix(), project_id)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(cleaned, encoding="utf-8")
-        upsert_document_meta(target_rel.as_posix(), project_id, source_type="upload")
+        upsert_document_meta(
+            target_rel.as_posix(), project_id, source_type="qa" if is_qa else "upload"
+        )
         src.unlink()
         committed.append(target_rel.as_posix())
 

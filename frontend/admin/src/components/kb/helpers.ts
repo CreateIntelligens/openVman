@@ -2,7 +2,8 @@ import type { KnowledgeDocumentSummary } from "../../api";
 
 /* ── Types ── */
 
-export type SourceMode = "upload" | "web" | "manual" | "qa";
+export type SourceMode = "upload" | "web" | "manual";
+export type SourceType = SourceMode | "qa";
 export type DeleteTarget = { type: "file" | "dir"; value: string } | null;
 export type RightPane = "folder" | "file";
 
@@ -16,12 +17,11 @@ export interface TreeNode {
 
 /* ── Constants ── */
 
-export const SOURCE_MODES: SourceMode[] = ["upload", "web", "manual", "qa"];
+export const SOURCE_MODES: SourceMode[] = ["upload", "web", "manual"];
 export const SOURCE_MODE_COPY: Record<SourceMode, string> = {
-  upload: "上傳本地檔案到目前資料夾。",
+  upload: "上傳本地文件到目前資料夾。",
   web: "貼網址後擷取頁面內容。",
-  manual: "直接貼上筆記或整理好的內容，存成可索引來源。",
-  qa: "用多列 Q&A 建立帶 heading 的 Markdown 來源。",
+  manual: "手動建立筆記內容。",
 };
 
 /* ── Formatters ── */
@@ -42,7 +42,7 @@ export function isUploadDerivedKnowledgeFile(doc: { source_type: string; path: s
   return doc.source_type === "upload" && doc.path.startsWith("knowledge/");
 }
 
-export function getSourceMeta(sourceType: SourceMode) {
+export function getSourceMeta(sourceType: SourceType) {
   switch (sourceType) {
     case "web":
       return { icon: "language", label: "網頁", chipClass: "border-sky-500/30 bg-sky-500/10 text-sky-300" };

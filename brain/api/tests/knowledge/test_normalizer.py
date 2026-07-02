@@ -19,21 +19,23 @@ if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
 
-def _load_normalizer():
-    """Import knowledge.normalizer with heavy core.llm_client stubbed out."""
+@pytest.fixture
+def normalizer(monkeypatch):
+    """Import knowledge.normalizer with heavy core.llm_client stubbed out.
+
+    The stub goes in via monkeypatch.setitem so the real core.llm_client is
+    restored after each test; knowledge.normalizer is evicted on teardown too,
+    since its import bound symbols from the stub.
+    """
     fake_llm = types.ModuleType("core.llm_client")
     fake_llm.generate_chat_reply = lambda messages, privacy_source=None: ""
     # graph_extractor (imported for _split_text) needs this symbol too.
     fake_llm.generate_chat_turn = lambda messages, privacy_source=None: None
-    sys.modules["core.llm_client"] = fake_llm
+    monkeypatch.setitem(sys.modules, "core.llm_client", fake_llm)
 
     sys.modules.pop("knowledge.normalizer", None)
-    return importlib.import_module("knowledge.normalizer")
-
-
-@pytest.fixture
-def normalizer():
-    return _load_normalizer()
+    yield importlib.import_module("knowledge.normalizer")
+    sys.modules.pop("knowledge.normalizer", None)
 
 
 def test_single_short_segment_calls_llm_once(normalizer, monkeypatch):

@@ -1,4 +1,5 @@
 import MarkdownPreview from "../MarkdownPreview";
+import { useModalDismiss } from "./useModalDismiss";
 
 interface NormalizationPreviewModalProps {
   path: string;
@@ -17,13 +18,12 @@ export default function NormalizationPreviewModal({
 }: NormalizationPreviewModalProps) {
   const actionIcon = applying ? "sync" : "check";
   const actionLabel = applying ? "套用中..." : "套用整理";
+  const dismiss = useModalDismiss(onClose);
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
+      {...dismiss}
     >
       <div className="flex max-h-[86dvh] w-[min(64rem,92vw)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-800">

@@ -7,6 +7,7 @@ import {
   get,
   getActiveProjectId,
 } from "../api/common";
+import { errorMessage } from "../utils/errorMessage";
 
 export interface QaEntry {
   question: string;
@@ -36,23 +37,12 @@ export interface MergedQaItem {
   hidden?: boolean;
 }
 
-export type ManualQaInput = {
-  q: string;
-  a: string;
-  img?: string;
-  url?: string;
-};
-
 function qaProjectUrl(path: string): string {
   return apiUrl(path, { project_id: getActiveProjectId() });
 }
 
 function nodePath(id: string, suffix = ""): string {
   return `/knowledge/qa/nodes/${encodeURIComponent(id)}${suffix}`;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function qaJson<T>(path: string, method: string, body?: unknown): Promise<T> {
@@ -146,13 +136,13 @@ export function useQaNodes() {
     () => qaJson<QaNode>(nodePath(id, "/reorder"), "POST", { sibling_ids_ordered: siblingIdsOrdered }),
     "Failed to reorder QA node", true), [run]);
 
-  const uploadCsv = useCallback((id: string, file: File) => run(
-    () => qaFormData<{ status: string }>(nodePath(id, "/upload-csv"), file),
-    "Failed to upload CSV", true), [run]);
+  const attachSource = useCallback((id: string, path: string) => run(
+    () => qaJson<{ status: string; added: number }>(nodePath(id, "/attach-source"), "POST", { path }),
+    "Failed to attach QA source", true), [run]);
 
-  const addManualQa = useCallback((id: string, qaEntry: ManualQaInput | ManualQaInput[]) => run(
-    () => qaJson<{ status: string }>(nodePath(id, "/manual"), "POST", qaEntry),
-    "Failed to add manual QA", true), [run]);
+  const detachSource = useCallback((id: string, path: string) => run(
+    () => qaJson<{ status: string; removed: number }>(nodePath(id, "/detach-source"), "POST", { path }),
+    "Failed to detach QA source", true), [run]);
 
   const fetchMergedQa = useCallback((id: string) => run(
     () => get<MergedQaItem[]>(nodePath(id, "/merged")),
@@ -184,8 +174,8 @@ export function useQaNodes() {
     deleteNode,
     moveNode,
     reorderNode,
-    uploadCsv,
-    addManualQa,
+    attachSource,
+    detachSource,
     fetchMergedQa,
     saveMergedQa,
     uploadImage,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { KnowledgeDocumentSummary } from "../../api";
+import { useModalDismiss } from "./useModalDismiss";
 
 export default function MoveModal({
   sourcePath,
@@ -37,9 +38,13 @@ export default function MoveModal({
   const sortedDirs = [...dirs].sort();
   const sourceDir = sourcePath.split("/").slice(0, -1).join("/");
   const filename = sourcePath.split("/").pop() || "";
+  const dismiss = useModalDismiss(onClose);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      {...dismiss}
+    >
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] flex flex-col mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2 min-w-0">

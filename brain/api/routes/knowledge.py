@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 
 from core.chat_service import record_generation_failure
+from knowledge.doc_meta import get_document_meta
 from knowledge.graph import (
     GRAPH_SUBDIR,
     EmptyGraphError,
@@ -14,7 +16,6 @@ from knowledge.graph import (
     load_project_summary,
     rebuild_project_graph,
 )
-from knowledge.workspace import get_workspace_root
 from knowledge.indexer import (
     has_stale_documents,
     rebuild_knowledge_index,
@@ -40,6 +41,7 @@ from knowledge.knowledge_admin import (
     save_workspace_note,
     update_workspace_document_meta,
 )
+from knowledge.workspace import get_workspace_root
 from protocol.schemas import (
     AdminActionRequest,
     KnowledgeDocumentActionRequest,
@@ -99,6 +101,20 @@ async def list_knowledge_base_documents_route(project_id: str = "default"):
     }
 
 
+def _assert_qa_not_attached(path: str, project_id: str) -> None:
+    """Block edits to QA docs that a QA-tree node references.
+
+    Unattached QA documents are ordinary documents-workspace citizens; only
+    tree-referenced ones are locked to keep node entries consistent.
+    """
+    if get_document_meta(path, project_id).get("source_type") != "qa":
+        return
+    from knowledge.qa_nodes import is_source_referenced
+
+    if is_source_referenced(path, project_id):
+        raise HTTPException(status_code=400, detail="此 QA 文件已被問答樹掛載，請先於問答樹卸載來源")
+
+
 @router.get("/knowledge/qa", summary="取得所有已啟用 QA 來源的問答清單")
 async def list_knowledge_qa_route(project_id: str = "default"):
     entries = list_qa_entries(project_id)
@@ -117,6 +133,7 @@ async def get_knowledge_document_route(path: str, project_id: str = "default"):
 
 @router.put("/knowledge/document", summary="儲存知識文件")
 async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
+    _assert_qa_not_attached(payload.path, payload.project_id)
     try:
         document = save_workspace_document(payload.path, payload.content, payload.project_id)
     except ValueError as exc:
@@ -150,6 +167,7 @@ async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatc
 
 @router.delete("/knowledge/document", summary="刪除知識文件")
 async def delete_knowledge_document_route(path: str, project_id: str = "default"):
+    _assert_qa_not_attached(path, project_id)
     try:
         delete_workspace_document(path, project_id)
     except ValueError as exc:
@@ -162,6 +180,7 @@ async def delete_knowledge_document_route(path: str, project_id: str = "default"
 
 @router.post("/knowledge/move", summary="移動/重新命名知識文件")
 async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
+    _assert_qa_not_attached(payload.source_path, payload.project_id)
     try:
         document = move_workspace_document(payload.source_path, payload.target_path, payload.project_id)
     except ValueError as exc:
@@ -224,6 +243,7 @@ async def preview_renormalize_knowledge_document_route(
     payload: KnowledgeDocumentActionRequest,
 ):
     pid = payload.project_id
+    _assert_qa_not_attached(payload.path, pid)
     try:
         document = await asyncio.to_thread(
             preview_workspace_document_normalization, payload.path, pid
@@ -243,6 +263,7 @@ async def apply_renormalize_knowledge_document_route(
     payload: KnowledgeDocumentPutRequest,
 ):
     pid = payload.project_id
+    _assert_qa_not_attached(payload.path, pid)
     try:
         document = await asyncio.to_thread(
             apply_workspace_document_normalization, payload.path, payload.content, pid
@@ -274,6 +295,7 @@ async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionR
     then reindex and rebuild the graph so the cleaned content re-enters RAG.
     """
     pid = payload.project_id
+    _assert_qa_not_attached(payload.path, pid)
     try:
         document = await asyncio.to_thread(
             renormalize_workspace_document, payload.path, pid

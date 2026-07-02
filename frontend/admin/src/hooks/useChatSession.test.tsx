@@ -32,6 +32,7 @@ let latestVadOptions: {
 vi.mock("../api", () => ({
   fetchChat: (...args: unknown[]) => fetchChatMock(...args),
   fetchChatHistory: (...args: unknown[]) => fetchChatHistoryMock(...args),
+  fetchKnowledgeQaEntries: () => Promise.resolve({ entries: [] }),
   starterPrompts: [],
 }));
 

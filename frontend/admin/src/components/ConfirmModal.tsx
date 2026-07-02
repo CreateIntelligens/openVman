@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 
+import { useModalDismiss } from "./useModalDismiss";
+
 interface ConfirmModalProps {
   open: boolean;
   title: string;
@@ -20,16 +22,7 @@ export default function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onCancel]);
+  const dismiss = useModalDismiss(onCancel, open);
 
   useEffect(() => {
     if (open) {
@@ -42,9 +35,7 @@ export default function ConfirmModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
+      {...dismiss}
     >
       <div
         ref={dialogRef}

@@ -101,6 +101,28 @@ def test_xlsx_round_trip(tmp_path: Path):
     assert "科別: 外科 ｜ 醫師: 李醫師" in result
 
 
+def test_qa_xlsx_emits_heading_per_row(tmp_path: Path):
+    import openpyxl
+
+    xlsx_path = tmp_path / "faq.xlsx"
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "FAQ"
+    sheet.append(["index", "question", "answer"])
+    sheet.append(["001", "如何上傳題庫？", "到上傳分頁選 CSV 或 XLSX。"])
+    sheet.append(["002", "可以手動新增嗎？", "可以，到手動分頁新增 QA。"])
+    workbook.save(xlsx_path)
+
+    result = converters.convert_to_text(xlsx_path)
+
+    assert result is not None
+    assert "# FAQ" in result
+    assert "## 如何上傳題庫？" in result
+    assert "到上傳分頁選 CSV 或 XLSX。" in result
+    assert "## 可以手動新增嗎？" in result
+    assert result.index("## 如何上傳題庫？") < result.index("## 可以手動新增嗎？")
+
+
 def test_docx_round_trip(tmp_path: Path):
     import docx
 
@@ -150,3 +172,18 @@ def test_supported_suffixes_set():
     assert converters.SUPPORTED_SUFFIXES == frozenset(
         {".md", ".txt", ".csv", ".docx", ".xlsx", ".pdf"}
     )
+
+
+def test_qa_csv_conversion_metadata(tmp_path: Path):
+    csv_path = tmp_path / "metadata_faq.csv"
+    csv_path.write_text(
+        "q,a,img,url\n"
+        "How to use?,Run the tool.,img_url.png,https://example.com\n",
+        encoding="utf-8"
+    )
+
+    result = converters.convert_to_text(csv_path)
+    assert result is not None
+    assert "## How to use?" in result
+    assert "Run the tool." in result
+    assert '<!-- qa_metadata: {"img": "img_url.png", "url": "https://example.com"} -->' in result

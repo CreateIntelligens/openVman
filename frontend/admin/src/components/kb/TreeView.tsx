@@ -15,6 +15,7 @@ export default function TreeView({
   onDragEnd,
   onDragTargetChange,
   onDropFile,
+  onDeleteFolder,
 }: {
   node: TreeNode;
   depth: number;
@@ -29,12 +30,14 @@ export default function TreeView({
   onDragEnd: () => void;
   onDragTargetChange: (path: string | null) => void;
   onDropFile: (targetDir: string) => void;
+  onDeleteFolder: (path: string) => void;
 }) {
   const isExpanded = expandedDirs.has(node.path);
   const isSelected = selectedPath === node.path;
   const effectiveDropDir = node.type === "folder" ? node.path : node.path.split("/").slice(0, -1).join("/");
   const isDropTarget = dropTargetPath === effectiveDropDir && !!draggingPath && effectiveDropDir !== sourceDragDir;
   const canAcceptDrop = !!draggingPath && effectiveDropDir !== sourceDragDir && node.path !== draggingPath;
+  const canDeleteFolder = node.type === "folder" && node.path !== "knowledge";
 
   return (
     <div>
@@ -116,6 +119,20 @@ export default function TreeView({
           </div>
         )}
 
+        {canDeleteFolder && (
+          <button
+            type="button"
+            aria-label={`刪除資料夾 ${node.path}`}
+            className="ml-1 shrink-0 rounded-md p-1 text-slate-400 opacity-0 transition-colors hover:bg-red-500/10 hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeleteFolder(node.path);
+            }}
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">delete</span>
+          </button>
+        )}
+
       </div>
 
       {/* Children */}
@@ -137,6 +154,7 @@ export default function TreeView({
               onDragEnd={onDragEnd}
               onDragTargetChange={onDragTargetChange}
               onDropFile={onDropFile}
+              onDeleteFolder={onDeleteFolder}
             />
           ))}
         </div>

@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { type MergedQaItem, useQaNodes } from "../../../hooks/useQaNodes";
+import ConfirmModal from "../../ConfirmModal";
+import { errorMessage } from "../../../utils/errorMessage";
 
 interface MergedCsvPaneProps {
   nodeId: string | null;
   nodeLabel?: string;
   onSuccess?: () => void;
+  onOpenAttachSource?: () => void;
 }
 
 interface LocalMergedQaItem extends MergedQaItem {
@@ -22,16 +25,13 @@ function cloneRows(rows: LocalMergedQaItem[]): LocalMergedQaItem[] {
   return rows.map((row) => ({ ...row }));
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 export default function MergedCsvPane({
   nodeId,
   nodeLabel = "",
   onSuccess,
+  onOpenAttachSource,
 }: MergedCsvPaneProps) {
-  const { fetchMergedQa, saveMergedQa } = useQaNodes();
+  const { fetchMergedQa, saveMergedQa, uploadImage, cleanupImages } = useQaNodes();
 
   const [rows, setRows] = useState<LocalMergedQaItem[]>([]);
   const [originalRows, setOriginalRows] = useState<LocalMergedQaItem[]>([]);
@@ -39,6 +39,11 @@ export default function MergedCsvPane({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [uploadingImageRow, setUploadingImageRow] = useState<number | null>(null);
+  const [cleanupConfirmOpen, setCleanupConfirmOpen] = useState(false);
+  const [cleaningImages, setCleaningImages] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pendingImageRowRef = useRef<number | null>(null);
 
   const loadMergedQa = useCallback(async (id: string) => {
     setLoading(true);
@@ -68,6 +73,11 @@ export default function MergedCsvPane({
     }
   }, [nodeId, loadMergedQa]);
 
+  const isDirty = useMemo(
+    () => JSON.stringify(rows) !== JSON.stringify(originalRows),
+    [rows, originalRows],
+  );
+
   if (!nodeId) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
@@ -78,11 +88,6 @@ export default function MergedCsvPane({
       </div>
     );
   }
-
-  const isDirty = useMemo(
-    () => JSON.stringify(rows) !== JSON.stringify(originalRows),
-    [rows, originalRows],
-  );
 
   const handleCellChange = (
     index: number,
@@ -119,6 +124,50 @@ export default function MergedCsvPane({
   const handleRemoveRow = (index: number) => {
     const next = rows.filter((_, i) => i !== index);
     setRows(next);
+  };
+
+  const handlePickImage = (index: number) => {
+    pendingImageRowRef.current = index;
+    imageInputRef.current?.click();
+  };
+
+  const handleImageFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const rowIndex = pendingImageRowRef.current;
+    e.target.value = "";
+    pendingImageRowRef.current = null;
+    if (!file || rowIndex === null) return;
+
+    setUploadingImageRow(rowIndex);
+    setStatusMsg(null);
+    try {
+      const { image_id } = await uploadImage(file);
+      setRows((prev) => prev.map((row, i) => (i === rowIndex ? { ...row, img: image_id } : row)));
+      setStatusMsg({ type: "success", text: `圖片已上傳（ID：${image_id}），請記得儲存變更。` });
+    } catch (error: unknown) {
+      setStatusMsg({ type: "error", text: errorMessage(error, "圖片上傳失敗") });
+    } finally {
+      setUploadingImageRow(null);
+    }
+  };
+
+  const handleCleanupImages = async () => {
+    setCleanupConfirmOpen(false);
+    setCleaningImages(true);
+    setStatusMsg(null);
+    try {
+      const { deleted_files } = await cleanupImages();
+      setStatusMsg({
+        type: "success",
+        text: deleted_files.length > 0
+          ? `已清理 ${deleted_files.length} 個未使用圖片：${deleted_files.join("、")}`
+          : "沒有需要清理的未使用圖片。",
+      });
+    } catch (error: unknown) {
+      setStatusMsg({ type: "error", text: errorMessage(error, "清理未使用圖片失敗") });
+    } finally {
+      setCleaningImages(false);
+    }
   };
 
   const handleCancel = () => {
@@ -171,17 +220,40 @@ export default function MergedCsvPane({
           )}
         </div>
 
-        {isDirty && (
-          <span className="self-start sm:self-center px-2 py-0.5 text-[0.7rem] font-bold text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/30 rounded-md animate-pulse">
-            有未儲存變更
-          </span>
-        )}
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          {isDirty && (
+            <span className="px-2 py-0.5 text-[0.7rem] font-bold text-warn bg-warn/10 border border-warn/25 rounded-md animate-pulse">
+              有未儲存變更
+            </span>
+          )}
+          {onOpenAttachSource && (
+            <button
+              type="button"
+              onClick={onOpenAttachSource}
+              className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+            >
+              <span className="material-symbols-outlined text-[1rem]">add_link</span>
+              掛載來源
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setCleanupConfirmOpen(true)}
+            disabled={cleaningImages}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 transition-colors hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+          >
+            <span className={`material-symbols-outlined text-[1rem] ${cleaningImages ? "animate-spin" : ""}`}>
+              {cleaningImages ? "sync" : "mop"}
+            </span>
+            {cleaningImages ? "清理中..." : "清理未使用圖片"}
+          </button>
+        </div>
       </div>
 
       {(error || statusMsg) && (
         <div className="px-6 pt-4 shrink-0">
           {error && (
-            <div className="flex items-start gap-2 rounded-lg bg-red-50 text-red-800 p-3 text-xs dark:bg-red-950/30 dark:text-red-300 border border-red-200 dark:border-red-900/30">
+            <div className="flex items-start gap-2 rounded-lg bg-danger/5 text-danger p-3 text-xs border border-danger/20">
               <span className="material-symbols-outlined text-[1.125rem] shrink-0 mt-0.5">error</span>
               <div>{error}</div>
             </div>
@@ -190,8 +262,8 @@ export default function MergedCsvPane({
             <div
               className={`flex items-start gap-2.5 rounded-lg p-3 text-xs leading-relaxed ${
                 statusMsg.type === "success"
-                  ? "bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300 border border-green-200 dark:border-green-800/30"
-                  : "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300 border border-red-200 dark:border-red-800/30"
+                  ? "bg-success/5 text-success border border-success/20"
+                  : "bg-danger/5 text-danger border border-danger/20"
               }`}
             >
               <span className="material-symbols-outlined text-[1.125rem] shrink-0 mt-0.5">
@@ -214,10 +286,10 @@ export default function MergedCsvPane({
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 py-12 space-y-2">
             <span className="material-symbols-outlined text-[2.5rem]">
-              table_rows_page
+              table_rows
             </span>
             <p className="text-sm font-medium">此節點尚無任何問答數據</p>
-            <p className="text-xs">請點擊下方「新增一列」或使用「上傳對話框」匯入問答</p>
+            <p className="text-xs">請點擊下方「新增一列」，或使用「掛載來源」掛載既有的問答文件</p>
           </div>
         ) : (
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden min-w-[50rem]">
@@ -271,13 +343,30 @@ export default function MergedCsvPane({
                     </td>
 
                     <td className="py-2 px-3 align-top">
-                      <input
-                        type="text"
-                        value={row.img || ""}
-                        onChange={(e) => handleCellChange(idx, "img", e.target.value)}
-                        placeholder="圖片 ID"
-                        className="w-full bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
-                      />
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={row.img || ""}
+                          onChange={(e) => handleCellChange(idx, "img", e.target.value)}
+                          placeholder="圖片 ID"
+                          className="w-full min-w-0 bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handlePickImage(idx)}
+                          disabled={uploadingImageRow !== null}
+                          className="shrink-0 inline-flex items-center justify-center p-1 rounded text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+                          title="上傳圖片並填入 ID"
+                        >
+                          <span
+                            className={`material-symbols-outlined text-[1.125rem] ${
+                              uploadingImageRow === idx ? "animate-spin" : ""
+                            }`}
+                          >
+                            {uploadingImageRow === idx ? "sync" : "add_photo_alternate"}
+                          </span>
+                        </button>
+                      </div>
                     </td>
 
                     <td className="py-2 px-3 align-top">
@@ -297,7 +386,7 @@ export default function MergedCsvPane({
                         className={`inline-flex items-center justify-center p-1.5 rounded-lg transition-colors ${
                           row.hidden
                             ? "bg-slate-100 hover:bg-slate-200 text-slate-400 dark:bg-slate-800 dark:hover:bg-slate-700"
-                            : "bg-green-50 hover:bg-green-100 text-green-600 dark:bg-green-950/20 dark:hover:bg-green-950/40 dark:text-green-400"
+                            : "bg-success/10 text-success hover:bg-success/20 dark:bg-success/20 dark:text-success"
                         }`}
                         title={row.hidden ? "目前已隱藏，點擊以顯示" : "目前顯示中，點擊以隱藏"}
                       >
@@ -311,7 +400,7 @@ export default function MergedCsvPane({
                       <button
                         type="button"
                         onClick={() => handleRemoveRow(idx)}
-                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all"
+                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-danger hover:bg-danger/10 transition-all"
                         title="刪除此行"
                       >
                         <span className="material-symbols-outlined text-[1.125rem]">delete</span>
@@ -365,6 +454,24 @@ export default function MergedCsvPane({
           </button>
         </div>
       </div>
+
+      <input
+        type="file"
+        ref={imageInputRef}
+        onChange={handleImageFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+
+      <ConfirmModal
+        open={cleanupConfirmOpen}
+        title="清理未使用圖片"
+        message="確定要清理所有未被任何問答引用的圖片嗎？此操作無法復原。"
+        confirmLabel="清理"
+        danger
+        onConfirm={handleCleanupImages}
+        onCancel={() => setCleanupConfirmOpen(false)}
+      />
     </div>
   );
 }

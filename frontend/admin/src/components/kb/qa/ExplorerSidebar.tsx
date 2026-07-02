@@ -1,9 +1,17 @@
 import { type DragEvent, type MouseEvent, useMemo, useState } from "react";
 
 import type { QaNode } from "../../../hooks/useQaNodes";
+import ConfirmModal from "../../ConfirmModal";
+import PromptModal from "../../PromptModal";
 
 type NodeUpdate = { label?: string; hidden?: boolean };
 type NodeAction = Promise<unknown>;
+
+type NodeDialog =
+  | { type: "add-root" }
+  | { type: "add-child"; node: QaNode }
+  | { type: "rename"; node: QaNode }
+  | { type: "delete"; node: QaNode };
 
 interface SidebarNodeItemProps {
   node: QaNode;
@@ -12,16 +20,10 @@ interface SidebarNodeItemProps {
   siblings: QaNode[];
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
-  onCreateNode: (
-    nodeId: string,
-    label: string,
-    parentIds?: string[],
-    childIds?: string[],
-    order?: number,
-    hidden?: boolean
-  ) => NodeAction;
+  onRequestAddChild: (node: QaNode) => void;
+  onRequestRename: (node: QaNode) => void;
+  onRequestDelete: (node: QaNode) => void;
   onUpdateNode: (id: string, updates: NodeUpdate) => NodeAction;
-  onDeleteNode: (id: string) => NodeAction;
   onReorderNode: (id: string, siblingIdsOrdered: string[]) => NodeAction;
   expandedNodeIds: Set<string>;
   toggleExpand: (nodeId: string) => void;
@@ -39,9 +41,10 @@ function SidebarNodeItem({
   siblings,
   selectedNodeId,
   onSelectNode,
-  onCreateNode,
+  onRequestAddChild,
+  onRequestRename,
+  onRequestDelete,
   onUpdateNode,
-  onDeleteNode,
   onReorderNode,
   expandedNodeIds,
   toggleExpand,
@@ -60,9 +63,9 @@ function SidebarNodeItem({
     "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
 
   if (isDragOver) {
-    itemStateClass = "bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-500";
+    itemStateClass = "bg-info/10 dark:bg-info/20 border-info/50";
   } else if (isSelected) {
-    itemStateClass = "bg-blue-100/70 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 font-medium";
+    itemStateClass = "bg-primary/10 text-primary font-medium";
   }
 
   const handleToggle = (e: MouseEvent) => {
@@ -112,30 +115,17 @@ function SidebarNodeItem({
 
   const handleAddChild = (e: MouseEvent) => {
     e.stopPropagation();
-    const label = window.prompt(`在「${node.label}」下新增子節點，請輸入名稱：`);
-    if (!label) return;
-    const rawId = window.prompt("請輸入唯一識別碼 (英文/數字/底線，留空自動生成)：");
-    const nodeId = rawId?.trim() || `node_${Date.now()}`;
-    onCreateNode(nodeId, label.trim(), [node.node_id], [], 1.0, false);
+    onRequestAddChild(node);
   };
 
   const handleEditLabel = (e: MouseEvent) => {
     e.stopPropagation();
-    const newLabel = window.prompt("請輸入新的節點名稱：", node.label);
-    if (newLabel === null) return;
-    const trimmed = newLabel.trim();
-    if (!trimmed) return;
-    onUpdateNode(node.node_id, { label: trimmed });
+    onRequestRename(node);
   };
 
   const handleDeleteClick = (e: MouseEvent) => {
     e.stopPropagation();
-    const confirmDelete = window.confirm(
-      `確定要刪除節點「${node.label}」嗎？\n注意：此操作無法復原，子節點將不會自動被刪除，但會與此節點脫鉤。`
-    );
-    if (confirmDelete) {
-      onDeleteNode(node.node_id);
-    }
+    onRequestDelete(node);
   };
 
   const handleToggleVisibility = (e: MouseEvent) => {
@@ -234,9 +224,10 @@ function SidebarNodeItem({
               siblings={children}
               selectedNodeId={selectedNodeId}
               onSelectNode={onSelectNode}
-              onCreateNode={onCreateNode}
+              onRequestAddChild={onRequestAddChild}
+              onRequestRename={onRequestRename}
+              onRequestDelete={onRequestDelete}
               onUpdateNode={onUpdateNode}
-              onDeleteNode={onDeleteNode}
               onReorderNode={onReorderNode}
               expandedNodeIds={expandedNodeIds}
               toggleExpand={toggleExpand}
@@ -268,7 +259,6 @@ interface ExplorerSidebarProps {
   onUpdateNode: (id: string, updates: NodeUpdate) => NodeAction;
   onDeleteNode: (id: string) => NodeAction;
   onReorderNode: (id: string, siblingIdsOrdered: string[]) => NodeAction;
-  onUploadClick?: () => void;
   loading?: boolean;
   error?: string | null;
 }
@@ -281,7 +271,6 @@ export default function ExplorerSidebar({
   onUpdateNode,
   onDeleteNode,
   onReorderNode,
-  onUploadClick,
   loading,
   error,
 }: ExplorerSidebarProps) {
@@ -289,6 +278,30 @@ export default function ExplorerSidebar({
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const [draggedParentId, setDraggedParentId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<NodeDialog | null>(null);
+
+  const closeDialog = () => setDialog(null);
+
+  const handleCreateSubmit = (values: Record<string, string>) => {
+    const parentIds = dialog?.type === "add-child" ? [dialog.node.node_id] : [];
+    const nodeId = values.node_id || `node_${Date.now()}`;
+    onCreateNode(nodeId, values.label, parentIds, [], 1.0, false);
+    closeDialog();
+  };
+
+  const handleRenameSubmit = (values: Record<string, string>) => {
+    if (dialog?.type === "rename" && values.label !== dialog.node.label) {
+      onUpdateNode(dialog.node.node_id, { label: values.label });
+    }
+    closeDialog();
+  };
+
+  const handleDeleteConfirm = () => {
+    if (dialog?.type === "delete") {
+      onDeleteNode(dialog.node.node_id);
+    }
+    closeDialog();
+  };
 
   const toggleExpand = (nodeId: string) => {
     setExpandedNodeIds((prev) => {
@@ -303,11 +316,7 @@ export default function ExplorerSidebar({
   };
 
   const handleAddRootNode = () => {
-    const label = window.prompt("新增根節點，請輸入名稱：");
-    if (!label) return;
-    const rawId = window.prompt("請輸入唯一識別碼 (英文/數字/底線，留空自動生成)：");
-    const nodeId = rawId?.trim() || `node_${Date.now()}`;
-    onCreateNode(nodeId, label.trim(), [], [], 1.0, false);
+    setDialog({ type: "add-root" });
   };
 
   const handleExpandAll = () => {
@@ -375,19 +384,9 @@ export default function ExplorerSidebar({
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            {onUploadClick && (
-              <button
-                onClick={onUploadClick}
-                className="flex items-center gap-1 text-[0.75rem] font-medium py-1 px-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/40 rounded transition-colors"
-                title="問答上傳"
-              >
-                <span className="material-symbols-outlined text-[1rem]">cloud_upload</span>
-                上傳
-              </button>
-            )}
             <button
               onClick={handleAddRootNode}
-              className="flex items-center gap-1 text-[0.75rem] font-medium py-1 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-950/40 rounded transition-colors"
+              className="flex items-center gap-1 text-[0.75rem] font-medium py-1 px-2 text-primary hover:bg-primary/10 rounded transition-colors"
               title="新增根節點"
             >
               <span className="material-symbols-outlined text-[1rem]">add</span>
@@ -402,7 +401,7 @@ export default function ExplorerSidebar({
             placeholder="搜尋節點名稱或 ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full text-xs pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
           />
           <span className="material-symbols-outlined text-[1rem] absolute left-2.5 top-1.5 text-slate-400 dark:text-slate-500">
             search
@@ -443,9 +442,10 @@ export default function ExplorerSidebar({
               siblings={nodesTree}
               selectedNodeId={selectedNodeId}
               onSelectNode={onSelectNode}
-              onCreateNode={onCreateNode}
+              onRequestAddChild={(target) => setDialog({ type: "add-child", node: target })}
+              onRequestRename={(target) => setDialog({ type: "rename", node: target })}
+              onRequestDelete={(target) => setDialog({ type: "delete", node: target })}
               onUpdateNode={onUpdateNode}
-              onDeleteNode={onDeleteNode}
               onReorderNode={onReorderNode}
               expandedNodeIds={expandedNodeIds}
               toggleExpand={toggleExpand}
@@ -458,6 +458,53 @@ export default function ExplorerSidebar({
           ))
         )}
       </div>
+
+      <PromptModal
+        open={dialog?.type === "add-root" || dialog?.type === "add-child"}
+        title={dialog?.type === "add-child" ? `在「${dialog.node.label}」下新增子節點` : "新增根節點"}
+        fields={[
+          { key: "label", label: "節點名稱", placeholder: "請輸入名稱", required: true },
+          {
+            key: "node_id",
+            label: "唯一識別碼",
+            placeholder: "留空自動生成",
+            hint: "限英文/數字/底線；留空自動生成",
+          },
+        ]}
+        submitLabel="新增"
+        onSubmit={handleCreateSubmit}
+        onCancel={closeDialog}
+      />
+
+      <PromptModal
+        open={dialog?.type === "rename"}
+        title="修改節點名稱"
+        fields={[
+          {
+            key: "label",
+            label: "節點名稱",
+            initialValue: dialog?.type === "rename" ? dialog.node.label : "",
+            required: true,
+          },
+        ]}
+        submitLabel="儲存"
+        onSubmit={handleRenameSubmit}
+        onCancel={closeDialog}
+      />
+
+      <ConfirmModal
+        open={dialog?.type === "delete"}
+        title="刪除節點"
+        message={
+          dialog?.type === "delete"
+            ? `確定要刪除節點「${dialog.node.label}」嗎？\n注意：此操作無法復原，子節點將不會自動被刪除，但會與此節點脫鉤。`
+            : ""
+        }
+        confirmLabel="刪除"
+        danger
+        onConfirm={handleDeleteConfirm}
+        onCancel={closeDialog}
+      />
     </div>
   );
 }

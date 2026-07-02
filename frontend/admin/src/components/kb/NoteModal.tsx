@@ -1,3 +1,5 @@
+import { useModalDismiss } from "./useModalDismiss";
+
 export default function NoteModal({
   noteTitle,
   setNoteTitle,
@@ -15,8 +17,13 @@ export default function NoteModal({
   onClose: () => void;
   onCreate: () => void;
 }) {
+  const dismiss = useModalDismiss(onClose);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      {...dismiss}
+    >
       <div className="w-full max-w-2xl rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-5 py-4">
           <div className="flex items-center gap-2">

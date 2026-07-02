@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import type { QaNode } from "../../../hooks/useQaNodes";
+import { useModalDismiss } from "../useModalDismiss";
+import { errorMessage } from "../../../utils/errorMessage";
 
 type NodeUpdate = { label?: string; hidden?: boolean };
 type NodeAction = Promise<unknown>;
@@ -15,10 +17,6 @@ interface VisibilityOrderModalProps {
   onRefresh: () => NodeAction;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
 export default function VisibilityOrderModal({
   isOpen,
   onClose,
@@ -31,6 +29,7 @@ export default function VisibilityOrderModal({
   const [localNodes, setLocalNodes] = useState<QaNode[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dismiss = useModalDismiss(onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -104,7 +103,7 @@ export default function VisibilityOrderModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+      {...dismiss}
     >
       <div
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4"
@@ -112,7 +111,7 @@ export default function VisibilityOrderModal({
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[1.5rem]">
+            <span className="material-symbols-outlined text-primary text-[1.5rem]">
               sort
             </span>
             <div>
@@ -176,7 +175,7 @@ export default function VisibilityOrderModal({
                           className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                             node.hidden
                               ? "bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400"
-                              : "bg-green-50 hover:bg-green-100 text-green-700 dark:bg-green-950/30 dark:hover:bg-green-950/60 dark:text-green-400"
+                              : "bg-success/10 text-success hover:bg-success/20 dark:bg-success/20 dark:text-success"
                           }`}
                         >
                           <span className="material-symbols-outlined text-[1rem]">
@@ -228,7 +227,7 @@ export default function VisibilityOrderModal({
           <button
             onClick={handleSave}
             disabled={saving || localNodes.length === 0}
-            className="px-5 py-2 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-md shadow-blue-500/10"
+            className="px-5 py-2 rounded-xl bg-primary text-sm font-semibold text-white hover:bg-primary-600 disabled:opacity-30 transition-all flex items-center gap-1.5 shadow-md shadow-primary/10"
           >
             {saving ? (
               <>

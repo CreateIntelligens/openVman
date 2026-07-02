@@ -16,6 +16,8 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
+from knowledge.qa_csv import convert_csv_to_qa_markdown, is_qa_csv, normalize_fieldname
+
 logger = logging.getLogger("brain.knowledge.converters")
 
 # Joins column:value pairs within a single row (full-width separators read
@@ -23,11 +25,12 @@ logger = logging.getLogger("brain.knowledge.converters")
 _PAIR_SEP = " ｜ "
 _KV_SEP = ": "
 
-# Q&A column aliases. A CSV whose header carries a question + answer column is a
-# FAQ table: each row is rendered as its own ``## question`` heading block so it
-# can form a distinct graph sub-node instead of collapsing into one file topic.
-_QA_QUESTION_ALIASES = ("q", "question", "問題", "问题", "題目", "题目")
-_QA_ANSWER_ALIASES = ("a", "answer", "答案", "回答", "回覆", "解答", "說明")
+
+def _cell_text(row: Sequence[object], index: int) -> str:
+    if index >= len(row):
+        return ""
+    value = row[index]
+    return "" if value is None else str(value).strip()
 
 
 def _row_to_line(header: list[str], row: Sequence[object]) -> str:
@@ -55,22 +58,26 @@ def _qa_column_indices(header: list[str]) -> tuple[int, int] | None:
     """Return (question_index, answer_index) if the header is a FAQ table."""
     q_index = a_index = None
     for index, name in enumerate(header):
-        key = name.strip().lower()
-        if q_index is None and any(alias in key for alias in _QA_QUESTION_ALIASES):
+        canonical = normalize_fieldname(name)
+        if q_index is None and canonical == "q":
             q_index = index
-        elif a_index is None and any(alias in key for alias in _QA_ANSWER_ALIASES):
+        elif a_index is None and canonical == "a":
             a_index = index
     if q_index is None or a_index is None:
         return None
     return q_index, a_index
 
 
-def _convert_qa_csv(rows: list[list[str]], q_index: int, a_index: int) -> str:
-    """Render a FAQ CSV as ``## question`` heading blocks, one per row."""
+def _convert_qa_rows(
+    rows: Sequence[Sequence[object]],
+    q_index: int,
+    a_index: int,
+) -> str:
+    """Render FAQ table rows as ``## question`` heading blocks."""
     blocks: list[str] = []
     for row in rows:
-        question = row[q_index].strip() if q_index < len(row) else ""
-        answer = row[a_index].strip() if a_index < len(row) else ""
+        question = _cell_text(row, q_index)
+        answer = _cell_text(row, a_index)
         if not question and not answer:
             continue
         heading = question or "未命名問題"
@@ -85,15 +92,19 @@ def _convert_csv(path: Path) -> str:
     so each row is a distinct, individually-retrievable section. Other tables
     fall back to one ``col: val ｜ ...`` line per row.
     """
+    try:
+        file_bytes = path.read_bytes()
+    except Exception:
+        return ""
+    if is_qa_csv(file_bytes):
+        return convert_csv_to_qa_markdown(file_bytes)
+
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.reader(handle)
         rows = list(reader)
     if not rows:
         return ""
     header = [str(cell).strip() for cell in rows[0]]
-    qa_indices = _qa_column_indices(header)
-    if qa_indices is not None:
-        return _convert_qa_csv(rows[1:], *qa_indices)
     lines = [_row_to_line(header, row) for row in rows[1:]]
     return "\n".join(line for line in lines if line)
 
@@ -132,6 +143,13 @@ def _convert_xlsx(path: Path) -> str:
             if not rows:
                 continue
             header = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
+            qa_indices = _qa_column_indices(header)
+            if qa_indices is not None:
+                qa_text = _convert_qa_rows(rows[1:], *qa_indices)
+                if qa_text:
+                    sections.append(f"# {sheet.title}\n\n{qa_text}")
+                continue
+
             lines = [f"# {sheet.title}"]
             for row in rows[1:]:
                 line = _row_to_line(header, list(row))

@@ -32,7 +32,7 @@ _MOCK_TOOL_MODULES = ("tools.tool_executor", "tools.tool_registry", "tools.mock_
 def make_fake_agent_loop() -> types.ModuleType:
     """Build a fake ``core.agent_loop`` module with stub classes.
 
-    Shared across test_pipeline.py and test_sse_interface.py to avoid
+    Shared across test_chat_pipeline.py and test_sse_interface.py to avoid
     maintaining duplicate definitions.
     """
     fake = types.ModuleType("core.agent_loop")

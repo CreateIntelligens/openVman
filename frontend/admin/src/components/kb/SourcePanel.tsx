@@ -12,7 +12,6 @@ export default function SourcePanel({
   crawling,
   onCrawl,
   onShowNote,
-  onShowQa,
 }: {
   activeMode: SourceMode;
   setActiveMode: (m: SourceMode) => void;
@@ -24,7 +23,6 @@ export default function SourcePanel({
   crawling: boolean;
   onCrawl: () => void;
   onShowNote: () => void;
-  onShowQa: () => void;
 }) {
   return (
     <div className="border-b border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 px-4 py-3 space-y-3 shrink-0">
@@ -41,7 +39,7 @@ export default function SourcePanel({
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-transparent"
               }`}
             >
-              <span className="material-symbols-outlined text-[1rem]">{meta.icon}</span>
+              <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">{meta.icon}</span>
               {meta.label}
             </button>
           );
@@ -49,61 +47,54 @@ export default function SourcePanel({
         <span className="ml-2 text-xs text-slate-500 self-center">{SOURCE_MODE_COPY[activeMode]}</span>
       </div>
 
-      {activeMode === "upload" && (
-        <button
-          type="button"
-          onClick={() => uploadInputRef.current?.click()}
-          disabled={uploading}
-          className="w-full rounded-lg border border-dashed border-slate-200 dark:border-slate-700 hover:border-primary/50 bg-slate-50 dark:bg-slate-900/20 hover:bg-primary/5 transition-all py-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm text-slate-500 dark:text-slate-400"
-        >
-          <span className="material-symbols-outlined text-[1.25rem]">cloud_upload</span>
-          {uploading ? "上傳中..." : `選擇檔案上傳到 ${currentDir}`}
-        </button>
-      )}
-
-      {activeMode === "web" && (
-        <div className="flex gap-2">
-          <input
-            type="url"
-            className="flex-1 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none"
-            placeholder="https://example.com/article"
-            value={crawlUrlValue}
-            onChange={(e) => setCrawlUrlValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && onCrawl()}
-            disabled={crawling}
-          />
+      <div className="h-14 flex items-stretch">
+        {activeMode === "upload" && (
           <button
-            onClick={onCrawl}
-            disabled={crawling || !crawlUrlValue.trim()}
-            className="bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-all disabled:opacity-50"
+            type="button"
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full rounded-lg border border-dashed border-slate-200 dark:border-slate-700 hover:border-primary/50 bg-slate-50 dark:bg-slate-900/20 hover:bg-primary/5 transition-all py-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm text-slate-500 dark:text-slate-400"
           >
-            <span className="material-symbols-outlined text-[1rem]">{crawling ? "hourglass_top" : "download"}</span>
-            {crawling ? "擷取中..." : "匯入"}
+            <span aria-hidden="true" className="material-symbols-outlined text-[1.25rem]">cloud_upload</span>
+            {uploading ? "上傳中..." : `選擇檔案上傳到 ${currentDir}`}
           </button>
-        </div>
-      )}
+        )}
 
-      {activeMode === "manual" && (
-        <button
-          type="button"
-          onClick={onShowNote}
-          className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors"
-        >
-          <span className="material-symbols-outlined text-[1.125rem]">note_add</span>
-          新增筆記
-        </button>
-      )}
+        {activeMode === "web" && (
+          <div className="flex gap-2 w-full items-center">
+            <input
+              type="url"
+              className="flex-1 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none"
+              placeholder="https://example.com/article"
+              value={crawlUrlValue}
+              onChange={(e) => setCrawlUrlValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onCrawl()}
+              disabled={crawling}
+            />
+            <button
+              onClick={onCrawl}
+              disabled={crawling || !crawlUrlValue.trim()}
+              className="bg-primary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 hover:bg-primary/90 transition-all disabled:opacity-50"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">{crawling ? "hourglass_top" : "download"}</span>
+              {crawling ? "擷取中..." : "匯入"}
+            </button>
+          </div>
+        )}
 
-      {activeMode === "qa" && (
-        <button
-          type="button"
-          onClick={onShowQa}
-          className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15 transition-colors"
-        >
-          <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">post_add</span>
-          新增 QA
-        </button>
-      )}
+        {activeMode === "manual" && (
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={onShowNote}
+              className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">note_add</span>
+              新增筆記
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

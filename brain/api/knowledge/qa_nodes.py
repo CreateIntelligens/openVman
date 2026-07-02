@@ -405,6 +405,23 @@ def add_qa_entry_to_node(
         return node
 
 
+def referenced_source_paths(project_id: str = "default") -> set[str]:
+    """Return every document path referenced by any node's qa_entries."""
+    with _lock:
+        data = _load_nodes_data(project_id)
+        return {
+            entry["source_path"]
+            for node in data["nodes"].values()
+            for entry in node.get("qa_entries", [])
+            if entry.get("source_path")
+        }
+
+
+def is_source_referenced(source_path: str, project_id: str = "default") -> bool:
+    """Return True if any node's qa_entries reference the given document path."""
+    return source_path in referenced_source_paths(project_id)
+
+
 def remove_qa_entry_from_node(
     node_id: str, question: str, project_id: str = "default"
 ) -> dict[str, Any] | None:

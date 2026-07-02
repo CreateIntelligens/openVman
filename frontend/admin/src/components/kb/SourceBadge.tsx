@@ -1,6 +1,6 @@
-import { getSourceMeta, type SourceMode } from "./helpers";
+import { getSourceMeta, type SourceType } from "./helpers";
 
-export default function SourceBadge({ sourceType }: { sourceType: SourceMode }) {
+export default function SourceBadge({ sourceType }: { sourceType: SourceType }) {
   const meta = getSourceMeta(sourceType);
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.625rem] font-semibold ${meta.chipClass}`}>

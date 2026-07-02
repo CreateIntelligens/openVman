@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface StatusAlertProps {
   type: "success" | "error";
@@ -8,6 +8,7 @@ interface StatusAlertProps {
 }
 
 export default function StatusAlert({ type, message, onDismiss, autoDismiss }: StatusAlertProps) {
+  const [isLeaving, setIsLeaving] = useState(false);
   const isSuccess = type === "success";
   const colorClasses = isSuccess
     ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
@@ -15,19 +16,30 @@ export default function StatusAlert({ type, message, onDismiss, autoDismiss }: S
   const icon = isSuccess ? "check_circle" : "error";
 
   useEffect(() => {
+    setIsLeaving(false);
     if (autoDismiss && onDismiss) {
-      const timer = setTimeout(onDismiss, autoDismiss);
-      return () => clearTimeout(timer);
+      const fadeMs = Math.min(200, autoDismiss);
+      const fadeTimer = setTimeout(() => setIsLeaving(true), autoDismiss - fadeMs);
+      const dismissTimer = setTimeout(onDismiss, autoDismiss);
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(dismissTimer);
+      };
     }
-  }, [autoDismiss, onDismiss]);
+  }, [autoDismiss, message, onDismiss, type]);
 
   return (
-    <div className={`flex items-start gap-3 p-4 rounded-xl border ${colorClasses}`}>
-      <span className="material-symbols-outlined">{icon}</span>
+    <div
+      role={isSuccess ? "status" : "alert"}
+      className={`flex items-start gap-3 p-4 rounded-xl border transition-all duration-200 ${
+        isLeaving ? "opacity-0 -translate-y-1" : "opacity-100 translate-y-0"
+      } ${colorClasses}`}
+    >
+      <span aria-hidden="true" className="material-symbols-outlined">{icon}</span>
       <p className="text-sm flex-1">{message}</p>
       {onDismiss && (
-        <button onClick={onDismiss} className="opacity-60 hover:opacity-100 transition-opacity shrink-0">
-          <span className="material-symbols-outlined text-[1.125rem]">close</span>
+        <button onClick={onDismiss} className="opacity-60 hover:opacity-100 transition-opacity shrink-0" aria-label="關閉提示">
+          <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">close</span>
         </button>
       )}
     </div>

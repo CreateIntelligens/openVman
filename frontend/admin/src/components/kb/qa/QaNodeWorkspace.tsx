@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { type QaNode, useQaNodes } from "../../../hooks/useQaNodes";
+import AttachSourceModal from "./AttachSourceModal";
 import ExplorerSidebar from "./ExplorerSidebar";
 import MergedCsvPane from "./MergedCsvPane";
-import UploadDialog from "./UploadDialog";
 
-function findNodeLabel(nodes: QaNode[], targetId: string): string | undefined {
+function findNode(nodes: QaNode[], targetId: string): QaNode | undefined {
   for (const node of nodes) {
     if (node.node_id === targetId) {
-      return node.label;
+      return node;
     }
     if (node.children && node.children.length > 0) {
-      const found = findNodeLabel(node.children, targetId);
+      const found = findNode(node.children, targetId);
       if (found) return found;
     }
   }
@@ -28,18 +28,20 @@ export default function QaNodeWorkspace() {
     updateNode,
     deleteNode,
     reorderNode,
+    attachSource,
+    detachSource,
   } = useQaNodes();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
 
   useEffect(() => {
     fetchTree();
   }, [fetchTree]);
 
-  const selectedNodeLabel = useMemo(() => {
-    if (!selectedNodeId) return undefined;
-    return findNodeLabel(nodesTree, selectedNodeId);
+  const selectedNode = useMemo(() => {
+    if (!selectedNodeId) return null;
+    return findNode(nodesTree, selectedNodeId) ?? null;
   }, [nodesTree, selectedNodeId]);
 
   const handleDeleteNode = useCallback(async (id: string) => {
@@ -65,7 +67,6 @@ export default function QaNodeWorkspace() {
           onUpdateNode={updateNode}
           onDeleteNode={handleDeleteNode}
           onReorderNode={reorderNode}
-          onUploadClick={() => setUploadOpen(true)}
           loading={loading}
           error={error}
         />
@@ -74,17 +75,18 @@ export default function QaNodeWorkspace() {
       <main className="flex-1 min-w-0 p-6 overflow-auto">
         <MergedCsvPane
           nodeId={selectedNodeId}
-          nodeLabel={selectedNodeLabel}
+          nodeLabel={selectedNode?.label}
           onSuccess={handleSuccess}
+          onOpenAttachSource={() => setAttachOpen(true)}
         />
       </main>
 
-      <UploadDialog
-        open={uploadOpen}
-        onClose={() => setUploadOpen(false)}
-        nodesTree={nodesTree}
-        defaultNodeId={selectedNodeId || undefined}
-        onSuccess={handleSuccess}
+      <AttachSourceModal
+        open={attachOpen}
+        node={selectedNode}
+        onAttach={attachSource}
+        onDetach={detachSource}
+        onClose={() => setAttachOpen(false)}
       />
     </div>
   );

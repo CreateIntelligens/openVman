@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -12,21 +11,17 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 import knowledge.indexer
-from knowledge.doc_meta import upsert_document_meta
+from knowledge.doc_meta import get_document_meta, upsert_document_meta
 from knowledge.knowledge_admin import (
     resolve_workspace_artifact,
     resolve_workspace_document,
     save_uploaded_artifact,
-    save_uploaded_document,
     save_workspace_document,
 )
 from knowledge.qa_csv import (
-    _parse_csv_rows,
-    extract_hidden_from_csv,
-    normalize_qa_csv_rows,
+    extract_image_id,
     parse_qa_markdown,
-    split_qa_csv_by_image,
-    validate_supported_qa_csv,
+    qa_markdown_block,
 )
 from knowledge.qa_nodes import (
     add_qa_entries_to_node,
@@ -67,11 +62,8 @@ class ReorderNodeRequest(BaseModel):
     sibling_ids_ordered: list[str]
 
 
-class ManualQaItem(BaseModel):
-    q: str
-    a: str
-    img: str | None = ""
-    url: str | None = ""
+class SourcePathRequest(BaseModel):
+    path: str
 
 
 class MergedQaItem(BaseModel):
@@ -84,42 +76,9 @@ class MergedQaItem(BaseModel):
     hidden: bool | None = False
 
 
-def _extract_image_id(raw: str) -> str:
-    value = (raw or "").strip()
-    if "=" in value:
-        value = value.split("=")[-1].strip()
-    if "/" in value:
-        value = value.split("/")[-1].strip()
-    return value
-
-
-def _qa_markdown_block(question: str, answer: str, img: str = "", url: str = "") -> str:
-    metadata = {"img": _extract_image_id(img), "url": url}
-    metadata_str = json.dumps(metadata, ensure_ascii=False)
-    return f"## {question}\n\n{answer}\n<!-- qa_metadata: {metadata_str} -->"
-
-
 def parse_qa_markdown_with_metadata(content: str) -> list[dict[str, Any]]:
     """Parse qa markdown file into a list of dict containing q, a, img, url."""
     return parse_qa_markdown(content)
-
-
-def convert_csv_to_qa_markdown(csv_bytes: bytes) -> str:
-    """Convert normalized QA CSV bytes to markdown with HTML comment metadata."""
-    parsed = _parse_csv_rows(csv_bytes)
-    if not parsed:
-        return ""
-    _, rows = parsed
-    blocks = []
-    for row in rows:
-        q = (row.get("q") or "").strip()
-        a = (row.get("a") or "").strip()
-        img = (row.get("img") or "").strip()
-        url = (row.get("url") or "").strip()
-        if not q and not a:
-            continue
-        blocks.append(_qa_markdown_block(q or "未命名問題", a, img, url))
-    return "\n\n".join(blocks)
 
 
 @router.get("/nodes")
@@ -170,6 +129,8 @@ def patch_qa_node_route(
 
 @router.delete("/nodes/{id}")
 def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str, str]:
+    # Nodes own structure only: deleting one drops its references, never the
+    # underlying QA documents (those belong to the documents workspace).
     success = delete_node(id, project_id=project_id)
     if not success:
         raise HTTPException(status_code=404, detail="Node not found")
@@ -206,173 +167,64 @@ def reorder_qa_node_route(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/nodes/{id}/upload-csv")
-async def upload_csv_route(
+@router.post("/nodes/{id}/attach-source")
+def attach_source_route(
     id: str,
-    file: UploadFile = File(...),
+    payload: SourcePathRequest,
     project_id: str = "default",
-) -> dict[str, str]:
-    node = await asyncio.to_thread(get_node, id, project_id=project_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    file_bytes = await file.read()
-
-    try:
-        await asyncio.to_thread(validate_supported_qa_csv, file_bytes)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    normalized_bytes = await asyncio.to_thread(normalize_qa_csv_rows, file_bytes)
-    if normalized_bytes is None:
-        raise HTTPException(status_code=400, detail="Failed to normalize CSV rows")
-
-    splits = await asyncio.to_thread(split_qa_csv_by_image, normalized_bytes, file.filename)
-    if not splits:
-        splits = [(file.filename, normalized_bytes)]
-
-    hidden_questions = set(await asyncio.to_thread(extract_hidden_from_csv, file_bytes))
-
-    for fn, csv_content in splits:
-        fn_md = Path(fn).with_suffix(".md").name
-        relative_doc_path = f"knowledge/{fn_md}"
-
-        # Reload so this split sees entries added by prior splits in the same
-        # upload; `existing_questions` is then seeded from the post-cleanup
-        # entries directly, avoiding a second full-file read of the node store.
-        node = await asyncio.to_thread(get_node, id, project_id=project_id)
-        existing_questions: set[str] = set()
-        if node:
-            clean_entries = [
-                entry
-                for entry in node.get("qa_entries", [])
-                if entry.get("source_path") != relative_doc_path
-            ]
-            await asyncio.to_thread(
-                update_node,
-                id,
-                {"qa_entries": clean_entries},
-                project_id=project_id,
-            )
-            existing_questions = {e["question"] for e in clean_entries}
-
-        markdown_text = convert_csv_to_qa_markdown(csv_content)
-        await asyncio.to_thread(
-            save_uploaded_document,
-            filename=fn_md,
-            content=markdown_text.encode("utf-8"),
-            target_dir="knowledge",
-            project_id=project_id,
-        )
-        await asyncio.to_thread(upsert_document_meta, relative_doc_path, project_id, source_type="qa")
-
-        parsed = await asyncio.to_thread(_parse_csv_rows, csv_content)
-        if parsed:
-            _, rows = parsed
-            new_entries_to_add: list[dict[str, Any]] = []
-
-            for row in rows:
-                q = (row.get("q") or "").strip()
-                if not q:
-                    continue
-                if q in existing_questions:
-                    continue
-
-                img_val = _extract_image_id(row.get("img") or "")
-                is_hidden = q in hidden_questions
-
-                qa_entry = {
-                    "question": q,
-                    "source_path": relative_doc_path,
-                    "hidden": is_hidden,
-                    "image_id": img_val if img_val else None,
-                }
-                new_entries_to_add.append(qa_entry)
-                existing_questions.add(q)
-
-            if new_entries_to_add:
-                await asyncio.to_thread(add_qa_entries_to_node, id, new_entries_to_add, project_id=project_id)
-
-    await asyncio.to_thread(knowledge.indexer.rebuild_knowledge_index, project_id)
-    return {"status": "ok"}
-
-
-@router.post("/nodes/{id}/manual")
-def manual_qa_route(
-    id: str,
-    payload: ManualQaItem | list[ManualQaItem],
-    project_id: str = "default",
-) -> dict[str, str]:
+) -> dict[str, Any]:
     node = get_node(id, project_id=project_id)
-    if not node:
+    if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    items = [payload] if not isinstance(payload, list) else payload
+    if get_document_meta(payload.path, project_id).get("source_type") != "qa":
+        raise HTTPException(status_code=400, detail="僅能掛載 QA 來源文件")
 
-    manual_filename = f"manual_{id}.md"
-    relative_doc_path = f"knowledge/{manual_filename}"
-
-    existing_items: list[dict[str, Any]] = []
     try:
-        doc_path = resolve_workspace_document(relative_doc_path, project_id)
-        if doc_path.exists():
-            content = doc_path.read_text(encoding="utf-8")
-            existing_items = parse_qa_markdown_with_metadata(content)
-    except Exception:
-        pass
+        doc_path = resolve_workspace_document(payload.path, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not doc_path.exists():
+        raise HTTPException(status_code=404, detail="找不到指定文件")
 
-    existing_questions_in_node = {e["question"] for e in node.get("qa_entries", [])}
-    existing_questions_in_doc = {item["q"] for item in existing_items}
-
-    new_added = False
-    new_entries_to_add: list[dict[str, Any]] = []
-
-    for item in items:
-        q = item.q.strip()
-        a = item.a.strip()
-        img = item.img.strip() if item.img else ""
-        url = item.url.strip() if item.url else ""
-        if not q:
+    parsed_entries = parse_qa_markdown(doc_path.read_text(encoding="utf-8"))
+    existing_questions = {entry["question"] for entry in node.get("qa_entries", [])}
+    new_entries: list[dict[str, Any]] = []
+    for parsed in parsed_entries:
+        question = parsed["q"].strip()
+        if not question or question in existing_questions:
             continue
-
-        if q in existing_questions_in_node:
-            continue
-
-        img_val = _extract_image_id(img)
-        if q not in existing_questions_in_doc:
-            existing_items.append({"q": q, "a": a, "img": img_val, "url": url})
-            existing_questions_in_doc.add(q)
-
-        qa_entry = {
-            "question": q,
-            "source_path": relative_doc_path,
-            "hidden": False,
-            "image_id": img_val if img_val else None,
-        }
-        new_entries_to_add.append(qa_entry)
-        existing_questions_in_node.add(q)
-        new_added = True
-
-    if new_added:
-        add_qa_entries_to_node(id, new_entries_to_add, project_id=project_id)
-
-    if new_added or not existing_items:
-        blocks = [
-            _qa_markdown_block(item["q"], item["a"], item["img"], item["url"])
-            for item in existing_items
-        ]
-        markdown_content = "\n\n".join(blocks)
-
-        save_uploaded_document(
-            filename=manual_filename,
-            content=markdown_content.encode("utf-8"),
-            target_dir="knowledge",
-            project_id=project_id,
+        image_id = extract_image_id(parsed.get("img") or "")
+        new_entries.append(
+            {
+                "question": question,
+                "source_path": payload.path,
+                "hidden": bool(parsed.get("hidden", False)),
+                "image_id": image_id or None,
+            }
         )
-        upsert_document_meta(relative_doc_path, project_id, source_type="qa")
+        existing_questions.add(question)
 
-    knowledge.indexer.rebuild_knowledge_index(project_id)
-    return {"status": "ok"}
+    if new_entries:
+        add_qa_entries_to_node(id, new_entries, project_id=project_id)
+    return {"status": "ok", "added": len(new_entries)}
+
+
+@router.post("/nodes/{id}/detach-source")
+def detach_source_route(
+    id: str,
+    payload: SourcePathRequest,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    node = get_node(id, project_id=project_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    entries = node.get("qa_entries", [])
+    remaining = [entry for entry in entries if entry.get("source_path") != payload.path]
+    if len(remaining) != len(entries):
+        update_node(id, {"qa_entries": remaining}, project_id=project_id)
+    return {"status": "ok", "removed": len(entries) - len(remaining)}
 
 
 @router.get("/nodes/{id}/merged")
@@ -458,14 +310,15 @@ def put_merged_qa_route(
             a = item.a.strip()
             img = item.img.strip() if item.img else ""
             url = item.url.strip() if item.url else ""
-            img_val = _extract_image_id(img)
+            img_val = extract_image_id(img)
 
-            blocks.append(_qa_markdown_block(q, a, img_val, url))
+            hidden = item.hidden if item.hidden is not None else existing_hidden.get(q, False)
+            blocks.append(qa_markdown_block(q, a, img_val, url, hidden))
             new_qa_entries.append(
                 {
                     "question": q,
                     "source_path": source_file,
-                    "hidden": item.hidden if item.hidden is not None else existing_hidden.get(q, False),
+                    "hidden": hidden,
                     "image_id": img_val if img_val else None,
                 }
             )

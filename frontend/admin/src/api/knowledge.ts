@@ -26,6 +26,8 @@ export interface KnowledgeDocumentSummary {
   source_url: string | null;
   enabled: boolean;
   created_at: string;
+  // source_type === "qa" 且被任一問答樹節點掛載時為 true
+  qa_attached?: boolean;
 }
 
 export interface KnowledgeDocument extends KnowledgeDocumentSummary {

@@ -115,46 +115,6 @@ def test_qa_nodes_crud_routes(client):
     assert response.json() == []
 
 
-def test_qa_nodes_upload_csv_route(client):
-    # Create node first
-    client.post("/brain/knowledge/qa/nodes", json={
-        "node_id": "csv_node",
-        "label": "CSV Node",
-        "parent_ids": [],
-        "child_ids": [],
-        "order": 1.0,
-        "hidden": False
-    })
-
-    # Prepare mock CSV bytes
-    csv_content = "q,a,img,url,display\nWhat is Python?,A programming language.,images/python.png,https://python.org,true\nWhat is FastAPI?,A web framework.,,https://fastapi.tiangolo.com,true\n"
-    file_payload = {"file": ("test.csv", csv_content.encode("utf-8"), "text/csv")}
-
-    response = client.post("/brain/knowledge/qa/nodes/csv_node/upload-csv", files=file_payload)
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-
-
-def test_qa_nodes_manual_route(client):
-    # Create node first
-    client.post("/brain/knowledge/qa/nodes", json={
-        "node_id": "manual_node",
-        "label": "Manual Node",
-        "parent_ids": [],
-        "child_ids": [],
-        "order": 1.0,
-        "hidden": False
-    })
-
-    manual_payload = [
-        {"q": "Q1", "a": "A1", "img": "img1.png", "url": "url1"},
-        {"q": "Q2", "a": "A2"}
-    ]
-    response = client.post("/brain/knowledge/qa/nodes/manual_node/manual", json=manual_payload)
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-
-
 def test_qa_nodes_merged_and_update_route(client):
     # Create node
     client.post("/brain/knowledge/qa/nodes", json={
@@ -166,10 +126,17 @@ def test_qa_nodes_merged_and_update_route(client):
         "hidden": False
     })
 
-    # Add manual QA (creates knowledge/manual_merged_node.md)
-    client.post("/brain/knowledge/qa/nodes/merged_node/manual", json=[
-        {"q": "Q1", "a": "A1", "img": "img1.png", "url": "url1"}
+    # Seed one row through the merged editor (creates the source file)
+    response = client.put("/brain/knowledge/qa/nodes/merged_node/merged", json=[
+        {
+            "q": "Q1",
+            "a": "A1",
+            "img": "img1.png",
+            "url": "url1",
+            "source_file": "knowledge/qa/manual_merged_node.md",
+        }
     ])
+    assert response.status_code == 200
 
     # 1. GET merged view
     response = client.get("/brain/knowledge/qa/nodes/merged_node/merged")
@@ -180,7 +147,7 @@ def test_qa_nodes_merged_and_update_route(client):
     assert items[0]["a"] == "A1"
     assert items[0]["img"] == "img1.png"
     assert items[0]["url"] == "url1"
-    assert items[0]["source_file"] == "knowledge/manual_merged_node.md"
+    assert items[0]["source_file"] == "knowledge/qa/manual_merged_node.md"
 
     # 2. PUT update merged view
     updated_payload = [
@@ -189,14 +156,14 @@ def test_qa_nodes_merged_and_update_route(client):
             "a": "A1-updated",
             "img": "img1-updated.png",
             "url": "url1-updated",
-            "source_file": "knowledge/manual_merged_node.md"
+            "source_file": "knowledge/qa/manual_merged_node.md"
         },
         {
             "q": "Q2-new",
             "a": "A2-new",
             "img": "",
             "url": "",
-            "source_file": "knowledge/manual_merged_node.md"
+            "source_file": "knowledge/qa/manual_merged_node.md"
         }
     ]
     response = client.put("/brain/knowledge/qa/nodes/merged_node/merged", json=updated_payload)
@@ -265,38 +232,178 @@ def test_qa_markdown_code_block_exclusion(client):
     assert parsed_admin[1]["question"] == "Q2"
 
 
-def test_upload_csv_ghost_entries_cleanup(client):
-    # 1. Create node
-    client.post("/brain/knowledge/qa/nodes", json={
-        "node_id": "ghost_node",
-        "label": "Ghost Node",
-        "parent_ids": [],
-        "child_ids": [],
-        "order": 1.0,
-        "hidden": False
+def test_attach_and_detach_source(client, tmp_path):
+    """掛載 QA 文件登記題目（含 hidden/image_id、去重）；卸載移除該來源的 entries。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    qa_path = root / "knowledge" / "faq_source.md"
+    qa_path.parent.mkdir(parents=True, exist_ok=True)
+    qa_path.write_text(
+        '## Q1\n\nA1\n<!-- qa_metadata: {"img": "p1.png", "url": ""} -->\n\n'
+        '## Q2\n\nA2\n<!-- qa_metadata: {"img": "", "url": "", "hidden": true} -->\n',
+        encoding="utf-8",
+    )
+    knowledge.doc_meta.upsert_document_meta("knowledge/faq_source.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q1", "source_path": "knowledge/other.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/attach-source",
+        json={"path": "knowledge/faq_source.md"},
+    )
+    assert response.status_code == 200
+    assert response.json()["added"] == 1  # Q1 已存在，僅 Q2 新增
+
+    node = qa_nodes.get_node("n1")
+    entries = {e["question"]: e for e in node["qa_entries"]}
+    assert set(entries) == {"Q1", "Q2"}
+    assert entries["Q2"]["source_path"] == "knowledge/faq_source.md"
+    assert entries["Q2"]["hidden"] is True
+    assert entries["Q2"]["image_id"] is None
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/detach-source",
+        json={"path": "knowledge/faq_source.md"},
+    )
+    assert response.status_code == 200
+    node = qa_nodes.get_node("n1")
+    assert {e["question"] for e in node["qa_entries"]} == {"Q1"}
+
+
+def test_attach_source_rejects_non_qa_document(client, tmp_path):
+    import knowledge.doc_meta
+
+    root = tmp_path / "workspace"
+    doc_path = root / "knowledge" / "note.md"
+    doc_path.parent.mkdir(parents=True, exist_ok=True)
+    doc_path.write_text("## 不是 QA\n\n內容", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/note.md", "default", source_type="manual")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/attach-source",
+        json={"path": "knowledge/note.md"},
+    )
+    assert response.status_code == 400
+
+
+def test_documents_list_reports_qa_attached(client, tmp_path):
+    """文件清單對 QA 文件回報 qa_attached：被掛載 true、未掛載 false。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    attached = root / "knowledge" / "faq_a.md"
+    attached.parent.mkdir(parents=True, exist_ok=True)
+    attached.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    free = root / "knowledge" / "faq_b.md"
+    free.write_text("## Q2\n\nA2\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/faq_a.md", "default", source_type="qa")
+    knowledge.doc_meta.upsert_document_meta("knowledge/faq_b.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q1", "source_path": "knowledge/faq_a.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.get("/brain/knowledge/documents")
+    assert response.status_code == 200
+    docs = {d["path"]: d for d in response.json()["documents"]}
+    assert docs["knowledge/faq_a.md"]["qa_attached"] is True
+    assert docs["knowledge/faq_b.md"]["qa_attached"] is False
+
+
+def test_delete_node_keeps_referenced_qa_docs(client, tmp_path):
+    """刪除 node 只解除引用，不刪除底層 QA 文件（文件端擁有內容）。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    doc = root / "knowledge" / "kept.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/kept.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q1", "source_path": "knowledge/kept.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.delete("/brain/knowledge/qa/nodes/n1")
+    assert response.status_code == 200
+
+    assert doc.exists()
+    assert "knowledge/kept.md" in knowledge.doc_meta.load_doc_meta("default")
+
+
+def test_knowledge_ownership_guard_locks_only_attached_qa_docs(client, tmp_path):
+    """guard 僅鎖被 node 掛載的 QA 文件；未掛載者可在文件端自由管理。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    attached = root / "knowledge" / "faq_attached.md"
+    attached.parent.mkdir(parents=True, exist_ok=True)
+    attached.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    detachedoc = root / "knowledge" / "faq_free.md"
+    detachedoc.write_text("## Q2\n\nA2\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/faq_attached.md", "default", source_type="qa")
+    knowledge.doc_meta.upsert_document_meta("knowledge/faq_free.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q1", "source_path": "knowledge/faq_attached.md", "hidden": False, "image_id": None},
+    ])
+
+    # 已掛載：save / delete / move / renormalize 全部 400
+    response = client.put("/brain/knowledge/document", json={
+        "path": "knowledge/faq_attached.md",
+        "content": "## Q1\n\nUpdated A1\n",
+        "project_id": "default",
     })
+    assert response.status_code == 400
+    assert "已被問答樹掛載" in response.json()["detail"]
 
-    # 2. Upload first CSV (with Q1 and Q2)
-    csv_1 = "q,a\nQ1,A1\nQ2,A2\n"
-    file_payload_1 = {"file": ("test.csv", csv_1.encode("utf-8"), "text/csv")}
-    response = client.post("/brain/knowledge/qa/nodes/ghost_node/upload-csv", files=file_payload_1)
+    response = client.delete(
+        "/brain/knowledge/document", params={"path": "knowledge/faq_attached.md"}
+    )
+    assert response.status_code == 400
+
+    response = client.post("/brain/knowledge/move", json={
+        "source_path": "knowledge/faq_attached.md",
+        "target_path": "knowledge/faq_moved.md",
+        "project_id": "default",
+    })
+    assert response.status_code == 400
+
+    response = client.post("/brain/knowledge/renormalize", json={
+        "path": "knowledge/faq_attached.md",
+        "project_id": "default",
+    })
+    assert response.status_code == 400
+
+    # 未掛載：可儲存、可移動、可刪除
+    response = client.put("/brain/knowledge/document", json={
+        "path": "knowledge/faq_free.md",
+        "content": "## Q2\n\nUpdated A2\n",
+        "project_id": "default",
+    })
     assert response.status_code == 200
 
-    # Verify node has Q1 and Q2
-    response = client.get("/brain/knowledge/qa/nodes")
-    node = next(n for n in response.json() if n["node_id"] == "ghost_node")
-    questions = {e["question"] for e in node["qa_entries"]}
-    assert questions == {"Q1", "Q2"}
-
-    # 3. Upload second CSV (re-upload same file, but Q2 is deleted, Q3 is added)
-    csv_2 = "q,a\nQ1,A1-updated\nQ3,A3\n"
-    file_payload_2 = {"file": ("test.csv", csv_2.encode("utf-8"), "text/csv")}
-    response = client.post("/brain/knowledge/qa/nodes/ghost_node/upload-csv", files=file_payload_2)
+    response = client.post("/brain/knowledge/move", json={
+        "source_path": "knowledge/faq_free.md",
+        "target_path": "knowledge/faq_free_moved.md",
+        "project_id": "default",
+    })
     assert response.status_code == 200
 
-    # Verify node has Q1 and Q3, and Q2 is cleaned up (no ghost entry)
-    response = client.get("/brain/knowledge/qa/nodes")
-    node = next(n for n in response.json() if n["node_id"] == "ghost_node")
-    questions = {e["question"] for e in node["qa_entries"]}
-    assert questions == {"Q1", "Q3"}  # Q2 should be gone
+    response = client.delete(
+        "/brain/knowledge/document", params={"path": "knowledge/faq_free_moved.md"}
+    )
+    assert response.status_code == 200
 

@@ -7,7 +7,6 @@ import GraphView from "../components/kb/GraphView";
 import MoveModal from "../components/kb/MoveModal";
 import NoteModal from "../components/kb/NoteModal";
 import NormalizationPreviewModal from "../components/kb/NormalizationPreviewModal";
-import QaModal from "../components/kb/QaModal";
 import SourcePanel from "../components/kb/SourcePanel";
 import TreeView from "../components/kb/TreeView";
 import type { TreeNode } from "../components/kb/helpers";
@@ -50,17 +49,11 @@ export default function KnowledgeBase() {
     noteTitle,
     noteContent,
     creatingNote,
-    showQaModal,
-    qaTitle,
-    qaTargetDir,
-    qaRows,
-    creatingQa,
     dragOver,
     normalizationPreview,
     uploadInputRef,
     filteredTree,
     visibleExpandedDirs,
-    qaDirectoryOptions,
     hasActiveSearch,
     currentDir,
     indexedCount,
@@ -77,9 +70,6 @@ export default function KnowledgeBase() {
     setShowNoteModal,
     setNoteTitle,
     setNoteContent,
-    setQaTitle,
-    setQaTargetDir,
-    setQaRows,
     toggleExpand,
     handleTreeSelect,
     handleSave,
@@ -93,12 +83,9 @@ export default function KnowledgeBase() {
     handleMove,
     handleToggleEnabled,
     handleCreateNote,
-    handleCreateQa,
     handleCreateFolderSubmit,
     cancelCreateFolder,
     closeNoteModal,
-    openQaModal,
-    closeQaModal,
     closeNormalizationPreview,
     closeFileView,
     updateEditContent,
@@ -133,7 +120,7 @@ export default function KnowledgeBase() {
   );
   const isUploadDerived = !!deleteTargetDocument && isUploadDerivedKnowledgeFile(deleteTargetDocument);
   const deleteMessage = deleteTarget?.type === "dir"
-    ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？`
+    ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？目錄內仍有檔案時不會刪除。`
     : isUploadDerived
       ? `確定要刪除 ${deleteTarget?.value} 嗎？這只會移除知識文件與索引；原始上傳檔仍保留在 raw/。`
       : `確定要刪除 ${deleteTarget?.value} 嗎？`;
@@ -246,7 +233,12 @@ export default function KnowledgeBase() {
 
       {status && (
         <div className="px-4 pt-2 shrink-0">
-          <StatusAlert type={status.type} message={status.message} onDismiss={() => setStatus(null)} />
+          <StatusAlert
+            type={status.type}
+            message={status.message}
+            onDismiss={() => setStatus(null)}
+            autoDismiss={status.type === "success" ? 3600 : undefined}
+          />
         </div>
       )}
 
@@ -268,11 +260,17 @@ export default function KnowledgeBase() {
           crawling={crawling}
           onCrawl={handleCrawl}
           onShowNote={() => setShowNoteModal(true)}
-          onShowQa={openQaModal}
         />
       )}
 
-      <input type="file" ref={uploadInputRef} onChange={handleFileUpload} className="hidden" multiple />
+      <input
+        type="file"
+        ref={uploadInputRef}
+        onChange={handleFileUpload}
+        className="hidden"
+        accept=".md,.txt,.csv,.xlsx,.docx,.pdf"
+        multiple
+      />
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <aside className="w-64 xl:w-72 shrink-0 border-r border-slate-200 dark:border-slate-800/60 flex flex-col bg-white dark:bg-slate-950/30 overflow-hidden">
@@ -355,6 +353,7 @@ export default function KnowledgeBase() {
                 onDragEnd={handleTreeDragEnd}
                 onDragTargetChange={setDropTargetPath}
                 onDropFile={handleTreeDrop}
+                onDeleteFolder={(path) => setDeleteTarget({ type: "dir", value: path })}
               />
             )}
             {/* Empty area drop zone — drops to root */}
@@ -385,6 +384,7 @@ export default function KnowledgeBase() {
               onMove={(path) => setMovingPath(path)}
               onToggleEnabled={handleToggleEnabled}
               onRenormalize={handleRenormalize}
+              onOpenQaTree={() => setActiveTab("qa_node_tree")}
               renormalizing={renormalizing || previewingNormalization}
             />
           ) : null}
@@ -422,21 +422,6 @@ export default function KnowledgeBase() {
           creating={creatingNote}
           onClose={closeNoteModal}
           onCreate={handleCreateNote}
-        />
-      )}
-
-      {showQaModal && (
-        <QaModal
-          qaTitle={qaTitle}
-          setQaTitle={setQaTitle}
-          qaTargetDir={qaTargetDir}
-          setQaTargetDir={setQaTargetDir}
-          directoryOptions={qaDirectoryOptions}
-          qaRows={qaRows}
-          setQaRows={setQaRows}
-          creating={creatingQa}
-          onClose={closeQaModal}
-          onCreate={handleCreateQa}
         />
       )}
 
