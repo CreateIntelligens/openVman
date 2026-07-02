@@ -428,6 +428,57 @@ def _schedule_graph_rebuild(project_id: str) -> bool:
     return True
 
 
+def _write_empty_graph_outputs(
+    project_id: str,
+    started_at: str,
+    built_at: str,
+    write_status,
+) -> None:
+    out_dir = get_workspace_root(project_id) / GRAPH_SUBDIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "graph.json").write_text(
+        json.dumps({"nodes": [], "edges": []}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (out_dir / "graph.html").write_text(
+        "<html><body><p style='font-family: sans-serif; text-align: center; "
+        "margin-top: 100px; color: #64748b;'>此項目尚無知識圖譜資料</p></body></html>",
+        encoding="utf-8",
+    )
+    summary = {
+        "project_id": project_id,
+        "built_at": built_at,
+        "note_graph_files": [],
+        "nodes": 0,
+        "edges": 0,
+        "communities": 0,
+        "god_nodes": [],
+        "surprising_bridges": 0,
+        "ast_nodes": 0,
+        "semantic_nodes": 0,
+        "cohesion": {},
+        "harness": {},
+        "output_dir": str(out_dir),
+        "obsidian_dir": str(out_dir / "obsidian"),
+    }
+    (out_dir / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    write_status(
+        project_id,
+        {
+            "state": "ready",
+            "project_id": project_id,
+            "started_at": started_at,
+            "finished_at": built_at,
+            "nodes": 0,
+            "edges": 0,
+            "communities": 0,
+        },
+    )
+
+
 async def _run_graph_rebuild(project_id: str) -> None:
     from datetime import datetime, timezone
 
@@ -448,9 +499,14 @@ async def _run_graph_rebuild(project_id: str) -> None:
         _write_status(project_id, {"state": "failed", "project_id": project_id, "error": str(exc), "started_at": started_at})
         log_exception("knowledge_graph_rebuild_error", exc, project_id=project_id)
         return
-    except EmptyGraphError as exc:
-        _write_status(project_id, {"state": "failed", "project_id": project_id, "error": str(exc), "started_at": started_at})
-        log_exception("knowledge_graph_rebuild_empty", exc, project_id=project_id)
+    except EmptyGraphError:
+        _write_empty_graph_outputs(
+            project_id,
+            started_at,
+            datetime.now(timezone.utc).isoformat(),
+            _write_status,
+        )
+        log_event("knowledge_graph_rebuild_empty", project_id=project_id)
         return
     except Exception as exc:  # pragma: no cover
         _write_status(project_id, {"state": "failed", "project_id": project_id, "error": repr(exc), "started_at": started_at})
