@@ -81,10 +81,12 @@ describe("Avatar page", () => {
       status: "ok",
       character: { char_id: "010", label: "新的名字", has_video: true, has_data: true, size_bytes: 1024, updated_at: "2026-06-08T00:00:00Z" },
     });
-    vi.spyOn(window, "prompt").mockReturnValue("新的名字");
-
     render(<Avatar />);
     fireEvent.click(await screen.findByRole("button", { name: /rename/i }));
+
+    const input = await screen.findByLabelText(/顯示名稱/);
+    fireEvent.change(input, { target: { value: "新的名字" } });
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
 
     expect(api.updateAvatarCharacterLabel).toHaveBeenCalledWith("010", "新的名字");
     await waitFor(() => expect(screen.getByText("新的名字")).toBeTruthy());

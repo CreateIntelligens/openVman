@@ -11,10 +11,14 @@ import {
   uploadAvatarBackground,
   uploadAvatarCharacter,
 } from "../api";
+import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 
 type Status = { type: "success" | "error"; message: string } | null;
+type RenameTarget =
+  | { kind: "character"; character: AvatarCharacter }
+  | { kind: "background"; background: AvatarBackground };
 const ASSET_TABS = ["characters", "backgrounds"] as const;
 type AssetTab = (typeof ASSET_TABS)[number];
 
@@ -81,6 +85,7 @@ export default function Avatar() {
   );
   const [characters, setCharacters] = useState<AvatarCharacter[]>([]);
   const [backgrounds, setBackgrounds] = useState<AvatarBackground[]>([]);
+  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [backgroundsLoading, setBackgroundsLoading] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -234,35 +239,35 @@ export default function Avatar() {
     }
   }
 
-  async function handleRename(character: AvatarCharacter): Promise<void> {
-    const newLabel = window.prompt("Enter the display name", character.label);
-    const trimmedNewLabel = newLabel?.trim();
-    if (!trimmedNewLabel || trimmedNewLabel === character.label) return;
+  async function handleRenameSubmit(values: Record<string, string>): Promise<void> {
+    const target = renameTarget;
+    setRenameTarget(null);
+    if (!target) return;
+    const newLabel = values.label;
 
-    setStatus(null);
-    try {
-      const res = await updateAvatarCharacterLabel(character.char_id, trimmedNewLabel);
-      setCharacters((prev) =>
-        prev.map((c) => (c.char_id === character.char_id ? res.character : c)),
-      );
-      setStatus({ type: "success", message: `Renamed to ${trimmedNewLabel}` });
-    } catch (err) {
-      setStatus({ type: "error", message: errorMessage(err) });
+    if (target.kind === "character") {
+      if (!newLabel || newLabel === target.character.label) return;
+      setStatus(null);
+      try {
+        const res = await updateAvatarCharacterLabel(target.character.char_id, newLabel);
+        setCharacters((prev) =>
+          prev.map((c) => (c.char_id === target.character.char_id ? res.character : c)),
+        );
+        setStatus({ type: "success", message: `Renamed to ${newLabel}` });
+      } catch (err) {
+        setStatus({ type: "error", message: errorMessage(err) });
+      }
+      return;
     }
-  }
 
-  async function handleBackgroundRename(background: AvatarBackground): Promise<void> {
-    const newLabel = window.prompt("Enter the display name", background.label);
-    const trimmedNewLabel = newLabel?.trim();
-    if (!trimmedNewLabel || trimmedNewLabel === background.label) return;
-
+    if (!newLabel || newLabel === target.background.label) return;
     setStatus(null);
     try {
-      const res = await updateAvatarBackgroundLabel(background.background_id, trimmedNewLabel);
+      const res = await updateAvatarBackgroundLabel(target.background.background_id, newLabel);
       setBackgrounds((prev) =>
-        prev.map((bg) => (bg.background_id === background.background_id ? res.background : bg)),
+        prev.map((bg) => (bg.background_id === target.background.background_id ? res.background : bg)),
       );
-      setStatus({ type: "success", message: `Renamed to ${trimmedNewLabel}` });
+      setStatus({ type: "success", message: `Renamed to ${newLabel}` });
     } catch (err) {
       setStatus({ type: "error", message: errorMessage(err) });
     }
@@ -432,7 +437,7 @@ export default function Avatar() {
                       Try
                     </button>
                     <button
-                      onClick={() => handleRename(character)}
+                      onClick={() => setRenameTarget({ kind: "character", character })}
                       className={secondaryActionClassName}
                     >
                       Rename
@@ -547,7 +552,7 @@ export default function Avatar() {
                       Use
                     </button>
                     <button
-                      onClick={() => handleBackgroundRename(background)}
+                      onClick={() => setRenameTarget({ kind: "background", background })}
                       className={secondaryActionClassName}
                     >
                       Rename
@@ -565,6 +570,25 @@ export default function Avatar() {
           )}
         </>
       )}
+
+      <PromptModal
+        open={renameTarget !== null}
+        title="修改顯示名稱"
+        fields={[
+          {
+            key: "label",
+            label: "顯示名稱",
+            initialValue:
+              renameTarget?.kind === "character"
+                ? renameTarget.character.label
+                : renameTarget?.background.label ?? "",
+            required: true,
+          },
+        ]}
+        submitLabel="儲存"
+        onSubmit={handleRenameSubmit}
+        onCancel={() => setRenameTarget(null)}
+      />
     </div>
   );
 }
