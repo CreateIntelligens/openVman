@@ -54,6 +54,12 @@ _MIN_QA_PAIRS_FOR_DETECTION = 1
 class ChunkSpec:
     text: str
     metadata: dict[str, Any]
+    embed_text: str | None = None
+
+
+def _format_qa_embed_text(title: str, question: str) -> str:
+    """QA 檢索以問題為主：長答案會稀釋向量，embedding 只吃主題+問題，完整答案留在 text 供檢索後回填。"""
+    return f"主題：{title}\n問題：{question.strip()}"
 
 
 def load_index_state(project_id: str = "default") -> dict[str, str]:
@@ -330,6 +336,11 @@ def _extract_text_chunks(path: Path, workspace_root: Path | None = None) -> list
             )
 
     _renumber_chunk_indices(chunks)
+    if relative_path.startswith("knowledge/qa/"):
+        for chunk in chunks:
+            heading_path = chunk.metadata.get("heading_path") or []
+            if heading_path and chunk.embed_text is None:
+                chunk.embed_text = _format_qa_embed_text(title, str(heading_path[-1]))
     return chunks
 
 
@@ -415,6 +426,7 @@ def _extract_markdown_qa_chunks(
                         "chunk_id": f"{relative_path}::{chunk_index}",
                         "char_count": len(text),
                     },
+                    embed_text=_format_qa_embed_text(title, question),
                 )
             )
             chunk_index += 1
@@ -945,6 +957,7 @@ def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[
                         "chunk_id": f"{relative_path}::{row_number}",
                         "char_count": len(text),
                     },
+                    embed_text=_format_qa_embed_text(title, question or "未命名問題"),
                 )
             )
 
@@ -955,7 +968,7 @@ def _build_knowledge_records(chunk_specs: list[ChunkSpec]) -> list[dict[str, Any
     if not chunk_specs:
         return []
 
-    texts = [chunk.text for chunk in chunk_specs]
+    texts = [chunk.embed_text or chunk.text for chunk in chunk_specs]
     vectors = get_embedder().encode(texts)
     records: list[dict[str, Any]] = []
 

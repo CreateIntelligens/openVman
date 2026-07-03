@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from datetime import datetime, timezone
+from collections.abc import Callable, Iterable
+from datetime import UTC, datetime, timezone
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -484,7 +485,34 @@ def list_qa_entries(project_id: str = "default") -> list[dict[str, str]]:
     return entries
 
 
-def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
+def _archive_original(src: Path, rel_in_raw: Path, root: Path) -> str:
+    """Move the committed original file into archive/originals/, returning its relative path."""
+    dest = root / "archive" / "originals" / rel_in_raw
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
+        dest = dest.with_name(f"{dest.stem}-{stamp}{dest.suffix}")
+    src.replace(dest)
+    return dest.relative_to(root).as_posix()
+
+
+def list_raw_files(project_id: str = "default") -> list[str]:
+    """List all staged files under raw/, relative to raw root."""
+    root = ensure_workspace_scaffold(project_id)
+    raw_root = root / "raw"
+    if not raw_root.exists():
+        return []
+    return sorted(
+        p.relative_to(raw_root).as_posix()
+        for p in raw_root.rglob("*")
+        if p.is_file()
+    )
+
+
+def commit_raw_documents(
+    project_id: str = "default",
+    on_progress: Callable[[str, str], None] | None = None,
+) -> dict[str, Any]:
     """Promote staged files from raw/ into knowledge/ (the 'commit' step).
 
     raw/ is a staging area (uploads land there un-indexed). Committing now runs
@@ -510,16 +538,28 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
     skipped: list[str] = []
     for src in sorted(p for p in raw_root.rglob("*") if p.is_file()):
         rel_in_raw = src.relative_to(raw_root)
+        rel_path_str = rel_in_raw.as_posix()
+
+        def _report(state: str) -> None:
+            if on_progress:
+                on_progress(rel_path_str, state)
+
         if src.suffix.lower() not in SUPPORTED_SUFFIXES:
-            skipped.append(rel_in_raw.as_posix())
+            _report("skipped")
+            skipped.append(rel_path_str)
             continue
 
-        is_qa = src.suffix.lower() == ".csv" and is_qa_csv(src.read_bytes())
+        _report("normalizing")
+
+        origin_bytes = src.read_bytes()
+        origin_hash = hashlib.sha256(origin_bytes).hexdigest()
+        is_qa = src.suffix.lower() == ".csv" and is_qa_csv(origin_bytes)
 
         text = convert_to_text(src)
         if not text:
             # Unsupported in practice / extraction failed: leave it in raw/.
-            skipped.append(rel_in_raw.as_posix())
+            _report("skipped")
+            skipped.append(rel_path_str)
             continue
 
         if is_qa:
@@ -529,7 +569,8 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
         else:
             cleaned = normalize_to_markdown(text)
         if not cleaned:
-            skipped.append(rel_in_raw.as_posix())
+            _report("skipped")
+            skipped.append(rel_path_str)
             continue
 
         # Output is always markdown regardless of the source format.
@@ -540,14 +581,20 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
         dest = resolve_workspace_document(target_rel.as_posix(), project_id)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(cleaned, encoding="utf-8")
+        archived_rel = _archive_original(src, rel_in_raw, root)
         upsert_document_meta(
-            target_rel.as_posix(), project_id, source_type="qa" if is_qa else "upload"
+            target_rel.as_posix(),
+            project_id,
+            source_type="qa" if is_qa else "upload",
+            origin_path=archived_rel,
+            origin_hash=origin_hash,
         )
         if is_qa:
             from knowledge.qa_nodes import create_node_for_source
 
             create_node_for_source(target_rel.as_posix(), target_rel.stem, project_id)
-        src.unlink()
         committed.append(target_rel.as_posix())
+        _report("committed")
 
     return {"committed": committed, "skipped": skipped}
+

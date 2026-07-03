@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Response
 from fastapi.responses import HTMLResponse
 
 from core.chat_service import record_generation_failure
@@ -30,6 +32,7 @@ from knowledge.knowledge_admin import (
     list_knowledge_base_directories,
     list_knowledge_base_documents,
     list_qa_entries,
+    list_raw_files,
     list_workspace_documents,
     move_workspace_document,
     preview_workspace_document_normalization,
@@ -41,6 +44,7 @@ from knowledge.knowledge_admin import (
     save_workspace_note,
     update_workspace_document_meta,
 )
+from knowledge import commit_jobs
 from knowledge.workspace import get_workspace_root
 from protocol.schemas import (
     AdminActionRequest,
@@ -55,19 +59,32 @@ from safety.observability import log_event, log_exception
 router = APIRouter(prefix="/brain", tags=["Knowledge"])
 
 
-async def _background_reindex(project_id: str) -> None:
-    try:
-        result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
-    except Exception as exc:
-        log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
+_REINDEX_DEBOUNCE_SECONDS = 2.0
+_reindex_state: dict[str, dict[str, Any]] = {}
+
+
+def _schedule_reindex(project_id: str) -> None:
+    """Coalesce reindex requests: debounce rapid edits, never run two at once."""
+    state = _reindex_state.setdefault(project_id, {"task": None, "dirty": False})
+    state["dirty"] = True
+    task = state["task"]
+    if task is not None and not task.done():
         return
-    log_event("knowledge_reindex_auto", project_id=project_id, **result)
-    # Keep the concept graph in sync with the vector index: any content change
-    # that triggers a reindex (upload, delete, note, edit, move) should also
-    # rebuild the graph so deleted documents don't leave orphan nodes/edges.
-    # Reuse the in-flight registry so rapid successive changes coalesce instead
-    # of spawning parallel (LLM-heavy) rebuilds.
+    state["task"] = asyncio.create_task(_reindex_worker(project_id, state))
+
+
+async def _reindex_worker(project_id: str, state: dict[str, Any]) -> None:
+    while state["dirty"]:
+        await asyncio.sleep(_REINDEX_DEBOUNCE_SECONDS)
+        state["dirty"] = False
+        try:
+            result = await asyncio.to_thread(rebuild_knowledge_index, project_id)
+        except Exception as exc:
+            log_exception("knowledge_reindex_auto_error", exc, project_id=project_id)
+            continue
+        log_event("knowledge_reindex_auto", project_id=project_id, **result)
     _schedule_graph_rebuild(project_id)
+
 
 
 async def _background_rename_document(source_path: str, target_path: str, project_id: str) -> None:
@@ -136,7 +153,7 @@ async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
         from knowledge.qa_nodes import sync_entries_for_source
 
         sync_entries_for_source(payload.path, payload.project_id)
-    asyncio.create_task(_background_reindex(payload.project_id))
+    _schedule_reindex(payload.project_id)
     return {"status": "ok", "document": document}
 
 
@@ -174,7 +191,7 @@ async def delete_knowledge_document_route(path: str, project_id: str = "default"
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="找不到指定文件") from exc
-    asyncio.create_task(_background_reindex(project_id))
+    _schedule_reindex(project_id)
     return {"status": "ok"}
 
 
@@ -278,15 +295,14 @@ async def apply_renormalize_knowledge_document_route(
         log_exception("knowledge_renormalize_apply_error", exc, project_id=pid)
         raise HTTPException(status_code=500, detail="套用整理失敗") from exc
 
-    index_result = await asyncio.to_thread(rebuild_knowledge_index, pid)
     log_event("knowledge_renormalize_apply", project_id=pid, path=payload.path)
-    _schedule_graph_rebuild(pid)
+    _schedule_reindex(pid)
 
     return {
         "status": "ok",
         "project_id": pid,
         "document": document,
-        "indexed": index_result,
+        "indexed": "background",
         "graph": "building",
     }
 
@@ -310,49 +326,57 @@ async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionR
         log_exception("knowledge_renormalize_error", exc, project_id=pid)
         raise HTTPException(status_code=500, detail="整理失敗") from exc
 
-    index_result = await asyncio.to_thread(rebuild_knowledge_index, pid)
     log_event("knowledge_renormalize", project_id=pid, path=payload.path)
-    _schedule_graph_rebuild(pid)
+    _schedule_reindex(pid)
 
     return {
         "status": "ok",
         "project_id": pid,
         "document": document,
-        "indexed": index_result,
-        "graph": "building",
-    }
-
-
-@router.post("/knowledge/raw/commit", summary="採納 raw 區檔案進知識庫並重建索引與圖譜")
-async def commit_knowledge_raw_route(payload: AdminActionRequest):
-    """The 'commit' step: promote staged raw/ files into knowledge/, and rebuild the
-    vector index and concept graph asynchronously in the background.
-    """
-    pid = payload.project_id
-    try:
-        result = await asyncio.to_thread(commit_raw_documents, pid)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:  # pragma: no cover
-        log_exception("knowledge_commit_error", exc, project_id=pid)
-        raise HTTPException(status_code=500, detail="採納失敗") from exc
-
-    if not result["committed"]:
-        return {"status": "nothing_to_commit", "project_id": pid, **result}
-
-    log_event("knowledge_commit", project_id=pid, committed=len(result["committed"]))
-
-    # Reindex and rebuild graph in background
-    asyncio.create_task(_background_reindex(pid))
-
-    return {
-        "status": "ok",
-        "project_id": pid,
-        "committed": result["committed"],
-        "skipped": result["skipped"],
         "indexed": "background",
         "graph": "building",
     }
+
+
+@router.post("/knowledge/raw/commit", summary="採納 raw 區檔案進知識庫（背景執行，逐檔進度可查詢）", status_code=202)
+async def commit_knowledge_raw_route(payload: AdminActionRequest, response: Response):
+    """The 'commit' step: promote staged raw/ files into knowledge/ in the
+    background (per-file LLM normalization is slow), then rebuild the vector
+    index and concept graph. Progress is polled via /knowledge/raw/commit/status.
+    """
+    pid = payload.project_id
+    pending = await asyncio.to_thread(list_raw_files, pid)
+    if not pending:
+        response.status_code = 200
+        return {"status": "nothing_to_commit", "project_id": pid, "committed": [], "skipped": []}
+    if not commit_jobs.start_job(pid, pending):
+        response.status_code = 200
+        return {"status": "already_running", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
+    asyncio.create_task(_run_commit_job(pid))
+    response.status_code = 202
+    return {"status": "started", "project_id": pid, "job": commit_jobs.job_snapshot(pid)}
+
+
+async def _run_commit_job(project_id: str) -> None:
+    def _on_progress(path: str, state: str) -> None:
+        commit_jobs.update_file(project_id, path, state)
+
+    try:
+        result = await asyncio.to_thread(commit_raw_documents, project_id, _on_progress)
+    except Exception as exc:
+        commit_jobs.fail_job(project_id, repr(exc))
+        log_exception("knowledge_commit_error", exc, project_id=project_id)
+        return
+    commit_jobs.finish_job(project_id, result["committed"], result["skipped"])
+    log_event("knowledge_commit", project_id=project_id, committed=len(result["committed"]))
+    if result["committed"]:
+        _schedule_reindex(project_id)
+
+
+@router.get("/knowledge/raw/commit/status", summary="查詢採納進度")
+async def commit_status_route(project_id: str = "default"):
+    return commit_jobs.job_snapshot(project_id)
+
 
 
 @router.post("/knowledge/upload", summary="上傳實體檔案至知識庫")
@@ -379,7 +403,7 @@ async def upload_knowledge_documents_route(
         raise HTTPException(status_code=400, detail="檔案需為 UTF-8 編碼") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    asyncio.create_task(_background_reindex(project_id))
+    _schedule_reindex(project_id)
     return {"status": "ok", "files": uploaded}
 
 
@@ -395,7 +419,7 @@ async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    asyncio.create_task(_background_reindex(payload.project_id))
+    _schedule_reindex(payload.project_id)
     return {"status": "ok", "document": document, "path": document["path"], "size": document["size"]}
 
 

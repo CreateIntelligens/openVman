@@ -11,6 +11,7 @@ import {
   moveKnowledgeDocument,
   reindexKnowledge,
   commitRawKnowledge,
+  getCommitStatus,
   previewRenormalizedKnowledgeDocument,
   saveKnowledgeDocument,
   updateKnowledgeDocumentMeta,
@@ -289,17 +290,33 @@ export function useKnowledgeBase() {
       const response = await commitRawKnowledge();
       if (response.status === "nothing_to_commit") {
         setStatus({ type: "success", message: "raw 區沒有可採納的文件。" });
-      } else {
-        const n = response.committed?.length ?? 0;
-        setStatus({ type: "success", message: `已採納 ${n} 份文件，正在重建索引與圖譜。` });
-        await loadDocuments();
+        return;
       }
+      let job = response.job ?? (await getCommitStatus());
+      while (job.state === "running") {
+        const total = Object.keys(job.files).length;
+        const processed = Object.values(job.files).filter(
+          (s) => s === "committed" || s === "skipped",
+        ).length;
+        setStatus({ type: "success", message: `採納處理中… ${processed}/${total} 份文件` });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        job = await getCommitStatus();
+      }
+      if (job.state === "failed") {
+        setStatus({ type: "error", message: `採納失敗：${job.error ?? "未知錯誤"}` });
+        return;
+      }
+      setStatus({
+        type: "success",
+        message: `已採納 ${job.committed.length} 份文件，正在重建索引與圖譜。`,
+      });
+      await loadDocuments();
     } catch (error) {
       setErrorStatus(error);
     } finally {
       setCommitting(false);
     }
-  }, [loadDocuments, setErrorStatus]);
+  }, [loadDocuments, setErrorStatus, setStatus]);
 
   const handleRenormalize = useCallback(async (path: string) => {
     setPreviewingNormalization(true);

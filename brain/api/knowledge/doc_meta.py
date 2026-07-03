@@ -64,6 +64,8 @@ def upsert_document_meta(
     source_url: str | None | object = UNSET,
     enabled: bool | object = UNSET,
     created_at: str | object = UNSET,
+    origin_path: str | None | object = UNSET,
+    origin_hash: str | None | object = UNSET,
 ) -> dict[str, Any]:
     metadata = load_doc_meta(project_id)
     current = dict(metadata.get(relative_path, {}))
@@ -80,6 +82,18 @@ def upsert_document_meta(
         current["enabled"] = bool(enabled)
     if created_at is not UNSET:
         current["created_at"] = str(created_at).strip()
+    if origin_path is not UNSET:
+        cleaned_path = str(origin_path).strip() if isinstance(origin_path, str) else ""
+        if cleaned_path:
+            current["origin_path"] = cleaned_path
+        else:
+            current.pop("origin_path", None)
+    if origin_hash is not UNSET:
+        cleaned_hash = str(origin_hash).strip() if isinstance(origin_hash, str) else ""
+        if cleaned_hash:
+            current["origin_hash"] = cleaned_hash
+        else:
+            current.pop("origin_hash", None)
 
     resolved = _resolved_entry(current)
     current["source_type"] = resolved["source_type"]
@@ -89,6 +103,14 @@ def upsert_document_meta(
         current["source_url"] = resolved["source_url"]
     else:
         current.pop("source_url", None)
+    if resolved["origin_path"]:
+        current["origin_path"] = resolved["origin_path"]
+    else:
+        current.pop("origin_path", None)
+    if resolved["origin_hash"]:
+        current["origin_hash"] = resolved["origin_hash"]
+    else:
+        current.pop("origin_hash", None)
 
     metadata[relative_path] = _normalize_entry(current)
     save_doc_meta(metadata, project_id)
@@ -135,6 +157,12 @@ def _normalize_entry(value: dict[str, Any]) -> dict[str, Any]:
     created_at = value.get("created_at")
     if isinstance(created_at, str) and created_at.strip():
         entry["created_at"] = created_at.strip()
+    origin_path = value.get("origin_path")
+    if isinstance(origin_path, str) and origin_path.strip():
+        entry["origin_path"] = origin_path.strip()
+    origin_hash = value.get("origin_hash")
+    if isinstance(origin_hash, str) and origin_hash.strip():
+        entry["origin_hash"] = origin_hash.strip()
     return entry
 
 
@@ -146,6 +174,8 @@ def _resolved_entry(value: dict[str, Any]) -> dict[str, Any]:
         "source_url": normalized.get("source_url") or None,
         "enabled": bool(normalized.get("enabled", True)),
         "created_at": created_at,
+        "origin_path": normalized.get("origin_path") or None,
+        "origin_hash": normalized.get("origin_hash") or None,
     }
 
 

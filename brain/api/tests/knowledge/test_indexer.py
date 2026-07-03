@@ -698,3 +698,72 @@ class TestReindexCLI:
         cli = importlib.import_module("scripts.reindex_knowledge")
         # Should not raise
         cli.main()
+
+
+def test_qa_markdown_chunk_embeds_question_only(monkeypatch, tmp_path):
+    indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+    # Create inputs
+    content = "Q: 如何退貨\nA: 請於七天內申請退貨並保留發票\nQ: 換貨流程\nA: 請聯絡客服專線"
+    title = "faq"
+    relative_path = "knowledge/faq.md"
+    fingerprint = "fp123"
+    persona_id = "p1"
+    
+    chunks = indexer._extract_markdown_qa_chunks(
+        content, title, relative_path, fingerprint, persona_id
+    )
+    assert len(chunks) == 2
+    assert chunks[0].embed_text == "主題：faq\n問題：如何退貨"
+    assert "請於七天內申請退貨" in chunks[0].text
+    assert chunks[1].embed_text == "主題：faq\n問題：換貨流程"
+
+
+def test_qa_heading_file_chunk_embeds_question_only(monkeypatch, tmp_path):
+    # This checks that markdown files under knowledge/qa/ (which use headings for Q and prose for A)
+    # get embed_text populated by _extract_text_chunks.
+    indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+    
+    qa_dir = ws / "knowledge" / "qa"
+    qa_dir.mkdir(parents=True, exist_ok=True)
+    faq_md = qa_dir / "faq.md"
+    faq_md.write_text("## 如何退貨\n\n請於七天內申請退貨並保留發票", encoding="utf-8")
+    
+    chunks = indexer._extract_text_chunks(faq_md, ws)
+    assert len(chunks) == 1
+    assert chunks[0].embed_text == "主題：faq\n問題：如何退貨"
+    assert "請於七天內申請退貨" in chunks[0].text
+
+
+def test_non_qa_chunks_have_no_embed_text(monkeypatch, tmp_path):
+    # Standard notes or files not in knowledge/qa/ should have embed_text as None
+    indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+    
+    note_md = ws / "knowledge" / "note.md"
+    note_md.parent.mkdir(parents=True, exist_ok=True)
+    note_md.write_text("## 一般章節\n\n這是普通段落內容", encoding="utf-8")
+    
+    chunks = indexer._extract_text_chunks(note_md, ws)
+    assert len(chunks) == 1
+    assert chunks[0].embed_text is None
+
+
+def test_build_knowledge_records_encodes_embed_text(monkeypatch, tmp_path):
+    indexer, ws, _, _ = _load_indexer(monkeypatch, tmp_path)
+    encoded: list[list[str]] = []
+
+    class FakeEmbedder:
+        def encode(self, texts, **kwargs):
+            encoded.append(list(texts))
+            return [[0.1, 0.2] for _ in texts]
+
+    monkeypatch.setattr("knowledge.indexer.get_embedder", lambda: FakeEmbedder())
+    monkeypatch.setattr("knowledge.indexer.normalize_vector", lambda v: v)
+    chunks = [
+        indexer.ChunkSpec(text="full QA payload", metadata={"path": "p", "chunk_id": "p::0"}, embed_text="主題：t\n問題：q"),
+        indexer.ChunkSpec(text="plain chunk", metadata={"path": "p", "chunk_id": "p::1"}),
+    ]
+    records = indexer._build_knowledge_records(chunks)
+    assert encoded[0] == ["主題：t\n問題：q", "plain chunk"]
+    assert records[0]["text"] == "full QA payload"
+    assert records[1]["text"] == "plain chunk"
+

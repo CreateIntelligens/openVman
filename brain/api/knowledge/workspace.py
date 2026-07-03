@@ -22,7 +22,7 @@ ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
 #   dreaming/      REM/Deep/Light process reports (consolidated memories already
 #                  live in the memories table; the reports are meta logs)
 #   .normalization-backups/  recovery copies for AI document cleanup
-EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/", ".normalization-backups/", "graphify-out/", "dreaming/")
+EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/", ".normalization-backups/", "graphify-out/", "dreaming/", "raw/", "archive/")
 WORKSPACE_TEMPLATES = {
     "SOUL.md": """# 核心人格設定 (SOUL)
 

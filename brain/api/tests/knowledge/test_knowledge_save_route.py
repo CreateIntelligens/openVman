@@ -38,6 +38,7 @@ def _load_knowledge_routes_module():
         list_knowledge_base_directories=lambda *args, **kwargs: [],
         list_knowledge_base_documents=lambda *args, **kwargs: [],
         list_qa_entries=lambda *args, **kwargs: [],
+        list_raw_files=lambda *args, **kwargs: [],
         list_workspace_documents=lambda *args, **kwargs: [],
         move_workspace_document=lambda *args, **kwargs: {},
         preview_workspace_document_normalization=lambda *args, **kwargs: {},
@@ -66,19 +67,9 @@ def test_save_knowledge_document_route_schedules_background_reindex(monkeypatch)
     knowledge_routes = _load_knowledge_routes_module()
     scheduled: dict[str, object] = {}
 
-    class FakeAwaitable:
-        def __await__(self):
-            if False:
-                yield
-            return None
-
-    def fake_background_reindex(project_id: str):
+    def fake_schedule_reindex(project_id: str):
         scheduled["project_id"] = project_id
-        return FakeAwaitable()
-
-    def fake_create_task(task: object):
-        scheduled["task"] = task
-        return SimpleNamespace()
+        scheduled["task"] = "scheduled"
 
     monkeypatch.setattr(
         knowledge_routes,
@@ -89,8 +80,7 @@ def test_save_knowledge_document_route_schedules_background_reindex(monkeypatch)
             "project_id": project_id,
         },
     )
-    monkeypatch.setattr(knowledge_routes, "_background_reindex", fake_background_reindex)
-    monkeypatch.setattr(knowledge_routes.asyncio, "create_task", fake_create_task)
+    monkeypatch.setattr(knowledge_routes, "_schedule_reindex", fake_schedule_reindex)
 
     payload = knowledge_routes.KnowledgeDocumentPutRequest(
         path="knowledge/ingested/example.md",
@@ -116,19 +106,9 @@ def test_create_note_route_passes_target_dir(monkeypatch):
     knowledge_routes = _load_knowledge_routes_module()
     captured: dict[str, object] = {}
 
-    class FakeAwaitable:
-        def __await__(self):
-            if False:
-                yield
-            return None
-
-    def fake_background_reindex(project_id: str):
+    def fake_schedule_reindex(project_id: str):
         captured["reindex_project_id"] = project_id
-        return FakeAwaitable()
-
-    def fake_create_task(task: object):
-        captured["task"] = task
-        return SimpleNamespace()
+        captured["task"] = "scheduled"
 
     def fake_save_workspace_note(
         title: str,
@@ -147,8 +127,7 @@ def test_create_note_route_passes_target_dir(monkeypatch):
         return {"path": "knowledge/faq/FAQ.md", "size": 12}
 
     monkeypatch.setattr(knowledge_routes, "save_workspace_note", fake_save_workspace_note)
-    monkeypatch.setattr(knowledge_routes, "_background_reindex", fake_background_reindex)
-    monkeypatch.setattr(knowledge_routes.asyncio, "create_task", fake_create_task)
+    monkeypatch.setattr(knowledge_routes, "_schedule_reindex", fake_schedule_reindex)
 
     payload = knowledge_routes.KnowledgeNoteCreateRequest(
         title="FAQ",

@@ -11,9 +11,11 @@ is never lost.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 from core.llm_client import generate_chat_reply
+
 from knowledge.graph_extractor import _split_text
 
 logger = logging.getLogger("brain.knowledge.normalizer")
@@ -35,14 +37,32 @@ NORMALIZE_PROMPT = """你是知識庫文件整理助手。下面是一段從 PDF
 """
 
 
+def _passes_sanity_check(original: str, cleaned: str) -> bool:
+    """Check if the cleaned output passes length sanity check."""
+    if not cleaned.strip():
+        return False
+    if len(original) < 500:
+        return True
+    ratio = len(cleaned) / len(original)
+    return 0.5 <= ratio <= 1.6
+
+
 def _normalize_segment(segment: str) -> str:
     """Normalize one segment via the LLM, falling back to the original on error."""
     prompt = NORMALIZE_PROMPT.format(text=segment)
     try:
-        return generate_chat_reply(
+        cleaned = generate_chat_reply(
             [{"role": "user", "content": prompt}],
             privacy_source="graph_extractor",
         )
+        if not _passes_sanity_check(segment, cleaned):
+            logger.warning(
+                "normalizer: segment failed sanity check (len original: %d, len cleaned: %d); using original text",
+                len(segment),
+                len(cleaned),
+            )
+            return segment
+        return cleaned
     except Exception:  # noqa: BLE001 - never drop content on LLM failure
         logger.warning(
             "normalizer: LLM call failed for a segment; using original text",
@@ -54,12 +74,14 @@ def _normalize_segment(segment: str) -> str:
 def normalize_to_markdown(text: str) -> str:
     """Clean raw extracted text into tidy Obsidian-style Markdown via the LLM.
 
-    Splits long input into segments, normalizes each, and rejoins. Returns the
-    cleaned markdown. On LLM failure for a segment, falls back to that segment's
-    original text (never loses content).
+    Splits long input into segments, normalizes each concurrently, and rejoins.
+    Returns the cleaned markdown. On LLM failure or sanity check failure for a
+    segment, falls back to that segment's original text (never loses content).
     """
     if not text.strip():
         return ""
     segments = _split_text(text, size=SEGMENT_SIZE)
-    cleaned = [_normalize_segment(seg) for seg in segments]
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        cleaned = list(executor.map(_normalize_segment, segments))
     return "\n\n".join(cleaned).strip()
+

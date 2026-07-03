@@ -180,17 +180,40 @@ export function reindexKnowledge() {
   });
 }
 
+export type KnowledgeCommitFileState =
+  | "pending"
+  | "normalizing"
+  | "committed"
+  | "skipped";
+
+export interface KnowledgeCommitJob {
+  state: "idle" | "running" | "done" | "failed";
+  started_at: string | null;
+  finished_at: string | null;
+  files: Record<string, KnowledgeCommitFileState>;
+  committed: string[];
+  skipped: string[];
+  error: string | null;
+}
+
 export interface KnowledgeCommitResponse {
-  status: string;
+  status: "started" | "nothing_to_commit" | "already_running";
   project_id: string;
   committed?: string[];
   skipped?: string[];
-  graph?: string;
+  job?: KnowledgeCommitJob;
 }
 
-/** Promote staged raw/ files into the knowledge base, then reindex + rebuild graph. */
+/** Promote staged raw/ files into the knowledge base as a background job. */
 export function commitRawKnowledge() {
   return post<KnowledgeCommitResponse>(knowledgePath("/raw/commit"), {
+    project_id: getActiveProjectId(),
+  });
+}
+
+/** Poll per-file progress of the background commit job. */
+export function getCommitStatus() {
+  return get<KnowledgeCommitJob>(knowledgePath("/raw/commit/status"), {
     project_id: getActiveProjectId(),
   });
 }

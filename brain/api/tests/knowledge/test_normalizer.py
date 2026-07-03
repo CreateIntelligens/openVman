@@ -60,22 +60,43 @@ def test_long_input_splits_into_multiple_segments(normalizer, monkeypatch):
     raw = "\n\n".join(paragraphs)
     assert len(raw) > 6000
 
-    seen_segments: list[str] = []
+    segments = normalizer._split_text(raw, size=normalizer.SEGMENT_SIZE)
+    assert len(segments) > 1, "long input should split into >1 segment"
+
+    seen_segments: list[str] = ["" for _ in segments]
 
     def fake(messages, privacy_source=None):
         content = messages[0]["content"]
-        # Each segment is echoed back tagged with its call index, so we can
-        # assert ordered rejoining.
-        idx = len(seen_segments)
-        seen_segments.append(content)
-        return f"CLEANED-{idx}"
+        # Extract the segment exactly
+        prefix = "待整理文字：\n---\n"
+        start_idx = content.find(prefix)
+        assert start_idx != -1
+        extracted = content[start_idx + len(prefix):]
+        end_idx = extracted.rfind("\n---")
+        assert end_idx != -1
+        seg = extracted[:end_idx]
+        seg_len = len(seg)
+
+        # Find which segment this is
+        idx = -1
+        for i, s in enumerate(segments):
+            if s == seg:
+                idx = i
+                break
+        assert idx != -1, "segment not found in precomputed segments"
+        seen_segments[idx] = content
+        prefix_out = f"CLEANED-{idx} "
+        return prefix_out + "字" * (seg_len - len(prefix_out))
 
     monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", fake)
 
     result = normalizer.normalize_to_markdown(raw)
 
-    assert len(seen_segments) > 1, "long input should split into >1 segment"
-    expected = "\n\n".join(f"CLEANED-{i}" for i in range(len(seen_segments)))
+    expected_parts = []
+    for i, seg in enumerate(segments):
+        prefix_out = f"CLEANED-{i} "
+        expected_parts.append(prefix_out + "字" * (len(seg) - len(prefix_out)))
+    expected = "\n\n".join(expected_parts)
     assert result == expected  # rejoined in order
 
 
@@ -86,14 +107,31 @@ def test_llm_failure_falls_back_to_original_segment(normalizer, monkeypatch):
     assert len(segments) > 1
 
     fail_index = 1
-    call_index = {"n": 0}
 
     def fake(messages, privacy_source=None):
-        i = call_index["n"]
-        call_index["n"] += 1
-        if i == fail_index:
+        content = messages[0]["content"]
+        # Extract the segment exactly
+        prefix = "待整理文字：\n---\n"
+        start_idx = content.find(prefix)
+        assert start_idx != -1
+        extracted = content[start_idx + len(prefix):]
+        end_idx = extracted.rfind("\n---")
+        assert end_idx != -1
+        seg = extracted[:end_idx]
+        seg_len = len(seg)
+
+        # Find which segment this is
+        idx = -1
+        for i, s in enumerate(segments):
+            if s == seg:
+                idx = i
+                break
+        assert idx != -1, "segment not found"
+
+        if idx == fail_index:
             raise RuntimeError("simulated LLM failure")
-        return f"CLEANED-{i}"
+        prefix_out = f"CLEANED-{idx} "
+        return prefix_out + "字" * (seg_len - len(prefix_out))
 
     monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", fake)
 
@@ -115,3 +153,61 @@ def test_empty_input_returns_empty_without_calling_llm(normalizer, monkeypatch):
 
     assert normalizer.normalize_to_markdown("") == ""
     assert normalizer.normalize_to_markdown("   \n\t  ") == ""
+
+
+def test_sanity_check_falls_back_on_truncated_output(normalizer, monkeypatch):
+    original = "內" * 1000
+    monkeypatch.setattr(
+        "knowledge.normalizer.generate_chat_reply",
+        lambda messages, privacy_source: "太短",
+    )
+    assert normalizer.normalize_to_markdown(original) == original
+
+
+def test_sanity_check_falls_back_on_bloated_output(normalizer, monkeypatch):
+    original = "內" * 1000
+    monkeypatch.setattr(
+        "knowledge.normalizer.generate_chat_reply",
+        lambda messages, privacy_source: "灌" * 5000,
+    )
+    assert normalizer.normalize_to_markdown(original) == original
+
+
+def test_sanity_check_skips_short_segments(normalizer, monkeypatch):
+    monkeypatch.setattr(
+        "knowledge.normalizer.generate_chat_reply",
+        lambda messages, privacy_source: "cleaned",
+    )
+    assert normalizer.normalize_to_markdown("短文") == "cleaned"
+
+
+def test_parallel_segments_preserve_order(normalizer, monkeypatch):
+    text = "\n\n".join(f"SEG{tag} " + ("字" * 6500) for tag in ("A", "B", "C"))
+    segments = normalizer._split_text(text, size=normalizer.SEGMENT_SIZE)
+
+    def echo_segment(messages, privacy_source):
+        content = messages[0]["content"]
+        # Extract the segment exactly
+        prefix = "待整理文字：\n---\n"
+        start_idx = content.find(prefix)
+        assert start_idx != -1
+        extracted = content[start_idx + len(prefix):]
+        end_idx = extracted.rfind("\n---")
+        assert end_idx != -1
+        seg = extracted[:end_idx]
+        seg_len = len(seg)
+
+        for marker in ("SEGA", "SEGB", "SEGC"):
+            if marker in seg:
+                prefix_out = f"cleaned-{marker} "
+                return prefix_out + "字" * (seg_len - len(prefix_out))
+        prefix_out = "cleaned-unknown "
+        return prefix_out + "字" * (seg_len - len(prefix_out))
+
+    monkeypatch.setattr("knowledge.normalizer.generate_chat_reply", echo_segment)
+    result = normalizer.normalize_to_markdown(text)
+    assert result.index("cleaned-SEGA") < result.index("cleaned-SEGB") < result.index("cleaned-SEGC")
+
+
+
+

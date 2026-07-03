@@ -298,3 +298,36 @@ def test_document_summary_reads_existing_meta(monkeypatch: pytest.MonkeyPatch, t
     assert documents[0]["source_url"] == "https://example.com"
     assert documents[0]["enabled"] is False
     assert documents[0]["created_at"] == "2026-03-23T10:00:00"
+
+
+def test_upsert_origin_fields_roundtrip(monkeypatch, tmp_path):
+    project_id = "default"
+    root = _configure_workspace(monkeypatch, tmp_path)
+    
+    # Ensure doc_meta is fresh
+    sys.modules.pop("knowledge.doc_meta", None)
+    doc_meta = _import("knowledge.doc_meta")
+    
+    doc_meta.upsert_document_meta(
+        "knowledge/a.md", 
+        project_id, 
+        origin_path="archive/originals/a.pdf", 
+        origin_hash="ab" * 32
+    )
+    meta = doc_meta.get_document_meta("knowledge/a.md", project_id)
+    assert meta["origin_path"] == "archive/originals/a.pdf"
+    assert meta["origin_hash"] == "ab" * 32
+
+
+def test_origin_fields_default_none(monkeypatch, tmp_path):
+    project_id = "default"
+    root = _configure_workspace(monkeypatch, tmp_path)
+    
+    sys.modules.pop("knowledge.doc_meta", None)
+    doc_meta = _import("knowledge.doc_meta")
+    
+    doc_meta.upsert_document_meta("knowledge/b.md", project_id)
+    meta = doc_meta.get_document_meta("knowledge/b.md", project_id)
+    assert meta["origin_path"] is None
+    assert meta["origin_hash"] is None
+
