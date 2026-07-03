@@ -101,18 +101,11 @@ async def list_knowledge_base_documents_route(project_id: str = "default"):
     }
 
 
-def _assert_qa_not_attached(path: str, project_id: str) -> None:
-    """Block edits to QA docs that a QA-tree node references.
+def _assert_not_qa_document(path: str, project_id: str) -> None:
+    """Block LLM-renormalization on QA files to prevent corrupting their structure."""
+    if get_document_meta(path, project_id).get("source_type") == "qa":
+        raise HTTPException(status_code=400, detail="QA 知識文件不支援重新整理，以免破壞問答格式結構")
 
-    Unattached QA documents are ordinary documents-workspace citizens; only
-    tree-referenced ones are locked to keep node entries consistent.
-    """
-    if get_document_meta(path, project_id).get("source_type") != "qa":
-        return
-    from knowledge.qa_nodes import is_source_referenced
-
-    if is_source_referenced(path, project_id):
-        raise HTTPException(status_code=400, detail="此 QA 文件已被問答樹掛載，請先於問答樹卸載來源")
 
 
 @router.get("/knowledge/qa", summary="取得所有已啟用 QA 來源的問答清單")
@@ -133,11 +126,16 @@ async def get_knowledge_document_route(path: str, project_id: str = "default"):
 
 @router.put("/knowledge/document", summary="儲存知識文件")
 async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
-    _assert_qa_not_attached(payload.path, payload.project_id)
     try:
         document = save_workspace_document(payload.path, payload.content, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # QA 文件允許在文件頁編輯：儲存後把掛載中節點的條目同步成檔案現況，
+    # 取代先前直接 400 擋下的作法（移動/刪除仍受 guard 保護）。
+    if get_document_meta(payload.path, payload.project_id).get("source_type") == "qa":
+        from knowledge.qa_nodes import sync_entries_for_source
+
+        sync_entries_for_source(payload.path, payload.project_id)
     asyncio.create_task(_background_reindex(payload.project_id))
     return {"status": "ok", "document": document}
 
@@ -167,7 +165,9 @@ async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatc
 
 @router.delete("/knowledge/document", summary="刪除知識文件")
 async def delete_knowledge_document_route(path: str, project_id: str = "default"):
-    _assert_qa_not_attached(path, project_id)
+    if get_document_meta(path, project_id).get("source_type") == "qa":
+        from knowledge.qa_nodes import remove_entries_for_source
+        remove_entries_for_source(path, project_id)
     try:
         delete_workspace_document(path, project_id)
     except ValueError as exc:
@@ -180,7 +180,9 @@ async def delete_knowledge_document_route(path: str, project_id: str = "default"
 
 @router.post("/knowledge/move", summary="移動/重新命名知識文件")
 async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
-    _assert_qa_not_attached(payload.source_path, payload.project_id)
+    if get_document_meta(payload.source_path, payload.project_id).get("source_type") == "qa":
+        from knowledge.qa_nodes import rename_source_path_in_nodes
+        rename_source_path_in_nodes(payload.source_path, payload.target_path, payload.project_id)
     try:
         document = move_workspace_document(payload.source_path, payload.target_path, payload.project_id)
     except ValueError as exc:
@@ -243,7 +245,7 @@ async def preview_renormalize_knowledge_document_route(
     payload: KnowledgeDocumentActionRequest,
 ):
     pid = payload.project_id
-    _assert_qa_not_attached(payload.path, pid)
+    _assert_not_qa_document(payload.path, pid)
     try:
         document = await asyncio.to_thread(
             preview_workspace_document_normalization, payload.path, pid
@@ -263,7 +265,7 @@ async def apply_renormalize_knowledge_document_route(
     payload: KnowledgeDocumentPutRequest,
 ):
     pid = payload.project_id
-    _assert_qa_not_attached(payload.path, pid)
+    _assert_not_qa_document(payload.path, pid)
     try:
         document = await asyncio.to_thread(
             apply_workspace_document_normalization, payload.path, payload.content, pid
@@ -295,7 +297,7 @@ async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionR
     then reindex and rebuild the graph so the cleaned content re-enters RAG.
     """
     pid = payload.project_id
-    _assert_qa_not_attached(payload.path, pid)
+    _assert_not_qa_document(payload.path, pid)
     try:
         document = await asyncio.to_thread(
             renormalize_workspace_document, payload.path, pid
@@ -323,8 +325,8 @@ async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionR
 
 @router.post("/knowledge/raw/commit", summary="採納 raw 區檔案進知識庫並重建索引與圖譜")
 async def commit_knowledge_raw_route(payload: AdminActionRequest):
-    """The 'commit' step: promote staged raw/ files into knowledge/, rebuild the
-    vector index synchronously, then rebuild the concept graph in the background.
+    """The 'commit' step: promote staged raw/ files into knowledge/, and rebuild the
+    vector index and concept graph asynchronously in the background.
     """
     pid = payload.project_id
     try:
@@ -338,18 +340,17 @@ async def commit_knowledge_raw_route(payload: AdminActionRequest):
     if not result["committed"]:
         return {"status": "nothing_to_commit", "project_id": pid, **result}
 
-    # RAG index: synchronous (incremental, fast). Graph: background (slow).
-    index_result = await asyncio.to_thread(rebuild_knowledge_index, pid)
     log_event("knowledge_commit", project_id=pid, committed=len(result["committed"]))
 
-    _schedule_graph_rebuild(pid)
+    # Reindex and rebuild graph in background
+    asyncio.create_task(_background_reindex(pid))
 
     return {
         "status": "ok",
         "project_id": pid,
         "committed": result["committed"],
         "skipped": result["skipped"],
-        "indexed": index_result,
+        "indexed": "background",
         "graph": "building",
     }
 
@@ -390,6 +391,7 @@ async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
             payload.content,
             payload.project_id,
             payload.target_dir,
+            note_format=payload.note_format,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

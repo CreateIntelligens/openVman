@@ -100,8 +100,10 @@ def test_qa_nodes_move_and_reorder(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     qa_nodes.reorder_node("new_child", ["child_1", "new_child", "child_2"])
     
     new_c = qa_nodes.get_node("new_child")
-    # fractional order calculation: between 10.0 and 20.0 should be 15.0
-    assert new_c["order"] == 15.0
+    # simplified order: child_1 (1.0), new_child (2.0), child_2 (3.0)
+    assert new_c["order"] == 2.0
+    assert qa_nodes.get_node("child_1")["order"] == 1.0
+    assert qa_nodes.get_node("child_2")["order"] == 3.0
 
 
 def test_qa_nodes_tree_and_cycle(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

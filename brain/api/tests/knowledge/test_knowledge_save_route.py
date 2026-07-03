@@ -135,12 +135,14 @@ def test_create_note_route_passes_target_dir(monkeypatch):
         content: str,
         project_id: str,
         target_dir: str,
+        note_format: str = "text",
     ):
         captured["note"] = {
             "title": title,
             "content": content,
             "project_id": project_id,
             "target_dir": target_dir,
+            "note_format": note_format,
         }
         return {"path": "knowledge/faq/FAQ.md", "size": 12}
 
@@ -162,6 +164,7 @@ def test_create_note_route_passes_target_dir(monkeypatch):
         "content": "## Q\n\nA",
         "project_id": "default",
         "target_dir": "faq",
+        "note_format": "text",
     }
     assert response["path"] == "knowledge/faq/FAQ.md"
     assert captured["reindex_project_id"] == "default"

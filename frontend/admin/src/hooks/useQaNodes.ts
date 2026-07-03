@@ -136,14 +136,6 @@ export function useQaNodes() {
     () => qaJson<QaNode>(nodePath(id, "/reorder"), "POST", { sibling_ids_ordered: siblingIdsOrdered }),
     "Failed to reorder QA node", true), [run]);
 
-  const attachSource = useCallback((id: string, path: string) => run(
-    () => qaJson<{ status: string; added: number }>(nodePath(id, "/attach-source"), "POST", { path }),
-    "Failed to attach QA source", true), [run]);
-
-  const detachSource = useCallback((id: string, path: string) => run(
-    () => qaJson<{ status: string; removed: number }>(nodePath(id, "/detach-source"), "POST", { path }),
-    "Failed to detach QA source", true), [run]);
-
   const fetchMergedQa = useCallback((id: string) => run(
     () => get<MergedQaItem[]>(nodePath(id, "/merged")),
     "Failed to fetch merged QA entries"), [run]);
@@ -164,6 +156,14 @@ export function useQaNodes() {
     () => qaJson<{ deleted_files: string[] }>("/knowledge/qa/images/cleanup-unused", "POST"),
     "Failed to cleanup images"), [run]);
 
+  const adoptSource = useCallback((path: string) => run(
+    () => qaJson<{ node_id: string }>("/knowledge/qa/nodes/adopt-source", "POST", { path }),
+    "Failed to adopt QA source", true), [run]);
+
+  const ingestSource = useCallback((id: string, path: string) => run(
+    () => qaJson<{ added: number }>(nodePath(id, "/ingest-source"), "POST", { path }),
+    "Failed to ingest QA source", true), [run]);
+
   return {
     nodesTree,
     loading,
@@ -174,12 +174,12 @@ export function useQaNodes() {
     deleteNode,
     moveNode,
     reorderNode,
-    attachSource,
-    detachSource,
     fetchMergedQa,
     saveMergedQa,
     uploadImage,
     deleteImage,
     cleanupImages,
+    adoptSource,
+    ingestSource,
   };
 }

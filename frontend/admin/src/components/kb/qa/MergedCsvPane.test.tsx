@@ -49,23 +49,14 @@ describe("MergedCsvPane", () => {
     expect(await screen.findByText("圖片已上傳（ID：img_123），請記得儲存變更。")).toBeTruthy();
   });
 
-  it("opens the attach source flow from the pane and does not mention the removed upload dialog", async () => {
+  it("starts an empty node with one editable row and exposes no attach-source action", async () => {
     qaNodeMocks.fetchMergedQa.mockResolvedValue([]);
-    const onOpenAttachSource = vi.fn();
 
-    render(
-      <MergedCsvPane
-        nodeId="root"
-        nodeLabel="Root"
-        onOpenAttachSource={onOpenAttachSource}
-      />,
-    );
+    render(<MergedCsvPane nodeId="root" nodeLabel="Root" />);
 
-    expect(await screen.findByText("此節點尚無任何問答數據")).toBeTruthy();
-    expect(screen.queryByText(/上傳對話框/)).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: /掛載來源/ }));
-
-    expect(onOpenAttachSource).toHaveBeenCalledTimes(1);
+    expect(await screen.findByPlaceholderText("請輸入問題")).toBeTruthy();
+    expect(screen.getByPlaceholderText("請輸入答案")).toBeTruthy();
+    expect(screen.queryByText("此節點尚無任何問答數據")).toBeNull();
+    expect(screen.queryByRole("button", { name: /掛載來源/ })).toBeNull();
   });
 });

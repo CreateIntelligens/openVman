@@ -263,8 +263,14 @@ def save_workspace_note(
     content: str,
     project_id: str = "default",
     target_dir: str = "",
+    note_format: str = "text",
 ) -> dict[str, Any]:
-    """Create a manual note under the default notes directory or target directory."""
+    """Create a manual note under the default notes directory or target directory.
+
+    ``note_format="qa"`` stores the note in the ``knowledge/qa/`` namespace with
+    ``source_type="qa"`` so it is managed by the QA subsystem; the content must
+    already be QA markdown (``## question`` blocks with qa_metadata comments).
+    """
     cleaned_title = title.strip()
     cleaned_content = content.strip()
     if not cleaned_title:
@@ -272,21 +278,39 @@ def save_workspace_note(
     if not cleaned_content:
         raise ValueError("content 不可為空")
 
+    is_qa = note_format == "qa"
+    if is_qa:
+        from knowledge.qa_csv import parse_qa_markdown
+
+        if not parse_qa_markdown(cleaned_content):
+            raise ValueError("內容不是有效的 QA 格式（需要 ## 問題 標題與答案）")
+
     filename = Path(cleaned_title).name
     if filename != cleaned_title:
         raise ValueError("title 不可包含路徑")
     if not filename.lower().endswith(".md"):
         filename = f"{filename}.md"
 
-    relative_path = _resolve_note_parent(target_dir) / filename
+    parent = Path("knowledge") / "qa" if is_qa else _resolve_note_parent(target_dir)
+    relative_path = parent / filename
     path = resolve_workspace_document(relative_path.as_posix(), project_id)
     if path.exists():
         raise ValueError("文件已存在")
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(cleaned_content, encoding="utf-8")
-    upsert_document_meta(relative_path.as_posix(), project_id, source_type="manual")
-    return _build_document_summary(path, project_id, content=cleaned_content)
+    upsert_document_meta(
+        relative_path.as_posix(), project_id, source_type="qa" if is_qa else "manual"
+    )
+    summary = _build_document_summary(path, project_id, content=cleaned_content)
+    if is_qa:
+        from knowledge.qa_nodes import create_node_for_source
+
+        node = create_node_for_source(
+            relative_path.as_posix(), Path(filename).stem, project_id
+        )
+        summary["qa_node_id"] = node["node_id"]
+    return summary
 
 
 def create_workspace_directory(relative_path: str, project_id: str = "default") -> dict[str, str]:
@@ -509,13 +533,20 @@ def commit_raw_documents(project_id: str = "default") -> dict[str, Any]:
             continue
 
         # Output is always markdown regardless of the source format.
-        target_rel = (Path("knowledge") / rel_in_raw).with_suffix(".md")
+        if is_qa:
+            target_rel = (Path("knowledge/qa") / rel_in_raw.name).with_suffix(".md")
+        else:
+            target_rel = (Path("knowledge") / rel_in_raw).with_suffix(".md")
         dest = resolve_workspace_document(target_rel.as_posix(), project_id)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(cleaned, encoding="utf-8")
         upsert_document_meta(
             target_rel.as_posix(), project_id, source_type="qa" if is_qa else "upload"
         )
+        if is_qa:
+            from knowledge.qa_nodes import create_node_for_source
+
+            create_node_for_source(target_rel.as_posix(), target_rel.stem, project_id)
         src.unlink()
         committed.append(target_rel.as_posix())
 

@@ -1,5 +1,5 @@
 import { createRef } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import SourcePanel from "./SourcePanel";
@@ -25,11 +25,14 @@ describe("SourcePanel", () => {
     expect(screen.queryByText(/題庫/)).toBeNull();
   });
 
-  it("shows only note creation in manual mode", () => {
+  it("opens note creation immediately when manual mode is selected", () => {
+    const setActiveMode = vi.fn();
+    const onShowNote = vi.fn();
+
     render(
       <SourcePanel
-        activeMode="manual"
-        setActiveMode={vi.fn()}
+        activeMode="upload"
+        setActiveMode={setActiveMode}
         uploading={false}
         uploadInputRef={createRef<HTMLInputElement>()}
         currentDir="knowledge"
@@ -37,11 +40,15 @@ describe("SourcePanel", () => {
         setCrawlUrlValue={vi.fn()}
         crawling={false}
         onCrawl={vi.fn()}
-        onShowNote={vi.fn()}
+        onShowNote={onShowNote}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "新增筆記" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /手動/ }));
+
+    expect(setActiveMode).toHaveBeenCalledWith("manual");
+    expect(onShowNote).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "新增筆記" })).toBeNull();
     expect(screen.queryByRole("button", { name: "手動新增 QA" })).toBeNull();
   });
 });

@@ -87,7 +87,8 @@ export interface KnowledgeNoteResponse {
   status: string;
   path: string;
   size: number;
-  document: KnowledgeDocumentSummary;
+  // QA 格式筆記建立時，後端會自動建立問答樹節點並回傳其 id
+  document: KnowledgeDocumentSummary & { qa_node_id?: string };
 }
 
 export async function fetchKnowledgeDocuments() {
@@ -292,12 +293,20 @@ export function updateKnowledgeDocumentMeta(
   );
 }
 
-export function createKnowledgeNote(title: string, content: string, targetDir = "") {
+export type KnowledgeNoteFormat = "text" | "qa";
+
+export function createKnowledgeNote(
+  title: string,
+  content: string,
+  targetDir = "",
+  noteFormat: KnowledgeNoteFormat = "text",
+) {
   return post<KnowledgeNoteResponse>(knowledgePath("/note"), {
     title,
     content,
     project_id: getActiveProjectId(),
     target_dir: targetDir,
+    note_format: noteFormat,
   });
 }
 

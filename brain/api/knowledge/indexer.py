@@ -148,7 +148,10 @@ class _IndexItemSource:
         done = {} if self._force_all else self._store.load()
         for path in iter_indexable_documents(self._project_id):
             relative_path = path.relative_to(self._workspace_root).as_posix()
-            fingerprint = _fingerprint_document(path)
+            try:
+                fingerprint = _fingerprint_document(path)
+            except FileNotFoundError:
+                continue
             if self._force_all or done.get(relative_path) != fingerprint:
                 yield path
 
@@ -161,10 +164,13 @@ class _IndexWorker:
         def _work() -> list[dict[str, Any]]:
             chunk_specs: list[ChunkSpec] = []
             for path in paths:
-                if path.suffix.lower() == ".csv":
-                    chunk_specs.extend(_extract_csv_chunks(path, self._workspace_root))
-                else:
-                    chunk_specs.extend(_extract_text_chunks(path, self._workspace_root))
+                try:
+                    if path.suffix.lower() == ".csv":
+                        chunk_specs.extend(_extract_csv_chunks(path, self._workspace_root))
+                    else:
+                        chunk_specs.extend(_extract_text_chunks(path, self._workspace_root))
+                except FileNotFoundError:
+                    continue
             return _build_knowledge_records(chunk_specs)
 
         return _work()
@@ -190,12 +196,13 @@ class _IndexSink:
         table.merge_insert("chunk_id").when_matched_update_all().when_not_matched_insert_all().execute(records)
 
     def commit_checkpoint(self, paths: list[Path]) -> None:
-        self._store.commit(
-            {
-                path.relative_to(self._workspace_root).as_posix(): _fingerprint_document(path)
-                for path in paths
-            }
-        )
+        updates = {}
+        for path in paths:
+            try:
+                updates[path.relative_to(self._workspace_root).as_posix()] = _fingerprint_document(path)
+            except FileNotFoundError:
+                pass
+        self._store.commit(updates)
 
 
 def _knowledge_table_name() -> str:

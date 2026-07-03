@@ -10,8 +10,7 @@ API_ROOT = Path(__file__).resolve().parents[2]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
-# We import app after path setup
-from main import app
+from main import app  # noqa: E402
 
 @pytest.fixture
 def client(monkeypatch, tmp_path):
@@ -102,7 +101,7 @@ def test_qa_nodes_crud_routes(client):
     response = client.post("/brain/knowledge/qa/nodes/test_node_1/reorder", json={"sibling_ids_ordered": ["test_node_2", "test_node_1"]})
     assert response.status_code == 200
     data = response.json()
-    assert data["order"] == 3.0  # reorder calculation: 2.0 + 1.0 (since it is the last item)
+    assert data["order"] == 2.0  # simplified sibling ordering: index 1 -> 2.0
 
     # 7. DELETE /brain/knowledge/qa/nodes/{id}
     response = client.delete("/brain/knowledge/qa/nodes/test_node_1")
@@ -232,64 +231,45 @@ def test_qa_markdown_code_block_exclusion(client):
     assert parsed_admin[1]["question"] == "Q2"
 
 
-def test_attach_and_detach_source(client, tmp_path):
-    """掛載 QA 文件登記題目（含 hidden/image_id、去重）；卸載移除該來源的 entries。"""
-    import knowledge.doc_meta
-    import knowledge.qa_nodes as qa_nodes
-
-    root = tmp_path / "workspace"
-    qa_path = root / "knowledge" / "faq_source.md"
-    qa_path.parent.mkdir(parents=True, exist_ok=True)
-    qa_path.write_text(
-        '## Q1\n\nA1\n<!-- qa_metadata: {"img": "p1.png", "url": ""} -->\n\n'
-        '## Q2\n\nA2\n<!-- qa_metadata: {"img": "", "url": "", "hidden": true} -->\n',
-        encoding="utf-8",
-    )
-    knowledge.doc_meta.upsert_document_meta("knowledge/faq_source.md", "default", source_type="qa")
-
-    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
-    qa_nodes.add_qa_entries_to_node("n1", [
-        {"question": "Q1", "source_path": "knowledge/other.md", "hidden": False, "image_id": None},
-    ])
-
+def test_qa_note_creates_tree_node(client):
+    """QA 筆記建立後直接成為問答樹節點（無掛載步驟）。"""
+    content = '## Q1\n\nA1\n<!-- qa_metadata: {"img": "", "url": ""} -->'
     response = client.post(
-        "/brain/knowledge/qa/nodes/n1/attach-source",
-        json={"path": "knowledge/faq_source.md"},
+        "/brain/knowledge/note",
+        json={"title": "門市問答", "content": content, "note_format": "qa"},
     )
     assert response.status_code == 200
-    assert response.json()["added"] == 1  # Q1 已存在，僅 Q2 新增
+    node_id = response.json()["document"].get("qa_node_id")
+    assert node_id
 
-    node = qa_nodes.get_node("n1")
-    entries = {e["question"]: e for e in node["qa_entries"]}
-    assert set(entries) == {"Q1", "Q2"}
-    assert entries["Q2"]["source_path"] == "knowledge/faq_source.md"
-    assert entries["Q2"]["hidden"] is True
-    assert entries["Q2"]["image_id"] is None
-
-    response = client.post(
-        "/brain/knowledge/qa/nodes/n1/detach-source",
-        json={"path": "knowledge/faq_source.md"},
-    )
-    assert response.status_code == 200
-    node = qa_nodes.get_node("n1")
-    assert {e["question"] for e in node["qa_entries"]} == {"Q1"}
+    tree = client.get("/brain/knowledge/qa/nodes").json()
+    nodes = {n["node_id"]: n for n in tree}
+    assert node_id in nodes
+    node = nodes[node_id]
+    assert node["label"] == "門市問答"
+    assert node["qa_entries"][0]["question"] == "Q1"
+    assert node["qa_entries"][0]["source_path"] == "knowledge/qa/門市問答.md"
 
 
-def test_attach_source_rejects_non_qa_document(client, tmp_path):
+def test_list_nodes_adopts_orphan_qa_sources(client, tmp_path):
+    """讀取問答樹時，未被任何節點引用的 QA 文件會自動補建節點。"""
     import knowledge.doc_meta
 
     root = tmp_path / "workspace"
-    doc_path = root / "knowledge" / "note.md"
-    doc_path.parent.mkdir(parents=True, exist_ok=True)
-    doc_path.write_text("## 不是 QA\n\n內容", encoding="utf-8")
-    knowledge.doc_meta.upsert_document_meta("knowledge/note.md", "default", source_type="manual")
+    orphan = root / "knowledge" / "qa" / "orphan_faq.md"
+    orphan.parent.mkdir(parents=True, exist_ok=True)
+    orphan.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/orphan_faq.md", "default", source_type="qa")
 
-    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
-    response = client.post(
-        "/brain/knowledge/qa/nodes/n1/attach-source",
-        json={"path": "knowledge/note.md"},
-    )
-    assert response.status_code == 400
+    tree = client.get("/brain/knowledge/qa/nodes").json()
+    assert len(tree) == 1
+    node = tree[0]
+    assert node["label"] == "orphan_faq"
+    assert node["qa_entries"][0]["source_path"] == "knowledge/qa/orphan_faq.md"
+
+    # 再次讀取不會重複建節點
+    tree_again = client.get("/brain/knowledge/qa/nodes").json()
+    assert len(tree_again) == 1
 
 
 def test_documents_list_reports_qa_attached(client, tmp_path):
@@ -318,31 +298,194 @@ def test_documents_list_reports_qa_attached(client, tmp_path):
     assert docs["knowledge/faq_b.md"]["qa_attached"] is False
 
 
-def test_delete_node_keeps_referenced_qa_docs(client, tmp_path):
-    """刪除 node 只解除引用，不刪除底層 QA 文件（文件端擁有內容）。"""
+def test_ingest_source_merges_rows_and_consumes_doc(client, tmp_path):
+    """拖曳進節點：格式 OK 的文件問答列併入節點，原始文件被吸收刪除。"""
     import knowledge.doc_meta
     import knowledge.qa_nodes as qa_nodes
 
     root = tmp_path / "workspace"
-    doc = root / "knowledge" / "kept.md"
-    doc.parent.mkdir(parents=True, exist_ok=True)
-    doc.write_text("## Q1\n\nA1\n", encoding="utf-8")
-    knowledge.doc_meta.upsert_document_meta("knowledge/kept.md", "default", source_type="qa")
+    own = root / "knowledge" / "qa" / "own.md"
+    own.parent.mkdir(parents=True, exist_ok=True)
+    own.write_text('## Q1\n\nA1\n<!-- qa_metadata: {"img": "", "url": ""} -->\n', encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/own.md", "default", source_type="qa")
+
+    dragged = root / "knowledge" / "notes" / "dragged.md"
+    dragged.parent.mkdir(parents=True, exist_ok=True)
+    dragged.write_text(
+        '## Q1\n\n重複的問題\n\n'
+        '## Q2\n\nA2\n<!-- qa_metadata: {"img": "", "url": "", "hidden": true} -->\n',
+        encoding="utf-8",
+    )
+    knowledge.doc_meta.upsert_document_meta("knowledge/notes/dragged.md", "default", source_type="manual")
 
     client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
     qa_nodes.add_qa_entries_to_node("n1", [
-        {"question": "Q1", "source_path": "knowledge/kept.md", "hidden": False, "image_id": None},
+        {"question": "Q1", "source_path": "knowledge/qa/own.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/notes/dragged.md"},
+    )
+    assert response.status_code == 200
+    assert response.json()["added"] == 1  # Q1 重複被跳過
+
+    node = qa_nodes.get_node("n1")
+    entries = {e["question"]: e for e in node["qa_entries"]}
+    assert set(entries) == {"Q1", "Q2"}
+    assert entries["Q2"]["source_path"] == "knowledge/qa/own.md"
+    assert entries["Q2"]["hidden"] is True
+
+    own_content = own.read_text(encoding="utf-8")
+    assert "## Q2" in own_content
+
+    assert not dragged.exists()
+    assert "knowledge/notes/dragged.md" not in knowledge.doc_meta.load_doc_meta("default")
+
+
+def test_ingest_source_rejects_nodes_own_doc(client, tmp_path):
+    """把節點自己的來源檔拖回自己：不得刪除節點內容。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    own = root / "knowledge" / "qa" / "own.md"
+    own.parent.mkdir(parents=True, exist_ok=True)
+    own.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/own.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q1", "source_path": "knowledge/qa/own.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/qa/own.md"},
+    )
+    assert response.status_code == 400
+    assert own.exists()
+    node = qa_nodes.get_node("n1")
+    assert {e["question"] for e in node["qa_entries"]} == {"Q1"}
+
+
+def test_ingest_source_clears_dangling_refs_in_other_nodes(client, tmp_path):
+    """拖入的文件原屬另一節點：吸收後舊節點的懸空 entries 一併清掉。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    moved = root / "knowledge" / "qa" / "moved.md"
+    moved.parent.mkdir(parents=True, exist_ok=True)
+    moved.write_text("## Q2\n\nA2\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/moved.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n2", "label": "N2"})
+    qa_nodes.add_qa_entries_to_node("n2", [
+        {"question": "Q2", "source_path": "knowledge/qa/moved.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/qa/moved.md"},
+    )
+    assert response.status_code == 200
+    assert response.json()["added"] == 1
+
+    n1 = qa_nodes.get_node("n1")
+    assert {e["question"] for e in n1["qa_entries"]} == {"Q2"}
+    n2 = qa_nodes.get_node("n2")
+    assert n2["qa_entries"] == []
+    assert not moved.exists()
+
+
+def test_ingest_source_rejects_non_qa_format(client, tmp_path):
+    import knowledge.doc_meta
+
+    root = tmp_path / "workspace"
+    doc = root / "knowledge" / "plain.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("沒有任何標題的純文字內容", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/plain.md", "default", source_type="manual")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n1/ingest-source",
+        json={"path": "knowledge/plain.md"},
+    )
+    assert response.status_code == 400
+    assert doc.exists()
+
+
+def test_adopt_source_creates_node_from_dropped_doc(client, tmp_path):
+    """拖曳到快速問答根目錄：格式 OK 的文件直接成為新節點。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    doc = root / "knowledge" / "notes" / "faq_note.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/notes/faq_note.md", "default", source_type="manual")
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/adopt-source",
+        json={"path": "knowledge/notes/faq_note.md"},
+    )
+    assert response.status_code == 200
+    node_id = response.json()["node_id"]
+
+    node = qa_nodes.get_node(node_id)
+    assert node["label"] == "faq_note"
+    assert node["qa_entries"][0]["source_path"] == "knowledge/notes/faq_note.md"
+    # 收養後文件歸問答樹管理
+    meta = knowledge.doc_meta.get_document_meta("knowledge/notes/faq_note.md", "default")
+    assert meta.get("source_type") == "qa"
+
+    # 已在樹中的文件不能重複收養
+    response = client.post(
+        "/brain/knowledge/qa/nodes/adopt-source",
+        json={"path": "knowledge/notes/faq_note.md"},
+    )
+    assert response.status_code == 400
+
+
+def test_delete_node_removes_owned_qa_doc(client, tmp_path):
+    """節點即內容：刪除節點時一併刪除其專屬 QA 文件；仍被其他節點引用者保留。"""
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    owned = root / "knowledge" / "qa" / "owned.md"
+    owned.parent.mkdir(parents=True, exist_ok=True)
+    owned.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    shared = root / "knowledge" / "qa" / "shared.md"
+    shared.write_text("## Q2\n\nA2\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/owned.md", "default", source_type="qa")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/shared.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n2", "label": "N2"})
+    qa_nodes.add_qa_entries_to_node("n1", [
+        {"question": "Q1", "source_path": "knowledge/qa/owned.md", "hidden": False, "image_id": None},
+        {"question": "Q2", "source_path": "knowledge/qa/shared.md", "hidden": False, "image_id": None},
+    ])
+    qa_nodes.add_qa_entries_to_node("n2", [
+        {"question": "Q2", "source_path": "knowledge/qa/shared.md", "hidden": False, "image_id": None},
     ])
 
     response = client.delete("/brain/knowledge/qa/nodes/n1")
     assert response.status_code == 200
 
-    assert doc.exists()
-    assert "knowledge/kept.md" in knowledge.doc_meta.load_doc_meta("default")
+    assert not owned.exists()
+    assert "knowledge/qa/owned.md" not in knowledge.doc_meta.load_doc_meta("default")
+    assert shared.exists()
+    assert "knowledge/qa/shared.md" in knowledge.doc_meta.load_doc_meta("default")
 
 
 def test_knowledge_ownership_guard_locks_only_attached_qa_docs(client, tmp_path):
-    """guard 僅鎖被 node 掛載的 QA 文件；未掛載者可在文件端自由管理。"""
+    """測試直接在文件端刪除或移動 QA 檔案時，系統會自動同步更新問答樹。"""
     import knowledge.doc_meta
     import knowledge.qa_nodes as qa_nodes
 
@@ -360,50 +503,45 @@ def test_knowledge_ownership_guard_locks_only_attached_qa_docs(client, tmp_path)
         {"question": "Q1", "source_path": "knowledge/faq_attached.md", "hidden": False, "image_id": None},
     ])
 
-    # 已掛載：save / delete / move / renormalize 全部 400
+    # 1. 編輯儲存：儲存時會自動將問題內容同步回 JSON 中的 node entries
     response = client.put("/brain/knowledge/document", json={
         "path": "knowledge/faq_attached.md",
-        "content": "## Q1\n\nUpdated A1\n",
+        "content": (
+            "## Q1 改\n\nUpdated A1\n"
+            '<!-- qa_metadata: {"img": "", "url": "", "hidden": true} -->\n'
+        ),
         "project_id": "default",
     })
-    assert response.status_code == 400
-    assert "已被問答樹掛載" in response.json()["detail"]
+    assert response.status_code == 200
+    synced = qa_nodes.get_node("n1")
+    assert synced is not None
+    entries = synced["qa_entries"]
+    assert [e["question"] for e in entries] == ["Q1 改"]
+    assert entries[0]["hidden"] is True
+    assert entries[0]["source_path"] == "knowledge/faq_attached.md"
 
-    response = client.delete(
-        "/brain/knowledge/document", params={"path": "knowledge/faq_attached.md"}
-    )
-    assert response.status_code == 400
-
+    # 2. 移動重新命名：會自動修改 JSON 中對應 entries 的 source_path
     response = client.post("/brain/knowledge/move", json={
         "source_path": "knowledge/faq_attached.md",
-        "target_path": "knowledge/faq_moved.md",
-        "project_id": "default",
-    })
-    assert response.status_code == 400
-
-    response = client.post("/brain/knowledge/renormalize", json={
-        "path": "knowledge/faq_attached.md",
-        "project_id": "default",
-    })
-    assert response.status_code == 400
-
-    # 未掛載：可儲存、可移動、可刪除
-    response = client.put("/brain/knowledge/document", json={
-        "path": "knowledge/faq_free.md",
-        "content": "## Q2\n\nUpdated A2\n",
+        "target_path": "knowledge/faq_attached_moved.md",
         "project_id": "default",
     })
     assert response.status_code == 200
+    synced = qa_nodes.get_node("n1")
+    assert synced is not None
+    assert synced["qa_entries"][0]["source_path"] == "knowledge/faq_attached_moved.md"
 
-    response = client.post("/brain/knowledge/move", json={
-        "source_path": "knowledge/faq_free.md",
-        "target_path": "knowledge/faq_free_moved.md",
-        "project_id": "default",
-    })
-    assert response.status_code == 200
-
+    # 3. 刪除檔案：會自動從 JSON 中移除該引用，且若節點變空則自動刪除節點
     response = client.delete(
-        "/brain/knowledge/document", params={"path": "knowledge/faq_free_moved.md"}
+        "/brain/knowledge/document", params={"path": "knowledge/faq_attached_moved.md"}
     )
     assert response.status_code == 200
+    assert qa_nodes.get_node("n1") is None  # 被自動刪除
 
+    # 4. 重新整理：QA 檔案不支援重新整理（LLM 整理會破壞問答格式）
+    response = client.post("/brain/knowledge/renormalize", json={
+        "path": "knowledge/faq_free.md",
+        "project_id": "default",
+    })
+    assert response.status_code == 400
+    assert "不支援重新整理" in response.json()["detail"]

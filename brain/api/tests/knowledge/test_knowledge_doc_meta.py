@@ -113,6 +113,45 @@ def test_manual_note_can_target_knowledge_directory(
     assert payload["knowledge/faq/customer/常見問題.md"]["source_type"] == "manual"
 
 
+def test_qa_note_writes_qa_meta_under_qa_namespace(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    content = '## 營業時間？\n\n週一至週五 9:00-18:00\n<!-- qa_metadata: {"img": "", "url": ""} -->'
+    document = knowledge_admin.save_workspace_note(
+        "門市問答",
+        content,
+        note_format="qa",
+    )
+
+    assert document["path"] == "knowledge/qa/門市問答.md"
+    assert document["source_type"] == "qa"
+    assert (root / "knowledge" / "qa" / "門市問答.md").exists()
+
+    payload = json.loads((root / ".doc_meta.json").read_text(encoding="utf-8"))
+    assert payload["knowledge/qa/門市問答.md"]["source_type"] == "qa"
+
+
+def test_qa_note_rejects_content_without_qa_entries(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    _configure_workspace(monkeypatch, tmp_path)
+    _stub_knowledge_admin_deps(monkeypatch)
+    sys.modules.pop("knowledge.doc_meta", None)
+    sys.modules.pop("knowledge.knowledge_admin", None)
+    knowledge_admin = _import("knowledge.knowledge_admin")
+
+    with pytest.raises(ValueError, match="QA"):
+        knowledge_admin.save_workspace_note("門市問答", "沒有任何標題的純文字", note_format="qa")
+
+
 @pytest.mark.parametrize("target_dir", ["../outside", "/absolute"])
 def test_manual_note_rejects_invalid_target_dir(
     monkeypatch: pytest.MonkeyPatch,

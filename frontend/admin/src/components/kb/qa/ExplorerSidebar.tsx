@@ -171,9 +171,8 @@ function SidebarNodeItem({
           {hasChildren ? (isExpanded ? "folder_open" : "folder") : "description"}
         </span>
 
-        <span className={`text-[0.875rem] truncate flex-1 ${node.hidden ? "opacity-50 line-through" : ""}`}>
+        <span className={`text-[0.875rem] truncate flex-1 ${node.hidden ? "opacity-40" : ""}`}>
           {node.label}
-          {node.hidden && <span className="ml-1 text-[0.75rem] text-slate-400">(已隱藏)</span>}
         </span>
 
         <div className="flex items-center gap-1.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">

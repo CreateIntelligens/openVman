@@ -7,8 +7,9 @@ import { errorMessage } from "../../../utils/errorMessage";
 interface MergedCsvPaneProps {
   nodeId: string | null;
   nodeLabel?: string;
+  refreshKey?: number;
   onSuccess?: () => void;
-  onOpenAttachSource?: () => void;
+  onOpenManualQa?: () => void;
 }
 
 interface LocalMergedQaItem extends MergedQaItem {
@@ -25,11 +26,24 @@ function cloneRows(rows: LocalMergedQaItem[]): LocalMergedQaItem[] {
   return rows.map((row) => ({ ...row }));
 }
 
+function createDraftMergedRow(nodeId: string): LocalMergedQaItem {
+  return {
+    q: "",
+    a: "",
+    img: "",
+    url: "",
+    source_file: `knowledge/qa/manual_${nodeId}.md`,
+    hidden: false,
+    _localId: localRowId("draft"),
+  };
+}
+
 export default function MergedCsvPane({
   nodeId,
   nodeLabel = "",
+  refreshKey = 0,
   onSuccess,
-  onOpenAttachSource,
+  onOpenManualQa,
 }: MergedCsvPaneProps) {
   const { fetchMergedQa, saveMergedQa, uploadImage, cleanupImages } = useQaNodes();
 
@@ -50,10 +64,12 @@ export default function MergedCsvPane({
     setError(null);
     try {
       const data = await fetchMergedQa(id);
-      const mapped = data.map((item, idx) => ({
-        ...item,
-        _localId: item.index || localRowId(`init_${idx}`),
-      }));
+      const mapped = data.length > 0
+        ? data.map((item, idx) => ({
+          ...item,
+          _localId: item.index || localRowId(`init_${idx}`),
+        }))
+        : [createDraftMergedRow(id)];
       setRows(mapped);
       setOriginalRows(cloneRows(mapped));
     } catch (error: unknown) {
@@ -71,7 +87,7 @@ export default function MergedCsvPane({
       setRows([]);
       setOriginalRows([]);
     }
-  }, [nodeId, loadMergedQa]);
+  }, [nodeId, refreshKey, loadMergedQa]);
 
   const isDirty = useMemo(
     () => JSON.stringify(rows) !== JSON.stringify(originalRows),
@@ -107,7 +123,7 @@ export default function MergedCsvPane({
     const defaultSourceFile =
       rows.length > 0 && rows[0].source_file
         ? rows[0].source_file
-        : `knowledge/manual_${nodeId}.md`;
+        : `knowledge/qa/manual_${nodeId}.md`;
 
     const newRow: LocalMergedQaItem = {
       q: "",
@@ -226,14 +242,14 @@ export default function MergedCsvPane({
               有未儲存變更
             </span>
           )}
-          {onOpenAttachSource && (
+          {onOpenManualQa && (
             <button
               type="button"
-              onClick={onOpenAttachSource}
+              onClick={onOpenManualQa}
               className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
             >
-              <span className="material-symbols-outlined text-[1rem]">add_link</span>
-              掛載來源
+              <span className="material-symbols-outlined text-[1rem]">edit_square</span>
+              手動輸入
             </button>
           )}
           <button
@@ -289,7 +305,7 @@ export default function MergedCsvPane({
               table_rows
             </span>
             <p className="text-sm font-medium">此節點尚無任何問答數據</p>
-            <p className="text-xs">請點擊下方「新增一列」，或使用「掛載來源」掛載既有的問答文件</p>
+            <p className="text-xs">請點擊下方「新增一列」，或使用「手動輸入」批次新增問答</p>
           </div>
         ) : (
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden min-w-[50rem]">

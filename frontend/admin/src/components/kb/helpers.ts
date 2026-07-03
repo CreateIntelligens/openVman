@@ -11,17 +11,38 @@ export interface TreeNode {
   name: string;
   path: string;
   type: "file" | "folder";
+  treeKind?: "qa-root" | "qa-node" | "qa-entry";
+  virtual?: boolean;
+  qaNodeId?: string;
+  qaHidden?: boolean;
   doc?: KnowledgeDocumentSummary;
   children: TreeNode[];
+}
+
+export interface QaEntryInput {
+  question: string;
+  source_path: string;
+  hidden: boolean;
+  image_id: string | null;
+}
+
+export interface QaTreeNodeInput {
+  node_id: string;
+  label: string;
+  hidden?: boolean;
+  qa_entries?: QaEntryInput[];
+  children?: QaTreeNodeInput[];
 }
 
 /* ── Constants ── */
 
 export const SOURCE_MODES: SourceMode[] = ["upload", "web", "manual"];
+export const QUICK_QA_TREE_LABEL = "快速問答";
+export const QUICK_QA_TREE_PATH = `knowledge/${QUICK_QA_TREE_LABEL}`;
 export const SOURCE_MODE_COPY: Record<SourceMode, string> = {
   upload: "上傳本地文件到目前資料夾。",
   web: "貼網址後擷取頁面內容。",
-  manual: "手動建立筆記內容。",
+  manual: "手動建立筆記，支援純文字與 QA 問答格式。",
 };
 
 /* ── Formatters ── */
@@ -76,7 +97,7 @@ export function matchesKnowledgeDocumentSearch(document: KnowledgeDocumentSummar
 export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: string[]): TreeNode {
   const root: TreeNode = { name: "knowledge", path: "knowledge", type: "folder", children: [] };
 
-  const ensureFolder = (path: string): TreeNode => {
+  function ensureFolder(path: string): TreeNode {
     const parts = path.split("/");
     let current = root;
     for (let i = 1; i < parts.length; i++) {
@@ -90,7 +111,7 @@ export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: str
       current = child;
     }
     return current;
-  };
+  }
 
   for (const dir of serverDirs) {
     if (dir.startsWith("knowledge")) ensureFolder(dir);
@@ -109,13 +130,13 @@ export function buildTree(documents: KnowledgeDocumentSummary[], serverDirs: str
     });
   }
 
-  const sortChildren = (node: TreeNode) => {
+  function sortChildren(node: TreeNode): void {
     node.children.sort((a, b) => {
       if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
     node.children.forEach(sortChildren);
-  };
+  }
   sortChildren(root);
 
   return root;
@@ -160,4 +181,84 @@ export function collectFolderPaths(node: TreeNode): string[] {
   }
 
   return [node.path, ...node.children.flatMap(collectFolderPaths)];
+}
+
+export function qaTreeNodePath(nodeId: string): string {
+  return `${QUICK_QA_TREE_PATH}/${encodeURIComponent(nodeId)}`;
+}
+
+function qaNodeMatchesSearch(node: QaTreeNodeInput, normalizedSearch: string): boolean {
+  return node.label.toLowerCase().includes(normalizedSearch) ||
+    node.node_id.toLowerCase().includes(normalizedSearch);
+}
+
+function qaNodeToTreeNode(
+  node: QaTreeNodeInput,
+  normalizedSearch: string,
+): TreeNode | null {
+  const childNodes = (node.children ?? [])
+    .map((child) => qaNodeToTreeNode(child, normalizedSearch))
+    .filter((child): child is TreeNode => child !== null);
+
+  const entries: TreeNode[] = (node.qa_entries ?? [])
+    .filter((entry) => !normalizedSearch || entry.question.toLowerCase().includes(normalizedSearch))
+    .map((entry) => ({
+      name: entry.question,
+      path: `${qaTreeNodePath(node.node_id)}/entry/${encodeURIComponent(entry.question)}`,
+      type: "file" as const,
+      treeKind: "qa-entry" as const,
+      virtual: true,
+      qaNodeId: node.node_id,
+      qaHidden: Boolean(entry.hidden),
+      children: [],
+    }));
+
+  const allChildren = [...childNodes, ...entries];
+  const matchesSelf = !normalizedSearch || qaNodeMatchesSearch(node, normalizedSearch);
+
+  if (!matchesSelf && allChildren.length === 0) {
+    return null;
+  }
+
+  return {
+    name: node.label || node.node_id,
+    path: qaTreeNodePath(node.node_id),
+    type: "folder",
+    treeKind: "qa-node",
+    virtual: true,
+    qaNodeId: node.node_id,
+    qaHidden: Boolean(node.hidden),
+    children: allChildren,
+  };
+}
+
+export function mergeQaNodesIntoTree(
+  documentTree: TreeNode,
+  qaNodes: QaTreeNodeInput[],
+  search = "",
+): TreeNode {
+  const normalizedSearch = normalizeSearchTerm(search);
+  const qaChildren = qaNodes
+    .map((node) => qaNodeToTreeNode(node, normalizedSearch))
+    .filter((node): node is TreeNode => node !== null);
+  const rootMatches = QUICK_QA_TREE_LABEL.toLowerCase().includes(normalizedSearch) ||
+    QUICK_QA_TREE_PATH.toLowerCase().includes(normalizedSearch);
+  const shouldShowQaRoot = !normalizedSearch || rootMatches || qaChildren.length > 0;
+  const children = [...documentTree.children];
+
+  if (shouldShowQaRoot) {
+    children.push({
+      name: QUICK_QA_TREE_LABEL,
+      path: QUICK_QA_TREE_PATH,
+      type: "folder",
+      treeKind: "qa-root",
+      virtual: true,
+      children: qaChildren,
+    });
+  }
+
+  return {
+    ...documentTree,
+    children,
+  };
 }

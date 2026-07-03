@@ -107,13 +107,16 @@ def _graph_dir(project_id: str) -> Path:
     return out
 
 
-def _run_ast_extraction(code_paths: list[Path]) -> dict[str, Any]:
+def _run_ast_extraction(code_paths: list[Path], cache_root: Path) -> dict[str, Any]:
     files: list[Path] = []
     for p in code_paths:
         files.extend(collect_files(p) if p.is_dir() else [p])
     if not files:
         return {"nodes": [], "edges": [], "input_tokens": 0, "output_tokens": 0}
-    return ast_extract(files)
+    # cache_root pins graphify's AST cache to <workspace>/graphify-out/cache/;
+    # without it graphify infers the files' common root (knowledge/) and drops
+    # a stray graphify-out/ inside the knowledge directory.
+    return ast_extract(files, cache_root=cache_root)
 
 
 NOTE_GRAPH_TABLE = "note_graph"
@@ -230,7 +233,10 @@ class _GraphItemSource:
         done = self.store.load()
         for path in doc_paths:
             rel = _relative(path, self.workspace_root)
-            fp = fingerprint_document(path)
+            try:
+                fp = fingerprint_document(path)
+            except FileNotFoundError:
+                continue
             if done.get(rel) != fp:
                 yield path
 
@@ -241,12 +247,16 @@ class _GraphWorker:
         self.llm_sem = llm_sem
 
     async def process_batch(self, items: list[Path]) -> list[tuple[Path, dict[str, Any]]]:
-        async def _extract_task(path: Path) -> tuple[Path, dict[str, Any]]:
+        async def _extract_task(path: Path) -> tuple[Path, dict[str, Any]] | None:
             async with self.llm_sem:
-                frag = await asyncio.to_thread(_extract_one_file, path, self.workspace_root)
-                return path, frag
+                try:
+                    frag = await asyncio.to_thread(_extract_one_file, path, self.workspace_root)
+                    return path, frag
+                except FileNotFoundError:
+                    return None
 
-        return await asyncio.gather(*(_extract_task(p) for p in items))
+        res = await asyncio.gather(*(_extract_task(p) for p in items))
+        return [r for r in res if r is not None]
 
 
 class _GraphSink:
@@ -272,8 +282,11 @@ class _GraphSink:
         done = {}
         for path in done_items:
             rel = _relative(path, self.workspace_root)
-            fp = fingerprint_document(path)
-            done[rel] = fp
+            try:
+                fp = fingerprint_document(path)
+                done[rel] = fp
+            except FileNotFoundError:
+                pass
         self.store.commit(done)
 
     def collected_fragments(self, doc_paths: list[Path]) -> dict[str, Any]:
@@ -331,7 +344,7 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
     # memories DB are deliberately excluded — they produced noisy, out-of-place
     # nodes. Memories that matter should be saved into knowledge/ to appear here.
 
-    ast_fragment = _run_ast_extraction(code_paths)
+    ast_fragment = _run_ast_extraction(code_paths, workspace_root)
 
     store = CheckpointStore(_graph_checkpoint_path(project_id))
     stale_keys = store.prune({_relative(p, workspace_root) for p in doc_paths})

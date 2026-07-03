@@ -94,6 +94,24 @@ describe("knowledge api", () => {
       content: "## Q\n\nA",
       project_id: "default",
       target_dir: "faq",
+      note_format: "text",
+    });
+  });
+
+  it("creates qa-format notes with note_format=qa", async () => {
+    const f = mockFetch({
+      status: "ok",
+      path: "knowledge/qa/FAQ.md",
+      size: 10,
+      document: { path: "knowledge/qa/FAQ.md" },
+    });
+
+    await createKnowledgeNote("FAQ", "## Q\n\nA", "", "qa");
+
+    const [, init] = f.mock.calls[0];
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
+      note_format: "qa",
+      target_dir: "",
     });
   });
 });

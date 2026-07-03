@@ -32,7 +32,12 @@ export default function SourcePanel({
           return (
             <button
               key={mode}
-              onClick={() => setActiveMode(mode)}
+              onClick={() => {
+                setActiveMode(mode);
+                if (mode === "manual") {
+                  onShowNote();
+                }
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 activeMode === mode
                   ? "bg-primary/15 text-primary border border-primary/30"
@@ -82,18 +87,7 @@ export default function SourcePanel({
           </div>
         )}
 
-        {activeMode === "manual" && (
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={onShowNote}
-              className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[1.125rem]">note_add</span>
-              新增筆記
-            </button>
-          </div>
-        )}
+        {activeMode === "manual" && <div className="flex-1" />}
       </div>
     </div>
   );

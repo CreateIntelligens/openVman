@@ -35,12 +35,23 @@ def test_commit_qa_csv_skips_llm_and_marks_source_type_qa(workspace: Path):
 
     result = commit_raw_documents("default")
 
-    assert result["committed"] == ["knowledge/faq.md"]
-    content = (workspace / "knowledge" / "faq.md").read_text(encoding="utf-8")
+    assert result["committed"] == ["knowledge/qa/faq.md"]
+    content = (workspace / "knowledge" / "qa" / "faq.md").read_text(encoding="utf-8")
     assert "LLM_CLEANED" not in content
     assert "## Q1" in content
     assert '"hidden": true' in content
-    assert get_document_meta("knowledge/faq.md", "default").get("source_type") == "qa"
+    assert get_document_meta("knowledge/qa/faq.md", "default").get("source_type") == "qa"
+
+    # 採納即進樹：QA CSV 轉出的文件自動成為問答樹節點
+    import knowledge.qa_nodes as qa_nodes
+
+    nodes = qa_nodes.list_nodes("default")
+    matching = [n for n in nodes.values() if n["label"] == "faq"]
+    assert len(matching) == 1
+    entries = {e["question"]: e for e in matching[0]["qa_entries"]}
+    assert set(entries) == {"Q1", "Q2"}
+    assert entries["Q1"]["source_path"] == "knowledge/qa/faq.md"
+    assert entries["Q2"]["hidden"] is True
 
 
 def test_commit_plain_csv_still_normalizes_as_upload(workspace: Path):

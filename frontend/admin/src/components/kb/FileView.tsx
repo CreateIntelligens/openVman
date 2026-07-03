@@ -1,7 +1,9 @@
+import { useState } from "react";
+
 import type { KnowledgeDocument, KnowledgeDocumentSummary } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
 import { formatSize, formatDate, isUploadDerivedKnowledgeFile } from "./helpers";
-import QaEntriesView from "./QaEntriesView";
+import QaDocEditor from "./QaDocEditor";
 import StatusDot from "./StatusDot";
 import SourceBadge from "./SourceBadge";
 
@@ -36,9 +38,10 @@ export default function FileView({
   onOpenQaTree?: () => void;
   renormalizing?: boolean;
 }) {
+  const [showQaRawSource, setShowQaRawSource] = useState(false);
   const showsUploadNotice = document ? isUploadDerivedKnowledgeFile(document) : false;
   const isQaDocument = document?.source_type === "qa";
-  const isQaLocked = isQaDocument && document?.qa_attached === true;
+  const isQaAttached = isQaDocument && document?.qa_attached === true;
 
   if (loading) {
     return (
@@ -85,7 +88,7 @@ export default function FileView({
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${document.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
           </button>
-          {!document.is_core && !isQaLocked && (
+          {!document.is_core && !isQaAttached && (
             <>
               <button
                 onClick={() => onMove(document.path)}
@@ -111,10 +114,10 @@ export default function FileView({
               className="flex items-center gap-1 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary/10"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">account_tree</span>
-              問答樹編輯
+              前往問答節點
             </button>
           )}
-          {!isQaLocked && onRenormalize && (
+          {!isQaAttached && onRenormalize && (
             <button
               onClick={() => onRenormalize(document.path)}
               disabled={renormalizing}
@@ -125,16 +128,14 @@ export default function FileView({
               {renormalizing ? "重新整理中..." : "重新整理"}
             </button>
           )}
-          {!isQaLocked && (
-            <button
-              onClick={onSave}
-              disabled={saving || !dirty}
-              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-40"
-            >
-              <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">{saving ? "sync" : "save"}</span>
-              {saving ? "儲存中..." : "儲存"}
-            </button>
-          )}
+          <button
+            onClick={onSave}
+            disabled={saving || !dirty}
+            className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-40"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">{saving ? "sync" : "save"}</span>
+            {saving ? "儲存中..." : "儲存"}
+          </button>
         </div>
       </div>
 
@@ -152,14 +153,38 @@ export default function FileView({
         </div>
       )}
 
-      {isQaLocked ? (
+      {isQaDocument ? (
         <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
-          <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
-            <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">問答清單（已被問答樹掛載，唯讀）</span>
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
+            <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">
+              {showQaRawSource ? "原始碼" : "問答編輯"}
+              {isQaAttached && (
+                <span className="ml-2 normal-case tracking-normal font-medium text-slate-400">
+                  屬於問答樹節點，儲存後會同步節點問答
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowQaRawSource(!showQaRawSource)}
+              className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-slate-400 hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[0.875rem]">
+                {showQaRawSource ? "table_rows" : "code"}
+              </span>
+              {showQaRawSource ? "問答編輯" : "原始碼"}
+            </button>
           </div>
-          <div className="min-h-0 flex-1">
-            <QaEntriesView content={editContent} />
-          </div>
+          {showQaRawSource ? (
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="flex-1 w-full bg-transparent text-sm text-slate-800 dark:text-slate-200 font-mono p-4 resize-none focus:outline-none overflow-auto"
+              spellCheck={false}
+            />
+          ) : (
+            <QaDocEditor content={editContent} onChange={setEditContent} />
+          )}
         </div>
       ) : (
         <div className="flex-1 flex min-h-0 overflow-hidden">
@@ -177,19 +202,11 @@ export default function FileView({
 
           <div className="flex-1 flex flex-col min-w-0">
             <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
-              <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">
-                {isQaDocument ? "問答預覽" : "預覽"}
-              </span>
+              <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">預覽</span>
             </div>
-            {isQaDocument ? (
-              <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
-                <QaEntriesView content={editContent} />
-              </div>
-            ) : (
-              <div className="flex-1 overflow-y-auto p-4 prose-container">
-                <MarkdownPreview content={editContent} />
-              </div>
-            )}
+            <div className="flex-1 overflow-y-auto p-4 prose-container">
+              <MarkdownPreview content={editContent} />
+            </div>
           </div>
         </div>
       )}

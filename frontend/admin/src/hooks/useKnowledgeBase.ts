@@ -18,6 +18,7 @@ import {
   type KnowledgeDocument,
   type KnowledgeNormalizationPreviewResponse,
   type KnowledgeDocumentSummary,
+  type KnowledgeNoteFormat,
 } from "../api";
 import {
   SOURCE_MODES,
@@ -106,9 +107,7 @@ export function useKnowledgeBase() {
   );
   const [crawlUrlValue, setCrawlUrlValue] = useState("");
   const [crawling, setCrawling] = useState(false);
-  const [showNoteModal, setShowNoteModal] = useState(false);
-  const [noteTitle, setNoteTitle] = useState("");
-  const [noteContent, setNoteContent] = useState("");
+  const [showNoteComposer, setShowNoteComposer] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -119,10 +118,8 @@ export function useKnowledgeBase() {
     return event.dataTransfer?.types?.includes("Files") ?? false;
   }, []);
 
-  const closeNoteModal = useCallback(() => {
-    setShowNoteModal(false);
-    setNoteTitle("");
-    setNoteContent("");
+  const closeNoteComposer = useCallback(() => {
+    setShowNoteComposer(false);
   }, []);
 
   const loadDocuments = useCallback(async () => {
@@ -421,23 +418,29 @@ export function useKnowledgeBase() {
     }
   }, [setErrorStatus]);
 
-  const handleCreateNote = useCallback(async () => {
-    if (!noteTitle.trim() || !noteContent.trim()) return;
+  const handleCreateNote = useCallback(async (
+    title: string,
+    content: string,
+    noteFormat: KnowledgeNoteFormat = "text",
+  ): Promise<{ path: string; qaNodeId?: string } | null> => {
+    if (!title.trim() || !content.trim()) return null;
     setCreatingNote(true);
     setStatus(null);
     try {
-      const result = await createKnowledgeNote(noteTitle, noteContent);
+      const result = await createKnowledgeNote(title, content, "", noteFormat);
       setStatus({ type: "success", message: `已建立筆記「${result.document.title}」` });
-      closeNoteModal();
+      closeNoteComposer();
       await loadDocuments();
       setSelectedPath(result.path);
       await openFile(result.path);
+      return { path: result.path, qaNodeId: result.document.qa_node_id };
     } catch (error) {
       setErrorStatus(error);
+      return null;
     } finally {
       setCreatingNote(false);
     }
-  }, [closeNoteModal, loadDocuments, noteContent, noteTitle, openFile, setErrorStatus]);
+  }, [closeNoteComposer, loadDocuments, openFile, setErrorStatus]);
 
   const handleCreateFolderSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -534,9 +537,7 @@ export function useKnowledgeBase() {
     activeSourceMode,
     crawlUrlValue,
     crawling,
-    showNoteModal,
-    noteTitle,
-    noteContent,
+    showNoteComposer,
     creatingNote,
     dragOver,
     normalizationPreview,
@@ -557,9 +558,7 @@ export function useKnowledgeBase() {
     setShowSourcePanel,
     setActiveSourceMode,
     setCrawlUrlValue,
-    setShowNoteModal,
-    setNoteTitle,
-    setNoteContent,
+    setShowNoteComposer,
     toggleExpand,
     handleTreeSelect,
     handleSave,
@@ -575,12 +574,13 @@ export function useKnowledgeBase() {
     handleCreateNote,
     handleCreateFolderSubmit,
     cancelCreateFolder,
-    closeNoteModal,
+    closeNoteComposer,
     closeNormalizationPreview,
     closeFileView,
     updateEditContent,
     handleDragEnter,
     handleDragLeave,
     handleDrop,
+    loadDocuments,
   };
 }

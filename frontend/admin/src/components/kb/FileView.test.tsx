@@ -49,14 +49,37 @@ describe("FileView", () => {
 
     renderFileView({ onRenormalize });
 
-    expect(screen.getByRole("textbox")).toBeTruthy();
+    expect(screen.getByPlaceholderText("請輸入問題")).toBeTruthy();
+    expect(screen.getByPlaceholderText("請輸入答案")).toBeTruthy();
     expect(screen.getByRole("button", { name: "儲存" })).toBeTruthy();
     expect(screen.getByTitle("移動")).toBeTruthy();
     expect(screen.getByTitle("刪除")).toBeTruthy();
     expect(screen.getByRole("button", { name: "重新整理" })).toBeTruthy();
   });
 
-  it("routes attached QA documents to the QA tree editor instead of raw Markdown editing", () => {
+  it("edits unattached QA documents as structured rows, not raw markdown", () => {
+    const { props } = renderFileView({
+      editContent: '## Q1\n\nA1\n<!-- qa_metadata: {"img":"","url":""} -->',
+    });
+
+    const question = screen.getByPlaceholderText("請輸入問題") as HTMLTextAreaElement;
+    expect(question.value).toBe("Q1");
+
+    fireEvent.change(question, { target: { value: "Q1 改" } });
+    expect(props.setEditContent).toHaveBeenCalledWith(
+      '## Q1 改\n\nA1\n<!-- qa_metadata: {"img":"","url":""} -->',
+    );
+  });
+
+  it("allows switching QA documents to raw markdown source view", () => {
+    renderFileView();
+
+    fireEvent.click(screen.getByRole("button", { name: /原始碼/ }));
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(textarea.value).toBe(baseDocument.content);
+  });
+
+  it("keeps attached QA documents editable while blocking move/delete/renormalize", () => {
     const { props } = renderFileView({
       document: {
         ...baseDocument,
@@ -65,12 +88,14 @@ describe("FileView", () => {
       onRenormalize: vi.fn(),
     });
 
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(screen.queryByRole("button", { name: "儲存" })).toBeNull();
+    expect(screen.getByPlaceholderText("請輸入問題")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "儲存" })).toBeTruthy();
+    expect(screen.getByText("屬於問答樹節點，儲存後會同步節點問答")).toBeTruthy();
+
     expect(screen.queryByTitle("移動")).toBeNull();
     expect(screen.queryByTitle("刪除")).toBeNull();
     expect(screen.queryByRole("button", { name: "重新整理" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "問答樹編輯" }));
+    fireEvent.click(screen.getByRole("button", { name: "前往問答節點" }));
 
     expect(props.onOpenQaTree).toHaveBeenCalledTimes(1);
   });

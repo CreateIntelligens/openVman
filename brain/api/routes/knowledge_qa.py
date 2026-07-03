@@ -11,8 +11,9 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 import knowledge.indexer
-from knowledge.doc_meta import get_document_meta, upsert_document_meta
+from knowledge.doc_meta import upsert_document_meta
 from knowledge.knowledge_admin import (
+    delete_workspace_document,
     resolve_workspace_artifact,
     resolve_workspace_document,
     save_uploaded_artifact,
@@ -24,14 +25,17 @@ from knowledge.qa_csv import (
     qa_markdown_block,
 )
 from knowledge.qa_nodes import (
-    add_qa_entries_to_node,
+    adopt_orphan_qa_sources,
     cleanup_unused_images,
     create_node,
+    create_node_for_source,
     delete_node,
     get_node,
     get_node_tree,
+    is_source_referenced,
     move_node,
     reorder_node,
+    sync_entries_for_source,
     update_node,
 )
 
@@ -83,7 +87,142 @@ def parse_qa_markdown_with_metadata(content: str) -> list[dict[str, Any]]:
 
 @router.get("/nodes")
 def list_qa_nodes_route(project_id: str = "default") -> list[dict[str, Any]]:
+    # 無掛載模型的自癒遷移：未被任何節點引用的 QA 文件在讀取時補建節點。
+    adopted = adopt_orphan_qa_sources(project_id)
+    if adopted:
+        logger.info("adopted orphan qa sources into tree: %s", adopted)
     return get_node_tree(project_id)
+
+
+@router.post("/nodes/adopt-source")
+def adopt_source_route(
+    payload: SourcePathRequest,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    path = payload.path.strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="path 不可為空")
+
+    if is_source_referenced(path, project_id):
+        raise HTTPException(status_code=400, detail="此 QA 文件已在問答樹中")
+
+    try:
+        doc_path = resolve_workspace_document(path, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not doc_path.exists():
+        raise HTTPException(status_code=404, detail="找不到指定文件")
+
+    content = doc_path.read_text(encoding="utf-8")
+    parsed = parse_qa_markdown(content)
+    if not parsed:
+        raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
+
+    label = doc_path.stem
+    try:
+        node = create_node_for_source(path, label, project_id=project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    upsert_document_meta(path, project_id, source_type="qa")
+    knowledge.indexer.rebuild_knowledge_index(project_id)
+
+    return {"node_id": node["node_id"]}
+
+
+@router.post("/nodes/{id}/ingest-source")
+def ingest_source_route(
+    id: str,
+    payload: SourcePathRequest,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    path = payload.path.strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="path 不可為空")
+
+    node = get_node(id, project_id=project_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="找不到指定節點")
+
+    try:
+        dragged_path = resolve_workspace_document(path, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not dragged_path.exists():
+        raise HTTPException(status_code=404, detail="找不到指定文件")
+
+    dragged_content = dragged_path.read_text(encoding="utf-8")
+    dragged_items = parse_qa_markdown(dragged_content)
+    if not dragged_items:
+        raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
+
+    qa_entries = node.get("qa_entries", [])
+    target_path = next((entry["source_path"] for entry in qa_entries if entry.get("source_path")), "")
+
+    if not target_path:
+        target_path = f"knowledge/qa/{id}.md"
+
+    if path == target_path:
+        raise HTTPException(status_code=400, detail="此文件已是該節點的內容")
+
+    try:
+        target_file = resolve_workspace_document(target_path, project_id)
+        if target_file.exists():
+            target_content = target_file.read_text(encoding="utf-8")
+            target_items = parse_qa_markdown(target_content)
+        else:
+            target_items = []
+    except Exception:
+        target_items = []
+
+    target_qa_dict = {item["q"].strip(): item for item in target_items}
+
+    added_count = 0
+    new_qa_entries = list(qa_entries)
+
+    for item in dragged_items:
+        q = item["q"].strip()
+        if q in target_qa_dict:
+            continue
+
+        target_items.append(item)
+        target_qa_dict[q] = item
+        added_count += 1
+
+        image_id = extract_image_id(item.get("img") or "")
+        new_qa_entries.append({
+            "question": q,
+            "source_path": target_path,
+            "hidden": bool(item.get("hidden", False)),
+            "image_id": image_id or None,
+        })
+
+    if added_count > 0:
+        blocks = []
+        for item in target_items:
+            blocks.append(
+                qa_markdown_block(
+                    item["q"],
+                    item["a"],
+                    item.get("img") or "",
+                    item.get("url") or "",
+                    bool(item.get("hidden", False)),
+                )
+            )
+        new_content = "\n\n".join(blocks)
+        save_workspace_document(target_path, new_content, project_id)
+        upsert_document_meta(target_path, project_id, source_type="qa")
+
+        update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
+
+    delete_workspace_document(path, project_id)
+    # 被吸收的文件若原屬其他節點，清掉那些節點的懸空 entries
+    sync_entries_for_source(path, project_id)
+    knowledge.indexer.rebuild_knowledge_index(project_id)
+
+    return {"added": added_count}
 
 
 @router.post("/nodes")
@@ -128,13 +267,33 @@ def patch_qa_node_route(
 
 
 @router.delete("/nodes/{id}")
-def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str, str]:
-    # Nodes own structure only: deleting one drops its references, never the
-    # underlying QA documents (those belong to the documents workspace).
-    success = delete_node(id, project_id=project_id)
-    if not success:
+def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str, Any]:
+    # 1 節點 = 1 來源：刪除節點時，其專屬 QA 文件一併刪除；
+    # 仍被其他節點引用（舊資料的多對多殘留）者保留。
+    node = get_node(id, project_id=project_id)
+    if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
-    return {"status": "ok"}
+    source_paths = {
+        entry["source_path"]
+        for entry in node.get("qa_entries", [])
+        if entry.get("source_path")
+    }
+
+    if not delete_node(id, project_id=project_id):
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    removed_docs: list[str] = []
+    for path in sorted(source_paths):
+        if is_source_referenced(path, project_id):
+            continue
+        try:
+            delete_workspace_document(path, project_id)
+            removed_docs.append(path)
+        except FileNotFoundError:
+            pass
+    if removed_docs:
+        knowledge.indexer.rebuild_knowledge_index(project_id)
+    return {"status": "ok", "removed_docs": removed_docs}
 
 
 @router.post("/nodes/{id}/move")
@@ -167,66 +326,6 @@ def reorder_qa_node_route(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/nodes/{id}/attach-source")
-def attach_source_route(
-    id: str,
-    payload: SourcePathRequest,
-    project_id: str = "default",
-) -> dict[str, Any]:
-    node = get_node(id, project_id=project_id)
-    if node is None:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    if get_document_meta(payload.path, project_id).get("source_type") != "qa":
-        raise HTTPException(status_code=400, detail="僅能掛載 QA 來源文件")
-
-    try:
-        doc_path = resolve_workspace_document(payload.path, project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if not doc_path.exists():
-        raise HTTPException(status_code=404, detail="找不到指定文件")
-
-    parsed_entries = parse_qa_markdown(doc_path.read_text(encoding="utf-8"))
-    existing_questions = {entry["question"] for entry in node.get("qa_entries", [])}
-    new_entries: list[dict[str, Any]] = []
-    for parsed in parsed_entries:
-        question = parsed["q"].strip()
-        if not question or question in existing_questions:
-            continue
-        image_id = extract_image_id(parsed.get("img") or "")
-        new_entries.append(
-            {
-                "question": question,
-                "source_path": payload.path,
-                "hidden": bool(parsed.get("hidden", False)),
-                "image_id": image_id or None,
-            }
-        )
-        existing_questions.add(question)
-
-    if new_entries:
-        add_qa_entries_to_node(id, new_entries, project_id=project_id)
-    return {"status": "ok", "added": len(new_entries)}
-
-
-@router.post("/nodes/{id}/detach-source")
-def detach_source_route(
-    id: str,
-    payload: SourcePathRequest,
-    project_id: str = "default",
-) -> dict[str, Any]:
-    node = get_node(id, project_id=project_id)
-    if node is None:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    entries = node.get("qa_entries", [])
-    remaining = [entry for entry in entries if entry.get("source_path") != payload.path]
-    if len(remaining) != len(entries):
-        update_node(id, {"qa_entries": remaining}, project_id=project_id)
-    return {"status": "ok", "removed": len(entries) - len(remaining)}
-
-
 @router.get("/nodes/{id}/merged")
 def get_merged_qa_route(
     id: str,
@@ -245,40 +344,29 @@ def get_merged_qa_route(
     merged_items: list[dict[str, Any]] = []
 
     for source_path, entries in by_path.items():
+        qa_dict = {}
         try:
             doc_path = resolve_workspace_document(source_path, project_id)
             if doc_path.exists():
                 content = doc_path.read_text(encoding="utf-8")
                 parsed_qas = parse_qa_markdown_with_metadata(content)
                 qa_dict = {item["q"]: item for item in parsed_qas}
-
-                for entry in entries:
-                    q = entry["question"]
-                    item_detail = qa_dict.get(q, {})
-                    merged_items.append(
-                        {
-                            "q": q,
-                            "a": item_detail.get("a", ""),
-                            "img": entry.get("image_id") or item_detail.get("img") or "",
-                            "url": item_detail.get("url") or "",
-                            "source_file": source_path,
-                            "hidden": entry.get("hidden", False),
-                        }
-                    )
-            else:
-                raise FileNotFoundError()
         except Exception:
-            for entry in entries:
-                merged_items.append(
-                    {
-                        "q": entry["question"],
-                        "a": "",
-                        "img": entry.get("image_id") or "",
-                        "url": "",
-                        "source_file": source_path,
-                        "hidden": entry.get("hidden", False),
-                    }
-                )
+            pass
+
+        for entry in entries:
+            q = entry["question"]
+            item_detail = qa_dict.get(q, {})
+            merged_items.append(
+                {
+                    "q": q,
+                    "a": item_detail.get("a", ""),
+                    "img": entry.get("image_id") or item_detail.get("img") or "",
+                    "url": item_detail.get("url") or "",
+                    "source_file": source_path,
+                    "hidden": entry.get("hidden", False),
+                }
+            )
 
     for idx, item in enumerate(merged_items, start=1):
         item["index"] = str(idx)

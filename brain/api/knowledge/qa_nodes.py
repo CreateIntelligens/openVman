@@ -297,43 +297,11 @@ def reorder_node(
         if node_id not in sibling_ids_ordered:
             return data["nodes"][node_id]
 
-        idx = sibling_ids_ordered.index(node_id)
+        for i, sid in enumerate(sibling_ids_ordered):
+            data["nodes"][sid]["order"] = float(i + 1)
 
-        def get_order_of_node(sid: str) -> float:
-            return data["nodes"][sid].get(
-                "order", float(sibling_ids_ordered.index(sid))
-            )
-
-        need_rebalance = False
-        if len(sibling_ids_ordered) == 1:
-            new_order = 1.0
-        elif idx == 0:
-            sibling_after = sibling_ids_ordered[1]
-            order_after = get_order_of_node(sibling_after)
-            new_order = order_after - 1.0
-        elif idx == len(sibling_ids_ordered) - 1:
-            sibling_before = sibling_ids_ordered[idx - 1]
-            order_before = get_order_of_node(sibling_before)
-            new_order = order_before + 1.0
-        else:
-            sibling_before = sibling_ids_ordered[idx - 1]
-            sibling_after = sibling_ids_ordered[idx + 1]
-            order_before = get_order_of_node(sibling_before)
-            order_after = get_order_of_node(sibling_after)
-
-            if order_after - order_before < 1e-9:
-                need_rebalance = True
-                new_order = float(idx + 1)
-            else:
-                new_order = (order_before + order_after) / 2.0
-
-        if need_rebalance:
-            for i, sid in enumerate(sibling_ids_ordered):
-                data["nodes"][sid]["order"] = float(i + 1)
-            _save_nodes_data(data, project_id)
-            return data["nodes"][node_id]
-        else:
-            return update_node(node_id, {"order": new_order}, project_id)
+        _save_nodes_data(data, project_id)
+        return data["nodes"][node_id]
 
 
 def get_node_tree(project_id: str = "default") -> list[dict[str, Any]]:
@@ -459,6 +427,171 @@ def add_qa_entries_to_node(
 
         _save_nodes_data(data, project_id)
         return node
+
+
+def _build_entries_for_source(source_path: str, project_id: str = "default") -> list[dict[str, Any]]:
+    """Parse a QA markdown doc into node qa_entries (deduped by question)."""
+    from knowledge.knowledge_admin import resolve_workspace_document
+    from knowledge.qa_csv import extract_image_id, parse_qa_markdown
+
+    doc_path = resolve_workspace_document(source_path, project_id)
+    parsed = (
+        parse_qa_markdown(doc_path.read_text(encoding="utf-8"))
+        if doc_path.exists()
+        else []
+    )
+
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in parsed:
+        question = item["q"].strip()
+        if not question or question in seen:
+            continue
+        seen.add(question)
+        image_id = extract_image_id(item.get("img") or "")
+        entries.append(
+            {
+                "question": question,
+                "source_path": source_path,
+                "hidden": bool(item.get("hidden", False)),
+                "image_id": image_id or None,
+            }
+        )
+    return entries
+
+
+def _unique_node_id(existing: set[str], label: str) -> str:
+    slug = "".join(ch if ch.isalnum() else "_" for ch in label.lower()).strip("_")
+    slug = "_".join(part for part in slug.split("_") if part) or "node"
+    candidate = f"qa_{slug}"
+    if candidate not in existing:
+        return candidate
+    suffix = 2
+    while f"{candidate}_{suffix}" in existing:
+        suffix += 1
+    return f"{candidate}_{suffix}"
+
+
+def create_node_for_source(
+    source_path: str,
+    label: str,
+    project_id: str = "default",
+) -> dict[str, Any]:
+    """Create a tree node that owns ``source_path`` (1 node = 1 QA doc).
+
+    Returns the created node dict augmented with its ``node_id``.
+    """
+    entries = _build_entries_for_source(source_path, project_id)
+    with _lock:
+        data = _load_nodes_data(project_id)
+        node_id = _unique_node_id(set(data["nodes"]), label)
+    node = create_node(
+        node_id,
+        label,
+        qa_entries=entries,
+        project_id=project_id,
+    )
+    return {**node, "node_id": node_id}
+
+
+def adopt_orphan_qa_sources(project_id: str = "default") -> list[str]:
+    """Create nodes for QA docs not yet referenced by any node.
+
+    Self-healing migration for the no-attach model: every QA source must live
+    in the tree, so unreferenced docs (e.g. created before this model) are
+    adopted on read. Returns the created node ids.
+    """
+    from knowledge.doc_meta import load_doc_meta
+    from knowledge.knowledge_admin import resolve_workspace_document
+
+    referenced = referenced_source_paths(project_id)
+    created: list[str] = []
+    for path, meta in load_doc_meta(project_id).items():
+        if meta.get("source_type") != "qa" or path in referenced:
+            continue
+        try:
+            doc_path = resolve_workspace_document(path, project_id)
+        except ValueError:
+            continue
+        if not doc_path.exists():
+            continue
+        label = Path(path).stem
+        node = create_node_for_source(path, label, project_id)
+        created.append(node["node_id"])
+    return created
+
+
+def sync_entries_for_source(source_path: str, project_id: str = "default") -> int:
+    """Replace referencing nodes' entries for ``source_path`` with the doc's current QA set.
+
+    Called after a documents-workspace edit of a tree-owned QA doc, so tree
+    entries (question text / hidden / image) stay consistent with the file
+    instead of blocking the edit. Returns the number of nodes updated.
+    """
+    new_entries = _build_entries_for_source(source_path, project_id)
+
+    updated = 0
+    with _lock:
+        data = _load_nodes_data(project_id)
+        for node in data["nodes"].values():
+            entries = node.get("qa_entries", [])
+            if not any(entry.get("source_path") == source_path for entry in entries):
+                continue
+            others = [entry for entry in entries if entry.get("source_path") != source_path]
+            node["qa_entries"] = others + [dict(entry) for entry in new_entries]
+            updated += 1
+        if updated:
+            _save_nodes_data(data, project_id)
+    return updated
+
+
+def remove_entries_for_source(source_path: str, project_id: str = "default") -> None:
+    """Remove all qa_entries referencing ``source_path``, and delete empty nodes."""
+    with _lock:
+        data = _load_nodes_data(project_id)
+        nodes_to_delete = []
+        for node_id, node in list(data["nodes"].items()):
+            entries = node.get("qa_entries", [])
+            filtered = [e for e in entries if e.get("source_path") != source_path]
+            node["qa_entries"] = filtered
+
+            if not filtered and not node.get("child_ids", []):
+                nodes_to_delete.append(node_id)
+
+        for node_id in nodes_to_delete:
+            node = data["nodes"][node_id]
+            for pid in node.get("parent_ids", []):
+                if pid in data["nodes"] and node_id in data["nodes"][pid]["child_ids"]:
+                    data["nodes"][pid]["child_ids"].remove(node_id)
+            del data["nodes"][node_id]
+
+        _save_nodes_data(data, project_id)
+
+
+def rename_source_path_in_nodes(
+    source_path: str, target_path: str, project_id: str = "default"
+) -> None:
+    """Update all entries referencing ``source_path`` to point to ``target_path``.
+
+    Also renames the node label if it matches the old file stem.
+    """
+    with _lock:
+        data = _load_nodes_data(project_id)
+        old_stem = Path(source_path).stem
+        new_stem = Path(target_path).stem
+
+        updated = False
+        for node in data["nodes"].values():
+            for entry in node.get("qa_entries", []):
+                if entry.get("source_path") == source_path:
+                    entry["source_path"] = target_path
+                    updated = True
+            if node.get("label") == old_stem:
+                node["label"] = new_stem
+                updated = True
+
+        if updated:
+            _save_nodes_data(data, project_id)
 
 
 def cleanup_unused_images(project_id: str = "default") -> list[str]:
