@@ -63,7 +63,7 @@ _REINDEX_DEBOUNCE_SECONDS = 2.0
 _reindex_state: dict[str, dict[str, Any]] = {}
 
 
-def _schedule_reindex(project_id: str) -> None:
+def schedule_reindex(project_id: str) -> None:
     """Coalesce reindex requests: debounce rapid edits, never run two at once."""
     state = _reindex_state.setdefault(project_id, {"task": None, "dirty": False})
     state["dirty"] = True
@@ -153,7 +153,7 @@ async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
         from knowledge.qa_nodes import sync_entries_for_source
 
         sync_entries_for_source(payload.path, payload.project_id)
-    _schedule_reindex(payload.project_id)
+    schedule_reindex(payload.project_id)
     return {"status": "ok", "document": document}
 
 
@@ -191,21 +191,24 @@ async def delete_knowledge_document_route(path: str, project_id: str = "default"
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="找不到指定文件") from exc
-    _schedule_reindex(project_id)
+    schedule_reindex(project_id)
     return {"status": "ok"}
 
 
 @router.post("/knowledge/move", summary="移動/重新命名知識文件")
 async def move_knowledge_document_route(payload: KnowledgeDocumentMoveRequest):
-    if get_document_meta(payload.source_path, payload.project_id).get("source_type") == "qa":
-        from knowledge.qa_nodes import rename_source_path_in_nodes
-        rename_source_path_in_nodes(payload.source_path, payload.target_path, payload.project_id)
+    is_qa = get_document_meta(payload.source_path, payload.project_id).get("source_type") == "qa"
     try:
         document = move_workspace_document(payload.source_path, payload.target_path, payload.project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if is_qa:
+        from knowledge.qa_nodes import rename_source_path_in_nodes
+        rename_source_path_in_nodes(payload.source_path, payload.target_path, payload.project_id)
+
     asyncio.create_task(
         _background_rename_document(payload.source_path, payload.target_path, payload.project_id)
     )
@@ -296,7 +299,7 @@ async def apply_renormalize_knowledge_document_route(
         raise HTTPException(status_code=500, detail="套用整理失敗") from exc
 
     log_event("knowledge_renormalize_apply", project_id=pid, path=payload.path)
-    _schedule_reindex(pid)
+    schedule_reindex(pid)
 
     return {
         "status": "ok",
@@ -327,7 +330,7 @@ async def renormalize_knowledge_document_route(payload: KnowledgeDocumentActionR
         raise HTTPException(status_code=500, detail="整理失敗") from exc
 
     log_event("knowledge_renormalize", project_id=pid, path=payload.path)
-    _schedule_reindex(pid)
+    schedule_reindex(pid)
 
     return {
         "status": "ok",
@@ -370,7 +373,7 @@ async def _run_commit_job(project_id: str) -> None:
     commit_jobs.finish_job(project_id, result["committed"], result["skipped"])
     log_event("knowledge_commit", project_id=project_id, committed=len(result["committed"]))
     if result["committed"]:
-        _schedule_reindex(project_id)
+        schedule_reindex(project_id)
 
 
 @router.get("/knowledge/raw/commit/status", summary="查詢採納進度")
@@ -403,7 +406,7 @@ async def upload_knowledge_documents_route(
         raise HTTPException(status_code=400, detail="檔案需為 UTF-8 編碼") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    _schedule_reindex(project_id)
+    schedule_reindex(project_id)
     return {"status": "ok", "files": uploaded}
 
 
@@ -419,7 +422,7 @@ async def create_knowledge_note_route(payload: KnowledgeNoteCreateRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    _schedule_reindex(payload.project_id)
+    schedule_reindex(payload.project_id)
     return {"status": "ok", "document": document, "path": document["path"], "size": document["size"]}
 
 

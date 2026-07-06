@@ -419,15 +419,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   align-items: center;
   justify-content: center;
   z-index: 8000;
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(0.1875rem);
 }
 
 .modal-card {
   background: var(--bg-soft);
   border: 1px solid var(--line);
   border-radius: 1rem;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  width: min(480px, calc(100vw - 2rem));
+  box-shadow: 0 1.25rem 2.5rem rgba(0, 0, 0, 0.2);
+  width: min(30rem, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);
   display: flex;
   flex-direction: column;
@@ -508,7 +508,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 .btn-apply:hover { background: var(--primary-hover); }
 .btn-apply--dirty {
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.25);
+  box-shadow: 0 0 0 0.1875rem rgba(14, 165, 233, 0.25);
 }
 .btn-apply:disabled {
   cursor: not-allowed;
@@ -714,7 +714,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .modal-leave-to { opacity: 0; }
 .modal-enter-from .modal-card,
 .modal-leave-to .modal-card {
-  transform: translateY(-12px);
+  transform: translateY(-0.75rem);
   opacity: 0;
 }
 

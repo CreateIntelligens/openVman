@@ -73,7 +73,7 @@ export default function MoveModal({
                 className={`w-full text-left px-5 py-2.5 flex items-center gap-2 transition-colors ${
                   isSelected ? "bg-primary/10 text-primary" : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/50"
                 }`}
-                style={{ paddingLeft: `${20 + depth * 16}px` }}
+                style={{ paddingLeft: `${1.25 + depth * 1}rem` }}
               >
                 <span className="material-symbols-outlined text-[1.125rem]">{isSelected ? "folder_open" : "folder"}</span>
                 <span className="text-sm truncate">{label}</span>

@@ -89,24 +89,24 @@ export default function FileView({
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${document.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
           </button>
           {!document.is_core && !isQaAttached && (
-            <>
-              <button
-                onClick={() => onMove(document.path)}
-                className="p-1 rounded-md text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors"
-                title="移動"
-                aria-label="移動"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">drive_file_move</span>
-              </button>
-              <button
-                onClick={() => onDelete(document.path)}
-                className="p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                title="刪除"
-                aria-label="刪除"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">delete</span>
-              </button>
-            </>
+            <button
+              onClick={() => onMove(document.path)}
+              className="p-1 rounded-md text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors"
+              title="移動"
+              aria-label="移動"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">drive_file_move</span>
+            </button>
+          )}
+          {!document.is_core && (
+            <button
+              onClick={() => onDelete(document.path)}
+              className="p-1 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              title={isQaAttached ? "刪除(連同問答節點)" : "刪除"}
+              aria-label="刪除"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">delete</span>
+            </button>
           )}
           {isQaDocument && onOpenQaTree && (
             <button

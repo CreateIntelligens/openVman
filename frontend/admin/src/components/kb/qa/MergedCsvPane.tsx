@@ -9,7 +9,6 @@ interface MergedCsvPaneProps {
   nodeLabel?: string;
   refreshKey?: number;
   onSuccess?: () => void;
-  onOpenManualQa?: () => void;
 }
 
 interface LocalMergedQaItem extends MergedQaItem {
@@ -43,7 +42,6 @@ export default function MergedCsvPane({
   nodeLabel = "",
   refreshKey = 0,
   onSuccess,
-  onOpenManualQa,
 }: MergedCsvPaneProps) {
   const { fetchMergedQa, saveMergedQa, uploadImage, cleanupImages } = useQaNodes();
 
@@ -242,16 +240,6 @@ export default function MergedCsvPane({
               有未儲存變更
             </span>
           )}
-          {onOpenManualQa && (
-            <button
-              type="button"
-              onClick={onOpenManualQa}
-              className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
-            >
-              <span className="material-symbols-outlined text-[1rem]">edit_square</span>
-              手動輸入
-            </button>
-          )}
           <button
             type="button"
             onClick={() => setCleanupConfirmOpen(true)}
@@ -305,7 +293,7 @@ export default function MergedCsvPane({
               table_rows
             </span>
             <p className="text-sm font-medium">此節點尚無任何問答數據</p>
-            <p className="text-xs">請點擊下方「新增一列」，或使用「手動輸入」批次新增問答</p>
+            <p className="text-xs">請點擊下方「新增一列」新增問答</p>
           </div>
         ) : (
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden min-w-[50rem]">
@@ -329,43 +317,43 @@ export default function MergedCsvPane({
                       row.hidden ? "opacity-60 bg-slate-50/20 dark:bg-slate-950/10" : ""
                     }`}
                   >
-                    <td className="py-2.5 px-4 text-center text-xs font-mono text-slate-400 dark:text-slate-500">
-                      <div className="group relative cursor-help">
+                    <td className="py-2 px-4 align-middle text-center text-xs font-mono text-slate-400 dark:text-slate-500">
+                      <div className="group relative cursor-help inline-block">
                         {idx + 1}
-                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block bg-slate-850 text-white text-[0.65rem] py-1 px-2 rounded shadow-lg whitespace-nowrap z-10 font-sans">
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block bg-slate-900 dark:bg-slate-950 text-white text-[0.65rem] py-1 px-2 rounded shadow-lg whitespace-nowrap z-10 font-sans">
                           來源檔案：{row.source_file}
                         </div>
                       </div>
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <textarea
                         value={row.q}
                         onChange={(e) => handleCellChange(idx, "q", e.target.value)}
                         placeholder="請輸入問題"
                         rows={2}
-                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
+                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
                       />
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <textarea
                         value={row.a}
                         onChange={(e) => handleCellChange(idx, "a", e.target.value)}
                         placeholder="請輸入答案"
                         rows={2}
-                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
+                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
                       />
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <div className="flex items-center gap-1">
                         <input
                           type="text"
                           value={row.img || ""}
                           onChange={(e) => handleCellChange(idx, "img", e.target.value)}
                           placeholder="圖片 ID"
-                          className="w-full min-w-0 bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
+                          className="w-full min-w-0 bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
                         />
                         <button
                           type="button"
@@ -385,13 +373,13 @@ export default function MergedCsvPane({
                       </div>
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <input
                         type="text"
                         value={row.url || ""}
                         onChange={(e) => handleCellChange(idx, "url", e.target.value)}
                         placeholder="外部連結"
-                        className="w-full bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
+                        className="w-full bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
                       />
                     </td>
 

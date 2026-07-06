@@ -180,6 +180,27 @@ def create_node(
         return node
 
 
+def _descendants_or_self(data: dict, ancestor_id: str) -> set[str]:
+    visited: set[str] = set()
+    queue = [ancestor_id]
+    while queue:
+        curr = queue.pop(0)
+        if curr in visited:
+            continue
+        visited.add(curr)
+        curr_node = data["nodes"].get(curr)
+        if curr_node:
+            queue.extend(curr_node.get("child_ids", []))
+    return visited
+
+
+def _unlink_from_parents(data: dict, node_id: str) -> None:
+    node = data["nodes"][node_id]
+    for pid in node.get("parent_ids", []):
+        if pid in data["nodes"] and node_id in data["nodes"][pid]["child_ids"]:
+            data["nodes"][pid]["child_ids"].remove(node_id)
+
+
 def update_node(
     node_id: str, updates: dict[str, Any], project_id: str = "default"
 ) -> dict[str, Any] | None:
@@ -262,9 +283,7 @@ def delete_node(node_id: str, project_id: str = "default") -> bool:
 
         node = data["nodes"][node_id]
 
-        for pid in node.get("parent_ids", []):
-            if pid in data["nodes"] and node_id in data["nodes"][pid]["child_ids"]:
-                data["nodes"][pid]["child_ids"].remove(node_id)
+        _unlink_from_parents(data, node_id)
 
         for cid in node.get("child_ids", []):
             if cid in data["nodes"] and node_id in data["nodes"][cid]["parent_ids"]:
@@ -279,7 +298,30 @@ def move_node(
     node_id: str, new_parent_ids: list[str], project_id: str = "default"
 ) -> dict[str, Any] | None:
     with _lock:
-        return update_node(node_id, {"parent_ids": new_parent_ids}, project_id)
+        data = _load_nodes_data(project_id)
+        if node_id not in data["nodes"]:
+            return None
+        descendants = _descendants_or_self(data, node_id)
+        for pid in new_parent_ids:
+            if pid not in data["nodes"]:
+                raise ValueError(f"Parent node '{pid}' does not exist in the database.")
+            if pid in descendants:
+                raise ValueError("Cannot move a node to itself or any of its descendants.")
+
+        node = data["nodes"][node_id]
+        old_parents = set(node.get("parent_ids", []))
+        new_parents = set(new_parent_ids)
+
+        for pid in old_parents - new_parents:
+            if pid in data["nodes"] and node_id in data["nodes"][pid]["child_ids"]:
+                data["nodes"][pid]["child_ids"].remove(node_id)
+        for pid in new_parents - old_parents:
+            if pid in data["nodes"] and node_id not in data["nodes"][pid]["child_ids"]:
+                data["nodes"][pid]["child_ids"].append(node_id)
+
+        node["parent_ids"] = list(new_parent_ids)
+        _save_nodes_data(data, project_id)
+        return node
 
 
 def reorder_node(
@@ -476,6 +518,7 @@ def create_node_for_source(
     source_path: str,
     label: str,
     project_id: str = "default",
+    parent_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Create a tree node that owns ``source_path`` (1 node = 1 QA doc).
 
@@ -488,6 +531,7 @@ def create_node_for_source(
     node = create_node(
         node_id,
         label,
+        parent_ids=parent_ids,
         qa_entries=entries,
         project_id=project_id,
     )
@@ -533,13 +577,21 @@ def sync_entries_for_source(source_path: str, project_id: str = "default") -> in
     updated = 0
     with _lock:
         data = _load_nodes_data(project_id)
-        for node in data["nodes"].values():
+        nodes_to_delete = []
+        for node_id, node in list(data["nodes"].items()):
             entries = node.get("qa_entries", [])
             if not any(entry.get("source_path") == source_path for entry in entries):
                 continue
             others = [entry for entry in entries if entry.get("source_path") != source_path]
             node["qa_entries"] = others + [dict(entry) for entry in new_entries]
             updated += 1
+            if not node["qa_entries"] and not node.get("child_ids", []):
+                nodes_to_delete.append(node_id)
+
+        for node_id in nodes_to_delete:
+            _unlink_from_parents(data, node_id)
+            del data["nodes"][node_id]
+
         if updated:
             _save_nodes_data(data, project_id)
     return updated
@@ -559,10 +611,7 @@ def remove_entries_for_source(source_path: str, project_id: str = "default") -> 
                 nodes_to_delete.append(node_id)
 
         for node_id in nodes_to_delete:
-            node = data["nodes"][node_id]
-            for pid in node.get("parent_ids", []):
-                if pid in data["nodes"] and node_id in data["nodes"][pid]["child_ids"]:
-                    data["nodes"][pid]["child_ids"].remove(node_id)
+            _unlink_from_parents(data, node_id)
             del data["nodes"][node_id]
 
         _save_nodes_data(data, project_id)

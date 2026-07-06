@@ -59,4 +59,13 @@ describe("MergedCsvPane", () => {
     expect(screen.queryByText("此節點尚無任何問答數據")).toBeNull();
     expect(screen.queryByRole("button", { name: /掛載來源/ })).toBeNull();
   });
+
+  it("keeps focused QA cells readable in dark mode", async () => {
+    render(<MergedCsvPane nodeId="root" nodeLabel="Root" />);
+
+    const question = await screen.findByDisplayValue("問題");
+
+    expect(question.className).toContain("dark:focus:bg-slate-950/70");
+    expect(question.className).not.toContain("dark:focus:bg-slate-850");
+  });
 });

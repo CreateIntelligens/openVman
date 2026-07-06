@@ -25,6 +25,10 @@ def client(monkeypatch, tmp_path):
     
     # Mock indexer to avoid heavy calculations
     monkeypatch.setattr(knowledge.indexer, "rebuild_knowledge_index", lambda project_id="default": {"status": "ok"})
+
+    # QA routes schedule a background reindex instead of running it inline
+    import routes.knowledge_qa
+    monkeypatch.setattr(routes.knowledge_qa, "schedule_reindex", lambda project_id="default": None)
     
     # Mock embedder to avoid real FlagEmbedding behavior and IndexError
     class FakeEmbedder:
@@ -381,8 +385,18 @@ def test_ingest_source_clears_dangling_refs_in_other_nodes(client, tmp_path):
     knowledge.doc_meta.upsert_document_meta("knowledge/qa/moved.md", "default", source_type="qa")
 
     client.post("/brain/knowledge/qa/nodes", json={"node_id": "n1", "label": "N1"})
+    
+    # n2 has no children -> should be deleted
     client.post("/brain/knowledge/qa/nodes", json={"node_id": "n2", "label": "N2"})
     qa_nodes.add_qa_entries_to_node("n2", [
+        {"question": "Q2", "source_path": "knowledge/qa/moved.md", "hidden": False, "image_id": None},
+    ])
+
+    # n3 has children -> should not be deleted
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n3", "label": "N3"})
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n3_child", "label": "N3 Child"})
+    qa_nodes.move_node("n3_child", ["n3"])
+    qa_nodes.add_qa_entries_to_node("n3", [
         {"question": "Q2", "source_path": "knowledge/qa/moved.md", "hidden": False, "image_id": None},
     ])
 
@@ -395,8 +409,15 @@ def test_ingest_source_clears_dangling_refs_in_other_nodes(client, tmp_path):
 
     n1 = qa_nodes.get_node("n1")
     assert {e["question"] for e in n1["qa_entries"]} == {"Q2"}
-    n2 = qa_nodes.get_node("n2")
-    assert n2["qa_entries"] == []
+    
+    # n2 should be deleted completely
+    assert qa_nodes.get_node("n2") is None
+    
+    # n3 should still exist but have empty qa_entries since it has children
+    n3 = qa_nodes.get_node("n3")
+    assert n3 is not None
+    assert n3["qa_entries"] == []
+    
     assert not moved.exists()
 
 
@@ -545,3 +566,97 @@ def test_knowledge_ownership_guard_locks_only_attached_qa_docs(client, tmp_path)
     })
     assert response.status_code == 400
     assert "不支援重新整理" in response.json()["detail"]
+
+
+def test_adopt_source_with_parent(client, tmp_path):
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    doc = root / "knowledge" / "notes" / "child_note.md"
+    doc.parent.mkdir(parents=True, exist_ok=True)
+    doc.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/notes/child_note.md", "default", source_type="manual")
+
+    # Create a parent node
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "parent_node", "label": "Parent Node"})
+
+    # 1. Adopt with non-existent parent
+    response = client.post(
+        "/brain/knowledge/qa/nodes/adopt-source",
+        json={"path": "knowledge/notes/child_note.md", "parent_id": "non_existent"},
+    )
+    assert response.status_code == 400
+    assert "父節點不存在" in response.json()["detail"]
+
+    # 2. Adopt with valid parent
+    response = client.post(
+        "/brain/knowledge/qa/nodes/adopt-source",
+        json={"path": "knowledge/notes/child_note.md", "parent_id": "parent_node"},
+    )
+    assert response.status_code == 200
+    node_id = response.json()["node_id"]
+
+    node = qa_nodes.get_node(node_id)
+    assert node["parent_ids"] == ["parent_node"]
+
+
+def test_knowledge_move_failure_retains_qa_nodes(client, tmp_path):
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    attached = root / "knowledge" / "faq_to_move.md"
+    attached.parent.mkdir(parents=True, exist_ok=True)
+    attached.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/faq_to_move.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n_move_fail", "label": "Move Fail"})
+    qa_nodes.add_qa_entries_to_node("n_move_fail", [
+        {"question": "Q1", "source_path": "knowledge/faq_to_move.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post("/brain/knowledge/move", json={
+        "source_path": "knowledge/faq_to_move.md",
+        "target_path": "",
+        "project_id": "default",
+    })
+    assert response.status_code == 400
+    
+    node = qa_nodes.get_node("n_move_fail")
+    assert node["qa_entries"][0]["source_path"] == "knowledge/faq_to_move.md"
+
+
+def test_ingest_source_removes_empty_ghost_node(client, tmp_path):
+    import knowledge.doc_meta
+    import knowledge.qa_nodes as qa_nodes
+
+    root = tmp_path / "workspace"
+    own = root / "knowledge" / "qa" / "own.md"
+    own.parent.mkdir(parents=True, exist_ok=True)
+    own.write_text("## Q1\n\nA1\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/own.md", "default", source_type="qa")
+
+    dragged = root / "knowledge" / "qa" / "ghost.md"
+    dragged.write_text("## Q2\n\nA2\n", encoding="utf-8")
+    knowledge.doc_meta.upsert_document_meta("knowledge/qa/ghost.md", "default", source_type="qa")
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n_own", "label": "N Own"})
+    qa_nodes.add_qa_entries_to_node("n_own", [
+        {"question": "Q1", "source_path": "knowledge/qa/own.md", "hidden": False, "image_id": None},
+    ])
+
+    client.post("/brain/knowledge/qa/nodes", json={"node_id": "n_ghost", "label": "N Ghost"})
+    qa_nodes.add_qa_entries_to_node("n_ghost", [
+        {"question": "Q2", "source_path": "knowledge/qa/ghost.md", "hidden": False, "image_id": None},
+    ])
+
+    response = client.post(
+        "/brain/knowledge/qa/nodes/n_own/ingest-source",
+        json={"path": "knowledge/qa/ghost.md"},
+    )
+    assert response.status_code == 200
+
+    assert qa_nodes.get_node("n_ghost") is None
+
+

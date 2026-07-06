@@ -467,7 +467,7 @@ export default function Chat() {
         {liveSession.cameraActive && (
           <div className="absolute right-4 bottom-24 z-50 w-64 overflow-hidden rounded-xl border border-border bg-surface-raised shadow-lg backdrop-blur-md">
             <div className="flex items-center justify-between bg-surface-sunken/80 px-3 py-2 text-xs font-medium text-content border-b border-border">
-              <span className="flex items-center gap-1.5 truncate max-w-[180px]">
+              <span className="flex items-center gap-1.5 truncate max-w-[11.25rem]">
                 <span className={`h-2 w-2 rounded-full bg-primary ${liveSession.cameraStatus ? 'animate-ping' : 'animate-pulse'}`} />
                 {liveSession.cameraStatus || "本機攝影機畫面"}
               </span>

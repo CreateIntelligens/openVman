@@ -364,4 +364,31 @@ def test_add_qa_entries_to_node_batch(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert node["qa_entries"][1]["hidden"] is True
 
 
+def test_move_node_cycle_prevented(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+
+    # Create A -> B -> C tree
+    qa_nodes.create_node("node_a", "Node A")
+    qa_nodes.create_node("node_b", "Node B", parent_ids=["node_a"])
+    qa_nodes.create_node("node_c", "Node C", parent_ids=["node_b"])
+
+    # 1. Moving A to itself should raise ValueError
+    with pytest.raises(ValueError, match="Cannot move a node to itself or any of its descendants"):
+        qa_nodes.move_node("node_a", ["node_a"])
+
+    # 2. Moving A to C (descendant) should raise ValueError
+    with pytest.raises(ValueError, match="Cannot move a node to itself or any of its descendants"):
+        qa_nodes.move_node("node_a", ["node_c"])
+
+    # 3. Moving B to C should raise ValueError
+    with pytest.raises(ValueError, match="Cannot move a node to itself or any of its descendants"):
+        qa_nodes.move_node("node_b", ["node_c"])
+
+    # 4. Moving B to A is valid
+    node = qa_nodes.move_node("node_b", ["node_a"])
+    assert node["parent_ids"] == ["node_a"]
+
+
+
 

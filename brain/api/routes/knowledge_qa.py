@@ -10,7 +10,6 @@ from uuid import uuid4
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-import knowledge.indexer
 from knowledge.doc_meta import upsert_document_meta
 from knowledge.knowledge_admin import (
     delete_workspace_document,
@@ -38,6 +37,8 @@ from knowledge.qa_nodes import (
     sync_entries_for_source,
     update_node,
 )
+
+from routes.knowledge import schedule_reindex
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class ReorderNodeRequest(BaseModel):
 
 class SourcePathRequest(BaseModel):
     path: str
+    parent_id: str | None = None
 
 
 class MergedQaItem(BaseModel):
@@ -95,134 +97,147 @@ def list_qa_nodes_route(project_id: str = "default") -> list[dict[str, Any]]:
 
 
 @router.post("/nodes/adopt-source")
-def adopt_source_route(
+async def adopt_source_route(
     payload: SourcePathRequest,
     project_id: str = "default",
 ) -> dict[str, Any]:
-    path = payload.path.strip()
-    if not path:
-        raise HTTPException(status_code=400, detail="path 不可為空")
+    def _adopt() -> dict[str, Any]:
+        path = payload.path.strip()
+        if not path:
+            raise HTTPException(status_code=400, detail="path 不可為空")
 
-    if is_source_referenced(path, project_id):
-        raise HTTPException(status_code=400, detail="此 QA 文件已在問答樹中")
+        if is_source_referenced(path, project_id):
+            raise HTTPException(status_code=400, detail="此 QA 文件已在問答樹中")
 
-    try:
-        doc_path = resolve_workspace_document(path, project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            doc_path = resolve_workspace_document(path, project_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if not doc_path.exists():
-        raise HTTPException(status_code=404, detail="找不到指定文件")
+        if not doc_path.exists():
+            raise HTTPException(status_code=404, detail="找不到指定文件")
 
-    content = doc_path.read_text(encoding="utf-8")
-    parsed = parse_qa_markdown(content)
-    if not parsed:
-        raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
+        content = doc_path.read_text(encoding="utf-8")
+        parsed = parse_qa_markdown(content)
+        if not parsed:
+            raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
 
-    label = doc_path.stem
-    try:
-        node = create_node_for_source(path, label, project_id=project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        parent_ids = None
+        if payload.parent_id is not None:
+            parent_node = get_node(payload.parent_id, project_id=project_id)
+            if not parent_node:
+                raise HTTPException(status_code=400, detail="指定之父節點不存在")
+            parent_ids = [payload.parent_id]
 
-    upsert_document_meta(path, project_id, source_type="qa")
-    knowledge.indexer.rebuild_knowledge_index(project_id)
+        label = doc_path.stem
+        try:
+            node = create_node_for_source(path, label, project_id=project_id, parent_ids=parent_ids)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    return {"node_id": node["node_id"]}
+        upsert_document_meta(path, project_id, source_type="qa")
+        return {"node_id": node["node_id"]}
+
+    result = await asyncio.to_thread(_adopt)
+    schedule_reindex(project_id)
+    return result
 
 
 @router.post("/nodes/{id}/ingest-source")
-def ingest_source_route(
+async def ingest_source_route(
     id: str,
     payload: SourcePathRequest,
     project_id: str = "default",
 ) -> dict[str, Any]:
-    path = payload.path.strip()
-    if not path:
-        raise HTTPException(status_code=400, detail="path 不可為空")
+    def _ingest() -> dict[str, Any]:
+        path = payload.path.strip()
+        if not path:
+            raise HTTPException(status_code=400, detail="path 不可為空")
 
-    node = get_node(id, project_id=project_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="找不到指定節點")
+        node = get_node(id, project_id=project_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="找不到指定節點")
 
-    try:
-        dragged_path = resolve_workspace_document(path, project_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            dragged_path = resolve_workspace_document(path, project_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if not dragged_path.exists():
-        raise HTTPException(status_code=404, detail="找不到指定文件")
+        if not dragged_path.exists():
+            raise HTTPException(status_code=404, detail="找不到指定文件")
 
-    dragged_content = dragged_path.read_text(encoding="utf-8")
-    dragged_items = parse_qa_markdown(dragged_content)
-    if not dragged_items:
-        raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
+        dragged_content = dragged_path.read_text(encoding="utf-8")
+        dragged_items = parse_qa_markdown(dragged_content)
+        if not dragged_items:
+            raise HTTPException(status_code=400, detail="無效的 QA 文件格式")
 
-    qa_entries = node.get("qa_entries", [])
-    target_path = next((entry["source_path"] for entry in qa_entries if entry.get("source_path")), "")
+        qa_entries = node.get("qa_entries", [])
+        target_path = next((entry["source_path"] for entry in qa_entries if entry.get("source_path")), "")
 
-    if not target_path:
-        target_path = f"knowledge/qa/{id}.md"
+        if not target_path:
+            target_path = f"knowledge/qa/{id}.md"
 
-    if path == target_path:
-        raise HTTPException(status_code=400, detail="此文件已是該節點的內容")
+        if path == target_path:
+            raise HTTPException(status_code=400, detail="此文件已是該節點的內容")
 
-    try:
-        target_file = resolve_workspace_document(target_path, project_id)
-        if target_file.exists():
-            target_content = target_file.read_text(encoding="utf-8")
-            target_items = parse_qa_markdown(target_content)
-        else:
+        try:
+            target_file = resolve_workspace_document(target_path, project_id)
+            if target_file.exists():
+                target_content = target_file.read_text(encoding="utf-8")
+                target_items = parse_qa_markdown(target_content)
+            else:
+                target_items = []
+        except Exception:
             target_items = []
-    except Exception:
-        target_items = []
 
-    target_qa_dict = {item["q"].strip(): item for item in target_items}
+        target_qa_dict = {item["q"].strip(): item for item in target_items}
 
-    added_count = 0
-    new_qa_entries = list(qa_entries)
+        added_count = 0
+        new_qa_entries = list(qa_entries)
 
-    for item in dragged_items:
-        q = item["q"].strip()
-        if q in target_qa_dict:
-            continue
+        for item in dragged_items:
+            q = item["q"].strip()
+            if q in target_qa_dict:
+                continue
 
-        target_items.append(item)
-        target_qa_dict[q] = item
-        added_count += 1
+            target_items.append(item)
+            target_qa_dict[q] = item
+            added_count += 1
 
-        image_id = extract_image_id(item.get("img") or "")
-        new_qa_entries.append({
-            "question": q,
-            "source_path": target_path,
-            "hidden": bool(item.get("hidden", False)),
-            "image_id": image_id or None,
-        })
+            image_id = extract_image_id(item.get("img") or "")
+            new_qa_entries.append({
+                "question": q,
+                "source_path": target_path,
+                "hidden": bool(item.get("hidden", False)),
+                "image_id": image_id or None,
+            })
 
-    if added_count > 0:
-        blocks = []
-        for item in target_items:
-            blocks.append(
-                qa_markdown_block(
-                    item["q"],
-                    item["a"],
-                    item.get("img") or "",
-                    item.get("url") or "",
-                    bool(item.get("hidden", False)),
+        if added_count > 0:
+            blocks = []
+            for item in target_items:
+                blocks.append(
+                    qa_markdown_block(
+                        item["q"],
+                        item["a"],
+                        item.get("img") or "",
+                        item.get("url") or "",
+                        bool(item.get("hidden", False)),
+                    )
                 )
-            )
-        new_content = "\n\n".join(blocks)
-        save_workspace_document(target_path, new_content, project_id)
-        upsert_document_meta(target_path, project_id, source_type="qa")
+            new_content = "\n\n".join(blocks)
+            save_workspace_document(target_path, new_content, project_id)
+            upsert_document_meta(target_path, project_id, source_type="qa")
 
-        update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
+            update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
 
-    delete_workspace_document(path, project_id)
-    # 被吸收的文件若原屬其他節點，清掉那些節點的懸空 entries
-    sync_entries_for_source(path, project_id)
-    knowledge.indexer.rebuild_knowledge_index(project_id)
+        delete_workspace_document(path, project_id)
+        # 被吸收的文件若原屬其他節點，清掉那些節點的懸空 entries
+        sync_entries_for_source(path, project_id)
+        return {"added": added_count}
 
-    return {"added": added_count}
+    result = await asyncio.to_thread(_ingest)
+    schedule_reindex(project_id)
+    return result
 
 
 @router.post("/nodes")
@@ -267,32 +282,36 @@ def patch_qa_node_route(
 
 
 @router.delete("/nodes/{id}")
-def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str, Any]:
+async def delete_qa_node_route(id: str, project_id: str = "default") -> dict[str, Any]:
     # 1 節點 = 1 來源：刪除節點時，其專屬 QA 文件一併刪除；
     # 仍被其他節點引用（舊資料的多對多殘留）者保留。
-    node = get_node(id, project_id=project_id)
-    if node is None:
-        raise HTTPException(status_code=404, detail="Node not found")
-    source_paths = {
-        entry["source_path"]
-        for entry in node.get("qa_entries", [])
-        if entry.get("source_path")
-    }
+    def _delete() -> list[str]:
+        node = get_node(id, project_id=project_id)
+        if node is None:
+            raise HTTPException(status_code=404, detail="Node not found")
+        source_paths = {
+            entry["source_path"]
+            for entry in node.get("qa_entries", [])
+            if entry.get("source_path")
+        }
 
-    if not delete_node(id, project_id=project_id):
-        raise HTTPException(status_code=404, detail="Node not found")
+        if not delete_node(id, project_id=project_id):
+            raise HTTPException(status_code=404, detail="Node not found")
 
-    removed_docs: list[str] = []
-    for path in sorted(source_paths):
-        if is_source_referenced(path, project_id):
-            continue
-        try:
-            delete_workspace_document(path, project_id)
-            removed_docs.append(path)
-        except FileNotFoundError:
-            pass
+        removed: list[str] = []
+        for path in sorted(source_paths):
+            if is_source_referenced(path, project_id):
+                continue
+            try:
+                delete_workspace_document(path, project_id)
+                removed.append(path)
+            except FileNotFoundError:
+                pass
+        return removed
+
+    removed_docs = await asyncio.to_thread(_delete)
     if removed_docs:
-        knowledge.indexer.rebuild_knowledge_index(project_id)
+        schedule_reindex(project_id)
     return {"status": "ok", "removed_docs": removed_docs}
 
 
@@ -375,48 +394,51 @@ def get_merged_qa_route(
 
 
 @router.put("/nodes/{id}/merged")
-def put_merged_qa_route(
+async def put_merged_qa_route(
     id: str,
     payload: list[MergedQaItem],
     project_id: str = "default",
 ) -> dict[str, str]:
-    node = get_node(id, project_id=project_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    def _save() -> None:
+        node = get_node(id, project_id=project_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
 
-    by_file: defaultdict[str, list[MergedQaItem]] = defaultdict(list)
-    for item in payload:
-        by_file[item.source_file].append(item)
+        by_file: defaultdict[str, list[MergedQaItem]] = defaultdict(list)
+        for item in payload:
+            by_file[item.source_file].append(item)
 
-    new_qa_entries: list[dict[str, Any]] = []
-    existing_hidden = {e["question"]: e.get("hidden", False) for e in node.get("qa_entries", [])}
+        new_qa_entries: list[dict[str, Any]] = []
+        existing_hidden = {e["question"]: e.get("hidden", False) for e in node.get("qa_entries", [])}
 
-    for source_file, items in by_file.items():
-        blocks: list[str] = []
-        for item in items:
-            q = item.q.strip()
-            a = item.a.strip()
-            img = item.img.strip() if item.img else ""
-            url = item.url.strip() if item.url else ""
-            img_val = extract_image_id(img)
+        for source_file, items in by_file.items():
+            blocks: list[str] = []
+            for item in items:
+                q = item.q.strip()
+                a = item.a.strip()
+                img = item.img.strip() if item.img else ""
+                url = item.url.strip() if item.url else ""
+                img_val = extract_image_id(img)
 
-            hidden = item.hidden if item.hidden is not None else existing_hidden.get(q, False)
-            blocks.append(qa_markdown_block(q, a, img_val, url, hidden))
-            new_qa_entries.append(
-                {
-                    "question": q,
-                    "source_path": source_file,
-                    "hidden": hidden,
-                    "image_id": img_val if img_val else None,
-                }
-            )
+                hidden = item.hidden if item.hidden is not None else existing_hidden.get(q, False)
+                blocks.append(qa_markdown_block(q, a, img_val, url, hidden))
+                new_qa_entries.append(
+                    {
+                        "question": q,
+                        "source_path": source_file,
+                        "hidden": hidden,
+                        "image_id": img_val if img_val else None,
+                    }
+                )
 
-        markdown_content = "\n\n".join(blocks)
-        save_workspace_document(source_file, markdown_content, project_id)
-        upsert_document_meta(source_file, project_id, source_type="qa")
+            markdown_content = "\n\n".join(blocks)
+            save_workspace_document(source_file, markdown_content, project_id)
+            upsert_document_meta(source_file, project_id, source_type="qa")
 
-    update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
-    knowledge.indexer.rebuild_knowledge_index(project_id)
+        update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
+
+    await asyncio.to_thread(_save)
+    schedule_reindex(project_id)
     return {"status": "ok"}
 
 

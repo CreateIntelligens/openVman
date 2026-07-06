@@ -112,7 +112,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                                    <button
                                           onClick={() => toggleFolder(node.path)}
                                           className="flex w-full items-center gap-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-md transition-colors text-left group"
-                                          style={{ paddingLeft: `${level * 16}px` }}
+                                          style={{ paddingLeft: `${level * 1}rem` }}
                                    >
                                           <span className="material-symbols-outlined text-[1rem] text-slate-400 dark:text-slate-500 shrink-0 group-hover:text-primary transition-colors">
                                                  {isExpanded ? "folder_open" : "folder"}
@@ -141,7 +141,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                             onClick={() => onSelect(node.path)}
                             className={`flex w-full items-center gap-2 py-1.5 pr-2 rounded-md transition-all text-left group ${isSelected ? "bg-primary/20 text-primary font-semibold" : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400"
                                    }`}
-                            style={{ paddingLeft: `${level * 16}px` }}
+                            style={{ paddingLeft: `${level * 1}rem` }}
                      >
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                                    <span className={`material-symbols-outlined text-[1rem] shrink-0 ${isSelected ? "text-primary" : iconColor}`}>

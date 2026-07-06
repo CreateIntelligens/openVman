@@ -14,6 +14,8 @@ export interface TreeNode {
   treeKind?: "qa-root" | "qa-node" | "qa-entry";
   virtual?: boolean;
   qaNodeId?: string;
+  qaEntryQuestion?: string;
+  qaEntrySourcePath?: string;
   qaHidden?: boolean;
   doc?: KnowledgeDocumentSummary;
   children: TreeNode[];
@@ -187,6 +189,43 @@ export function qaTreeNodePath(nodeId: string): string {
   return `${QUICK_QA_TREE_PATH}/${encodeURIComponent(nodeId)}`;
 }
 
+export function qaTreeEntryPath(nodeId: string, question: string): string {
+  return `${qaTreeNodePath(nodeId)}/entry/${encodeURIComponent(question)}`;
+}
+
+export function qaNodeDragPath(nodeId: string): string {
+  return `qa_node:${encodeURIComponent(nodeId)}`;
+}
+
+export function qaEntryDragPath(nodeId: string, question: string): string {
+  return `qa_entry:${encodeURIComponent(nodeId)}:${encodeURIComponent(question)}`;
+}
+
+export function parseQaNodeDragPath(path: string): string | null {
+  if (!path.startsWith("qa_node:")) return null;
+  try {
+    return decodeURIComponent(path.slice("qa_node:".length));
+  } catch {
+    return null;
+  }
+}
+
+export function parseQaEntryDragPath(path: string): { nodeId: string; question: string } | null {
+  if (!path.startsWith("qa_entry:")) return null;
+  const value = path.slice("qa_entry:".length);
+  const separatorIndex = value.indexOf(":");
+  if (separatorIndex === -1) return null;
+
+  try {
+    return {
+      nodeId: decodeURIComponent(value.slice(0, separatorIndex)),
+      question: decodeURIComponent(value.slice(separatorIndex + 1)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function qaNodeMatchesSearch(node: QaTreeNodeInput, normalizedSearch: string): boolean {
   return node.label.toLowerCase().includes(normalizedSearch) ||
     node.node_id.toLowerCase().includes(normalizedSearch);
@@ -204,11 +243,13 @@ function qaNodeToTreeNode(
     .filter((entry) => !normalizedSearch || entry.question.toLowerCase().includes(normalizedSearch))
     .map((entry) => ({
       name: entry.question,
-      path: `${qaTreeNodePath(node.node_id)}/entry/${encodeURIComponent(entry.question)}`,
+      path: qaTreeEntryPath(node.node_id, entry.question),
       type: "file" as const,
       treeKind: "qa-entry" as const,
       virtual: true,
       qaNodeId: node.node_id,
+      qaEntryQuestion: entry.question,
+      qaEntrySourcePath: entry.source_path,
       qaHidden: Boolean(entry.hidden),
       children: [],
     }));

@@ -24,7 +24,7 @@ def test_burst_of_requests_coalesces_into_one_run(monkeypatch):
 
     async def scenario():
         for _ in range(5):
-            knowledge_routes._schedule_reindex("p1")
+            knowledge_routes.schedule_reindex("p1")
         await asyncio.sleep(0.5)
 
     asyncio.run(scenario())
@@ -48,9 +48,9 @@ def test_request_during_run_triggers_followup_run(monkeypatch):
             return {"status": "ok"}
 
         monkeypatch.setattr(knowledge_routes, "rebuild_knowledge_index", slow_rebuild)
-        knowledge_routes._schedule_reindex("p1")
+        knowledge_routes.schedule_reindex("p1")
         await started.wait()
-        knowledge_routes._schedule_reindex("p1")
+        knowledge_routes.schedule_reindex("p1")
         release.set()
         await asyncio.sleep(0.5)
 
@@ -63,8 +63,8 @@ def test_projects_do_not_block_each_other(monkeypatch):
     _setup(monkeypatch, calls)
 
     async def scenario():
-        knowledge_routes._schedule_reindex("p1")
-        knowledge_routes._schedule_reindex("p2")
+        knowledge_routes.schedule_reindex("p1")
+        knowledge_routes.schedule_reindex("p2")
         await asyncio.sleep(0.5)
 
     asyncio.run(scenario())

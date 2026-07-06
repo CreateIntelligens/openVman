@@ -15,11 +15,15 @@ import {
   collectFolderPaths,
   isUploadDerivedKnowledgeFile,
   mergeQaNodesIntoTree,
+  parseQaEntryDragPath,
+  parseQaNodeDragPath,
+  qaEntryDragPath,
+  qaNodeDragPath,
   qaTreeNodePath,
   QUICK_QA_TREE_PATH,
 } from "../components/kb/helpers";
-import ManualQaModal from "../components/kb/qa/ManualQaModal";
 import MergedCsvPane from "../components/kb/qa/MergedCsvPane";
+import VisibilityOrderModal from "../components/kb/qa/VisibilityOrderModal";
 import type { KnowledgeNoteFormat } from "../api";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
@@ -53,6 +57,34 @@ function findQaNode(nodes: QaNode[], targetId: string): QaNode | undefined {
 function findNodeReferencingSource(nodes: QaNode[], sourcePath: string): QaNode | undefined {
   return findQaNodeMatching(nodes, (node) =>
     (node.qa_entries ?? []).some((entry) => entry.source_path === sourcePath));
+}
+
+function getFileParentPaths(path: string): string[] {
+  const parts = path.split("/");
+  const parents: string[] = [];
+  for (let i = 1; i < parts.length; i++) {
+    parents.push(parts.slice(0, i).join("/"));
+  }
+  return parents;
+}
+
+function isQaNodeDescendant(node: QaNode, targetId: string): boolean {
+  return (node.children ?? []).some(
+    (child) => child.node_id === targetId || isQaNodeDescendant(child, targetId),
+  );
+}
+
+function getQaNodeAncestors(nodes: QaNode[], targetId: string, ancestors: string[] = []): string[] | null {
+  for (const node of nodes) {
+    if (node.node_id === targetId) {
+      return ancestors;
+    }
+    if (node.children && node.children.length > 0) {
+      const result = getQaNodeAncestors(node.children, targetId, [...ancestors, node.node_id]);
+      if (result) return result;
+    }
+  }
+  return null;
 }
 
 export default function KnowledgeBase() {
@@ -104,6 +136,7 @@ export default function KnowledgeBase() {
     setCrawlUrlValue,
     setShowNoteComposer,
     toggleExpand,
+    setExpandedDirs,
     handleTreeSelect,
     handleSave,
     handleFileUpload,
@@ -153,26 +186,103 @@ export default function KnowledgeBase() {
     createNode,
     updateNode,
     deleteNode,
+    moveNode,
+    reorderNode,
     fetchMergedQa,
     saveMergedQa,
-    uploadImage,
-    deleteImage,
     adoptSource,
     ingestSource,
   } = useQaNodes();
-  const [selectedQaNodeId, setSelectedQaNodeId] = useState<string | null>(null);
-  const [manualQaOpen, setManualQaOpen] = useState(false);
+  const [selectedQaNodeId, setSelectedQaNodeId] = useState<string | null>(() => {
+    return localStorage.getItem("kb-selected-qa-node-id");
+  });
   const [qaNodeDialog, setQaNodeDialog] = useState<QaNodeDialog | null>(null);
   const [mergedRefreshKey, setMergedRefreshKey] = useState(0);
+  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [orderModalParentNode, setOrderModalParentNode] = useState<QaNode | null>(null);
 
   useEffect(() => {
     fetchQaTree();
   }, [fetchQaTree]);
 
+  useEffect(() => {
+    if (selectedQaNodeId && nodesTree.length > 0) {
+      const ancestors = getQaNodeAncestors(nodesTree, selectedQaNodeId);
+      if (ancestors) {
+        const pathsToExpand = ["quick_qa_tree_root"];
+        let currentPath = "quick_qa_tree_root";
+        for (const id of ancestors) {
+          currentPath = `${currentPath}/${encodeURIComponent(id)}`;
+          pathsToExpand.push(currentPath);
+        }
+        setExpandedDirs((prev) => {
+          const next = new Set(prev);
+          let changed = false;
+          for (const path of pathsToExpand) {
+            if (!next.has(path)) {
+              next.add(path);
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+      }
+    } else if (selectedPath && selectedPath !== "knowledge") {
+      const pathsToExpand = getFileParentPaths(selectedPath);
+      setExpandedDirs((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        for (const path of pathsToExpand) {
+          if (!next.has(path)) {
+            next.add(path);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [selectedQaNodeId, selectedPath, nodesTree, setExpandedDirs]);
+
   const selectedQaNode = useMemo(() => {
     if (!selectedQaNodeId) return null;
     return findQaNode(nodesTree, selectedQaNodeId) ?? null;
   }, [nodesTree, selectedQaNodeId]);
+
+  const handleOpenOrderModal = useCallback((parentNodeId: string | null) => {
+    if (parentNodeId === null) {
+      setOrderModalParentNode(null);
+    } else {
+      const node = findQaNode(nodesTree, parentNodeId);
+      if (node) {
+        setOrderModalParentNode(node);
+      } else {
+        return;
+      }
+    }
+    setOrderModalOpen(true);
+  }, [nodesTree]);
+
+  const canDropQaNode = useCallback((draggedPath: string, targetPath: string) => {
+    const draggedNodeId = parseQaNodeDragPath(draggedPath);
+    const targetNodeId = parseQaNodeDragPath(targetPath);
+    if (!draggedNodeId || !targetNodeId) return false;
+    if (draggedNodeId === targetNodeId) return false;
+
+    const draggedNode = findQaNode(nodesTree, draggedNodeId);
+    const targetNode = findQaNode(nodesTree, targetNodeId);
+    if (!draggedNode || !targetNode) return false;
+
+    // 同父層 = 排序;跨父層 = 換父層(re-parent),但不能移進自己的子孫
+    return !isQaNodeDescendant(draggedNode, targetNodeId);
+  }, [nodesTree]);
+
+  const canDropQaEntry = useCallback((draggedPath: string, targetPath: string) => {
+    const draggedEntry = parseQaEntryDragPath(draggedPath);
+    const targetEntry = parseQaEntryDragPath(targetPath);
+    if (!draggedEntry || !targetEntry) return false;
+    if (draggedEntry.nodeId !== targetEntry.nodeId) return false;
+    return draggedEntry.question !== targetEntry.question;
+  }, []);
   const displayTree = useMemo(
     () => mergeQaNodesIntoTree(filteredTree, nodesTree, search),
     [filteredTree, nodesTree, search],
@@ -187,11 +297,14 @@ export default function KnowledgeBase() {
 
   const handleSelectQaNode = useCallback((nodeId: string) => {
     setSelectedQaNodeId(nodeId);
+    localStorage.setItem("kb-selected-qa-node-id", nodeId);
+    localStorage.removeItem("kb-selected-file-path");
     closeFileView();
   }, [closeFileView]);
 
   const handleSelectTreeFile = useCallback((node: TreeNode) => {
     setSelectedQaNodeId(null);
+    localStorage.removeItem("kb-selected-qa-node-id");
     handleTreeSelect(node);
   }, [handleTreeSelect]);
 
@@ -261,10 +374,11 @@ export default function KnowledgeBase() {
     fetchQaTree();
   }, [fetchQaTree]);
 
-  const handleManualQaSuccess = useCallback(() => {
-    fetchQaTree();
-    setMergedRefreshKey((key) => key + 1);
-  }, [fetchQaTree]);
+  // 刪除 QA 文件時後端會同步清掉問答樹節點,前端也要跟著重抓樹
+  const handleDeleteConfirmAndRefreshQa = useCallback(async () => {
+    await handleDeleteConfirm();
+    await fetchQaTree();
+  }, [handleDeleteConfirm, fetchQaTree]);
 
   const handleComposerCreate = useCallback((
     title: string,
@@ -287,7 +401,12 @@ export default function KnowledgeBase() {
   }, [openDocument, nodesTree]);
 
   const sourceDragDir = useMemo(
-    () => draggingPath ? draggingPath.split("/").slice(0, -1).join("/") : "",
+    () => {
+      if (!draggingPath || parseQaNodeDragPath(draggingPath) || parseQaEntryDragPath(draggingPath)) {
+        return "";
+      }
+      return draggingPath.split("/").slice(0, -1).join("/");
+    },
     [draggingPath],
   );
   const hasMatchingTreeNodes = displayTree.children.length > 0;
@@ -297,13 +416,24 @@ export default function KnowledgeBase() {
     [deleteTarget, documents],
   );
   const isUploadDerived = !!deleteTargetDocument && isUploadDerivedKnowledgeFile(deleteTargetDocument);
+  const isQaAttachedTarget = deleteTargetDocument?.source_type === "qa" && deleteTargetDocument?.qa_attached === true;
   const deleteMessage = deleteTarget?.type === "dir"
     ? `確定要刪除資料夾 ${deleteTarget.value} 嗎？目錄內仍有檔案時不會刪除。`
-    : isUploadDerived
-      ? `確定要刪除 ${deleteTarget?.value} 嗎？這只會移除知識文件與索引；原始上傳檔仍保留在 raw/。`
-      : `確定要刪除 ${deleteTarget?.value} 嗎？`;
+    : isQaAttachedTarget
+      ? `確定要刪除 ${deleteTarget?.value} 嗎？快速問答樹上對應的節點與題目會一併移除。`
+      : isUploadDerived
+        ? `確定要刪除 ${deleteTarget?.value} 嗎？這只會移除知識文件與索引；原始上傳檔仍保留在 raw/。`
+        : `確定要刪除 ${deleteTarget?.value} 嗎？`;
 
   const handleTreeDragStart = useCallback((node: TreeNode) => {
+    if (node.treeKind === "qa-node" && node.qaNodeId) {
+      setDraggingPath(qaNodeDragPath(node.qaNodeId));
+      return;
+    }
+    if (node.treeKind === "qa-entry" && node.qaNodeId) {
+      setDraggingPath(qaEntryDragPath(node.qaNodeId, node.qaEntryQuestion ?? node.name));
+      return;
+    }
     setDraggingPath(node.path);
   }, []);
 
@@ -318,6 +448,10 @@ export default function KnowledgeBase() {
 
     const isQaRootDrop = targetDir === QUICK_QA_TREE_PATH;
     const isQaNodeDrop = targetDir.startsWith(`${QUICK_QA_TREE_PATH}/`);
+    const draggedQaNodeId = parseQaNodeDragPath(draggingPath);
+    const targetQaNodeId = parseQaNodeDragPath(targetDir);
+    const draggedQaEntry = parseQaEntryDragPath(draggingPath);
+    const targetQaEntry = parseQaEntryDragPath(targetDir);
 
     const cleanup = () => {
       setDraggingPath(null);
@@ -325,17 +459,99 @@ export default function KnowledgeBase() {
     };
 
     try {
-      if (isQaRootDrop) {
-        await adoptSource(draggingPath);
-        loadDocuments();
-      } else if (isQaNodeDrop) {
-        const encodedNodeId = targetDir.substring(QUICK_QA_TREE_PATH.length + 1);
-        const nodeId = decodeURIComponent(encodedNodeId);
-        await ingestSource(nodeId, draggingPath);
+      if (draggedQaEntry && targetQaEntry) {
+        if (
+          draggedQaEntry.nodeId === targetQaEntry.nodeId &&
+          draggedQaEntry.question !== targetQaEntry.question
+        ) {
+          const mergedRows = await fetchMergedQa(draggedQaEntry.nodeId);
+          const dragIdx = mergedRows.findIndex((row) => row.q === draggedQaEntry.question);
+          const targetIdx = mergedRows.findIndex((row) => row.q === targetQaEntry.question);
+
+          if (dragIdx !== -1 && targetIdx !== -1) {
+            const reorderedRows = [...mergedRows];
+            const [draggedRow] = reorderedRows.splice(dragIdx, 1);
+            const insertIdx = reorderedRows.findIndex((row) => row.q === targetQaEntry.question);
+            reorderedRows.splice(insertIdx, 0, draggedRow);
+            await saveMergedQa(draggedQaEntry.nodeId, reorderedRows);
+            if (selectedQaNodeId === draggedQaEntry.nodeId) {
+              setMergedRefreshKey((key) => key + 1);
+            }
+          }
+        }
+        cleanup();
+        return;
+      }
+
+      if (draggedQaNodeId && isQaRootDrop) {
+        const draggedNode = findQaNode(nodesTree, draggedQaNodeId);
+        if (draggedNode && (draggedNode.parent_ids?.length ?? 0) > 0) {
+          await moveNode(draggedQaNodeId, []);
+          await fetchQaTree();
+        }
+        cleanup();
+        return;
+      }
+
+      if (draggedQaNodeId && targetQaNodeId) {
+        const draggedNodeId = draggedQaNodeId;
+        const targetNodeId = targetQaNodeId;
+        if (draggedNodeId !== targetNodeId) {
+          const draggedNode = findQaNode(nodesTree, draggedNodeId);
+          const targetNode = findQaNode(nodesTree, targetNodeId);
+          const draggingParentId = draggedNode?.parent_ids?.[0] || null;
+          const targetParentId = targetNode?.parent_ids?.[0] || null;
+
+          if (draggingParentId === targetParentId) {
+            const siblings = draggingParentId === null
+              ? nodesTree
+              : (findQaNode(nodesTree, draggingParentId)?.children || []);
+
+            const siblingIds = siblings.map(s => s.node_id);
+            const dragIdx = siblingIds.indexOf(draggedNodeId);
+            const targetIdx = siblingIds.indexOf(targetNodeId);
+
+            if (dragIdx !== -1 && targetIdx !== -1) {
+              const newOrdered = [...siblingIds];
+              newOrdered.splice(dragIdx, 1);
+              const insertIdx = newOrdered.indexOf(targetNodeId);
+              newOrdered.splice(insertIdx, 0, draggedNodeId);
+              await reorderNode(draggedNodeId, newOrdered);
+              await fetchQaTree();
+            }
+          } else {
+            await moveNode(draggedNodeId, [targetNodeId]);
+            await fetchQaTree();
+          }
+        }
+        cleanup();
+        return;
+      }
+
+      const attachSourceToNode = async (nodeId: string) => {
+        const targetNode = findQaNode(nodesTree, nodeId);
+        const isDirectoryNode = targetNode && (!targetNode.qa_entries || targetNode.qa_entries.length === 0);
+        if (isDirectoryNode) {
+          await adoptSource(draggingPath, nodeId);
+        } else {
+          await ingestSource(nodeId, draggingPath);
+        }
         loadDocuments();
         if (selectedQaNodeId === nodeId) {
           setMergedRefreshKey((key) => key + 1);
         }
+      };
+
+      if (isQaRootDrop) {
+        await adoptSource(draggingPath);
+        loadDocuments();
+      } else if (targetQaNodeId) {
+        await attachSourceToNode(targetQaNodeId);
+      } else if (isQaNodeDrop) {
+        const encodedNodeId = targetDir.substring(QUICK_QA_TREE_PATH.length + 1);
+        await attachSourceToNode(decodeURIComponent(encodedNodeId));
+      } else if (targetDir === "" && selectedQaNodeId) {
+        await attachSourceToNode(selectedQaNodeId);
       } else {
         await handleMove(draggingPath, targetDir);
       }
@@ -344,7 +560,20 @@ export default function KnowledgeBase() {
     } finally {
       cleanup();
     }
-  }, [draggingPath, handleMove, adoptSource, ingestSource, loadDocuments, selectedQaNodeId]);
+  }, [
+    draggingPath,
+    handleMove,
+    adoptSource,
+    ingestSource,
+    loadDocuments,
+    selectedQaNodeId,
+    nodesTree,
+    reorderNode,
+    fetchQaTree,
+    fetchMergedQa,
+    saveMergedQa,
+    moveNode,
+  ]);
 
   const handleToggleSourcePanel = useCallback(() => {
     if (!showSourcePanel && activeSourceMode === "manual") {
@@ -572,10 +801,13 @@ export default function KnowledgeBase() {
                 onRenameQaNode={openRenameQaNodeDialog}
                 onToggleQaNodeHidden={handleToggleQaNodeHidden}
                 onDeleteQaNode={openDeleteQaNodeDialog}
+                onOrderQaNode={handleOpenOrderModal}
+                canDropQaNode={canDropQaNode}
+                canDropQaEntry={canDropQaEntry}
               />
             )}
             {/* Empty area drop zone — drops to root */}
-            {draggingPath && (
+            {draggingPath && !parseQaNodeDragPath(draggingPath) && !parseQaEntryDragPath(draggingPath) && (
               <div
                 className={`flex-1 min-h-8 transition-colors ${dropTargetPath === "" ? "bg-primary/10" : ""}`}
                 onDragOver={(e) => { e.preventDefault(); setDropTargetPath(""); }}
@@ -602,7 +834,6 @@ export default function KnowledgeBase() {
                 nodeLabel={selectedQaNode?.label}
                 refreshKey={mergedRefreshKey}
                 onSuccess={handleQaMutationSuccess}
-                onOpenManualQa={() => setManualQaOpen(true)}
               />
             </main>
           ) : rightPane === "file" && openDocument ? (
@@ -629,17 +860,6 @@ export default function KnowledgeBase() {
           ) : null}
         </div>
       </div>
-
-      <ManualQaModal
-        open={manualQaOpen}
-        node={selectedQaNode}
-        onFetchMergedQa={fetchMergedQa}
-        onSaveMergedQa={saveMergedQa}
-        onUploadImage={uploadImage}
-        onDeleteImage={deleteImage}
-        onClose={() => setManualQaOpen(false)}
-        onSuccess={handleManualQaSuccess}
-      />
 
       <PromptModal
         open={qaNodeDialog?.type === "add-root" || qaNodeDialog?.type === "add-child"}
@@ -692,7 +912,7 @@ export default function KnowledgeBase() {
         message={deleteMessage}
         confirmLabel="刪除"
         danger
-        onConfirm={handleDeleteConfirm}
+        onConfirm={handleDeleteConfirmAndRefreshQa}
         onCancel={() => setDeleteTarget(null)}
       />
 
@@ -717,6 +937,21 @@ export default function KnowledgeBase() {
           applying={renormalizing}
           onApply={handleApplyNormalizationPreview}
           onClose={closeNormalizationPreview}
+        />
+      )}
+
+      {orderModalOpen && (
+        <VisibilityOrderModal
+          isOpen={orderModalOpen}
+          onClose={() => {
+            setOrderModalOpen(false);
+            setOrderModalParentNode(null);
+          }}
+          parentNode={orderModalParentNode}
+          nodesTree={nodesTree}
+          onUpdateNode={updateNode}
+          onReorderNode={reorderNode}
+          onRefresh={fetchQaTree}
         />
       )}
     </div>

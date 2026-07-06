@@ -88,8 +88,23 @@ export function useKnowledgeBase() {
   const [uploading, setUploading] = useState(false);
   const { status, setStatus, setErrorStatus } = useStatusState();
   const [search, setSearch] = useState("");
-  const [selectedPath, setSelectedPath] = useState<string>("knowledge");
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(["knowledge"]));
+  const [selectedPath, setSelectedPath] = useState<string>(() => {
+    return localStorage.getItem("kb-selected-file-path") ?? "knowledge";
+  });
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem("kb-expanded-dirs");
+      if (saved) {
+        const arr = JSON.parse(saved);
+        if (Array.isArray(arr)) {
+          return new Set(arr);
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return new Set(["knowledge"]);
+  });
   const [rightPane, setRightPane] = useState<RightPane>("folder");
   const [openDocument, setOpenDocument] = useState<KnowledgeDocument | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -159,14 +174,18 @@ export function useKnowledgeBase() {
   );
 
   const currentDir = useMemo(() => {
+    let path = "knowledge";
     if (rightPane === "folder") {
-      return selectedPath;
+      path = selectedPath;
+    } else if (openDocument) {
+      path = openDocument.path;
     }
-    if (openDocument) {
-      return openDocument.path.split("/").slice(0, -1).join("/");
+    const isFile = documents.some((doc) => doc.path === path) || /\.[a-zA-Z0-9]+$/.test(path);
+    if (isFile) {
+      return path.split("/").slice(0, -1).join("/") || "knowledge";
     }
-    return "knowledge";
-  }, [openDocument, rightPane, selectedPath]);
+    return path;
+  }, [documents, openDocument, rightPane, selectedPath]);
 
   const indexedCount = useMemo(
     () => documents.filter((document) => document.is_indexed).length,
@@ -207,6 +226,28 @@ export function useKnowledgeBase() {
       setEditLoading(false);
     }
   }, [setErrorStatus]);
+
+  useEffect(() => {
+    if (selectedPath) {
+      localStorage.setItem("kb-selected-file-path", selectedPath);
+    }
+  }, [selectedPath]);
+
+  useEffect(() => {
+    const hasQaNodeSelected = !!localStorage.getItem("kb-selected-qa-node-id");
+    const initialPath = localStorage.getItem("kb-selected-file-path");
+    if (!hasQaNodeSelected && initialPath && initialPath !== "knowledge") {
+      if (initialPath.endsWith(".md")) {
+        void openFile(initialPath);
+      } else {
+        setRightPane("folder");
+      }
+    }
+  }, [openFile]);
+
+  useEffect(() => {
+    localStorage.setItem("kb-expanded-dirs", JSON.stringify(Array.from(expandedDirs)));
+  }, [expandedDirs]);
 
   const handleTreeSelect = useCallback((node: { type: string; path: string }) => {
     if (node.type === "folder") {
@@ -390,15 +431,21 @@ export function useKnowledgeBase() {
           setRightPane("folder");
           setOpenDocument(null);
         }
+        if (selectedPath === value) {
+          setSelectedPath(value.split("/").slice(0, -1).join("/") || "knowledge");
+        }
       } else {
         await deleteKnowledgeDirectory(value);
         setStatus({ type: "success", message: `已刪除資料夾 ${value}` });
+        if (selectedPath === value || selectedPath.startsWith(value + "/")) {
+          setSelectedPath(value.split("/").slice(0, -1).join("/") || "knowledge");
+        }
       }
       await loadDocuments();
     } catch (error) {
       setErrorStatus(error);
     }
-  }, [deleteTarget, loadDocuments, openDocument, setErrorStatus]);
+  }, [deleteTarget, loadDocuments, openDocument, selectedPath, setErrorStatus]);
 
   const handleMove = useCallback(async (sourcePath: string, targetDir: string) => {
     const filename = sourcePath.split("/").pop() || "";
@@ -577,6 +624,7 @@ export function useKnowledgeBase() {
     setCrawlUrlValue,
     setShowNoteComposer,
     toggleExpand,
+    setExpandedDirs,
     handleTreeSelect,
     handleSave,
     handleFileUpload,

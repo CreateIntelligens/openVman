@@ -1,5 +1,11 @@
 import type { TreeNode } from "./helpers";
-import { qaTreeNodePath } from "./helpers";
+import {
+  parseQaEntryDragPath,
+  parseQaNodeDragPath,
+  qaEntryDragPath,
+  qaNodeDragPath,
+  qaTreeNodePath,
+} from "./helpers";
 import StatusDot from "./StatusDot";
 
 function TreeActionButton({
@@ -54,6 +60,9 @@ export default function TreeView({
   onRenameQaNode,
   onToggleQaNodeHidden,
   onDeleteQaNode,
+  onOrderQaNode,
+  canDropQaNode,
+  canDropQaEntry,
 }: {
   node: TreeNode;
   depth: number;
@@ -74,6 +83,9 @@ export default function TreeView({
   onRenameQaNode?: (nodeId: string) => void;
   onToggleQaNodeHidden?: (nodeId: string, hidden: boolean) => void;
   onDeleteQaNode?: (nodeId: string) => void;
+  onOrderQaNode?: (parentNodeId: string | null) => void;
+  canDropQaNode?: (draggedPath: string, targetPath: string) => boolean;
+  canDropQaEntry?: (draggedPath: string, targetPath: string) => boolean;
 }) {
   const isExpanded = expandedDirs.has(node.path);
   const isSelected = selectedPath === node.path;
@@ -81,12 +93,21 @@ export default function TreeView({
   const isQaNode = node.treeKind === "qa-node";
   const isQaEntry = node.treeKind === "qa-entry";
   const qaNodeId = node.qaNodeId;
+  const draggingQaNodeId = draggingPath ? parseQaNodeDragPath(draggingPath) : null;
+  const draggingQaEntry = draggingPath ? parseQaEntryDragPath(draggingPath) : null;
+  const qaNodeDropTargetKey = qaNodeId ? qaTreeNodePath(qaNodeId) : node.path;
+  const qaNodeReorderTargetKey = qaNodeId ? qaNodeDragPath(qaNodeId) : node.path;
+  const qaEntryReorderTargetKey = qaNodeId
+    ? qaEntryDragPath(qaNodeId, node.qaEntryQuestion ?? node.name)
+    : node.path;
   const effectiveDropDir = node.type === "folder" ? node.path : node.path.split("/").slice(0, -1).join("/");
   let dropTargetKey: string;
   if (isQaRoot) {
     dropTargetKey = node.path;
-  } else if (isQaNode || isQaEntry) {
-    dropTargetKey = qaTreeNodePath(qaNodeId || "");
+  } else if (isQaNode) {
+    dropTargetKey = draggingQaNodeId ? qaNodeReorderTargetKey : qaNodeDropTargetKey;
+  } else if (isQaEntry) {
+    dropTargetKey = draggingQaEntry ? qaEntryReorderTargetKey : qaNodeDropTargetKey;
   } else {
     dropTargetKey = effectiveDropDir;
   }
@@ -94,7 +115,11 @@ export default function TreeView({
   const canAcceptDrop =
     !!draggingPath &&
     node.path !== draggingPath &&
-    (isQaRoot || isQaNode || isQaEntry || (!node.virtual && effectiveDropDir !== sourceDragDir));
+    (draggingQaNodeId
+      ? (isQaRoot || (isQaNode && !!canDropQaNode && canDropQaNode(draggingPath, dropTargetKey)))
+      : draggingQaEntry
+        ? (isQaEntry && !!canDropQaEntry && canDropQaEntry(draggingPath, dropTargetKey))
+      : (isQaRoot || isQaNode || isQaEntry || (!node.virtual && effectiveDropDir !== sourceDragDir)));
   const isDropTarget = dropTargetPath === dropTargetKey && !!draggingPath;
   const canDeleteFolder = node.type === "folder" && node.path !== "knowledge" && !node.virtual;
 
@@ -120,10 +145,27 @@ export default function TreeView({
               ? "bg-primary/15 text-primary"
               : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
         }`}
-        style={{ paddingLeft: `${depth * 14 + 8}px` }}
+        style={{ paddingLeft: `${depth * 0.875 + 0.5}rem` }}
         onClick={handleSelect}
-        draggable={node.type === "file" && !node.virtual}
+        draggable={(node.type === "file" && !node.virtual) || isQaNode || isQaEntry}
         onDragStart={(event) => {
+          if (isQaNode && qaNodeId) {
+            event.stopPropagation();
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", qaNodeDragPath(qaNodeId));
+            onDragStart(node);
+            return;
+          }
+          if (isQaEntry && qaNodeId) {
+            event.stopPropagation();
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(
+              "text/plain",
+              qaEntryDragPath(qaNodeId, node.qaEntryQuestion ?? node.name),
+            );
+            onDragStart(node);
+            return;
+          }
           if (node.type !== "file" || node.virtual) return;
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("text/plain", node.path);
@@ -205,17 +247,21 @@ export default function TreeView({
         )}
 
         {isQaRoot && onCreateQaNode && (
-          <button
-            type="button"
-            title="新增快速問答節點"
-            className="ml-1 shrink-0 rounded-md p-1 text-slate-400 opacity-0 transition-colors hover:bg-primary/10 hover:text-primary focus:opacity-100 group-hover:opacity-100"
-            onClick={(event) => {
-              event.stopPropagation();
-              onCreateQaNode(null);
-            }}
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">add</span>
-          </button>
+          <div className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+            {onOrderQaNode && (
+              <TreeActionButton
+                title="調整順序與可見性"
+                icon="sort"
+                onClick={() => onOrderQaNode(null)}
+              />
+            )}
+            <TreeActionButton
+              title="新增快速問答節點"
+              icon="add"
+              variant="primary"
+              onClick={() => onCreateQaNode(null)}
+            />
+          </div>
         )}
 
         {isQaNode && qaNodeId && (
@@ -225,6 +271,13 @@ export default function TreeView({
                 title={node.qaHidden ? "顯示節點" : "隱藏節點"}
                 icon={node.qaHidden ? "visibility_off" : "visibility"}
                 onClick={() => onToggleQaNodeHidden(qaNodeId, !node.qaHidden)}
+              />
+            )}
+            {onOrderQaNode && (
+              <TreeActionButton
+                title="調整子節點順序與可見性"
+                icon="sort"
+                onClick={() => onOrderQaNode(qaNodeId)}
               />
             )}
             {onCreateQaNode && (
@@ -294,6 +347,9 @@ export default function TreeView({
               onRenameQaNode={onRenameQaNode}
               onToggleQaNodeHidden={onToggleQaNodeHidden}
               onDeleteQaNode={onDeleteQaNode}
+              onOrderQaNode={onOrderQaNode}
+              canDropQaNode={canDropQaNode}
+              canDropQaEntry={canDropQaEntry}
             />
           ))}
         </div>

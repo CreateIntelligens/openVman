@@ -86,47 +86,47 @@ export default function QaDocEditor({ content, onChange }: QaDocEditorProps) {
                       row.hidden ? "opacity-60 bg-slate-50/20 dark:bg-slate-950/10" : ""
                     }`}
                   >
-                    <td className="py-2.5 px-4 text-center text-xs font-mono text-slate-400 dark:text-slate-500">
+                    <td className="py-2 px-4 align-middle text-center text-xs font-mono text-slate-400 dark:text-slate-500">
                       {idx + 1}
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <textarea
                         value={row.question}
                         onChange={(e) => handleCellChange(idx, "question", e.target.value)}
                         placeholder="請輸入問題"
                         rows={2}
-                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
+                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
                       />
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <textarea
                         value={row.answer}
                         onChange={(e) => handleCellChange(idx, "answer", e.target.value)}
                         placeholder="請輸入答案"
                         rows={2}
-                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
+                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
                       />
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <input
                         type="text"
                         value={row.img}
                         onChange={(e) => handleCellChange(idx, "img", e.target.value)}
                         placeholder="圖片 ID"
-                        className="w-full min-w-0 bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
+                        className="w-full min-w-0 bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
                       />
                     </td>
 
-                    <td className="py-2 px-3 align-top">
+                    <td className="py-2 px-3 align-middle">
                       <input
                         type="text"
                         value={row.url}
                         onChange={(e) => handleCellChange(idx, "url", e.target.value)}
                         placeholder="外部連結"
-                        className="w-full bg-transparent outline-none focus:bg-white dark:focus:bg-slate-850 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
+                        className="w-full bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
                       />
                     </td>
 

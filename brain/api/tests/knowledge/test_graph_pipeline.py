@@ -111,7 +111,7 @@ def test_graph_extraction_checkpoint_resume(tmp_path, monkeypatch):
     monkeypatch.setattr("knowledge.graph.score_all", lambda g, c: {})
     monkeypatch.setattr("knowledge.graph.god_nodes", lambda g: [])
     monkeypatch.setattr("knowledge.graph.surprising_connections", lambda g, c: [])
-    monkeypatch.setattr("knowledge.graph.to_json", lambda g, c, p: None)
+    monkeypatch.setattr("knowledge.graph.to_json", lambda g, c, p, **kwargs: None)
     monkeypatch.setattr("knowledge.graph.to_html", lambda g, c, p, **k: None)
     monkeypatch.setattr("knowledge.graph.to_obsidian", lambda g, c, p, **k: None)
     monkeypatch.setattr("knowledge.graph.to_canvas", lambda g, c, p, **k: None)

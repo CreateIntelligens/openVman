@@ -156,8 +156,8 @@ export function useQaNodes() {
     () => qaJson<{ deleted_files: string[] }>("/knowledge/qa/images/cleanup-unused", "POST"),
     "Failed to cleanup images"), [run]);
 
-  const adoptSource = useCallback((path: string) => run(
-    () => qaJson<{ node_id: string }>("/knowledge/qa/nodes/adopt-source", "POST", { path }),
+  const adoptSource = useCallback((path: string, parentId?: string) => run(
+    () => qaJson<{ node_id: string }>("/knowledge/qa/nodes/adopt-source", "POST", { path, parent_id: parentId }),
     "Failed to adopt QA source", true), [run]);
 
   const ingestSource = useCallback((id: string, path: string) => run(

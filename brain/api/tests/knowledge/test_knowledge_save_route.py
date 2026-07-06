@@ -67,7 +67,7 @@ def test_save_knowledge_document_route_schedules_background_reindex(monkeypatch)
     knowledge_routes = _load_knowledge_routes_module()
     scheduled: dict[str, object] = {}
 
-    def fake_schedule_reindex(project_id: str):
+    def fakeschedule_reindex(project_id: str):
         scheduled["project_id"] = project_id
         scheduled["task"] = "scheduled"
 
@@ -80,7 +80,7 @@ def test_save_knowledge_document_route_schedules_background_reindex(monkeypatch)
             "project_id": project_id,
         },
     )
-    monkeypatch.setattr(knowledge_routes, "_schedule_reindex", fake_schedule_reindex)
+    monkeypatch.setattr(knowledge_routes, "schedule_reindex", fakeschedule_reindex)
 
     payload = knowledge_routes.KnowledgeDocumentPutRequest(
         path="knowledge/ingested/example.md",
@@ -106,7 +106,7 @@ def test_create_note_route_passes_target_dir(monkeypatch):
     knowledge_routes = _load_knowledge_routes_module()
     captured: dict[str, object] = {}
 
-    def fake_schedule_reindex(project_id: str):
+    def fakeschedule_reindex(project_id: str):
         captured["reindex_project_id"] = project_id
         captured["task"] = "scheduled"
 
@@ -127,7 +127,7 @@ def test_create_note_route_passes_target_dir(monkeypatch):
         return {"path": "knowledge/faq/FAQ.md", "size": 12}
 
     monkeypatch.setattr(knowledge_routes, "save_workspace_note", fake_save_workspace_note)
-    monkeypatch.setattr(knowledge_routes, "_schedule_reindex", fake_schedule_reindex)
+    monkeypatch.setattr(knowledge_routes, "schedule_reindex", fakeschedule_reindex)
 
     payload = knowledge_routes.KnowledgeNoteCreateRequest(
         title="FAQ",

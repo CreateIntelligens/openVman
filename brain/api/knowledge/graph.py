@@ -404,7 +404,10 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
     surprises = surprising_connections(graph, communities)
 
     community_labels = {cid: f"Community {cid}" for cid in communities}
-    to_json(graph, communities, str(out_dir / "graph.json"))
+    # force=True: this is a full rebuild, so a smaller graph (e.g. after the
+    # user deletes knowledge files) is legitimate. graphify's shrink guard is
+    # meant for incremental --update runs and would leave graph.json stale here.
+    to_json(graph, communities, str(out_dir / "graph.json"), force=True)
     if graph.number_of_nodes() <= MAX_HTML_NODES:
         to_html(
             graph,
@@ -415,7 +418,16 @@ def rebuild_project_graph(project_id: str = "default") -> dict[str, Any]:
 
     # Obsidian vault: one note per node with [[links]] + a canvas, so the same
     # graph can be browsed in Obsidian (graph view, backlinks) not just the HTML.
+    # to_obsidian never deletes anything, so purge generated notes first or
+    # nodes removed from the graph linger as zombie notes in the vault.
+    # Only *.md/*.canvas at the top level: .obsidian/ (user config) survives.
     vault_dir = out_dir / "obsidian"
+    if vault_dir.exists():
+        for stale in list(vault_dir.glob("*.md")) + list(vault_dir.glob("*.canvas")):
+            try:
+                stale.unlink()
+            except OSError:
+                pass
     to_obsidian(
         graph,
         communities,

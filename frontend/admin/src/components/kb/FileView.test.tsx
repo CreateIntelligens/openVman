@@ -71,6 +71,17 @@ describe("FileView", () => {
     );
   });
 
+  it("keeps structured QA fields readable when focused in dark mode", () => {
+    renderFileView({
+      editContent: '## Q1\n\nA1\n<!-- qa_metadata: {"img":"","url":""} -->',
+    });
+
+    const question = screen.getByPlaceholderText("請輸入問題");
+
+    expect(question.className).toContain("dark:focus:bg-slate-950/70");
+    expect(question.className).not.toContain("dark:focus:bg-slate-850");
+  });
+
   it("allows switching QA documents to raw markdown source view", () => {
     renderFileView();
 

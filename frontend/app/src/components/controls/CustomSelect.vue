@@ -129,7 +129,7 @@ onUnmounted(() => {
 
 .custom-select__trigger:focus {
   border-color: var(--primary, #0ea5e9);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 0 0.1875rem rgba(14, 165, 233, 0.15);
 }
 
 .custom-select__trigger--open {
@@ -160,7 +160,7 @@ onUnmounted(() => {
   background: var(--bg-soft, #fff);
   border: 1px solid var(--line, #e2e8f0);
   border-radius: 0.625rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0.625rem 1.5625rem -0.3125rem rgba(0, 0, 0, 0.1), 0 0.5rem 0.625rem -0.375rem rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 
@@ -226,11 +226,11 @@ onUnmounted(() => {
 .slide-enter-from,
 .slide-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-0.25rem);
 }
 
 .custom-select__dropdown--dropup.slide-enter-from,
 .custom-select__dropdown--dropup.slide-leave-to {
-  transform: translateY(4px);
+  transform: translateY(0.25rem);
 }
 </style>

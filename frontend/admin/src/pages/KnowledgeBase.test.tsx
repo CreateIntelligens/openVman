@@ -1,13 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { QUICK_QA_TREE_PATH, type TreeNode } from "../components/kb/helpers";
+import { QUICK_QA_TREE_PATH, qaTreeNodePath, type TreeNode } from "../components/kb/helpers";
 import KnowledgeBase from "./KnowledgeBase";
 
 const knowledgeBaseMocks = vi.hoisted(() => ({
   closeFileView: vi.fn(),
   handleTreeSelect: vi.fn(),
   toggleExpand: vi.fn(),
+  setExpandedDirs: vi.fn(),
   setStatus: vi.fn(),
   setShowSourcePanel: vi.fn(),
   setShowNoteComposer: vi.fn(),
@@ -17,6 +18,21 @@ const knowledgeBaseMocks = vi.hoisted(() => ({
 }));
 
 const qaNodeMocks = vi.hoisted(() => ({
+  nodesTree: [] as Array<{
+    node_id: string;
+    label: string;
+    parent_ids: string[];
+    child_ids: string[];
+    order: number;
+    hidden: boolean;
+    qa_entries: Array<{
+      question: string;
+      source_path: string;
+      hidden: boolean;
+      image_id: string | null;
+    }>;
+    children: unknown[];
+  }>,
   fetchTree: vi.fn(),
   createNode: vi.fn(),
   updateNode: vi.fn(),
@@ -148,6 +164,7 @@ vi.mock("../hooks/useKnowledgeBase", () => ({
     setCrawlUrlValue: vi.fn(),
     setShowNoteComposer: knowledgeBaseMocks.setShowNoteComposer,
     toggleExpand: knowledgeBaseMocks.toggleExpand,
+    setExpandedDirs: knowledgeBaseMocks.setExpandedDirs,
     handleTreeSelect: knowledgeBaseMocks.handleTreeSelect,
     handleSave: vi.fn(),
     handleFileUpload: vi.fn(),
@@ -174,18 +191,6 @@ vi.mock("../hooks/useKnowledgeBase", () => ({
 
 vi.mock("../hooks/useQaNodes", () => ({
   useQaNodes: () => ({
-    nodesTree: [
-      {
-        node_id: "returns",
-        label: "退換貨",
-        parent_ids: [],
-        child_ids: [],
-        order: 1,
-        hidden: false,
-        qa_entries: [],
-        children: [],
-      },
-    ],
     loading: false,
     error: null,
     ...qaNodeMocks,
@@ -208,6 +213,18 @@ describe("KnowledgeBase merged tree", () => {
     knowledgeBaseMocks.showSourcePanel = false;
     knowledgeBaseMocks.activeSourceMode = "upload";
     knowledgeBaseMocks.visibleExpandedDirs = new Set(["knowledge", QUICK_QA_TREE_PATH]);
+    qaNodeMocks.nodesTree = [
+      {
+        node_id: "returns",
+        label: "退換貨",
+        parent_ids: [],
+        child_ids: [],
+        order: 1,
+        hidden: false,
+        qa_entries: [],
+        children: [],
+      },
+    ];
   });
 
   afterEach(() => {
@@ -239,6 +256,53 @@ describe("KnowledgeBase merged tree", () => {
     fireEvent.click(screen.getByText("快速問答"));
 
     expect(knowledgeBaseMocks.toggleExpand).toHaveBeenCalledWith(QUICK_QA_TREE_PATH);
+  });
+
+  it("reorders quick-QA entries by dragging one question onto another", async () => {
+    qaNodeMocks.nodesTree = [
+      {
+        node_id: "returns",
+        label: "退換貨",
+        parent_ids: [],
+        child_ids: [],
+        order: 1,
+        hidden: false,
+        qa_entries: [
+          { question: "Q1", source_path: "knowledge/faq.md", hidden: false, image_id: null },
+          { question: "Q2", source_path: "knowledge/faq.md", hidden: false, image_id: null },
+        ],
+        children: [],
+      },
+    ];
+    qaNodeMocks.fetchMergedQa.mockResolvedValue([
+      { index: "1", q: "Q1", a: "A1", img: "", url: "", source_file: "knowledge/faq.md", hidden: false },
+      { index: "2", q: "Q2", a: "A2", img: "", url: "", source_file: "knowledge/faq.md", hidden: false },
+    ]);
+    qaNodeMocks.saveMergedQa.mockResolvedValue({ status: "ok" });
+    knowledgeBaseMocks.visibleExpandedDirs = new Set([
+      "knowledge",
+      QUICK_QA_TREE_PATH,
+      qaTreeNodePath("returns"),
+    ]);
+
+    render(<KnowledgeBase />);
+
+    const q1 = screen.getByText("Q1").closest(".group") as HTMLElement;
+    const q2 = screen.getByText("Q2").closest(".group") as HTMLElement;
+    const dataTransfer = {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: vi.fn(),
+    };
+
+    fireEvent.dragStart(q2, { dataTransfer });
+    fireEvent.dragOver(q1, { dataTransfer });
+    fireEvent.drop(q1, { dataTransfer });
+
+    await waitFor(() => expect(qaNodeMocks.saveMergedQa).toHaveBeenCalled());
+    expect(qaNodeMocks.fetchMergedQa).toHaveBeenCalledWith("returns");
+    expect(qaNodeMocks.saveMergedQa.mock.calls[0][0]).toBe("returns");
+    expect(qaNodeMocks.saveMergedQa.mock.calls[0][1].map((row: { q: string }) => row.q)).toEqual(["Q2", "Q1"]);
   });
 
 
