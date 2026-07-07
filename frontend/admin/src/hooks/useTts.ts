@@ -1,5 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { synthesizeSpeech, fetchTtsProviders, type TtsProvider } from "../api";
+import { fetchTtsProviders, synthesizeSpeech, type TtsProvider } from "../api";
+import { useMascot } from "../context/MascotContext";
+
+type WebAudioWindow = Window & typeof globalThis & {
+       webkitAudioContext?: typeof AudioContext;
+};
+
+type MascotAudioGraph = {
+       analyser: AnalyserNode;
+       source: MediaElementAudioSourceNode;
+};
+
+function createAudioContext(): AudioContext | null {
+       const AudioContextConstructor =
+              window.AudioContext || (window as WebAudioWindow).webkitAudioContext;
+       return AudioContextConstructor ? new AudioContextConstructor() : null;
+}
+
+function rmsVolume(data: Uint8Array): number {
+       let sum = 0;
+       for (let i = 0; i < data.length; i++) {
+              const v = (data[i] - 128) / 128;
+              sum += v * v;
+       }
+       return Math.min(1, Math.sqrt(sum / data.length) * 3.4);
+}
 
 const TTS_PROVIDER_STORAGE_KEY = "brain-tts-provider";
 const TTS_VOICE_STORAGE_KEY = "brain-tts-voice";
@@ -57,6 +82,10 @@ export function useTts() {
        const ttsCacheRef = useRef<Map<string, CachedSpeech>>(new Map());
        const ttsPrefetchAbortRef = useRef<AbortController | null>(null);
        const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+       const mascotAudioCtxRef = useRef<AudioContext | null>(null);
+       const mascotAudioGraphRef = useRef<MascotAudioGraph | null>(null);
+       const mascotRafRef = useRef<number | null>(null);
+       const { driveMouth, stopMouth } = useMascot();
 
        const ttsProviderRef = useRef(ttsProvider);
        ttsProviderRef.current = ttsProvider;
@@ -83,14 +112,58 @@ export function useTts() {
               ttsCacheRef.current.clear();
        }, []);
 
+       const stopMascotAnalyser = useCallback(() => {
+              if (mascotRafRef.current !== null) {
+                     cancelAnimationFrame(mascotRafRef.current);
+                     mascotRafRef.current = null;
+              }
+              mascotAudioGraphRef.current?.source.disconnect();
+              mascotAudioGraphRef.current?.analyser.disconnect();
+              mascotAudioGraphRef.current = null;
+              stopMouth();
+       }, [stopMouth]);
+
        const stopAudio = useCallback(() => {
               ttsAbortRef.current?.abort();
               if (audioRef.current) {
                      audioRef.current.pause();
                      audioRef.current = null;
               }
+              stopMascotAnalyser();
               setPlayingIndex(null);
-       }, []);
+       }, [stopMascotAnalyser]);
+
+       const driveMascotFromAudio = useCallback((audio: HTMLAudioElement) => {
+              stopMascotAnalyser();
+              if (!mascotAudioCtxRef.current) {
+                     const ctx = createAudioContext();
+                     if (!ctx) {
+                            return;
+                     }
+                     mascotAudioCtxRef.current = ctx;
+              }
+
+              try {
+                     const ctx = mascotAudioCtxRef.current;
+                     const source = ctx.createMediaElementSource(audio);
+                     const analyser = ctx.createAnalyser();
+                     analyser.fftSize = 256;
+                     source.connect(analyser);
+                     analyser.connect(ctx.destination);
+                     mascotAudioGraphRef.current = { analyser, source };
+                     const data = new Uint8Array(analyser.fftSize);
+
+                     const loop = () => {
+                            analyser.getByteTimeDomainData(data);
+                            driveMouth(rmsVolume(data));
+                            mascotRafRef.current = requestAnimationFrame(loop);
+                     };
+                     mascotRafRef.current = requestAnimationFrame(loop);
+              } catch (reason) {
+                     console.warn("Failed to connect mascot audio analyser:", reason);
+                     stopMascotAnalyser();
+              }
+       }, [driveMouth, stopMascotAnalyser]);
 
        const playAudioBuffer = useCallback((buffer: ArrayBuffer, fallback?: string) => {
               if (fallback) {
@@ -108,11 +181,14 @@ export function useTts() {
                      setPlayingIndex(null);
                      audioRef.current = null;
                      URL.revokeObjectURL(url);
+                     stopMascotAnalyser();
               };
 
               audio.onended = cleanup;
-              audio.play().catch(cleanup);
-       }, []);
+              audio.play()
+                     .then(() => driveMascotFromAudio(audio))
+                     .catch(cleanup);
+       }, [driveMascotFromAudio, stopMascotAnalyser]);
 
        const prefetchTts = useCallback(async (text: string) => {
               ttsPrefetchAbortRef.current?.abort();
@@ -142,14 +218,9 @@ export function useTts() {
        }, []);
 
        const playTts = useCallback(async (text: string, index: number) => {
-              if (audioRef.current) {
-                     audioRef.current.pause();
-                     audioRef.current = null;
-              }
-              ttsAbortRef.current?.abort();
-
-              if (playingIndex === index) {
-                     setPlayingIndex(null);
+              const shouldStopCurrent = playingIndex === index;
+              stopAudio();
+              if (shouldStopCurrent) {
                      return;
               }
 
@@ -179,7 +250,7 @@ export function useTts() {
                      }
                      setPlayingIndex(null);
               }
-       }, [playAudioBuffer, playingIndex]);
+       }, [playAudioBuffer, playingIndex, stopAudio]);
 
        const handleTtsProviderChange = useCallback((id: string) => {
               setTtsProvider(id);
@@ -200,7 +271,10 @@ export function useTts() {
               ttsPrefetchAbortRef.current?.abort();
               audioRef.current?.pause();
               if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-       }, []);
+              stopMascotAnalyser();
+              void mascotAudioCtxRef.current?.close();
+              mascotAudioCtxRef.current = null;
+       }, [stopMascotAnalyser]);
 
        return {
               ttsProviders,

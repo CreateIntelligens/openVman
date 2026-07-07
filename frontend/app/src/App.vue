@@ -95,6 +95,32 @@
       :message="fatalError.message"
       @retry="handleFatalRetry"
     />
+
+    <div
+      v-if="!immersive && !mascotClosed"
+      class="mascot-widget"
+      :class="{ dragging: mascotDragging }"
+      :style="mascotPositionStyle"
+    >
+      <div class="mascot-drag-handle" @mousedown="handleMascotDragStart" />
+      <iframe
+        ref="mascotFrameRef"
+        :src="MASCOT_WIDGET_SRC"
+        title="AI 虛擬人小助理"
+        allow="microphone; autoplay"
+      />
+    </div>
+
+    <button
+      v-if="!immersive && mascotClosed"
+      type="button"
+      class="mascot-reopen-button"
+      title="打開 AI 虛擬人小助理"
+      aria-label="打開 AI 虛擬人小助理"
+      @click="mascotClosed = false"
+    >
+      <span aria-hidden="true">🧑</span>
+    </button>
   </div>
 </template>
 
@@ -120,11 +146,82 @@ import { useSettingsStore } from "./stores/useSettingsStore";
 import type { AvatarBackgroundFit, AvatarBackgroundId } from "./types/avatarBackground";
 
 const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
+const HOST_MESSAGE_NAMESPACE = "avatar-widget-host";
+const MASCOT_DEFAULT_MARGIN_REM = 1;
+const MASCOT_WIDGET_SRC = "/vendor/ai-avatar-bot/widget.html";
+const WIDGET_MESSAGE_NAMESPACE = "avatar-widget";
+
+interface MascotPosition {
+  right: number;
+  bottom: number;
+}
+
+type MascotMessage = {
+  ns: typeof WIDGET_MESSAGE_NAMESPACE;
+  type: string;
+};
 
 const isStarted = ref(false);
 const isTyping = ref(false);
 const showSettings = ref(false);
 const immersive = ref(false);
+const mascotClosed = ref(false);
+const mascotDragging = ref(false);
+const mascotPosition = ref<MascotPosition | null>(null);
+const mascotFrameRef = ref<HTMLIFrameElement | null>(null);
+let mascotDragOffset = { x: 0, y: 0 };
+
+function getRootFontSize(): number {
+  const rootFontSize = Number.parseFloat(
+    getComputedStyle(document.documentElement).fontSize,
+  );
+  return Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
+}
+
+function toRem(value: number): string {
+  return `${value / getRootFontSize()}rem`;
+}
+
+function defaultMascotMarginPixels(): number {
+  return MASCOT_DEFAULT_MARGIN_REM * getRootFontSize();
+}
+
+function clampInset(value: number, size: number, viewportSize: number, margin: number): number {
+  const maxInset = Math.max(margin, viewportSize - size - margin);
+  return Math.min(Math.max(value, margin), maxInset);
+}
+
+function isWidgetMessage(data: unknown): data is MascotMessage {
+  if (typeof data !== "object" || data === null) return false;
+  const message = data as Partial<MascotMessage>;
+  return message.ns === WIDGET_MESSAGE_NAMESPACE && typeof message.type === "string";
+}
+
+function postToMascot(message: Record<string, unknown>): void {
+  const frame = mascotFrameRef.value;
+  if (!frame?.contentWindow) return;
+  frame.contentWindow.postMessage(
+    { ns: HOST_MESSAGE_NAMESPACE, ...message },
+    window.location.origin,
+  );
+}
+
+function pcmRmsVolume(pcm: Int16Array): number {
+  let sum = 0;
+  for (let i = 0; i < pcm.length; i++) {
+    const v = pcm[i] / 32768;
+    sum += v * v;
+  }
+  return Math.min(1, Math.sqrt(sum / pcm.length) * 3.4);
+}
+
+function driveMascotMouth(pcm: Int16Array): void {
+  postToMascot({ type: "mouth", volume: pcmRmsVolume(pcm) });
+}
+
+function stopMascotMouth(): void {
+  postToMascot({ type: "mouth-stop" });
+}
 
 // Error overlay state (fatal errors shown full-screen)
 const fatalError = ref<{ code: string; message: string } | null>(null);
@@ -281,8 +378,14 @@ async function fetchBackgrounds(): Promise<void> {
 const wasm = useMatesX();
 
 const audio = useAudioPlayer({
-  onPcmChunk: (pcm) => wasm.pushAudio(pcm),
-  onPlaybackEnd: () => wasm.clearAudio(),
+  onPcmChunk: (pcm) => {
+    wasm.pushAudio(pcm);
+    driveMascotMouth(pcm);
+  },
+  onPlaybackEnd: () => {
+    wasm.clearAudio();
+    stopMascotMouth();
+  },
   onQueueEmpty: onAudioQueueEmpty,
 });
 
@@ -330,6 +433,7 @@ const chat = useAvatarChat({
     ttsStreamer.cancel();
     audio.flush();
     wasm.clearAudio();
+    stopMascotMouth();
     typewriter.flush();
     pendingText = "";
     isTyping.value = false;
@@ -380,6 +484,69 @@ const chatPlaceholder = computed(() => {
 const cameraPreviewStyle = computed<Record<string, string>>(() => ({
   "--camera-preview-scale": String(settings.cameraPreviewScale),
 }));
+
+const mascotPositionStyle = computed<Record<string, string>>(() => {
+  if (!mascotPosition.value) {
+    return {
+      right: `${MASCOT_DEFAULT_MARGIN_REM}rem`,
+      bottom: `${MASCOT_DEFAULT_MARGIN_REM}rem`,
+    };
+  }
+  return {
+    right: toRem(mascotPosition.value.right),
+    bottom: toRem(mascotPosition.value.bottom),
+  };
+});
+
+let mascotSize = { width: 0, height: 0 };
+
+function handleMascotDragStart(event: MouseEvent): void {
+  const handle = event.currentTarget as HTMLElement;
+  const widget = handle.closest(".mascot-widget") as HTMLElement | null;
+  if (!widget) return;
+
+  event.preventDefault();
+  mascotDragging.value = true;
+  const rect = widget.getBoundingClientRect();
+  mascotSize = { width: rect.width, height: rect.height };
+  mascotDragOffset = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+  window.addEventListener("mousemove", handleMascotDragMove);
+  window.addEventListener("mouseup", handleMascotDragEnd);
+}
+
+function handleMascotDragMove(event: MouseEvent): void {
+  if (!mascotDragging.value) return;
+  const { width, height } = mascotSize;
+  const left = event.clientX - mascotDragOffset.x;
+  const top = event.clientY - mascotDragOffset.y;
+  const margin = defaultMascotMarginPixels();
+  const right = clampInset(
+    window.innerWidth - left - width,
+    width,
+    window.innerWidth,
+    margin,
+  );
+  const bottom = clampInset(
+    window.innerHeight - top - height,
+    height,
+    window.innerHeight,
+    margin,
+  );
+  mascotPosition.value = { right, bottom };
+}
+
+function removeMascotDragListeners(): void {
+  window.removeEventListener("mousemove", handleMascotDragMove);
+  window.removeEventListener("mouseup", handleMascotDragEnd);
+}
+
+function handleMascotDragEnd(): void {
+  mascotDragging.value = false;
+  removeMascotDragListeners();
+}
 
 async function handleSend(text: string): Promise<void> {
   if (!isStarted.value) {
@@ -565,8 +732,15 @@ watch(showSettings, () => {
   void fetchBackgrounds();
 });
 
+function handleMascotMessage(event: MessageEvent): void {
+  if (isWidgetMessage(event.data) && event.data.type === "close") {
+    mascotClosed.value = true;
+  }
+}
+
 onMounted(async () => {
   document.addEventListener("fullscreenchange", handleFullscreenChange);
+  window.addEventListener("message", handleMascotMessage);
   void fetchTtsProviders();
   void fetchBackgrounds();
   await fetchProjects();
@@ -583,6 +757,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  window.removeEventListener("message", handleMascotMessage);
+  removeMascotDragListeners();
 });
 </script>
 
@@ -690,6 +866,65 @@ body {
   border-radius: 0.5rem;
   background: #000;
   overflow: hidden;
+}
+
+.mascot-widget {
+  position: fixed;
+  z-index: 1000;
+  width: min(21.25rem, 90vw);
+  height: min(30rem, 70dvh);
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: var(--surface-shadow);
+  background: transparent;
+}
+
+.mascot-widget iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.mascot-widget .mascot-drag-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1.5rem;
+  z-index: 1;
+  cursor: grab;
+}
+
+.mascot-widget.dragging .mascot-drag-handle {
+  cursor: grabbing;
+}
+
+.mascot-widget.dragging iframe {
+  pointer-events: none;
+}
+
+.mascot-reopen-button {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1000;
+  width: 3rem;
+  height: 3rem;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  background: var(--bg-soft);
+  box-shadow: var(--surface-shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.mascot-reopen-button:hover {
+  transform: scale(1.08);
 }
 
 /* Immersive mode: avatar fills the entire viewport, other panels float on top */

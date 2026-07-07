@@ -1,9 +1,11 @@
 import { useState } from "react";
 import AppSidebar from "./components/app/AppSidebar";
+import MascotWidget from "./components/app/MascotWidget";
 import OfflineBanner from "./components/app/OfflineBanner";
 import TopBar, { MobileNavDrawer } from "./components/app/TopBar";
 import { components, type Tab } from "./components/app/navigation";
 import { BackendHealthProvider } from "./context/BackendHealthContext";
+import { MascotProvider } from "./context/MascotContext";
 import { NavigationProvider } from "./context/NavigationContext";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
@@ -64,6 +66,8 @@ function AppContent() {
           </div>
         </div>
       </main>
+
+      <MascotWidget />
     </div>
     </NavigationProvider>
   );
@@ -74,7 +78,9 @@ export default function App() {
     <ThemeProvider>
       <BackendHealthProvider>
         <ProjectProvider>
-          <AppContent />
+          <MascotProvider>
+            <AppContent />
+          </MascotProvider>
         </ProjectProvider>
       </BackendHealthProvider>
     </ThemeProvider>
