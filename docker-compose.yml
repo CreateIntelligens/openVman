@@ -124,17 +124,16 @@ services:
   admin:
     <<: *shared
     build:
-      context: ./frontend/admin
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: frontend/admin/Dockerfile
+      target: dev
     ports:
       - "${PORT:-8786}:80"
       - "${HTTPS_PORT:-8787}:443"
     volumes:
       - ./frontend/admin:/app
       - admin-node-modules:/app/node_modules
-      - ./frontend/admin/nginx/default.conf:/etc/nginx/http.d/default.conf:ro
-      - ./frontend/admin/nginx/proxy-params.conf:/etc/nginx/http.d/proxy-params.conf:ro
-      - ./frontend/admin/nginx/websocket.conf:/etc/nginx/http.d/websocket.conf:ro
+      - ./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro
       - ./infra/nginx/certs:/etc/nginx/certs
       - ./frontend/app/dist/embed:/srv/openvman/embed:ro
       - ./frontend/embed-loader/dist:/srv/openvman/embed-loader:ro

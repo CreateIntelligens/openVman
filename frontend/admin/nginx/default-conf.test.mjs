@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "default.conf"), "utf8");
+const source = readFileSync(resolve(__dirname, "http.d/default.conf"), "utf8");
 
 describe("nginx default config", () => {
   it("proxies avatar background assets to backend before avatar frontend fallback", () => {
