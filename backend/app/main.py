@@ -52,6 +52,10 @@ from app.gateway.worker import (
     reset_plugins,
 )
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.providers.gemini_tts_adapter import (
+    GEMINI_STREAM_CONTENT_TYPE,
+    GeminiTTSHTTPError,
+)
 from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.service import TTSRouterService
 
@@ -400,6 +404,8 @@ async def create_speech(body: SpeechRequest) -> Response:
 class TtsStreamRequest(BaseModel):
     text: str
     character: str = ""
+    provider: str = ""
+    voice: str = ""
 
 
 async def _proxy_indextts_stream(
@@ -460,6 +466,22 @@ async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
         return JSONResponse(status_code=400, content={"error": "empty text"})
 
     character = body.character or cfg.tts_indextts_default_character
+
+    # Gemini TTS Console 支援 stream=true，邊生成邊吐 raw PCM（24000Hz），
+    # 避免等整段合成完的高延遲。content-type 帶 rate 讓前端知道要重採樣。
+    if body.provider == "gemini-tts":
+        svc = _get_service()
+        gemini = svc.gemini_adapter
+        if gemini.enabled:
+            try:
+                stream = await gemini.open_stream(
+                    SynthesizeRequest(text=cleaned, voice_hint=body.voice)
+                )
+            except GeminiTTSHTTPError as exc:
+                return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
+            except RuntimeError as exc:
+                return JSONResponse(status_code=502, content={"error": str(exc)})
+            return StreamingResponse(stream, media_type=GEMINI_STREAM_CONTENT_TYPE)
 
     # Primary: proxy stream directly from IndexTTS
     if cfg.tts_indextts_url:

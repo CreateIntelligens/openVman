@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Gemini TTS Provider**: Added `GeminiTTSAdapter` (`backend/app/providers/gemini_tts_adapter.py`) integrating the Gemini TTS Console API into the backend's TTS fallback chain, with dedicated config settings (`TTS_GEMINI_*`) and pytest coverage (`test_gemini_adapter.py`, `test_gemini_config.py`).
 - **Dynamic Gemini Model Discovery**: Implemented a dynamic model discovery service (`model_discovery.py`) using the `google-genai` SDK to query, filter (for `generateContent` actions), and sort available models dynamically (Pro -> Flash -> Flash-Lite -> Others) with a thread-safe 10-minute TTL cache.
 - **Dynamic Fallback Chain Generation**: Overhauled fallback chain generation (`models_config.py` and `fallback_chain.py`) to lazily initialize a Gemini client and dynamically expand Gemini provider hops into the dynamically discovered model list.
 - **Fallback Graceful Degradation**: Added graceful degradation safety net that falls back to static `FALLBACK_MODELS` if dynamic API discovery fails due to network or credential errors.

@@ -17,8 +17,10 @@ def _make_config(
     aws_enabled: bool = True,
     gcp_enabled: bool = True,
     edge_enabled: bool = False,
+    gemini_url: str = "",
 ) -> TTSRouterConfig:
     return TTSRouterConfig(
+        _env_file=None,
         tts_indextts_url=indextts_url,
         tts_indextts_default_character="hayley",
         tts_aws_enabled=aws_enabled,
@@ -35,6 +37,7 @@ def _make_config(
         tts_gcp_audio_encoding="LINEAR16",
         tts_gcp_sample_rate=24000,
         edge_tts_enabled=edge_enabled,
+        tts_gemini_url=gemini_url,
     )
 
 
@@ -136,6 +139,24 @@ class TestRouterFallback:
         chain = svc.build_chain()
         targets = [t.target for t in chain]
         assert targets == ["indextts", "gcp-tts", "aws-polly"]
+
+    def test_chain_order_with_gemini(self):
+        """Verify the chain order when gemini is enabled."""
+        svc = TTSRouterService(_make_config(gemini_url="http://localhost:8206"))
+        chain = svc.build_chain()
+        targets = [t.target for t in chain]
+        assert targets == ["indextts", "gemini-tts", "gcp-tts", "aws-polly"]
+
+    def test_indextts_fails_falls_back_to_gemini(self):
+        """IndexTTS fails -> Gemini succeeds."""
+        svc = TTSRouterService(_make_config(gemini_url="http://localhost:8206"))
+        svc._indextts.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._gemini.synthesize = MagicMock(return_value=_ok_result("gemini"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
+
+        result = svc.synthesize(SynthesizeRequest(text="hello"))
+        assert result.result.provider == "gemini"
+        svc._gcp.synthesize.assert_not_called()
 
     def test_indextts_success_stops_without_extra_hops(self):
         """After IndexTTS success, no more hops are attempted."""

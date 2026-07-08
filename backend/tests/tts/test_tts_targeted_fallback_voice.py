@@ -9,6 +9,7 @@ from app.service import TTSRouterService
 
 def _make_config() -> TTSRouterConfig:
     return TTSRouterConfig(
+        _env_file=None,
         tts_indextts_url="http://index",
         tts_indextts_default_character="hayley",
         edge_tts_enabled=True,

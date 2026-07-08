@@ -111,6 +111,30 @@ test("explicit IndexTTS provider sends the selected voice as character", async (
   }
 });
 
+test("gemini-tts uses the streaming endpoint with provider and voice fields", async () => {
+  const fetchMock = installFetch(() => streamingWavResponse());
+
+  try {
+    const streamer = useTtsStreamer({
+      ttsProviders: () => [
+        { id: "gemini-tts", name: "Gemini TTS", default_voice: "Kore", voices: ["Kore", "Despina"] },
+      ],
+      onPcmChunk: () => undefined,
+    });
+
+    await streamer.speak("測試", { provider: "gemini-tts", voice: "Despina" });
+
+    assert.equal(fetchMock.calls[0].url, "/tts/stream");
+    assert.deepEqual(fetchMock.calls[0].body, {
+      text: "測試",
+      provider: "gemini-tts",
+      voice: "Despina",
+    });
+  } finally {
+    fetchMock.restore();
+  }
+});
+
 test("non-streaming providers continue to use the full speech endpoint", async () => {
   const fetchMock = installFetch(() => fullSpeechResponse());
 
@@ -131,6 +155,48 @@ test("non-streaming providers continue to use the full speech endpoint", async (
       provider: "edge-tts",
       voice: "zh-TW-HsiaoChenNeural",
     });
+  } finally {
+    fetchMock.restore();
+  }
+});
+
+test("gemini-tts's 24kHz raw PCM stream is resampled to 16kHz across chunk boundaries", async () => {
+  // 24kHz PCM ramp, split into two raw chunks (no WAV header) to exercise
+  // the streaming resampler's cross-chunk continuity.
+  const allSamples = Array.from({ length: 48 }, (_, i) => i * 100);
+  const chunk1 = bytesFromInt16(allSamples.slice(0, 24));
+  const chunk2 = bytesFromInt16(allSamples.slice(24));
+
+  const fetchMock = installFetch(() => new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(chunk1);
+        controller.enqueue(chunk2);
+        controller.close();
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "audio/l16;rate=24000;channels=1" } },
+  ));
+
+  const chunks = [];
+  try {
+    const streamer = useTtsStreamer({
+      ttsProviders: () => [
+        { id: "gemini-tts", name: "Gemini TTS", default_voice: "Kore", voices: ["Kore"] },
+      ],
+      onPcmChunk: (pcm) => chunks.push([...pcm]),
+    });
+
+    await streamer.speak("測試", { provider: "gemini-tts", voice: "Kore" });
+
+    const combined = chunks.flat();
+    // 48 samples at 24kHz => 2ms; resampled to 16kHz => 32 samples.
+    assert.equal(combined.length, 32);
+    // Values should stay monotonically increasing (no discontinuity/seam
+    // at the chunk boundary introduced by the resampler).
+    for (let i = 1; i < combined.length; i++) {
+      assert.ok(combined[i] >= combined[i - 1], `sample ${i} decreased: ${combined[i - 1]} -> ${combined[i]}`);
+    }
   } finally {
     fetchMock.restore();
   }

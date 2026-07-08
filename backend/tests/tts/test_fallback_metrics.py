@@ -14,6 +14,7 @@ from app.service import TTSRouterService
 
 def _make_config() -> TTSRouterConfig:
     return TTSRouterConfig(
+        _env_file=None,
         tts_indextts_url="",
         tts_aws_enabled=True,
         tts_aws_region="ap-northeast-1",

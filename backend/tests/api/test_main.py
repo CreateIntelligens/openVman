@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
 import sys
@@ -46,6 +47,12 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
         markitdown_max_upload_bytes=max_upload_bytes,
     ))
     return module, FakeMarkItDown
+
+
+def _get_tts_provider_payload(module) -> list[dict]:
+    response = asyncio.run(module.admin_routes.get_tts_providers())
+    assert response.status_code == 200
+    return json.loads(response.body)
 
 
 def test_app_import_avoids_on_event_deprecation(monkeypatch):
@@ -223,15 +230,12 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         tts_indextts_default_character="hayley",
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
+        tts_gemini_url="",
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
     ))
 
-    client = TestClient(module.app)
-    response = client.get("/v1/tts/providers")
-
-    assert response.status_code == 200
-    assert response.json() == [
+    assert _get_tts_provider_payload(module) == [
         {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
         {
             "id": "indextts",
@@ -269,17 +273,56 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
         tts_indextts_default_character="hayley",
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
+        tts_gemini_url="",
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
     ))
 
-    client = TestClient(module.app)
-    response = client.get("/v1/tts/providers")
-
-    assert response.status_code == 200
-    ids = [p["id"] for p in response.json()]
+    ids = [p["id"] for p in _get_tts_provider_payload(module)]
     assert "indextts" not in ids
     assert ids == ["auto", "edge-tts"]
+
+
+def test_tts_providers_includes_gemini_when_configured(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    class FakeClient:
+        def get(self):
+            class FakeAsyncClient:
+                async def get(self, url: str, timeout=None):
+                    class FakeResponse:
+                        def raise_for_status(self):
+                            pass
+
+                        def json(self):
+                            return {"voices": [{"name": "Zephyr"}, {"name": "Kore"}]}
+
+                    return FakeResponse()
+
+            return FakeAsyncClient()
+
+        async def close(self):
+            pass
+
+    module.admin_routes._health_http = FakeClient()
+    monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
+        markitdown_max_upload_bytes=1024,
+        tts_indextts_url="",
+        tts_gcp_enabled=False,
+        tts_aws_enabled=False,
+        tts_gemini_url="http://nurse.5gao.ai:8206",
+        edge_tts_enabled=False,
+    ))
+
+    assert _get_tts_provider_payload(module) == [
+        {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
+        {
+            "id": "gemini-tts",
+            "name": "Gemini TTS",
+            "default_voice": "Kore",
+            "voices": ["Zephyr", "Kore"],
+        },
+    ]
 
 
 def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):

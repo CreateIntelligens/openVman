@@ -78,7 +78,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     if (options.shouldUseStream) return options.shouldUseStream(provider);
 
     const normalized = normalizedProvider(provider);
-    if (!normalized || normalized === "indextts") return true;
+    if (!normalized || normalized === "indextts" || normalized === "gemini-tts") return true;
     if (normalized === "auto") return Boolean(getIndexTtsProvider());
     return false;
   }
@@ -95,10 +95,16 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
   }
 
   function buildStreamBody(text: string, opts: SpeakOptions): Record<string, string> {
-    return options.buildStreamBody?.(text, opts) ?? {
-      text,
-      character: resolveStreamCharacter(opts),
-    };
+    if (options.buildStreamBody) return options.buildStreamBody(text, opts);
+
+    const provider = normalizedProvider(opts.provider ?? "");
+    if (provider === "gemini-tts") {
+      const body: Record<string, string> = { text, provider: "gemini-tts" };
+      if (opts.voice) body.voice = opts.voice;
+      return body;
+    }
+
+    return { text, character: resolveStreamCharacter(opts) };
   }
 
   function buildSpeechBody(text: string, opts: SpeakOptions, provider: string): Record<string, string> {
@@ -148,9 +154,18 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
 
       const contentType = response.headers.get("Content-Type") ?? "";
       if (useStream && streamResponseCanEmitPcm(contentType)) {
-        await streamPcmResponse(response, abort.signal, emitPcmChunk, (reader) => {
-          activeReader = reader;
-        }, streamResponseHasWavHeader(contentType));
+        await streamPcmResponse(
+          response,
+          abort.signal,
+          emitPcmChunk,
+          (reader) => {
+            activeReader = reader;
+          },
+          {
+            stripWavHeader: streamResponseHasWavHeader(contentType),
+            sourceSampleRate: rawPcmSampleRate(contentType) ?? PCM_SAMPLE_RATE,
+          },
+        );
       } else {
         await emitSpeechResponseChunks(response, abort.signal, emitPcmChunk);
       }
@@ -202,17 +217,22 @@ async function streamPcmResponse(
   signal: AbortSignal,
   emitPcmChunk: (pcm: Int16Array) => Promise<void>,
   setActiveReader: (reader: ReadableStreamDefaultReader<Uint8Array>) => void,
-  stripWavHeader = true,
+  options: StreamPcmOptions = {},
 ): Promise<void> {
   if (!response.body) {
     throw new Error("TTS response has no body");
   }
 
+  const {
+    stripWavHeader = true,
+    sourceSampleRate = PCM_SAMPLE_RATE,
+  } = options;
   const reader = response.body.getReader();
   setActiveReader(reader);
 
   let headerBytesSeen = stripWavHeader ? 0 : WAV_HEADER_BYTES;
   let leftover: ByteArray = new Uint8Array(0);
+  const resampler = createStreamingResampler(sourceSampleRate, PCM_SAMPLE_RATE);
 
   while (!signal.aborted) {
     const { done, value } = await reader.read();
@@ -232,8 +252,72 @@ async function streamPcmResponse(
     leftover = aligned.leftover;
     if (aligned.usable.length === 0) continue;
 
-    await emitPcmChunk(int16ArrayFromBytes(aligned.usable));
+    const samples = resampler.push(int16ArrayFromBytes(aligned.usable));
+    if (samples.length > 0) await emitPcmChunk(samples);
   }
+
+  const finalSamples = resampler.flush();
+  if (finalSamples.length > 0) await emitPcmChunk(finalSamples);
+}
+
+type StreamPcmOptions = {
+  stripWavHeader?: boolean;
+  sourceSampleRate?: number;
+};
+
+type StreamingResampler = {
+  push: (samples: Int16Array) => Int16Array;
+  flush: () => Int16Array;
+};
+
+function createStreamingResampler(sourceSampleRate: number, targetSampleRate: number): StreamingResampler {
+  if (sourceSampleRate === targetSampleRate) {
+    return {
+      push: (samples: Int16Array) => samples,
+      flush: () => new Int16Array(0),
+    };
+  }
+
+  let carry: Int16Array = new Int16Array(0);
+  let sourcePos = 0;
+  const sampleRateRatio = sourceSampleRate / targetSampleRate;
+
+  return {
+    push(samples: Int16Array): Int16Array {
+      const combined = concatInt16(carry, samples);
+      if (combined.length < 2) {
+        carry = combined;
+        return new Int16Array(0);
+      }
+
+      const out: number[] = [];
+      let pos = sourcePos;
+      while (Math.floor(pos) < combined.length - 1) {
+        out.push(interpolatedInt16Sample(combined, pos));
+        pos += sampleRateRatio;
+      }
+
+      const consumedWhole = Math.floor(pos);
+      carry = combined.slice(consumedWhole);
+      sourcePos = pos - consumedWhole;
+
+      return new Int16Array(out);
+    },
+    flush(): Int16Array {
+      const result = carry.length > 0 ? carry.slice(0, 1) : new Int16Array(0);
+      carry = new Int16Array(0);
+      return result;
+    },
+  };
+}
+
+function concatInt16(a: Int16Array, b: Int16Array): Int16Array {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+  const merged = new Int16Array(a.length + b.length);
+  merged.set(a, 0);
+  merged.set(b, a.length);
+  return merged;
 }
 
 async function emitSpeechResponseChunks(
@@ -306,12 +390,18 @@ export function audioResponseNeedsDecode(contentType: string): boolean {
   return !isWavContentType(type) && !isRawPcmContentType(type);
 }
 
-export function pcmChunksFromAudioBytes(bytes: Uint8Array, contentType: string): Int16Array[] {
+export function pcmChunksFromAudioBytes(
+  bytes: Uint8Array,
+  contentType: string,
+  targetSampleRate = PCM_SAMPLE_RATE,
+): Int16Array[] {
   const type = normalizeContentType(contentType);
   let pcmBytes = bytes;
+  let sourceSampleRate = targetSampleRate;
 
   if (isWavContentType(type) || looksLikeWav(bytes)) {
     pcmBytes = bytes.subarray(wavDataOffset(bytes));
+    sourceSampleRate = wavSampleRate(bytes) ?? targetSampleRate;
   }
 
   if (pcmBytes.length % 2 !== 0) {
@@ -321,7 +411,46 @@ export function pcmChunksFromAudioBytes(bytes: Uint8Array, contentType: string):
 
   const aligned = new Uint8Array(pcmBytes.length);
   aligned.set(pcmBytes);
-  return splitPcmChunks(new Int16Array(aligned.buffer));
+  const samples = new Int16Array(aligned.buffer);
+
+  const resampled = sourceSampleRate !== targetSampleRate
+    ? resampleInt16(samples, sourceSampleRate, targetSampleRate)
+    : samples;
+
+  return splitPcmChunks(resampled);
+}
+
+function wavSampleRate(bytes: Uint8Array): number | null {
+  if (!looksLikeWav(bytes) || bytes.length < WAV_HEADER_BYTES) return null;
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 12;
+
+  while (offset + 8 <= bytes.length) {
+    const chunkId = ascii(bytes, offset, offset + 4);
+    const chunkSize = view.getUint32(offset + 4, true);
+    const dataStart = offset + 8;
+    if (chunkId === "fmt " && dataStart + 8 <= bytes.length) {
+      return view.getUint32(dataStart + 4, true);
+    }
+    offset = dataStart + chunkSize + (chunkSize % 2);
+  }
+
+  return null;
+}
+
+function resampleInt16(samples: Int16Array, sourceSampleRate: number, targetSampleRate: number): Int16Array {
+  if (samples.length === 0 || sourceSampleRate <= 0) return samples;
+
+  const targetLength = Math.max(1, Math.round(samples.length * targetSampleRate / sourceSampleRate));
+  const resampled = new Int16Array(targetLength);
+
+  for (let i = 0; i < targetLength; i++) {
+    const sourcePos = i * sourceSampleRate / targetSampleRate;
+    resampled[i] = interpolatedInt16Sample(samples, sourcePos);
+  }
+
+  return resampled;
 }
 
 export function decodedAudioBufferToPcmChunks(
@@ -339,13 +468,10 @@ export function decodedAudioBufferToPcmChunks(
 
   for (let i = 0; i < targetLength; i++) {
     const sourcePos = i * audioBuffer.sampleRate / targetSampleRate;
-    const lower = Math.min(Math.floor(sourcePos), audioBuffer.length - 1);
-    const upper = Math.min(lower + 1, audioBuffer.length - 1);
-    const ratio = sourcePos - lower;
     let mixed = 0;
 
     for (const channel of channels) {
-      mixed += channel[lower] + (channel[upper] - channel[lower]) * ratio;
+      mixed += interpolatedSample(channel, sourcePos);
     }
     mixed /= channels.length;
 
@@ -411,6 +537,11 @@ function isRawPcmContentType(type: string): boolean {
   return type === "audio/pcm" || type === "audio/l16" || type === "audio/x-raw";
 }
 
+function rawPcmSampleRate(contentType: string): number | null {
+  const match = /rate=(\d+)/.exec(contentType);
+  return match ? Number(match[1]) : null;
+}
+
 function looksLikeWav(bytes: Uint8Array): boolean {
   return ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WAVE";
 }
@@ -442,6 +573,17 @@ function splitPcmChunks(samples: Int16Array, chunkSamples = PCM_CHUNK_SAMPLES): 
     chunks.push(samples.slice(offset, offset + chunkSamples));
   }
   return chunks;
+}
+
+function interpolatedSample(samples: ArrayLike<number>, sourcePos: number): number {
+  const lower = Math.min(Math.floor(sourcePos), samples.length - 1);
+  const upper = Math.min(lower + 1, samples.length - 1);
+  const ratio = sourcePos - lower;
+  return samples[lower] + (samples[upper] - samples[lower]) * ratio;
+}
+
+function interpolatedInt16Sample(samples: Int16Array, sourcePos: number): number {
+  return Math.round(interpolatedSample(samples, sourcePos));
 }
 
 function floatToInt16(sample: number): number {

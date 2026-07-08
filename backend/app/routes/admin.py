@@ -14,6 +14,7 @@ from app.gateway.temp_storage import get_temp_storage
 from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
+from app.providers.gemini_tts_adapter import GEMINI_DEFAULT_VOICE, GEMINI_PROVIDER_NAME
 
 logger = logging.getLogger("backend")
 router = APIRouter()
@@ -87,25 +88,47 @@ async def enable_embed_key(key_id: str) -> dict:
     return _record_payload(record)
 
 
-async def _fetch_indextts_voices(base_url: str) -> list[str]:
-    voices_url = f"{base_url.rstrip('/')}/audio/voices"
+async def _fetch_provider_voices(
+    base_url: str,
+    voices_path: str,
+    provider_name: str,
+) -> list[str]:
+    voices_url = f"{base_url.rstrip('/')}{voices_path}"
     try:
         response = await _health_http.get().get(voices_url, timeout=_TTS_PROVIDER_TIMEOUT_SECONDS)
         response.raise_for_status()
         return _extract_voice_names(response.json())
     except Exception as exc:
-        logger.warning("failed to fetch indextts voices from %s: %s", voices_url, exc)
+        logger.warning("failed to fetch %s voices from %s: %s", provider_name, voices_url, exc)
         return []
+
+
+async def _fetch_indextts_voices(base_url: str) -> list[str]:
+    return await _fetch_provider_voices(base_url, "/audio/voices", "indextts")
+
+
+async def _fetch_gemini_voices(base_url: str) -> list[str]:
+    return await _fetch_provider_voices(base_url, "/api/voices", "gemini")
 
 
 def _extract_voice_names(payload: object) -> list[str]:
     if isinstance(payload, dict):
-        candidates = payload.keys()
+        voices = payload.get("voices")
+        candidates = voices if isinstance(voices, list) else payload.keys()
     elif isinstance(payload, list):
         candidates = payload
     else:
         return []
-    return [name for name in candidates if isinstance(name, str) and name]
+
+    names: list[str] = []
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate:
+            names.append(candidate)
+        elif isinstance(candidate, dict):
+            name = candidate.get("name")
+            if isinstance(name, str) and name:
+                names.append(name)
+    return names
 
 
 def _prepend_default_voice(voices: list[str], default_voice: str) -> list[str]:
@@ -173,6 +196,19 @@ async def get_tts_providers() -> JSONResponse:
             "default_voice": cfg.tts_aws_polly_voice_id,
             "voices": [cfg.tts_aws_polly_voice_id],
         })
+
+    if cfg.tts_gemini_url:
+        fetched_voices = await _fetch_gemini_voices(cfg.tts_gemini_url)
+        if fetched_voices:
+            providers.append({
+                "id": GEMINI_PROVIDER_NAME,
+                "name": "Gemini TTS",
+                "default_voice": GEMINI_DEFAULT_VOICE,
+                "voices": _prepend_default_voice(
+                    fetched_voices,
+                    GEMINI_DEFAULT_VOICE,
+                ),
+            })
 
     if cfg.edge_tts_enabled:
         voices = ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "zh-CN-XiaoyiNeural"]

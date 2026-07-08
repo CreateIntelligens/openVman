@@ -61,6 +61,9 @@ class TTSRouterConfig(BaseSettings):
     tts_gcp_audio_encoding: str = "LINEAR16"
     tts_gcp_sample_rate: int = 24000
 
+    # --- Gemini TTS Console ---
+    tts_gemini_url: str = Field(default="", validation_alias="TTS_GEMINI_URL")
+
     # --- Edge-TTS (in-process) ---
     edge_tts_enabled: bool = Field(default=True, validation_alias="TTS_EDGE_ENABLED")
     edge_tts_voice: str = Field(

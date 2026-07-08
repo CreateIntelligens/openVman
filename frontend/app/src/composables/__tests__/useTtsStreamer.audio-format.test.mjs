@@ -26,7 +26,7 @@ function bytesFromInt16(samples) {
   return new Uint8Array(pcm.buffer);
 }
 
-function wavBytes(samples) {
+function wavBytes(samples, sampleRate = 16000) {
   const pcm = bytesFromInt16(samples);
   const bytes = new Uint8Array(44 + pcm.length);
   const view = new DataView(bytes.buffer);
@@ -37,8 +37,8 @@ function wavBytes(samples) {
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
   view.setUint16(22, 1, true);
-  view.setUint32(24, 16000, true);
-  view.setUint32(28, 32000, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
   view.setUint16(32, 2, true);
   view.setUint16(34, 16, true);
   bytes.set([...Buffer.from("data")], 36);
@@ -66,6 +66,15 @@ test("WAV responses skip the RIFF header and keep PCM data", () => {
 
   assert.equal(chunks.length, 1);
   assert.deepEqual([...chunks[0]], [10, -10, 20, -20]);
+});
+
+test("WAV responses at a non-16kHz rate (e.g. Gemini TTS's 24kHz) are resampled to 16kHz", () => {
+  const samples = Array.from({ length: 24 }, (_, i) => i * 100);
+  const chunks = pcmChunksFromAudioBytes(wavBytes(samples, 24000), "audio/wav");
+
+  assert.equal(chunks.length, 1);
+  // 24 samples at 24kHz => 1ms; resampled to 16kHz => 16 samples.
+  assert.equal(chunks[0].length, 16);
 });
 
 test("decoded encoded audio is resampled to 16 kHz PCM", () => {

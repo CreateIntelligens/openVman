@@ -20,9 +20,11 @@ from app.providers.error_mapping import (
     classify_aws_error,
     classify_edge_tts_error,
     classify_gcp_error,
+    classify_gemini_error,
     classify_indextts_error,
 )
 from app.providers.gcp_adapter import GCPTTSAdapter
+from app.providers.gemini_tts_adapter import GeminiTTSAdapter
 from app.providers.indextts_adapter import IndexTTSAdapter
 
 
@@ -50,6 +52,7 @@ class TTSRouterService:
     def __init__(self, config: TTSRouterConfig | None = None) -> None:
         self._config = config or get_tts_config()
         self._indextts = IndexTTSAdapter(self._config)
+        self._gemini = GeminiTTSAdapter(self._config)
         self._aws = AWSPollyAdapter(self._config)
         self._gcp = GCPTTSAdapter(self._config)
         self._edge = EdgeTTSAdapter(self._config)
@@ -58,6 +61,11 @@ class TTSRouterService:
     def edge_adapter(self) -> EdgeTTSAdapter:
         """Edge-TTS adapter, exposed for the streaming fallback path."""
         return self._edge
+
+    @property
+    def gemini_adapter(self) -> GeminiTTSAdapter:
+        """Gemini TTS adapter, exposed for the streaming fallback path."""
+        return self._gemini
 
     def build_chain(self) -> list[RouteTarget]:
         """Build the ordered fallback chain based on config."""
@@ -202,6 +210,7 @@ class TTSRouterService:
     ) -> tuple[tuple[str, ProviderAdapter, Callable[[Exception], str]], ...]:
         return (
             ("indextts", self._indextts, classify_indextts_error),
+            ("gemini-tts", self._gemini, classify_gemini_error),
             ("gcp-tts", self._gcp, classify_gcp_error),
             ("aws-polly", self._aws, classify_aws_error),
             ("edge-tts", self._edge, classify_edge_tts_error),

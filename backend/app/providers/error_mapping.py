@@ -134,3 +134,10 @@ def classify_edge_tts_error(exc: Exception) -> str:
         return REASON_BAD_REQUEST
 
     return _classify_network_error(exc) or REASON_UNKNOWN
+
+
+def classify_gemini_error(exc: Exception) -> str:
+    """Classify an error from Gemini TTS Console."""
+    from app.providers.gemini_tts_adapter import GeminiTTSHTTPError
+
+    return _classify_http_provider_error(exc, GeminiTTSHTTPError)
