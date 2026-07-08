@@ -178,11 +178,12 @@ async def load_privacy_filter_if_enabled() -> None:
         await asyncio.to_thread(load_privacy_filter_model)
     except Exception as exc:
         logger.warning("Privacy Filter GPU load failed; retrying on CPU: %s", exc)
-        from privacy.model import load_privacy_filter_model_cpu
+        from privacy.model import disable_privacy_filter, load_privacy_filter_model_cpu
         try:
             await asyncio.to_thread(load_privacy_filter_model_cpu)
         except Exception as cpu_exc:
-            logger.warning("Privacy Filter CPU load also failed; regex fallback will be used: %s", cpu_exc)
+            logger.warning("Privacy Filter CPU load also failed; disabling filter: %s", cpu_exc)
+            disable_privacy_filter(f"model_load_failed: {cpu_exc}")
 
 
 

@@ -40,6 +40,11 @@ async def test_startup_model_load_failure_disables_filter(monkeypatch) -> None:
     monkeypatch.setattr(main, "get_settings", lambda: _Settings())
     monkeypatch.setattr(privacy_filter, "get_settings", lambda: _Settings())
     monkeypatch.setattr(privacy_model, "load_privacy_filter_model", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        privacy_model,
+        "load_privacy_filter_model_cpu",
+        lambda: (_ for _ in ()).throw(RuntimeError("cpu boom")),
+    )
 
     await main.load_privacy_filter_if_enabled()
 
