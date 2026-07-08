@@ -206,17 +206,8 @@ function postToMascot(message: Record<string, unknown>): void {
   );
 }
 
-function pcmRmsVolume(pcm: Int16Array): number {
-  let sum = 0;
-  for (let i = 0; i < pcm.length; i++) {
-    const v = pcm[i] / 32768;
-    sum += v * v;
-  }
-  return Math.min(1, Math.sqrt(sum / pcm.length) * 3.4);
-}
-
-function driveMascotMouth(pcm: Int16Array): void {
-  postToMascot({ type: "mouth", volume: pcmRmsVolume(pcm) });
+function driveMascotMouth(volume: number): void {
+  postToMascot({ type: "mouth", volume });
 }
 
 function stopMascotMouth(): void {
@@ -380,8 +371,8 @@ const wasm = useMatesX();
 const audio = useAudioPlayer({
   onPcmChunk: (pcm) => {
     wasm.pushAudio(pcm);
-    driveMascotMouth(pcm);
   },
+  onPlaybackVolume: driveMascotMouth,
   onPlaybackEnd: () => {
     wasm.clearAudio();
     stopMascotMouth();

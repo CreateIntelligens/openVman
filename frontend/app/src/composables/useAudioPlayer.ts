@@ -10,6 +10,8 @@ import { ref, readonly, onUnmounted } from 'vue'
 interface AudioPlayerOptions {
        /** Callback to push PCM to WASM lip-sync engine */
        onPcmChunk?: (pcm: Int16Array) => void
+       /** Called with the current output volume while audio is playing */
+       onPlaybackVolume?: (volume: number) => void
        /** Called when the entire queued audio finishes playing */
        onPlaybackEnd?: () => void
        /** Called when the audio queue drains (last scheduled chunk has played) */
@@ -25,6 +27,9 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
        let nextStartTime = 0
        let playbackGeneration = 0
        const liveSources = new Set<AudioBufferSourceNode>()
+       let volumeAnalyser: AnalyserNode | null = null
+       let volumeData: Uint8Array<ArrayBuffer> | null = null
+       let volumeRaf: number | null = null
 
        function ensureContext(): AudioContext {
               if (!audioCtx) {
@@ -37,6 +42,53 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
        async function resumeContext(): Promise<void> {
               const ctx = ensureContext()
               if (ctx.state === 'suspended') await ctx.resume()
+       }
+
+       function ensureVolumeAnalyser(ctx: AudioContext): AnalyserNode | null {
+              if (!options.onPlaybackVolume) return null
+              if (!volumeAnalyser) {
+                     volumeAnalyser = ctx.createAnalyser()
+                     volumeAnalyser.fftSize = 256
+                     volumeAnalyser.connect(ctx.destination)
+                     volumeData = new Uint8Array(volumeAnalyser.fftSize)
+              }
+              return volumeAnalyser
+       }
+
+       function stopVolumeMonitor(): void {
+              if (volumeRaf !== null) {
+                     cancelAnimationFrame(volumeRaf)
+                     volumeRaf = null
+              }
+       }
+
+       function disconnectVolumeAnalyser(): void {
+              stopVolumeMonitor()
+              try {
+                     volumeAnalyser?.disconnect()
+              } catch {
+                     void 0
+              }
+              volumeAnalyser = null
+              volumeData = null
+       }
+
+       function startVolumeMonitor(): void {
+              if (!options.onPlaybackVolume || volumeRaf !== null) return
+              if (typeof requestAnimationFrame !== 'function') return
+
+              const tick = () => {
+                     if (!volumeAnalyser || !volumeData || liveSources.size === 0) {
+                            volumeRaf = null
+                            return
+                     }
+
+                     volumeAnalyser.getByteTimeDomainData(volumeData)
+                     options.onPlaybackVolume?.(rmsVolume(volumeData))
+                     volumeRaf = requestAnimationFrame(tick)
+              }
+
+              volumeRaf = requestAnimationFrame(tick)
        }
 
        /**
@@ -69,7 +121,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                      buffer.copyToChannel(float32, 0)
                      const source = ctx.createBufferSource()
                      source.buffer = buffer
-                     source.connect(ctx.destination)
+                     source.connect(ensureVolumeAnalyser(ctx) ?? ctx.destination)
 
                      const now = ctx.currentTime
                      if (nextStartTime < now) nextStartTime = now
@@ -77,6 +129,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                      source.start(nextStartTime)
                      isPlaying.value = true
                      liveSources.add(source)
+                     startVolumeMonitor()
 
                      const duration = float32.length / 16000
                      nextStartTime += duration
@@ -85,6 +138,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                             liveSources.delete(source)
                             // If nothing else is scheduled, mark playback as done
                             if (ctx.currentTime >= nextStartTime - 0.01) {
+                                   stopVolumeMonitor()
                                    isPlaying.value = false
                                    options.onPlaybackEnd?.()
                                    options.onQueueEmpty?.()
@@ -108,6 +162,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                      audioCtx.close()
                      audioCtx = null
               }
+              disconnectVolumeAnalyser()
               liveSources.clear()
               nextStartTime = 0
               isPlaying.value = false
@@ -130,6 +185,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                      }
               }
               liveSources.clear()
+              disconnectVolumeAnalyser()
               nextStartTime = 0
               isPlaying.value = false
        }
@@ -156,4 +212,13 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
               bytes[i] = bin.charCodeAt(i)
        }
        return bytes.buffer
+}
+
+function rmsVolume(data: Uint8Array<ArrayBuffer>): number {
+       let sum = 0
+       for (let i = 0; i < data.length; i++) {
+              const v = (data[i] - 128) / 128
+              sum += v * v
+       }
+       return Math.min(1, Math.sqrt(sum / data.length) * 3.4)
 }

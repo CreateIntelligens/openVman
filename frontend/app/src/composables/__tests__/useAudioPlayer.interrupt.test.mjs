@@ -96,3 +96,99 @@ test("flush cancels a chunk that is waiting for AudioContext resume", async () =
     console.warn = previousConsoleWarn;
   }
 });
+
+test("playback volume is sampled from the audio output graph", async () => {
+  const previousAudioContext = globalThis.AudioContext;
+  const previousRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const previousCancelAnimationFrame = globalThis.cancelAnimationFrame;
+
+  let animationFrameCallback;
+  let connectedSourceTarget = null;
+  let analyserDestination = null;
+  const volumes = [];
+
+  class FakeAnalyser {
+    constructor() {
+      this.fftSize = 4;
+    }
+
+    connect(target) {
+      analyserDestination = target;
+    }
+
+    disconnect() {}
+
+    getByteTimeDomainData(data) {
+      data[0] = 128;
+      data[1] = 255;
+      data[2] = 128;
+      data[3] = 1;
+    }
+  }
+
+  class FakeAudioContext {
+    constructor() {
+      this.currentTime = 3;
+      this.destination = { name: "destination" };
+      this.state = "running";
+    }
+
+    async resume() {}
+
+    createAnalyser() {
+      this.analyser = new FakeAnalyser();
+      return this.analyser;
+    }
+
+    createBuffer() {
+      return {
+        copyToChannel() {},
+      };
+    }
+
+    createBufferSource() {
+      return {
+        buffer: null,
+        connect(target) {
+          connectedSourceTarget = target;
+        },
+        start() {},
+        stop() {},
+        onended: null,
+      };
+    }
+
+    close() {
+      this.state = "closed";
+    }
+  }
+
+  globalThis.AudioContext = FakeAudioContext;
+  globalThis.requestAnimationFrame = (callback) => {
+    animationFrameCallback = callback;
+    return 1;
+  };
+  globalThis.cancelAnimationFrame = () => undefined;
+
+  try {
+    const audio = useAudioPlayer({
+      onPlaybackVolume: (volume) => {
+        volumes.push(volume);
+      },
+    });
+
+    await audio.playChunk(new Int16Array([1, 2, 3, 4]).buffer);
+
+    assert.ok(connectedSourceTarget instanceof FakeAnalyser);
+    assert.equal(analyserDestination?.name, "destination");
+    assert.equal(typeof animationFrameCallback, "function");
+
+    animationFrameCallback();
+
+    assert.ok(volumes[0] > 0);
+  } finally {
+    globalThis.AudioContext = previousAudioContext;
+    globalThis.requestAnimationFrame = previousRequestAnimationFrame;
+    globalThis.cancelAnimationFrame = previousCancelAnimationFrame;
+  }
+});
