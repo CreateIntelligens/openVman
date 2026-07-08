@@ -72,3 +72,6 @@ frontend/admin/public/models/
 
 # graphify knowledge-graph output (local only)
 .graphify-out/
+
+# Git worktrees
+.worktree/
