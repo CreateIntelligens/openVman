@@ -17,7 +17,7 @@ export const fallbackStarterPrompts = [
 export function getConversationTitle(loadingHistory: boolean, sending: boolean) {
   if (loadingHistory) return "載入先前對話...";
   if (sending) return "即時串流回覆中...";
-  return "直接詢問 Brain";
+  return "Chat";
 }
 
 export function addPendingExchange(messages: ChatMessage[], userMessage: string, createdAt: string) {
