@@ -1,7 +1,7 @@
 # openVman — 虛擬人系統架構總覽 (Architecture Index)
 
 > **版本**：v0.10.1
-> **最後更新**：2026-05-28
+> **最後更新**：2026-07-07
 > **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
 
 ---
@@ -37,7 +37,11 @@ python scripts/embed_keys_cli.py rotate <key_id>
 
 第三方網站接入流程、Web Component 屬性、postMessage v1 事件表與公開錯誤碼請參閱 [虛擬人外部嵌入整合指南 (docs/avatar-embed/README.md)](./docs/avatar-embed/README.md)。
 
+## 環境變數 (.env)
 
+所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時只需 `cp .env.example .env` 並填值，不用分開維護多份。
+
+`backend/app/config.py`、`brain/api/config.py` 兩者的 pydantic-settings 仍各自帶有一個相對路徑的 `env_file=` 備援設定，但在 Docker 部署下不會用到（容器只掛載服務子目錄，該路徑在容器內不存在）——實際生效值一律來自 compose 注入的環境變數。
 
 ### AI Coding 餵檔策略
 

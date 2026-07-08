@@ -19,7 +19,7 @@ services:
       - opf-cache:/home/appuser/.opf
       - triton-cache:/home/appuser/.triton
     env_file:
-      - ./brain/.env
+      - ./.env
     environment:
       - HOME=/home/appuser
       - OPF_MOE_TRITON=false
@@ -189,7 +189,7 @@ services:
       - ./data/avatar:/data/avatar
       - ./data/backgrounds:/data/backgrounds
     env_file:
-      - ./backend/.env
+      - ./.env
     environment:
       - REDIS_URL=redis://redis:6379
       - TTS_INDEXTTS_URL=http://index-tts-vllm:8011

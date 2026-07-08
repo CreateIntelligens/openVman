@@ -15,7 +15,7 @@ def _read_text(path: Path) -> str:
 
 
 def test_backend_env_example_uses_dev_mode():
-    env_example = _read_text(BACKEND_ROOT / ".env.example")
+    env_example = _read_text(REPO_ROOT / ".env.example")
     assert "ENV=dev" in env_example
 
 
