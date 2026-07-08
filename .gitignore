@@ -16,6 +16,7 @@ supervisord.pid
 # Avatar uploads and runtime media
 data/avatar/
 data/backgrounds/
+data/mascots/
 
 # Python
 __pycache__/

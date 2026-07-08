@@ -41,6 +41,20 @@ python scripts/embed_keys_cli.py rotate <key_id>
 
 所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時只需 `cp .env.example .env` 並填值，不用分開維護多份。
 
+### 部署前置：資料目錄權限
+
+`docker-compose.yml` 裡多個 volume 是 host 端 bind mount（如 `./data`、`./backend/data`）。若該目錄尚不存在，Docker 會以 root 自動建立，但容器內服務是以 `${UID:-1000}:${GID:-1000}` 非 root 身分執行，會導致寫入失敗（例如 `avatar-mascots dir not preparable at import: Permission denied`）。
+
+`./data` 底下的 `avatar`/`backgrounds`/`mascots` 子目錄統一用 `./data:/data` 一行掛載（三者都對應 `/data/*`，合併掛載即可，不用逐條列出）；子目錄由服務啟動時自行 `mkdir` 建立。
+
+首次部署或新增 bind mount 目錄後，先執行：
+
+```bash
+./scripts/ensure-data-dirs.sh
+```
+
+它會建立所有必要的 host 資料目錄並 `chown` 成正確的 UID:GID，之後再 `docker compose up` 即可。
+
 `backend/app/config.py`、`brain/api/config.py` 兩者的 pydantic-settings 仍各自帶有一個相對路徑的 `env_file=` 備援設定，但在 Docker 部署下不會用到（容器只掛載服務子目錄，該路徑在容器內不存在）——實際生效值一律來自 compose 注入的環境變數。
 
 ### AI Coding 餵檔策略

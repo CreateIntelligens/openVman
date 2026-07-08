@@ -33,6 +33,7 @@ services:
 
   index-tts-vllm:
     <<: *shared
+    profiles: ["indextts"]
     build:
       context: ./backend/index-tts-vllm
       dockerfile: Dockerfile
@@ -186,8 +187,7 @@ services:
       - ./backend/Dockerfile:/app/Dockerfile
       - ./backend/requirements.txt:/app/requirements.txt
       - ./backend/scripts:/app/scripts
-      - ./data/avatar:/data/avatar
-      - ./data/backgrounds:/data/backgrounds
+      - ./data:/data
     env_file:
       - ./.env
     environment:
@@ -195,6 +195,7 @@ services:
       - TTS_INDEXTTS_URL=http://index-tts-vllm:8011
       - AVATAR_ASSETS_DIR=/data/avatar
       - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
+      - AVATAR_MASCOTS_DIR=/data/mascots
     depends_on:
       api:
         condition: service_started
