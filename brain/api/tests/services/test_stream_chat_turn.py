@@ -135,6 +135,14 @@ def _stub_config(monkeypatch: pytest.MonkeyPatch, llm_client: Any, *, api_key: s
     monkeypatch.setattr(config, "get_settings", lambda: fake_cfg)
     monkeypatch.setattr(llm_client, "get_settings", lambda: fake_cfg)
 
+    # provider_router / fallback_chain bind `get_settings` at import time via
+    # `from config import get_settings`; patching the `config` module alone
+    # doesn't reach those already-bound names, so patch them directly too.
+    import core.provider_router as provider_router_module
+    monkeypatch.setattr(provider_router_module, "get_settings", lambda: fake_cfg)
+    import core.fallback_chain as fallback_chain_module
+    monkeypatch.setattr(fallback_chain_module, "get_settings", lambda: fake_cfg)
+
     fake_privacy = types.ModuleType("privacy.filter")
     fake_privacy.detect_llm_messages_pii = lambda messages, source="unknown", trace_id="": None
     fake_privacy.FilterSource = str

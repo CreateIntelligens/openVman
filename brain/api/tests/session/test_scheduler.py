@@ -278,6 +278,15 @@ class TestForceSkip:
     def setup_method(self):
         _last_run.clear()
 
+    @pytest.fixture(autouse=True)
+    def _isolate_dreams_dir(self, tmp_path, monkeypatch):
+        """_dreams_dir resolves to a real, shared project data directory —
+        redirect it to tmp_path so these tests never touch the production
+        last-run.json (used by the api container's real dreaming scheduler)."""
+        from memory.dreaming import scheduler
+
+        monkeypatch.setattr(scheduler, "_dreams_dir", lambda project_id: tmp_path)
+
     def _mock_phases(self):
         """Patch phase modules so run_dreaming_cycle can execute."""
         mock_light = MagicMock(return_value={"status": "ok", "candidate_count": 0})
@@ -293,11 +302,9 @@ class TestForceSkip:
         rp.run_rem_phase = mock_rem
 
     def test_force_true_always_runs(self):
-        from memory.dreaming import scheduler
-
         tz = _get_tz("UTC+8")
         today = datetime.now(tz).strftime("%Y-%m-%d")
-        scheduler._last_run["default"] = {
+        _last_run["default"] = {
             "status": "ok",
             "completed_at": f"{today}T03:00:00+08:00",
         }
@@ -309,11 +316,9 @@ class TestForceSkip:
             assert result["status"] == "ok"
 
     def test_no_force_skips_if_ran_today(self):
-        from memory.dreaming import scheduler
-
         tz = _get_tz("UTC+8")
         today = datetime.now(tz).strftime("%Y-%m-%d")
-        scheduler._last_run["default"] = {
+        _last_run["default"] = {
             "status": "ok",
             "completed_at": f"{today}T03:00:00+08:00",
         }
@@ -323,7 +328,8 @@ class TestForceSkip:
         assert result["reason"] == "already_ran_today"
 
     def test_no_force_runs_if_no_previous(self):
-        from memory.dreaming.scheduler import _last_run, _dreams_dir
+        from memory.dreaming.scheduler import _dreams_dir
+
         _last_run.clear()
         state_file = _dreams_dir("default") / "last-run.json"
         if state_file.exists():

@@ -6,6 +6,7 @@ import importlib
 import json
 import sys
 import types
+from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -14,6 +15,12 @@ import pytest
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
+
+# Writeback tests exercise the real archive-old-transcripts pass (30-day
+# retention), so the daily file's date must stay inside that window —
+# a hardcoded past date eventually falls outside retention and gets
+# archived out from under the test.
+TODAY = date.today().isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -120,14 +127,14 @@ class TestDailySummaryWriteback:
 
         result = gov.write_summary_and_reindex(
             persona_id="default",
-            day="2026-03-15",
+            day=TODAY,
             summary_text="- 使用者詢問糖尿病飲食控制",
             source_turns=8,
             session_id="abc123",
         )
 
         assert result["status"] == "ok"
-        daily_file = ws / "memory" / "default" / "2026-03-15.md"
+        daily_file = ws / "memory" / "default" / f"{TODAY}.md"
         assert daily_file.exists()
 
         content = daily_file.read_text(encoding="utf-8")
@@ -142,12 +149,12 @@ class TestDailySummaryWriteback:
         summary = "- 使用者喜歡簡短回覆"
         gov.write_summary_and_reindex(
             persona_id="default",
-            day="2026-03-15",
+            day=TODAY,
             summary_text=summary,
         )
         result = gov.write_summary_and_reindex(
             persona_id="default",
-            day="2026-03-15",
+            day=TODAY,
             summary_text=summary,
         )
 
@@ -158,15 +165,15 @@ class TestDailySummaryWriteback:
         """Existing transcript content should not be destroyed."""
         gov, ws, _ = _stub_deps(monkeypatch, tmp_path)
 
-        daily_file = ws / "memory" / "default" / "2026-03-15.md"
+        daily_file = ws / "memory" / "default" / f"{TODAY}.md"
         daily_file.write_text(
-            "# 2026-03-15 對話日誌\n\n## 10:00 | session xyz\n\n### User\n你好\n",
+            f"# {TODAY} 對話日誌\n\n## 10:00 | session xyz\n\n### User\n你好\n",
             encoding="utf-8",
         )
 
         gov.write_summary_and_reindex(
             persona_id="default",
-            day="2026-03-15",
+            day=TODAY,
             summary_text="- 打招呼",
             session_id="xyz",
         )
@@ -183,7 +190,7 @@ class TestDailySummaryWriteback:
 
         result = gov.write_summary_and_reindex(
             persona_id="default",
-            day="2026-03-15",
+            day=TODAY,
             summary_text="- 測試 reindex hook",
         )
 
@@ -197,7 +204,7 @@ class TestDailySummaryWriteback:
 
         gov.write_summary_and_reindex(
             persona_id="default",
-            day="2026-03-15",
+            day=TODAY,
             summary_text="- 測試 log",
         )
 
@@ -210,13 +217,13 @@ class TestDailySummaryWriteback:
 
         gov.write_summary_and_reindex(
             persona_id="default",
-            day="2026-03-15",
+            day=TODAY,
             summary_text="- 格式測試",
             source_turns=5,
             session_id="sess-1",
         )
 
-        daily_file = ws / "memory" / "default" / "2026-03-15.md"
+        daily_file = ws / "memory" / "default" / f"{TODAY}.md"
         content = daily_file.read_text(encoding="utf-8")
 
         assert "persona_id: default" in content
