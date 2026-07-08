@@ -115,6 +115,7 @@ export interface ServerCameraFrameStatusEvent {
   timestamp: number;
   frame_timestamp?: number;
   message?: string;
+  visual_state?: Record<string, unknown>;
 }
 
 export interface UserTranscriptionEvent {

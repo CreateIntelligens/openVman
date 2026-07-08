@@ -35,6 +35,20 @@
     "message": {
       "type": "string",
       "minLength": 1
+    },
+    "visual_state": {
+      "type": "object",
+      "properties": {
+        "event_key": { "type": "string" },
+        "state": { "type": "string" },
+        "color": { "type": "string" },
+        "label": { "type": "string" },
+        "active": { "type": "boolean" },
+        "true_streak": { "type": "integer" },
+        "confirm_frames": { "type": "integer" }
+      },
+      "required": ["event_key", "state", "color", "label", "active", "true_streak", "confirm_frames"],
+      "additionalProperties": false
     }
   },
   "required": [

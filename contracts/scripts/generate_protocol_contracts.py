@@ -187,7 +187,8 @@ def _render_ts_type(property_name: str, schema: dict[str, Any], parent_name: str
     if schema_type == "boolean":
         return "boolean"
     if schema_type == "object":
-        if schema.get("additionalProperties", {}).get("type") == "string":
+        add_props = schema.get("additionalProperties", {})
+        if isinstance(add_props, dict) and add_props.get("type") == "string":
             return "Record<string, string>"
         return "Record<string, unknown>"
     if schema_type == "array":
@@ -316,7 +317,8 @@ def _render_python_type(model_name: str, property_name: str, schema: dict[str, A
     if schema_type == "boolean":
         return "bool"
     if schema_type == "object":
-        if schema.get("additionalProperties", {}).get("type") == "string":
+        add_props = schema.get("additionalProperties", {})
+        if isinstance(add_props, dict) and add_props.get("type") == "string":
             return "dict[str, str]"
         return "dict[str, object]"
     if schema_type == "array":

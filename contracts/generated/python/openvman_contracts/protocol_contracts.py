@@ -97,6 +97,7 @@ class ServerCameraFrameStatusEvent(GeneratedProtocolModel):
     timestamp: int = Field(ge=0)
     frame_timestamp: int | None = Field(default=None, ge=0)
     message: str | None = Field(default=None, min_length=1)
+    visual_state: dict[str, object] | None = Field(default=None)
 
 class UserTranscriptionEvent(GeneratedProtocolModel):
     event: Literal['user_transcription']
