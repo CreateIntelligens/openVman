@@ -55,6 +55,18 @@ vi.mock("../api", () => ({
       },
     ],
   }),
+  fetchAvatarMascots: vi.fn().mockResolvedValue({
+    mascots: [
+      {
+        mascot_id: "qqman",
+        label: "QQman",
+        engine: "3d",
+        builtin: false,
+        size_bytes: 2048,
+        updated_at: "2026-07-07T00:00:00Z",
+      },
+    ],
+  }),
   saveKnowledgeDocument: vi.fn(),
   setPersonaAvatar: vi.fn().mockResolvedValue({ status: "ok" }),
 }));
@@ -72,7 +84,7 @@ describe("Personas page", () => {
     expect(screen.queryByRole("combobox")).toBeNull();
 
     fireEvent.click(trigger);
-    fireEvent.mouseDown(await screen.findByRole("option", { name: "ESG-AIKKA半身" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "ESG-AIKKA半身 (2D)" }));
 
     await waitFor(() => {
       expect(setPersonaAvatar).toHaveBeenCalledWith("default", "0616");

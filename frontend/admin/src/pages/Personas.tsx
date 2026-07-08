@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import {
+       AvatarCharacter,
+       AvatarMascot,
        clonePersona,
        createPersona,
        deletePersona,
+       fetchAvatarCharacters,
+       fetchAvatarMascots,
        fetchPersonas,
        fetchKnowledgeDocument,
        PersonaSummary,
        saveKnowledgeDocument,
-       fetchAvatarCharacters,
        setPersonaAvatar,
-       AvatarCharacter,
 } from "../api";
 import StatusAlert from "../components/StatusAlert";
 import ConfirmModal from "../components/ConfirmModal";
@@ -24,6 +26,23 @@ import { useLocalStorageState } from "../hooks/useLocalStorageState";
 type EditorMode = "edit" | "preview" | "split";
 const EDITOR_MODES: readonly EditorMode[] = ["edit", "split", "preview"];
 type Status = { type: "success" | "error"; message: string } | null;
+type AvatarBindingOption = Pick<AvatarCharacter, "char_id" | "label">;
+
+function buildAvatarBindingOptions(
+       characters: AvatarCharacter[],
+       mascots: AvatarMascot[],
+): AvatarBindingOption[] {
+       return [
+              ...characters.map((character) => ({
+                     char_id: character.char_id,
+                     label: `${character.label || character.char_id} (2D)`,
+              })),
+              ...mascots.map((mascot) => ({
+                     char_id: mascot.mascot_id,
+                     label: `${mascot.label || mascot.mascot_id} (3D VRM)`,
+              })),
+       ];
+}
 
 export default function Personas() {
        const { projectId } = useProject();
@@ -33,7 +52,7 @@ export default function Personas() {
        const [templateSourceId, setTemplateSourceId] = useState("");
 
        const [selectedPersona, setSelectedPersona] = useState<PersonaSummary | null>(null);
-       const [avatarChars, setAvatarChars] = useState<AvatarCharacter[]>([]);
+       const [avatarChars, setAvatarChars] = useState<AvatarBindingOption[]>([]);
 
        // Document Editor State
        const [selectedPath, setSelectedPath] = useState("");
@@ -191,14 +210,19 @@ export default function Personas() {
        }, [projectId]);
 
        useEffect(() => {
-              fetchAvatarCharacters()
-                     .then((r) => setAvatarChars(r.characters))
-                     .catch(() => setAvatarChars([]));
+              Promise.all([
+                     fetchAvatarCharacters().catch(() => ({ characters: [] })),
+                     fetchAvatarMascots().catch(() => ({ mascots: [] })),
+              ]).then(([charsRes, mascotsRes]) => {
+                     setAvatarChars(
+                            buildAvatarBindingOptions(charsRes.characters, mascotsRes.mascots),
+                     );
+              });
        }, []);
 
-       const onBindAvatar = async (personaId: string, charId: string) => {
+       const onBindAvatar = async (personaId: string, charId: string | null) => {
               try {
-                     await setPersonaAvatar(personaId, charId || null);
+                     await setPersonaAvatar(personaId, charId);
                      setStatus({ type: "success", message: "已更新虛擬人綁定" });
                      await loadPersonas(personaId);
               } catch (error) {
@@ -217,6 +241,7 @@ export default function Personas() {
                      { path: `${docPrefix}AGENTS.md`, label: "AGENTS.md", icon: "group_work" },
                      { path: `${docPrefix}TOOLS.md`, label: "TOOLS.md", icon: "build" },
                      { path: `${docPrefix}MEMORY.md`, label: "MEMORY.md", icon: "memory" },
+                     { path: `${docPrefix}ASR_PROMPT.md`, label: "ASR_PROMPT.md", icon: "record_voice_over" },
               ]
               : [];
 
@@ -329,26 +354,26 @@ function PersonaAvatarSelector({
        persona,
        onBind,
 }: {
-       characters: AvatarCharacter[];
+       characters: AvatarBindingOption[];
        persona: PersonaSummary;
-       onBind: (personaId: string, charId: string) => void;
+       onBind: (personaId: string, charId: string | null) => Promise<void>;
 }) {
        const options = [
               { value: "", label: "（未綁定）" },
               ...characters.map((character) => ({
                      value: character.char_id,
-                     label: character.label || character.char_id,
+                     label: character.label,
               })),
        ];
 
        return (
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800/60">
-                     <span className="text-sm text-slate-600 dark:text-slate-400">虛擬人角色：</span>
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-900/10">
+                     <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">虛擬人模型：</span>
                      <Select
                             value={persona.avatar_char_id ?? ""}
                             options={options}
-                            onChange={(value) => onBind(persona.persona_id, value)}
-                            className="min-w-[8rem]"
+                            onChange={(value) => onBind(persona.persona_id, value || null)}
+                            className="min-w-[10rem]"
                      />
               </div>
        );

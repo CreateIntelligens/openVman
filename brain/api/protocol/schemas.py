@@ -40,6 +40,10 @@ class PersonaCloneRequest(BaseModel):
 class PersonaAvatarRequest(BaseModel):
     persona_id: str = Field(..., description="Persona to bind")
     avatar_char_id: str | None = Field(None, description="Avatar char_id, or null to clear")
+    asr_prompt: str | None = Field(
+        None,
+        description="ASR prompt / glossary for this persona, or null to clear",
+    )
     project_id: str = Field("default", description="Project this persona belongs to")
 
 

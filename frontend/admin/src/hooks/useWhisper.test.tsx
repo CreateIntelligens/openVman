@@ -42,7 +42,7 @@ describe("useWhisper hook", () => {
 
     expect(result.current.status).toBe("ready");
     expect(result.current.loadProgress).toBe(1.0);
-    expect(mockPipeline).toHaveBeenCalledWith("automatic-speech-recognition", "whisper-base", expect.any(Object));
+    expect(mockPipeline).toHaveBeenCalledWith("automatic-speech-recognition", "whisper-small", expect.any(Object));
   });
 
   it("transcribes audio data successfully", async () => {

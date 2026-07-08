@@ -9,7 +9,12 @@ from personas.personas import (
     list_personas,
     set_persona_avatar,
 )
-from protocol.schemas import PersonaAvatarRequest, PersonaCloneRequest, PersonaCreateRequest, PersonaDeleteRequest
+from protocol.schemas import (
+    PersonaAvatarRequest,
+    PersonaCloneRequest,
+    PersonaCreateRequest,
+    PersonaDeleteRequest,
+)
 from safety.observability import log_event
 
 router = APIRouter(prefix="/brain", tags=["Personas"])
@@ -24,7 +29,11 @@ async def list_personas_route(project_id: str = "default"):
 @router.post("/personas", summary="建立新人設")
 async def create_persona_route(payload: PersonaCreateRequest):
     try:
-        result = create_persona_scaffold(payload.persona_id, payload.label, payload.project_id)
+        result = create_persona_scaffold(
+            payload.persona_id,
+            payload.label,
+            payload.project_id,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     log_event("persona_created", persona_id=payload.persona_id, project_id=payload.project_id)
@@ -44,7 +53,11 @@ async def delete_persona_route(payload: PersonaDeleteRequest):
 @router.post("/personas/clone", summary="複製人設")
 async def clone_persona_route(payload: PersonaCloneRequest):
     try:
-        result = clone_persona_scaffold(payload.source_persona_id, payload.target_persona_id, payload.project_id)
+        result = clone_persona_scaffold(
+            payload.source_persona_id,
+            payload.target_persona_id,
+            payload.project_id,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     log_event(
@@ -59,7 +72,12 @@ async def clone_persona_route(payload: PersonaCloneRequest):
 @router.post("/personas/avatar", summary="綁定 persona 的 Avatar 角色")
 async def set_persona_avatar_route(payload: PersonaAvatarRequest):
     try:
-        result = set_persona_avatar(payload.persona_id, payload.avatar_char_id, payload.project_id)
+        result = set_persona_avatar(
+            payload.persona_id,
+            payload.avatar_char_id,
+            payload.project_id,
+            payload.asr_prompt,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     log_event(
@@ -69,4 +87,3 @@ async def set_persona_avatar_route(payload: PersonaAvatarRequest):
         project_id=payload.project_id,
     )
     return result
-

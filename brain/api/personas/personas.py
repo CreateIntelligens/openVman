@@ -18,6 +18,7 @@ PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
     "tools": "TOOLS.md",
     "memory": "MEMORY.md",
     "identity": "IDENTITY.md",
+    "asr_prompt": "ASR_PROMPT.md",
 }
 PERSONA_CORE_KEYS = frozenset(PERSONA_CORE_KEYS_TO_FILES.keys())
 PERSONA_CORE_FILENAMES = frozenset(PERSONA_CORE_KEYS_TO_FILES.values())
@@ -65,7 +66,14 @@ def list_personas(project_id: str = "default") -> list[dict[str, Any]]:
         if not soul_path.exists():
             continue
         persona_id = normalize_persona_id(path.name)
-        personas.append(_build_persona_summary(persona_id, soul_path, is_default=False, project_id=project_id))
+        personas.append(
+            _build_persona_summary(
+                persona_id,
+                soul_path,
+                is_default=False,
+                project_id=project_id,
+            )
+        )
     return personas
 
 
@@ -86,7 +94,12 @@ def create_persona_scaffold(persona_id: str, label: str = "", project_id: str = 
         (persona_dir / filename).write_text(content, encoding="utf-8")
 
     ws = workspace.get_workspace_root(project_id)
-    persona = _build_persona_summary(normalized, persona_dir / "SOUL.md", is_default=False, project_id=project_id)
+    persona = _build_persona_summary(
+        normalized,
+        persona_dir / "SOUL.md",
+        is_default=False,
+        project_id=project_id,
+    )
     return {
         "status": "ok",
         "persona": persona,
@@ -119,7 +132,9 @@ def clone_persona_scaffold(
     project_id: str = "default",
 ) -> dict[str, Any]:
     source_paths = resolve_core_document_paths(source_persona_id, project_id)
-    target_id = normalize_persona_id(_require_text(target_persona_id, "target_persona_id"))
+    target_id = normalize_persona_id(
+        _require_text(target_persona_id, "target_persona_id")
+    )
     if target_id == "default":
         raise ValueError("不可覆蓋 default persona")
 
@@ -137,7 +152,12 @@ def clone_persona_scaffold(
         shutil.copyfile(source_path, target_path)
         copied_files.append(target_path.relative_to(ws).as_posix())
 
-    persona = _build_persona_summary(target_id, target_dir / "SOUL.md", is_default=False, project_id=project_id)
+    persona = _build_persona_summary(
+        target_id,
+        target_dir / "SOUL.md",
+        is_default=False,
+        project_id=project_id,
+    )
     return {
         "status": "ok",
         "persona": persona,
@@ -166,7 +186,11 @@ def _build_default_persona_summary(project_id: str = "default") -> dict[str, Any
     core_docs = workspace.get_core_documents(project_id)
     soul_path = core_docs["soul"]
     return _build_persona_summary(
-        "default", soul_path, is_default=True, label="default", project_id=project_id,
+        "default",
+        soul_path,
+        is_default=True,
+        label="default",
+        project_id=project_id,
     )
 
 
@@ -186,29 +210,72 @@ def _build_persona_summary(
     project_id: str = "default",
 ) -> dict[str, Any]:
     ws = workspace.get_workspace_root(project_id)
+    meta = _read_avatar_meta(persona_id, project_id, is_default=is_default)
+    asr_prompt = _read_asr_prompt_file(persona_id, project_id, is_default=is_default)
     return {
         "persona_id": persona_id,
         "label": label or _extract_heading_or_name(soul_path, persona_id),
         "path": soul_path.relative_to(ws).as_posix(),
         "preview": _read_preview(soul_path),
         "is_default": is_default,
-        "avatar_char_id": _read_avatar_char_id(persona_id, project_id, is_default=is_default),
+        "avatar_char_id": meta.get("avatar_char_id"),
+        "asr_prompt": asr_prompt,
     }
 
 
-def _read_avatar_char_id(persona_id: str, project_id: str, *, is_default: bool) -> str | None:
+def _read_asr_prompt_file(persona_id: str, project_id: str, *, is_default: bool) -> str | None:
+    path = _persona_core_path(
+        persona_id,
+        project_id,
+        filename="ASR_PROMPT.md",
+        is_default=is_default,
+    )
+    if not path.exists():
+        return None
+
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+        content_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if stripped:
+                content_lines.append(stripped)
+        return " ".join(content_lines).strip() or None
+    except OSError:
+        return None
+
+
+def _persona_core_path(
+    persona_id: str,
+    project_id: str,
+    *,
+    filename: str,
+    is_default: bool,
+) -> Path:
+    if is_default:
+        return workspace.get_workspace_root(project_id) / filename
+    return get_persona_directory(persona_id, project_id) / filename
+
+
+def _read_avatar_meta(persona_id: str, project_id: str, *, is_default: bool) -> dict[str, Any]:
     meta_path = _avatar_meta_path(persona_id, project_id, is_default=is_default)
     if not meta_path.exists():
-        return None
+        return {}
     try:
         data = json.loads(meta_path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError):
-        return None
-    value = data.get("avatar_char_id")
-    return value if isinstance(value, str) and value else None
+        return {}
 
 
-def set_persona_avatar(persona_id: str, char_id: str | None, project_id: str = "default") -> dict[str, Any]:
+def set_persona_avatar(
+    persona_id: str,
+    char_id: str | None,
+    project_id: str = "default",
+    asr_prompt: str | None = None,
+) -> dict[str, Any]:
     normalized = normalize_persona_id(persona_id)
     if normalized == "default":
         ws = workspace.get_workspace_root(project_id)
@@ -218,10 +285,20 @@ def set_persona_avatar(persona_id: str, char_id: str | None, project_id: str = "
         if not (persona_dir / "SOUL.md").exists():
             raise ValueError("persona 不存在")
 
-    meta_path = _avatar_meta_path(normalized, project_id, is_default=normalized == "default")
-    cleaned = char_id.strip() if (char_id and char_id.strip()) else None
-    meta_path.write_text(json.dumps({"avatar_char_id": cleaned}, ensure_ascii=False), encoding="utf-8")
-    return {"status": "ok", "persona_id": normalized, "avatar_char_id": cleaned}
+    is_default = normalized == "default"
+    meta_path = _avatar_meta_path(normalized, project_id, is_default=is_default)
+    meta = _read_avatar_meta(normalized, project_id, is_default=is_default)
+
+    cleaned_char_id = char_id.strip() if (char_id and char_id.strip()) else None
+    meta["avatar_char_id"] = cleaned_char_id
+    meta.pop("asr_prompt", None)
+
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    return {
+        "status": "ok",
+        "persona_id": normalized,
+        "avatar_char_id": cleaned_char_id,
+    }
 
 
 def _avatar_meta_path(persona_id: str, project_id: str, *, is_default: bool) -> Path:
@@ -295,5 +372,12 @@ _PERSONA_TEMPLATES: dict[str, callable] = {
 ## 說明
 - 此檔定義 {label} persona 的外部身份與視覺主題。
 - 若沒有特別覆蓋，系統仍會沿用全域 IDENTITY 設定。
+""",
+    "asr_prompt": lambda label: f"""# {label} ASR 語音優化詞庫 (ASR_PROMPT)
+#
+# 在此檔案中，您可以輸入本角色常被辨識錯誤的專有名詞、英文單字或同音字。
+# 所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。
+
+openVman 虛擬人、VRM 3D 模型、Live2D 角色與 AI 應用。
 """,
 }

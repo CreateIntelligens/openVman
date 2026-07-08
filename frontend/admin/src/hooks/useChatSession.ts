@@ -243,8 +243,10 @@ export function useChatSession() {
   const markAsrActivity = useCallback(() => {
     if (asrListening) scheduleAsrIdleTimeout();
   }, [asrListening, scheduleAsrIdleTimeout]);
+  const currentPersona = personas.find((p) => p.persona_id === selectedPersonaId);
   const { status: whisperStatus, loadProgress: whisperProgress, transcribe } = useWhisper({
     enabled: asrListening,
+    prompt: currentPersona?.asr_prompt || "這是一段關於 openVman 虛擬人、VRM 3D 模型、Live2D 角色與 AI 應用的對話。",
   });
 
   const toggleAsr = useCallback(() => {

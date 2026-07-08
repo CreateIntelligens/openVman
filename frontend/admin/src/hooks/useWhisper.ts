@@ -1,10 +1,20 @@
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type WhisperStatus = "idle" | "loading" | "ready" | "transcribing" | "error";
+export interface UseWhisperOptions {
+  enabled?: boolean;
+  prompt?: string;
+}
 type WhisperResult = { text?: string } | Array<{ text?: string }>;
+type WhisperTranscribeOptions = {
+  language: string;
+  task: "transcribe";
+  prompt?: string;
+  generation_config?: { prompt?: string };
+};
 type WhisperPipeline = (
   audio: Float32Array,
-  options: { language: string; task: "transcribe" },
+  options: WhisperTranscribeOptions,
 ) => Promise<WhisperResult>;
 type ProgressEvent = {
   file?: string;
@@ -15,7 +25,7 @@ type ProgressEvent = {
 export interface UseWhisperResult {
   status: WhisperStatus;
   loadProgress: number;
-  transcribe: (audio: Float32Array) => Promise<string>;
+  transcribe: (audio: Float32Array, prompt?: string) => Promise<string>;
   ensureLoaded: () => Promise<void>;
 }
 
@@ -28,7 +38,7 @@ let currentProgress = 0;
 const statusCallbacks = new Set<(status: WhisperStatus) => void>();
 const progressCallbacks = new Set<(progress: number) => void>();
 
-export function __resetGlobals() {
+export function __resetGlobals(): void {
   whisperPipelinePromise = null;
   whisperPipeline = null;
   currentStatus = "idle";
@@ -37,17 +47,17 @@ export function __resetGlobals() {
   progressCallbacks.clear();
 }
 
-function updateStatus(status: WhisperStatus) {
+function updateStatus(status: WhisperStatus): void {
   currentStatus = status;
   statusCallbacks.forEach((callback) => callback(status));
 }
 
-function updateProgress(progress: number) {
+function updateProgress(progress: number): void {
   currentProgress = progress;
   progressCallbacks.forEach((callback) => callback(progress));
 }
 
-function markReady() {
+function markReady(): void {
   updateStatus("ready");
   updateProgress(1);
 }
@@ -57,7 +67,24 @@ function readTranscriptionText(result: WhisperResult): string {
   return firstResult?.text || "";
 }
 
-export function useWhisper(options?: { enabled?: boolean }): UseWhisperResult {
+function buildTranscriptionOptions(promptText?: string): WhisperTranscribeOptions {
+  const transcriptionOptions: WhisperTranscribeOptions = {
+    language: "zh",
+    task: "transcribe",
+  };
+
+  if (!promptText) {
+    return transcriptionOptions;
+  }
+
+  return {
+    ...transcriptionOptions,
+    prompt: promptText,
+    generation_config: { prompt: promptText },
+  };
+}
+
+export function useWhisper(options?: UseWhisperOptions): UseWhisperResult {
   const [status, setStatus] = useState<WhisperStatus>(currentStatus);
   const [loadProgress, setLoadProgress] = useState<number>(currentProgress);
 
@@ -125,7 +152,7 @@ export function useWhisper(options?: { enabled?: boolean }): UseWhisperResult {
           transformers.env.backends.onnx.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
         }
 
-        const pipe = await transformers.pipeline("automatic-speech-recognition", "whisper-base", {
+        const pipe = await transformers.pipeline("automatic-speech-recognition", "whisper-small", {
           progress_callback: progressCallback,
         });
 
@@ -143,28 +170,30 @@ export function useWhisper(options?: { enabled?: boolean }): UseWhisperResult {
     await whisperPipelinePromise;
   }, []);
 
-  const transcribe = useCallback(async (audio: Float32Array): Promise<string> => {
-    try {
-      await ensureLoaded();
-      if (!whisperPipeline) {
-        throw new Error("ASR model is not initialized");
+  const transcribe = useCallback(
+    async (audio: Float32Array, prompt?: string): Promise<string> => {
+      try {
+        await ensureLoaded();
+        if (!whisperPipeline) {
+          throw new Error("ASR model is not initialized");
+        }
+
+        updateStatus("transcribing");
+
+        const promptText = prompt || options?.prompt;
+
+        const result = await whisperPipeline(audio, buildTranscriptionOptions(promptText));
+
+        markReady();
+        return readTranscriptionText(result);
+      } catch (err) {
+        console.error("Client-side Whisper transcription failed:", err);
+        updateStatus("ready"); // Reset status to ready to prevent UI getting stuck
+        return "";
       }
-
-      updateStatus("transcribing");
-
-      const result = await whisperPipeline(audio, {
-        language: "zh",
-        task: "transcribe",
-      });
-
-      markReady();
-      return readTranscriptionText(result);
-    } catch (err) {
-      console.error("Client-side Whisper transcription failed:", err);
-      updateStatus("ready"); // Reset status to ready to prevent UI getting stuck
-      return "";
-    }
-  }, [ensureLoaded]);
+    },
+    [ensureLoaded, options?.prompt],
+  );
 
   // Pre-load if enabled is true
   useEffect(() => {

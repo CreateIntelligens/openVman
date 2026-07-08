@@ -1,9 +1,11 @@
 import os
+
 from huggingface_hub import hf_hub_download
 
-def main():
-    repo_id = "onnx-community/whisper-base"
-    local_dir = "frontend/admin/public/models/whisper-base"
+
+def main() -> None:
+    repo_id = "onnx-community/whisper-small"
+    local_dir = "frontend/admin/public/models/whisper-small"
 
     files = [
         "config.json",

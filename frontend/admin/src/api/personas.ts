@@ -1,4 +1,12 @@
-import { fetchJson, projectUrl, post, jsonRequest, personaPath, PERSONAS_PATH, getActiveProjectId } from "./common";
+import {
+  PERSONAS_PATH,
+  fetchJson,
+  getActiveProjectId,
+  jsonRequest,
+  personaPath,
+  post,
+  projectUrl,
+} from "./common";
 
 export interface PersonaSummary {
   persona_id: string;
@@ -7,6 +15,7 @@ export interface PersonaSummary {
   preview: string;
   is_default: boolean;
   avatar_char_id?: string | null;
+  asr_prompt?: string | null;
 }
 
 export interface PersonasResponse {
@@ -24,11 +33,14 @@ export interface PersonaCloneResponse extends PersonaCreateResponse {
   source_persona_id: string;
 }
 
-export async function fetchPersonas() {
+export async function fetchPersonas(): Promise<PersonasResponse> {
   return fetchJson<PersonasResponse>(projectUrl(PERSONAS_PATH));
 }
 
-export function createPersona(personaId: string, label: string) {
+export function createPersona(
+  personaId: string,
+  label: string,
+): Promise<PersonaCreateResponse> {
   return post<PersonaCreateResponse>(PERSONAS_PATH, {
     persona_id: personaId,
     label,
@@ -36,7 +48,9 @@ export function createPersona(personaId: string, label: string) {
   });
 }
 
-export function deletePersona(personaId: string) {
+export function deletePersona(
+  personaId: string,
+): Promise<{ status: string; persona_id: string }> {
   return jsonRequest<{ status: string; persona_id: string }>(
     "DELETE",
     PERSONAS_PATH,
@@ -44,7 +58,10 @@ export function deletePersona(personaId: string) {
   );
 }
 
-export function clonePersona(sourcePersonaId: string, targetPersonaId: string) {
+export function clonePersona(
+  sourcePersonaId: string,
+  targetPersonaId: string,
+): Promise<PersonaCloneResponse> {
   return post<PersonaCloneResponse>(personaPath("/clone"), {
     source_persona_id: sourcePersonaId,
     target_persona_id: targetPersonaId,
@@ -52,13 +69,25 @@ export function clonePersona(sourcePersonaId: string, targetPersonaId: string) {
   });
 }
 
-export function setPersonaAvatar(personaId: string, avatarCharId: string | null) {
-  return post<{ status: string; persona_id: string; avatar_char_id: string | null }>(
-    personaPath("/avatar"),
-    {
-      persona_id: personaId,
-      avatar_char_id: avatarCharId,
-      project_id: getActiveProjectId(),
-    },
-  );
+export function setPersonaAvatar(
+  personaId: string,
+  avatarCharId: string | null,
+  asrPrompt?: string | null,
+): Promise<{
+  status: string;
+  persona_id: string;
+  avatar_char_id: string | null;
+  asr_prompt?: string | null;
+}> {
+  return post<{
+    status: string;
+    persona_id: string;
+    avatar_char_id: string | null;
+    asr_prompt?: string | null;
+  }>(personaPath("/avatar"), {
+    persona_id: personaId,
+    avatar_char_id: avatarCharId,
+    asr_prompt: asrPrompt,
+    project_id: getActiveProjectId(),
+  });
 }

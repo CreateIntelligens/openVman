@@ -22,7 +22,15 @@ ALLOWED_INDEX_SUFFIXES = ALLOWED_DOCUMENT_SUFFIXES | ALLOWED_CODE_SUFFIXES
 #   dreaming/      REM/Deep/Light process reports (consolidated memories already
 #                  live in the memories table; the reports are meta logs)
 #   .normalization-backups/  recovery copies for AI document cleanup
-EXCLUDED_INDEX_PREFIXES = ("memory/", ".learnings/", ".normalization-backups/", "graphify-out/", "dreaming/", "raw/", "archive/")
+EXCLUDED_INDEX_PREFIXES = (
+    "memory/",
+    ".learnings/",
+    ".normalization-backups/",
+    "graphify-out/",
+    "dreaming/",
+    "raw/",
+    "archive/",
+)
 WORKSPACE_TEMPLATES = {
     "SOUL.md": """# 核心人格設定 (SOUL)
 
@@ -89,6 +97,13 @@ WORKSPACE_TEMPLATES = {
     "MEMORY_SUMMARIES.md": """# 記憶摘要 (MEMORY_SUMMARIES)
 
 - 每日對話整理後會寫在這裡，作為長期記憶治理的摘要輸出。
+""",
+    "ASR_PROMPT.md": """# ASR 語音優化詞庫 (ASR_PROMPT)
+#
+# 在此檔案中，您可以輸入本角色常被辨識錯誤的專有名詞、英文單字或同音字。
+# 所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。
+
+openVman 虛擬人、VRM 3D 模型、Live2D 角色與 AI 應用。
 """,
 }
 RESERVED_INDEX_PATHS = frozenset(WORKSPACE_TEMPLATES.keys())
@@ -196,7 +211,9 @@ def resolve_workspace_artifact(relative_path: str, project_id: str = "default") 
     return resolved
 
 
-_CORE_CONTEXT_CACHE: dict[tuple[str, str], tuple[tuple[tuple[str, float], ...], dict[str, str]]] = {}
+CoreContextCacheValue = tuple[tuple[tuple[str, float], ...], dict[str, str]]
+
+_CORE_CONTEXT_CACHE: dict[tuple[str, str], CoreContextCacheValue] = {}
 
 
 def load_core_workspace_context(persona_id: str = "default", project_id: str = "default") -> dict[str, str]:
