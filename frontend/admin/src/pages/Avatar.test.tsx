@@ -212,4 +212,188 @@ describe("Avatar page", () => {
     expect(window.localStorage.getItem("avatar.background_url")).toBe("/backgrounds/clinic/image.png");
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
   });
+
+  it("can replace the right-corner mascot used by the admin and avatar app", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({
+      mascots: [
+        {
+          mascot_id: "qqman",
+          label: "Frieren",
+          engine: "3d",
+          model_url: "",
+          vrm_url: "/QQman_fll.vrm",
+          fit: "",
+          builtin: true,
+          size_bytes: 0,
+          updated_at: "",
+        },
+      ],
+    });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Use Frieren" }));
+
+    expect(window.localStorage.getItem("avatar.mascot_id")).toBe("qqman");
+    expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
+  });
+
+  it("captures uploaded mascot snapshots with that mascot's widget source", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({
+      mascots: [
+        {
+          mascot_id: "custom",
+          label: "自訂小助理",
+          engine: "3d",
+          model_url: "",
+          vrm_url: "/mascots/custom/model.vrm",
+          fit: "",
+          builtin: false,
+          size_bytes: 4096,
+          updated_at: "2026-07-08T00:00:00Z",
+        },
+      ],
+    });
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+
+    const frame = await screen.findByTitle("Mascot snapshot capture");
+    const src = decodeURIComponent(frame.getAttribute("src") ?? "");
+
+    expect(src).toContain("/mascots/custom/model.vrm");
+    expect(src).toContain("engine=3d");
+  });
+
+  it("uploads a mascot VRM from the mascot tab", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({ mascots: [] });
+    vi.spyOn(api, "uploadAvatarMascot").mockResolvedValue({
+      status: "ok",
+      mascot: {
+        mascot_id: "custom",
+        label: "自訂小助理",
+        engine: "3d",
+        model_url: "",
+        vrm_url: "/mascots/custom/model.vrm",
+        fit: "",
+        builtin: false,
+        size_bytes: 4096,
+        updated_at: "2026-07-08T00:00:00Z",
+      },
+    });
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.change(await screen.findByPlaceholderText("Mascot ID"), {
+      target: { value: "custom" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Mascot display name"), {
+      target: { value: "自訂小助理" },
+    });
+    fireEvent.change(screen.getByLabelText(/VRM/), {
+      target: { files: [new File(["glTF"], "custom.vrm", { type: "model/gltf-binary" })] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Upload mascot" }));
+
+    await waitFor(() => {
+      expect(api.uploadAvatarMascot).toHaveBeenCalledWith({
+        mascotId: "custom",
+        label: "自訂小助理",
+        model: expect.any(File),
+      });
+    });
+  });
+
+  it("renames an uploaded mascot without changing mascot id", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({
+      mascots: [
+        {
+          mascot_id: "custom",
+          label: "自訂小助理",
+          engine: "3d",
+          model_url: "",
+          vrm_url: "/mascots/custom/model.vrm",
+          fit: "",
+          builtin: false,
+          size_bytes: 4096,
+          updated_at: "2026-07-08T00:00:00Z",
+        },
+      ],
+    });
+    vi.spyOn(api, "updateAvatarMascotLabel").mockResolvedValue({
+      status: "ok",
+      mascot: {
+        mascot_id: "custom",
+        label: "新小助理",
+        engine: "3d",
+        model_url: "",
+        vrm_url: "/mascots/custom/model.vrm",
+        fit: "",
+        builtin: false,
+        size_bytes: 4096,
+        updated_at: "2026-07-08T00:00:00Z",
+      },
+    });
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rename custom" }));
+
+    const input = await screen.findByLabelText(/顯示名稱/);
+    fireEvent.change(input, { target: { value: "新小助理" } });
+    fireEvent.click(screen.getByRole("button", { name: "儲存" }));
+
+    expect(api.updateAvatarMascotLabel).toHaveBeenCalledWith("custom", "新小助理");
+    await waitFor(() => expect(screen.getByText("新小助理")).toBeTruthy());
+    expect(screen.getByText("custom")).toBeTruthy();
+  });
+
+  it("deletes uploaded mascots but not builtin mascots", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarMascots").mockResolvedValue({
+      mascots: [
+        {
+          mascot_id: "qqman",
+          label: "Frieren",
+          engine: "3d",
+          model_url: "",
+          vrm_url: "/QQman_fll.vrm",
+          fit: "",
+          builtin: true,
+          size_bytes: 0,
+          updated_at: "",
+        },
+        {
+          mascot_id: "custom",
+          label: "自訂小助理",
+          engine: "3d",
+          model_url: "",
+          vrm_url: "/mascots/custom/model.vrm",
+          fit: "",
+          builtin: false,
+          size_bytes: 4096,
+          updated_at: "2026-07-08T00:00:00Z",
+        },
+      ],
+    });
+    vi.spyOn(api, "deleteAvatarMascot").mockResolvedValue({
+      status: "ok",
+      mascot_id: "custom",
+    });
+
+    render(<Avatar />);
+    fireEvent.click(await screen.findByRole("button", { name: "Mascots" }));
+
+    expect(screen.queryByRole("button", { name: "Delete Frieren" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete custom" }));
+
+    expect(api.deleteAvatarMascot).toHaveBeenCalledWith("custom");
+    await waitFor(() => expect(screen.queryByText("custom")).toBeNull());
+    expect(screen.getByText("Frieren")).toBeTruthy();
+  });
 });

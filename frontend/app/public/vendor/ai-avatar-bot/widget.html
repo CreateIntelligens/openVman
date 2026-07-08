@@ -118,10 +118,17 @@
   <script>
   // ===== 可設定（由 embed.js 透過 query 帶入）：皮=模型 / 肉的語音=後端 / 內容=知識庫 =====
   const CFG = new URLSearchParams(location.search);
+  function readNumberParam(name, fallback, min, max) {
+    const value = Number.parseFloat(CFG.get(name) || '');
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(max, Math.max(min, value));
+  }
   const MODEL_URL = CFG.get('model') || 'https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json';
 
   // 皮的引擎判斷：data-vrm 指向 .vrm → 走 3D(VRM)；否則 data-model(.model3.json) → 走 2D(Live2D)
   let VRM_URL = CFG.get('vrm') || (/\.vrm($|\?)/i.test(MODEL_URL) ? MODEL_URL : ''); // let：拖放自己的 VRM 時可換
+  const VRM_TARGET_HEIGHT = readNumberParam('vrmTargetHeight', 1.68, 0.8, 2.4);
+  const VRM_FIT_PADDING = readNumberParam('vrmFitPadding', 1.18, 1.05, 1.6);
   const ENGINE  = VRM_URL ? '3d' : '2d';
   // 切換用：embedder 兩個皮都給(data-model + data-vrm) → 長出 2D/3D 切換鈕。
   // 預設引擎：data-engine 優先；否則有明確 2D 皮就 2D、只有 3D 就 3D。
@@ -252,6 +259,19 @@
   // ===== 3D 皮：VRM（three + three-vrm，ESM 動態 import）=====
   async function bootVRM() {
     try {
+      // 抑制特定 VRM 動畫載入的 console warnings
+      const _originalWarn = console.warn;
+      console.warn = (...args) => {
+        const msg = args[0];
+        if (typeof msg === 'string' && (
+          msg.includes('specVersion of the VRMA is not defined') ||
+          msg.includes('VRMLookAtQuaternionProxy is not found')
+        )) {
+          return;
+        }
+        _originalWarn.apply(console, args);
+      };
+
       const THREE = await import('three');
       const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
       const { VRMLoaderPlugin, VRMUtils } = await import('@pixiv/three-vrm');
@@ -266,13 +286,14 @@
 
       const stage = document.getElementById('stage');
       const canvas = newCanvas();
-      const r3 = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      const r3 = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
       r3.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       r3.setClearColor(0x000000, 0);
 
       const camera = new THREE.PerspectiveCamera(26, 1, 0.1, 20);
-      camera.position.set(0, 1.40, 1.6); camera.lookAt(0, 1.30, 0);
-      const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; r3.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+      camera.position.set(0, 1, 4); camera.lookAt(0, 0.8, 0);
+      let fittedVRMScene = null;
+      const resize = () => { const w = stage.clientWidth, h = stage.clientHeight; r3.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (fittedVRMScene) fitVRMToCamera(THREE, fittedVRMScene, camera); };
       resize(); window.addEventListener('resize', resize);
 
       const scene = new THREE.Scene();
@@ -282,10 +303,51 @@
       scene.add(key, fill, new THREE.AmbientLight(0xffffff, 0.38));
       const lookTarget = new THREE.Object3D(); scene.add(lookTarget);   // lookAt 目標：跟著滑鼠
       let mx = 0, my = 0;                                                // 游標相對位置 -1..1
+      let lookTargetBaseY = 1.3, lookTargetRangeX = 0.9, lookTargetRangeY = 0.55, lookTargetZ = 4;
       const onMove = (ev) => { const r = stage.getBoundingClientRect(); if (!r.width) return; mx = Math.max(-1, Math.min(1, ((ev.clientX - r.left) / r.width) * 2 - 1)); my = Math.max(-1, Math.min(1, ((ev.clientY - r.top) / r.height) * 2 - 1)); };
       window.addEventListener('pointermove', onMove);
 
+      function fitVRMToCamera(THREE, vrmScene, camera) {
+        vrmScene.position.set(0, 0, 0);
+        vrmScene.scale.setScalar(1);
+        vrmScene.updateMatrixWorld(true);
+
+        const box = new THREE.Box3().setFromObject(vrmScene);
+        const size = box.getSize(new THREE.Vector3());
+        if (!Number.isFinite(size.y) || size.y <= 0) return;
+        const scale = VRM_TARGET_HEIGHT / Math.max(size.y, 0.001);
+        vrmScene.scale.setScalar(scale);
+        vrmScene.updateMatrixWorld(true);
+
+        const scaledBox = new THREE.Box3().setFromObject(vrmScene);
+        const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+        vrmScene.position.x -= scaledCenter.x;
+        vrmScene.position.y -= scaledBox.min.y;
+        vrmScene.position.z -= scaledCenter.z;
+        vrmScene.updateMatrixWorld(true);
+
+        const fittedBox = new THREE.Box3().setFromObject(vrmScene);
+        const fittedSize = fittedBox.getSize(new THREE.Vector3());
+        const center = fittedBox.getCenter(new THREE.Vector3());
+        const halfVerticalFov = THREE.MathUtils.degToRad(camera.fov) / 2;
+        const aspect = Number.isFinite(camera.aspect) && camera.aspect > 0 ? camera.aspect : 1;
+        const halfHorizontalFov = Math.atan(Math.tan(halfVerticalFov) * aspect);
+        const verticalDistance = (fittedSize.y / 2) / Math.tan(halfVerticalFov);
+        const horizontalDistance = (fittedSize.x / 2) / Math.tan(halfHorizontalFov);
+        const halfDepth = fittedSize.z / 2;
+        const distance = Math.max(verticalDistance, horizontalDistance, 0.8) * VRM_FIT_PADDING;
+        camera.position.set(0, center.y, distance + halfDepth);
+        camera.lookAt(center);
+        camera.updateProjectionMatrix();
+
+        lookTargetBaseY = fittedBox.min.y + fittedSize.y * 0.78;
+        lookTargetRangeX = Math.max(fittedSize.x * 0.45, 0.35);
+        lookTargetRangeY = Math.max(fittedSize.y * 0.22, 0.25);
+        lookTargetZ = camera.position.z;
+      }
+
       let vrm = null, armSign = 1, nextBlink = 2 + Math.random() * 3, blinkT = -1, mixer = null, waving = false; const BLINK = 0.12;
+      let mouthExpressionName = 'aa', blinkExpressionName = 'blink';
       const gestureActions = {}; let currentGesture = null, idleBreak = 0;
       const clock = new THREE.Clock();
       const loader = new GLTFLoader();
@@ -300,8 +362,42 @@
         // VRM0 被 rotateVRM0 轉 180°，手臂 z 旋轉方向會相反；VRM1 不轉 → 用版本決定正負號
         armSign = (String(vrm.meta && vrm.meta.metaVersion) === '1') ? -1 : 1;
         vrm.scene.traverse((o) => { o.frustumCulled = false; });
+        fittedVRMScene = vrm.scene;
+        fitVRMToCamera(THREE, vrm.scene, camera);
         scene.add(vrm.scene);
         window.__avatarVrm = vrm;
+        try {
+          const em = vrm.expressionManager;
+          const names = em ? em.expressions.map(x => x.name) : [];
+          console.log("3D Mascot Expressions:", names);
+          if (em && names.length > 0) {
+            // Find mouth expression
+            if (names.includes('aa')) mouthExpressionName = 'aa';
+            else if (names.includes('a')) mouthExpressionName = 'a';
+            else {
+              const foundAa = names.find(n => n.toLowerCase().includes('aa'));
+              if (foundAa) mouthExpressionName = foundAa;
+              else {
+                const foundA = names.find(n => {
+                  const l = n.toLowerCase();
+                  return l.includes('a') && !l.includes('sad') && !l.includes('happy') && !l.includes('angry') && !l.includes('relaxed');
+                });
+                if (foundA) mouthExpressionName = foundA;
+              }
+            }
+
+            // Find blink expression
+            if (names.includes('blink')) blinkExpressionName = 'blink';
+            else {
+              const foundBlink = names.find(n => n.toLowerCase().includes('blink') && !n.toLowerCase().includes('left') && !n.toLowerCase().includes('right'));
+              if (foundBlink) blinkExpressionName = foundBlink;
+            }
+            console.log('Mapped 3D mouth expression:', mouthExpressionName);
+            console.log('Mapped 3D blink expression:', blinkExpressionName);
+          }
+        } catch (e) {
+          console.warn("Failed to dynamically map expressions:", e);
+        }
         try { if (vrm.lookAt) vrm.lookAt.target = lookTarget; } catch (e) {}   // 眼睛跟著滑鼠
         // VRMA 情境手勢庫（body-only，不碰嘴）：點擊/出場揮手、思考托腮、待機變化(環顧/放鬆)
         (async () => {
@@ -330,6 +426,16 @@
         })();
         setTimeout(() => showBubble('點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋'), 700);
         postToParent('ready');
+        setTimeout(() => {
+          if (!alive || !vrm) return;
+          try {
+            r3.render(scene, camera);
+            const dataUrl = canvas.toDataURL('image/png');
+            postToParent('screenshot', { dataUrl });
+          } catch (e) {
+            console.warn('自動擷取 3D 頭像失敗：', e);
+          }
+        }, 1500);
       }, undefined, (e) => { console.error(e); postToParent('error', { message: String(e) }); });
 
       function playGesture(name) {                               // 播一個手勢（期間 mixer 控身體），平時用程序化站姿
@@ -350,10 +456,12 @@
           const em = vrm.expressionManager;
           // 對嘴 + 眨眼（永遠歸我們，mixer 之後 vrm.update 之前）
           const mv = computeMouth();
-          em && em.setValue('aa', mv);
+          if (em) {
+            em.setValue(mouthExpressionName, mv);
+          }
           if (blinkT < 0) { nextBlink -= dt; if (nextBlink <= 0) { blinkT = 0; nextBlink = 2 + Math.random() * 4; } }
-          else { blinkT += dt / BLINK; em && em.setValue('blink', Math.sin(Math.min(blinkT, 1) * Math.PI)); if (blinkT >= 1) { blinkT = -1; em && em.setValue('blink', 0); } }
-          lookTarget.position.set(mx * 0.9, 1.42 - my * 0.55, 1.6); // 眼睛 lookAt 目標跟游標（永遠更新）
+          else { blinkT += dt / BLINK; if (em) { em.setValue(blinkExpressionName, Math.sin(Math.min(blinkT, 1) * Math.PI)); } if (blinkT >= 1) { blinkT = -1; if (em) { em.setValue(blinkExpressionName, 0); } } }
+          lookTarget.position.set(mx * lookTargetRangeX, lookTargetBaseY - my * lookTargetRangeY, lookTargetZ); // 眼睛 lookAt 目標跟游標（永遠更新）
           if (!waving) {                                          // 待機：直立、手放下、輕呼吸、頭跟游標
             const h = vrm.humanoid;
             const lUA = h.getNormalizedBoneNode('leftUpperArm'), rUA = h.getNormalizedBoneNode('rightUpperArm'), sp = h.getNormalizedBoneNode('spine'), hd = h.getNormalizedBoneNode('head');
@@ -403,6 +511,7 @@
       app = new PIXI.Application({
         view: canvas,
         autoStart: true, backgroundAlpha: 0, antialias: true,
+        preserveDrawingBuffer: true,
         resizeTo: document.getElementById('stage'),
       });
 
@@ -458,6 +567,17 @@
       setTimeout(() => showBubble('點 🎤 說話、或直接打字問我；想更聰明可按 🧠 啟用 AI 大腦 👋'), 700);
       postToParent('ready');
       window.__avatarModel = model;
+      setTimeout(() => {
+        try {
+          if (app && app.renderer) {
+            app.renderer.render(app.stage);
+          }
+          const dataUrl = canvas.toDataURL('image/png');
+          postToParent('screenshot', { dataUrl });
+        } catch (e) {
+          console.warn('自動擷取 2D 頭像失敗：', e);
+        }
+      }, 1500);
 
       return { dispose() {
         try { window.removeEventListener('resize', fit); } catch (e) {}

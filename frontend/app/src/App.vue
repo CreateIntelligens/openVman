@@ -103,9 +103,15 @@
       :style="mascotPositionStyle"
     >
       <div class="mascot-drag-handle" @mousedown="handleMascotDragStart" />
+      <MascotSwitcher
+        :mascots="mascotOptions"
+        :current-mascot-id="selectedMascot.id"
+        @mascot-change="handleMascotChange"
+      />
       <iframe
         ref="mascotFrameRef"
-        :src="MASCOT_WIDGET_SRC"
+        :key="settings.mascotId"
+        :src="mascotWidgetSrc"
         title="AI 虛擬人小助理"
         allow="microphone; autoplay"
       />
@@ -131,6 +137,7 @@ import CameraPreview from "./components/avatar/CameraPreview.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";
 import type { PersonaSummary } from "./components/controls/ControlBar.vue";
+import MascotSwitcher from "./components/mascot/MascotSwitcher.vue";
 import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
@@ -142,13 +149,20 @@ import { useMatesX } from "./composables/useMatesX";
 import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useWebcamCapture } from "./composables/useWebcamCapture";
+import {
+  buildMascotWidgetSrc,
+  FALLBACK_MASCOT_CATALOG,
+  resolveMascotOption,
+  toMascotOption,
+  type MascotApiRecord,
+  type MascotOption,
+} from "./data/mascotCatalog";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import type { AvatarBackgroundFit, AvatarBackgroundId } from "./types/avatarBackground";
 
 const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
 const HOST_MESSAGE_NAMESPACE = "avatar-widget-host";
 const MASCOT_DEFAULT_MARGIN_REM = 1;
-const MASCOT_WIDGET_SRC = "/vendor/ai-avatar-bot/widget.html";
 const WIDGET_MESSAGE_NAMESPACE = "avatar-widget";
 
 interface MascotPosition {
@@ -214,6 +228,11 @@ function stopMascotMouth(): void {
   postToMascot({ type: "mouth-stop" });
 }
 
+function handleMascotChange(mascotId: string): void {
+  stopMascotMouth();
+  settings.mascotId = resolveMascotOption(mascotId, mascotOptions.value).id;
+}
+
 // Error overlay state (fatal errors shown full-screen)
 const fatalError = ref<{ code: string; message: string } | null>(null);
 // Ref to StatusToast component for gateway status messages
@@ -244,6 +263,11 @@ function onAudioQueueEmpty(): void {
 }
 
 const settings = useSettingsStore();
+const mascotOptions = ref<MascotOption[]>([...FALLBACK_MASCOT_CATALOG]);
+const selectedMascot = computed(() =>
+  resolveMascotOption(settings.mascotId, mascotOptions.value),
+);
+const mascotWidgetSrc = computed(() => buildMascotWidgetSrc(selectedMascot.value));
 
 const fallbackCharacters = [
   { id: "008", name: "角色 008" },
@@ -363,6 +387,22 @@ async function fetchBackgrounds(): Promise<void> {
     backgrounds.value = data.backgrounds ?? [];
   } catch {
     backgrounds.value = [];
+  }
+}
+
+async function fetchMascots(): Promise<void> {
+  try {
+    const res = await fetch("/api/avatar/mascots");
+    if (!res.ok) return;
+    const data = await res.json();
+    const items: MascotApiRecord[] = data.mascots ?? [];
+    if (items.length > 0) {
+      mascotOptions.value = items.map(toMascotOption);
+    } else {
+      mascotOptions.value = [...FALLBACK_MASCOT_CATALOG];
+    }
+  } catch {
+    mascotOptions.value = [...FALLBACK_MASCOT_CATALOG];
   }
 }
 
@@ -734,6 +774,7 @@ onMounted(async () => {
   window.addEventListener("message", handleMascotMessage);
   void fetchTtsProviders();
   void fetchBackgrounds();
+  void fetchMascots();
   await fetchProjects();
   await fetchPersonas(settings.projectId);
   await avatarCatalog.load();

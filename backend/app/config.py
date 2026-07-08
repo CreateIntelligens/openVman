@@ -87,6 +87,10 @@ class TTSRouterConfig(BaseSettings):
         default="/data/backgrounds",
         validation_alias="AVATAR_BACKGROUNDS_DIR",
     )
+    avatar_mascots_dir: str = Field(
+        default="/data/mascots",
+        validation_alias="AVATAR_MASCOTS_DIR",
+    )
     avatar_max_upload_bytes: int = Field(
         default=100 * 1024 * 1024,
         validation_alias="AVATAR_MAX_UPLOAD_BYTES",
@@ -94,6 +98,10 @@ class TTSRouterConfig(BaseSettings):
     avatar_background_max_upload_bytes: int = Field(
         default=25 * 1024 * 1024,
         validation_alias="AVATAR_BACKGROUND_MAX_UPLOAD_BYTES",
+    )
+    avatar_mascot_max_upload_bytes: int = Field(
+        default=100 * 1024 * 1024,
+        validation_alias="AVATAR_MASCOT_MAX_UPLOAD_BYTES",
     )
     docling_serve_url: str = Field(default="", validation_alias="DOCLING_SERVE_URL")
     docling_timeout_ms: int = Field(default=5000, validation_alias="DOCLING_TIMEOUT_MS")

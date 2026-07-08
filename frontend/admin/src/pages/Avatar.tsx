@@ -1,32 +1,62 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   AvatarBackground,
   AvatarCharacter,
+  AvatarMascot,
   deleteAvatarBackground,
   deleteAvatarCharacter,
+  deleteAvatarMascot,
   fetchAvatarBackgrounds,
   fetchAvatarCharacters,
+  fetchAvatarMascots,
   updateAvatarBackgroundLabel,
   updateAvatarCharacterLabel,
+  updateAvatarMascotLabel,
   uploadAvatarBackground,
   uploadAvatarCharacter,
+  uploadAvatarMascot,
+  uploadAvatarMascotThumbnail,
 } from "../api";
 import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
+import { useMascot } from "../context/MascotContext";
+import {
+  buildMascotWidgetSrc,
+  DEFAULT_MASCOT_ID,
+  toMascotOption,
+} from "../data/mascotCatalog";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { dataUrlToFile } from "../utils/dataUrlToFile";
 
 type Status = { type: "success" | "error"; message: string } | null;
 type RenameTarget =
   | { kind: "character"; character: AvatarCharacter }
-  | { kind: "background"; background: AvatarBackground };
-const ASSET_TABS = ["characters", "backgrounds"] as const;
+  | { kind: "background"; background: AvatarBackground }
+  | { kind: "mascot"; mascot: AvatarMascot };
+const ASSET_TABS = ["characters", "backgrounds", "mascots"] as const;
 type AssetTab = (typeof ASSET_TABS)[number];
+type WidgetScreenshotMessage = {
+  ns: "avatar-widget";
+  type: "screenshot";
+  dataUrl: string;
+};
 
 const AVATAR_CHARACTER_STORAGE_KEY = "avatar.character_id";
 const AVATAR_BACKGROUND_ID_STORAGE_KEY = "avatar.background_id";
 const AVATAR_BACKGROUND_URL_STORAGE_KEY = "avatar.background_url";
+const MASCOT_SNAPSHOT_MIN_BYTES = 6000;
+const MASCOT_SNAPSHOT_TIMEOUT_MS = 8000;
 const assetGridStyle = {
   gridTemplateColumns: "repeat(auto-fill, minmax(16rem, 1fr))",
+};
+const hiddenSnapshotFrameStyle: CSSProperties = {
+  position: "absolute",
+  left: "-62.5rem",
+  top: "-62.5rem",
+  width: "25rem",
+  height: "31.25rem",
+  pointerEvents: "none",
 };
 
 const inputClassName = [
@@ -57,6 +87,29 @@ const dangerActionClassName = [
   "flex-1 rounded border border-red-200 py-1 text-xs text-red-600 transition-colors",
   "hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20",
 ].join(" ");
+const filePickerBaseClassName = [
+  "flex cursor-pointer items-center gap-1.5 rounded border border-dashed px-3 py-1.5",
+  "text-xs transition-all",
+].join(" ");
+const filePickerSelectedClassName = [
+  "border-blue-500 bg-blue-50/30 text-blue-600",
+  "dark:bg-blue-950/20 dark:text-blue-400",
+].join(" ");
+const filePickerEmptyClassName = [
+  "border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100",
+  "dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800",
+].join(" ");
+const MASCOT_FALLBACK_BACKGROUNDS: Record<AvatarMascot["engine"], string> = {
+  "2d": [
+    "radial-gradient(circle at 50% 34%, #fef3c7 0 20%, transparent 21%)",
+    "radial-gradient(circle at 50% 72%, #38bdf8 0 34%, transparent 35%)",
+    "linear-gradient(160deg, #eff6ff, #dbeafe)",
+  ].join(", "),
+  "3d": [
+    "radial-gradient(circle at 50% 35%, #ecfccb 0 20%, transparent 21%)",
+    "conic-gradient(from 160deg, #34d399, #22c55e, #0f766e, #34d399)",
+  ].join(", "),
+};
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -77,7 +130,53 @@ function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {
   ].join(" ");
 }
 
+function filePickerClassName(fileName: string): string {
+  return [
+    filePickerBaseClassName,
+    fileName ? filePickerSelectedClassName : filePickerEmptyClassName,
+  ].join(" ");
+}
+
+function needsMascotSnapshot(mascot: AvatarMascot): boolean {
+  return !mascot.thumbnail_url || !mascot.thumbnail_url.includes("/mascots/");
+}
+
+function mascotPreviewStyle(mascot: AvatarMascot): CSSProperties | undefined {
+  if (mascot.thumbnail_url) return undefined;
+  return { background: MASCOT_FALLBACK_BACKGROUNDS[mascot.engine] };
+}
+
+function snapshotWidgetSrc(mascots: AvatarMascot[], mascotId: string | null): string | null {
+  if (!mascotId) return null;
+  const mascot = mascots.find((item) => item.mascot_id === mascotId);
+  return mascot ? buildMascotWidgetSrc(toMascotOption(mascot)) : null;
+}
+
+function renameTargetLabel(target: RenameTarget | null): string {
+  if (!target) return "";
+
+  switch (target.kind) {
+    case "character":
+      return target.character.label;
+    case "background":
+      return target.background.label;
+    case "mascot":
+      return target.mascot.label;
+  }
+}
+
+function isWidgetScreenshotMessage(data: unknown): data is WidgetScreenshotMessage {
+  if (typeof data !== "object" || data === null) return false;
+  const message = data as Partial<WidgetScreenshotMessage>;
+  return (
+    message.ns === "avatar-widget"
+    && message.type === "screenshot"
+    && typeof message.dataUrl === "string"
+  );
+}
+
 export default function Avatar() {
+  const { selectedMascotId, setMascotOptions, setSelectedMascotId } = useMascot();
   const [activeTab, setActiveTab] = useLocalStorageState<AssetTab>(
     "admin.avatar.assets_tab",
     "characters",
@@ -85,12 +184,16 @@ export default function Avatar() {
   );
   const [characters, setCharacters] = useState<AvatarCharacter[]>([]);
   const [backgrounds, setBackgrounds] = useState<AvatarBackground[]>([]);
+  const [mascots, setMascots] = useState<AvatarMascot[]>([]);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [backgroundsLoading, setBackgroundsLoading] = useState(false);
+  const [mascotsLoading, setMascotsLoading] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const backgroundsLoaded = useRef(false);
   const backgroundsLoadingRef = useRef(false);
+  const mascotsLoaded = useRef(false);
+  const mascotsLoadingRef = useRef(false);
 
   const [uploadCharId, setUploadCharId] = useState("");
   const [uploadLabel, setUploadLabel] = useState("");
@@ -101,10 +204,25 @@ export default function Avatar() {
   const [uploadBackgroundLabel, setUploadBackgroundLabel] = useState("");
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
+  const [uploadMascotId, setUploadMascotId] = useState("");
+  const [uploadMascotLabel, setUploadMascotLabel] = useState("");
+  const [mascotUploading, setMascotUploading] = useState(false);
+  const mascotModelRef = useRef<HTMLInputElement>(null);
+  const mascotThumbnailRef = useRef<HTMLInputElement>(null);
+
+  const [snapshotQueue, setSnapshotQueue] = useState<string[]>([]);
+  const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(null);
 
   const [selectedVideoName, setSelectedVideoName] = useState<string>("");
   const [selectedDataName, setSelectedDataName] = useState<string>("");
   const [selectedImageName, setSelectedImageName] = useState<string>("");
+  const [selectedMascotModelName, setSelectedMascotModelName] = useState<string>("");
+  const [selectedMascotThumbnailName, setSelectedMascotThumbnailName] = useState<string>("");
+
+  function syncMascots(nextMascots: AvatarMascot[]): void {
+    setMascots(nextMascots);
+    setMascotOptions(nextMascots.map(toMascotOption));
+  }
 
   function resetUploadForm(): void {
     setUploadCharId("");
@@ -120,6 +238,15 @@ export default function Avatar() {
     setUploadBackgroundLabel("");
     setSelectedImageName("");
     if (imageRef.current) imageRef.current.value = "";
+  }
+
+  function resetMascotUploadForm(): void {
+    setUploadMascotId("");
+    setUploadMascotLabel("");
+    setSelectedMascotModelName("");
+    setSelectedMascotThumbnailName("");
+    if (mascotModelRef.current) mascotModelRef.current.value = "";
+    if (mascotThumbnailRef.current) mascotThumbnailRef.current.value = "";
   }
 
   async function load(): Promise<void> {
@@ -152,6 +279,23 @@ export default function Avatar() {
     }
   }
 
+  async function loadMascots(): Promise<void> {
+    if (mascotsLoadingRef.current) return;
+    mascotsLoadingRef.current = true;
+    setMascotsLoading(true);
+    setStatus(null);
+    try {
+      const res = await fetchAvatarMascots();
+      syncMascots(res.mascots);
+      mascotsLoaded.current = true;
+    } catch (err) {
+      setStatus({ type: "error", message: errorMessage(err) });
+    } finally {
+      mascotsLoadingRef.current = false;
+      setMascotsLoading(false);
+    }
+  }
+
   useEffect(() => {
     void load();
   }, []);
@@ -160,7 +304,72 @@ export default function Avatar() {
     if (activeTab === "backgrounds" && !backgroundsLoaded.current) {
       void loadBackgrounds();
     }
+    if (activeTab === "mascots" && !mascotsLoaded.current) {
+      void loadMascots();
+    }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!mascotsLoading && mascots.length > 0) {
+      const missing = mascots
+        .filter(needsMascotSnapshot)
+        .map((mascot) => mascot.mascot_id);
+      if (missing.length > 0) {
+        setSnapshotQueue((prev) => {
+          const combined = Array.from(new Set([...prev, ...missing]));
+          if (combined.length !== prev.length) {
+            return combined;
+          }
+          return prev;
+        });
+      }
+    }
+  }, [mascots, mascotsLoading]);
+
+  useEffect(() => {
+    if (snapshotQueue.length > 0 && !currentSnapshotId) {
+      const nextId = snapshotQueue[0];
+      setCurrentSnapshotId(nextId);
+      setSnapshotQueue((prev) => prev.slice(1));
+    }
+  }, [snapshotQueue, currentSnapshotId]);
+
+  useEffect(() => {
+    if (!currentSnapshotId) return;
+    const timer = setTimeout(() => {
+      console.warn(`[Snapshotter] Mascot ${currentSnapshotId} snapshot timed out, skipping...`);
+      setCurrentSnapshotId(null);
+    }, MASCOT_SNAPSHOT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [currentSnapshotId]);
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent): void {
+      if (!isWidgetScreenshotMessage(event.data)) return;
+      if (!currentSnapshotId) return;
+
+      const file = dataUrlToFile(event.data.dataUrl, `${currentSnapshotId}.png`);
+      if (file.size < MASCOT_SNAPSHOT_MIN_BYTES) {
+        console.warn("[Snapshotter] Mascot snapshot too small, skipping:", file.size);
+        setCurrentSnapshotId(null);
+        return;
+      }
+
+      uploadAvatarMascotThumbnail(currentSnapshotId, file)
+        .then(() => {
+          void loadMascots();
+        })
+        .catch((err) => {
+          console.warn("[Snapshotter] Failed to upload mascot snapshot:", err);
+        })
+        .finally(() => {
+          setCurrentSnapshotId(null);
+        });
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [currentSnapshotId]);
 
   function handleTabChange(tab: AssetTab): void {
     setActiveTab(tab);
@@ -228,6 +437,32 @@ export default function Avatar() {
     }
   }
 
+  async function handleMascotUpload(): Promise<void> {
+    const mascotId = uploadMascotId.trim();
+    const label = uploadMascotLabel.trim();
+    const model = mascotModelRef.current?.files?.[0];
+    const thumbnail = mascotThumbnailRef.current?.files?.[0] || undefined;
+    if (!mascotId || !label || !model) {
+      setStatus({
+        type: "error",
+        message: "Please fill in all fields and select a VRM model",
+      });
+      return;
+    }
+    setMascotUploading(true);
+    setStatus(null);
+    try {
+      await uploadAvatarMascot({ mascotId, label, model, thumbnail });
+      resetMascotUploadForm();
+      setStatus({ type: "success", message: "Mascot upload successful" });
+      await loadMascots();
+    } catch (err) {
+      setStatus({ type: "error", message: errorMessage(err) });
+    } finally {
+      setMascotUploading(false);
+    }
+  }
+
   async function handleBackgroundDelete(backgroundId: string): Promise<void> {
     setStatus(null);
     try {
@@ -239,37 +474,80 @@ export default function Avatar() {
     }
   }
 
+  async function handleMascotDelete(mascotId: string): Promise<void> {
+    setStatus(null);
+    try {
+      await deleteAvatarMascot(mascotId);
+      const nextMascots = mascots.filter((mascot) => mascot.mascot_id !== mascotId);
+      syncMascots(nextMascots);
+      if (selectedMascotId === mascotId) {
+        setSelectedMascotId(DEFAULT_MASCOT_ID);
+      }
+      setStatus({ type: "success", message: `Deleted ${mascotId}` });
+    } catch (err) {
+      setStatus({ type: "error", message: errorMessage(err) });
+    }
+  }
+
   async function handleRenameSubmit(values: Record<string, string>): Promise<void> {
     const target = renameTarget;
     setRenameTarget(null);
     if (!target) return;
     const newLabel = values.label;
 
-    if (target.kind === "character") {
-      if (!newLabel || newLabel === target.character.label) return;
-      setStatus(null);
-      try {
-        const res = await updateAvatarCharacterLabel(target.character.char_id, newLabel);
-        setCharacters((prev) =>
-          prev.map((c) => (c.char_id === target.character.char_id ? res.character : c)),
-        );
-        setStatus({ type: "success", message: `Renamed to ${newLabel}` });
-      } catch (err) {
-        setStatus({ type: "error", message: errorMessage(err) });
+    switch (target.kind) {
+      case "character": {
+        if (!newLabel || newLabel === target.character.label) return;
+        setStatus(null);
+        try {
+          const res = await updateAvatarCharacterLabel(target.character.char_id, newLabel);
+          setCharacters((prev) =>
+            prev.map((character) =>
+              character.char_id === target.character.char_id ? res.character : character,
+            ),
+          );
+          setStatus({ type: "success", message: `Renamed to ${newLabel}` });
+        } catch (err) {
+          setStatus({ type: "error", message: errorMessage(err) });
+        }
+        return;
       }
-      return;
-    }
-
-    if (!newLabel || newLabel === target.background.label) return;
-    setStatus(null);
-    try {
-      const res = await updateAvatarBackgroundLabel(target.background.background_id, newLabel);
-      setBackgrounds((prev) =>
-        prev.map((bg) => (bg.background_id === target.background.background_id ? res.background : bg)),
-      );
-      setStatus({ type: "success", message: `Renamed to ${newLabel}` });
-    } catch (err) {
-      setStatus({ type: "error", message: errorMessage(err) });
+      case "background": {
+        if (!newLabel || newLabel === target.background.label) return;
+        setStatus(null);
+        try {
+          const res = await updateAvatarBackgroundLabel(
+            target.background.background_id,
+            newLabel,
+          );
+          setBackgrounds((prev) =>
+            prev.map((background) =>
+              background.background_id === target.background.background_id
+                ? res.background
+                : background,
+            ),
+          );
+          setStatus({ type: "success", message: `Renamed to ${newLabel}` });
+        } catch (err) {
+          setStatus({ type: "error", message: errorMessage(err) });
+        }
+        return;
+      }
+      case "mascot": {
+        if (!newLabel || newLabel === target.mascot.label) return;
+        setStatus(null);
+        try {
+          const res = await updateAvatarMascotLabel(target.mascot.mascot_id, newLabel);
+          syncMascots(
+            mascots.map((mascot) =>
+              mascot.mascot_id === target.mascot.mascot_id ? res.mascot : mascot,
+            ),
+          );
+          setStatus({ type: "success", message: `Renamed to ${newLabel}` });
+        } catch (err) {
+          setStatus({ type: "error", message: errorMessage(err) });
+        }
+      }
     }
   }
 
@@ -286,6 +564,13 @@ export default function Avatar() {
     window.localStorage.setItem(AVATAR_BACKGROUND_URL_STORAGE_KEY, background.url);
     window.open("/", "_blank", "noopener,noreferrer");
   }
+
+  function handleUseMascot(mascot: AvatarMascot): void {
+    setSelectedMascotId(mascot.mascot_id);
+    window.open("/", "_blank", "noopener,noreferrer");
+  }
+
+  const currentSnapshotSrc = snapshotWidgetSrc(mascots, currentSnapshotId);
 
   return (
     <div
@@ -316,6 +601,13 @@ export default function Avatar() {
         >
           Backgrounds
         </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange("mascots")}
+          className={tabButtonClassName("mascots", activeTab)}
+        >
+          Mascots
+        </button>
       </div>
 
       {activeTab === "characters" && (
@@ -344,11 +636,7 @@ export default function Avatar() {
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Video (.webm):</span>
-                <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded border border-dashed text-xs cursor-pointer transition-all ${
-                  selectedVideoName
-                    ? "border-blue-500 bg-blue-50/30 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400"
-                    : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}>
+                <label className={filePickerClassName(selectedVideoName)}>
                   <span className="material-symbols-outlined text-sm">movie</span>
                   <span className="max-w-[12rem] truncate">{selectedVideoName || "Select WebM"}</span>
                   <input
@@ -364,11 +652,7 @@ export default function Avatar() {
 
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Data (.gz):</span>
-                <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded border border-dashed text-xs cursor-pointer transition-all ${
-                  selectedDataName
-                    ? "border-blue-500 bg-blue-50/30 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400"
-                    : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}>
+                <label className={filePickerClassName(selectedDataName)}>
                   <span
                     aria-hidden="true"
                     className="material-symbols-outlined inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden text-[1rem] leading-none"
@@ -487,11 +771,7 @@ export default function Avatar() {
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Image (.png, .jpg, .webp):</span>
-                <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded border border-dashed text-xs cursor-pointer transition-all ${
-                  selectedImageName
-                    ? "border-blue-500 bg-blue-50/30 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400"
-                    : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}>
+                <label className={filePickerClassName(selectedImageName)}>
                   <span className="material-symbols-outlined text-sm">image</span>
                   <span className="max-w-[15rem] truncate">{selectedImageName || "Select background image"}</span>
                   <input
@@ -576,6 +856,157 @@ export default function Avatar() {
         </>
       )}
 
+      {activeTab === "mascots" && (
+        <>
+          <div className={formPanelClassName}>
+            <p className="flex items-center gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <span className="material-symbols-outlined text-base">view_in_ar</span>
+              Upload mascot
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <input
+                type="text"
+                placeholder="Mascot ID"
+                value={uploadMascotId}
+                onChange={(e) => setUploadMascotId(e.target.value)}
+                className={inputClassName}
+              />
+              <input
+                type="text"
+                placeholder="Mascot display name"
+                value={uploadMascotLabel}
+                onChange={(e) => setUploadMascotLabel(e.target.value)}
+                className={inputClassName}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Model (.vrm):</span>
+                <label className={filePickerClassName(selectedMascotModelName)}>
+                  <span className="material-symbols-outlined text-sm">deployed_code</span>
+                  <span className="max-w-[15rem] truncate">{selectedMascotModelName || "Select VRM"}</span>
+                  <input
+                    ref={mascotModelRef}
+                    type="file"
+                    accept=".vrm"
+                    className="hidden"
+                    aria-label="VRM"
+                    onChange={(e) => setSelectedMascotModelName(e.target.files?.[0]?.name || "")}
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Thumbnail (Image):</span>
+                <label className={filePickerClassName(selectedMascotThumbnailName)}>
+                  <span className="material-symbols-outlined text-sm">image</span>
+                  <span className="max-w-[15rem] truncate">{selectedMascotThumbnailName || "Select Image"}</span>
+                  <input
+                    ref={mascotThumbnailRef}
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.webp"
+                    className="hidden"
+                    aria-label="Thumbnail"
+                    onChange={(e) => setSelectedMascotThumbnailName(e.target.files?.[0]?.name || "")}
+                  />
+                </label>
+              </div>
+
+              <button
+                onClick={handleMascotUpload}
+                disabled={mascotUploading}
+                className="ml-auto rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+              >
+                {mascotUploading ? "Uploading…" : "Upload mascot"}
+              </button>
+            </div>
+          </div>
+
+          {mascotsLoading && (
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+          )}
+
+          {!mascotsLoading && mascots.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-12 text-slate-400 dark:text-slate-600">
+              <span className="material-symbols-outlined text-4xl">view_in_ar</span>
+              <p className="text-sm">No mascots yet</p>
+            </div>
+          )}
+
+          {!mascotsLoading && mascots.length > 0 && (
+            <div className="grid gap-4" style={assetGridStyle}>
+              {mascots.map((mascot) => {
+                const selected = mascot.mascot_id === selectedMascotId;
+                return (
+                  <div key={mascot.mascot_id} className={assetCardClassName}>
+                    <div
+                      className="flex aspect-video items-center justify-center bg-slate-100 dark:bg-slate-900 overflow-hidden relative"
+                      style={mascotPreviewStyle(mascot)}
+                    >
+                      {mascot.thumbnail_url ? (
+                        <img
+                          src={mascot.thumbnail_url}
+                          alt={mascot.label}
+                          className="max-h-[90%] max-w-[90%] object-contain drop-shadow-md"
+                        />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="material-symbols-outlined text-4xl text-white drop-shadow-md"
+                        >
+                          {mascot.engine === "3d" ? "view_in_ar" : "face"}
+                        </span>
+                      )}
+                    </div>
+                    <div className={cardBodyClassName}>
+                      <p className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        {mascot.mascot_id}
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        {mascot.label}
+                      </p>
+                      <p className="text-xs uppercase text-slate-400 dark:text-slate-500">
+                        {mascot.builtin ? "built-in" : `${mascot.engine} · ${formatSize(mascot.size_bytes)}`}
+                      </p>
+                    </div>
+                    <div className={cardActionsClassName}>
+                      <button
+                        type="button"
+                        onClick={() => handleUseMascot(mascot)}
+                        aria-label={`Use ${mascot.label}`}
+                        className={selected ? secondaryActionClassName : primaryActionClassName}
+                      >
+                        {selected ? "Using" : "Use"}
+                      </button>
+                      {!mascot.builtin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setRenameTarget({ kind: "mascot", mascot })}
+                            aria-label={`Rename ${mascot.mascot_id}`}
+                            className={secondaryActionClassName}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMascotDelete(mascot.mascot_id)}
+                            aria-label={`Delete ${mascot.mascot_id}`}
+                            className={dangerActionClassName}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
       <PromptModal
         open={renameTarget !== null}
         title="修改顯示名稱"
@@ -583,10 +1014,7 @@ export default function Avatar() {
           {
             key: "label",
             label: "顯示名稱",
-            initialValue:
-              renameTarget?.kind === "character"
-                ? renameTarget.character.label
-                : renameTarget?.background.label ?? "",
+            initialValue: renameTargetLabel(renameTarget),
             required: true,
           },
         ]}
@@ -594,6 +1022,14 @@ export default function Avatar() {
         onSubmit={handleRenameSubmit}
         onCancel={() => setRenameTarget(null)}
       />
+      {currentSnapshotSrc && (
+        <iframe
+          key={currentSnapshotId}
+          src={currentSnapshotSrc}
+          title="Mascot snapshot capture"
+          style={hiddenSnapshotFrameStyle}
+        />
+      )}
     </div>
   );
 }

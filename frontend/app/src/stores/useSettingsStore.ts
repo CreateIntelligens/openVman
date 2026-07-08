@@ -3,6 +3,7 @@ import {
   normalizeAvatarBackgroundFit,
   normalizeAvatarBackgroundId,
 } from "../types/avatarBackground"
+import { DEFAULT_MASCOT_ID } from "../data/mascotCatalog"
 import { STORAGE_KEYS, readPref, writePref } from "../utils/storageUtils"
 
 function normalizeCameraPreviewScale(value: string): number {
@@ -22,6 +23,7 @@ const state = reactive({
   backgroundUrl: readPref(STORAGE_KEYS.BACKGROUND_URL, ""),
   backgroundFit: normalizeAvatarBackgroundFit(readPref(STORAGE_KEYS.BACKGROUND_FIT, "cover")),
   cameraPreviewScale: normalizeCameraPreviewScale(readPref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, "1")),
+  mascotId: readPref(STORAGE_KEYS.MASCOT_ID, DEFAULT_MASCOT_ID),
 })
 
 watch(() => state.ttsProvider, (v) => writePref(STORAGE_KEYS.TTS_ENGINE, v))
@@ -34,6 +36,7 @@ watch(() => state.backgroundId, (v) => writePref(STORAGE_KEYS.BACKGROUND_ID, v))
 watch(() => state.backgroundUrl, (v) => writePref(STORAGE_KEYS.BACKGROUND_URL, v))
 watch(() => state.backgroundFit, (v) => writePref(STORAGE_KEYS.BACKGROUND_FIT, v))
 watch(() => state.cameraPreviewScale, (v) => writePref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, String(v)))
+watch(() => state.mascotId, (v) => writePref(STORAGE_KEYS.MASCOT_ID, v))
 
 export function useSettingsStore() {
   return state

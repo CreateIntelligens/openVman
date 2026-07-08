@@ -17,4 +17,14 @@ describe("nginx default config", () => {
     expect(backgroundsLocation).toBeLessThan(avatarFallback);
     expect(source).toMatch(/location \/backgrounds\/[\s\S]*proxy_pass \$backend\$request_uri;/);
   });
+
+  it("proxies avatar mascot assets to backend before avatar frontend fallback", () => {
+    const mascotsLocation = source.indexOf("location /mascots/");
+    const avatarFallback = source.indexOf("location / {");
+
+    expect(mascotsLocation).not.toBe(-1);
+    expect(avatarFallback).not.toBe(-1);
+    expect(mascotsLocation).toBeLessThan(avatarFallback);
+    expect(source).toMatch(/location \/mascots\/[\s\S]*proxy_pass \$backend\$request_uri;/);
+  });
 });

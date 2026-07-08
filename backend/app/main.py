@@ -36,6 +36,7 @@ from app.internal_routes import router as internal_router
 from app.routes import admin as admin_routes
 from app.routes import avatar as avatar_routes
 from app.routes import backgrounds as background_routes
+from app.routes import mascots as mascot_routes
 from app.error_payloads import upload_failed_response
 from app.tts_text_cleaner import clean_for_tts
 from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
@@ -245,6 +246,12 @@ def _mount_avatar_assets(app_instance: FastAPI) -> None:
         directory=cfg.avatar_backgrounds_dir,
         name="avatar-backgrounds",
     )
+    _mount_static_assets(
+        app_instance,
+        route_path="/mascots",
+        directory=cfg.avatar_mascots_dir,
+        name="avatar-mascots",
+    )
 
 
 app.include_router(gateway_router)
@@ -254,6 +261,7 @@ app.include_router(embed_router)
 app.include_router(admin_routes.router)
 app.include_router(avatar_routes.router)
 app.include_router(background_routes.router)
+app.include_router(mascot_routes.router)
 app.include_router(brain_proxy_router)
 app.include_router(websocket_routes.router)
 _mount_avatar_assets(app)

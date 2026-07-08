@@ -39,6 +39,12 @@ test("avatar settings persist camera preview scale", () => {
   assert.match(storeSource, /watch\(\(\) => state\.cameraPreviewScale,\s*\(v\) => writePref\(STORAGE_KEYS\.CAMERA_PREVIEW_SCALE,\s*String\(v\)\)\)/);
 });
 
+test("avatar settings persist the selected right-corner mascot", () => {
+  assert.match(storageSource, /MASCOT_ID:\s*"avatar\.mascot_id"/);
+  assert.match(storeSource, /mascotId:\s*readPref\(STORAGE_KEYS\.MASCOT_ID,\s*DEFAULT_MASCOT_ID\)/);
+  assert.match(storeSource, /watch\(\(\) => state\.mascotId,\s*\(v\) => writePref\(STORAGE_KEYS\.MASCOT_ID,\s*v\)\)/);
+});
+
 test("avatar settings accept uploaded background ids", () => {
   assert.match(backgroundTypeSource, /type UploadedAvatarBackgroundId = `uploaded:\$\{string\}`/);
   assert.match(backgroundTypeSource, /isUploadedAvatarBackgroundId/);
