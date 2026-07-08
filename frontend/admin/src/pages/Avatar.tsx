@@ -369,7 +369,12 @@ export default function Avatar() {
                     ? "border-blue-500 bg-blue-50/30 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400"
                     : "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                 }`}>
-                  <span className="material-symbols-outlined text-sm">settings_zip</span>
+                  <span
+                    aria-hidden="true"
+                    className="material-symbols-outlined inline-flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden text-[1rem] leading-none"
+                  >
+                    folder_zip
+                  </span>
                   <span className="max-w-[12rem] truncate">{selectedDataName || "Select GZ data"}</span>
                   <input
                     ref={dataRef}

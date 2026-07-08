@@ -71,6 +71,20 @@ describe("Avatar page", () => {
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
   });
 
+  it("uses a bounded zip icon for the GZ data picker", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+
+    render(<Avatar />);
+
+    await screen.findByText(/no characters yet/i);
+
+    expect(screen.queryByText("settings_zip")).toBeNull();
+    const icon = screen.getByText("folder_zip");
+    expect(icon.className).toContain("w-4");
+    expect(icon.className).toContain("overflow-hidden");
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("renames the display label without changing character id", async () => {
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({
       characters: [
