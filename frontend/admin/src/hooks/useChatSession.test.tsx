@@ -21,13 +21,55 @@ const setSlashIndexMock = vi.fn();
 const setSlashOpenMock = vi.fn();
 const pickSlashMock = vi.fn();
 const handleInputChangeMock = vi.fn();
-const transcribeMock = vi.fn();
-const ensureLoadedMock = vi.fn();
-let vadSupportedMock = true;
-let latestVadOptions: {
-  onSpeechStart?: () => void;
-  onAudio?: (audio: Float32Array) => void;
+let latestSpeechRecognition: {
+  start: ReturnType<typeof vi.fn>;
+  stop: ReturnType<typeof vi.fn>;
+  abort: ReturnType<typeof vi.fn>;
+  onstart?: () => void;
+  onend?: () => void;
+  onspeechstart?: () => void;
+  onresult?: (event: {
+    resultIndex: number;
+    results: Array<{
+      isFinal: boolean;
+      0: { transcript: string };
+    }>;
+  }) => void;
 } | null = null;
+
+class MockSpeechRecognition {
+  continuous = false;
+  interimResults = true;
+  lang = "";
+  maxAlternatives = 0;
+  onstart?: () => void;
+  onend?: () => void;
+  onspeechstart?: () => void;
+  onresult?: (event: {
+    resultIndex: number;
+    results: Array<{
+      isFinal: boolean;
+      0: { transcript: string };
+    }>;
+  }) => void;
+  start = vi.fn(() => {
+    this.onstart?.();
+  });
+  stop = vi.fn(() => {
+    this.onend?.();
+  });
+  abort = vi.fn();
+
+  constructor() {
+    latestSpeechRecognition = this;
+  }
+}
+
+function installSpeechRecognitionMock() {
+  (window as typeof window & {
+    webkitSpeechRecognition?: unknown;
+  }).webkitSpeechRecognition = MockSpeechRecognition;
+}
 
 vi.mock("../api", () => ({
   fetchChat: (...args: unknown[]) => fetchChatMock(...args),
@@ -92,28 +134,6 @@ vi.mock("./useChatHistory", async () => {
   };
 });
 
-vi.mock("./useWhisper", () => ({
-  useWhisper: () => ({
-    status: "ready",
-    loadProgress: 1.0,
-    transcribe: transcribeMock,
-    ensureLoaded: ensureLoadedMock,
-  }),
-}));
-
-vi.mock("./useVad", () => ({
-  useVad: (options: {
-    onSpeechStart?: () => void;
-    onAudio?: (audio: Float32Array) => void;
-  }) => {
-    latestVadOptions = options;
-    return {
-      speaking: false,
-      supported: vadSupportedMock,
-    };
-  },
-}));
-
 vi.mock("./useSlashAutocomplete", () => ({
   useSlashAutocomplete: (_input: string, setInput: (value: string) => void) => ({
     slashOpen: false,
@@ -134,8 +154,8 @@ import { useChatSession } from "./useChatSession";
 describe("useChatSession TTS prefetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vadSupportedMock = true;
-    latestVadOptions = null;
+    latestSpeechRecognition = null;
+    delete (window as typeof window & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
     window.localStorage.clear();
   });
 
@@ -263,26 +283,27 @@ describe("useChatSession TTS prefetch", () => {
     expect(result.current.messages[0].privacy_warning?.counts.private_phone).toBe(1);
   });
 
-  it("defaults privacy warnings to visible and persists toggle changes", () => {
+  it("defaults privacy warnings to visible and persists toggle changes", async () => {
     window.localStorage.removeItem("chat.privacy_warning_visible");
 
     const { result } = renderHook(() => useChatSession());
 
     expect(result.current.privacyWarningsVisible).toBe(true);
 
-    act(() => {
+    await act(async () => {
       result.current.setPrivacyWarningsVisible(false);
     });
 
     expect(window.localStorage.getItem("chat.privacy_warning_visible")).toBe("false");
   });
 
-  it("turns off ASR after 10 seconds without voice activity", () => {
+  it("turns off ASR after 10 seconds without voice activity", async () => {
     vi.useFakeTimers();
+    installSpeechRecognitionMock();
 
     const { result } = renderHook(() => useChatSession());
 
-    act(() => {
+    await act(async () => {
       result.current.toggleAsr();
     });
 
@@ -299,19 +320,55 @@ describe("useChatSession TTS prefetch", () => {
     expect(result.current.asrListening).toBe(false);
   });
 
-  it("resets the ASR idle timeout when VAD detects speech activity", () => {
-    vi.useFakeTimers();
+  it("submits final Web Speech API transcripts", async () => {
+    installSpeechRecognitionMock();
+    fetchChatMock.mockResolvedValue({
+      session_id: "sess-voice",
+      reply: "收到",
+      knowledge_results: [],
+      memory_results: [],
+      history: [],
+    });
 
     const { result } = renderHook(() => useChatSession());
 
     act(() => {
       result.current.toggleAsr();
     });
+
+    expect(latestSpeechRecognition?.start).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      latestSpeechRecognition?.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: "語音測試" } }],
+      });
+    });
+
+    await waitFor(() => {
+      expect(fetchChatMock).toHaveBeenCalledWith(
+        "語音測試",
+        "default",
+        undefined,
+        expect.any(AbortSignal),
+      );
+    });
+  });
+
+  it("resets the ASR idle timeout when Web Speech detects activity", async () => {
+    vi.useFakeTimers();
+    installSpeechRecognitionMock();
+
+    const { result } = renderHook(() => useChatSession());
+
+    await act(async () => {
+      result.current.toggleAsr();
+    });
     expect(result.current.asrListening).toBe(true);
 
     act(() => {
       vi.advanceTimersByTime(9000);
-      latestVadOptions?.onSpeechStart?.();
+      latestSpeechRecognition?.onspeechstart?.();
     });
 
     act(() => {

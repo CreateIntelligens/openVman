@@ -40,6 +40,17 @@ def test_default_persona_has_null_avatar(monkeypatch, tmp_path):
     assert all("avatar_char_id" in p for p in items)
     default = next(p for p in items if p["is_default"])
     assert default["avatar_char_id"] is None
+    assert "asr_prompt" not in default
+
+
+def test_persona_scaffold_does_not_create_asr_prompt(monkeypatch, tmp_path):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    personas = _import("personas.personas")
+
+    result = personas.create_persona_scaffold("doctor01", "Doctor", "default")
+
+    assert "personas/doctor01/ASR_PROMPT.md" not in result["files"]
+    assert not (root / "personas" / "doctor01" / "ASR_PROMPT.md").exists()
 
 
 def test_set_and_read_avatar(monkeypatch, tmp_path):

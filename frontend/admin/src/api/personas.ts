@@ -15,7 +15,6 @@ export interface PersonaSummary {
   preview: string;
   is_default: boolean;
   avatar_char_id?: string | null;
-  asr_prompt?: string | null;
 }
 
 export interface PersonasResponse {
@@ -72,22 +71,18 @@ export function clonePersona(
 export function setPersonaAvatar(
   personaId: string,
   avatarCharId: string | null,
-  asrPrompt?: string | null,
 ): Promise<{
   status: string;
   persona_id: string;
   avatar_char_id: string | null;
-  asr_prompt?: string | null;
 }> {
   return post<{
     status: string;
     persona_id: string;
     avatar_char_id: string | null;
-    asr_prompt?: string | null;
   }>(personaPath("/avatar"), {
     persona_id: personaId,
     avatar_char_id: avatarCharId,
-    asr_prompt: asrPrompt,
     project_id: getActiveProjectId(),
   });
 }

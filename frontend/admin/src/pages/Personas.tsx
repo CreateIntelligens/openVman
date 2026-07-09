@@ -241,7 +241,6 @@ export default function Personas() {
                      { path: `${docPrefix}AGENTS.md`, label: "AGENTS.md", icon: "group_work" },
                      { path: `${docPrefix}TOOLS.md`, label: "TOOLS.md", icon: "build" },
                      { path: `${docPrefix}MEMORY.md`, label: "MEMORY.md", icon: "memory" },
-                     { path: `${docPrefix}ASR_PROMPT.md`, label: "ASR_PROMPT.md", icon: "record_voice_over" },
               ]
               : [];
 

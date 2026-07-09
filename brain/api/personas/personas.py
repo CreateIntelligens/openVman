@@ -18,7 +18,6 @@ PERSONA_CORE_KEYS_TO_FILES: dict[str, str] = {
     "tools": "TOOLS.md",
     "memory": "MEMORY.md",
     "identity": "IDENTITY.md",
-    "asr_prompt": "ASR_PROMPT.md",
 }
 PERSONA_CORE_KEYS = frozenset(PERSONA_CORE_KEYS_TO_FILES.keys())
 PERSONA_CORE_FILENAMES = frozenset(PERSONA_CORE_KEYS_TO_FILES.values())
@@ -211,7 +210,6 @@ def _build_persona_summary(
 ) -> dict[str, Any]:
     ws = workspace.get_workspace_root(project_id)
     meta = _read_avatar_meta(persona_id, project_id, is_default=is_default)
-    asr_prompt = _read_asr_prompt_file(persona_id, project_id, is_default=is_default)
     return {
         "persona_id": persona_id,
         "label": label or _extract_heading_or_name(soul_path, persona_id),
@@ -219,44 +217,7 @@ def _build_persona_summary(
         "preview": _read_preview(soul_path),
         "is_default": is_default,
         "avatar_char_id": meta.get("avatar_char_id"),
-        "asr_prompt": asr_prompt,
     }
-
-
-def _read_asr_prompt_file(persona_id: str, project_id: str, *, is_default: bool) -> str | None:
-    path = _persona_core_path(
-        persona_id,
-        project_id,
-        filename="ASR_PROMPT.md",
-        is_default=is_default,
-    )
-    if not path.exists():
-        return None
-
-    try:
-        lines = path.read_text(encoding="utf-8-sig").splitlines()
-        content_lines = []
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("#"):
-                continue
-            if stripped:
-                content_lines.append(stripped)
-        return " ".join(content_lines).strip() or None
-    except OSError:
-        return None
-
-
-def _persona_core_path(
-    persona_id: str,
-    project_id: str,
-    *,
-    filename: str,
-    is_default: bool,
-) -> Path:
-    if is_default:
-        return workspace.get_workspace_root(project_id) / filename
-    return get_persona_directory(persona_id, project_id) / filename
 
 
 def _read_avatar_meta(persona_id: str, project_id: str, *, is_default: bool) -> dict[str, Any]:
@@ -274,7 +235,6 @@ def set_persona_avatar(
     persona_id: str,
     char_id: str | None,
     project_id: str = "default",
-    asr_prompt: str | None = None,
 ) -> dict[str, Any]:
     normalized = normalize_persona_id(persona_id)
     if normalized == "default":
@@ -291,7 +251,6 @@ def set_persona_avatar(
 
     cleaned_char_id = char_id.strip() if (char_id and char_id.strip()) else None
     meta["avatar_char_id"] = cleaned_char_id
-    meta.pop("asr_prompt", None)
 
     meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
     return {
@@ -372,12 +331,5 @@ _PERSONA_TEMPLATES: dict[str, callable] = {
 ## 說明
 - 此檔定義 {label} persona 的外部身份與視覺主題。
 - 若沒有特別覆蓋，系統仍會沿用全域 IDENTITY 設定。
-""",
-    "asr_prompt": lambda label: f"""# {label} ASR 語音優化詞庫 (ASR_PROMPT)
-#
-# 在此檔案中，您可以輸入本角色常被辨識錯誤的專有名詞、英文單字或同音字。
-# 所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。
-
-openVman 虛擬人、VRM 3D 模型、Live2D 角色與 AI 應用。
 """,
 }

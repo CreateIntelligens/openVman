@@ -15,13 +15,12 @@ import {
   readPrivacyWarningsVisible,
   writePrivacyWarningsVisible,
 } from "../components/chat/privacyWarnings";
-import { useWhisper } from "./useWhisper";
-import { useVad } from "./useVad";
 import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
 import { useInputHistory } from "./useInputHistory";
 import { useStarterPrompts } from "./useStarterPrompts";
+import { useSpeechRecognition } from "./useSpeechRecognition";
 
 const STOP_REPLY_NOTICE = "已停止回覆";
 const STOP_REPLY_NOTICE_MS = 2500;
@@ -224,7 +223,7 @@ export function useChatSession() {
     writePrivacyWarningsVisible(privacyWarningsVisible);
   }, [privacyWarningsVisible]);
 
-  // --- ASR & VAD (Whisper & Silero) ---
+  // --- ASR ---
   const [asrListening, setAsrListening] = useState(false);
   const asrIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearAsrIdleTimer = useCallback(() => {
@@ -243,23 +242,10 @@ export function useChatSession() {
   const markAsrActivity = useCallback(() => {
     if (asrListening) scheduleAsrIdleTimeout();
   }, [asrListening, scheduleAsrIdleTimeout]);
-  const currentPersona = personas.find((p) => p.persona_id === selectedPersonaId);
-  const { status: whisperStatus, loadProgress: whisperProgress, transcribe } = useWhisper({
-    enabled: asrListening,
-    prompt: currentPersona?.asr_prompt || "這是一段關於 openVman 虛擬人、VRM 3D 模型、Live2D 角色與 AI 應用的對話。",
-  });
 
   const toggleAsr = useCallback(() => {
     setAsrListening((prev) => !prev);
   }, []);
-
-  // Handle Whisper loading/initialization errors
-  useEffect(() => {
-    if (whisperStatus === "error") {
-      setError("語音模型載入失敗");
-      setAsrListening(false);
-    }
-  }, [whisperStatus, setError]);
 
   useEffect(() => {
     if (!asrListening) {
@@ -268,54 +254,40 @@ export function useChatSession() {
     }
     scheduleAsrIdleTimeout();
     return clearAsrIdleTimer;
-  }, [asrListening, whisperStatus, scheduleAsrIdleTimeout, clearAsrIdleTimer]);
+  }, [asrListening, scheduleAsrIdleTimeout, clearAsrIdleTimer]);
 
-  const pendingTranscriptionRef = useRef<Promise<string> | null>(null);
   const inputRef = useRef(input);
   inputRef.current = input;
   const submitRef = useRef<(value?: string) => Promise<void>>();
 
-  const handleAudio = useCallback((audio: Float32Array) => {
+  const handleFinalTranscript = useCallback((transcript: string) => {
+    const text = transcript.trim();
+    if (!text) return;
+
     markAsrActivity();
-    const promise = transcribe(audio);
-    pendingTranscriptionRef.current = promise;
+    const currentInput = inputRef.current.trim();
+    const nextInput = currentInput ? `${currentInput} ${text}` : text;
+    inputRef.current = nextInput;
+    setInput(nextInput);
+    void submitRef.current?.(nextInput);
+  }, [markAsrActivity]);
 
-    const clearIfCurrent = () => {
-      if (pendingTranscriptionRef.current === promise) {
-        pendingTranscriptionRef.current = null;
-        return true;
-      }
-      return false;
-    };
-
-    promise.then((text) => {
-      if (clearIfCurrent() && text) {
-        setInput((prev) => prev + text);
-      }
-    }).catch(clearIfCurrent);
-  }, [markAsrActivity, transcribe]);
-
-  const { speaking: vadSpeaking, supported: vadSupported } = useVad({
+  const {
+    speaking: asrSpeaking,
+    supported: asrSupported,
+  } = useSpeechRecognition({
     enabled: asrListening,
-    onAudio: handleAudio,
-    onSpeechStart: markAsrActivity,
-    onSpeechCommit: useCallback(async () => {
-      // Ensure any active transcription completes before sending
-      if (pendingTranscriptionRef.current) {
-        await pendingTranscriptionRef.current;
-      }
-      const text = inputRef.current.trim();
-      if (text) {
-        await submitRef.current?.(text);
-      }
-    }, []),
+    onActivity: markAsrActivity,
+    onError: useCallback((message: string) => {
+      setError(message);
+      setAsrListening(false);
+    }, [setError]),
+    onFinalTranscript: handleFinalTranscript,
   });
 
-  const asrSupported = vadSupported;
-
   useEffect(() => {
-    if (asrListening && !vadSupported) setAsrListening(false);
-  }, [asrListening, vadSupported]);
+    if (asrListening && !asrSupported) setAsrListening(false);
+  }, [asrListening, asrSupported]);
 
   // --- Coordination ---
   const conversationTitle = getConversationTitle(loadingHistory, sending);
@@ -511,9 +483,7 @@ export function useChatSession() {
     asrListening,
     asrSupported,
     toggleAsr,
-    whisperStatus,
-    whisperProgress,
-    vadSpeaking,
+    asrSpeaking,
     handleActionConfirmed,
     handleActionCancelled,
     setMessages,

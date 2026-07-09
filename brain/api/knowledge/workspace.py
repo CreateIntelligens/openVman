@@ -98,13 +98,6 @@ WORKSPACE_TEMPLATES = {
 
 - 每日對話整理後會寫在這裡，作為長期記憶治理的摘要輸出。
 """,
-    "ASR_PROMPT.md": """# ASR 語音優化詞庫 (ASR_PROMPT)
-#
-# 在此檔案中，您可以輸入本角色常被辨識錯誤的專有名詞、英文單字或同音字。
-# 所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。
-
-openVman 虛擬人、VRM 3D 模型、Live2D 角色與 AI 應用。
-""",
 }
 RESERVED_INDEX_PATHS = frozenset(WORKSPACE_TEMPLATES.keys())
 

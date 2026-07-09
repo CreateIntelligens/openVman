@@ -76,7 +76,6 @@ async def set_persona_avatar_route(payload: PersonaAvatarRequest):
             payload.persona_id,
             payload.avatar_char_id,
             payload.project_id,
-            payload.asr_prompt,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

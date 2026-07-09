@@ -5,7 +5,6 @@ import { TtsControls } from "./TtsControls";
 import { SlashDropdown } from "./SlashDropdown";
 import { AsrButton } from "./AsrButton";
 import PrivacyWarningToggle from "./PrivacyWarningToggle";
-import type { WhisperStatus } from "../../hooks/useWhisper";
 
 interface ChatInputProps {
   mode: "text" | "live";
@@ -22,9 +21,7 @@ interface ChatInputProps {
   ttsFallbackToast: string;
   asrListening: boolean;
   asrSupported: boolean;
-  whisperStatus: WhisperStatus;
-  whisperProgress: number;
-  vadSpeaking: boolean;
+  asrSpeaking: boolean;
   privacyWarningsVisible: boolean;
   onInputChange: (value: string) => void;
   onHistoryKeyDown?: (
@@ -66,9 +63,7 @@ export default function ChatInput(props: ChatInputProps) {
     ttsFallbackToast,
     asrListening,
     asrSupported,
-    whisperStatus,
-    whisperProgress,
-    vadSpeaking,
+    asrSpeaking,
     privacyWarningsVisible,
     onInputChange,
     onHistoryKeyDown,
@@ -256,9 +251,7 @@ export default function ChatInput(props: ChatInputProps) {
                 <AsrButton
                   supported={asrSupported}
                   listening={asrListening}
-                  speaking={vadSpeaking}
-                  whisperStatus={whisperStatus}
-                  whisperProgress={whisperProgress}
+                  speaking={asrSpeaking}
                   onToggle={onToggleAsr}
                 />
               )}
