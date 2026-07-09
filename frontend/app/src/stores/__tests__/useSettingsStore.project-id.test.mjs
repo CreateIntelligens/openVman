@@ -39,10 +39,17 @@ test("avatar settings persist camera preview scale", () => {
   assert.match(storeSource, /watch\(\(\) => state\.cameraPreviewScale,\s*\(v\) => writePref\(STORAGE_KEYS\.CAMERA_PREVIEW_SCALE,\s*String\(v\)\)\)/);
 });
 
-test("avatar settings persist the selected right-corner mascot", () => {
-  assert.match(storageSource, /MASCOT_ID:\s*"avatar\.mascot_id"/);
-  assert.match(storeSource, /mascotId:\s*readPref\(STORAGE_KEYS\.MASCOT_ID,\s*DEFAULT_MASCOT_ID\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.mascotId,\s*\(v\) => writePref\(STORAGE_KEYS\.MASCOT_ID,\s*v\)\)/);
+test("avatar settings persist the selected render mode", () => {
+  assert.match(storageSource, /RENDER_MODE:\s*"avatar\.render_mode"/);
+  assert.match(storeSource, /function normalizeAvatarRenderMode\(value: string\): '2d' \| '3d'/);
+  assert.match(storeSource, /renderMode:\s*normalizeAvatarRenderMode\(readPref\(STORAGE_KEYS\.RENDER_MODE,\s*"2d"\)\)/);
+  assert.match(storeSource, /watch\(\(\) => state\.renderMode,\s*\(v\) => writePref\(STORAGE_KEYS\.RENDER_MODE,\s*v\)\)/);
+});
+
+test("avatar settings persist the selected VRM avatar id", () => {
+  assert.match(storageSource, /VRM_AVATAR_ID:\s*"avatar\.vrm_avatar_id"/);
+  assert.match(storeSource, /vrmAvatarId:\s*readPref\(STORAGE_KEYS\.VRM_AVATAR_ID,\s*"qqman"\)/);
+  assert.match(storeSource, /watch\(\(\) => state\.vrmAvatarId,\s*\(v\) => writePref\(STORAGE_KEYS\.VRM_AVATAR_ID,\s*v\)\)/);
 });
 
 test("avatar settings accept uploaded background ids", () => {

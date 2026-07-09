@@ -20,9 +20,9 @@ test("settings modal splits brain project selection from persona selection", () 
 
 test("project selector is backed by project ids", () => {
   assert.match(source, /v-model="draftProjectId"/);
-  assert.match(source, /v-for="p in projects"/);
-  assert.match(source, /:key="p\.project_id"/);
-  assert.match(source, /:value="p\.project_id"/);
+  assert.match(source, /const projectOptions = computed/);
+  assert.match(source, /props\.projects\.map\(\(p\) => \(\{ value: p\.project_id, label: p\.label \|\| p\.project_id \}\)\)/);
+  assert.match(source, /:options="projectOptions"/);
 });
 
 test("brain project selector is shown before persona selector", () => {
@@ -56,6 +56,39 @@ test("settings modal exposes stage background controls", () => {
   assert.match(source, /v-model="draftBackgroundFit"/);
   assert.match(source, /uploaded:\$\{background\.background_id\}/);
   assert.match(source, /resolvedDraftBackgroundUrl/);
+});
+
+test("character selector exposes MatesX and VRM avatar choices directly", () => {
+  assert.match(source, /renderMode:\s*'2d' \| '3d'/);
+  assert.match(source, /renderModeChange:\s*\[mode:\s*'2d' \| '3d'\]/);
+  assert.match(source, /export interface VrmCharacterSummary/);
+  assert.match(source, /vrmCharacters:\s*VrmCharacterSummary\[\]/);
+  assert.match(source, /currentVrmId:\s*string/);
+  assert.match(source, /vrmCharacterChange:\s*\[vrmId:\s*string\]/);
+  assert.match(source, /toMatesXCharacterValue/);
+  assert.match(source, /toVrmCharacterValue/);
+  assert.match(source, /draftCharacterValue/);
+  assert.match(source, /v-model="draftCharacterValue"/);
+  assert.match(source, /label: `\$\{c\.name\} · MatesX`/);
+  assert.match(source, /label: `\$\{v\.label\} · VRM`/);
+  assert.doesNotMatch(source, /· 2D/);
+  assert.doesNotMatch(source, /· 3D/);
+  assert.doesNotMatch(source, />顯示模式</);
+});
+
+test("render mode stays internal to character selection", () => {
+  assert.match(source, /draftRenderMode/);
+  assert.doesNotMatch(source, /renderModeOptions/);
+  assert.doesNotMatch(source, /v-for="option in renderModeOptions"/);
+  assert.doesNotMatch(source, /v-model="draftRenderMode"/);
+});
+
+test("renderer choice changes remain applyable when renderer controls are disabled", () => {
+  assert.match(source, /const isRenderModeDirty = computed/);
+  assert.match(source, /const isVrmDirty = computed/);
+  assert.match(source, /const rendererChoiceDirty = computed/);
+  assert.match(source, /const applyDisabled = computed\(\(\) =>\s*Boolean\(props\.personasLoading\) \|\|\s*\(Boolean\(props\.disabled\) && !rendererChoiceDirty\.value\)\s*\)/);
+  assert.match(source, /v-model="draftCharacterValue"/);
 });
 
 test("background changes apply without forcing chat reconnect", () => {

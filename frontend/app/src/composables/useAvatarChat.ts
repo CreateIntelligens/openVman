@@ -30,6 +30,8 @@ export interface ChatMessage {
        role: 'user' | 'ai'
        text: string
        timestamp: number
+       sourcePath?: string
+       sourcePathContent?: string
 }
 
 interface ChatOptions {
@@ -129,6 +131,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
        const messages = ref<ChatMessage[]>([])
        const sessionId = ref<string | null>(null)
        const visualState = ref<VisualState>({ ...DEFAULT_VISUAL_STATE })
+       let activeSourcePath: string | undefined = undefined
+       let activeSourcePathContent: string | undefined = undefined
 
        let socket: WebSocket | null = null
        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -158,6 +162,15 @@ export function useAvatarChat(options: ChatOptions = {}) {
        function applyVisualState(value: unknown): void {
               const next = normalizeVisualState(value)
               if (next) visualState.value = next
+       }
+
+       function consumeActiveSource(): Pick<ChatMessage, 'sourcePath' | 'sourcePathContent'> {
+              const source: Pick<ChatMessage, 'sourcePath' | 'sourcePathContent'> = {}
+              if (activeSourcePath) source.sourcePath = activeSourcePath
+              if (activeSourcePathContent) source.sourcePathContent = activeSourcePathContent
+              activeSourcePath = undefined
+              activeSourcePathContent = undefined
+              return source
        }
 
        // ── Build client_init payload ──────────────────────────
@@ -328,11 +341,13 @@ export function useAvatarChat(options: ChatOptions = {}) {
        }
 
        // ── Send user message ──────────────────────────────────
-       function sendMessage(text: string): void {
+       function sendMessage(text: string, sourcePath?: string, sourcePathContent?: string): void {
                const trimmed = text.trim()
                if (!trimmed) return
 
                stopActiveResponse()
+               activeSourcePath = sourcePath
+               activeSourcePathContent = sourcePathContent
 
                if (currentMode === 'text') {
                       void _sendMessageText(trimmed)
@@ -574,8 +589,16 @@ export function useAvatarChat(options: ChatOptions = {}) {
        /** Create (or reuse) the active AI message bubble so appendAssistantText has a target. */
        function beginAssistantMessage(): void {
               const last = messages.value[messages.value.length - 1]
-              if (last && last.role === 'ai' && last.text === '') return
-              messages.value.push({ role: 'ai', text: '', timestamp: Date.now() })
+              if (last && last.role === 'ai' && last.text === '') {
+                     Object.assign(last, consumeActiveSource())
+                     return
+              }
+              messages.value.push({
+                     role: 'ai',
+                     text: '',
+                     timestamp: Date.now(),
+                     ...consumeActiveSource(),
+              })
        }
 
        /** Append a chunk of text to the current AI bubble (creating one if needed). */
@@ -585,7 +608,12 @@ export function useAvatarChat(options: ChatOptions = {}) {
               if (last && last.role === 'ai') {
                      last.text += chunk
               } else {
-                     messages.value.push({ role: 'ai', text: chunk, timestamp: Date.now() })
+                     messages.value.push({
+                            role: 'ai',
+                            text: chunk,
+                            timestamp: Date.now(),
+                            ...consumeActiveSource(),
+                     })
               }
        }
 

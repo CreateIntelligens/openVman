@@ -15,6 +15,8 @@ interface Character {
   name: string
 }
 
+type AvatarRenderMode = '2d' | '3d'
+
 export interface PersonaSummary {
   persona_id: string
   label: string
@@ -33,10 +35,17 @@ export interface AvatarBackgroundSummary {
   url: string
 }
 
+export interface VrmCharacterSummary {
+  id: string
+  label: string
+}
+
 const props = defineProps<{
   open: boolean
   characters: Character[]
+  vrmCharacters: VrmCharacterSummary[]
   currentCharId: string | null
+  currentVrmId: string
   ttsProvider: string
   ttsVoice: string
   ttsProviders: TtsProvider[]
@@ -46,6 +55,7 @@ const props = defineProps<{
   currentPersonaId: string
   personasLoading?: boolean
   voiceMode?: 'live' | 'text'
+  renderMode: '2d' | '3d'
   backgroundId: AvatarBackgroundId
   backgroundUrl: string
   backgroundFit: AvatarBackgroundFit
@@ -63,6 +73,8 @@ const emit = defineEmits<{
   projectPreviewChange: [projectId: string]
   personaChange: [personaId: string]
   voiceModeChange: [mode: 'live' | 'text']
+  renderModeChange: [mode: '2d' | '3d']
+  vrmCharacterChange: [vrmId: string]
   backgroundChange: [
     backgroundId: AvatarBackgroundId,
     backgroundUrl: string,
@@ -91,6 +103,22 @@ const backgroundFitOptions: { id: AvatarBackgroundFit; label: string; descriptio
   { id: 'repeat', label: '平鋪', description: '重複小圖' },
 ]
 
+function toMatesXCharacterValue(charId: string): string {
+  return `matesx:${charId}`
+}
+
+function parseMatesXCharacterValue(value: string): string {
+  return value.startsWith('matesx:') ? value.slice(7) : value
+}
+
+function toVrmCharacterValue(vrmId: string): string {
+  return `vrm:${vrmId}`
+}
+
+function parseVrmCharacterValue(value: string): string {
+  return value.startsWith('vrm:') ? value.slice(4) : value
+}
+
 const backgroundOptions = computed<BackgroundOption[]>(() => [
   ...builtInBackgroundOptions,
   ...props.backgrounds.map((background) => ({
@@ -105,12 +133,31 @@ const backgroundOptions = computed<BackgroundOption[]>(() => [
 const draftProjectId = ref(props.currentProjectId)
 const draftPersonaId = ref(props.currentPersonaId)
 const draftCharId = ref(props.currentCharId ?? '')
+const draftVrmId = ref(props.currentVrmId)
 const draftTtsProvider = ref(props.ttsProvider)
 const draftTtsVoice = ref(props.ttsVoice)
 const draftVoiceMode = ref<'live' | 'text'>(props.voiceMode ?? 'text')
+const draftRenderMode = ref<AvatarRenderMode>(props.renderMode)
 const draftBackgroundId = ref<AvatarBackgroundId>(props.backgroundId)
 const draftBackgroundUrl = ref(props.backgroundUrl)
 const draftBackgroundFit = ref<AvatarBackgroundFit>(props.backgroundFit)
+
+const draftCharacterValue = computed({
+  get() {
+    return draftRenderMode.value === '3d'
+      ? toVrmCharacterValue(draftVrmId.value)
+      : toMatesXCharacterValue(draftCharId.value)
+  },
+  set(value: string) {
+    if (value.startsWith('vrm:')) {
+      draftRenderMode.value = '3d'
+      draftVrmId.value = parseVrmCharacterValue(value)
+      return
+    }
+    draftRenderMode.value = '2d'
+    draftCharId.value = parseMatesXCharacterValue(value)
+  },
+})
 
 function pickPersonaId(preferred: string): string {
   if (props.personas.some((p) => p.persona_id === preferred)) return preferred
@@ -119,15 +166,22 @@ function pickPersonaId(preferred: string): string {
     ?? 'default'
 }
 
+function pickVrmId(preferred: string): string {
+  if (props.vrmCharacters.some((v) => v.id === preferred)) return preferred
+  return props.vrmCharacters[0]?.id ?? preferred
+}
+
 // Sync draft when modal opens
 watch(() => props.open, (open) => {
   if (open) {
     draftProjectId.value = props.currentProjectId
     draftPersonaId.value = props.currentPersonaId
     draftCharId.value = props.currentCharId ?? ''
+    draftVrmId.value = pickVrmId(props.currentVrmId)
     draftTtsProvider.value = props.ttsProvider
     draftTtsVoice.value = props.ttsVoice
     draftVoiceMode.value = props.voiceMode ?? 'text'
+    draftRenderMode.value = props.renderMode
     draftBackgroundId.value = props.backgroundId
     draftBackgroundUrl.value = props.backgroundUrl
     draftBackgroundFit.value = props.backgroundFit
@@ -136,6 +190,10 @@ watch(() => props.open, (open) => {
 
 watch(() => props.personas, () => {
   draftPersonaId.value = pickPersonaId(draftPersonaId.value)
+}, { deep: true })
+
+watch(() => props.vrmCharacters, () => {
+  draftVrmId.value = pickVrmId(draftVrmId.value)
 }, { deep: true })
 
 // When provider changes, reset voice to that provider's default
@@ -160,7 +218,16 @@ const personaOptions = computed(() =>
 )
 
 const characterOptions = computed(() =>
-  props.characters.map((c) => ({ value: c.id, label: c.name }))
+  [
+    ...props.characters.map((c) => ({
+      value: toMatesXCharacterValue(c.id),
+      label: `${c.name} · MatesX`,
+    })),
+    ...props.vrmCharacters.map((v) => ({
+      value: toVrmCharacterValue(v.id),
+      label: `${v.label} · VRM`,
+    })),
+  ]
 )
 
 const ttsProviderOptions = computed(() =>
@@ -189,8 +256,18 @@ const isBackgroundDirty = computed(() =>
   resolvedDraftBackgroundUrl.value !== props.backgroundUrl.trim() ||
   draftBackgroundFit.value !== props.backgroundFit
 )
-const isDirty = computed(() => needsReconnect.value || isBackgroundDirty.value)
-const applyDisabled = computed(() => Boolean(props.disabled) || Boolean(props.personasLoading))
+const isRenderModeDirty = computed(() => draftRenderMode.value !== props.renderMode)
+const isVrmDirty = computed(() => draftVrmId.value !== props.currentVrmId)
+const rendererChoiceDirty = computed(() => isRenderModeDirty.value || isVrmDirty.value)
+const isDirty = computed(() =>
+  needsReconnect.value ||
+  isBackgroundDirty.value ||
+  rendererChoiceDirty.value
+)
+const applyDisabled = computed(() =>
+  Boolean(props.personasLoading) ||
+  (Boolean(props.disabled) && !rendererChoiceDirty.value)
+)
 const applyLabel = computed(() => {
   if (!isDirty.value) return '關閉'
   return needsReconnect.value ? '套用並重新連線' : '套用'
@@ -233,6 +310,12 @@ function applyAndClose(): void {
   }
   if (draftVoiceMode.value !== (props.voiceMode ?? 'text')) {
     emit('voiceModeChange', draftVoiceMode.value)
+  }
+  if (draftRenderMode.value !== props.renderMode) {
+    emit('renderModeChange', draftRenderMode.value)
+  }
+  if (draftVrmId.value !== props.currentVrmId) {
+    emit('vrmCharacterChange', draftVrmId.value)
   }
   if (isBackgroundDirty.value) {
     emit(
@@ -292,9 +375,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <div class="field-card">
                 <span class="field-card__label">角色配置</span>
                 <CustomSelect
-                  v-model="draftCharId"
+                  v-model="draftCharacterValue"
                   :options="characterOptions"
-                  :disabled="disabled"
                 />
               </div>
 

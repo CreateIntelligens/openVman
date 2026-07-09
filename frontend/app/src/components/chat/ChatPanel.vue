@@ -9,36 +9,65 @@
     </header>
 
     <div class="chat-messages" ref="messagesRef">
-      <div class="chat-messages__content" ref="contentRef">
-      <div
-        v-for="(msg, i) in visibleMessages"
-        :key="i"
-        class="chat-msg"
-        :class="msg.role"
-      >
-        <div class="chat-msg__meta">
-          <span class="chat-role">{{ msg.role === "user" ? "訪客" : "虛擬人" }}</span>
-          <span class="chat-time">{{ formatTime(msg.timestamp) }}</span>
-        </div>
-        <p v-if="msg.role === 'user'" class="chat-text">{{ msg.text }}</p>
-        <p v-else class="chat-text">
-          <TypewriterText
-            :text="msg.text"
-            :is-typing="isTyping && msg === messages[messages.length - 1]"
-          />
-        </p>
-      </div>
+      <div ref="contentRef" class="chat-messages__content">
+        <div
+          v-for="(msg, i) in visibleMessages"
+          :key="i"
+          class="chat-msg"
+          :class="msg.role"
+        >
+          <div class="chat-msg__meta">
+            <span class="chat-role">{{ msg.role === "user" ? "訪客" : "虛擬人" }}</span>
+            <span class="chat-time">{{ formatTime(msg.timestamp) }}</span>
+          </div>
+          <p v-if="msg.role === 'user'" class="chat-text">{{ msg.text }}</p>
+          <p v-else class="chat-text">
+            <TypewriterText
+              :text="msg.text"
+              :is-typing="isTyping && msg === messages[messages.length - 1]"
+            />
+          </p>
+          <div v-if="!compact && msg.sourcePath" class="chat-msg__reference-container">
+            <button
+              type="button"
+              class="chat-msg__ref-btn"
+              :class="{ 'chat-msg__ref-btn--open': expandedRefs[i] }"
+              :disabled="!msg.sourcePathContent"
+              @click="toggleRef(i)"
+              :title="msg.sourcePath"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ref-icon">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+              <span class="ref-label">參考資料：</span>
+              <span class="ref-value">{{ formatSourcePath(msg.sourcePath) }}</span>
+              <span v-if="msg.sourcePathContent" class="ref-toggle-indicator">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </span>
+            </button>
 
-      <div v-if="isThinking" class="chat-msg ai thinking">
-        <div class="chat-msg__meta">
-          <span class="chat-role">虛擬人</span>
-          <span class="chat-time">即時生成</span>
+            <div v-if="expandedRefs[i] && msg.sourcePathContent" class="chat-msg__ref-content">
+              <p class="ref-content-text">{{ msg.sourcePathContent }}</p>
+            </div>
+          </div>
         </div>
-        <div class="thinking-row">
-          <span class="thinking-copy">正在整理回覆</span>
-          <span class="dots"><span /><span /><span /></span>
+
+        <div v-if="isThinking" class="chat-msg ai thinking">
+          <div class="chat-msg__meta">
+            <span class="chat-role">虛擬人</span>
+            <span class="chat-time">即時生成</span>
+          </div>
+          <div class="thinking-row">
+            <span class="thinking-copy">正在整理回覆</span>
+            <span class="dots"><span /><span /><span /></span>
+          </div>
         </div>
-      </div>
       </div>
     </div>
 
@@ -120,6 +149,17 @@ function formatTime(timestamp: number): string {
     hour: "2-digit",
     minute: "2-digit",
   })
+}
+
+function formatSourcePath(path: string): string {
+  if (!path) return ""
+  return path.split("/").pop() || path
+}
+
+const expandedRefs = ref<Record<number, boolean>>({})
+
+function toggleRef(idx: number): void {
+  expandedRefs.value[idx] = !expandedRefs.value[idx]
 }
 
 useStickToBottom(messagesRef, contentRef)
@@ -241,6 +281,111 @@ useStickToBottom(messagesRef, contentRef)
 .chat-text {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.chat-msg__reference-container {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chat-msg__ref-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-soft);
+  border: var(--hairline) solid var(--line);
+  border-radius: 0.35rem;
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.chat-msg__ref-btn:hover:not(:disabled) {
+  background: var(--bg);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.chat-msg__ref-btn:disabled {
+  cursor: default;
+}
+
+.ref-icon {
+  opacity: 0.8;
+  flex-shrink: 0;
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.ref-label {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.ref-value {
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+  max-width: 12rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: left;
+}
+
+.ref-toggle-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+  margin-left: 0.15rem;
+  flex-shrink: 0;
+}
+
+.ref-toggle-indicator svg {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+.chat-msg__ref-btn--open .ref-toggle-indicator {
+  transform: rotate(180deg);
+}
+
+.chat-msg__ref-content {
+  margin-left: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border-radius: 0 0.5rem 0.5rem 0;
+  border-left: 0.125rem solid var(--primary);
+  animation: slideDown 0.2s ease;
+}
+
+.ref-content-text {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  white-space: pre-wrap;
+  word-break: break-all;
+  text-align: left;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .thinking {

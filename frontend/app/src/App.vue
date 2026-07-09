@@ -8,8 +8,8 @@
       <ControlBar
         class="control-area"
         :state="chat.state.value"
-        :disabled="!wasm.isReady.value || wasm.isLoading.value"
-        :error-message="wasm.error.value"
+        :disabled="rendererDisabled"
+        :error-message="rendererErrorMessage"
         :camera-active="webcam.active.value"
         :immersive="immersive"
         :camera-preview-scale="settings.cameraPreviewScale"
@@ -22,14 +22,28 @@
       <section class="stage-panel">
         <div class="stage-card">
           <div class="stage-frame">
+            <div
+              class="stage-background"
+              :class="stageBackgroundClass"
+              :style="stageBackgroundStyle"
+            />
             <AvatarCanvas
+              v-show="settings.renderMode === '2d'"
               :width="800"
               :height="800"
-              :show-loading="wasm.isLoading.value"
+              :show-loading="settings.renderMode === '2d' && wasm.isLoading.value"
               :loading-text="loadingText"
               :background-id="settings.backgroundId"
               :custom-background-url="settings.backgroundUrl"
               :background-fit="settings.backgroundFit"
+            />
+            <iframe
+              v-if="settings.renderMode === '3d'"
+              ref="stageAvatarFrameRef"
+              class="stage-avatar-frame"
+              :src="stageAvatarWidgetSrc"
+              title="VRM 虛擬人"
+              allow="autoplay"
             />
             <CameraPreview
               :stream="webcam.stream.value"
@@ -37,13 +51,36 @@
               :visual-state="chat.visualState.value"
             />
           </div>
+
+          <button
+            class="quick-qa-toggle-btn"
+            @click="showQuickQa = !showQuickQa"
+            :class="{ 'quick-qa-toggle-btn--active': showQuickQa }"
+            title="快速問題"
+            aria-label="開啟快速問題"
+          >
+            <div class="toggle-btn-content">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" class="toggle-icon">
+                <line x1="12" y1="16" x2="12" y2="11"/>
+                <line x1="12" y1="7" x2="12.01" y2="7"/>
+              </svg>
+              <span class="toggle-label">快速問題</span>
+            </div>
+          </button>
+
+          <QuickQaPanel
+            :open="showQuickQa"
+            :project-id="settings.projectId"
+            @close="showQuickQa = false"
+            @select-question="handleSend"
+          />
         </div>
       </section>
 
       <ChatPanel
         class="chat-area"
         :messages="chat.messages.value"
-        :disabled="!wasm.isReady.value || wasm.isLoading.value || chat.state.value === 'CONNECTING'"
+        :disabled="rendererDisabled || chat.state.value === 'CONNECTING'"
         :placeholder="chatPlaceholder"
         :is-thinking="chat.state.value === 'THINKING'"
         :is-typing="isTyping"
@@ -61,7 +98,9 @@
     <SettingsModal
       v-model:open="showSettings"
       :characters="characters"
+      :vrm-characters="vrmCharacterOptions"
       :current-char-id="wasm.currentCharId.value"
+      :current-vrm-id="settings.vrmAvatarId"
       :tts-provider="settings.ttsProvider"
       :tts-voice="settings.ttsVoice"
       :tts-providers="ttsProviders"
@@ -71,12 +110,13 @@
       :current-persona-id="settings.personaId"
       :personas-loading="personasLoading"
       :voice-mode="settings.voiceMode"
+      :render-mode="settings.renderMode"
       :background-id="settings.backgroundId"
       :background-url="settings.backgroundUrl"
       :background-fit="settings.backgroundFit"
       :backgrounds="backgrounds"
       :state="chat.state.value"
-      :disabled="!wasm.isReady.value || wasm.isLoading.value"
+      :disabled="rendererDisabled"
       @char-change="handleCharChange"
       @tts-provider-change="handleTtsChange"
       @tts-voice-change="handleTtsVoiceChange"
@@ -84,6 +124,8 @@
       @project-change="handleProjectChange"
       @persona-change="handlePersonaChange"
       @voice-mode-change="handleVoiceModeChange"
+      @render-mode-change="handleRenderModeChange"
+      @vrm-character-change="handleVrmAvatarChange"
       @background-change="handleBackgroundChange"
       @apply="handleSettingsApply"
     />
@@ -95,38 +137,6 @@
       :message="fatalError.message"
       @retry="handleFatalRetry"
     />
-
-    <div
-      v-if="!immersive && !mascotClosed"
-      class="mascot-widget"
-      :class="{ dragging: mascotDragging }"
-      :style="mascotPositionStyle"
-    >
-      <div class="mascot-drag-handle" @mousedown="handleMascotDragStart" />
-      <MascotSwitcher
-        :mascots="mascotOptions"
-        :current-mascot-id="selectedMascot.id"
-        @mascot-change="handleMascotChange"
-      />
-      <iframe
-        ref="mascotFrameRef"
-        :key="settings.mascotId"
-        :src="mascotWidgetSrc"
-        title="AI 虛擬人小助理"
-        allow="microphone; autoplay"
-      />
-    </div>
-
-    <button
-      v-if="!immersive && mascotClosed"
-      type="button"
-      class="mascot-reopen-button"
-      title="打開 AI 虛擬人小助理"
-      aria-label="打開 AI 虛擬人小助理"
-      @click="mascotClosed = false"
-    >
-      <span aria-hidden="true">🧑</span>
-    </button>
   </div>
 </template>
 
@@ -137,10 +147,10 @@ import CameraPreview from "./components/avatar/CameraPreview.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";
 import type { PersonaSummary } from "./components/controls/ControlBar.vue";
-import MascotSwitcher from "./components/mascot/MascotSwitcher.vue";
 import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
+import QuickQaPanel from "./components/controls/QuickQaPanel.vue";
 import { useAudioPlayer } from "./composables/useAudioPlayer";
 import { useAvatarCatalog } from "./composables/useAvatarCatalog";
 import { useAvatarChat } from "./composables/useAvatarChat";
@@ -152,67 +162,31 @@ import { useWebcamCapture } from "./composables/useWebcamCapture";
 import {
   buildMascotWidgetSrc,
   FALLBACK_MASCOT_CATALOG,
-  resolveMascotOption,
   toMascotOption,
   type MascotApiRecord,
   type MascotOption,
 } from "./data/mascotCatalog";
 import { useSettingsStore } from "./stores/useSettingsStore";
-import type { AvatarBackgroundFit, AvatarBackgroundId } from "./types/avatarBackground";
+import {
+  isUploadedAvatarBackgroundId,
+  type AvatarBackgroundFit,
+  type AvatarBackgroundId,
+} from "./types/avatarBackground";
 
 const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
 const HOST_MESSAGE_NAMESPACE = "avatar-widget-host";
-const MASCOT_DEFAULT_MARGIN_REM = 1;
-const WIDGET_MESSAGE_NAMESPACE = "avatar-widget";
-
-interface MascotPosition {
-  right: number;
-  bottom: number;
-}
-
-type MascotMessage = {
-  ns: typeof WIDGET_MESSAGE_NAMESPACE;
-  type: string;
-};
+const fallbackVrmAvatarOptions = FALLBACK_MASCOT_CATALOG
+  .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
 
 const isStarted = ref(false);
 const isTyping = ref(false);
 const showSettings = ref(false);
+const showQuickQa = ref(false);
 const immersive = ref(false);
-const mascotClosed = ref(false);
-const mascotDragging = ref(false);
-const mascotPosition = ref<MascotPosition | null>(null);
-const mascotFrameRef = ref<HTMLIFrameElement | null>(null);
-let mascotDragOffset = { x: 0, y: 0 };
+const stageAvatarFrameRef = ref<HTMLIFrameElement | null>(null);
 
-function getRootFontSize(): number {
-  const rootFontSize = Number.parseFloat(
-    getComputedStyle(document.documentElement).fontSize,
-  );
-  return Number.isFinite(rootFontSize) && rootFontSize > 0 ? rootFontSize : 16;
-}
-
-function toRem(value: number): string {
-  return `${value / getRootFontSize()}rem`;
-}
-
-function defaultMascotMarginPixels(): number {
-  return MASCOT_DEFAULT_MARGIN_REM * getRootFontSize();
-}
-
-function clampInset(value: number, size: number, viewportSize: number, margin: number): number {
-  const maxInset = Math.max(margin, viewportSize - size - margin);
-  return Math.min(Math.max(value, margin), maxInset);
-}
-
-function isWidgetMessage(data: unknown): data is MascotMessage {
-  if (typeof data !== "object" || data === null) return false;
-  const message = data as Partial<MascotMessage>;
-  return message.ns === WIDGET_MESSAGE_NAMESPACE && typeof message.type === "string";
-}
-
-function postToMascot(message: Record<string, unknown>): void {
-  const frame = mascotFrameRef.value;
+function postToStageAvatar(message: Record<string, unknown>): void {
+  const frame = stageAvatarFrameRef.value;
   if (!frame?.contentWindow) return;
   frame.contentWindow.postMessage(
     { ns: HOST_MESSAGE_NAMESPACE, ...message },
@@ -220,17 +194,18 @@ function postToMascot(message: Record<string, unknown>): void {
   );
 }
 
-function driveMascotMouth(volume: number): void {
-  postToMascot({ type: "mouth", volume });
+function driveStageAvatarMouth(volume: number): void {
+  if (settings.renderMode !== "3d") return;
+  postToStageAvatar({ type: "mouth", volume });
 }
 
-function stopMascotMouth(): void {
-  postToMascot({ type: "mouth-stop" });
+function stopStageAvatarMouth(): void {
+  postToStageAvatar({ type: "mouth-stop" });
 }
 
-function handleMascotChange(mascotId: string): void {
-  stopMascotMouth();
-  settings.mascotId = resolveMascotOption(mascotId, mascotOptions.value).id;
+function triggerStageAvatarGesture(name: string): void {
+  if (settings.renderMode !== "3d") return;
+  postToStageAvatar({ type: "gesture", name });
 }
 
 // Error overlay state (fatal errors shown full-screen)
@@ -263,11 +238,36 @@ function onAudioQueueEmpty(): void {
 }
 
 const settings = useSettingsStore();
-const mascotOptions = ref<MascotOption[]>([...FALLBACK_MASCOT_CATALOG]);
-const selectedMascot = computed(() =>
-  resolveMascotOption(settings.mascotId, mascotOptions.value),
+const vrmAvatarOptions = ref<MascotOption[]>(fallbackVrmAvatarOptions);
+const selectedVrmAvatar = computed(() =>
+  resolveVrmAvatarOption(settings.vrmAvatarId, vrmAvatarOptions.value),
 );
-const mascotWidgetSrc = computed(() => buildMascotWidgetSrc(selectedMascot.value));
+const vrmCharacterOptions = computed(() =>
+  vrmAvatarOptions.value.map((mascot) => ({
+    id: mascot.id,
+    label: mascot.label,
+  })),
+);
+const stageAvatarWidgetSrc = computed(() =>
+  `${buildMascotWidgetSrc(selectedVrmAvatar.value)}&chrome=stage`,
+);
+const stageBackgroundClass = computed(() =>
+  isUploadedAvatarBackgroundId(settings.backgroundId)
+    ? "stage-background--custom"
+    : `stage-background--${settings.backgroundId}`,
+);
+const stageBackgroundStyle = computed<Record<string, string>>(() => {
+  const url = settings.backgroundUrl.trim();
+  if (
+    settings.backgroundId !== "custom" &&
+    !isUploadedAvatarBackgroundId(settings.backgroundId)
+  ) return {};
+  if (url.length === 0) return {};
+  return {
+    backgroundImage: `url(${JSON.stringify(url)})`,
+    ...stageBackgroundFitStyle(settings.backgroundFit),
+  };
+});
 
 const fallbackCharacters = [
   { id: "008", name: "角色 008" },
@@ -285,6 +285,10 @@ interface AvatarBackgroundSummary {
   background_id: string;
   label: string;
   url: string;
+}
+
+interface VrmMascotsResponse {
+  mascots?: MascotApiRecord[];
 }
 
 const DEFAULT_PROJECT: ProjectSummary = { project_id: "default", label: "預設" };
@@ -318,6 +322,57 @@ function pickFallbackPersonaId(items: PersonaSummary[], preferredId: string): st
   return items.find((p) => p.persona_id === "default")?.persona_id
     ?? items[0]?.persona_id
     ?? DEFAULT_PERSONA.persona_id;
+}
+
+function resolveVrmAvatarOption(
+  vrmId: string | null | undefined,
+  catalog: readonly MascotOption[],
+): MascotOption {
+  return catalog.find((mascot) => mascot.id === vrmId)
+    ?? catalog[0]
+    ?? fallbackVrmAvatarOptions[0];
+}
+
+async function fetchVrmAvatars(): Promise<void> {
+  try {
+    const res = await fetch("/api/avatar/mascots");
+    if (!res.ok) return;
+    const data = (await res.json()) as VrmMascotsResponse;
+    const items = (data.mascots ?? [])
+      .map(toMascotOption)
+      .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
+    vrmAvatarOptions.value = items.length > 0 ? items : fallbackVrmAvatarOptions;
+  } catch {
+    vrmAvatarOptions.value = fallbackVrmAvatarOptions;
+  } finally {
+    settings.vrmAvatarId = resolveVrmAvatarOption(
+      settings.vrmAvatarId,
+      vrmAvatarOptions.value,
+    ).id;
+  }
+}
+
+function stageBackgroundFitStyle(fit: AvatarBackgroundFit): Record<string, string> {
+  switch (fit) {
+    case "repeat":
+      return {
+        backgroundPosition: "top left",
+        backgroundRepeat: "repeat",
+        backgroundSize: "auto",
+      };
+    case "contain":
+      return {
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "contain",
+      };
+    default:
+      return {
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      };
+  }
 }
 
 async function fetchProjects(): Promise<void> {
@@ -390,32 +445,22 @@ async function fetchBackgrounds(): Promise<void> {
   }
 }
 
-async function fetchMascots(): Promise<void> {
-  try {
-    const res = await fetch("/api/avatar/mascots");
-    if (!res.ok) return;
-    const data = await res.json();
-    const items: MascotApiRecord[] = data.mascots ?? [];
-    if (items.length > 0) {
-      mascotOptions.value = items.map(toMascotOption);
-    } else {
-      mascotOptions.value = [...FALLBACK_MASCOT_CATALOG];
-    }
-  } catch {
-    mascotOptions.value = [...FALLBACK_MASCOT_CATALOG];
-  }
-}
-
 const wasm = useMatesX();
+const rendererDisabled = computed(() =>
+  settings.renderMode === "2d" && (!wasm.isReady.value || wasm.isLoading.value),
+);
+const rendererErrorMessage = computed(() =>
+  settings.renderMode === "2d" ? wasm.error.value : null,
+);
 
 const audio = useAudioPlayer({
   onPcmChunk: (pcm) => {
-    wasm.pushAudio(pcm);
+    if (settings.renderMode === "2d") wasm.pushAudio(pcm);
   },
-  onPlaybackVolume: driveMascotMouth,
+  onPlaybackVolume: driveStageAvatarMouth,
   onPlaybackEnd: () => {
     wasm.clearAudio();
-    stopMascotMouth();
+    stopStageAvatarMouth();
   },
   onQueueEmpty: onAudioQueueEmpty,
 });
@@ -464,7 +509,7 @@ const chat = useAvatarChat({
     ttsStreamer.cancel();
     audio.flush();
     wasm.clearAudio();
-    stopMascotMouth();
+    stopStageAvatarMouth();
     typewriter.flush();
     pendingText = "";
     isTyping.value = false;
@@ -501,14 +546,15 @@ const chat = useAvatarChat({
 });
 
 const loadingText = computed(() => {
+  if (settings.renderMode !== "2d") return "";
   if (!wasm.isReady.value) return "載入引擎中...";
   if (wasm.isLoading.value) return "切換展示角色中...";
   return "";
 });
 
 const chatPlaceholder = computed(() => {
-  if (!wasm.isReady.value) return "正在準備...";
-  if (wasm.isLoading.value) return "切換展示角色中...";
+  if (settings.renderMode === "2d" && !wasm.isReady.value) return "正在準備...";
+  if (settings.renderMode === "2d" && wasm.isLoading.value) return "切換展示角色中...";
   return "向數位虛擬人提問...";
 });
 
@@ -516,70 +562,7 @@ const cameraPreviewStyle = computed<Record<string, string>>(() => ({
   "--camera-preview-scale": String(settings.cameraPreviewScale),
 }));
 
-const mascotPositionStyle = computed<Record<string, string>>(() => {
-  if (!mascotPosition.value) {
-    return {
-      right: `${MASCOT_DEFAULT_MARGIN_REM}rem`,
-      bottom: `${MASCOT_DEFAULT_MARGIN_REM}rem`,
-    };
-  }
-  return {
-    right: toRem(mascotPosition.value.right),
-    bottom: toRem(mascotPosition.value.bottom),
-  };
-});
-
-let mascotSize = { width: 0, height: 0 };
-
-function handleMascotDragStart(event: MouseEvent): void {
-  const handle = event.currentTarget as HTMLElement;
-  const widget = handle.closest(".mascot-widget") as HTMLElement | null;
-  if (!widget) return;
-
-  event.preventDefault();
-  mascotDragging.value = true;
-  const rect = widget.getBoundingClientRect();
-  mascotSize = { width: rect.width, height: rect.height };
-  mascotDragOffset = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-  };
-  window.addEventListener("mousemove", handleMascotDragMove);
-  window.addEventListener("mouseup", handleMascotDragEnd);
-}
-
-function handleMascotDragMove(event: MouseEvent): void {
-  if (!mascotDragging.value) return;
-  const { width, height } = mascotSize;
-  const left = event.clientX - mascotDragOffset.x;
-  const top = event.clientY - mascotDragOffset.y;
-  const margin = defaultMascotMarginPixels();
-  const right = clampInset(
-    window.innerWidth - left - width,
-    width,
-    window.innerWidth,
-    margin,
-  );
-  const bottom = clampInset(
-    window.innerHeight - top - height,
-    height,
-    window.innerHeight,
-    margin,
-  );
-  mascotPosition.value = { right, bottom };
-}
-
-function removeMascotDragListeners(): void {
-  window.removeEventListener("mousemove", handleMascotDragMove);
-  window.removeEventListener("mouseup", handleMascotDragEnd);
-}
-
-function handleMascotDragEnd(): void {
-  mascotDragging.value = false;
-  removeMascotDragListeners();
-}
-
-async function handleSend(text: string): Promise<void> {
+async function handleSend(text: string, sourcePath?: string, referenceText?: string): Promise<void> {
   if (!isStarted.value) {
     try {
       await audio.resumeContext();
@@ -601,7 +584,7 @@ async function handleSend(text: string): Promise<void> {
         });
       }
       
-      if (window.characterVideo && window.characterVideo.paused) {
+      if (settings.renderMode === "2d" && window.characterVideo && window.characterVideo.paused) {
         window.characterVideo.play().catch(e => console.warn("[App] characterVideo play failed:", e));
       }
       
@@ -611,13 +594,15 @@ async function handleSend(text: string): Promise<void> {
       return;
     }
   }
-  chat.sendMessage(text);
+  chat.sendMessage(text, sourcePath, referenceText);
 }
 
 async function handleCharChange(charId: string): Promise<void> {
   wasm.clearAudio();
-  await wasm.loadCharacter(charId);
   settings.characterId = charId;
+  if (wasm.isReady.value) {
+    await wasm.loadCharacter(charId);
+  }
 }
 
 function handleTtsChange(engine: string): void {
@@ -642,6 +627,24 @@ function handlePersonaChange(personaId: string): void {
 
 function handleVoiceModeChange(mode: 'live' | 'text'): void {
   settings.voiceMode = mode;
+}
+
+function handleRenderModeChange(mode: '2d' | '3d'): void {
+  if (settings.renderMode === mode) return;
+  settings.renderMode = mode;
+  if (mode === "3d") {
+    wasm.clearAudio();
+    return;
+  }
+  stopStageAvatarMouth();
+  const charId = settings.characterId || pickInitialCharacter();
+  if (wasm.isReady.value && wasm.currentCharId.value !== charId) {
+    void wasm.loadCharacter(charId);
+  }
+}
+
+function handleVrmAvatarChange(vrmId: string): void {
+  settings.vrmAvatarId = resolveVrmAvatarOption(vrmId, vrmAvatarOptions.value).id;
 }
 
 function handleBackgroundChange(
@@ -753,6 +756,8 @@ function pickInitialCharacter(): string {
 
 // Pause ASR during THINKING/SPEAKING to avoid feedback loops
 watch(() => chat.state.value, (newState) => {
+  if (newState === 'THINKING') triggerStageAvatarGesture("thinking-hand");
+  if (newState === 'SPEAKING') triggerStageAvatarGesture("explain-open-hand");
   if ((newState === 'THINKING' || newState === 'SPEAKING') && asr.isListening.value) {
     asr.pause();
   }
@@ -763,18 +768,11 @@ watch(showSettings, () => {
   void fetchBackgrounds();
 });
 
-function handleMascotMessage(event: MessageEvent): void {
-  if (isWidgetMessage(event.data) && event.data.type === "close") {
-    mascotClosed.value = true;
-  }
-}
-
 onMounted(async () => {
   document.addEventListener("fullscreenchange", handleFullscreenChange);
-  window.addEventListener("message", handleMascotMessage);
+  void fetchVrmAvatars();
   void fetchTtsProviders();
   void fetchBackgrounds();
-  void fetchMascots();
   await fetchProjects();
   await fetchPersonas(settings.projectId);
   await avatarCatalog.load();
@@ -789,8 +787,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  window.removeEventListener("message", handleMascotMessage);
-  removeMascotDragListeners();
 });
 </script>
 
@@ -890,73 +886,58 @@ body {
   background: var(--bg-soft);
   border: var(--hairline) solid var(--line);
   box-shadow: var(--surface-shadow);
+  overflow: hidden;
 }
 
 .stage-frame {
   position: relative;
   height: 100%;
   border-radius: 0.5rem;
-  background: #000;
+  background: #0a0a0f;
   overflow: hidden;
 }
 
-.mascot-widget {
-  position: fixed;
-  z-index: 1000;
-  width: min(21.25rem, 90vw);
-  height: min(30rem, 70dvh);
-  border-radius: 1rem;
-  overflow: hidden;
-  box-shadow: var(--surface-shadow);
-  background: transparent;
+.stage-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transition: background 0.2s ease, opacity 0.2s ease;
 }
 
-.mascot-widget iframe {
+.stage-background--dark {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(47, 65, 88, 0.92) 0%, rgba(9, 14, 20, 0) 54%),
+    linear-gradient(180deg, #121722 0%, #06080d 100%);
+}
+
+.stage-background--clinic {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(135deg, #dbeafe 0%, #f8fafc 48%, #d1fae5 100%);
+}
+
+.stage-background--studio {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(250, 204, 21, 0.28) 0%, rgba(250, 204, 21, 0) 34%),
+    radial-gradient(circle at 18% 78%, rgba(20, 184, 166, 0.35) 0%, rgba(20, 184, 166, 0) 36%),
+    linear-gradient(145deg, #16110f 0%, #243042 52%, #101820 100%);
+}
+
+.stage-background--custom {
+  background-color: #0a0a0f;
+}
+
+.stage-avatar-frame {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   border: none;
   display: block;
-}
-
-.mascot-widget .mascot-drag-handle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1.5rem;
-  z-index: 1;
-  cursor: grab;
-}
-
-.mascot-widget.dragging .mascot-drag-handle {
-  cursor: grabbing;
-}
-
-.mascot-widget.dragging iframe {
-  pointer-events: none;
-}
-
-.mascot-reopen-button {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  z-index: 1000;
-  width: 3rem;
-  height: 3rem;
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  background: var(--bg-soft);
-  box-shadow: var(--surface-shadow);
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.mascot-reopen-button:hover {
-  transform: scale(1.08);
+  background: transparent;
 }
 
 /* Immersive mode: avatar fills the entire viewport, other panels float on top */
@@ -1152,5 +1133,81 @@ body {
   .stage-card {
     height: clamp(14rem, 44svh, 22rem);
   }
+}
+
+.quick-qa-toggle-btn {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 10;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a7f3d0 0%, #0d9488 100%);
+  border: 0.09375rem solid rgba(255, 255, 255, 0.6);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0.25rem 0.875rem rgba(13, 148, 136, 0.35);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.quick-qa-toggle-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0.375rem 1.125rem rgba(13, 148, 136, 0.5);
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.quick-qa-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.quick-qa-toggle-btn--active {
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  border-color: #ffffff;
+  box-shadow: 0 0.25rem 1rem rgba(5, 150, 105, 0.45);
+}
+
+.toggle-btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.toggle-icon {
+  stroke: #ffffff;
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+.toggle-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.02rem;
+  white-space: nowrap;
+}
+
+.app-shell.immersive .quick-qa-toggle-btn {
+  top: 1.5rem;
+  right: 1.5rem;
+  box-shadow:
+    0 0.375rem 1.125rem rgba(0, 0, 0, 0.3),
+    0 0.25rem 0.875rem rgba(13, 148, 136, 0.35);
+}
+
+.app-shell.immersive .quick-qa-toggle-btn:hover {
+  background: rgba(15, 23, 42, 0.8);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.app-shell.immersive .quick-qa-toggle-btn--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 </style>

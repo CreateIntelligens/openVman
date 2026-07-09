@@ -34,11 +34,11 @@ export const FALLBACK_MASCOT_CATALOG: MascotOption[] = [
     id: "qqman",
     label: "Frieren",
     engine: "3d",
-    vrmUrl: "/QQman_fll.vrm",
+    vrmUrl: "/mascots/qqman/model.vrm",
   },
   {
     id: "vrm-sample",
-    label: "VRM 3D",
+    label: "VRM 範例",
     engine: "3d",
     vrmUrl: "https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm",
   },

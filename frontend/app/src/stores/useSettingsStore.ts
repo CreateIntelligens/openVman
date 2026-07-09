@@ -3,8 +3,11 @@ import {
   normalizeAvatarBackgroundFit,
   normalizeAvatarBackgroundId,
 } from "../types/avatarBackground"
-import { DEFAULT_MASCOT_ID } from "../data/mascotCatalog"
 import { STORAGE_KEYS, readPref, writePref } from "../utils/storageUtils"
+
+function normalizeAvatarRenderMode(value: string): '2d' | '3d' {
+  return value === '3d' ? '3d' : '2d'
+}
 
 function normalizeCameraPreviewScale(value: string): number {
   const scale = Number.parseFloat(value)
@@ -23,7 +26,8 @@ const state = reactive({
   backgroundUrl: readPref(STORAGE_KEYS.BACKGROUND_URL, ""),
   backgroundFit: normalizeAvatarBackgroundFit(readPref(STORAGE_KEYS.BACKGROUND_FIT, "cover")),
   cameraPreviewScale: normalizeCameraPreviewScale(readPref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, "1")),
-  mascotId: readPref(STORAGE_KEYS.MASCOT_ID, DEFAULT_MASCOT_ID),
+  renderMode: normalizeAvatarRenderMode(readPref(STORAGE_KEYS.RENDER_MODE, "2d")),
+  vrmAvatarId: readPref(STORAGE_KEYS.VRM_AVATAR_ID, "qqman"),
 })
 
 watch(() => state.ttsProvider, (v) => writePref(STORAGE_KEYS.TTS_ENGINE, v))
@@ -36,7 +40,8 @@ watch(() => state.backgroundId, (v) => writePref(STORAGE_KEYS.BACKGROUND_ID, v))
 watch(() => state.backgroundUrl, (v) => writePref(STORAGE_KEYS.BACKGROUND_URL, v))
 watch(() => state.backgroundFit, (v) => writePref(STORAGE_KEYS.BACKGROUND_FIT, v))
 watch(() => state.cameraPreviewScale, (v) => writePref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, String(v)))
-watch(() => state.mascotId, (v) => writePref(STORAGE_KEYS.MASCOT_ID, v))
+watch(() => state.renderMode, (v) => writePref(STORAGE_KEYS.RENDER_MODE, v))
+watch(() => state.vrmAvatarId, (v) => writePref(STORAGE_KEYS.VRM_AVATAR_ID, v))
 
 export function useSettingsStore() {
   return state

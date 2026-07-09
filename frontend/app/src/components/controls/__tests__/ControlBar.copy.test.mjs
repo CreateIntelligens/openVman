@@ -21,3 +21,9 @@ test("immersive camera mode exposes a camera size slider", () => {
   assert.match(source, /min="0\.85"/);
   assert.match(source, /max="1\.35"/);
 });
+
+test("settings button can stay enabled while renderer actions are disabled", () => {
+  assert.match(source, /settingsDisabled\?:\s*boolean/);
+  assert.match(source, /class="settings-btn"[\s\S]*?:disabled="settingsDisabled"/);
+  assert.match(source, /:disabled="disabled \|\| cameraDisabled"/);
+});

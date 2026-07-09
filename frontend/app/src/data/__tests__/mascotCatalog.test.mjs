@@ -41,6 +41,14 @@ test("qqman mascot uses the Frieren display name", async () => {
   assert.equal(qqmanMascot?.label, "Frieren");
 });
 
+test("qqman mascot points at the built-in VRM asset route", async () => {
+  const { MASCOT_CATALOG } = await loadModule();
+  const qqmanMascot = MASCOT_CATALOG.find((mascot) => mascot.id === "qqman");
+
+  assert.equal(qqmanMascot?.vrmUrl, "/mascots/qqman/model.vrm");
+  assert.notEqual(qqmanMascot?.vrmUrl, "/QQman_fll.vrm");
+});
+
 test("mascot widget src encodes a 2D model option", async () => {
   const { buildMascotWidgetSrc } = await loadModule();
   const src = buildMascotWidgetSrc({

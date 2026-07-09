@@ -93,6 +93,7 @@
   #control-bar .dock-row:last-child > *:not(#btn-close) { display:none !important; }
   #control-bar #btn-close { background:rgba(20,20,30,.4); }
   #control-bar #btn-close:hover { background:rgba(20,20,30,.6); }
+  html.stage-mode #control-bar { display:none !important; }
 </style>
 </head>
 <body>
@@ -118,6 +119,7 @@
   <script>
   // ===== 可設定（由 embed.js 透過 query 帶入）：皮=模型 / 肉的語音=後端 / 內容=知識庫 =====
   const CFG = new URLSearchParams(location.search);
+  if (CFG.get('chrome') === 'stage') document.documentElement.classList.add('stage-mode');
   function readNumberParam(name, fallback, min, max) {
     const value = Number.parseFloat(CFG.get(name) || '');
     if (!Number.isFinite(value)) return fallback;
@@ -182,6 +184,7 @@
     if (d.ns !== 'avatar-widget-host') return;
     if (d.type === 'mouth') driveMouth(d.volume);
     if (d.type === 'mouth-stop') stopMouth();
+    if (d.type === 'gesture' && typeof d.name === 'string') gesture3D && gesture3D(d.name);
     // 注意：不接受用 postMessage 遠端啟動麥克風（listen），避免惡意父頁偷開麥；麥克風只由使用者點擊觸發
   });
 
@@ -277,12 +280,20 @@
       const { VRMLoaderPlugin, VRMUtils } = await import('@pixiv/three-vrm');
       const { VRMAnimationLoaderPlugin, createVRMAnimationClip } = await import('@pixiv/three-vrm-animation');
       const TK = 'https://cdn.jsdelivr.net/gh/tk256ailab/vrm-viewer@main/VRMA/';
-      const GESTURES = {        // 情境手勢 + 待機變化（body-only，不碰嘴）
-        wave: TK + 'Goodbye.vrma',
-        bow: 'https://cdn.jsdelivr.net/gh/hirokazuniimoto/virtual-avatar-sdk@main/assets/animations/quick_formal_bow.vrma',
-        thinking: TK + 'Thinking.vrma', look: TK + 'LookAround.vrma', relax: TK + 'Relax.vrma'
+      const VRMA_GESTURES = {        // 情境手勢 + 待機變化（body-only，不碰嘴）
+        'wave-soft': TK + 'Goodbye.vrma',
+        'thinking-hand': TK + 'Thinking.vrma',
+        'look-around': TK + 'LookAround.vrma',
+        'relax-shift': TK + 'Relax.vrma',
+        'bow-light': 'https://cdn.jsdelivr.net/gh/hirokazuniimoto/virtual-avatar-sdk@main/assets/animations/quick_formal_bow.vrma'
       };
-      const TAP_GESTURES = ['wave', 'bow']; // 點一下隨機：揮手/鞠躬問候（歡迎感）
+      const PROCEDURAL_GESTURES = {
+        'nod-small': { duration: 0.9 },
+        'explain-open-hand': { duration: 1.6 },
+      };
+      const GESTURE_ALIASES = { wave: 'wave-soft', bow: 'bow-light', thinking: 'thinking-hand', look: 'look-around', relax: 'relax-shift' };
+      const TAP_GESTURES = ['wave-soft', 'bow-light', 'nod-small']; // 點一下隨機：揮手/鞠躬/小點頭
+      const IDLE_GESTURES = ['look-around', 'relax-shift'];
 
       const stage = document.getElementById('stage');
       const canvas = newCanvas();
@@ -348,7 +359,7 @@
 
       let vrm = null, armSign = 1, nextBlink = 2 + Math.random() * 3, blinkT = -1, mixer = null, waving = false; const BLINK = 0.12;
       let mouthExpressionName = 'aa', blinkExpressionName = 'blink';
-      const gestureActions = {}; let currentGesture = null, idleBreak = 0;
+      const gestureActions = {}; let currentGesture = null, proceduralGesture = null, idleBreak = 0;
       const clock = new THREE.Clock();
       const loader = new GLTFLoader();
       loader.register((p) => new VRMLoaderPlugin(p));
@@ -404,7 +415,7 @@
           const bodyOnly = (cl) => { cl.tracks = cl.tracks.filter((tr) => /\.quaternion$/.test(tr.name)); return cl; }; // 只留骨架旋轉、剝臉部表情與位移
           try {
             mixer = new THREE.AnimationMixer(vrm.scene);
-            for (const [name, file] of Object.entries(GESTURES)) {
+            for (const [name, file] of Object.entries(VRMA_GESTURES)) {
               try {
                 const gg = await loader.loadAsync(file);
                 const a = gg.userData.vrmAnimations && gg.userData.vrmAnimations[0];
@@ -415,12 +426,12 @@
               } catch (e) { console.warn('VRMA ' + name + ' 載入失敗：', e && e.message); }
             }
             mixer.addEventListener('finished', (e) => {        // 手勢播完 → 立刻停、交回程序化站姿（不 fadeOut，避免露出 bind T-pose）
-              if (e.action === currentGesture) { try { e.action.stop(); } catch (er) {} currentGesture = null; waving = false; }
+              if (e.action === currentGesture) { try { e.action.stop(); } catch (er) {} currentGesture = null; proceduralGesture = null; waving = false; }
             });
             gesture3D = playGesture;                            // 對外 hook：思考等時機可從對話流程觸發
-            if (gestureActions.wave) setTimeout(() => playGesture('wave'), 800);    // 出場招呼
+            if (gestureActions['wave-soft']) setTimeout(() => playGesture('wave-soft'), 800);    // 出場招呼
             idleBreak = setInterval(() => {                     // 待機變化：偶爾環顧/放鬆，不死板
-              if (!waving && !isSpeaking && Math.random() < 0.65) playGesture(Math.random() < 0.5 ? 'look' : 'relax');
+              if (!waving && !isSpeaking && Math.random() < 0.65) playGesture(IDLE_GESTURES[Math.floor(Math.random() * IDLE_GESTURES.length)]);
             }, 15000);
           } catch (e) { console.warn('VRMA 手勢庫載入失敗：', e && e.message); }
         })();
@@ -438,9 +449,49 @@
         }, 1500);
       }, undefined, (e) => { console.error(e); postToParent('error', { message: String(e) }); });
 
+      function canonicalGestureName(name) {
+        return GESTURE_ALIASES[name] || name;
+      }
+      function startProceduralGesture(name) {
+        const def = PROCEDURAL_GESTURES[name];
+        if (!def || waving) return false;
+        proceduralGesture = { name, elapsed: 0, duration: def.duration };
+        currentGesture = null;
+        waving = true;
+        return true;
+      }
+      function proceduralGesturePose(dt) {
+        if (!proceduralGesture) return null;
+        proceduralGesture.elapsed += dt;
+        const p = Math.min(1, proceduralGesture.elapsed / proceduralGesture.duration);
+        const ease = Math.sin(Math.PI * p);
+        const settle = Math.sin(Math.PI * Math.min(1, p * 2));
+        const pose = {};
+        if (proceduralGesture.name === 'nod-small') {
+          pose.headX = ease * 0.16;
+          pose.spineX = ease * 0.025;
+        } else if (proceduralGesture.name === 'explain-open-hand') {
+          pose.headY = Math.sin(Math.PI * p * 1.5) * 0.035;
+          pose.spineY = ease * 0.04;
+          pose.leftUpperArmZ = -ease * 0.22 * armSign;
+          pose.rightUpperArmZ = ease * 0.22 * armSign;
+          pose.leftLowerArmX = -settle * 0.25;
+          pose.rightLowerArmX = -settle * 0.25;
+        }
+        if (p >= 1) {
+          proceduralGesture = null;
+          waving = false;
+        }
+        return pose;
+      }
       function playGesture(name) {                               // 播一個手勢（期間 mixer 控身體），平時用程序化站姿
-        const act = gestureActions[name];
-        if (!act || waving) return;                              // 一次一個，播放中不打斷
+        const gestureName = canonicalGestureName(name);
+        const act = gestureActions[gestureName];
+        if (!act) {
+          startProceduralGesture(gestureName);
+          return;
+        }
+        if (waving) return;                                      // 一次一個，播放中不打斷
         waving = true; currentGesture = act;
         act.reset(); act.setEffectiveWeight(1); act.play();      // 硬切，不 fadeIn（fade 低權重會露出 bind T-pose）
       }
@@ -462,12 +513,13 @@
           if (blinkT < 0) { nextBlink -= dt; if (nextBlink <= 0) { blinkT = 0; nextBlink = 2 + Math.random() * 4; } }
           else { blinkT += dt / BLINK; if (em) { em.setValue(blinkExpressionName, Math.sin(Math.min(blinkT, 1) * Math.PI)); } if (blinkT >= 1) { blinkT = -1; if (em) { em.setValue(blinkExpressionName, 0); } } }
           lookTarget.position.set(mx * lookTargetRangeX, lookTargetBaseY - my * lookTargetRangeY, lookTargetZ); // 眼睛 lookAt 目標跟游標（永遠更新）
-          if (!waving) {                                          // 待機：直立、手放下、輕呼吸、頭跟游標
+          if (!currentGesture) {                                  // 待機：直立、手放下、輕呼吸、頭跟游標
             const h = vrm.humanoid;
-            const lUA = h.getNormalizedBoneNode('leftUpperArm'), rUA = h.getNormalizedBoneNode('rightUpperArm'), sp = h.getNormalizedBoneNode('spine'), hd = h.getNormalizedBoneNode('head');
+            const lUA = h.getNormalizedBoneNode('leftUpperArm'), rUA = h.getNormalizedBoneNode('rightUpperArm'), lLA = h.getNormalizedBoneNode('leftLowerArm'), rLA = h.getNormalizedBoneNode('rightLowerArm'), sp = h.getNormalizedBoneNode('spine'), hd = h.getNormalizedBoneNode('head');
             let armL = 1.15 * armSign, armR = -1.15 * armSign;
             let spX = Math.sin(t * 0.9) * 0.018, spY = Math.sin(t * 0.5) * 0.012;
             let hdY = mx * 0.3, hdX = my * 0.12 + Math.sin(t * 0.5) * 0.01;
+            let lowerArmLX = 0, lowerArmRX = 0;
             if (isSpeaking) {                                     // 講話時：身體/頭/手持續小動作（疊在站姿上）
               const ts = t * 3.0;
               spY += Math.sin(ts) * 0.03;
@@ -476,8 +528,21 @@
               armL += Math.sin(ts * 0.7) * 0.06;                  // 手臂比劃
               armR -= Math.sin(ts * 0.62) * 0.06;
             }
+            const gesturePose = proceduralGesturePose(dt);
+            if (gesturePose) {
+              hdX += gesturePose.headX || 0;
+              hdY += gesturePose.headY || 0;
+              spX += gesturePose.spineX || 0;
+              spY += gesturePose.spineY || 0;
+              armL += gesturePose.leftUpperArmZ || 0;
+              armR += gesturePose.rightUpperArmZ || 0;
+              lowerArmLX += gesturePose.leftLowerArmX || 0;
+              lowerArmRX += gesturePose.rightLowerArmX || 0;
+            }
             if (lUA) lUA.rotation.z = armL;
             if (rUA) rUA.rotation.z = armR;
+            if (lLA) lLA.rotation.x = lowerArmLX;
+            if (rLA) rLA.rotation.x = lowerArmRX;
             if (sp) { sp.rotation.x = spX; sp.rotation.y = spY; }
             if (hd) { hd.rotation.y = hdY; hd.rotation.x = hdX; }
           }
