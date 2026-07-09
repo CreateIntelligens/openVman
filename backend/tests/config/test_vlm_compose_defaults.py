@@ -11,14 +11,30 @@ ROOT = Path(__file__).resolve().parents[3]
 def test_vlm_compose_defaults_match_qwen3_fp8_runtime():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
-    assert "${VLM_IMAGE:-vllm/vllm-openai:v0.11.0}" in compose
+    assert "image: vllm/vllm-openai:v0.24.0" in compose
     assert "${VLM_MODEL:-Qwen/Qwen3-VL-4B-Instruct-FP8}" in compose
-    assert "${VLM_GPU_MEMORY_UTILIZATION:-0.62}" in compose
+    assert "${VLM_GPU_MEMORY_UTILIZATION:-0.45}" in compose
+    assert "- openvman-vlm" in compose
+    assert "- \"1024\"" in compose
+    assert "- \"1\"" in compose
+    assert "- \"512\"" in compose
+
+
+def test_vlm_healthcheck_does_not_emit_http_access_logs():
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+
+    assert "- --disable-log-requests" not in compose
+    assert "/v1/models" not in compose
+    assert "socket.create_connection" in compose
 
 
 def test_vlm_env_example_matches_qwen3_fp8_runtime():
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
-    assert "VLM_IMAGE=vllm/vllm-openai:v0.11.0" in env_example
-    assert "VLM_MODEL=Qwen/Qwen3-VL-4B-Instruct-FP8" in env_example
-    assert "VLM_GPU_MEMORY_UTILIZATION=0.62" in env_example
+    assert "VLM_IMAGE=" not in env_example
+    assert "VLM_SERVED_MODEL=" not in env_example
+    assert "VLM_MAX_MODEL_LEN=" not in env_example
+    assert "VLM_MAX_NUM_SEQS=" not in env_example
+    assert "VLM_MAX_NUM_BATCHED_TOKENS=" not in env_example
+    assert "# VLM_MODEL=Qwen/Qwen3-VL-4B-Instruct-FP8" in env_example
+    assert "# VLM_GPU_MEMORY_UTILIZATION=0.45" in env_example
