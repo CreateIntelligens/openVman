@@ -40,7 +40,7 @@ export const FALLBACK_MASCOT_CATALOG: MascotOption[] = [
     id: "qqman",
     label: "Frieren",
     engine: "3d",
-    vrmUrl: "/QQman_fll.vrm",
+    vrmUrl: "/mascots/qqman/model.vrm",
     builtin: true,
   },
   {

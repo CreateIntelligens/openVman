@@ -21,6 +21,6 @@ describe("MascotWidget", () => {
     const src = frame.getAttribute("src") ?? "";
 
     expect(src).toContain("engine=3d");
-    expect(decodeURIComponent(src)).toContain("/QQman_fll.vrm");
+    expect(decodeURIComponent(src)).toContain("/mascots/qqman/model.vrm");
   });
 });
