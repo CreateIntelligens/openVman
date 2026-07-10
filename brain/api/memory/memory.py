@@ -75,7 +75,11 @@ def append_session_message(
 ) -> SessionState:
     """Append a message to the session and enforce max rounds."""
     state, _ = get_session_store(project_id).append_message(
-        session_id, persona_id, role, content, metadata=metadata,
+        session_id,
+        persona_id,
+        role,
+        content,
+        metadata=metadata,
     )
     return state
 
@@ -90,7 +94,11 @@ def append_session_message_with_id(
 ) -> tuple[SessionState, int]:
     """Append and return the new message's row id for later metadata patches."""
     return get_session_store(project_id).append_message(
-        session_id, persona_id, role, content, metadata=metadata,
+        session_id,
+        persona_id,
+        role,
+        content,
+        metadata=metadata,
     )
 
 
@@ -190,9 +198,17 @@ def delete_memory(
 def list_sessions_for_project(
     project_id: str = "default",
     persona_id: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    search: str | None = None,
 ) -> list[dict[str, Any]]:
     """List all chat sessions for a project."""
-    return get_session_store(project_id).list_sessions(persona_id)
+    return get_session_store(project_id).list_sessions(
+        persona_id=persona_id,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+    )
 
 
 def delete_session_for_project(

@@ -14,9 +14,21 @@ export interface SessionsListResponse {
   session_count: number;
 }
 
-export async function fetchSessions(personaId?: string) {
+export interface SessionFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+}
+
+export async function fetchSessions(
+  personaId?: string,
+  { dateFrom, dateTo, search }: SessionFilters = {},
+) {
   const params: QueryParams = {};
   if (personaId) params.persona_id = personaId;
+  if (dateFrom) params.date_from = dateFrom;
+  if (dateTo) params.date_to = dateTo;
+  if (search) params.search = search;
   return fetchJson<SessionsListResponse>(projectUrl(SESSIONS_PATH, params));
 }
 

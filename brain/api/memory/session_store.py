@@ -6,11 +6,12 @@ import json
 import sqlite3
 import threading
 from dataclasses import asdict, dataclass
-from typing import Any
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Lock
 from time import monotonic
+from typing import Any
+from zoneinfo import ZoneInfo
 
 from config import get_settings
 from infra.datetime_utils import normalize_iso_timestamp, utc_now_iso
@@ -35,6 +36,25 @@ def _validate_persona_match(existing_raw: str | None, expected: str) -> None:
     existing = normalize_persona_id(str(existing_raw or "default"))
     if existing != normalize_persona_id(expected):
         raise ValueError("session_id 已綁定其他 persona")
+
+
+def _local_date_to_utc_iso(
+    date_str: str | None,
+    *,
+    end_of_day: bool = False,
+) -> str | None:
+    if not date_str:
+        return None
+
+    boundary_time = "23:59:59" if end_of_day else "00:00:00"
+    try:
+        local_datetime = datetime.strptime(
+            f"{date_str} {boundary_time}",
+            "%Y-%m-%d %H:%M:%S",
+        ).replace(tzinfo=ZoneInfo("Asia/Taipei"))
+    except ValueError:
+        return None
+    return local_datetime.astimezone(UTC).isoformat(timespec="seconds")
 
 
 @dataclass(slots=True)
@@ -63,7 +83,6 @@ class DuplicateMessageError(RuntimeError):
 
 
 _DEDUP_WINDOW_SECONDS = 5.0
-
 
 
 class SessionStore:
@@ -134,25 +153,32 @@ class SessionStore:
 
                 # Prune oldest messages beyond the limit
                 overflow_ids = [
-                    row[0] for row in conn.execute(
+                    row[0]
+                    for row in conn.execute(
                         "SELECT id FROM messages WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?",
                         (session_id, max_messages),
                     ).fetchall()
                 ]
                 if overflow_ids:
                     placeholders = ",".join("?" for _ in overflow_ids)
-                    conn.execute(f"DELETE FROM messages WHERE id IN ({placeholders})", overflow_ids)
+                    conn.execute(
+                        f"DELETE FROM messages WHERE id IN ({placeholders})",
+                        overflow_ids,
+                    )
                 conn.commit()
                 return self._load_session_locked(conn, session_id), message_id
 
-    def update_message_metadata(self, message_id: int, metadata: dict[str, Any]) -> None:
+    def update_message_metadata(
+        self, message_id: int, metadata: dict[str, Any]
+    ) -> None:
         """Merge ``metadata`` into the existing message metadata."""
         if message_id <= 0 or not metadata:
             return
         with self._lock:
             with self._connect() as conn:
                 row = conn.execute(
-                    "SELECT metadata FROM messages WHERE id = ?", (message_id,),
+                    "SELECT metadata FROM messages WHERE id = ?",
+                    (message_id,),
                 ).fetchone()
                 if row is None:
                     return
@@ -223,8 +249,18 @@ class SessionStore:
                     _validate_persona_match(row[0], persona_id)
                 return normalize_iso_timestamp(row[1])
 
-    def list_sessions(self, persona_id: str | None = None) -> list[dict[str, object]]:
-        """List sessions that have at least one message."""
+    def list_sessions(
+        self,
+        persona_id: str | None = None,
+        date_from: str | None = None,
+        date_to: str | None = None,
+        search: str | None = None,
+    ) -> list[dict[str, object]]:
+        """List sessions that have at least one message, matching optional filters."""
+        utc_from = _local_date_to_utc_iso(date_from)
+        utc_to = _local_date_to_utc_iso(date_to, end_of_day=True)
+        search_text = search.strip() if search else ""
+
         with self._lock:
             with self._connect() as conn:
                 base_sql = """
@@ -238,10 +274,27 @@ class SessionStore:
                     FROM sessions s
                     WHERE EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
                 """
-                params: tuple[str, ...] = ()
+                params: list[Any] = []
                 if persona_id:
                     base_sql += " AND s.persona_id = ?"
-                    params = (normalize_persona_id(persona_id),)
+                    params.append(normalize_persona_id(persona_id))
+
+                if utc_from:
+                    base_sql += " AND s.created_at >= ?"
+                    params.append(utc_from)
+
+                if utc_to:
+                    base_sql += " AND s.created_at <= ?"
+                    params.append(utc_to)
+
+                if search_text:
+                    base_sql += """ AND EXISTS (
+                        SELECT 1 FROM messages m
+                        WHERE m.session_id = s.session_id
+                          AND m.content LIKE ?
+                    )"""
+                    params.append(f"%{search_text}%")
+
                 base_sql += " ORDER BY s.updated_at DESC"
 
                 return [
@@ -283,9 +336,7 @@ class SessionStore:
         lock = self._get_inflight_lock(session_id)
         acquired = lock.acquire(blocking=False)
         if not acquired:
-            raise InflightError(
-                f"session {session_id} 已有進行中的回應，請稍候"
-            )
+            raise InflightError(f"session {session_id} 已有進行中的回應，請稍候")
 
     def release_inflight(self, session_id: str) -> None:
         """Release the inflight lock for a session.
@@ -322,9 +373,7 @@ class SessionStore:
             if prev is not None:
                 prev_hash, prev_time = prev
                 if prev_hash == msg_hash and (now - prev_time) < _DEDUP_WINDOW_SECONDS:
-                    raise DuplicateMessageError(
-                        f"session {session_id} 重複訊息已忽略"
-                    )
+                    raise DuplicateMessageError(f"session {session_id} 重複訊息已忽略")
             self._dedup_cache[session_id] = (msg_hash, now)
 
     # ------------------------------------------------------------------
@@ -381,8 +430,7 @@ class SessionStore:
                 """
             )
             columns = {
-                row[1]
-                for row in conn.execute("PRAGMA table_info(sessions)").fetchall()
+                row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()
             }
             if "persona_id" not in columns:
                 conn.execute(
@@ -405,8 +453,7 @@ class SessionStore:
                 """
             )
             message_columns = {
-                row[1]
-                for row in conn.execute("PRAGMA table_info(messages)").fetchall()
+                row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()
             }
             if "metadata" not in message_columns:
                 conn.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")
@@ -420,7 +467,9 @@ class SessionStore:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
-    def _load_session_locked(self, conn: sqlite3.Connection, session_id: str) -> SessionState:
+    def _load_session_locked(
+        self, conn: sqlite3.Connection, session_id: str
+    ) -> SessionState:
         """Load a session that is known to exist (called after _ensure_session_persona_locked)."""
         row = conn.execute(
             "SELECT session_id, persona_id, created_at, updated_at FROM sessions WHERE session_id = ?",
@@ -481,14 +530,18 @@ class SessionStore:
         with self._connect() as conn:
             # Collect session IDs to prune before deleting
             expired_ids = [
-                row[0] for row in conn.execute(
+                row[0]
+                for row in conn.execute(
                     "SELECT session_id FROM sessions WHERE updated_at < ?",
                     (expiry.isoformat(timespec="seconds"),),
                 ).fetchall()
             ]
-            empty_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="seconds")
+            empty_cutoff = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(
+                timespec="seconds"
+            )
             empty_ids = [
-                row[0] for row in conn.execute(
+                row[0]
+                for row in conn.execute(
                     """
                     SELECT session_id FROM sessions
                     WHERE NOT EXISTS (SELECT 1 FROM messages m WHERE m.session_id = sessions.session_id)

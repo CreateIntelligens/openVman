@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import threading
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -209,6 +211,45 @@ def test_interrupt_clears_dedup(store: SessionStore):
 def test_interrupt_when_idle_is_safe(store: SessionStore):
     """Interrupting a session with nothing in-flight should not raise."""
     store.interrupt_session("s1")
+
+
+@pytest.mark.parametrize(
+    ("search", "expected_session_ids"),
+    [
+        ("apple", ["s1"]),
+        ("banana", ["s2"]),
+        ("cherry", []),
+    ],
+)
+def test_list_sessions_filters_by_message_content(
+    store: SessionStore,
+    search: str,
+    expected_session_ids: list[str],
+):
+    store.get_or_create_session("s1", "default")
+    store.append_message("s1", "default", "user", "I like apple")
+    store.get_or_create_session("s2", "default")
+    store.append_message("s2", "default", "user", "I like banana")
+
+    sessions = store.list_sessions("default", search=search)
+
+    assert [session["session_id"] for session in sessions] == expected_session_ids
+
+
+def test_list_sessions_filters_by_date_range(store: SessionStore):
+    store.get_or_create_session("s1", "default")
+    store.append_message("s1", "default", "user", "hello")
+    local_today = datetime.now(ZoneInfo("Asia/Taipei")).strftime("%Y-%m-%d")
+
+    sessions_today = store.list_sessions(
+        "default",
+        date_from=local_today,
+        date_to=local_today,
+    )
+    assert [session["session_id"] for session in sessions_today] == ["s1"]
+
+    sessions_future = store.list_sessions("default", date_from="2099-01-01")
+    assert sessions_future == []
 
 
 # ------------------------------------------------------------------

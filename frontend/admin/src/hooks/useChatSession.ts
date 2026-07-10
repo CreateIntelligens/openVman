@@ -190,6 +190,13 @@ export function useChatSession() {
     loadSessionHistory,
     handlePersonaChange,
     confirmDeleteSession,
+    searchQuery,
+    setSearchQuery,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    resetFilters,
   } = useChatHistory(clearTtsPrefetchState);
 
   const {
@@ -487,5 +494,12 @@ export function useChatSession() {
     handleActionConfirmed,
     handleActionCancelled,
     setMessages,
+    searchQuery,
+    setSearchQuery,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    resetFilters,
   };
 }

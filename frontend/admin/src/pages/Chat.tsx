@@ -90,6 +90,13 @@ export default function Chat() {
     handleActionConfirmed,
     handleActionCancelled,
     setMessages,
+    searchQuery,
+    setSearchQuery,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    resetFilters,
   } = useChatSession();
   const liveClientIdRef = useRef<string>("");
   if (!liveClientIdRef.current) {
@@ -262,6 +269,13 @@ export default function Chat() {
         onLoadSessions={loadSessions}
         onLoadSessionHistory={loadSessionHistory}
         onDeleteSession={setDeleteSessionTarget}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        dateFrom={dateFrom}
+        onDateFromChange={setDateFrom}
+        dateTo={dateTo}
+        onDateToChange={setDateTo}
+        onResetFilters={resetFilters}
       />
 
       <main className="relative flex min-w-0 flex-1 bg-surface">

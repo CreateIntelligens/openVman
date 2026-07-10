@@ -18,6 +18,13 @@ interface ChatSidebarProps {
   onLoadSessions: () => void;
   onLoadSessionHistory: (id: string) => void;
   onDeleteSession: (s: SessionSummary) => void;
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  dateFrom: string;
+  onDateFromChange: (value: string) => void;
+  dateTo: string;
+  onDateToChange: (value: string) => void;
+  onResetFilters: () => void;
 }
 
 export default function ChatSidebar({
@@ -35,6 +42,13 @@ export default function ChatSidebar({
   onLoadSessions,
   onLoadSessionHistory,
   onDeleteSession,
+  searchQuery,
+  onSearchQueryChange,
+  dateFrom,
+  onDateFromChange,
+  dateTo,
+  onDateToChange,
+  onResetFilters,
 }: ChatSidebarProps) {
   if (!open) return null;
 
@@ -102,6 +116,57 @@ export default function ChatSidebar({
               >
                 {loadingSessions ? "…" : "重新整理"}
               </button>
+            </div>
+
+            <div className="mb-3 shrink-0 space-y-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => onSearchQueryChange(e.target.value)}
+                  placeholder="搜尋對話內容..."
+                  className="w-full rounded-md border border-border bg-surface-raised px-2.5 py-1.5 pl-8 text-xs text-content placeholder-content-subtle outline-none transition-colors focus:border-primary/50"
+                />
+                <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[1rem] text-content-subtle">
+                  search
+                </span>
+                {searchQuery && (
+                  <button
+                    onClick={() => onSearchQueryChange("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content"
+                  >
+                    <span className="material-symbols-outlined text-[0.875rem]">close</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => onDateFromChange(e.target.value)}
+                  className="w-full rounded-md border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content outline-none transition-colors focus:border-primary/50"
+                  title="起始日期"
+                />
+                <span className="text-content-subtle text-[0.625rem]">至</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => onDateToChange(e.target.value)}
+                  className="w-full rounded-md border border-border bg-surface-raised px-2 py-1 text-[0.6875rem] text-content outline-none transition-colors focus:border-primary/50"
+                  title="結束日期"
+                />
+              </div>
+
+              {(searchQuery || dateFrom || dateTo) && (
+                <button
+                  onClick={onResetFilters}
+                  className="flex w-full items-center justify-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[0.6875rem] text-content-muted transition-colors hover:bg-surface-raised hover:text-content"
+                >
+                  <span className="material-symbols-outlined text-[0.875rem]">filter_alt_off</span>
+                  清除篩選條件
+                </button>
+              )}
             </div>
 
             <div className="flex-1 space-y-1.5 overflow-y-auto pr-1">
