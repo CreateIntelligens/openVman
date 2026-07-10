@@ -71,7 +71,9 @@ def patched(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(config_mod, "get_settings", lambda: _FakeConfig())
     monkeypatch.setattr(retrieval, "vector_table_exists", lambda *a, **k: True)
-    monkeypatch.setattr(retrieval, "list_disabled_document_paths", lambda *a, **k: set())
+    monkeypatch.setattr(
+        retrieval, "list_disabled_document_paths", lambda *a, **k: set()
+    )
     monkeypatch.setattr(retrieval, "record_trace", lambda **k: None)
 
     def use_table(table):
@@ -98,18 +100,22 @@ def _search(query_text="hello", query_type="hybrid", top_k=5, expansion_terms=No
 
 class TestHybridRrf:
     def test_record_in_both_lists_ranks_first(self, patched):
-        patched(_FakeTable(
-            vector_records=[_rec("v-only", 0.2), _rec("shared", 0.3)],
-            fts_records=[_rec("shared"), _rec("f-only")],
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[_rec("v-only", 0.2), _rec("shared", 0.3)],
+                fts_records=[_rec("shared"), _rec("f-only")],
+            )
+        )
         results = _search()
         assert results[0]["text"] == "shared"
 
     def test_scores_are_normalized(self, patched):
-        patched(_FakeTable(
-            vector_records=[_rec("v-only", 0.2), _rec("shared", 0.3)],
-            fts_records=[_rec("shared"), _rec("f-only")],
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[_rec("v-only", 0.2), _rec("shared", 0.3)],
+                fts_records=[_rec("shared"), _rec("f-only")],
+            )
+        )
         results = _search()
         scores = [r["_score"] for r in results]
         assert scores[0] == 1.0
@@ -117,28 +123,44 @@ class TestHybridRrf:
         assert scores == sorted(scores, reverse=True)
 
     def test_fts_failure_falls_back_to_vector_with_score(self, patched):
-        patched(_FakeTable(
-            vector_records=[_rec("near", 0.1), _rec("far", 0.5)],
-            fts_raises=True,
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[_rec("near", 0.1), _rec("far", 0.5)],
+                fts_raises=True,
+            )
+        )
         results = _search()
         assert [r["text"] for r in results] == ["near", "far"]
         assert results[0]["_score"] == 1.0
         assert results[1]["_score"] == 0.0
 
     def test_fts_only_hit_survives_distance_cutoff(self, patched):
-        patched(_FakeTable(
-            vector_records=[_rec("v", 0.2)],
-            fts_records=[_rec("keyword-hit")],
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[_rec("v", 0.2)],
+                fts_records=[_rec("keyword-hit")],
+            )
+        )
         results = _search()
         assert "keyword-hit" in [r["text"] for r in results]
 
+    def test_fused_fts_hit_survives_vector_distance_cutoff(self, patched):
+        patched(
+            _FakeTable(
+                vector_records=[_rec("keyword-hit", 0.99)],
+                fts_records=[_rec("keyword-hit")],
+            )
+        )
+        results = _search()
+        assert [r["text"] for r in results] == ["keyword-hit"]
+
     def test_vector_hit_over_cutoff_is_dropped(self, patched):
-        patched(_FakeTable(
-            vector_records=[_rec("good", 0.2), _rec("too-far", 0.99)],
-            fts_records=[],
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[_rec("good", 0.2), _rec("too-far", 0.99)],
+                fts_records=[],
+            )
+        )
         results = _search()
         assert [r["text"] for r in results] == ["good"]
 
@@ -150,22 +172,26 @@ class TestHybridRrf:
 
 class TestSearchDedup:
     def test_exact_duplicate_text_removed(self, patched):
-        patched(_FakeTable(
-            vector_records=[_rec("dup", 0.1), _rec("dup", 0.2), _rec("uniq", 0.3)],
-            fts_records=[],
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[_rec("dup", 0.1), _rec("dup", 0.2), _rec("uniq", 0.3)],
+                fts_records=[],
+            )
+        )
         results = _search()
         assert [r["text"] for r in results] == ["dup", "uniq"]
 
     def test_near_duplicate_embedding_removed(self, patched):
-        patched(_FakeTable(
-            vector_records=[
-                _rec("a", 0.1, vector=[1.0, 0.0]),
-                _rec("a-paraphrase", 0.2, vector=[0.999, 0.01]),
-                _rec("different", 0.3, vector=[0.0, 1.0]),
-            ],
-            fts_records=[],
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[
+                    _rec("a", 0.1, vector=[1.0, 0.0]),
+                    _rec("a-paraphrase", 0.2, vector=[0.999, 0.01]),
+                    _rec("different", 0.3, vector=[0.0, 1.0]),
+                ],
+                fts_records=[],
+            )
+        )
         results = _search()
         assert [r["text"] for r in results] == ["a", "different"]
         # vector 欄位最終仍會被剝除
@@ -180,23 +206,31 @@ class TestSearchDedup:
 class TestQueryExpansion:
     def test_expansion_term_results_are_fused(self, patched, monkeypatch):
         # 原文 vector 查到 base;擴展詞「退款流程」FTS 查到 expanded-hit
-        monkeypatch.setattr(retrieval, "encode_text", lambda text, version=None: [0.9, 0.9])
-        patched(_FakeTable(
-            vector_records={(0.1, 0.2): [_rec("base", 0.2)], (0.9, 0.9): []},
-            fts_records={"hello": [], "退款流程": [_rec("expanded-hit")]},
-        ))
+        monkeypatch.setattr(
+            retrieval, "encode_text", lambda text, version=None: [0.9, 0.9]
+        )
+        patched(
+            _FakeTable(
+                vector_records={(0.1, 0.2): [_rec("base", 0.2)], (0.9, 0.9): []},
+                fts_records={"hello": [], "退款流程": [_rec("expanded-hit")]},
+            )
+        )
         results = _search(expansion_terms=["退款流程"])
         assert {r["text"] for r in results} == {"base", "expanded-hit"}
 
     def test_hit_across_original_and_expansion_ranks_first(self, patched, monkeypatch):
-        monkeypatch.setattr(retrieval, "encode_text", lambda text, version=None: [0.9, 0.9])
-        patched(_FakeTable(
-            vector_records={
-                (0.1, 0.2): [_rec("only-original", 0.1), _rec("both", 0.2)],
-                (0.9, 0.9): [_rec("both", 0.3)],
-            },
-            fts_records={},
-        ))
+        monkeypatch.setattr(
+            retrieval, "encode_text", lambda text, version=None: [0.9, 0.9]
+        )
+        patched(
+            _FakeTable(
+                vector_records={
+                    (0.1, 0.2): [_rec("only-original", 0.1), _rec("both", 0.2)],
+                    (0.9, 0.9): [_rec("both", 0.3)],
+                },
+                fts_records={},
+            )
+        )
         results = _search(expansion_terms=["改寫詞"])
         assert results[0]["text"] == "both"
 
@@ -205,17 +239,21 @@ class TestQueryExpansion:
             raise RuntimeError("embedder down")
 
         monkeypatch.setattr(retrieval, "encode_text", boom)
-        patched(_FakeTable(
-            vector_records={(0.1, 0.2): [_rec("base", 0.2)]},
-            fts_records={},
-        ))
+        patched(
+            _FakeTable(
+                vector_records={(0.1, 0.2): [_rec("base", 0.2)]},
+                fts_records={},
+            )
+        )
         results = _search(expansion_terms=["退款流程"])
         assert [r["text"] for r in results] == ["base"]
 
     def test_no_expansion_terms_keeps_existing_behavior(self, patched):
-        patched(_FakeTable(
-            vector_records=[_rec("near", 0.1), _rec("far", 0.5)],
-            fts_records=[],
-        ))
+        patched(
+            _FakeTable(
+                vector_records=[_rec("near", 0.1), _rec("far", 0.5)],
+                fts_records=[],
+            )
+        )
         results = _search(expansion_terms=[])
         assert [r["text"] for r in results] == ["near", "far"]

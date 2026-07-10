@@ -11,7 +11,6 @@ import json
 import sys
 import types
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -117,6 +116,39 @@ def test_expand_via_graph_threads_query_vector_into_fetch(monkeypatch):
     )
 
     assert table.search_calls == [query_vector]
+
+
+def test_search_one_uses_hybrid_chunk_retrieval(monkeypatch):
+    kt = _load_knowledge_tools()
+    calls: list[dict] = []
+
+    fake_embedder = types.ModuleType("memory.embedder")
+    fake_embedder.encode_query_with_fallback = lambda *a, **k: types.SimpleNamespace(
+        vector=[0.1, 0.2],
+        version="bge",
+    )
+    fake_retrieval = types.ModuleType("memory.retrieval")
+
+    def fake_search_records(*args, **kwargs):
+        calls.append(kwargs)
+        return [{"chunk_id": "hit", "text": "PRP"}]
+
+    fake_retrieval.search_records = fake_search_records
+    monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder)
+    monkeypatch.setitem(sys.modules, "memory.retrieval", fake_retrieval)
+
+    records, version, vector = kt._search_one(
+        "knowledge",
+        "PRP",
+        top_k=5,
+        persona_id="default",
+        project_id="default",
+    )
+
+    assert records == [{"chunk_id": "hit", "text": "PRP"}]
+    assert version == "bge"
+    assert vector == [0.1, 0.2]
+    assert calls[0]["query_type"] == "hybrid"
 
 
 # ---------------------------------------------------------------------------

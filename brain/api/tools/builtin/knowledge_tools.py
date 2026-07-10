@@ -26,6 +26,7 @@ def _search_one(
         query_vector=embedding_route.vector,
         top_k=top_k,
         query_text=query,
+        query_type="hybrid",
         persona_id=persona_id,
         project_id=project_id,
         embedding_version=embedding_route.version,

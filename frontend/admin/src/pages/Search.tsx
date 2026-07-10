@@ -1,27 +1,72 @@
-import StatusAlert from "../components/StatusAlert";
 import Select from "../components/Select";
-import { useSemanticSearch } from "../hooks/useSemanticSearch";
+import StatusAlert from "../components/StatusAlert";
+import { type SearchResult, useSemanticSearch } from "../hooks/useSemanticSearch";
 
 const TOP_K_OPTIONS = [3, 5, 10, 20] as const;
 
-function getSimilarityPercentage(distance: number | null | undefined): number | null {
-  if (distance == null) return null;
-  return Math.max(0, Math.min(100, (1 - distance) * 100));
+function clampPercentage(value: number): number {
+  return Math.max(0, Math.min(100, value));
 }
 
-function getPersonaId(metadata?: string): string | null {
-  if (!metadata) return null;
+function getSimilarityPercentage(distance: number | null | undefined): number | null {
+  if (distance == null) return null;
+  return clampPercentage((1 - distance) * 100);
+}
+
+interface SearchMetadata {
+  path?: string;
+  title?: string;
+  heading_path?: string[];
+  chunk_id?: string;
+  persona_id?: string;
+}
+
+function parseMetadata(metadata?: string): SearchMetadata {
+  if (!metadata) return {};
 
   try {
-    const parsed = JSON.parse(metadata) as { persona_id?: string };
-    if (!parsed.persona_id || parsed.persona_id === "default") {
-      return null;
-    }
-
-    return parsed.persona_id;
+    const parsed = JSON.parse(metadata) as SearchMetadata;
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
-    return null;
+    return {};
   }
+}
+
+function getResultPercentage(item: SearchResult): number | null {
+  if (item._score != null) {
+    return clampPercentage(item._score * 100);
+  }
+  return getSimilarityPercentage(item._distance);
+}
+
+function normalizeExactMatchText(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+function hasExactMatch(
+  query: string,
+  item: SearchResult,
+  metadata: SearchMetadata,
+): boolean {
+  const needle = normalizeExactMatchText(query);
+  if (!needle) return false;
+
+  const haystacks = [
+    item.text,
+    item.path ?? "",
+    item.title ?? "",
+    item.chunk_id ?? "",
+    metadata.path ?? "",
+    metadata.title ?? "",
+    metadata.chunk_id ?? "",
+    ...(metadata.heading_path ?? []),
+  ];
+  return haystacks.some((value) => normalizeExactMatchText(value).includes(needle));
+}
+
+function getPersonaId(metadata: SearchMetadata): string | null {
+  const personaId = metadata.persona_id;
+  return personaId && personaId !== "default" ? personaId : null;
 }
 
 export default function Search() {
@@ -45,7 +90,7 @@ export default function Search() {
       <header className="sticky top-0 z-10 px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-primary/10">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">知識庫搜尋</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          使用高維向量相似度查詢你的數位大腦。
+          顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。
         </p>
       </header>
 
@@ -94,7 +139,6 @@ export default function Search() {
             className="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-8 rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
           >
             <span>{loading ? "搜尋中..." : "執行查詢"}</span>
-            <span className="material-symbols-outlined">bolt</span>
           </button>
         </div>
 
@@ -115,7 +159,13 @@ export default function Search() {
 
             <div className="grid gap-4">
               {response.results.map((item, i) => {
-                const similarity = getSimilarityPercentage(item._distance);
+                const metadata = parseMetadata(item.metadata);
+                const similarity = getResultPercentage(item);
+                const resultPath = item.path ?? metadata.path ?? "";
+                const resultTitle = item.title ?? metadata.title ?? "";
+                const chunkId = item.chunk_id ?? metadata.chunk_id ?? "";
+                const headings = metadata.heading_path ?? [];
+                const exactMatch = hasExactMatch(query, item, metadata);
                 return (
                   <div
                     key={i}
@@ -124,13 +174,21 @@ export default function Search() {
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-1 rounded bg-primary/10 text-primary text-[0.625rem] font-bold uppercase tracking-wider">
+                          RAG chunk
+                        </span>
+                        <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[0.625rem] font-bold uppercase tracking-wider">
                           {response.table}
                         </span>
-                        {response.table === "memories" && <PersonaBadge metadata={item.metadata} />}
+                        {exactMatch && (
+                          <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 text-[0.625rem] font-bold">
+                            完全命中
+                          </span>
+                        )}
+                        {response.table === "memories" && <PersonaBadge metadata={metadata} />}
                         <span className="text-xs text-slate-500">來源：{item.source}</span>
                       </div>
                       <div className="text-right min-w-[7.5rem]">
-                        <p className="text-[0.625rem] text-slate-500 uppercase font-bold tracking-tighter mb-1">相似度</p>
+                        <p className="text-[0.625rem] text-slate-500 uppercase font-bold tracking-tighter mb-1">相關度</p>
                         {similarity != null ? (
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-2 rounded-full bg-slate-700 overflow-hidden">
@@ -149,6 +207,16 @@ export default function Search() {
                       </div>
                     </div>
                     <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-4">{item.text}</p>
+                    {(resultTitle || resultPath || headings.length > 0 || chunkId) && (
+                      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        {resultTitle && (
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">{resultTitle}</span>
+                        )}
+                        {headings.length > 0 && <span>{headings.join(" / ")}</span>}
+                        {resultPath && <span className="font-mono">{resultPath}</span>}
+                        {chunkId && <span className="font-mono text-slate-400">{chunkId}</span>}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-xs pt-4 border-t border-slate-100 dark:border-slate-700/50">
                       <span className="material-symbols-outlined text-sm">calendar_today</span>
                       <span>{item.date}</span>
@@ -168,7 +236,7 @@ export default function Search() {
   );
 }
 
-function PersonaBadge({ metadata }: { metadata?: string }) {
+function PersonaBadge({ metadata }: { metadata: SearchMetadata }) {
   const personaId = getPersonaId(metadata);
 
   if (!personaId) {

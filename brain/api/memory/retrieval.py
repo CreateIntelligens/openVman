@@ -52,11 +52,12 @@ def search_records(
     *expansion_terms*(語意擴展詞,通常由 memory.query_expansion 產生)
     每個詞會額外跑 vector + FTS 檢索,所有名次表一起進 RRF 融合。
 
-    Results with _distance > distance_cutoff are dropped (FTS-only 命中
-    沒有 _distance,不受 cutoff 影響)。候選會先做去重(exact text +
-    embedding 餘弦相似度)。top_k is an upper cap.
+    Results with _distance > distance_cutoff are dropped, unless they
+    were also matched by FTS. 候選會先做去重(exact text + embedding
+    餘弦相似度)。top_k is an upper cap.
     """
     from config import get_settings
+
     cfg = get_settings()
     cutoff = distance_cutoff if distance_cutoff is not None else cfg.rag_distance_cutoff
 
@@ -65,7 +66,9 @@ def search_records(
     if not vector_table_exists(table_name, project_id, embedding_version):
         return []
     table = get_search_table(table_name, project_id, embedding_version)
-    disabled_paths = list_disabled_document_paths(project_id) if table_name == "knowledge" else set()
+    disabled_paths = (
+        list_disabled_document_paths(project_id) if table_name == "knowledge" else set()
+    )
     search_limit = top_k * 4 if disabled_paths else top_k * 2
 
     raw_records = _safe_search(
@@ -84,9 +87,11 @@ def search_records(
     visible = [
         record
         for record in raw_records
-        if record.get("_distance", 0.0) <= cutoff
+        if _passes_relevance_cutoff(record, cutoff)
         and _matches_persona(record, normalized_persona)
-        and not (disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths))
+        and not (
+            disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths)
+        )
     ]
     deduped = deduplicate(
         visible,
@@ -160,7 +165,9 @@ def _hybrid_search(
 
     for term in expansion_terms:
         if term_vector := _try_encode(term, embedding_version):
-            if term_records := _search_to_records(table.search(term_vector).limit(limit)):
+            if term_records := _search_to_records(
+                table.search(term_vector).limit(limit)
+            ):
                 ranked_lists.append(term_records)
         if term_fts := _try_fts_search(table, term, limit):
             ranked_lists.append(term_fts)
@@ -169,7 +176,9 @@ def _hybrid_search(
         return _normalize_vector_results(vector_records)
 
     fused = rrf_fuse(ranked_lists, k=rrf_k)
-    return min_max_normalize(fused, source_field="_rrf_score", out_field="_score")[:limit]
+    return min_max_normalize(fused, source_field="_rrf_score", out_field="_score")[
+        :limit
+    ]
 
 
 def _try_fts_search(table: Any, query_text: str, limit: int) -> list[dict[str, Any]]:
@@ -178,7 +187,12 @@ def _try_fts_search(table: Any, query_text: str, limit: int) -> list[dict[str, A
         return []
     try:
         # 需要先建立 FTS index(infra.db.ensure_fts_index)
-        return _search_to_records(table.search(query_text, query_type="fts").limit(limit))
+        return [
+            {**record, "_fts_match": True}
+            for record in _search_to_records(
+                table.search(query_text, query_type="fts").limit(limit)
+            )
+        ]
     except Exception as exc:
         logger.debug("FTS search failed or unavailable for %r: %s", query_text, exc)
         return []
@@ -195,7 +209,15 @@ def _try_encode(term: str, embedding_version: str | None) -> list[float] | None:
 
 def _normalize_vector_results(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """vector-only 結果以 _distance 反向 min-max 正規化出 _score。"""
-    return min_max_normalize(records, source_field="_distance", out_field="_score", invert=True)
+    return min_max_normalize(
+        records, source_field="_distance", out_field="_score", invert=True
+    )
+
+
+def _passes_relevance_cutoff(record: dict[str, Any], cutoff: float) -> bool:
+    if record.get("_fts_match") is True:
+        return True
+    return record.get("_distance", 0.0) <= cutoff
 
 
 def _search_to_records(search_result: Any) -> list[dict[str, Any]]:
@@ -215,7 +237,11 @@ def _matches_persona(record: dict[str, Any], persona_id: str) -> bool:
 
 
 def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
-    result = {key: value for key, value in record.items() if key != "vector"}
+    result = {
+        key: value
+        for key, value in record.items()
+        if key not in {"_fts_match", "vector"}
+    }
     meta = parse_record_metadata(record)
     if path := str(meta.get("path", "")).strip():
         result["path"] = path
@@ -224,7 +250,9 @@ def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _matches_disabled_knowledge_path(record: dict[str, Any], disabled_paths: set[str]) -> bool:
+def _matches_disabled_knowledge_path(
+    record: dict[str, Any], disabled_paths: set[str]
+) -> bool:
     metadata = parse_record_metadata(record)
     relative_path = str(metadata.get("path", "")).strip()
     return relative_path in disabled_paths

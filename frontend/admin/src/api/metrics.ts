@@ -27,7 +27,13 @@ export function postEmbed<T = Record<string, unknown>>(texts: string[]) {
 }
 
 export function postSearch<T = Record<string, unknown>>(query: string, table = "knowledge", topK = 5) {
-  return post<T>("/search", { query, table, top_k: topK, project_id: getActiveProjectId() });
+  return post<T>("/search", {
+    query,
+    table,
+    top_k: topK,
+    project_id: getActiveProjectId(),
+    query_type: "hybrid",
+  });
 }
 
 export async function fetchMetrics() {

@@ -6,8 +6,13 @@ export interface SearchResult {
   text: string;
   source: string;
   date: string;
-  _distance: number;
+  _distance?: number;
+  _score?: number;
   metadata?: string;
+  path?: string;
+  title?: string;
+  chunk_id?: string;
+  matched_queries?: string[];
 }
 
 export interface SearchResponse {
