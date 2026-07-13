@@ -20,19 +20,26 @@
     </style>
   </head>
   <body>
-    <button id="greet" type="button" disabled>請虛擬人打招呼</button>
+    <main>
+      <label>
+        選擇音訊
+        <input id="audio-file" type="file" accept="audio/*" disabled>
+      </label>
+      <button id="stop" type="button" disabled>停止</button>
+    </main>
 
     <script src="https://YOUR_OPENVMAN_HOST/openvman-avatar-sdk.js"></script>
     <script>
-      const button = document.querySelector("#greet");
+      const audioFile = document.querySelector("#audio-file");
+      const stopButton = document.querySelector("#stop");
       let avatar;
 
       OpenVmanAvatar.init({
-        apiKey: "PASTE_API_KEY",
         characterId: "000",
       }).then((instance) => {
         avatar = instance;
-        button.disabled = false;
+        audioFile.disabled = false;
+        stopButton.disabled = false;
         avatar.on("error", ({ code, message }) => {
           console.error(code, message);
         });
@@ -40,8 +47,13 @@
         console.error(error.code, error.message);
       });
 
-      button.addEventListener("click", () => {
-        void avatar?.speak("你好，歡迎使用 openVman");
+      audioFile.addEventListener("change", () => {
+        const file = audioFile.files?.[0];
+        if (file) void avatar?.playAudio(file);
+      });
+
+      stopButton.addEventListener("click", () => {
+        avatar?.interrupt();
       });
     </script>
   </body>

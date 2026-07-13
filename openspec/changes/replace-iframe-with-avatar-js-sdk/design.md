@@ -10,16 +10,16 @@
 
 - 第三方只需載入單一 IIFE script 並呼叫 `OpenVmanAvatar.init()`。
 - 虛擬人直接存在宿主 DOM，可透明懸浮、疊加在既有頁面並響應 viewport。
-- `speak(text)` 直接讓虛擬人朗讀指定文字，適合商品點擊、導覽與客服提示。
-- 封裝 API Key、TTS、PCM 播放、WASM 嘴形、事件與清理生命週期。
+- `playAudio()` 接受宿主提供的完整音檔，`pushPcm()` 接受 16 kHz mono 16-bit PCM 串流。
+- SDK 在瀏覽器本機完成解碼、播放、重採樣、WASM 嘴形、事件與清理生命週期。
 - SDK 的 CSS、DOM class 與自訂事件全部使用 `openvman-` 前綴，避免污染宿主。
-- 直接跨網域請求使用瀏覽器原生 `Origin` 驗證客戶 domain allowlist。
+- SDK、WASM 與角色素材可從不同 origin 載入，不依賴 backend API 或 API Key。
 
 **Non-Goals:**
 
 - 不在第一版提供 iframe fallback。
 - 不在第一版支援同頁多個 WASM runtime。
-- 不在第一版內建完整聊天 UI、輸入框、ASR 或購物車 adapter。
+- 不對第三方開放 openVman Brain、TTS、ASR、WebSocket、Chat UI 或 API Key 管理。
 - 不修改或重新編譯 vendor WASM。
 - 不宣稱第三方引擎為 openVman 自研。
 
@@ -35,21 +35,21 @@
 
 SDK 在全域維護 active instance。相同設定重複 `init()` 回傳現有 instance；不同設定拋出 `INSTANCE_EXISTS`。`destroy()` 會停止音訊並移除可見 DOM，但 vendor WASM 沒有 terminate API，內部 main loop 無法可靠重建，因此同一頁 destroy 後再次 `init()` 以 `RUNTIME_DISPOSED` 拒絕，必須重新載入頁面。這避免固定 canvas ID、全域 video 與 WASM singleton 互相覆蓋。
 
-### D3：SDK URL 是所有資源與 API 的基準來源
+### D3：SDK URL 是所有靜態資源的基準來源
 
-SDK 執行時從 `document.currentScript.src` 擷取 openVman origin，除非呼叫端明確提供 `baseUrl`。vendor JS、WASM、角色影片、角色資料與 `/api/embed/tts` 均使用該 origin 的絕對 URL，不依賴客戶網站路徑。
+SDK 執行時從 `document.currentScript.src` 擷取 openVman origin。vendor JS、WASM、角色影片與角色資料均使用該 origin 的絕對 URL，不依賴客戶網站路徑。SDK 不以該 origin 組合任何 backend API URL。
 
-### D4：`speak(text)` 是直接朗讀，不是送進 LLM
+### D4：完整音檔與 PCM 串流都由宿主提供
 
-宿主網站事件通常已知道要說什麼，例如商品折扣提示。`speak()` 直接呼叫 `/api/embed/tts`，解碼音訊、播放並把 PCM 傳給 WASM。聊天能力日後另以 `ask()` capability 擴充，避免一個方法同時代表「使用者問題」與「虛擬人台詞」。
+`playAudio()` 接受 `Blob` 或 `ArrayBuffer`，新呼叫會中斷前一段完整音檔，再由 Web Audio 解碼、播放、重採樣至 16 kHz mono PCM 並推送給 WASM。`pushPcm()` 接受宿主已產生的 16 kHz mono 16-bit `Int16Array`，連續 chunks 依序無縫排入同一播放佇列並同步推送給 WASM。`interrupt()` 會停止完整音檔、清空 PCM 佇列與嘴形狀態。
 
 ### D5：用前綴 light DOM 與最小 inline stylesheet 降低衝突
 
 SDK 建立 `#openvman-avatar-root`、固定 vendor canvas IDs 與一個帶 `data-openvman-avatar-sdk` 的 style。外層預設固定於右下角、透明背景、使用彈性 viewport 尺寸；設定可改 `container`、`position`、`width`、`height` 與 `zIndex`。所有 class 使用 `openvman-` 前綴，`destroy()` 必須移除 SDK 建立的 DOM、style、audio 與 listener。
 
-### D6：跨網域驗證直接沿用既有 Embed API Key middleware
+### D6：公開範圍只包含靜態 SDK 與角色資源
 
-SDK 在客戶頁面直接 fetch openVman，瀏覽器 `Origin` 即為客戶 origin，既有 domain allowlist 可正確驗證。TTS preflight 必須允許 `Authorization`、`Content-Type`；靜態 SDK、vendor JS/WASM、角色資料與影片提供精準 CORS header。WebSocket／chat 不在第一版 SDK UI 使用，但 backend routes 保留供後續擴充。
+靜態 SDK、vendor JS/WASM、角色資料與影片提供跨來源載入所需的精準 CORS header。SDK 不接收 API Key，也不呼叫 openVman backend。舊 iframe 專用的 Embed API Key store、middleware、HTTP／WS routes、admin API／UI 與 CLI 全部移除；內部 app/admin 既有 `/api/*`、`/ws/*`、`/tts/*`、`/v1/*` routes 不在移除範圍。
 
 ### D7：vendor 名稱只留在供應商邊界
 
@@ -61,20 +61,20 @@ SDK 在客戶頁面直接 fetch openVman，瀏覽器 `Origin` 即為客戶 origi
 - [宿主 CSS 影響 light DOM] → class／attribute 全部前綴，關鍵 layout 使用 SDK 自有 stylesheet 與低特異性 selector。
 - [角色影片沒有 alpha] → SDK 可透明疊加，但真正去背仍取決於角色素材是否含 alpha；不以 CSS 偽造去背。
 - [跨域 WASM／影片載入失敗] → 對指定 SDK 資源加 CORS，新增真實不同 origin 測試頁驗證。
-- [瀏覽器 autoplay 限制] → `speak()` 若不是由使用者操作觸發，回報 `AUTOPLAY_BLOCKED`，文件要求首次呼叫由 click/tap 觸發。
-- [API Key 可在前端看到] → API Key 綁 allowed domains、可 rotate／disable，且只走 HTTPS；不把它視為可保密的 server secret。
+- [瀏覽器 autoplay 限制] → 第一次 `playAudio()` 或 `pushPcm()` 若無法啟用 AudioContext，回報 `AUTOPLAY_BLOCKED`，文件要求先由 click/tap 觸發音訊操作。
+- [公開靜態資源可能被 hotlink] → 第一版以公開 CORS 支援直接嵌入；若日後需要商業存取控制，另設 CDN／簽名資源方案，不重新使用 backend Embed API Key。
 - [第三方授權未完成] → 上線前仍須取得引擎嵌入／再分發與角色資料書面授權。
 
 ## Migration Plan
 
 1. 建立 direct SDK 與測試，先與舊 iframe 程式並存但不對外切換。
 2. 加入 edge nginx SDK/runtime/resource 路由與 CORS，完成不同 origin 實測。
-3. 更新文件與範例改用 `OpenVmanAvatar.init()`。
+3. 更新文件與範例改用無 Key 的 `OpenVmanAvatar.init()` 與宿主音訊 API。
 4. 移除 iframe build entry、embed-loader mount 與公開 nginx 路由。
-5. 保留 `/api/embed/*`、`/ws/embed/*`、API Key 管理與 backend tests。
-6. Rollback 時恢復上一版 nginx/static 產物；backend API 不需回滾。
+5. 移除 `/api/embed/*`、`/ws/embed/*`、API Key 管理、admin UI／API、CLI 與專屬 tests。
+6. 回歸驗證一般 app/admin 的 Brain、TTS、Avatar、WebSocket 與管理 API 不受影響。
+7. Rollback 時恢復上一版 nginx/static 產物與 Embed backend modules。
 
 ## Open Questions
 
-- 後續是否增加 `ask(text)` 聊天 API，與 `speak(text)` 維持明確分工。
 - 是否需要第二種 inline container layout；第一版已可用 `container` 指定宿主元素，但不提供完整 chat panel。

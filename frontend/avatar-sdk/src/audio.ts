@@ -7,11 +7,16 @@ const PCM_CHUNK_SAMPLES = 4096;
 export class AvatarAudio {
   private context: AudioContext | null = null;
   private destroyed = false;
+  private nextStartTime = 0;
   private playbackGeneration = 0;
   private settlePlayback: (() => void) | null = null;
-  private source: AudioBufferSourceNode | null = null;
+  private sources = new Set<AudioBufferSourceNode>();
+  private speaking = false;
 
-  constructor(private readonly runtime: AvatarRuntime) {}
+  constructor(
+    private readonly runtime: AvatarRuntime,
+    private readonly onSpeakingChange: (speaking: boolean) => void,
+  ) {}
 
   async prepare(): Promise<void> {
     const context = this.ensureContext();
@@ -24,47 +29,88 @@ export class AvatarAudio {
     }
   }
 
-  async speak(response: Response): Promise<void> {
+  async playAudio(source: Blob | ArrayBuffer): Promise<void> {
+    this.interrupt();
     const generation = this.playbackGeneration;
     if (this.destroyed) return;
     const context = this.ensureContext();
     await this.prepare();
     if (generation !== this.playbackGeneration || this.destroyed) return;
 
-    const decoded = await context.decodeAudioData(await response.arrayBuffer());
+    const encoded = typeof (source as Blob).arrayBuffer === "function"
+      ? await (source as Blob).arrayBuffer()
+      : source as ArrayBuffer;
+    if (generation !== this.playbackGeneration || this.destroyed) return;
+    const decoded = await context.decodeAudioData(encoded);
     if (generation !== this.playbackGeneration || this.destroyed) return;
     for (const chunk of decodedAudioBufferToPcmChunks(decoded)) {
       this.runtime.pushAudio(chunk);
     }
 
     await new Promise<void>((resolve, reject) => {
-      const source = context.createBufferSource();
-      this.source = source;
-      source.buffer = decoded;
-      source.connect(context.destination);
-      const finish = () => {
-        if (this.source === source) this.source = null;
-        if (this.settlePlayback === finish) this.settlePlayback = null;
-        this.runtime.clearAudio();
-        resolve();
-      };
-      this.settlePlayback = finish;
-      source.onended = finish;
       try {
-        source.start();
+        const { onFinished } = this.scheduleSource(context, decoded);
+        this.settlePlayback = () => resolve();
+        onFinished(() => {
+          if (this.settlePlayback) this.settlePlayback = null;
+          resolve();
+        });
       } catch (error) {
-        this.settlePlayback = null;
-        this.source = null;
         reject(error);
       }
     });
   }
 
+  async pushPcm(chunk: Int16Array): Promise<void> {
+    if (this.destroyed || chunk.length === 0) return;
+    await this.prepare();
+    if (this.destroyed) return;
+
+    const context = this.ensureContext();
+    const buffer = context.createBuffer(1, chunk.length, PCM_SAMPLE_RATE);
+    const samples = new Float32Array(chunk.length);
+    for (let index = 0; index < chunk.length; index += 1) {
+      samples[index] = chunk[index] < 0
+        ? chunk[index] / 32768
+        : chunk[index] / 32767;
+    }
+    buffer.copyToChannel(samples, 0);
+    this.runtime.pushAudio(chunk);
+
+    this.scheduleSource(context, buffer);
+  }
+
+  private scheduleSource(
+    context: AudioContext,
+    buffer: AudioBuffer,
+  ): { onFinished: (listener: () => void) => void } {
+    const playbackSource = context.createBufferSource();
+    this.sources.add(playbackSource);
+    playbackSource.buffer = buffer;
+    playbackSource.connect(context.destination);
+    let listener: (() => void) | null = null;
+    const finish = () => {
+      this.sources.delete(playbackSource);
+      this.finishIfIdle();
+      listener?.();
+    };
+    playbackSource.onended = finish;
+    try {
+      this.setSpeaking(true);
+      const startTime = Math.max(context.currentTime, this.nextStartTime);
+      playbackSource.start(startTime);
+      this.nextStartTime = startTime + buffer.length / buffer.sampleRate;
+    } catch (error) {
+      this.sources.delete(playbackSource);
+      this.finishIfIdle();
+      throw error;
+    }
+    return { onFinished: (next) => { listener = next; } };
+  }
+
   interrupt(): void {
     this.playbackGeneration += 1;
-    const source = this.source;
-    this.source = null;
-    if (source) {
+    for (const source of this.sources) {
       source.onended = null;
       try {
         source.stop();
@@ -72,10 +118,13 @@ export class AvatarAudio {
         void 0;
       }
     }
+    this.sources.clear();
+    this.nextStartTime = this.context?.currentTime ?? 0;
     const settle = this.settlePlayback;
     this.settlePlayback = null;
     if (settle) settle();
-    else this.runtime.clearAudio();
+    this.runtime.clearAudio();
+    this.setSpeaking(false);
   }
 
   destroy(): void {
@@ -97,6 +146,18 @@ export class AvatarAudio {
     }
     this.context ??= new AudioContextConstructor({ sampleRate: PCM_SAMPLE_RATE });
     return this.context;
+  }
+
+  private finishIfIdle(): void {
+    if (this.sources.size > 0) return;
+    this.runtime.clearAudio();
+    this.setSpeaking(false);
+  }
+
+  private setSpeaking(speaking: boolean): void {
+    if (this.speaking === speaking) return;
+    this.speaking = speaking;
+    this.onSpeakingChange(speaking);
   }
 }
 

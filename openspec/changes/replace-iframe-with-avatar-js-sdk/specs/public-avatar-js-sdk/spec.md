@@ -4,9 +4,10 @@
 系統 SHALL 提供 `openvman-avatar-sdk.js` IIFE 腳本，載入後 SHALL 在 `window.OpenVmanAvatar` 暴露 `init(options)`，且 SHALL 不依賴 iframe、Vue、React 或宿主頁的 bundler。
 
 #### Scenario: 純 HTML 頁面初始化
-- **WHEN** 第三方頁面載入 `https://<openvman-host>/openvman-avatar-sdk.js` 並呼叫 `OpenVmanAvatar.init({ apiKey })`
+- **WHEN** 第三方頁面載入 `https://<openvman-host>/openvman-avatar-sdk.js` 並呼叫 `OpenVmanAvatar.init({ characterId: "000" })`
 - **THEN** SDK 在目前頁面建立虛擬人 DOM 並回傳 Promise 型 instance
 - **AND** 頁面中不存在 openVman iframe
+- **AND** 初始化不要求 API Key 或 backend session
 
 ### Requirement: 直接 DOM 與透明懸浮呈現
 SDK SHALL 直接在宿主頁 light DOM 建立帶 `openvman-` 前綴的 root、style 與 vendor 所需 Canvas。預設 root SHALL 固定於 viewport 右下角、背景透明且不使用固定 px layout 尺寸；呼叫端 SHALL 可指定 container 與定位尺寸選項。
@@ -40,34 +41,52 @@ SDK SHALL 在每個 page lifetime 只允許一個 WASM runtime。重複相同初
 - **THEN** Promise 以 `RUNTIME_DISPOSED` 錯誤拒絕
 - **AND** 文件說明必須重新載入頁面才能重建 vendor runtime
 
-### Requirement: 直接朗讀控制 API
-Instance SHALL 提供 `speak(text)` 與 `interrupt()`。`speak(text)` SHALL 將指定文字直接送至 openVman TTS、播放音訊並同步推送 PCM 至 avatar runtime，不得先送入 LLM 改寫內容。`interrupt()` SHALL 立即停止音訊並清除嘴形狀態。
+### Requirement: 宿主音檔播放 API
+Instance SHALL 提供 `playAudio(source)` 與 `interrupt()`。`playAudio()` SHALL 接受宿主提供的 `Blob` 或 `ArrayBuffer`，中斷前一段完整音檔，在瀏覽器解碼與播放，並將重採樣後的 16 kHz mono PCM 推送至 avatar runtime。SDK SHALL NOT 將文字或音訊送至 openVman backend。
 
-#### Scenario: 宿主事件觸發台詞
-- **WHEN** 客戶網站在商品點擊事件中呼叫 `avatar.speak("這款商品目前有優惠")`
-- **THEN** 虛擬人朗讀完全相同的文字並同步嘴形
+#### Scenario: 播放宿主提供的音檔
+- **WHEN** 客戶網站在使用者操作中呼叫 `avatar.playAudio(audioBlob)`
+- **THEN** 瀏覽器播放該音檔並同步驅動嘴形
+- **AND** Network 中沒有 `/api/embed/*`、Brain 或 openVman TTS 請求
 
-#### Scenario: 中止朗讀
-- **WHEN** 虛擬人朗讀中呼叫 `avatar.interrupt()`
+#### Scenario: 新音檔取代前一段音檔
+- **WHEN** 前一段 `playAudio()` 尚未結束又呼叫新的 `playAudio()`
+- **THEN** SDK 中止前一段並只播放新的音檔
+
+#### Scenario: 中止播放
+- **WHEN** 虛擬人播放中呼叫 `avatar.interrupt()`
 - **THEN** 目前音訊立即停止且 runtime speaking state 被清除
+
+### Requirement: 宿主 PCM 串流 API
+Instance SHALL 提供 `pushPcm(chunk)`，接受 16 kHz、mono、16-bit signed PCM `Int16Array`。連續 chunks SHALL 依序無縫播放並依相同順序推送至 avatar runtime；SDK SHALL NOT 將 chunks 上傳至任何 backend。
+
+#### Scenario: 串流 PCM chunks
+- **WHEN** 宿主依序呼叫 `pushPcm(chunkA)` 與 `pushPcm(chunkB)`
+- **THEN** SDK 依序播放兩個 chunks 並以相同順序驅動嘴形
+
+#### Scenario: 中止 PCM 串流
+- **WHEN** PCM 佇列尚未播放完成時呼叫 `interrupt()`
+- **THEN** SDK 停止所有 scheduled sources、清空佇列並清除 runtime audio state
 
 ### Requirement: 事件 API
 Instance SHALL 提供 `on(type, handler)` 與 `off(type, handler)`，至少支援 `ready`、`speaking`、`error`、`destroyed`。事件 SHALL 直接在同一 JavaScript context 派送，不使用 `postMessage`。
 
 #### Scenario: 監聽朗讀狀態
 - **WHEN** 呼叫端訂閱 `speaking`
-- **THEN** TTS 開始與停止時分別收到 `{ state: "start" }` 與 `{ state: "stop" }`
+- **THEN** 完整音檔或 PCM 佇列開始與停止時分別收到 `{ state: "start" }` 與 `{ state: "stop" }`
 
-### Requirement: API Key 與 domain allowlist
-所有 SDK API 請求 SHALL 帶 Embed API Key，backend SHALL 以瀏覽器原生 `Origin` 比對該 key 的 allowed domains。SDK 靜態資源 SHALL 提供跨網域載入所需的精準 CORS header；正式使用 SHALL 要求 HTTPS。
+### Requirement: 無 backend 與 Key 依賴
+SDK 初始化與所有 instance API SHALL 不接受或要求 API Key，且 SHALL NOT 呼叫 `/api/embed/*`、`/ws/embed/*`、Brain、TTS 或 ASR。SDK 靜態資源 SHALL 提供跨網域載入所需的精準 CORS header；正式使用 SHALL 要求 HTTPS。
 
-#### Scenario: 允許的客戶網域
-- **WHEN** `https://shop.example` 使用綁定 `shop.example` 的有效 key 呼叫 TTS
-- **THEN** backend 通過驗證並回傳允許該 origin 的 CORS header
+#### Scenario: 無 Key 初始化
+- **WHEN** `https://shop.example` 不帶 API Key 初始化 SDK
+- **THEN** runtime 與角色資源成功載入
+- **AND** SDK 不建立 backend session
 
-#### Scenario: 未允許的客戶網域
-- **WHEN** 其他 origin 使用同一 key 呼叫 SDK API
-- **THEN** backend 回 403 且 SDK 派送公開 `error` 事件
+#### Scenario: 公開 Embed backend 已移除
+- **WHEN** client 請求舊 `/api/embed/*`、`/ws/embed/*` 或 `/api/admin/embed-keys`
+- **THEN** edge 或 backend 不再提供該能力
+- **AND** 一般 `/api/*`、`/ws/*`、`/tts/*` 與 `/v1/*` 維持原有行為
 
 ### Requirement: 宿主隔離與衝突防護
 SDK SHALL 對自建 class、data attribute、事件與 global namespace 使用 `openvman` 前綴，並 SHALL 在初始化前偵測 vendor 固定 DOM ID 衝突。SDK SHALL NOT 修改宿主頁既有元素的全域樣式。
@@ -85,8 +104,8 @@ SDK SHALL 對自建 class、data attribute、事件與 global namespace 使用 `
 - **AND** repository 不再建置 iframe embed entry
 
 ### Requirement: 錯誤與瀏覽器限制
-SDK SHALL 以具名錯誤代碼回報初始化、授權、資源載入、TTS 與 autoplay 問題，且失敗時 SHALL 清理部分建立的資源。文件 SHALL 說明首次播放的 user gesture、HTTPS、CSP 與瀏覽器需求。
+SDK SHALL 以具名錯誤代碼回報初始化、資源載入、音訊格式、音訊解碼與 autoplay 問題，且失敗時 SHALL 清理部分建立的資源。文件 SHALL 說明首次播放的 user gesture、PCM 格式、HTTPS、CSP 與瀏覽器需求。
 
 #### Scenario: 首次播放被瀏覽器阻擋
 - **WHEN** 瀏覽器因缺少 user gesture 阻擋音訊播放
-- **THEN** `speak()` Promise 以 `AUTOPLAY_BLOCKED` 拒絕並派送 `error` 事件
+- **THEN** `playAudio()` 或 `pushPcm()` Promise 以 `AUTOPLAY_BLOCKED` 拒絕並派送 `error` 事件

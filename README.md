@@ -15,27 +15,13 @@
 | 02 | [02_FRONTEND_SPEC.md](./docs/02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
 | 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
 | 04 | [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md) | 網關 (外圍)：媒體處理 · 任務佇列 · 插件 (Camera/Web) · 臨時儲存 · 計費備援 | ✅ 已完成 |
-| 05 | [avatar-embed/README.md](./docs/avatar-embed/README.md) | 外部嵌入：Web Component · postMessage 協定 · API Key 管理 · 公開錯誤碼 | ✅ 已完成 |
+| 05 | [avatar-embed/README.md](./docs/avatar-embed/README.md) | Avatar JavaScript SDK：直接 DOM · 外部音訊 · PCM 串流 · 公開錯誤碼 | ✅ 已完成 |
 | -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
 
 
-## 對外 API Key 管理
-
-對外嵌入通道使用本地 JSON key store（預設 `backend/data/embed_keys.json`），secret 只會在建立或輪替時輸出一次；後續 `list` 僅能看到 `secret_hash`。
-
-```bash
-cd backend
-python scripts/embed_keys_cli.py create --tenant-id tenant-a --domain example.com --note "demo"
-python scripts/embed_keys_cli.py list
-python scripts/embed_keys_cli.py disable <key_id>
-python scripts/embed_keys_cli.py rotate <key_id>
-```
-
-測試或非預設部署可用 `--store /path/to/embed_keys.json` 指定 key store。對外請求以 `Authorization: Bearer <secret>` 或 iframe query string `?api_key=<secret>` 驗證，並會檢查該 key 的 domain allowlist。
-
 ## 對外接入
 
-第三方網站接入流程、Web Component 屬性、postMessage v1 事件表與公開錯誤碼請參閱 [虛擬人外部嵌入整合指南 (docs/avatar-embed/README.md)](./docs/avatar-embed/README.md)。
+第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](./docs/avatar-embed/README.md)。
 
 ## 環境變數 (.env)
 

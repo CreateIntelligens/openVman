@@ -10,7 +10,6 @@ async function loadSdk({
   autoEnd = true,
   characterStatus = 200,
   deferDecode = false,
-  deferTts = false,
   resumeSucceeds = true,
 } = {}) {
   const source = await readFile(bundleUrl, "utf8");
@@ -21,7 +20,9 @@ async function loadSdk({
     clearAudio: 0,
     pushedAudio: 0,
     resumeCalled: 0,
+    scheduledStarts: [],
     sourceStarted: 0,
+    sourceStopped: 0,
     videoRemoved: 0,
   };
   let finishDecode;
@@ -46,7 +47,7 @@ async function loadSdk({
               },
             };
             context.window.createQtAppInstance = async () => ({
-              HEAPU8: new Uint8Array(1024),
+              HEAPU8: new Uint8Array(16384),
               _clearAudio() {
                 runtimeCalls.clearAudio += 1;
               },
@@ -106,13 +107,6 @@ async function loadSdk({
         resumeCalled: runtimeCalls.resumeCalled,
         url,
       });
-      if (deferTts && url.endsWith("/api/embed/tts")) {
-        return new Promise((_, reject) => {
-          options.signal.addEventListener("abort", () => {
-            reject(new DOMException("Aborted", "AbortError"));
-          }, { once: true });
-        });
-      }
       const isCharacter = url.includes("combined_data.json.gz");
       return {
         arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
@@ -125,19 +119,32 @@ async function loadSdk({
   };
   context.window.AudioContext = class {
     constructor() {
+      this.currentTime = 0;
       this.destination = {};
       this.state = audioState;
     }
     async close() {}
+    createBuffer(_channels, length, sampleRate) {
+      return {
+        copyToChannel() {},
+        getChannelData: () => new Float32Array(length),
+        length,
+        numberOfChannels: 1,
+        sampleRate,
+      };
+    }
     createBufferSource() {
       const source = {
         connect() {},
         onended: null,
-        start() {
+        start(when = 0) {
           runtimeCalls.sourceStarted += 1;
+          runtimeCalls.scheduledStarts.push(when);
           if (autoEnd) queueMicrotask(() => source.onended?.());
         },
-        stop() {},
+        stop() {
+          runtimeCalls.sourceStopped += 1;
+        },
       };
       return source;
     }
@@ -175,13 +182,15 @@ test("exposes the framework-free OpenVmanAvatar global", async () => {
   assert.equal(typeof sdk?.init, "function");
 });
 
-test("rejects an empty API key with a named public error", async () => {
+test("initializes without an API key", async () => {
   const { sdk } = await loadSdk();
 
-  await assert.rejects(
-    sdk.init({ apiKey: "" }),
-    (error) => error.code === "INVALID_OPTIONS",
-  );
+  const avatar = await sdk.init({ characterId: "000" });
+
+  assert.equal(typeof avatar.playAudio, "function");
+  assert.equal(typeof avatar.pushPcm, "function");
+  assert.equal("speak" in avatar, false);
+  assert.equal("setPersona" in avatar, false);
 });
 
 test("derives resources from the SDK script origin", async () => {
@@ -192,18 +201,18 @@ test("derives resources from the SDK script origin", async () => {
 
 test("reuses identical init and rejects different page-lifetime init", async () => {
   const { sdk } = await loadSdk();
-  const first = await sdk.init({ apiKey: "key_123" });
+  const first = await sdk.init({ characterId: "000" });
 
-  assert.equal(await sdk.init({ apiKey: "key_123" }), first);
+  assert.equal(await sdk.init({ characterId: "000" }), first);
   await assert.rejects(
-    sdk.init({ apiKey: "key_123", characterId: "other" }),
+    sdk.init({ characterId: "other" }),
     (error) => error.code === "INSTANCE_EXISTS",
   );
 });
 
 test("creates direct DOM, cleans it on destroy, and forbids runtime reuse", async () => {
   const { document, runtimeCalls, sdk } = await loadSdk();
-  const avatar = await sdk.init({ apiKey: "key_123" });
+  const avatar = await sdk.init({ characterId: "000" });
 
   assert.ok(document.getElementById("canvas_video"));
   assert.ok(document.getElementById("canvas_gl"));
@@ -212,7 +221,7 @@ test("creates direct DOM, cleans it on destroy, and forbids runtime reuse", asyn
   assert.equal(document.getElementById("canvas_video"), null);
   assert.equal(runtimeCalls.videoRemoved, 1);
   await assert.rejects(
-    sdk.init({ apiKey: "key_123" }),
+    sdk.init({ characterId: "000" }),
     (error) => error.code === "RUNTIME_DISPOSED",
   );
 });
@@ -223,40 +232,36 @@ test("rejects vendor DOM ID conflicts without overwriting the host", async () =>
   existing.id = "canvas_video";
 
   await assert.rejects(
-    sdk.init({ apiKey: "key_123" }),
+    sdk.init({ characterId: "000" }),
     (error) => error.code === "DOM_CONFLICT",
   );
   assert.equal(document.getElementById("canvas_video"), existing);
 });
 
-test("speak sends the exact host text to TTS and pushes PCM to the runtime", async () => {
+test("playAudio decodes host audio without calling an embed API", async () => {
   const { requests, runtimeCalls, sdk } = await loadSdk();
-  const avatar = await sdk.init({ apiKey: "key_123" });
+  const avatar = await sdk.init({ characterId: "000" });
   const states = [];
   avatar.on("speaking", (event) => states.push(event.state));
 
-  await avatar.speak("這款商品目前有優惠");
+  await avatar.playAudio(new ArrayBuffer(16));
 
-  const ttsRequest = requests.find(({ url }) => url.endsWith("/api/embed/tts"));
-  assert.deepEqual(JSON.parse(ttsRequest.options.body), {
-    text: "這款商品目前有優惠",
-  });
-  assert.equal(ttsRequest.options.headers.Authorization, "Bearer key_123");
+  assert.equal(requests.some(({ url }) => url.includes("/api/embed/")), false);
   assert.ok(runtimeCalls.pushedAudio > 0);
   assert.deepEqual(states, ["start", "stop"]);
 });
 
-test("speak reports autoplay blocking with a named error event", async () => {
+test("playAudio reports autoplay blocking with a named error event", async () => {
   const { sdk } = await loadSdk({
     audioState: "suspended",
     resumeSucceeds: false,
   });
-  const avatar = await sdk.init({ apiKey: "key_123" });
+  const avatar = await sdk.init({ characterId: "000" });
   const errors = [];
   avatar.on("error", (event) => errors.push(event.code));
 
   await assert.rejects(
-    avatar.speak("需要點擊後播放"),
+    avatar.playAudio(new ArrayBuffer(16)),
     (error) => error.code === "AUTOPLAY_BLOCKED",
   );
   assert.deepEqual(errors, ["AUTOPLAY_BLOCKED"]);
@@ -264,17 +269,17 @@ test("speak reports autoplay blocking with a named error event", async () => {
 
 test("interrupt stops pending speech and clears the runtime", async () => {
   const { runtimeCalls, sdk } = await loadSdk({ autoEnd: false });
-  const avatar = await sdk.init({ apiKey: "key_123" });
+  const avatar = await sdk.init({ characterId: "000" });
   const states = [];
   avatar.on("speaking", (event) => states.push(event.state));
-  const speech = avatar.speak("停止這段語音");
+  const playback = avatar.playAudio(new ArrayBuffer(16));
   await new Promise((resolve) => setImmediate(resolve));
 
   avatar.interrupt();
   await Promise.race([
-    speech,
+    playback,
     new Promise((_, reject) => setTimeout(
-      () => reject(new Error("interrupted speech did not settle")),
+      () => reject(new Error("interrupted playback did not settle")),
       20,
     )),
   ]);
@@ -283,74 +288,44 @@ test("interrupt stops pending speech and clears the runtime", async () => {
   assert.ok(runtimeCalls.clearAudio > 0);
 });
 
-test("interrupt aborts an in-flight TTS request without emitting an error", async () => {
-  const { sdk } = await loadSdk({ deferTts: true });
-  const avatar = await sdk.init({ apiKey: "key_123" });
-  const events = [];
-  avatar.on("error", (event) => events.push(event));
-  const speech = avatar.speak("尚未產生完成的語音");
-  await new Promise((resolve) => setImmediate(resolve));
-
-  avatar.interrupt();
-  await speech;
-
-  assert.deepEqual(events, []);
-});
-
-test("unlocks audio synchronously before starting the TTS request", async () => {
-  const { requests, runtimeCalls, sdk } = await loadSdk({
+test("playAudio resumes the audio context before decoding", async () => {
+  const { runtimeCalls, sdk } = await loadSdk({
     audioState: "suspended",
   });
-  const avatar = await sdk.init({ apiKey: "key_123" });
+  const avatar = await sdk.init({ characterId: "000" });
 
-  await avatar.speak("由點擊事件觸發的首句");
+  await avatar.playAudio(new ArrayBuffer(16));
 
   assert.equal(runtimeCalls.resumeCalled, 1);
-  assert.equal(
-    requests.find(({ url }) => url.endsWith("/api/embed/tts")).resumeCalled,
-    1,
-  );
 });
 
 test("interrupt during decode prevents PCM and source playback", async () => {
   const { finishDecode, runtimeCalls, sdk } = await loadSdk({
     deferDecode: true,
   });
-  const avatar = await sdk.init({ apiKey: "key_123" });
-  const speech = avatar.speak("正在解碼的語音");
+  const avatar = await sdk.init({ characterId: "000" });
+  const playback = avatar.playAudio(new ArrayBuffer(16));
   await new Promise((resolve) => setImmediate(resolve));
 
   avatar.interrupt();
   finishDecode();
-  await speech;
+  await playback;
 
   assert.equal(runtimeCalls.pushedAudio, 0);
   assert.equal(runtimeCalls.sourceStarted, 0);
 });
 
-test("different persona or container is treated as a different init", async () => {
+test("different container is treated as a different init", async () => {
   const { document, sdk } = await loadSdk();
   const firstContainer = document.createElement("section");
   const secondContainer = document.createElement("section");
   await sdk.init({
-    apiKey: "key_123",
     container: firstContainer,
-    persona: "sales",
   });
 
   await assert.rejects(
     sdk.init({
-      apiKey: "key_123",
       container: secondContainer,
-      persona: "sales",
-    }),
-    (error) => error.code === "INSTANCE_EXISTS",
-  );
-  await assert.rejects(
-    sdk.init({
-      apiKey: "key_123",
-      container: firstContainer,
-      persona: "support",
     }),
     (error) => error.code === "INSTANCE_EXISTS",
   );
@@ -360,11 +335,37 @@ test("character failure disposes the created runtime for the page lifetime", asy
   const { sdk } = await loadSdk({ characterStatus: 404 });
 
   await assert.rejects(
-    sdk.init({ apiKey: "key_123" }),
+    sdk.init({ characterId: "000" }),
     (error) => error.code === "RESOURCE_LOAD_FAILED",
   );
   await assert.rejects(
-    sdk.init({ apiKey: "key_123" }),
+    sdk.init({ characterId: "000" }),
     (error) => error.code === "RUNTIME_DISPOSED",
   );
+});
+
+test("pushPcm queues host chunks in order without backend requests", async () => {
+  const { requests, runtimeCalls, sdk } = await loadSdk({ autoEnd: false });
+  const avatar = await sdk.init({ characterId: "000" });
+
+  await avatar.pushPcm(new Int16Array(1600));
+  await avatar.pushPcm(new Int16Array(800));
+
+  assert.equal(requests.some(({ url }) => url.includes("/api/embed/")), false);
+  assert.equal(runtimeCalls.pushedAudio, 2);
+  assert.deepEqual(runtimeCalls.scheduledStarts, [0, 0.1]);
+});
+
+test("a new playAudio call replaces current playback", async () => {
+  const { runtimeCalls, sdk } = await loadSdk({ autoEnd: false });
+  const avatar = await sdk.init({ characterId: "000" });
+  const first = avatar.playAudio(new ArrayBuffer(16));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const second = avatar.playAudio(new ArrayBuffer(16));
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.ok(runtimeCalls.sourceStopped > 0);
+  avatar.interrupt();
+  await Promise.all([first, second]);
 });

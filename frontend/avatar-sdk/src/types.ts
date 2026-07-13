@@ -5,12 +5,10 @@ export type OpenVmanAvatarEventType =
   | "speaking";
 
 export interface OpenVmanAvatarOptions {
-  apiKey: string;
   assetsBaseUrl?: string;
   characterId?: string;
   container?: HTMLElement;
   height?: string;
-  persona?: string;
   position?: "bottom-left" | "bottom-right";
   width?: string;
   zIndex?: number;
@@ -38,8 +36,8 @@ export interface OpenVmanAvatarInstance {
     type: T,
     handler: OpenVmanAvatarEventHandler<T>,
   ): void;
-  setPersona(persona: string): void;
-  speak(text: string): Promise<void>;
+  playAudio(source: Blob | ArrayBuffer): Promise<void>;
+  pushPcm(chunk: Int16Array): Promise<void>;
 }
 
 export interface OpenVmanAvatarGlobal {

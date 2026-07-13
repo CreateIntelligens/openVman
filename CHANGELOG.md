@@ -10,6 +10,7 @@
 - **Dynamic Model Fallback Testing**: Added comprehensive pytest coverage for dynamic discovery, sorting logic, graceful degradation on error, and fallback chain integration (`test_llm_fallback_chain.py`).
 
 ### Changed / Fixed
+- **Keyless Avatar SDK**: Changed the public Avatar JavaScript SDK to accept host-provided complete audio or 16 kHz mono PCM chunks through `playAudio()` and `pushPcm()`. Removed the public Embed backend API, API-key middleware/store/CLI, and Embed Keys admin page while preserving internal frontend API, WebSocket, and TTS routes.
 - **`.env` Consolidation**: Merged `backend/.env`, `brain/.env`, and the root `.env` into a single root-level `.env` / `.env.example`. `docker-compose.yml`'s `api` and `backend` services now both use `env_file: ./.env`, so deployment only requires maintaining one file (`cp .env.example .env`) instead of three. Along the way, removed a duplicated dead-write `TTS_GEMINI_URL` entry, backfilled missing documented settings (Docling, PDF Inspector/Repair, Avatar uploads, TTS Cache) that existed in `config.py` but not in any example file, and deleted `infra/.env.example` / `backend/index-tts-vllm/.env.example` (never actually wired to an `env_file:` — those values were always sourced via compose `${VAR}` interpolation from the root `.env`).
 
 ## [0.10.0] - 2026-05-25

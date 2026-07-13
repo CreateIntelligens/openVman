@@ -26,9 +26,6 @@ vi.mock("./pages/Avatar", () => ({
 vi.mock("./pages/Chat", () => ({
   default: () => <div data-testid="tab-chat">Chat tab</div>,
 }));
-vi.mock("./pages/EmbedKeys", () => ({
-  default: () => <div data-testid="tab-embed-keys">Embed keys tab</div>,
-}));
 vi.mock("./pages/Health", () => ({
   default: () => <div data-testid="tab-health">Health tab</div>,
 }));
@@ -58,6 +55,7 @@ vi.mock("./pages/Workspace", () => ({
 }));
 
 import App from "./App";
+import { allTabs } from "./components/app/navigation";
 
 describe("App tab mounting", () => {
   beforeEach(() => {
@@ -74,5 +72,9 @@ describe("App tab mounting", () => {
     expect(screen.queryByTestId("tab-avatar")).toBeNull();
 
     unmount();
+  });
+
+  it("does not expose Embed Keys navigation", () => {
+    expect(allTabs.some((tab) => String(tab.key) === "EmbedKeys")).toBe(false);
   });
 });

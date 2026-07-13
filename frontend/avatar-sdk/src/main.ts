@@ -40,12 +40,10 @@ function containerId(container?: HTMLElement): string {
 
 function signature(options: OpenVmanAvatarOptions): string {
   return JSON.stringify({
-    apiKey: options.apiKey,
     assetsBaseUrl: options.assetsBaseUrl,
     characterId: options.characterId,
     container: containerId(options.container),
     height: options.height,
-    persona: options.persona,
     position: options.position,
     width: options.width,
     zIndex: options.zIndex,
@@ -55,9 +53,7 @@ function signature(options: OpenVmanAvatarOptions): string {
 async function init(
   options: OpenVmanAvatarOptions,
 ): Promise<OpenVmanAvatarInstance> {
-  if (!options?.apiKey?.trim()) {
-    throw new OpenVmanAvatarError("INVALID_OPTIONS", "apiKey is required.");
-  }
+  options ??= {};
   if (runtimeDisposed) {
     throw new OpenVmanAvatarError(
       "RUNTIME_DISPOSED",
@@ -99,10 +95,7 @@ async function createInstance(
     OpenVmanAvatarEventType,
     Set<OpenVmanAvatarEventHandler<OpenVmanAvatarEventType>>
   >();
-  let persona = options.persona ?? "";
   let destroyed = false;
-  let speaking = false;
-  let speechController: AbortController | null = null;
 
   let runtime: AvatarRuntime | null = null;
   try {
@@ -122,13 +115,36 @@ async function createInstance(
         error instanceof Error ? error.message : String(error),
       );
   }
-  const audio = new AvatarAudio(runtime);
-
   const emit = <T extends OpenVmanAvatarEventType>(
     type: T,
     event: OpenVmanAvatarEventMap[T],
   ): void => {
     for (const handler of handlers.get(type) ?? []) handler(event);
+  };
+  const audio = new AvatarAudio(runtime, (speaking) => {
+    emit("speaking", {
+      state: speaking ? "start" : "stop",
+      type: "speaking",
+    });
+  });
+
+  const runAudio = async (operation: () => Promise<void>): Promise<void> => {
+    try {
+      await operation();
+    } catch (error) {
+      const publicError = error instanceof OpenVmanAvatarError
+        ? error
+        : new OpenVmanAvatarError(
+          "AUDIO_PLAYBACK_FAILED",
+          error instanceof Error ? error.message : String(error),
+        );
+      emit("error", {
+        code: publicError.code,
+        message: publicError.message,
+        type: "error",
+      });
+      throw publicError;
+    }
   };
 
   const instance: OpenVmanAvatarInstance = {
@@ -136,8 +152,6 @@ async function createInstance(
       if (destroyed) return;
       destroyed = true;
       runtimeDisposed = true;
-      speechController?.abort();
-      speechController = null;
       audio.destroy();
       removeAvatarDom(dom);
       emit("destroyed", { type: "destroyed" });
@@ -145,13 +159,7 @@ async function createInstance(
       activeInstance = null;
     },
     interrupt() {
-      speechController?.abort();
-      speechController = null;
       audio.interrupt();
-      if (speaking) {
-        speaking = false;
-        emit("speaking", { state: "stop", type: "speaking" });
-      }
     },
     off(type, handler) {
       handlers.get(type)?.delete(
@@ -168,67 +176,11 @@ async function createInstance(
         queueMicrotask(() => handler({ type: "ready" } as never));
       }
     },
-    setPersona(nextPersona) {
-      persona = nextPersona;
-      void persona;
+    async playAudio(source) {
+      await runAudio(() => audio.playAudio(source));
     },
-    async speak(text) {
-      const normalizedText = text.trim();
-      if (!normalizedText) {
-        throw new OpenVmanAvatarError("INVALID_OPTIONS", "Speech text is required.");
-      }
-      instance.interrupt();
-      const controller = new AbortController();
-      speechController = controller;
-      const audioReady = audio.prepare();
-      try {
-        const responsePromise = fetch(`${resourceBaseUrl}/api/embed/tts`, {
-          body: JSON.stringify({ text }),
-          headers: {
-            Accept: "audio/*",
-            Authorization: `Bearer ${options.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          method: "POST",
-          signal: controller.signal,
-        });
-        void responsePromise.catch(() => undefined);
-        await audioReady;
-        const response = await responsePromise;
-        if (!response.ok) {
-          throw new OpenVmanAvatarError(
-            response.status === 401 || response.status === 403
-              ? "API_ERROR"
-              : "TTS_FAILED",
-            `TTS request failed with HTTP ${response.status}.`,
-          );
-        }
-        speaking = true;
-        emit("speaking", { state: "start", type: "speaking" });
-        await audio.speak(response);
-      } catch (error) {
-        const interrupted = controller.signal.aborted;
-        if (!interrupted) controller.abort();
-        if (interrupted) return;
-        const publicError = error instanceof OpenVmanAvatarError
-          ? error
-          : new OpenVmanAvatarError(
-            "TTS_FAILED",
-            error instanceof Error ? error.message : String(error),
-          );
-        emit("error", {
-          code: publicError.code,
-          message: publicError.message,
-          type: "error",
-        });
-        throw publicError;
-      } finally {
-        if (speechController === controller) speechController = null;
-        if (speaking) {
-          speaking = false;
-          emit("speaking", { state: "stop", type: "speaking" });
-        }
-      }
+    async pushPcm(chunk) {
+      await runAudio(() => audio.pushPcm(chunk));
     },
   };
 

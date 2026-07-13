@@ -51,6 +51,18 @@ describe("nginx default config", () => {
     expect(source).not.toContain("/srv/openvman/embed");
   });
 
+  it("does not proxy retired public embed backend routes", () => {
+    const embedApi = source.indexOf("location /api/embed/");
+    const embedSocket = source.indexOf("location /ws/embed/");
+    const generalApi = source.indexOf("location /api/ {");
+    const generalSocket = source.indexOf("location /ws/ {");
+
+    expect(source).toMatch(/location \/api\/embed\/ \{\s*return 410;/);
+    expect(source).toMatch(/location \/ws\/embed\/ \{\s*return 410;/);
+    expect(embedApi).toBeLessThan(generalApi);
+    expect(embedSocket).toBeLessThan(generalSocket);
+  });
+
   it("allows cross-origin character resources for the direct SDK", () => {
     const assetsLocation = source.match(/location \/assets\/ \{([\s\S]*?)\n    \}/)?.[1];
 
