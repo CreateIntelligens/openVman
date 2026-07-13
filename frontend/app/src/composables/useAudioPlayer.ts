@@ -3,7 +3,7 @@
  *
  * Accepts raw PCM chunks (16 kHz, mono, 16-bit LE — either binary or base64),
  * schedules them for gapless playback via AudioContext, and simultaneously
- * forwards each chunk to the MatesX WASM engine for real-time lip-sync.
+ * forwards each chunk to the avatar WASM runtime for real-time lip-sync.
  */
 import { ref, readonly, onUnmounted } from 'vue'
 

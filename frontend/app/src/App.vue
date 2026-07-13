@@ -155,7 +155,7 @@ import { useAudioPlayer } from "./composables/useAudioPlayer";
 import { useAvatarCatalog } from "./composables/useAvatarCatalog";
 import { useAvatarChat } from "./composables/useAvatarChat";
 import { useAsr } from "./composables/useAsr";
-import { useMatesX } from "./composables/useMatesX";
+import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
 import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useWebcamCapture } from "./composables/useWebcamCapture";
@@ -445,7 +445,7 @@ async function fetchBackgrounds(): Promise<void> {
   }
 }
 
-const wasm = useMatesX();
+const wasm = useOpenVmanAvatarRuntime();
 const rendererDisabled = computed(() =>
   settings.renderMode === "2d" && (!wasm.isReady.value || wasm.isLoading.value),
 );

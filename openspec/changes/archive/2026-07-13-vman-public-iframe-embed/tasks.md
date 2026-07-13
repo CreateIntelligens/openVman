@@ -58,8 +58,8 @@
 
 ## 8. 文件
 
-- [x] 8.1 新增 `docs/PUBLIC_INTEGRATION_SPEC.md`：嵌入步驟、API Key 申請、postMessage 事件表
-- [x] 8.2 新增 `docs/PUBLIC_ERROR_CODES.md`：對外錯誤碼字典
+- [x] 8.1 新增 `docs/avatar-embed/README.md`：嵌入步驟、API Key 申請、Web Component API 與 postMessage 事件表
+- [x] 8.2 在 `docs/avatar-embed/README.md` 提供公開錯誤碼與排錯指南
 - [x] 8.3 README 主目錄加「對外接入」段落，連到上述兩份文件
 - [x] 8.4 CHANGELOG 補一筆
 
@@ -75,5 +75,5 @@
 
 - [ ] 10.1 撰寫詢問稿並透過 MatesX 微信公眾號取得「嵌入第三方網站」之書面授權確認
 - [ ] 10.2 確認手上形象 `combined_data.json.gz` 是否為已去 logo 版本
-- [x] 10.3 在 docs/PUBLIC_INTEGRATION_SPEC.md 標註「形象授權限制 / 適用範圍」段落
+- [x] 10.3 在 `docs/avatar-embed/README.md` 標註「形象授權限制 / 適用範圍」段落
 - [ ] 10.4 在對外開放前完成上述 3 項，否則本次 change 上線範圍限定為內部測試客戶

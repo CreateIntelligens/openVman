@@ -58,18 +58,18 @@ test("settings modal exposes stage background controls", () => {
   assert.match(source, /resolvedDraftBackgroundUrl/);
 });
 
-test("character selector exposes MatesX and VRM avatar choices directly", () => {
+test("character selector exposes openVman 2D and VRM avatar choices directly", () => {
   assert.match(source, /renderMode:\s*'2d' \| '3d'/);
   assert.match(source, /renderModeChange:\s*\[mode:\s*'2d' \| '3d'\]/);
   assert.match(source, /export interface VrmCharacterSummary/);
   assert.match(source, /vrmCharacters:\s*VrmCharacterSummary\[\]/);
   assert.match(source, /currentVrmId:\s*string/);
   assert.match(source, /vrmCharacterChange:\s*\[vrmId:\s*string\]/);
-  assert.match(source, /toMatesXCharacterValue/);
+  assert.match(source, /toOpenVmanCharacterValue/);
   assert.match(source, /toVrmCharacterValue/);
   assert.match(source, /draftCharacterValue/);
   assert.match(source, /v-model="draftCharacterValue"/);
-  assert.match(source, /label: `\$\{c\.name\} · MatesX`/);
+  assert.match(source, /label: `\$\{c\.name\} · openVman 2D`/);
   assert.match(source, /label: `\$\{v\.label\} · VRM`/);
   assert.doesNotMatch(source, /· 2D/);
   assert.doesNotMatch(source, /· 3D/);

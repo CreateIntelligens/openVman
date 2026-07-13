@@ -122,6 +122,12 @@ services:
       - ./frontend/app:/app
       - avatar-node-modules:/app/node_modules
 
+  avatar-sdk:
+    <<: *shared
+    build:
+      context: ./frontend/avatar-sdk
+      dockerfile: Dockerfile
+
   admin:
     <<: *shared
     build:
@@ -136,13 +142,12 @@ services:
       - admin-node-modules:/app/node_modules
       - ./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro
       - ./infra/nginx/certs:/etc/nginx/certs
-      - ./frontend/app/dist/embed:/srv/openvman/embed:ro
-      - ./frontend/embed-loader/dist:/srv/openvman/embed-loader:ro
       - ./contracts:/contracts:ro
     depends_on:
       - api
       - backend
       - avatar
+      - avatar-sdk
 
   redis:
     <<: *shared

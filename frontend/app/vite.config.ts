@@ -43,10 +43,7 @@ export default defineConfig({
     outDir: "dist",
     assetsInlineLimit: 0, // Don't inline WASM or large assets
     rollupOptions: {
-      input: {
-        main: resolve(rootDir, "index.html"),
-        embed: resolve(rootDir, "embed/avatar.html"),
-      },
+      input: resolve(rootDir, "index.html"),
     },
   },
 });

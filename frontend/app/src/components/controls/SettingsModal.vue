@@ -103,12 +103,16 @@ const backgroundFitOptions: { id: AvatarBackgroundFit; label: string; descriptio
   { id: 'repeat', label: '平鋪', description: '重複小圖' },
 ]
 
-function toMatesXCharacterValue(charId: string): string {
-  return `matesx:${charId}`
+const LEGACY_2D_CHARACTER_PREFIX = 'matesx:'
+
+function toOpenVmanCharacterValue(charId: string): string {
+  return `${LEGACY_2D_CHARACTER_PREFIX}${charId}`
 }
 
-function parseMatesXCharacterValue(value: string): string {
-  return value.startsWith('matesx:') ? value.slice(7) : value
+function parseOpenVmanCharacterValue(value: string): string {
+  return value.startsWith(LEGACY_2D_CHARACTER_PREFIX)
+    ? value.slice(LEGACY_2D_CHARACTER_PREFIX.length)
+    : value
 }
 
 function toVrmCharacterValue(vrmId: string): string {
@@ -146,7 +150,7 @@ const draftCharacterValue = computed({
   get() {
     return draftRenderMode.value === '3d'
       ? toVrmCharacterValue(draftVrmId.value)
-      : toMatesXCharacterValue(draftCharId.value)
+      : toOpenVmanCharacterValue(draftCharId.value)
   },
   set(value: string) {
     if (value.startsWith('vrm:')) {
@@ -155,7 +159,7 @@ const draftCharacterValue = computed({
       return
     }
     draftRenderMode.value = '2d'
-    draftCharId.value = parseMatesXCharacterValue(value)
+    draftCharId.value = parseOpenVmanCharacterValue(value)
   },
 })
 
@@ -220,8 +224,8 @@ const personaOptions = computed(() =>
 const characterOptions = computed(() =>
   [
     ...props.characters.map((c) => ({
-      value: toMatesXCharacterValue(c.id),
-      label: `${c.name} · MatesX`,
+      value: toOpenVmanCharacterValue(c.id),
+      label: `${c.name} · openVman 2D`,
     })),
     ...props.vrmCharacters.map((v) => ({
       value: toVrmCharacterValue(v.id),

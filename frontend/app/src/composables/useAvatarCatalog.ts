@@ -5,7 +5,7 @@
  * The app previously only ever connected with a fixed persona_id and had no
  * way to discover which visual characters exist. This composable exposes that
  * list so callers can let the user pick a character (the chosen `char_id` is
- * what `useMatesX.loadCharacter()` expects).
+ * what `useOpenVmanAvatarRuntime.loadCharacter()` expects).
  *
  * Pure parsing/error logic lives in `useAvatarCatalogCore.ts` so it can be
  * unit-tested without a Vue runtime.

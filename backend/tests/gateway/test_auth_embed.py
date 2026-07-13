@@ -174,6 +174,24 @@ def test_preflight_with_query_key_uses_allowlist(tmp_path):
     assert "Access-Control-Allow-Origin" not in denied.headers
 
 
+def test_browser_preflight_without_authorization_reaches_protected_api(tmp_path):
+    client, _created, _store, _clock = _client(tmp_path)
+    origin = "https://example.com"
+
+    preflight = client.options(
+        "/api/embed/ping",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+
+    assert preflight.status_code == 204
+    assert preflight.headers["Access-Control-Allow-Origin"] == origin
+    assert "Authorization" in preflight.headers["Access-Control-Allow-Headers"]
+
+
 def test_rate_limit_returns_429_with_retry_after(tmp_path):
     client, created, _store, _clock = _client(tmp_path, limit_per_minute=2)
     headers = {

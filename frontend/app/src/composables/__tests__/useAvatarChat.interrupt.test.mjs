@@ -8,7 +8,6 @@ import ts from "typescript";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
 const appSource = readFileSync(resolve(__dirname, "../../App.vue"), "utf8");
-const embedSource = readFileSync(resolve(__dirname, "../../embed/EmbedApp.vue"), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ES2022,
@@ -70,13 +69,9 @@ test("text-mode user input stops current speech and aborts the previous request"
   }
 });
 
-test("avatar shells flush scheduled audio when speech is interrupted", () => {
+test("avatar shell flushes scheduled audio when speech is interrupted", () => {
   assert.match(
     appSource,
     /onStopAudio:\s*\(\)\s*=>\s*\{[\s\S]*audio\.flush\(\)[\s\S]*wasm\.clearAudio\(\)/,
-  );
-  assert.match(
-    embedSource,
-    /function stopCurrentSpeech\(\): void\s*\{[\s\S]*audio\.flush\(\)[\s\S]*wasm\.clearAudio\(\)/,
   );
 });

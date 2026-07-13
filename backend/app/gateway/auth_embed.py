@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import math
 import logging
+import math
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
@@ -94,6 +94,17 @@ class EmbedAuthMiddleware:
             return
 
         request = Request(scope, receive=receive)
+        if request.method == "OPTIONS" and extract_api_key(request) is None:
+            origin = request.headers.get("origin")
+            # Preflight never carries Authorization; the following real request
+            # still enforces the API key and its domain allowlist.
+            if origin and host_from_url(origin):
+                response = Response(status_code=204, headers=_cors_headers(origin))
+            else:
+                response = JSONResponse(UNAUTHORIZED_BODY, status_code=401)
+            await response(scope, receive, send)
+            return
+
         result = authenticate_embed_request(
             request,
             store=self.store,

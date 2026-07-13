@@ -27,4 +27,33 @@ describe("nginx default config", () => {
     expect(mascotsLocation).toBeLessThan(avatarFallback);
     expect(source).toMatch(/location \/mascots\/[\s\S]*proxy_pass \$backend\$request_uri;/);
   });
+
+  it("serves the direct avatar SDK and branded runtime resources with CORS", () => {
+    expect(source).toMatch(
+      /location = \/openvman-avatar-sdk\.js \{[\s\S]*Access-Control-Allow-Origin "\*"/,
+    );
+    expect(source).toMatch(
+      /location = \/openvman-avatar-sdk\.js \{[\s\S]*proxy_pass \$avatar_sdk\/openvman-avatar-sdk\.js/,
+    );
+    expect(source).toMatch(
+      /location = \/sdk\/runtime\/OpenVmanAvatarRuntime\.wasm \{[\s\S]*application\/wasm/,
+    );
+    expect(source).toMatch(
+      /location = \/sdk\/runtime\/OpenVmanAvatarRuntime\.js \{[\s\S]*DHLiveMini2\.js/,
+    );
+    expect(source.match(/proxy_hide_header Access-Control-Allow-Origin;/g)).toHaveLength(2);
+  });
+
+  it("does not expose the retired iframe integration routes", () => {
+    expect(source).toMatch(/location = \/embed\/avatar \{\s*return 410;/);
+    expect(source).toMatch(/location = \/vman-embed\.js \{\s*return 410;/);
+    expect(source).toMatch(/location \/embed\/ \{\s*return 410;/);
+    expect(source).not.toContain("/srv/openvman/embed");
+  });
+
+  it("allows cross-origin character resources for the direct SDK", () => {
+    const assetsLocation = source.match(/location \/assets\/ \{([\s\S]*?)\n    \}/)?.[1];
+
+    expect(assetsLocation).toContain('Access-Control-Allow-Origin "*"');
+  });
 });
