@@ -40,7 +40,13 @@ export interface OpenVmanAvatarInstance {
   pushPcm(chunk: Int16Array): Promise<void>;
 }
 
+export interface OpenVmanAvatarCharacter {
+  charId: string;
+  label: string;
+}
+
 export interface OpenVmanAvatarGlobal {
   init(options: OpenVmanAvatarOptions): Promise<OpenVmanAvatarInstance>;
+  listCharacters(): Promise<OpenVmanAvatarCharacter[]>;
   readonly resourceBaseUrl: string;
 }

@@ -13,7 +13,7 @@
 - `playAudio()` 接受宿主提供的完整音檔，`pushPcm()` 接受 16 kHz mono 16-bit PCM 串流。
 - SDK 在瀏覽器本機完成解碼、播放、重採樣、WASM 嘴形、事件與清理生命週期。
 - SDK 的 CSS、DOM class 與自訂事件全部使用 `openvman-` 前綴，避免污染宿主。
-- SDK、WASM 與角色素材可從不同 origin 載入，不依賴 backend API 或 API Key。
+- SDK、WASM 與角色素材可從不同 origin 載入；角色探索只依賴同 origin 的無 Key 唯讀 API。
 
 **Non-Goals:**
 
@@ -27,7 +27,7 @@
 
 ### D1：純 TypeScript IIFE SDK，不使用 Vue 或 iframe
 
-新增 `frontend/avatar-sdk/`，Vite 建置成單一 `openvman-avatar-sdk.js`，在 `window.OpenVmanAvatar` 暴露 `init()`。SDK 直接建立 light-DOM root 與 canvas；不將 Vue runtime 或既有完整 avatar app 打包給客戶。部署以 multi-stage `avatar-sdk` service 建置與提供靜態產物，再由既有 edge nginx proxy，不新增 host port。
+新增 `frontend/avatar-sdk/`，Vite 建置成單一 `openvman-avatar-sdk.js`，在 `window.OpenVmanAvatar` 暴露 `init()` 與 `listCharacters()`。SDK 直接建立 light-DOM root 與 canvas；不將 Vue runtime 或既有完整 avatar app 打包給客戶。部署以 multi-stage `avatar-sdk` service 建置與提供靜態產物，再由既有 edge nginx proxy，不新增 host port。
 
 替代方案 Web Component + iframe 已封存，原因是無法突破矩形視覺邊界。Shadow DOM 直接渲染亦否決，因 vendor runtime 使用 `document.getElementById()`，看不到 shadow tree。
 
@@ -35,9 +35,9 @@
 
 SDK 在全域維護 active instance。相同設定重複 `init()` 回傳現有 instance；不同設定拋出 `INSTANCE_EXISTS`。`destroy()` 會停止音訊並移除可見 DOM，但 vendor WASM 沒有 terminate API，內部 main loop 無法可靠重建，因此同一頁 destroy 後再次 `init()` 以 `RUNTIME_DISPOSED` 拒絕，必須重新載入頁面。這避免固定 canvas ID、全域 video 與 WASM singleton 互相覆蓋。
 
-### D3：SDK URL 是所有靜態資源的基準來源
+### D3：SDK URL 是靜態資源與角色探索的基準來源
 
-SDK 執行時從 `document.currentScript.src` 擷取 openVman origin。vendor JS、WASM、角色影片與角色資料均使用該 origin 的絕對 URL，不依賴客戶網站路徑。SDK 不以該 origin 組合任何 backend API URL。
+SDK 執行時從 `document.currentScript.src` 擷取 openVman origin。vendor JS、WASM、角色影片與角色資料均使用該 origin 的絕對 URL，不依賴客戶網站路徑。`listCharacters()` 使用相同 origin 呼叫唯一允許的公開唯讀 `GET /characters`；SDK 不以該 origin 組合其他 backend API URL。
 
 ### D4：完整音檔與 PCM 串流都由宿主提供
 
@@ -47,9 +47,9 @@ SDK 執行時從 `document.currentScript.src` 擷取 openVman origin。vendor JS
 
 SDK 建立 `#openvman-avatar-root`、固定 vendor canvas IDs 與一個帶 `data-openvman-avatar-sdk` 的 style。外層預設固定於右下角、透明背景、使用彈性 viewport 尺寸；設定可改 `container`、`position`、`width`、`height` 與 `zIndex`。所有 class 使用 `openvman-` 前綴，`destroy()` 必須移除 SDK 建立的 DOM、style、audio 與 listener。
 
-### D6：公開範圍只包含靜態 SDK 與角色資源
+### D6：公開範圍只包含 SDK、角色資源與角色探索
 
-靜態 SDK、vendor JS/WASM、角色資料與影片提供跨來源載入所需的精準 CORS header。SDK 不接收 API Key，也不呼叫 openVman backend。舊 iframe 專用的 Embed API Key store、middleware、HTTP／WS routes、admin API／UI 與 CLI 全部移除；內部 app/admin 既有 `/api/*`、`/ws/*`、`/tts/*`、`/v1/*` routes 不在移除範圍。
+靜態 SDK、vendor JS/WASM、角色資料與影片提供跨來源載入所需的精準 CORS header。唯一公開 backend surface 是無 Key、唯讀的 `GET /characters`，只回傳素材完整角色的 ID 與顯示名稱，不建立 session。SDK 不呼叫 Brain、TTS、ASR、WebSocket 或其他內部 API。舊 iframe 專用的 Embed API Key store、middleware、HTTP／WS routes、admin API／UI 與 CLI 全部移除；內部 app/admin 既有 `/api/*`、`/ws/*`、`/tts/*`、`/v1/*` routes 不在移除範圍。
 
 ### D7：vendor 名稱只留在供應商邊界
 

@@ -68,4 +68,14 @@ describe("nginx default config", () => {
 
     expect(assetsLocation).toContain('Access-Control-Allow-Origin "*"');
   });
+
+  it("proxies the public character list with CORS and short caching", () => {
+    const charactersLocation = source.match(
+      /location = \/characters \{([\s\S]*?)\n    \}/,
+    )?.[1];
+
+    expect(charactersLocation).toContain("proxy_pass $backend$request_uri;");
+    expect(charactersLocation).toContain('Access-Control-Allow-Origin "*"');
+    expect(charactersLocation).toContain('Cache-Control "public, max-age=300"');
+  });
 });

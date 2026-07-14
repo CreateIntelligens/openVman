@@ -9,6 +9,8 @@ async function loadSdk({
   audioState = "running",
   autoEnd = true,
   characterStatus = 200,
+  charactersBody = { characters: [{ char_id: "000", label: "Default" }] },
+  charactersStatus = 200,
   deferDecode = false,
   resumeSucceeds = true,
 } = {}) {
@@ -107,6 +109,13 @@ async function loadSdk({
         resumeCalled: runtimeCalls.resumeCalled,
         url,
       });
+      if (url.endsWith("/characters")) {
+        return {
+          json: async () => charactersBody,
+          ok: charactersStatus === 200,
+          status: charactersStatus,
+        };
+      }
       const isCharacter = url.includes("combined_data.json.gz");
       return {
         arrayBuffer: async () => new TextEncoder().encode("{}").buffer,
@@ -368,4 +377,35 @@ test("a new playAudio call replaces current playback", async () => {
   assert.ok(runtimeCalls.sourceStopped > 0);
   avatar.interrupt();
   await Promise.all([first, second]);
+});
+
+test("listCharacters fetches the public character list from the SDK origin", async () => {
+  const { requests, sdk } = await loadSdk({
+    charactersBody: {
+      characters: [
+        { char_id: "000", label: "Default" },
+        { char_id: "0713", label: "夏季限定" },
+      ],
+    },
+  });
+
+  const characters = await sdk.listCharacters();
+
+  assert.equal(characters.length, 2);
+  assert.equal(characters[0].charId, "000");
+  assert.equal(characters[0].label, "Default");
+  assert.equal(characters[1].charId, "0713");
+  assert.equal(characters[1].label, "夏季限定");
+  assert.ok(
+    requests.some(({ url }) => url === "https://avatar.example/characters"),
+  );
+});
+
+test("listCharacters reports a named error when the request fails", async () => {
+  const { sdk } = await loadSdk({ charactersStatus: 500 });
+
+  await assert.rejects(
+    sdk.listCharacters(),
+    (error) => error.code === "RESOURCE_LOAD_FAILED",
+  );
 });

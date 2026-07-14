@@ -3,6 +3,7 @@ import { createAvatarDom, removeAvatarDom } from "./dom";
 import { OpenVmanAvatarError } from "./errors";
 import { AvatarRuntime } from "./runtime";
 import type {
+  OpenVmanAvatarCharacter,
   OpenVmanAvatarEventHandler,
   OpenVmanAvatarEventMap,
   OpenVmanAvatarEventType,
@@ -85,6 +86,31 @@ async function init(
     throw error;
   });
   return activeInitPromise;
+}
+
+async function listCharacters(): Promise<OpenVmanAvatarCharacter[]> {
+  let response: Response;
+  try {
+    response = await fetch(`${resourceBaseUrl}/characters`);
+  } catch (error) {
+    throw new OpenVmanAvatarError(
+      "RESOURCE_LOAD_FAILED",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+  if (!response.ok) {
+    throw new OpenVmanAvatarError(
+      "RESOURCE_LOAD_FAILED",
+      `Character list request failed with HTTP ${response.status}.`,
+    );
+  }
+  const body = (await response.json()) as {
+    characters?: { char_id: string; label: string }[];
+  };
+  return (body.characters ?? []).map((character) => ({
+    charId: character.char_id,
+    label: character.label,
+  }));
 }
 
 async function createInstance(
@@ -189,4 +215,4 @@ async function createInstance(
   return instance;
 }
 
-window.OpenVmanAvatar = Object.freeze({ init, resourceBaseUrl });
+window.OpenVmanAvatar = Object.freeze({ init, listCharacters, resourceBaseUrl });

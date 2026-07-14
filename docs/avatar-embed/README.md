@@ -55,7 +55,7 @@ const avatar = await OpenVmanAvatar.init({
 
 | 選項 | 必填 | 預設值 | 說明 |
 |---|---:|---|---|
-| `characterId` | 否 | `000` | `/assets/<id>/` 下的角色 ID。 |
+| `characterId` | 否 | `000` | `/assets/<id>/` 下的角色 ID，可用 `OpenVmanAvatar.listCharacters()` 查詢可用清單。 |
 | `position` | 否 | `bottom-right` | 預設懸浮位置，可設為 `bottom-left`。 |
 | `width` | 否 | `min(42vw, 28rem)` | CSS width 值。 |
 | `height` | 否 | `min(72dvh, 42rem)` | CSS height 值。 |
@@ -66,6 +66,20 @@ const avatar = await OpenVmanAvatar.init({
 同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`destroy()` 後必須重新載入頁面才能再次初始化。
 
 ## JavaScript API
+
+### `await OpenVmanAvatar.listCharacters()`
+
+回傳目前可用角色清單，可在 `init()` 前呼叫，不需要 instance。只列出素材完整（影片與驅動資料齊全）的角色，回傳 `{ charId, label }[]`。
+
+```js
+const characters = await OpenVmanAvatar.listCharacters();
+for (const { charId, label } of characters) {
+  const option = document.createElement("option");
+  option.value = charId;
+  option.textContent = label;
+  characterSelect.append(option);
+}
+```
 
 ### `await avatar.playAudio(source)`
 
@@ -126,6 +140,7 @@ SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'un
 | `/openvman-avatar-sdk.js` | IIFE SDK。 |
 | `/sdk/runtime/OpenVmanAvatarRuntime.js` | 內部 runtime 公開別名。 |
 | `/sdk/runtime/OpenVmanAvatarRuntime.wasm` | 內部 WASM 公開別名。 |
+| `/characters` | 可用角色清單（唯讀，無需驗證）。 |
 | `/assets/<characterId>/combined_data.json.gz` | 角色驅動資料。 |
 | `/assets/<characterId>/01.webm` | 透明角色影片。 |
 

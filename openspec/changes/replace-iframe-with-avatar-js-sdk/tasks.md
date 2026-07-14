@@ -3,6 +3,7 @@
 - [x] 1.1 建立 `frontend/avatar-sdk/` pnpm + TypeScript + Vite IIFE 專案，產出 `openvman-avatar-sdk.js`
 - [x] 1.2 先寫公開 global、`init()`、page lifetime 單 instance 與資源 base URL 的失敗測試
 - [x] 1.3 將公開 options／instance 契約改為無 API Key，定義 `playAudio()`、`pushPcm()`、事件 payload 與音訊錯誤型別
+- [x] 1.4 新增 global `listCharacters()` 契約、角色欄位轉換與 `RESOURCE_LOAD_FAILED` 測試
 
 ## 2. DOM 與 Vendor Runtime
 
@@ -24,6 +25,7 @@
 - [x] 4.2 在 edge nginx 服務 `/openvman-avatar-sdk.js` 與 branded runtime alias，不新增 host port
 - [x] 4.3 為 SDK 所需靜態資源設定精準 CORS、cache 與 MIME type
 - [x] 4.4 以 multi-stage `avatar-sdk` service 提供 build 產物，移除 embed-loader／iframe dist 掛載
+- [x] 4.5 新增無 Key `GET /characters`、完整素材過濾及 nginx CORS／短快取測試
 
 ## 5. 移除 iframe 與 Embed backend 公開接入
 
@@ -37,7 +39,7 @@
 
 ## 6. 文件與驗證
 
-- [x] 6.1 改寫 direct SDK 指南，移除 Key／Brain／TTS 並補上 `playAudio()`、`pushPcm()` 格式、autoplay 與排錯
+- [x] 6.1 改寫 direct SDK 指南，移除 Key／Brain／TTS 並補上 `listCharacters()`、`playAudio()`、`pushPcm()` 格式、autoplay 與排錯
 - [x] 6.2 更新最小範例為無 Key 初始化與宿主音檔播放
 - [x] 6.3 更新 README／CHANGELOG，移除 Embed backend／Key 管理說明並保留歷史脈絡
 - [x] 6.4 建置 SDK、avatar、admin，執行 SDK、backend、admin、nginx、Compose 與一般 API 回歸測試

@@ -47,12 +47,20 @@ class AvatarStore:
         return self._dir(normalize_char_id(char_id)).is_dir()
 
     def list_characters(self) -> list[dict[str, Any]]:
-        out: list[dict[str, Any]] = []
+        characters: list[dict[str, Any]] = []
         for path in sorted(self._base.iterdir()):
-            if not path.is_dir():
+            if not path.is_dir() or path.name.startswith("."):
                 continue
-            out.append(self._summary(path))
-        return out
+            characters.append(self._summary(path))
+        return characters
+
+    def list_public_characters(self) -> list[dict[str, str]]:
+        """Return SDK summaries for characters with complete runtime assets."""
+        return [
+            {"char_id": summary["char_id"], "label": summary["label"]}
+            for summary in self.list_characters()
+            if summary["has_video"] and summary["has_data"]
+        ]
 
     def get_character(self, char_id: str) -> dict[str, Any]:
         cid = normalize_char_id(char_id)

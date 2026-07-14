@@ -9,6 +9,23 @@
 - **AND** 頁面中不存在 openVman iframe
 - **AND** 初始化不要求 API Key 或 backend session
 
+### Requirement: 公開角色探索 API
+系統 SHALL 在 `window.OpenVmanAvatar` 提供可於 `init()` 前呼叫的 `listCharacters()`。此方法 SHALL 向 SDK origin 的無 Key、唯讀 `GET /characters` 取得角色清單，並回傳 `{ charId, label }[]`。系統 SHALL 只列出同時具備角色影片與驅動資料的角色，且 SHALL NOT 建立 backend session。
+
+#### Scenario: 查詢可用角色
+- **WHEN** 第三方頁面呼叫 `OpenVmanAvatar.listCharacters()`
+- **THEN** SDK 向自身 origin 的 `/characters` 發出請求
+- **AND** 回傳清單只包含 `charId` 與 `label`
+- **AND** 請求不要求 API Key 或建立 backend session
+
+#### Scenario: 排除素材不完整角色
+- **WHEN** 角色缺少影片或驅動資料
+- **THEN** `/characters` 回應不包含該角色
+
+#### Scenario: 角色清單請求失敗
+- **WHEN** `/characters` 發生網路錯誤或回傳非成功 HTTP 狀態
+- **THEN** `listCharacters()` Promise 以 `RESOURCE_LOAD_FAILED` 拒絕
+
 ### Requirement: 直接 DOM 與透明懸浮呈現
 SDK SHALL 直接在宿主頁 light DOM 建立帶 `openvman-` 前綴的 root、style 與 vendor 所需 Canvas。預設 root SHALL 固定於 viewport 右下角、背景透明且不使用固定 px layout 尺寸；呼叫端 SHALL 可指定 container 與定位尺寸選項。
 
@@ -75,8 +92,8 @@ Instance SHALL 提供 `on(type, handler)` 與 `off(type, handler)`，至少支�
 - **WHEN** 呼叫端訂閱 `speaking`
 - **THEN** 完整音檔或 PCM 佇列開始與停止時分別收到 `{ state: "start" }` 與 `{ state: "stop" }`
 
-### Requirement: 無 backend 與 Key 依賴
-SDK 初始化與所有 instance API SHALL 不接受或要求 API Key，且 SHALL NOT 呼叫 `/api/embed/*`、`/ws/embed/*`、Brain、TTS 或 ASR。SDK 靜態資源 SHALL 提供跨網域載入所需的精準 CORS header；正式使用 SHALL 要求 HTTPS。
+### Requirement: 無受保護 backend 與 Key 依賴
+SDK 初始化與所有 instance API SHALL 不接受或要求 API Key。除無 Key、唯讀的 `GET /characters` 外，SDK SHALL NOT 呼叫 `/api/embed/*`、`/ws/embed/*`、Brain、TTS、ASR、WebSocket 或其他 backend 能力。SDK 靜態資源與角色探索 API SHALL 提供跨網域載入所需的精準 CORS header；正式使用 SHALL 要求 HTTPS。
 
 #### Scenario: 無 Key 初始化
 - **WHEN** `https://shop.example` 不帶 API Key 初始化 SDK
