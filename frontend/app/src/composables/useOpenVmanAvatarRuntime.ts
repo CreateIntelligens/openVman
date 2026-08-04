@@ -94,27 +94,37 @@ export function useOpenVmanAvatarRuntime() {
   async function initWasm(): Promise<OpenVmanAvatarRuntimeInstance> {
     if (runtimeInstance) {
       isReady.value = true
+      error.value = null
       return runtimeInstance
     }
     if (runtimeInitPromise) return runtimeInitPromise
 
-    await ensureAvatarRuntimeScript()
-    if (typeof window.createQtAppInstance !== 'function') {
-      throw new Error('[OpenVmanAvatarRuntime] Runtime factory is unavailable')
+    error.value = null
+    try {
+      await ensureAvatarRuntimeScript()
+      if (typeof window.createQtAppInstance !== 'function') {
+        throw new Error('[OpenVmanAvatarRuntime] Runtime factory is unavailable')
+      }
+
+      runtimeInitPromise = window.createQtAppInstance({
+        locateFile(path: string) {
+          return path.endsWith('.wasm') ? '/wasm/DHLiveMini2.wasm' : path
+        },
+        onRuntimeInitialized() {
+          console.log('[OpenVmanAvatarRuntime] WASM runtime initialised')
+        },
+      })
+
+      runtimeInstance = await runtimeInitPromise
+      isReady.value = true
+      return runtimeInstance
+    } catch (caughtError) {
+      runtimeInitPromise = null
+      error.value = caughtError instanceof Error
+        ? caughtError.message
+        : String(caughtError)
+      throw caughtError
     }
-
-    runtimeInitPromise = window.createQtAppInstance({
-      locateFile(path: string) {
-        return path.endsWith('.wasm') ? '/wasm/DHLiveMini2.wasm' : path
-      },
-      onRuntimeInitialized() {
-        console.log('[OpenVmanAvatarRuntime] WASM runtime initialised')
-      },
-    })
-
-    runtimeInstance = await runtimeInitPromise
-    isReady.value = true
-    return runtimeInstance
   }
 
   async function loadCharacter(

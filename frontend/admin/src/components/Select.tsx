@@ -1,4 +1,10 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 export interface SelectOption {
   value: string;
@@ -13,6 +19,7 @@ interface SelectProps {
   className?: string;
   title?: string;
   placeholder?: string;
+  ariaLabel?: string;
 }
 
 export default function Select({
@@ -23,12 +30,24 @@ export default function Select({
   className = "",
   title,
   placeholder,
+  ariaLabel,
 }: SelectProps) {
+  const getOptionClassName = (optionValue: string, index: number) => {
+    if (optionValue === value) {
+      return "bg-primary/15 text-primary font-semibold";
+    }
+    if (index === focusedIndex) {
+      return "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100";
+    }
+    return "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60";
+  };
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const typeaheadRef = useRef({ value: "", time: 0 });
+  const listboxId = useId();
 
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption?.label ?? placeholder ?? "";
@@ -58,8 +77,10 @@ export default function Select({
 
   useLayoutEffect(() => {
     if (!open || !listRef.current) return;
-    const el = listRef.current.querySelectorAll("button")[focusedIndex];
-    el?.scrollIntoView({ block: "nearest" });
+    const element = listRef.current.querySelectorAll<HTMLElement>(
+      '[role="option"]',
+    )[focusedIndex];
+    element?.scrollIntoView?.({ block: "nearest" });
   }, [open, focusedIndex]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -84,6 +105,27 @@ export default function Select({
       if (open) setFocusedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Escape") {
       setOpen(false);
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      if (!open) openDropdown();
+      setFocusedIndex(e.key === "Home" ? 0 : options.length - 1);
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const now = Date.now();
+      const prefix =
+        now - typeaheadRef.current.time > 700
+          ? e.key
+          : `${typeaheadRef.current.value}${e.key}`;
+      typeaheadRef.current = { value: prefix, time: now };
+      const matchIndex = options.findIndex((option) =>
+        option.label.toLocaleLowerCase().startsWith(prefix.toLocaleLowerCase()),
+      );
+      if (matchIndex >= 0) {
+        e.preventDefault();
+        if (!open) openDropdown();
+        setFocusedIndex(matchIndex);
+      }
     }
   };
 
@@ -91,6 +133,16 @@ export default function Select({
     <div ref={containerRef} className={`relative ${className}`} title={title}>
       <button
         type="button"
+        role="combobox"
+        aria-label={ariaLabel ?? title ?? placeholder ?? "選擇選項"}
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-haspopup="listbox"
+        aria-activedescendant={
+          open && focusedIndex >= 0
+            ? `${listboxId}-option-${focusedIndex}`
+            : undefined
+        }
         onClick={() => (open ? setOpen(false) : openDropdown())}
         onKeyDown={handleKeyDown}
         disabled={disabled}
@@ -104,14 +156,16 @@ export default function Select({
 
       {open && (
         <div
+          id={listboxId}
           ref={listRef}
           role="listbox"
+          aria-label={ariaLabel ?? title ?? placeholder ?? "選擇選項"}
           className={`absolute z-50 w-full min-w-[7.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl dark:shadow-[0_0.5rem_1.875rem_rgba(0,0,0,0.5)] overflow-y-auto max-h-[12.5rem] py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           {options.map((option, i) => (
-            <button
+            <div
               key={option.value}
-              type="button"
+              id={`${listboxId}-option-${i}`}
               role="option"
               aria-selected={option.value === value}
               onMouseDown={(e) => {
@@ -120,16 +174,13 @@ export default function Select({
                 setOpen(false);
               }}
               onMouseEnter={() => setFocusedIndex(i)}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${
-                option.value === value
-                  ? "bg-primary/15 text-primary font-semibold"
-                  : i === focusedIndex
-                    ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                    : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-              }`}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer ${getOptionClassName(
+                option.value,
+                i,
+              )}`}
             >
               {option.label}
-            </button>
+            </div>
           ))}
         </div>
       )}

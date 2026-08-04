@@ -69,15 +69,25 @@ defineExpose({ show, showCountdown, dismiss, clear })
 </script>
 
 <template>
-  <div class="status-toast-container">
+  <div class="status-toast-container" aria-label="系統通知">
     <div
       v-for="toast in toasts"
       :key="toast.id"
       class="status-toast"
       :class="{ 'status-toast--persistent': toast.persistent }"
+      :role="toast.persistent ? 'alert' : 'status'"
+      :aria-live="toast.persistent ? 'assertive' : 'polite'"
+      aria-atomic="true"
     >
       <span class="status-toast__msg">{{ toast.message }}</span>
-      <button class="status-toast__close" @click="dismiss(toast.id)">✕</button>
+      <button
+        type="button"
+        class="status-toast__close"
+        aria-label="關閉通知"
+        @click="dismiss(toast.id)"
+      >
+        ✕
+      </button>
     </div>
   </div>
 </template>
@@ -91,8 +101,9 @@ defineExpose({ show, showCountdown, dismiss, clear })
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  z-index: 9000;
+  z-index: var(--ov-z-toast);
   pointer-events: none;
+  width: min(32rem, calc(100% - 1rem));
 }
 .status-toast {
   display: flex;
@@ -106,13 +117,25 @@ defineExpose({ show, showCountdown, dismiss, clear })
   font-size: 0.85rem;
   backdrop-filter: blur(0.375rem);
   pointer-events: all;
-  animation: toast-in 0.2s ease;
+  animation: toast-in var(--ov-dur-short) var(--ov-ease-out);
+  width: 100%;
+}
+
+.status-toast__msg {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .status-toast--persistent {
   border-color: rgba(255, 180, 0, 0.5);
   background: rgba(40, 30, 0, 0.92);
 }
 .status-toast__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   background: none;
   border: none;
   color: #999;

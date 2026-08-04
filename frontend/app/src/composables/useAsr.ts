@@ -52,15 +52,23 @@ export function useAsr(options: AsrOptions = {}) {
     return r
   }
 
-  function start(): void {
-    if (isListening.value) return
+  function start(): boolean {
+    if (isListening.value) return true
     recognition = _build()
     if (!recognition) {
       console.warn('[ASR] SpeechRecognition not supported')
-      return
+      options.onError?.('not-supported')
+      return false
     }
     isListening.value = true
-    recognition.start()
+    try {
+      recognition.start()
+    } catch {
+      isListening.value = false
+      options.onError?.('start-failed')
+      return false
+    }
+    return true
   }
 
   function stop(): void {

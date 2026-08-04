@@ -82,8 +82,17 @@ export class AvatarRuntime {
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
+    const ready = waitForVideoReady(video, video.src);
     video.load();
-    await video.play().catch(() => undefined);
+    await ready;
+    try {
+      await video.play();
+    } catch (error) {
+      throw new OpenVmanAvatarError(
+        "RESOURCE_LOAD_FAILED",
+        `Avatar character video could not start: ${errorMessage(error)}.`,
+      );
+    }
   }
 
   clearAudio(): void {
@@ -105,6 +114,58 @@ export class AvatarRuntime {
 
 function isGzip(payload: Uint8Array): boolean {
   return payload.length >= 2 && payload[0] === 0x1f && payload[1] === 0x8b;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function waitForVideoReady(
+  video: HTMLVideoElement,
+  src: string,
+): Promise<void> {
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new OpenVmanAvatarError(
+        "RESOURCE_LOAD_FAILED",
+        `Avatar character video timed out while loading ${src}.`,
+      ));
+    }, 15_000);
+
+    const cleanup = (): void => {
+      window.clearTimeout(timeout);
+      video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("error", handleError);
+      video.removeEventListener("loadeddata", handleCanPlay);
+    };
+    const handleCanPlay = (): void => {
+      cleanup();
+      resolve();
+    };
+    const handleError = (): void => {
+      cleanup();
+      const mediaMessage = video.error?.message
+        ? `: ${video.error.message}`
+        : "";
+      reject(new OpenVmanAvatarError(
+        "RESOURCE_LOAD_FAILED",
+        `Avatar character video failed to load ${src}${mediaMessage}.`,
+      ));
+    };
+
+    video.addEventListener("canplay", handleCanPlay, { once: true });
+    video.addEventListener("error", handleError, { once: true });
+    video.addEventListener("loadeddata", handleCanPlay, { once: true });
+
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      handleCanPlay();
+    }
+  });
 }
 
 async function loadRuntimeScript(src: string): Promise<void> {

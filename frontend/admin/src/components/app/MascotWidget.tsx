@@ -11,6 +11,7 @@ import { dataUrlToFile } from "../../utils/dataUrlToFile";
 
 const MASCOT_DEFAULT_MARGIN_REM = 1;
 const MASCOT_SNAPSHOT_MIN_BYTES = 6000;
+const MOBILE_MEDIA_QUERY = "(max-width: 48rem)";
 const HOST_MESSAGE_NAMESPACE = "avatar-widget-host";
 const WIDGET_MESSAGE_NAMESPACE = "avatar-widget";
 const MASCOT_FALLBACK_BACKGROUNDS: Record<MascotOption["engine"], string> = {
@@ -51,6 +52,11 @@ function defaultMarginPixels(): number {
   return MASCOT_DEFAULT_MARGIN_REM * getRootFontSize();
 }
 
+function isMobileViewport(): boolean {
+  return typeof window.matchMedia === "function"
+    && window.matchMedia(MOBILE_MEDIA_QUERY).matches;
+}
+
 function clampInset(value: number, size: number, viewportSize: number, margin: number): number {
   const maxInset = Math.max(margin, viewportSize - size - margin);
   return Math.min(Math.max(value, margin), maxInset);
@@ -68,7 +74,7 @@ function mascotPreviewStyle(mascot: MascotOption): CSSProperties | undefined {
 }
 
 export default function MascotWidget() {
-  const [closed, setClosed] = useState(false);
+  const [closed, setClosed] = useState(isMobileViewport);
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<MascotPosition | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -80,6 +86,16 @@ export default function MascotWidget() {
   const { mascotOptions, registerDriver, selectedMascotId, setSelectedMascotId } = useMascot();
   const selectedMascot = resolveMascotOption(selectedMascotId, mascotOptions);
   const widgetSrc = buildMascotWidgetSrc(selectedMascot);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mediaQuery = window.matchMedia(MOBILE_MEDIA_QUERY);
+    const handleCompactViewport = (event: MediaQueryListEvent) => {
+      if (event.matches) setClosed(true);
+    };
+    mediaQuery.addEventListener("change", handleCompactViewport);
+    return () => mediaQuery.removeEventListener("change", handleCompactViewport);
+  }, []);
 
   useEffect(() => {
     if (!switcherOpen) return;
@@ -196,9 +212,21 @@ export default function MascotWidget() {
         title="打開 AI 虛擬人小助理"
         aria-label="打開 AI 虛擬人小助理"
         onClick={() => setClosed(false)}
-        className="fixed bottom-4 right-4 z-[1000] flex h-12 w-12 items-center justify-center rounded-full bg-surface-raised text-2xl shadow-lg transition-transform hover:scale-105"
+        className="mascot-trigger fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-raised text-primary shadow-lg transition-colors hover:bg-surface-sunken"
       >
-        <span aria-hidden="true">🧑</span>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-6 w-6"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+        </svg>
       </button>
     );
   }
@@ -210,7 +238,7 @@ export default function MascotWidget() {
   return (
     <div
       ref={widgetRef}
-      className="fixed z-[1000] w-[min(21.25rem,90vw)] h-[min(30rem,70dvh)] overflow-hidden rounded-2xl shadow-lg group"
+      className="mascot-widget fixed h-[min(30rem,70dvh)] w-[min(21.25rem,90vw)] overflow-hidden rounded-2xl shadow-lg group"
       style={style}
     >
       <div
@@ -226,7 +254,7 @@ export default function MascotWidget() {
         <button
           type="button"
           onClick={() => setSwitcherOpen((open) => !open)}
-          className="inline-flex items-center max-w-full min-h-[2.25rem] gap-2 px-2.5 py-1.5 border border-white/30 rounded-lg bg-slate-900/60 hover:bg-slate-900/80 text-white shadow-lg backdrop-blur-md cursor-pointer transition-all duration-150"
+          className="inline-flex items-center max-w-full min-h-[2.25rem] gap-2 px-2.5 py-1.5 border border-white/30 rounded-lg bg-slate-900/60 hover:bg-slate-900/80 text-white shadow-lg backdrop-blur-md cursor-pointer transition-colors duration-150"
         >
           <span
             className={`w-3 h-3 flex-none rounded-full shadow-[0_0_0_3px_rgba(255,255,255,0.14)] ${
@@ -250,7 +278,7 @@ export default function MascotWidget() {
                     setSelectedMascotId(opt.id);
                     setSwitcherOpen(false);
                   }}
-                  className={`grid grid-cols-[2.25rem_1fr] items-center gap-2.5 min-w-0 p-1.5 border border-transparent rounded-lg bg-transparent text-slate-800 dark:text-slate-200 cursor-pointer text-left transition-all duration-150 hover:bg-sky-500/10 hover:border-sky-500/30 ${
+                  className={`grid grid-cols-[2.25rem_1fr] items-center gap-2.5 min-w-0 p-1.5 border border-transparent rounded-lg bg-transparent text-slate-800 dark:text-slate-200 cursor-pointer text-left transition-colors duration-150 hover:bg-sky-500/10 hover:border-sky-500/30 ${
                     isActive ? "bg-sky-500/10 border-sky-500/30 font-semibold" : ""
                   }`}
                 >

@@ -1,9 +1,14 @@
 <template>
   <Transition name="slide-up">
-    <div v-if="open" class="quick-qa-panel">
+    <div
+      v-if="open"
+      class="quick-qa-panel"
+      role="dialog"
+      aria-labelledby="quick-qa-title"
+    >
       <div class="panel-header">
         <div class="panel-header__left">
-          <button v-if="currentPath.length > 0" class="back-btn" @click="goBack" title="返回上一層">
+          <button v-if="currentPath.length > 0" type="button" class="back-btn" @click="goBack" title="返回上一層">
             <svg class="back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"/>
               <polyline points="12 19 5 12 12 5"/>
@@ -13,9 +18,9 @@
           <span v-else class="header-label">快速問題</span>
         </div>
 
-        <h4 class="panel-title">{{ currentTitle }}</h4>
+        <h4 id="quick-qa-title" class="panel-title">{{ currentTitle }}</h4>
 
-        <button class="close-btn" @click="handleClose" aria-label="關閉" title="關閉">
+        <button type="button" class="close-btn" @click="handleClose" aria-label="關閉" title="關閉">
           <svg class="close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -30,7 +35,7 @@
         </div>
         <div v-else-if="error" class="state-container error-state">
           <p>{{ error }}</p>
-          <button class="retry-btn" @click="fetchNodes">重新整理</button>
+          <button type="button" class="retry-btn" @click="fetchNodes">重新整理</button>
         </div>
         <div v-else-if="currentSubNodes.length === 0 && currentQuestions.length === 0" class="state-container empty-state">
           <p>此分類尚無問答內容</p>
@@ -40,6 +45,7 @@
           <button
             v-for="node in currentSubNodes"
             :key="node.node_id"
+            type="button"
             class="qa-btn qa-btn--folder"
             @click="enterNode(node)"
           >
@@ -49,6 +55,7 @@
           <button
             v-for="(qa, idx) in currentQuestions"
             :key="idx"
+            type="button"
             class="qa-btn qa-btn--question"
             @click="selectQuestion(qa.question, qa.source_path)"
           >
@@ -267,7 +274,11 @@ onMounted(() => {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background-color var(--ov-dur-micro) var(--ov-ease-out),
+    border-color var(--ov-dur-micro) var(--ov-ease-out),
+    color var(--ov-dur-micro) var(--ov-ease-out);
+  min-height: 2.75rem;
 }
 
 .back-btn:hover {
@@ -311,8 +322,12 @@ onMounted(() => {
   justify-content: center;
   padding: 0.35rem;
   border-radius: 0.5rem;
-  transition: all 0.15s ease;
-  min-width: 2rem;
+  transition:
+    background-color var(--ov-dur-micro) var(--ov-ease-out),
+    color var(--ov-dur-micro) var(--ov-ease-out),
+    opacity var(--ov-dur-micro) var(--ov-ease-out);
+  min-width: 2.75rem;
+  min-height: 2.75rem;
 }
 
 .close-icon {
@@ -367,6 +382,7 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   margin-top: 0.5rem;
+  min-height: 2.75rem;
   box-shadow: 0 0.125rem 0.375rem rgba(0, 0, 0, 0.05);
 }
 
@@ -376,7 +392,7 @@ onMounted(() => {
 
 .qa-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
   gap: 0.85rem;
 }
 
@@ -394,7 +410,10 @@ onMounted(() => {
   font-weight: 700;
   border-radius: 0.75rem;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    background-color var(--ov-dur-short) var(--ov-ease-out),
+    border-color var(--ov-dur-short) var(--ov-ease-out),
+    color var(--ov-dur-short) var(--ov-ease-out);
   line-height: 1.4;
   gap: 0.75rem;
 }
@@ -403,8 +422,6 @@ onMounted(() => {
   background: var(--bg-soft);
   border-color: var(--primary);
   color: var(--primary);
-  transform: translateY(-0.125rem);
-  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.05);
 }
 
 .qa-btn:active {

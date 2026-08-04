@@ -1,3 +1,6 @@
+import { useId } from "react";
+import type { KeyboardEvent, MouseEvent } from "react";
+
 import type { TreeNode } from "./helpers";
 import {
   parseQaEntryDragPath,
@@ -17,7 +20,7 @@ function TreeActionButton({
   title: string;
   icon: string;
   variant?: "default" | "primary" | "danger";
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const variantClass = {
     default: "hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200",
@@ -28,16 +31,63 @@ function TreeActionButton({
   return (
     <button
       type="button"
+      aria-label={title}
       title={title}
       className={`rounded-md p-1 text-slate-400 transition-colors ${variantClass}`}
       onClick={(event) => {
         event.stopPropagation();
-        onClick();
+        onClick(event);
       }}
     >
       <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">{icon}</span>
     </button>
   );
+}
+
+function hasVisibleSelectedNode(
+  node: TreeNode,
+  selectedPath: string,
+  expandedDirs: Set<string>,
+): boolean {
+  if (node.path === selectedPath) {
+    return true;
+  }
+  if (node.type !== "folder" || !expandedDirs.has(node.path)) {
+    return false;
+  }
+  return node.children.some((child) =>
+    hasVisibleSelectedNode(child, selectedPath, expandedDirs),
+  );
+}
+
+function getVisibleTreeItems(treeItem: HTMLElement): HTMLElement[] {
+  const tree = treeItem.closest('[role="tree"]');
+  if (!tree) {
+    return [];
+  }
+  return Array.from(tree.querySelectorAll<HTMLElement>('[role="treeitem"]'));
+}
+
+function focusTreeItem(treeItem: HTMLElement | undefined): void {
+  if (!treeItem) {
+    return;
+  }
+  const visibleItems = getVisibleTreeItems(treeItem);
+  visibleItems.forEach((item) => {
+    item.tabIndex = item === treeItem ? 0 : -1;
+  });
+  treeItem.focus();
+}
+
+function isKeyboardMoveActive(treeItem: HTMLElement): boolean {
+  return treeItem.closest<HTMLElement>('[role="tree"]')?.dataset.keyboardMove === "true";
+}
+
+function finishKeyboardMove(treeItem: HTMLElement): void {
+  const tree = treeItem.closest<HTMLElement>('[role="tree"]');
+  if (tree) {
+    delete tree.dataset.keyboardMove;
+  }
 }
 
 export default function TreeView({
@@ -87,6 +137,7 @@ export default function TreeView({
   canDropQaNode?: (draggedPath: string, targetPath: string) => boolean;
   canDropQaEntry?: (draggedPath: string, targetPath: string) => boolean;
 }) {
+  const instructionsId = useId();
   const isExpanded = expandedDirs.has(node.path);
   const isSelected = selectedPath === node.path;
   const isQaRoot = node.treeKind === "qa-root";
@@ -100,6 +151,13 @@ export default function TreeView({
   const qaEntryReorderTargetKey = qaNodeId
     ? qaEntryDragPath(qaNodeId, node.qaEntryQuestion ?? node.name)
     : node.path;
+  const nodeDragPath = isQaNode && qaNodeId
+    ? qaNodeDragPath(qaNodeId)
+    : isQaEntry && qaNodeId
+      ? qaEntryDragPath(qaNodeId, node.qaEntryQuestion ?? node.name)
+      : node.path;
+  const isDraggable = (node.type === "file" && !node.virtual) || isQaNode || isQaEntry;
+  const isDraggingThisNode = draggingPath === nodeDragPath;
   const effectiveDropDir = node.type === "folder" ? node.path : node.path.split("/").slice(0, -1).join("/");
   let dropTargetKey: string;
   if (isQaRoot) {
@@ -122,8 +180,21 @@ export default function TreeView({
       : (isQaRoot || isQaNode || isQaEntry || (!node.virtual && effectiveDropDir !== sourceDragDir)));
   const isDropTarget = dropTargetPath === dropTargetKey && !!draggingPath;
   const canDeleteFolder = node.type === "folder" && node.path !== "knowledge" && !node.virtual;
+  const isTreeTabStop = isSelected ||
+    (depth === 0 && !hasVisibleSelectedNode(node, selectedPath, expandedDirs));
 
-  const handleSelect = () => {
+  const handleSelect = (treeItem: HTMLElement) => {
+    if (draggingPath && isKeyboardMoveActive(treeItem)) {
+      if (isDraggingThisNode) {
+        finishKeyboardMove(treeItem);
+        onDragEnd();
+      } else if (canAcceptDrop) {
+        finishKeyboardMove(treeItem);
+        onDragTargetChange(dropTargetKey);
+        onDropFile(dropTargetKey);
+      }
+      return;
+    }
     if (isQaRoot) {
       onToggle(node.path);
       return;
@@ -135,20 +206,121 @@ export default function TreeView({
     onSelect(node);
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    const currentItem = event.currentTarget;
+    const visibleItems = getVisibleTreeItems(currentItem);
+    const currentIndex = visibleItems.indexOf(currentItem);
+    const focusAt = (index: number) => {
+      focusTreeItem(visibleItems[index]);
+    };
+
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        focusAt(Math.min(currentIndex + 1, visibleItems.length - 1));
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        focusAt(Math.max(currentIndex - 1, 0));
+        break;
+      case "Home":
+        event.preventDefault();
+        focusAt(0);
+        break;
+      case "End":
+        event.preventDefault();
+        focusAt(visibleItems.length - 1);
+        break;
+      case "ArrowRight": {
+        if (node.type !== "folder") {
+          return;
+        }
+        event.preventDefault();
+        if (!isExpanded) {
+          onToggle(node.path);
+          return;
+        }
+        const childGroup = currentItem.nextElementSibling;
+        const firstChild = childGroup?.getAttribute("role") === "group"
+          ? childGroup.querySelector<HTMLElement>('[role="treeitem"]')
+          : null;
+        focusTreeItem(firstChild ?? undefined);
+        break;
+      }
+      case "ArrowLeft": {
+        event.preventDefault();
+        if (node.type === "folder" && isExpanded) {
+          onToggle(node.path);
+          return;
+        }
+        const parentGroup = currentItem.parentElement?.parentElement;
+        const parentItem = parentGroup?.getAttribute("role") === "group"
+          ? parentGroup.previousElementSibling
+          : null;
+        focusTreeItem(parentItem instanceof HTMLElement ? parentItem : undefined);
+        break;
+      }
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        handleSelect(currentItem);
+        break;
+      case "Escape":
+        if (draggingPath && isKeyboardMoveActive(currentItem)) {
+          event.preventDefault();
+          finishKeyboardMove(currentItem);
+          onDragEnd();
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
-    <div>
+    <div
+      role={depth === 0 ? "tree" : "none"}
+      aria-label={depth === 0 ? "知識庫目錄" : undefined}
+      aria-describedby={depth === 0 ? instructionsId : undefined}
+    >
+      {depth === 0 && (
+        <span id={instructionsId} className="sr-only">
+          使用方向鍵巡覽，Enter 或空白鍵開啟。選擇「使用鍵盤移動」後，移至目標並按 Enter 或空白鍵放置，Escape 取消。
+        </span>
+      )}
       <div
-        className={`group flex items-center py-1 px-2 cursor-pointer transition-all duration-150 ${
+        role="treeitem"
+        aria-expanded={node.type === "folder" ? isExpanded : undefined}
+        aria-selected={isSelected}
+        aria-level={depth + 1}
+        aria-label={node.name}
+        tabIndex={isTreeTabStop ? 0 : -1}
+        className={`group flex cursor-pointer items-center px-2 py-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
           isDropTarget
             ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
             : isSelected
               ? "bg-primary/15 text-primary"
               : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
-        }`}
+        } ${isDraggingThisNode ? "ring-1 ring-inset ring-primary/40" : ""}`}
         style={{ paddingLeft: `${depth * 0.875 + 0.5}rem` }}
-        onClick={handleSelect}
-        draggable={(node.type === "file" && !node.virtual) || isQaNode || isQaEntry}
+        onClick={(event) => handleSelect(event.currentTarget)}
+        onKeyDown={handleKeyDown}
+        onFocus={(event) => {
+          if (event.target !== event.currentTarget) {
+            return;
+          }
+          focusTreeItem(event.currentTarget);
+          if (draggingPath && canAcceptDrop && isKeyboardMoveActive(event.currentTarget)) {
+            onDragTargetChange(dropTargetKey);
+          }
+        }}
+        draggable={isDraggable}
         onDragStart={(event) => {
+          finishKeyboardMove(event.currentTarget);
           if (isQaNode && qaNodeId) {
             event.stopPropagation();
             event.dataTransfer.effectAllowed = "move";
@@ -171,7 +343,10 @@ export default function TreeView({
           event.dataTransfer.setData("text/plain", node.path);
           onDragStart(node);
         }}
-        onDragEnd={onDragEnd}
+        onDragEnd={(event) => {
+          finishKeyboardMove(event.currentTarget);
+          onDragEnd();
+        }}
         onDragOver={(event) => {
           if (!canAcceptDrop) return;
           event.preventDefault();
@@ -306,6 +481,23 @@ export default function TreeView({
           </div>
         )}
 
+        {isDraggable && (
+          <TreeActionButton
+            title="使用鍵盤移動"
+            icon="drive_file_move"
+            onClick={(event) => {
+              const tree = event.currentTarget.closest<HTMLElement>('[role="tree"]');
+              if (tree) {
+                tree.dataset.keyboardMove = "true";
+              }
+              onDragStart(node);
+              onDragTargetChange(null);
+              const treeItem = event.currentTarget.closest<HTMLElement>('[role="treeitem"]');
+              focusTreeItem(treeItem ?? undefined);
+            }}
+          />
+        )}
+
         {canDeleteFolder && (
           <button
             type="button"
@@ -324,7 +516,7 @@ export default function TreeView({
 
       {/* Children */}
       {node.type === "folder" && isExpanded && node.children.length > 0 && (
-        <div>
+        <div role="group">
           {node.children.map((child) => (
             <TreeView
               key={child.path}
@@ -353,6 +545,13 @@ export default function TreeView({
             />
           ))}
         </div>
+      )}
+      {depth === 0 && (
+        <span className="sr-only" role="status" aria-live="polite">
+          {draggingPath
+            ? "移動模式已啟用。請巡覽至有效目標，按 Enter 或空白鍵放置，按 Escape 取消。"
+            : ""}
+        </span>
       )}
     </div>
   );

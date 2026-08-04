@@ -20,6 +20,7 @@ import PersonaCreateForm from "../components/personas/PersonaCreateForm";
 import PersonaEditor from "../components/personas/PersonaEditor";
 import PersonaEmptyState from "../components/personas/PersonaEmptyState";
 import PersonaList from "../components/personas/PersonaList";
+import { useUnsavedChanges } from "../context/NavigationGuardContext";
 import { useProject } from "../context/ProjectContext";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 
@@ -75,6 +76,7 @@ export default function Personas() {
        const [deletePersonaTarget, setDeletePersonaTarget] = useState<PersonaSummary | null>(null);
 
        const hasUnsavedChanges = draftContent !== loadedContent;
+       useUnsavedChanges("persona-editor", hasUnsavedChanges, "Persona 文件");
 
        const loadPersonas = async (preferredId?: string) => {
               setLoadingList(true);
@@ -369,6 +371,7 @@ function PersonaAvatarSelector({
               <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-900/10">
                      <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">虛擬人模型：</span>
                      <Select
+                            ariaLabel="虛擬人模型"
                             value={persona.avatar_char_id ?? ""}
                             options={options}
                             onChange={(value) => onBind(persona.persona_id, value || null)}

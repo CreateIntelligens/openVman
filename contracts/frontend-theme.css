@@ -1,0 +1,37 @@
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · macrostructure: paired operational shells · genre: modern-minimal · tone: technical/utilitarian · anchor hue: blue */
+:root {
+  --ov-font-ui: "Noto Sans TC", "IBM Plex Sans", "Segoe UI", sans-serif;
+  --ov-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --ov-touch-target: 2.75rem;
+  --ov-focus-ring-width: 0.1875rem;
+  --ov-focus-ring-offset: 0.125rem;
+
+  --ov-dur-micro: 120ms;
+  --ov-dur-short: 220ms;
+  --ov-dur-long: 420ms;
+  --ov-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ov-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ov-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --ov-color-success: 16 185 129;
+  --ov-color-warn: 245 158 11;
+  --ov-color-danger: 248 113 113;
+  --ov-color-info: 96 165 250;
+
+  --ov-z-base: 1;
+  --ov-z-raised: 10;
+  --ov-z-dropdown: 100;
+  --ov-z-sticky: 200;
+  --ov-z-modal: 400;
+  --ov-z-toast: 500;
+  --ov-z-tooltip: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ov-dur-micro: 0ms;
+    --ov-dur-short: 0ms;
+    --ov-dur-long: 150ms;
+  }
+}

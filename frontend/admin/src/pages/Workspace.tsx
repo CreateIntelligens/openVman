@@ -2,6 +2,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import WorkspaceDesktopSidebar from "../components/workspace/WorkspaceDesktopSidebar";
 import WorkspaceEditor from "../components/workspace/WorkspaceEditor";
 import WorkspaceMobileSidebar from "../components/workspace/WorkspaceMobileSidebar";
+import { useUnsavedChanges } from "../context/NavigationGuardContext";
 import { useWorkspaceManager } from "../hooks/useWorkspaceManager";
 
 export default function Workspace() {
@@ -41,6 +42,7 @@ export default function Workspace() {
     uploading,
     uploadInputRef,
   } = useWorkspaceManager();
+  useUnsavedChanges("workspace-editor", hasUnsavedChanges, "Workspace 文件");
 
   return (
     <div

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import CustomSelect from './CustomSelect.vue'
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
@@ -145,6 +145,8 @@ const draftRenderMode = ref<AvatarRenderMode>(props.renderMode)
 const draftBackgroundId = ref<AvatarBackgroundId>(props.backgroundId)
 const draftBackgroundUrl = ref(props.backgroundUrl)
 const draftBackgroundFit = ref<AvatarBackgroundFit>(props.backgroundFit)
+const dialogRef = ref<HTMLDialogElement | null>(null)
+let previouslyFocused: HTMLElement | null = null
 
 const draftCharacterValue = computed({
   get() {
@@ -176,7 +178,7 @@ function pickVrmId(preferred: string): string {
 }
 
 // Sync draft when modal opens
-watch(() => props.open, (open) => {
+watch(() => props.open, async (open) => {
   if (open) {
     draftProjectId.value = props.currentProjectId
     draftPersonaId.value = props.currentPersonaId
@@ -189,7 +191,20 @@ watch(() => props.open, (open) => {
     draftBackgroundId.value = props.backgroundId
     draftBackgroundUrl.value = props.backgroundUrl
     draftBackgroundFit.value = props.backgroundFit
+    previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    await nextTick()
+    dialogRef.value?.showModal()
+    dialogRef.value
+      ?.querySelector<HTMLElement>('select, input, button:not(.modal-close)')
+      ?.focus()
+    return
   }
+  dialogRef.value?.close()
+  await nextTick()
+  previouslyFocused?.focus()
+  previouslyFocused = null
 })
 
 watch(() => props.personas, () => {
@@ -337,22 +352,32 @@ function close(): void {
   emit('update:open', false)
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') close()
+function handleDialogClick(event: MouseEvent): void {
+  if (event.target === event.currentTarget) close()
 }
-
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="open" class="modal-backdrop" @click.self="close">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-label="系統設定">
+      <dialog
+        v-if="open"
+        ref="dialogRef"
+        class="modal-card"
+        aria-label="系統設定"
+        @cancel.prevent="close"
+        @click="handleDialogClick"
+      >
           <div class="modal-header">
             <h3>系統設定</h3>
-            <button class="modal-close" @click="close" title="關閉">✕</button>
+            <button
+              type="button"
+              class="modal-close"
+              aria-label="關閉系統設定"
+              @click="close"
+            >
+              ✕
+            </button>
           </div>
 
           <div class="modal-body">
@@ -461,17 +486,41 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <div class="mode-toggle">
                 <label class="mode-option" :class="{ 'mode-option--active': draftVoiceMode === 'live' }">
                   <input type="radio" v-model="draftVoiceMode" value="live" :disabled="disabled" />
-                  <span class="mode-option__icon">🎙️</span>
+                  <svg
+                    class="mode-option__icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" />
+                  </svg>
                   <span class="mode-option__text">
-                    <strong>Realtime</strong>
+                    <strong>即時</strong>
                     <small>Gemini Live 即時語音</small>
                   </span>
                 </label>
                 <label class="mode-option" :class="{ 'mode-option--active': draftVoiceMode === 'text' }">
                   <input type="radio" v-model="draftVoiceMode" value="text" :disabled="disabled" />
-                  <span class="mode-option__icon">💬</span>
+                  <svg
+                    class="mode-option__icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />
+                    <path d="M8 10h.01M12 10h.01M16 10h.01" />
+                  </svg>
                   <span class="mode-option__text">
-                    <strong>Standard</strong>
+                    <strong>標準</strong>
                     <small>文字 AI（多模型）</small>
                   </span>
                 </label>
@@ -480,8 +529,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           </div>
 
           <div class="modal-footer">
-            <button class="btn-cancel" @click="close">取消</button>
+            <button type="button" class="btn-cancel" @click="close">取消</button>
             <button
+              type="button"
               class="btn-apply"
               :class="{ 'btn-apply--dirty': isDirty }"
               :disabled="applyDisabled"
@@ -490,25 +540,22 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               {{ applyLabel }}
             </button>
           </div>
-        </div>
-      </div>
+      </dialog>
     </Transition>
   </Teleport>
 </template>
 
 <style scoped>
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
+.modal-card::backdrop {
   background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 8000;
   backdrop-filter: blur(0.1875rem);
 }
 
 .modal-card {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  padding: 0;
   background: var(--bg-soft);
   border: 1px solid var(--line);
   border-radius: 1rem;
@@ -518,6 +565,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  color: var(--text);
 }
 
 .modal-header {
@@ -541,6 +589,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   color: var(--text-soft);
   font-size: 1rem;
   cursor: pointer;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
   transition: background 0.15s, color 0.15s;
@@ -567,6 +617,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .btn-cancel {
+  min-height: 2.75rem;
   padding: 0.5rem 1.25rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
@@ -582,6 +633,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .btn-apply {
+  min-height: 2.75rem;
   padding: 0.5rem 1.25rem;
   border: none;
   border-radius: 0.5rem;
@@ -655,7 +707,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .background-option input[type="radio"] {
-  display: none;
+  position: absolute;
+  width: 0.0625rem;
+  height: 0.0625rem;
+  margin: -0.0625rem;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 .background-option--active {
@@ -724,7 +781,6 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   color: var(--text);
   font-size: 0.95rem;
   padding: 0 0.75rem;
-  outline: none;
   width: 100%;
 }
 
@@ -756,7 +812,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .background-fit-option input[type="radio"] {
-  display: none;
+  position: absolute;
+  width: 0.0625rem;
+  height: 0.0625rem;
+  margin: -0.0625rem;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 .background-fit-option--active {
@@ -823,7 +884,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .mode-option input[type="radio"] {
-  display: none;
+  position: absolute;
+  width: 0.0625rem;
+  height: 0.0625rem;
+  margin: -0.0625rem;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.background-option:has(input:focus-visible),
+.background-fit-option:has(input:focus-visible),
+.mode-option:has(input:focus-visible) {
+  outline: var(--focus-ring-size) solid var(--primary);
+  outline-offset: 0.1875rem;
 }
 
 .mode-option--active {
@@ -832,7 +905,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .mode-option__icon {
-  font-size: 1.1rem;
+  width: 1.25rem;
+  height: 1.25rem;
   flex-shrink: 0;
 }
 

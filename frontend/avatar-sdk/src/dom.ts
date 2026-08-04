@@ -33,8 +33,8 @@ export function createAvatarDom(options: OpenVmanAvatarOptions): AvatarDom {
 }
 .openvman-avatar-root[data-openvman-contained="true"] {
   height: 100%;
-  inset: 0;
-  position: absolute;
+  inset: auto;
+  position: relative;
   width: 100%;
 }
 .openvman-avatar-root[data-openvman-position="bottom-left"] {

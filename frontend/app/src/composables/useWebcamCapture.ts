@@ -12,6 +12,7 @@ export interface WebcamCaptureOptions {
   width?: number;
   height?: number;
   quality?: number;
+  shouldCapture?: () => boolean;
 }
 
 export interface WebcamCaptureResult {
@@ -38,6 +39,7 @@ export function useWebcamCapture(
     width = DEFAULT_WIDTH,
     height = DEFAULT_HEIGHT,
     quality = DEFAULT_QUALITY,
+    shouldCapture = () => true,
   } = options;
 
   const active = ref(false);
@@ -48,11 +50,15 @@ export function useWebcamCapture(
   let context: CanvasRenderingContext2D | null = null;
   let video: HTMLVideoElement | null = null;
   let intervalId: ReturnType<typeof setInterval> | null = null;
+  let encoding = false;
+  let captureGeneration = 0;
 
   const onFrameRef: { current: WebcamFrameHandler } = { current: onFrame };
   onFrameRef.current = onFrame;
 
   function stop(): void {
+    captureGeneration += 1;
+    encoding = false;
     if (intervalId !== null) {
       clearInterval(intervalId);
       intervalId = null;
@@ -73,13 +79,42 @@ export function useWebcamCapture(
   }
 
   function captureFrame(): void {
-    if (!canvas || !video || !context) return;
+    if (
+      !canvas
+      || !video
+      || !context
+      || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+      || encoding
+      || document.visibilityState === "hidden"
+      || !shouldCapture()
+    ) return;
 
     context.drawImage(video, 0, 0, width, height);
-    const dataUrl = canvas.toDataURL(MIME_TYPE, quality);
-    const [, base64] = dataUrl.split(",", 2);
-    if (!base64) return;
-    onFrameRef.current(base64, MIME_TYPE, Date.now());
+    encoding = true;
+    const generation = captureGeneration;
+    canvas.toBlob((blob) => {
+      if (generation !== captureGeneration) return;
+      if (!blob) {
+        encoding = false;
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (generation !== captureGeneration) return;
+        encoding = false;
+        if (
+          !active.value
+          || document.visibilityState === "hidden"
+          || !shouldCapture()
+        ) return;
+        const [, base64] = String(reader.result ?? "").split(",", 2);
+        if (base64) onFrameRef.current(base64, MIME_TYPE, Date.now());
+      };
+      reader.onerror = () => {
+        if (generation === captureGeneration) encoding = false;
+      };
+      reader.readAsDataURL(blob);
+    }, MIME_TYPE, quality);
   }
 
   async function start(): Promise<void> {
@@ -116,6 +151,7 @@ export function useWebcamCapture(
 
       active.value = true;
       error.value = "";
+      captureGeneration += 1;
       intervalId = setInterval(captureFrame, intervalMs);
     } catch (reason) {
       stop();

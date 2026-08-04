@@ -106,9 +106,12 @@ let documentTree = makeDocumentTree();
 
 vi.mock("../context/NavigationContext", () => ({
   useNavigation: () => ({
-    pendingToken: 0,
-    consumeSubView: vi.fn(() => null),
+    currentSubView: undefined,
   }),
+}));
+
+vi.mock("../context/NavigationGuardContext", () => ({
+  useUnsavedChanges: vi.fn(),
 }));
 
 vi.mock("../hooks/useLocalStorageState", () => ({
@@ -256,6 +259,21 @@ describe("KnowledgeBase merged tree", () => {
     fireEvent.click(screen.getByText("快速問答"));
 
     expect(knowledgeBaseMocks.toggleExpand).toHaveBeenCalledWith(QUICK_QA_TREE_PATH);
+  });
+
+  it("closes the compact file tree with Escape and restores the opener", () => {
+    render(<KnowledgeBase />);
+
+    const opener = screen.getAllByRole("button", { name: "開啟檔案樹" })[0];
+    fireEvent.click(opener);
+
+    expect(opener.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("dialog", { name: "知識庫檔案樹" })).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(opener.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(opener);
   });
 
   it("reorders quick-QA entries by dragging one question onto another", async () => {

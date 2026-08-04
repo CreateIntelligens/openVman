@@ -1,23 +1,27 @@
 # Root .dockerignore — applies only to builds using the repo root as
-# context. Currently that is the admin image (both targets):
-#   dev:  docker compose build admin        (target: dev)
-#   prod: docker build -f frontend/admin/Dockerfile -t openvman-admin:prod .
+# context. Currently that covers:
+#   admin:  docker compose build admin        (target: dev)
+#           docker build -f frontend/admin/Dockerfile -t openvman-admin:prod .
+#   avatar: docker compose build avatar       (context: ., dockerfile: frontend/app/Dockerfile)
 #
 # Other compose services use their own subdir as context and are NOT
-# affected by this file. Keep the admin build context lean and avoid
+# affected by this file. Keep the build context lean and avoid
 # unreadable/root-owned paths (e.g. TTS model checkpoints).
 
 # Ignore everything by default …
 *
 
-# … then re-include only what the admin production build needs.
+# … then re-include only what the admin/avatar builds need.
 !frontend/admin
+!frontend/app
 !contracts
 
 # Prune heavy/generated/unreadable subpaths even within the allowed dirs.
 frontend/admin/node_modules
 frontend/admin/dist
 frontend/admin/dist-verify
+frontend/app/node_modules
+frontend/app/dist
 **/.git
 **/__pycache__
 **/*.pyc

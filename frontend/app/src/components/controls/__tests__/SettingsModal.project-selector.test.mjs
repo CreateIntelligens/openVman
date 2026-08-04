@@ -34,9 +34,17 @@ test("brain project selector is shown before persona selector", () => {
   assert.ok(projectLabel < personaLabel, "project must be selected before persona");
 });
 
-test("text chat mode keeps the Standard label", () => {
-  assert.match(source, /<strong>Standard<\/strong>/);
+test("text chat mode uses a Traditional-Chinese label", () => {
+  assert.match(source, /<strong>標準<\/strong>/);
   assert.doesNotMatch(source, /<strong>預設<\/strong>/);
+});
+
+test("settings use a native modal dialog with browser-managed focus trapping", () => {
+  assert.match(source, /<dialog/);
+  assert.match(source, /\.showModal\(\)/);
+  assert.match(source, /@cancel\.prevent="close"/);
+  assert.match(source, /previouslyFocused\?\.focus\(\)/);
+  assert.doesNotMatch(source, /role="dialog"/);
 });
 
 test("settings modal exposes stage background controls", () => {

@@ -34,6 +34,11 @@ export interface ChatMessage {
        sourcePathContent?: string
 }
 
+export interface SendMessageResult {
+       accepted: boolean
+       reason?: 'empty' | 'not_ready'
+}
+
 interface ChatOptions {
        /** Called when a PCM audio chunk arrives (binary frame) */
        onAudioChunk?: (data: ArrayBuffer) => void
@@ -55,6 +60,8 @@ interface ChatOptions {
        onGatewayStatus?: (plugin: string, status: string, message: string) => void
        /** Called whenever the WebSocket disconnects (before reconnect scheduling) */
        onDisconnect?: () => void
+       /** Called after automatic reconnect attempts are exhausted */
+       onReconnectExhausted?: () => void
        /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/chat */
        mode?: 'live' | 'text'
        /** Override text-mode chat endpoint. */
@@ -90,6 +97,7 @@ function createClientId(): string {
 }
 
 const MAX_RECONNECT_ATTEMPTS = 6
+const CONNECT_TIMEOUT_MS = 10000
 export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/chat'
 export const DEFAULT_VISION_ENDPOINT = '/api/vision/describe'
 export const DEFAULT_VISION_RESET_ENDPOINT = '/api/vision/reset'
@@ -136,8 +144,13 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        let socket: WebSocket | null = null
        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+       let connectTimer: ReturnType<typeof setTimeout> | null = null
+       let connectPromise: Promise<void> | null = null
+       let resolveConnect: (() => void) | null = null
+       let rejectConnect: ((reason?: unknown) => void) | null = null
        let reconnectAttempt = 0
-       let lastWsUrl: string | null = null
+       let intentionalDisconnect = false
+       let lastUrlOverride: string | undefined
        let clientId = createClientId()
        let currentPersonaId = options.personaId ?? 'default'
        let currentProjectId = options.projectId ?? 'default'
@@ -213,17 +226,20 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       return Promise.resolve()
                }
 
-               return new Promise((resolve, reject) => {
-                      if (socket) {
-                            resolve() // Socket already exists — resolve regardless of ready state
-                            return
-                     }
+               if (sessionId.value && socket?.readyState === WebSocket.OPEN) {
+                      return Promise.resolve()
+               }
+               if (connectPromise) return connectPromise
 
+               intentionalDisconnect = false
+               connectPromise = new Promise((resolve, reject) => {
+                     resolveConnect = resolve
+                     rejectConnect = reject
                      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
                      const host = window.location.host
                      clientId = createClientId()
                      const wsUrl = url ?? options.wsUrlBuilder?.(clientId) ?? `${protocol}://${host}/ws/${clientId}`
-                     lastWsUrl = wsUrl
+                     lastUrlOverride = url
 
                      state.value = 'CONNECTING'
                      socket = new WebSocket(wsUrl)
@@ -231,9 +247,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
                      socket.onopen = () => {
                             console.log('[AvatarChat] WebSocket connected')
-                            reconnectAttempt = 0
                             sendEvent(_buildClientInit())
-                            resolve()
                      }
 
                      socket.onmessage = (event) => {
@@ -247,28 +261,57 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
                      socket.onclose = () => {
                             console.log('[AvatarChat] WebSocket disconnected')
+                            const disconnectError = new Error('WebSocket disconnected before initialization')
+                            rejectPendingConnect(disconnectError)
                             socket = null
                             sessionId.value = null
                             state.value = 'DISCONNECTED'
                             options.onDisconnect?.()
+                            if (intentionalDisconnect) return
                             if (reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
                                    state.value = 'ERROR'
                                    console.warn('[AvatarChat] reconnect attempts exhausted')
+                                   options.onReconnectExhausted?.()
                                    return
                             }
                             state.value = 'RECONNECTING'
                             const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000)
                             const delay = baseDelay * (0.75 + Math.random() * 0.5)
                             reconnectAttempt++
-                            reconnectTimer = setTimeout(() => { void connect(wsUrl).catch(console.error) }, delay)
+                            reconnectTimer = setTimeout(() => {
+                                   void connect(url).catch(console.error)
+                            }, delay)
                      }
 
                      socket.onerror = (err) => {
                             console.error('[AvatarChat] WebSocket error:', err)
                             state.value = 'ERROR'
-                            reject(err)
                      }
+
+                     connectTimer = setTimeout(() => {
+                            rejectPendingConnect(new Error('WebSocket initialization timed out'))
+                            socket?.close()
+                     }, CONNECT_TIMEOUT_MS)
               })
+               return connectPromise
+       }
+
+       function resolvePendingConnect(): void {
+              if (connectTimer) clearTimeout(connectTimer)
+              connectTimer = null
+              resolveConnect?.()
+              connectPromise = null
+              resolveConnect = null
+              rejectConnect = null
+       }
+
+       function rejectPendingConnect(reason: unknown): void {
+              if (connectTimer) clearTimeout(connectTimer)
+              connectTimer = null
+              rejectConnect?.(reason)
+              connectPromise = null
+              resolveConnect = null
+              rejectConnect = null
        }
 
        // ── Handle incoming JSON events ────────────────────────
@@ -279,6 +322,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      case 'server_init_ack':
                             sessionId.value = data.session_id as string
                             state.value = 'IDLE'
+                            reconnectAttempt = 0
+                            resolvePendingConnect()
                             console.log(`[AvatarChat] Session: ${sessionId.value}`)
                             sendEvent({ event: 'set_lip_sync_mode', mode: currentLipSyncMode })
                             break
@@ -341,20 +386,28 @@ export function useAvatarChat(options: ChatOptions = {}) {
        }
 
        // ── Send user message ──────────────────────────────────
-       function sendMessage(text: string, sourcePath?: string, sourcePathContent?: string): void {
+       function sendMessage(
+              text: string,
+              sourcePath?: string,
+              sourcePathContent?: string,
+       ): SendMessageResult {
                const trimmed = text.trim()
-               if (!trimmed) return
+               if (!trimmed) return { accepted: false, reason: 'empty' }
+
+               if (
+                      currentMode === 'live'
+                      && (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value)
+               ) {
+                      return { accepted: false, reason: 'not_ready' }
+               }
 
                stopActiveResponse()
                activeSourcePath = sourcePath
                activeSourcePathContent = sourcePathContent
-
                if (currentMode === 'text') {
                       void _sendMessageText(trimmed)
-                      return
+                      return { accepted: true }
                }
-
-               if (!socket || socket.readyState !== WebSocket.OPEN || !sessionId.value) return
 
                messages.value.push({ role: 'user', text: trimmed, timestamp: Date.now() })
                state.value = 'THINKING'
@@ -363,6 +416,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       text: trimmed,
                       timestamp: Date.now(),
                })
+               return { accepted: true }
        }
 
        async function _sendMessageText(text: string): Promise<void> {
@@ -437,6 +491,15 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      mime_type: mimeType,
                      timestamp,
               })
+       }
+
+       function canSendVisualInput(): boolean {
+              if (currentMode === 'text') return !visionInFlight
+              return Boolean(
+                     socket
+                     && socket.readyState === WebSocket.OPEN
+                     && sessionId.value,
+              )
        }
 
        async function _sendVisualInputText(
@@ -558,12 +621,19 @@ export function useAvatarChat(options: ChatOptions = {}) {
 
        // ── Disconnect ─────────────────────────────────────────
        function disconnect(): void {
+               intentionalDisconnect = true
                textRequestId += 1
                textAbortController?.abort()
                textAbortController = null
                if (reconnectTimer) clearTimeout(reconnectTimer)
-               socket?.close()
+               reconnectTimer = null
+               rejectPendingConnect(new Error('Connection closed'))
+               const activeSocket = socket
                socket = null
+               if (activeSocket) {
+                      activeSocket.onclose = null
+                      activeSocket.close()
+               }
                sessionId.value = null
                resetVisualState()
                state.value = 'DISCONNECTED'
@@ -573,13 +643,12 @@ export function useAvatarChat(options: ChatOptions = {}) {
                currentMode = mode
        }
 
-       function manualReconnect(): void {
-               if (reconnectTimer) {
-                      clearTimeout(reconnectTimer)
-                      reconnectTimer = null
-               }
+       function manualReconnect(): Promise<void> {
+               const urlOverride = lastUrlOverride
+               disconnect()
                reconnectAttempt = 0
-               void connect(lastWsUrl ?? undefined).catch(console.error)
+               intentionalDisconnect = false
+               return connect(urlOverride)
        }
 
        onUnmounted(() => {
@@ -626,6 +695,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                disconnect,
                sendMessage,
                sendVisualInput,
+               canSendVisualInput,
                resetVisualInput,
                interrupt,
                reinit,

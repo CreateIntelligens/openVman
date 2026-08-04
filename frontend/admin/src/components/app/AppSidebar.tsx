@@ -11,14 +11,21 @@ interface AppSidebarProps {
 
 export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin }: AppSidebarProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const isExpanded = isPinned || isHovered;
+  const [hasFocus, setHasFocus] = useState(false);
+  const isExpanded = isPinned || isHovered || hasFocus;
 
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setHasFocus(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setHasFocus(false);
+        }
+      }}
       className={`group/sidebar relative z-20 hidden h-full flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out md:block ${
-        isPinned ? "w-60" : "w-[4.5rem] hover:w-60"
+        isExpanded ? "w-60" : "w-[4.5rem]"
       }`}
     >
       <aside className="flex h-full w-full flex-col overflow-hidden border-r border-border bg-surface-sunken">
@@ -27,7 +34,7 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
             <span className="material-symbols-outlined text-[1.125rem]">neurology</span>
           </div>
           <span
-            className={`truncate font-semibold text-content transition-all duration-200 ${
+            className={`truncate font-semibold text-content transition-opacity duration-200 ${
               isExpanded ? "opacity-100" : "opacity-0"
             }`}
           >
@@ -52,6 +59,7 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
           <button
             onClick={onTogglePin}
             title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
+            aria-label={isPinned ? "取消固定側邊欄" : "固定側邊欄"}
             className={`flex h-9 w-full items-center gap-2 rounded-md px-3 text-sm text-content-muted transition-colors hover:bg-surface hover:text-content ${
               isExpanded ? "justify-start" : "justify-center"
             }`}
@@ -64,7 +72,7 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
               push_pin
             </span>
             <span
-              className={`transition-all duration-200 ${
+              className={`transition-[max-width,opacity] duration-200 ${
                 isExpanded ? "opacity-100 max-w-full" : "opacity-0 max-w-0 overflow-hidden"
               }`}
             >

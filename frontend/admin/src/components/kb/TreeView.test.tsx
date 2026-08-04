@@ -43,6 +43,123 @@ function renderTreeView(overrides: Partial<Parameters<typeof TreeView>[0]> = {})
 }
 
 describe("TreeView", () => {
+  it("exposes tree semantics and a single roving tab stop", () => {
+    renderTreeView();
+
+    const treeRoot = screen.getByRole("tree", { name: "知識庫目錄" });
+    const rootItem = screen.getByRole("treeitem", { name: "knowledge" });
+    const childItem = screen.getByRole("treeitem", { name: "faq" });
+
+    expect(treeRoot.getAttribute("aria-describedby")).toBeTruthy();
+    expect(rootItem.getAttribute("aria-expanded")).toBe("true");
+    expect(rootItem.getAttribute("aria-selected")).toBe("true");
+    expect(rootItem.getAttribute("aria-level")).toBe("1");
+    expect(rootItem.getAttribute("tabindex")).toBe("0");
+    expect(childItem.getAttribute("aria-expanded")).toBe("false");
+    expect(childItem.getAttribute("aria-selected")).toBe("false");
+    expect(childItem.getAttribute("aria-level")).toBe("2");
+    expect(childItem.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("moves roving focus with arrow, Home, and End keys", () => {
+    renderTreeView();
+
+    const rootItem = screen.getByRole("treeitem", { name: "knowledge" });
+    const childItem = screen.getByRole("treeitem", { name: "faq" });
+
+    rootItem.focus();
+    fireEvent.keyDown(rootItem, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(childItem);
+    expect(childItem.getAttribute("tabindex")).toBe("0");
+    expect(rootItem.getAttribute("tabindex")).toBe("-1");
+
+    fireEvent.keyDown(childItem, { key: "Home" });
+    expect(document.activeElement).toBe(rootItem);
+
+    fireEvent.keyDown(rootItem, { key: "End" });
+    expect(document.activeElement).toBe(childItem);
+
+    fireEvent.keyDown(childItem, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(rootItem);
+  });
+
+  it("uses left and right arrows to traverse and toggle folders", () => {
+    const { props } = renderTreeView();
+    const rootItem = screen.getByRole("treeitem", { name: "knowledge" });
+    const childItem = screen.getByRole("treeitem", { name: "faq" });
+
+    rootItem.focus();
+    fireEvent.keyDown(rootItem, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(childItem);
+
+    fireEvent.keyDown(childItem, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(rootItem);
+
+    fireEvent.keyDown(childItem, { key: "ArrowRight" });
+    expect(props.onToggle).toHaveBeenCalledWith("knowledge/faq");
+
+    fireEvent.keyDown(rootItem, { key: "ArrowLeft" });
+    expect(props.onToggle).toHaveBeenCalledWith("knowledge");
+  });
+
+  it("activates focused items with Enter and Space", () => {
+    const { props } = renderTreeView();
+    const childItem = screen.getByRole("treeitem", { name: "faq" });
+
+    fireEvent.keyDown(childItem, { key: "Enter" });
+    fireEvent.keyDown(childItem, { key: " " });
+
+    expect(props.onSelect).toHaveBeenCalledTimes(2);
+    expect(props.onSelect).toHaveBeenNthCalledWith(1, tree.children[0]);
+    expect(props.onSelect).toHaveBeenNthCalledWith(2, tree.children[0]);
+  });
+
+  it("provides a non-drag move entry and supports keyboard drop or cancel", () => {
+    const movableTree: TreeNode = {
+      name: "knowledge",
+      path: "knowledge",
+      type: "folder",
+      children: [
+        {
+          name: "doc.md",
+          path: "knowledge/doc.md",
+          type: "file",
+          children: [],
+        },
+        {
+          name: "target",
+          path: "knowledge/target",
+          type: "folder",
+          children: [],
+        },
+      ],
+    };
+    const onDragStart = vi.fn();
+    const onDragEnd = vi.fn();
+    const onDropFile = vi.fn();
+    const { rerender, props } = renderTreeView({
+      node: movableTree,
+      onDragStart,
+      onDragEnd,
+      onDropFile,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "使用鍵盤移動" }));
+    expect(onDragStart).toHaveBeenCalledWith(movableTree.children[0]);
+    expect(document.activeElement).toBe(screen.getByRole("treeitem", { name: "doc.md" }));
+
+    rerender(<TreeView {...props} node={movableTree} draggingPath="knowledge/doc.md" />);
+    const targetItem = screen.getByRole("treeitem", { name: "target" });
+    targetItem.focus();
+    fireEvent.keyDown(targetItem, { key: "Escape" });
+    expect(onDragEnd).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "使用鍵盤移動" }));
+    targetItem.focus();
+    fireEvent.keyDown(targetItem, { key: "Enter" });
+    expect(onDropFile).toHaveBeenCalledWith("knowledge/target");
+  });
+
   it("allows deleting non-root folders without selecting the folder", () => {
     const { props } = renderTreeView();
 

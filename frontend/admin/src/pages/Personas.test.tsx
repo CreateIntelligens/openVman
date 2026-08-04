@@ -8,6 +8,10 @@ vi.mock("../context/ProjectContext", () => ({
   useProject: () => ({ projectId: "default" }),
 }));
 
+vi.mock("../context/NavigationGuardContext", () => ({
+  useUnsavedChanges: vi.fn(),
+}));
+
 vi.mock("../components/personas/PersonaCreateForm", () => ({
   default: () => <div data-testid="persona-create-form" />,
 }));
@@ -80,8 +84,10 @@ describe("Personas page", () => {
   it("uses the styled Select component for avatar binding", async () => {
     render(<Personas />);
 
-    const trigger = await screen.findByRole("button", { name: /未綁定/ });
-    expect(screen.queryByRole("combobox")).toBeNull();
+    const trigger = await screen.findByRole("combobox", {
+      name: "虛擬人模型",
+    });
+    expect(trigger.textContent).toContain("未綁定");
 
     fireEvent.click(trigger);
     fireEvent.mouseDown(await screen.findByRole("option", { name: "ESG-AIKKA半身 (2D)" }));

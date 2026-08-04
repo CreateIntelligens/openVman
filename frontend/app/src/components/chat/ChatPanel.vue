@@ -2,7 +2,7 @@
   <section class="chat-panel" :class="{ 'chat-panel--compact': compact }">
     <header v-if="!compact" class="chat-panel__header">
       <div>
-        <p class="chat-panel__eyebrow">Guest Dialogue</p>
+        <p class="chat-panel__eyebrow">訪客對話</p>
         <h3>對話紀錄</h3>
       </div>
 
@@ -74,7 +74,8 @@
     <div class="chat-input-bar">
       <AsrButton
         :is-listening="asrListening"
-        :disabled="disabled"
+        :disabled="!canSend || !asrSupported"
+        :is-supported="asrSupported"
         @toggle="emit('asr-toggle')"
       />
       <label class="composer-shell">
@@ -84,13 +85,23 @@
           v-model="inputText"
           type="text"
           :placeholder="placeholder"
-          :disabled="disabled"
+          :disabled="!canSend"
+          :aria-describedby="feedbackMessage ? 'chat-composer-feedback' : undefined"
+          @input="feedbackMessage = ''"
           @keydown.enter="handleSend"
         />
       </label>
-      <button :disabled="disabled || !inputText.trim()" @click="handleSend">
+      <button :disabled="!canSend || !inputText.trim()" @click="handleSend">
         送出
       </button>
+      <p
+        v-if="feedbackMessage"
+        id="chat-composer-feedback"
+        class="chat-input-feedback"
+        role="alert"
+      >
+        {{ feedbackMessage }}
+      </p>
     </div>
   </section>
 </template>
@@ -102,22 +113,39 @@ import { useStickToBottom } from "../../composables/useStickToBottom";
 import TypewriterText from "./TypewriterText.vue";
 import AsrButton from "./AsrButton.vue";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   messages: ChatMessage[]
-  disabled?: boolean
+  canSend?: boolean
   placeholder?: string
   isThinking?: boolean
   isTyping?: boolean
   asrListening?: boolean
+  asrSupported?: boolean
+  asrError?: string
   compact?: boolean
-}>()
+}>(), {
+  canSend: true,
+  asrSupported: true,
+})
+
+interface ComposerSendResult {
+  accepted: boolean
+  message?: string
+}
 
 const emit = defineEmits<{
-  send: [text: string]
+  send: [text: string, done: (result: ComposerSendResult) => void]
   'asr-toggle': []
 }>()
 
 const inputText = ref("")
+const localFeedback = ref("")
+const feedbackMessage = computed({
+  get: () => props.asrError || localFeedback.value,
+  set: (value: string) => {
+    localFeedback.value = value
+  },
+})
 const messagesRef = ref<HTMLDivElement>()
 const contentRef = ref<HTMLDivElement>()
 const inputRef = ref<HTMLInputElement>()
@@ -139,9 +167,16 @@ const visibleMessages = computed(() => {
 
 function handleSend(): void {
   const text = inputText.value.trim()
-  if (!text || props.disabled) return
-  emit("send", text)
-  inputText.value = ""
+  if (!text || !props.canSend) return
+  const draft = inputText.value
+  localFeedback.value = ""
+  emit("send", text, (result) => {
+    if (result.accepted) {
+      if (inputText.value === draft) inputText.value = ""
+      return
+    }
+    localFeedback.value = result.message || "目前尚未連線，內容已保留，請稍後再試。"
+  })
 }
 
 function formatTime(timestamp: number): string {
@@ -301,7 +336,10 @@ useStickToBottom(messagesRef, contentRef)
   color: var(--text-soft);
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    background-color var(--ov-dur-micro) var(--ov-ease-out),
+    border-color var(--ov-dur-micro) var(--ov-ease-out),
+    color var(--ov-dur-micro) var(--ov-ease-out);
   align-self: flex-start;
   max-width: 100%;
 }
@@ -421,10 +459,18 @@ useStickToBottom(messagesRef, contentRef)
 
 .chat-input-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
   border-top: var(--hairline) solid var(--line);
   background: var(--bg-soft);
+}
+
+.chat-input-feedback {
+  flex-basis: 100%;
+  margin: 0 0 0 3rem;
+  color: #b91c1c;
+  font-size: 0.8rem;
 }
 
 .composer-shell {
@@ -438,7 +484,7 @@ useStickToBottom(messagesRef, contentRef)
 }
 
 .chat-input-bar input {
-  height: 2.5rem;
+  height: 2.75rem;
   width: 100%;
   border: var(--hairline) solid var(--line);
   border-radius: 0.5rem;
@@ -446,7 +492,6 @@ useStickToBottom(messagesRef, contentRef)
   color: var(--text);
   font-size: 0.95rem;
   padding: 0 0.75rem;
-  outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -462,7 +507,7 @@ useStickToBottom(messagesRef, contentRef)
 }
 
 .chat-input-bar button {
-  height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0 1.25rem;
   border: none;
   border-radius: 0.5rem;

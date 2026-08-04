@@ -116,11 +116,12 @@ services:
   avatar:
     <<: *shared
     build:
-      context: ./frontend/app
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/app/Dockerfile
     volumes:
       - ./frontend/app:/app
       - avatar-node-modules:/app/node_modules
+      - ./contracts:/contracts:ro
 
   avatar-sdk:
     <<: *shared

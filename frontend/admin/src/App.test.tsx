@@ -1,4 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./api", () => ({
@@ -55,12 +60,25 @@ vi.mock("./pages/Workspace", () => ({
 }));
 
 import App from "./App";
+import { fetchProjects } from "./api";
 import { allTabs } from "./components/app/navigation";
 
 describe("App tab mounting", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.history.replaceState(null, "", "/admin/");
     vi.clearAllMocks();
+    vi.mocked(fetchProjects).mockResolvedValue({
+      project_count: 1,
+      projects: [
+        {
+          project_id: "default",
+          label: "Default",
+          document_count: 0,
+          persona_count: 0,
+        },
+      ],
+    });
   });
 
   it("mounts only the active tab content", async () => {
@@ -76,5 +94,47 @@ describe("App tab mounting", () => {
 
   it("does not expose Embed Keys navigation", () => {
     expect(allTabs.some((tab) => String(tab.key) === "EmbedKeys")).toBe(false);
+  });
+
+  it("restores a deep-linked tab and keeps tab changes in the URL", async () => {
+    window.history.replaceState(null, "", "/admin/health?project=default");
+    render(<App />);
+
+    expect(await screen.findByTestId("tab-health")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: /Chat/ })[0]);
+
+    expect(await screen.findByTestId("tab-chat")).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/chat");
+  });
+
+  it("shows a project loading error and retries without hiding the active project", async () => {
+    vi.mocked(fetchProjects)
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce({
+        project_count: 1,
+        projects: [
+          {
+            project_id: "default",
+            label: "Default",
+            document_count: 0,
+            persona_count: 0,
+          },
+        ],
+      });
+    render(<App />);
+
+    const trigger = await screen.findByRole("button", {
+      name: "目前專案：default",
+    });
+    fireEvent.click(trigger);
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "network unavailable",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "重試" }));
+    await waitFor(() => expect(fetchProjects).toHaveBeenCalledTimes(2));
+    expect(
+      await screen.findByRole("button", { name: "目前專案：Default" }),
+    ).toBeTruthy();
   });
 });

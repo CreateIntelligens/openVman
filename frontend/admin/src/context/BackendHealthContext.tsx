@@ -20,10 +20,10 @@ const INITIAL_STATE: BackendHealthState = {
 
 const BackendHealthContext = createContext<BackendHealthState>(INITIAL_STATE);
 
-const MIN_INTERVAL_MS = 3000;
-const MAX_INTERVAL_MS = 10000;
-const HEALTH_TIMEOUT_MS = 8000;
-const OFFLINE_FAILURE_THRESHOLD = 2;
+const MIN_INTERVAL_MS = 10000;
+const MAX_INTERVAL_MS = 30000;
+const HEALTH_TIMEOUT_MS = 12000;
+const OFFLINE_FAILURE_THRESHOLD = 4;
 
 async function probeHealth(signal: AbortSignal): Promise<void> {
   await Promise.race([

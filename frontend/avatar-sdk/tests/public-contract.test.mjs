@@ -12,7 +12,10 @@ async function loadSdk({
   charactersBody = { characters: [{ char_id: "000", label: "Default" }] },
   charactersStatus = 200,
   deferDecode = false,
+  deferVideoReady = false,
   resumeSucceeds = true,
+  videoLoadSucceeds = true,
+  videoPlaySucceeds = true,
 } = {}) {
   const source = await readFile(bundleUrl, "utf8");
   const script = { src: "https://avatar.example/openvman-avatar-sdk.js" };
@@ -28,6 +31,7 @@ async function loadSdk({
     videoRemoved: 0,
   };
   let finishDecode;
+  let finishVideoReady;
   let context;
   const createElement = (tagName) => {
     const element = {
@@ -41,11 +45,39 @@ async function loadSdk({
           child.parent = this;
           this.children.push(child);
           if (child.tagName === "script") {
+            const videoListeners = new Map();
             context.window.characterVideo = {
-              load() {},
-              play: async () => {},
+              addEventListener(type, handler) {
+                const handlers = videoListeners.get(type) ?? new Set();
+                handlers.add(handler);
+                videoListeners.set(type, handlers);
+              },
+              error: null,
+              load() {
+                const finish = () => {
+                  const type = videoLoadSucceeds ? "canplay" : "error";
+                  if (videoLoadSucceeds) this.readyState = 3;
+                  for (const handler of videoListeners.get(type) ?? []) {
+                    handler();
+                  }
+                };
+                if (deferVideoReady) {
+                  finishVideoReady = finish;
+                } else {
+                  queueMicrotask(finish);
+                }
+              },
+              play: async () => {
+                if (!videoPlaySucceeds) {
+                  throw new Error("playback rejected");
+                }
+              },
+              readyState: 0,
               remove() {
                 runtimeCalls.videoRemoved += 1;
+              },
+              removeEventListener(type, handler) {
+                videoListeners.get(type)?.delete(handler);
               },
             };
             context.window.createQtAppInstance = async () => ({
@@ -91,6 +123,7 @@ async function loadSdk({
   const head = createElement("head");
   context = {
     AbortController,
+    HTMLMediaElement: { HAVE_CURRENT_DATA: 2 },
     TextDecoder,
     TextEncoder,
     URL,
@@ -124,7 +157,10 @@ async function loadSdk({
       };
     },
     queueMicrotask,
-    window: {},
+    window: {
+      clearTimeout,
+      setTimeout,
+    },
   };
   context.window.AudioContext = class {
     constructor() {
@@ -179,6 +215,7 @@ async function loadSdk({
   return {
     document: context.document,
     finishDecode: () => finishDecode?.(),
+    finishVideoReady: () => finishVideoReady?.(),
     requests,
     runtimeCalls,
     sdk: context.window.OpenVmanAvatar,
@@ -350,6 +387,44 @@ test("character failure disposes the created runtime for the page lifetime", asy
   await assert.rejects(
     sdk.init({ characterId: "000" }),
     (error) => error.code === "RUNTIME_DISPOSED",
+  );
+});
+
+test("does not resolve init before the character video can render", async () => {
+  const { finishVideoReady, sdk } = await loadSdk({
+    deferVideoReady: true,
+  });
+  let initialized = false;
+  const initialization = sdk.init({ characterId: "000" }).then(() => {
+    initialized = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(initialized, false);
+  finishVideoReady();
+  await initialization;
+  assert.equal(initialized, true);
+});
+
+test("rejects init when the character video fails to load", async () => {
+  const { sdk } = await loadSdk({
+    videoLoadSucceeds: false,
+  });
+
+  await assert.rejects(
+    sdk.init({ characterId: "000" }),
+    (error) => error.code === "RESOURCE_LOAD_FAILED",
+  );
+});
+
+test("rejects init when the character video cannot start", async () => {
+  const { sdk } = await loadSdk({
+    videoPlaySucceeds: false,
+  });
+
+  await assert.rejects(
+    sdk.init({ characterId: "000" }),
+    (error) => error.code === "RESOURCE_LOAD_FAILED",
   );
 });
 

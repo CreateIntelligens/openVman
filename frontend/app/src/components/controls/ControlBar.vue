@@ -1,7 +1,7 @@
 <template>
   <div class="control-bar">
     <div class="control-bar__left">
-      <h2>openVman console</h2>
+      <h2>openVman 控制台</h2>
     </div>
 
     <div class="control-bar__right">
@@ -22,7 +22,9 @@
           <path d="m23 7-7 5 7 5z"/>
           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
         </svg>
-        {{ cameraActive ? '關鏡頭' : '開鏡頭' }}
+        <span class="control-button__label">
+          {{ cameraActive ? '關鏡頭' : '開鏡頭' }}
+        </span>
       </button>
 
       <label
@@ -42,12 +44,18 @@
         />
       </label>
 
-      <button class="settings-btn" :disabled="settingsDisabled" @click="$emit('openSettings')" title="系統設定">
+      <button
+        class="settings-btn"
+        :disabled="settingsDisabled"
+        aria-label="系統設定"
+        title="系統設定"
+        @click="$emit('openSettings')"
+      >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
-        設定
+        <span class="control-button__label">設定</span>
       </button>
 
       <button
@@ -69,7 +77,9 @@
           <path d="M3 16h3a2 2 0 0 1 2 2v3"/>
           <path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
         </svg>
-        {{ immersive ? '結束全螢幕' : '全螢幕' }}
+        <span class="control-button__label">
+          {{ immersive ? '結束全螢幕' : '全螢幕' }}
+        </span>
       </button>
     </div>
 
@@ -140,9 +150,11 @@ function handleCameraPreviewScaleInput(event: Event): void {
 
 .control-bar__right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.75rem;
-  flex-shrink: 0;
+  min-width: 0;
 }
 
 .camera-btn {
@@ -159,6 +171,7 @@ function handleCameraPreviewScaleInput(event: Event): void {
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
+  min-height: 2.75rem;
 }
 .camera-btn:hover:not(:disabled) {
   background: var(--bg-soft);
@@ -214,6 +227,7 @@ function handleCameraPreviewScaleInput(event: Event): void {
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
+  min-height: 2.75rem;
 }
 .settings-btn:hover:not(:disabled) {
   background: var(--bg-soft);
@@ -239,6 +253,7 @@ function handleCameraPreviewScaleInput(event: Event): void {
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
+  min-height: 2.75rem;
 }
 .immersive-btn:hover {
   background: var(--bg-soft);
@@ -266,6 +281,43 @@ function handleCameraPreviewScaleInput(event: Event): void {
   color: #b91c1c;
   font-size: 0.85rem;
   font-weight: 500;
+}
+
+@media (max-width: 30rem) {
+  .control-bar {
+    padding: 0.75rem;
+  }
+
+  .control-bar__left,
+  .control-bar__right {
+    flex-basis: 100%;
+  }
+
+  .control-bar__right {
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .camera-btn,
+  .settings-btn,
+  .immersive-btn {
+    min-width: 2.75rem;
+    padding-inline: 0.75rem;
+  }
+}
+
+@media (max-width: 24rem) {
+  .control-button__label {
+    position: absolute;
+    width: 0.0625rem;
+    height: 0.0625rem;
+    padding: 0;
+    margin: -0.0625rem;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 }
 
 </style>

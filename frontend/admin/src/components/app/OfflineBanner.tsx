@@ -43,12 +43,12 @@ export default function OfflineBanner() {
   const showRecovered = status === "recovering-visible" || status === "recovering-fading";
 
   const baseClasses =
-    "pointer-events-auto flex items-center gap-2 rounded-full border px-4 py-2 text-sm shadow-lg backdrop-blur-md transition-all duration-300 ease-out";
+    "pointer-events-auto flex w-full max-w-[36rem] flex-wrap items-center justify-center gap-2 rounded-lg border px-3 py-2 text-center text-sm shadow-lg backdrop-blur-md transition-[opacity,transform] duration-300 ease-out sm:w-auto sm:rounded-full sm:px-4";
   const motionClasses = visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2";
 
   if (showRecovered) {
     return (
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center">
+      <div className="pointer-events-none flex shrink-0 justify-center px-2 py-2 sm:px-4">
         <div
           role="status"
           className={`${baseClasses} ${motionClasses} border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300`}
@@ -61,7 +61,7 @@ export default function OfflineBanner() {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center">
+    <div className="pointer-events-none flex shrink-0 justify-center px-2 py-2 sm:px-4">
       <div
         role="alert"
         className={`${baseClasses} ${motionClasses} border-warn/40 bg-warn/15 text-warn`}
@@ -78,7 +78,7 @@ export default function OfflineBanner() {
           type="button"
           onClick={checkNow}
           disabled={checking}
-          className="ml-2 rounded-full border border-warn/40 px-2.5 py-0.5 text-xs hover:bg-warn/25 disabled:opacity-50"
+          className="rounded-full border border-warn/40 px-2.5 py-0.5 text-xs hover:bg-warn/25 disabled:opacity-50 sm:ml-2"
         >
           立即重試
         </button>

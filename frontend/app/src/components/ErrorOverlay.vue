@@ -10,12 +10,33 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="error-overlay">
+  <div
+    class="error-overlay"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="fatal-error-code"
+    aria-describedby="fatal-error-message"
+  >
     <div class="error-overlay__card">
-      <div class="error-overlay__icon">⚠️</div>
-      <h2 class="error-overlay__code">{{ code }}</h2>
-      <p class="error-overlay__msg">{{ message }}</p>
-      <button class="error-overlay__btn" @click="emit('retry')">重新連線</button>
+      <svg
+        class="error-overlay__icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M10.3 3.6 2.4 17.3A2 2 0 0 0 4.1 20h15.8a2 2 0 0 0 1.7-2.7L13.7 3.6a2 2 0 0 0-3.4 0Z" />
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+      </svg>
+      <h2 id="fatal-error-code" class="error-overlay__code">{{ code }}</h2>
+      <p id="fatal-error-message" class="error-overlay__msg">{{ message }}</p>
+      <button type="button" class="error-overlay__btn" autofocus @click="emit('retry')">
+        重試
+      </button>
     </div>
   </div>
 </template>
@@ -28,7 +49,7 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: var(--ov-z-modal);
   backdrop-filter: blur(0.25rem);
 }
 .error-overlay__card {
@@ -37,12 +58,15 @@ const emit = defineEmits<{
   border-radius: 1rem;
   padding: 2.5rem 3rem;
   text-align: center;
-  max-width: 23.75rem;
+  width: min(23.75rem, calc(100% - 2rem));
   color: #e0e0e0;
+  overflow-wrap: anywhere;
 }
 .error-overlay__icon {
-  font-size: 3rem;
+  width: 3rem;
+  height: 3rem;
   margin-bottom: 1rem;
+  color: rgb(var(--ov-color-danger));
 }
 .error-overlay__code {
   font-size: 1.1rem;
@@ -57,6 +81,7 @@ const emit = defineEmits<{
   line-height: 1.5;
 }
 .error-overlay__btn {
+  min-height: 2.75rem;
   background: #4a90e2;
   color: #fff;
   border: none;

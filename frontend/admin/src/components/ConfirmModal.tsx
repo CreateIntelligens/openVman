@@ -1,6 +1,4 @@
-import { useEffect, useRef } from "react";
-
-import { useModalDismiss } from "./useModalDismiss";
+import { useEffect, useId, useRef } from "react";
 
 interface ConfirmModalProps {
   open: boolean;
@@ -21,48 +19,89 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const dismiss = useModalDismiss(onCancel, open);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const backdropPointerDownRef = useRef(false);
+  const titleId = useId();
+  const messageId = useId();
 
   useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
     if (open) {
-      dialogRef.current?.focus();
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+      if (!dialog.open) {
+        if (typeof dialog.showModal === "function") {
+          dialog.showModal();
+        } else {
+          dialog.setAttribute("open", "");
+        }
+      }
+      dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+      return;
+    }
+
+    if (dialog.open) {
+      if (typeof dialog.close === "function") {
+        dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+      previousFocusRef.current?.focus();
     }
   }, [open]);
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      {...dismiss}
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      aria-describedby={messageId}
+      aria-modal="true"
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+      onPointerDown={(event) => {
+        backdropPointerDownRef.current = event.target === event.currentTarget;
+      }}
+      onPointerUp={(event) => {
+        if (
+          backdropPointerDownRef.current &&
+          event.target === event.currentTarget
+        ) {
+          onCancel();
+        }
+        backdropPointerDownRef.current = false;
+      }}
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-border bg-surface-overlay p-6 text-content shadow-2xl"
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl outline-none transition-all"
+      <h2 id={titleId} className="text-lg font-semibold">
+        {title}
+      </h2>
+      <p
+        id={messageId}
+        className="mt-3 whitespace-pre-wrap text-sm leading-7 text-content-muted"
       >
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h3>
-        <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{message}</p>
-        <div className="mt-6 flex items-center justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white transition-colors"
-          >
-            取消
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-bold text-white transition-colors ${
-              danger
-                ? "bg-red-600 hover:bg-red-500"
-                : "bg-primary hover:bg-primary/90"
-            }`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+        {message}
+      </p>
+      <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+        <button
+          type="button"
+          data-autofocus
+          onClick={onCancel}
+          className="btn btn-ghost"
+        >
+          取消
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className={danger ? "btn btn-danger" : "btn btn-primary"}
+        >
+          {confirmLabel}
+        </button>
       </div>
-    </div>
+    </dialog>
   );
 }

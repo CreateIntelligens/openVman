@@ -27,7 +27,15 @@ test("defaults match design: 1s / 640x480 / jpeg q0.7", () => {
 test("start() uses getUserMedia and an interval capture loop", () => {
   assert.match(source, /getUserMedia\(\{[\s\S]*?video:\s*true[\s\S]*?\}\)/);
   assert.match(source, /setInterval\(/);
-  assert.match(source, /toDataURL\(/);
+  assert.match(source, /toBlob\(/);
+  assert.doesNotMatch(source, /toDataURL\(/);
+});
+
+test("capture skips hidden, busy, and downstream-not-ready frames", () => {
+  assert.match(source, /shouldCapture\?:\s*\(\)\s*=>\s*boolean/);
+  assert.match(source, /document\.visibilityState === "hidden"/);
+  assert.match(source, /\|\| encoding/);
+  assert.match(source, /\|\| !shouldCapture\(\)/);
 });
 
 test("stop() clears interval and stops media tracks", () => {

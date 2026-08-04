@@ -6,8 +6,10 @@ interface TopBarProps {
   projectId: string;
   projects: ProjectSummary[];
   loadingProjects: boolean;
+  projectError: string | null;
   theme: "light" | "dark";
   onSelectProject: (id: string) => void;
+  onRetryProjects: () => void;
   onToggleTheme: () => void;
   onOpenMobileNav: () => void;
 }
@@ -17,8 +19,10 @@ export default function TopBar({
   projectId,
   projects,
   loadingProjects,
+  projectError,
   theme,
   onSelectProject,
+  onRetryProjects,
   onToggleTheme,
   onOpenMobileNav,
 }: TopBarProps) {
@@ -59,7 +63,11 @@ export default function TopBar({
       <div ref={wrapRef} className="relative ml-auto md:ml-0 md:mr-auto">
         <button
           onClick={() => setOpen((v) => !v)}
-          disabled={loadingProjects}
+          disabled={loadingProjects && projects.length === 0}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-controls="project-switcher-list"
+          aria-label={`目前專案：${displayLabel}`}
           className="flex h-9 items-center gap-2 rounded-md border border-border bg-surface-raised px-3 text-sm font-medium text-content transition-colors hover:border-border-strong disabled:opacity-50"
         >
           <span className="flex h-5 w-5 items-center justify-center rounded bg-primary/15 text-[0.6875rem] font-bold text-primary">
@@ -70,19 +78,28 @@ export default function TopBar({
         </button>
 
         {open && (
-          <div className="absolute left-0 top-[calc(100%+0.375rem)] z-50 min-w-[14rem] overflow-hidden rounded-lg border border-border-strong bg-surface-overlay shadow-lg">
+          <div
+            id="project-switcher-list"
+            role="listbox"
+            aria-label="切換專案"
+            className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[14rem] overflow-hidden rounded-lg border border-border-strong bg-surface-overlay shadow-lg md:left-0 md:right-auto"
+          >
             <div className="border-b border-border px-3 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-content-subtle">
               Switch project
             </div>
             <div className="max-h-[16rem] overflow-y-auto py-1">
               {projects.length === 0 && (
-                <div className="px-3 py-3 text-center text-xs text-content-subtle">No projects</div>
+                <div className="px-3 py-3 text-center text-xs text-content-subtle">
+                  {loadingProjects ? "載入專案中…" : "沒有可用的專案"}
+                </div>
               )}
               {projects.map((project) => {
                 const isActive = project.project_id === projectId;
                 return (
                   <button
                     key={project.project_id}
+                    role="option"
+                    aria-selected={isActive}
                     onClick={() => {
                       onSelectProject(project.project_id);
                       setOpen(false);
@@ -115,6 +132,21 @@ export default function TopBar({
                 );
               })}
             </div>
+            {projectError && (
+              <div
+                className="border-t border-border px-3 py-3 text-xs text-danger"
+                role="alert"
+              >
+                <p>{projectError}</p>
+                <button
+                  type="button"
+                  onClick={onRetryProjects}
+                  className="mt-2 rounded-md border border-danger/40 px-2 py-1 font-medium hover:bg-danger/10"
+                >
+                  重試
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -122,6 +154,7 @@ export default function TopBar({
       <button
         onClick={onToggleTheme}
         title={theme === "dark" ? "Light mode" : "Dark mode"}
+        aria-label={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
         className="flex h-9 w-9 items-center justify-center rounded-md text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
       >
         <span className="material-symbols-outlined text-[1.125rem]">
@@ -140,11 +173,50 @@ interface MobileNavDrawerProps {
 }
 
 export function MobileNavDrawer({ open, active, onClose, onSelectTab }: MobileNavDrawerProps) {
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    drawerRef.current?.querySelector<HTMLElement>("button")?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !drawerRef.current) return;
+
+      const focusable = Array.from(
+        drawerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [onClose, open]);
+
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 md:hidden" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="主要導覽"
         onClick={(e) => e.stopPropagation()}
         className="absolute left-0 top-0 flex h-full w-[16rem] flex-col border-r border-border bg-surface-sunken"
       >
@@ -157,6 +229,7 @@ export function MobileNavDrawer({ open, active, onClose, onSelectTab }: MobileNa
           </div>
           <button
             onClick={onClose}
+            aria-label="關閉導覽"
             className="flex h-8 w-8 items-center justify-center rounded-md text-content-muted hover:bg-surface hover:text-content"
           >
             <span className="material-symbols-outlined text-[1.125rem]">close</span>
@@ -168,6 +241,7 @@ export function MobileNavDrawer({ open, active, onClose, onSelectTab }: MobileNa
             return (
               <button
                 key={tab.key}
+                aria-current={isActive ? "page" : undefined}
                 onClick={() => {
                   onSelectTab(tab.key);
                   onClose();

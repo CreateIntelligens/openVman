@@ -31,7 +31,9 @@
               v-show="settings.renderMode === '2d'"
               :width="800"
               :height="800"
-              :show-loading="settings.renderMode === '2d' && wasm.isLoading.value"
+              :show-loading="settings.renderMode === '2d' && (
+                rendererBootstrapState === 'loading' || wasm.isLoading.value
+              )"
               :loading-text="loadingText"
               :background-id="settings.backgroundId"
               :custom-background-url="settings.backgroundUrl"
@@ -80,13 +82,15 @@
       <ChatPanel
         class="chat-area"
         :messages="chat.messages.value"
-        :disabled="rendererDisabled || chat.state.value === 'CONNECTING'"
+        :can-send="canSend"
         :placeholder="chatPlaceholder"
         :is-thinking="chat.state.value === 'THINKING'"
         :is-typing="isTyping"
         :asr-listening="asr.isListening.value"
+        :asr-supported="asr.isSupported.value"
+        :asr-error="asrError"
         :compact="immersive"
-        @send="handleSend"
+        @send="handleComposerSend"
         @asr-toggle="handleAsrToggle"
       />
     </main>
@@ -153,7 +157,10 @@ import ErrorOverlay from "./components/ErrorOverlay.vue";
 import QuickQaPanel from "./components/controls/QuickQaPanel.vue";
 import { useAudioPlayer } from "./composables/useAudioPlayer";
 import { useAvatarCatalog } from "./composables/useAvatarCatalog";
-import { useAvatarChat } from "./composables/useAvatarChat";
+import {
+  useAvatarChat,
+  type SendMessageResult,
+} from "./composables/useAvatarChat";
 import { useAsr } from "./composables/useAsr";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
 import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
@@ -179,6 +186,8 @@ const fallbackVrmAvatarOptions = FALLBACK_MASCOT_CATALOG
   .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
 
 const isStarted = ref(false);
+const rendererBootstrapState = ref<"loading" | "ready" | "error">("loading");
+const asrError = ref("");
 const isTyping = ref(false);
 const showSettings = ref(false);
 const showQuickQa = ref(false);
@@ -447,7 +456,11 @@ async function fetchBackgrounds(): Promise<void> {
 
 const wasm = useOpenVmanAvatarRuntime();
 const rendererDisabled = computed(() =>
-  settings.renderMode === "2d" && (!wasm.isReady.value || wasm.isLoading.value),
+  settings.renderMode === "2d" && (
+    rendererBootstrapState.value !== "ready"
+    || !wasm.isReady.value
+    || wasm.isLoading.value
+  ),
 );
 const rendererErrorMessage = computed(() =>
   settings.renderMode === "2d" ? wasm.error.value : null,
@@ -504,7 +517,16 @@ const chat = useAvatarChat({
   personaId: settings.personaId,
   mode: settings.voiceMode,
   onAudioChunk: (data) => audio.playChunk(data),
-  onDisconnect: () => audio.flush(),
+  onDisconnect: () => {
+    isStarted.value = false;
+    audio.flush();
+  },
+  onReconnectExhausted: () => {
+    statusToastRef.value?.show(
+      "連線重試已達上限，請再次送出訊息以重新連線。",
+      { persistent: true },
+    );
+  },
   onStopAudio: () => {
     ttsStreamer.cancel();
     audio.flush();
@@ -544,9 +566,15 @@ const chat = useAvatarChat({
     statusToastRef.value?.show(text, { persistent: status === 'degraded' });
   },
 });
+const canSend = computed(() =>
+  !rendererDisabled.value
+  && chat.state.value !== "CONNECTING"
+  && chat.state.value !== "RECONNECTING",
+);
 
 const loadingText = computed(() => {
   if (settings.renderMode !== "2d") return "";
+  if (rendererBootstrapState.value === "error") return "虛擬人載入失敗";
   if (!wasm.isReady.value) return "載入引擎中...";
   if (wasm.isLoading.value) return "切換展示角色中...";
   return "";
@@ -562,39 +590,59 @@ const cameraPreviewStyle = computed<Record<string, string>>(() => ({
   "--camera-preview-scale": String(settings.cameraPreviewScale),
 }));
 
-async function handleSend(text: string, sourcePath?: string, referenceText?: string): Promise<void> {
-  if (!isStarted.value) {
+interface ComposerSendResult {
+  accepted: boolean;
+  message?: string;
+}
+
+async function handleSend(
+  text: string,
+  sourcePath?: string,
+  referenceText?: string,
+): Promise<ComposerSendResult> {
+  if (
+    !isStarted.value
+    || !chat.sessionId.value
+    || chat.state.value === "DISCONNECTED"
+    || chat.state.value === "ERROR"
+  ) {
     try {
       await audio.resumeContext();
       await chat.connect();
-      
-      // Wait for session to initialize so we don't accidentally fall back to plain-text
-      if (!chat.sessionId.value) {
-        await new Promise<void>((resolve) => {
-          const unwatch = watch(() => chat.sessionId.value, (newVal) => {
-            if (newVal) {
-              unwatch();
-              resolve();
-            }
-          });
-          setTimeout(() => {
-            unwatch();
-            resolve();
-          }, 2000);
-        });
-      }
-      
+
       if (settings.renderMode === "2d" && window.characterVideo && window.characterVideo.paused) {
         window.characterVideo.play().catch(e => console.warn("[App] characterVideo play failed:", e));
       }
-      
+
       isStarted.value = true;
     } catch (e) {
       console.error("[App] Initial connection failed:", e);
-      return;
+      return {
+        accepted: false,
+        message: "目前無法建立連線，內容已保留，請稍後再試。",
+      };
     }
   }
-  chat.sendMessage(text, sourcePath, referenceText);
+  const result: SendMessageResult = chat.sendMessage(
+    text,
+    sourcePath,
+    referenceText,
+  );
+  return result.accepted
+    ? { accepted: true }
+    : {
+        accepted: false,
+        message: result.reason === "empty"
+          ? "請先輸入訊息。"
+          : "連線尚未完成，內容已保留，請稍後再試。",
+      };
+}
+
+function handleComposerSend(
+  text: string,
+  done: (result: ComposerSendResult) => void,
+): void {
+  void handleSend(text).then(done);
 }
 
 async function handleCharChange(charId: string): Promise<void> {
@@ -666,29 +714,66 @@ async function handleSettingsApply(): Promise<void> {
   chat.disconnect();
   isStarted.value = false;
   await audio.resumeContext();
-  void chat.connect();
-  isStarted.value = true;
+  try {
+    await chat.connect();
+    isStarted.value = true;
+  } catch {
+    isStarted.value = false;
+    statusToastRef.value?.show("設定已儲存，但目前無法重新連線。");
+  }
 }
 
 async function handleFatalRetry(): Promise<void> {
+  if (fatalError.value?.code === "AVATAR_RENDERER") {
+    fatalError.value = null;
+    await bootstrapRenderer();
+    return;
+  }
   fatalError.value = null;
-  await audio.resumeContext();
-  chat.setProject(settings.projectId);
-  chat.setPersona(settings.personaId);
-  void chat.connect();
+  try {
+    await audio.resumeContext();
+    chat.setProject(settings.projectId);
+    chat.setPersona(settings.personaId);
+    await chat.manualReconnect();
+    isStarted.value = true;
+  } catch {
+    isStarted.value = false;
+    fatalError.value = {
+      code: "CONNECTION_FAILED",
+      message: "重新連線失敗，請稍後再試。",
+    };
+  }
 }
 
 const asr = useAsr({
   lang: 'zh-TW',
   onResult: (transcript) => {
-    void handleSend(transcript);
+    asrError.value = "";
+    void handleSend(transcript).then((result) => {
+      if (!result.accepted && result.message) {
+        statusToastRef.value?.show(result.message);
+      }
+    });
   },
   onError: (error) => {
     console.warn('[ASR]', error);
+    const messages: Record<string, string> = {
+      "not-supported": "此瀏覽器不支援語音輸入，請改用鍵盤輸入。",
+      "not-allowed": "麥克風權限遭拒，請在瀏覽器設定中允許存取。",
+      "audio-capture": "找不到可用的麥克風。",
+      "network": "語音辨識服務目前無法連線。",
+      "no-speech": "沒有偵測到語音，請再試一次。",
+      "start-failed": "無法啟動語音輸入，請稍後再試。",
+    };
+    asrError.value = messages[error] || "語音輸入發生錯誤，請再試一次。";
   },
 });
+if (!asr.isSupported.value) {
+  asrError.value = "此瀏覽器不支援語音輸入，請改用鍵盤輸入。";
+}
 
 function handleAsrToggle(): void {
+  asrError.value = "";
   if (asr.isListening.value) asr.stop(); else asr.start();
 }
 
@@ -697,6 +782,7 @@ function handleCameraPreviewScaleChange(scale: number): void {
 }
 
 const webcam = useWebcamCapture({
+  shouldCapture: () => chat.canSendVisualInput(),
   onFrame: (base64, mimeType, timestamp) => {
     chat.sendVisualInput(base64, mimeType, timestamp);
   },
@@ -754,6 +840,27 @@ function pickInitialCharacter(): string {
   return characters.value[0]?.id || "001";
 }
 
+async function bootstrapRenderer(): Promise<void> {
+  rendererBootstrapState.value = "loading";
+  try {
+    await Promise.all([
+      wasm.initWasm(),
+      avatarCatalog.load().catch((error) => {
+        console.warn("[App] avatar catalog unavailable, using fallback:", error);
+      }),
+    ]);
+    await wasm.loadCharacter(pickInitialCharacter());
+    rendererBootstrapState.value = "ready";
+  } catch (error) {
+    rendererBootstrapState.value = "error";
+    console.error("[App] avatar renderer bootstrap failed:", error);
+    fatalError.value = {
+      code: "AVATAR_RENDERER",
+      message: "虛擬人載入失敗，請檢查網路後重試。",
+    };
+  }
+}
+
 // Pause ASR during THINKING/SPEAKING to avoid feedback loops
 watch(() => chat.state.value, (newState) => {
   if (newState === 'THINKING') triggerStageAvatarGesture("thinking-hand");
@@ -768,21 +875,15 @@ watch(showSettings, () => {
   void fetchBackgrounds();
 });
 
-onMounted(async () => {
+onMounted(() => {
   document.addEventListener("fullscreenchange", handleFullscreenChange);
-  void fetchVrmAvatars();
-  void fetchTtsProviders();
-  void fetchBackgrounds();
-  await fetchProjects();
-  await fetchPersonas(settings.projectId);
-  await avatarCatalog.load();
-  try {
-    await wasm.initWasm();
-    const firstChar = pickInitialCharacter();
-    await wasm.loadCharacter(firstChar);
-  } catch (e) {
-    console.error("[App] WASM init or char load failed:", e);
-  }
+  void Promise.allSettled([
+    fetchVrmAvatars(),
+    fetchTtsProviders(),
+    fetchBackgrounds(),
+    fetchProjects().then(() => fetchPersonas(settings.projectId)),
+    bootstrapRenderer(),
+  ]);
 });
 
 onUnmounted(() => {
@@ -791,6 +892,8 @@ onUnmounted(() => {
 </script>
 
 <style>
+@import "@contracts/frontend-theme.css";
+
 :root {
   --bg: #f8fafc;
   --bg-soft: #ffffff;
@@ -800,7 +903,7 @@ onUnmounted(() => {
   --primary: #0ea5e9;
   --primary-hover: #0284c7;
   --hairline: 0.0625rem;
-  --focus-ring-size: 0.1875rem;
+  --focus-ring-size: var(--ov-focus-ring-width);
   --radius-pill: 999rem;
   --surface-shadow: 0 0.25rem 0.375rem -0.0625rem rgba(0, 0, 0, 0.05);
 }
@@ -815,13 +918,19 @@ html, body, #app {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  overflow-x: clip;
   margin: 0;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-size) solid var(--primary);
+  outline-offset: var(--ov-focus-ring-offset);
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--ov-font-ui);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -830,12 +939,23 @@ body {
   html, body, #app {
     height: auto;
     min-height: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
     overflow-y: auto;
   }
 
   body {
     min-height: 100dvh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 </style>
@@ -1151,12 +1271,14 @@ body {
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 0.25rem 0.875rem rgba(13, 148, 136, 0.35);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    background var(--ov-dur-short) var(--ov-ease-out),
+    border-color var(--ov-dur-short) var(--ov-ease-out),
+    box-shadow var(--ov-dur-short) var(--ov-ease-out),
+    transform var(--ov-dur-short) var(--ov-ease-out);
 }
 
 .quick-qa-toggle-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0.375rem 1.125rem rgba(13, 148, 136, 0.5);
   border-color: rgba(255, 255, 255, 0.85);
 }
 

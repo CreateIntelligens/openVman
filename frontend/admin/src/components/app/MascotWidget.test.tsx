@@ -1,11 +1,16 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
-import MascotWidget from "./MascotWidget";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { MascotProvider } from "../../context/MascotContext";
+import MascotWidget from "./MascotWidget";
 
 describe("MascotWidget", () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("loads the selected mascot iframe source from localStorage", () => {
@@ -22,5 +27,27 @@ describe("MascotWidget", () => {
 
     expect(src).toContain("engine=3d");
     expect(decodeURIComponent(src)).toContain("/mascots/qqman/model.vrm");
+  });
+
+  it("starts collapsed on compact viewports", () => {
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({
+      matches: true,
+      media: "(max-width: 48rem)",
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+
+    render(
+      <MascotProvider>
+        <MascotWidget />
+      </MascotProvider>,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "打開 AI 虛擬人小助理" }),
+    ).not.toBeNull();
+    expect(
+      screen.queryByTitle("AI 虛擬人小助理"),
+    ).toBeNull();
   });
 });

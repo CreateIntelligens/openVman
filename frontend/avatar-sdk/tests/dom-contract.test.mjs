@@ -22,3 +22,14 @@ test("does not use fixed pixel layout dimensions", async () => {
 
   assert.doesNotMatch(source, /(?:width|height|right|bottom):\s*\d+px/);
 });
+
+test("keeps contained avatars inside their own positioning context", async () => {
+  const source = await readFile(domSourceUrl, "utf8");
+  const containedRule = source.match(
+    /\.openvman-avatar-root\[data-openvman-contained="true"\]\s*\{([^}]+)\}/,
+  );
+
+  assert.ok(containedRule);
+  assert.match(containedRule[1], /position:\s*relative/);
+  assert.doesNotMatch(containedRule[1], /position:\s*absolute/);
+});

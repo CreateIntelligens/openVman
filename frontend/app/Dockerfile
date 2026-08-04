@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.7
 
-# --- Stage 1: Builder (deps prewarm for volume mount layout) ---
 FROM node:20-alpine AS builder
 
 WORKDIR /app
-COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+COPY frontend/app/package.json frontend/app/pnpm-lock.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    corepack enable \
+    && corepack prepare pnpm@9.15.4 --activate \
+    && pnpm install --frozen-lockfile
 
-# --- Stage 2: Runner (vite dev server) ---
 FROM node:20-alpine AS runner
 
 ENV TZ=Asia/Taipei
@@ -19,4 +19,4 @@ COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 80
 
-CMD ["npx", "vite", "--host", "--port", "80"]
+CMD ["corepack", "pnpm", "dev", "--", "--host", "0.0.0.0", "--port", "80"]

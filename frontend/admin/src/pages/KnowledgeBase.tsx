@@ -1,5 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { useNavigation } from "../context/NavigationContext";
+import { useUnsavedChanges } from "../context/NavigationGuardContext";
 import ConfirmModal from "../components/ConfirmModal";
 import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
@@ -162,21 +170,26 @@ export default function KnowledgeBase() {
   } = useKnowledgeBase();
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
+  const mobileTreeOpenerRef = useRef<HTMLButtonElement | null>(null);
+  const mobileTreePanelRef = useRef<HTMLElement | null>(null);
   const [activeTab, setActiveTab] = useLocalStorageState<KnowledgeTab>(
     "admin.knowledge.active_tab",
     "documents",
     KNOWLEDGE_TABS,
   );
-  const { pendingToken, consumeSubView } = useNavigation();
+  const { currentSubView } = useNavigation();
+  useUnsavedChanges("knowledge-base-editor", editorDirty, "知識庫文件");
   useEffect(() => {
-    const view = consumeSubView("KnowledgeBase");
-    if (view === "graph") {
+    if (currentSubView === "graph") {
       setActiveTab("graph");
-    } else if (view === "documents" || view === "qa_node_tree") {
-      // 問答樹已整合進文件分頁
+    } else if (
+      currentSubView === "documents" ||
+      currentSubView === "qa_node_tree"
+    ) {
       setActiveTab("documents");
     }
-  }, [pendingToken, consumeSubView]);
+  }, [currentSubView, setActiveTab]);
 
   const {
     nodesTree,
@@ -300,13 +313,45 @@ export default function KnowledgeBase() {
     localStorage.setItem("kb-selected-qa-node-id", nodeId);
     localStorage.removeItem("kb-selected-file-path");
     closeFileView();
+    setMobileTreeOpen(false);
   }, [closeFileView]);
 
   const handleSelectTreeFile = useCallback((node: TreeNode) => {
     setSelectedQaNodeId(null);
     localStorage.removeItem("kb-selected-qa-node-id");
     handleTreeSelect(node);
+    setMobileTreeOpen(false);
   }, [handleTreeSelect]);
+
+  const openMobileTree = useCallback(
+    (event: ReactMouseEvent<HTMLButtonElement>) => {
+      mobileTreeOpenerRef.current = event.currentTarget;
+      setMobileTreeOpen(true);
+    },
+    [],
+  );
+
+  const closeMobileTree = useCallback(() => {
+    setMobileTreeOpen(false);
+    mobileTreeOpenerRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!mobileTreeOpen) return;
+
+    mobileTreePanelRef.current
+      ?.querySelector<HTMLButtonElement>('button[aria-label="關閉檔案樹"]')
+      ?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeMobileTree();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeMobileTree, mobileTreeOpen]);
 
   const openCreateQaNodeDialog = useCallback((parentNodeId: string | null) => {
     if (!parentNodeId) {
@@ -601,12 +646,24 @@ export default function KnowledgeBase() {
         </div>
       )}
 
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-3 dark:border-slate-800/60 sm:px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={openMobileTree}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-primary dark:hover:bg-slate-800 md:hidden"
+            aria-label="開啟檔案樹"
+            aria-controls="knowledge-tree-panel"
+            aria-expanded={mobileTreeOpen}
+          >
+            <span className="material-symbols-outlined text-[1.125rem]">
+              account_tree
+            </span>
+          </button>
           <span className="material-symbols-outlined text-primary text-[1.5rem]">school</span>
           <h1 className="text-lg font-bold text-slate-900 dark:text-white">知識庫</h1>
-          <span className="text-xs text-slate-500">{documents.length} 文件 · {indexedCount} 已索引</span>
-          <div className="ml-3 flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/40 p-0.5">
+          <span className="hidden text-xs text-slate-500 lg:inline">{documents.length} 文件 · {indexedCount} 已索引</span>
+          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-800 dark:bg-slate-900/40 sm:ml-3">
             <button
               onClick={() => setActiveTab("documents")}
               className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
@@ -630,7 +687,7 @@ export default function KnowledgeBase() {
           </div>
         </div>
         {activeTab === "documents" && (
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
             <button
               onClick={handleToggleSourcePanel}
               className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
@@ -642,7 +699,7 @@ export default function KnowledgeBase() {
               onClick={handleCommit}
               disabled={committing}
               title="採納 raw 區的上傳檔案進知識庫，並重建索引與圖譜"
-              className="flex items-center gap-1.5 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
             >
               <span className={`material-symbols-outlined text-[1rem] ${committing ? "animate-spin" : ""}`}>library_add</span>
               {committing ? "採納中..." : "採納上傳"}
@@ -650,7 +707,7 @@ export default function KnowledgeBase() {
             <button
               onClick={handleReindex}
               disabled={reindexing}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <span className={`material-symbols-outlined text-[1rem] ${reindexing ? "animate-spin" : ""}`}>sync</span>
               {reindexing ? "索引中..." : "重新索引"}
@@ -701,8 +758,25 @@ export default function KnowledgeBase() {
         multiple
       />
 
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        <aside className="w-64 xl:w-72 shrink-0 border-r border-slate-200 dark:border-slate-800/60 flex flex-col bg-white dark:bg-slate-950/30 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {mobileTreeOpen && (
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            onClick={closeMobileTree}
+            aria-label="關閉檔案樹"
+          />
+        )}
+        <aside
+          ref={mobileTreePanelRef}
+          id="knowledge-tree-panel"
+          aria-label="知識庫檔案樹"
+          aria-modal={mobileTreeOpen ? "true" : undefined}
+          role={mobileTreeOpen ? "dialog" : undefined}
+          className={`fixed inset-y-0 left-0 z-50 w-[min(18rem,85vw)] shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-slate-800/60 dark:bg-slate-950 md:relative md:z-auto md:flex md:w-64 md:bg-white md:dark:bg-slate-950/30 xl:w-72 ${
+            mobileTreeOpen ? "flex" : "hidden"
+          }`}
+        >
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800/40 flex items-center justify-between">
             <div className="flex min-w-0 items-center gap-1.5">
@@ -720,6 +794,16 @@ export default function KnowledgeBase() {
               title="新增資料夾"
             >
               <span className="material-symbols-outlined text-[1rem]">create_new_folder</span>
+            </button>
+            <button
+              type="button"
+              onClick={closeMobileTree}
+              className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white md:hidden"
+              aria-label="關閉檔案樹"
+            >
+              <span className="material-symbols-outlined text-[1.125rem]">
+                close
+              </span>
             </button>
           </div>
 
@@ -857,7 +941,21 @@ export default function KnowledgeBase() {
               }
               renormalizing={renormalizing || previewingNormalization}
             />
-          ) : null}
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-content-muted">
+              <span className="material-symbols-outlined text-3xl text-content-subtle">
+                description
+              </span>
+              <p>從檔案樹選擇文件或快速問答節點</p>
+              <button
+                type="button"
+                onClick={openMobileTree}
+                className="btn btn-ghost md:hidden"
+              >
+                開啟檔案樹
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

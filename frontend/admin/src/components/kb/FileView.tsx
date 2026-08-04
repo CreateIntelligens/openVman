@@ -61,8 +61,7 @@ export default function FileView({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* File toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 dark:border-slate-800/60 bg-white dark:bg-slate-950/30 shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800/60 dark:bg-slate-950/30 sm:px-4">
         <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={onClose}
@@ -79,10 +78,13 @@ export default function FileView({
           <StatusDot doc={document} />
           {dirty && <span className="text-[0.625rem] text-amber-400 font-bold">● 未儲存</span>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex w-full items-center justify-end gap-2 overflow-x-auto sm:w-auto">
           <SourceBadge sourceType={document.source_type} />
           <button
             onClick={(e) => { e.stopPropagation(); onToggleEnabled(document); }}
+            role="switch"
+            aria-checked={document.enabled}
+            aria-label={document.enabled ? "停用文件" : "啟用文件"}
             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${document.enabled ? "bg-emerald-500" : "bg-slate-700"}`}
             title={document.enabled ? "停用" : "啟用"}
           >
@@ -111,7 +113,7 @@ export default function FileView({
           {isQaDocument && onOpenQaTree && (
             <button
               onClick={onOpenQaTree}
-              className="flex items-center gap-1 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-all hover:bg-primary/10"
+              className="flex items-center gap-1 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
             >
               <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">account_tree</span>
               前往問答節點
@@ -122,7 +124,7 @@ export default function FileView({
               onClick={() => onRenormalize(document.path)}
               disabled={renormalizing}
               title="用 AI 產生整理預覽"
-              className="flex items-center gap-1 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-all disabled:opacity-50"
+              className="flex items-center gap-1 rounded-lg border border-primary px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
             >
               <span aria-hidden="true" className={`material-symbols-outlined text-[0.875rem] ${renormalizing ? "animate-spin" : ""}`}>auto_fix_high</span>
               {renormalizing ? "重新整理中..." : "重新整理"}
@@ -131,7 +133,7 @@ export default function FileView({
           <button
             onClick={onSave}
             disabled={saving || !dirty}
-            className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 transition-colors disabled:opacity-40"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-[0.875rem]">{saving ? "sync" : "save"}</span>
             {saving ? "儲存中..." : "儲存"}
@@ -187,8 +189,8 @@ export default function FileView({
           )}
         </div>
       ) : (
-        <div className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="flex-1 flex flex-col min-w-0 border-r border-slate-200 dark:border-slate-800/40">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col border-b border-slate-200 dark:border-slate-800/40 md:border-b-0 md:border-r">
             <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
               <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">原始碼</span>
             </div>
@@ -200,7 +202,7 @@ export default function FileView({
             />
           </div>
 
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="px-3 py-1.5 border-b border-slate-200 dark:border-slate-800/30 bg-slate-50 dark:bg-slate-950/20">
               <span className="text-[0.625rem] font-bold uppercase tracking-widest text-slate-500">預覽</span>
             </div>
@@ -211,8 +213,7 @@ export default function FileView({
         </div>
       )}
 
-      {/* File metadata bar */}
-      <div className="flex items-center gap-4 px-4 py-1.5 border-t border-slate-200 dark:border-slate-800/40 bg-white dark:bg-slate-950/30 text-[0.6875rem] text-slate-500 shrink-0">
+      <div className="flex shrink-0 items-center gap-4 overflow-x-auto border-t border-slate-200 bg-white px-4 py-1.5 text-[0.6875rem] text-slate-500 dark:border-slate-800/40 dark:bg-slate-950/30">
         <span>{document.path}</span>
         <span>{document.extension || "—"}</span>
         <span>{formatSize(document.size)}</span>

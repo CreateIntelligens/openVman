@@ -2,6 +2,7 @@
 defineProps<{
   isListening?: boolean
   disabled?: boolean
+  isSupported?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -13,8 +14,14 @@ const emit = defineEmits<{
   <button
     class="asr-btn"
     :class="{ 'asr-btn--active': isListening }"
-    :disabled="disabled"
-    :title="isListening ? '停止語音輸入' : '語音輸入'"
+    :disabled="disabled || isSupported === false"
+    :aria-label="isSupported === false
+      ? '此瀏覽器不支援語音輸入'
+      : isListening ? '停止語音輸入' : '開始語音輸入'"
+    :aria-pressed="Boolean(isListening)"
+    :title="isSupported === false
+      ? '此瀏覽器不支援語音輸入'
+      : isListening ? '停止語音輸入' : '語音輸入'"
     @click="emit('toggle')"
   >
     <span class="asr-btn__icon">
@@ -36,8 +43,8 @@ const emit = defineEmits<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 50%;
   border: var(--hairline, 0.0625rem) solid var(--line, #e2e8f0);
   background: var(--bg-soft, #fff);
@@ -45,7 +52,6 @@ const emit = defineEmits<{
   position: relative;
   transition: background 0.2s, border-color 0.2s;
   flex-shrink: 0;
-  outline: none;
 }
 .asr-btn:hover:not(:disabled) {
   background: #f0f4ff;

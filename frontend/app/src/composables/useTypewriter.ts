@@ -43,6 +43,13 @@ export function useTypewriter(options: TypewriterOptions) {
     pendingText = text
     if (!pendingText) return
     options.onBegin()
+    if (
+      typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      flush()
+      return
+    }
     timer = setInterval(() => {
       if (!pendingText) {
         stop()

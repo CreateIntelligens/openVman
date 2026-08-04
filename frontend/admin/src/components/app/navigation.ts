@@ -1,15 +1,8 @@
-import type { FC } from "react";
-import Chat from "../../pages/Chat";
-import Health from "../../pages/Health";
-import KnowledgeBase from "../../pages/KnowledgeBase";
-import Memory from "../../pages/Memory";
-import Monitoring from "../../pages/Monitoring";
-import Avatar from "../../pages/Avatar";
-import Personas from "../../pages/Personas";
-import Projects from "../../pages/Projects";
-import Search from "../../pages/Search";
-import Tools from "../../pages/Tools";
-import Workspace from "../../pages/Workspace";
+import {
+  lazy,
+  type ComponentType,
+  type LazyExoticComponent,
+} from "react";
 
 export const workspaceTabs = [
   { key: "Chat", label: "Chat", icon: "chat" },
@@ -43,16 +36,81 @@ export type Tab = (typeof allTabs)[number]["key"];
 export type TabConfig = (typeof allTabs)[number];
 export type ProjectSummary = { project_id: string; label: string };
 
-export const components: Record<Tab, FC> = {
-  Chat,
-  Health,
-  Monitoring,
-  Search,
-  Memory,
-  Avatar,
-  Personas,
-  Workspace,
-  KnowledgeBase,
-  Projects,
-  Tools,
+export const pageComponents: Record<
+  Tab,
+  LazyExoticComponent<ComponentType>
+> = {
+  Chat: lazy(() => import("../../pages/Chat")),
+  Search: lazy(() => import("../../pages/Search")),
+  Workspace: lazy(() => import("../../pages/Workspace")),
+  KnowledgeBase: lazy(() => import("../../pages/KnowledgeBase")),
+  Memory: lazy(() => import("../../pages/Memory")),
+  Personas: lazy(() => import("../../pages/Personas")),
+  Avatar: lazy(() => import("../../pages/Avatar")),
+  Tools: lazy(() => import("../../pages/Tools")),
+  Projects: lazy(() => import("../../pages/Projects")),
+  Health: lazy(() => import("../../pages/Health")),
+  Monitoring: lazy(() => import("../../pages/Monitoring")),
 };
+
+const tabPathSegments: Record<Tab, string> = {
+  Chat: "chat",
+  Search: "search",
+  Workspace: "workspace",
+  KnowledgeBase: "knowledge",
+  Memory: "memory",
+  Personas: "personas",
+  Avatar: "avatar",
+  Tools: "tools",
+  Projects: "projects",
+  Health: "health",
+  Monitoring: "monitoring",
+};
+
+const tabsByPathSegment = Object.fromEntries(
+  Object.entries(tabPathSegments).map(([tab, segment]) => [segment, tab]),
+) as Record<string, Tab>;
+
+export interface AdminRoute {
+  tab: Tab;
+  subView?: string;
+}
+
+export function isTab(value: string | null): value is Tab {
+  return value !== null && allTabs.some((tab) => tab.key === value);
+}
+
+export function parseAdminRoute(
+  pathname: string,
+  search = "",
+): AdminRoute | null {
+  const match = pathname.match(/^\/admin\/?([^/]*)\/?$/);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const tab = tabsByPathSegment[match[1]];
+  if (!tab) {
+    return null;
+  }
+
+  const subView = new URLSearchParams(search).get("view") || undefined;
+  return { tab, subView };
+}
+
+export function buildAdminPath(
+  tab: Tab,
+  projectId = "default",
+  subView?: string,
+): string {
+  const params = new URLSearchParams();
+  if (projectId && projectId !== "default") {
+    params.set("project", projectId);
+  }
+  if (subView) {
+    params.set("view", subView);
+  }
+
+  const query = params.toString();
+  return `/admin/${tabPathSegments[tab]}${query ? `?${query}` : ""}`;
+}

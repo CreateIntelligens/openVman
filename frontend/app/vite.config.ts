@@ -1,7 +1,8 @@
-import { defineConfig } from "vite";
-import vue from "@vitejs/plugin-vue";
-import checker from "vite-plugin-checker";
 import { resolve } from "node:path";
+
+import vue from "@vitejs/plugin-vue";
+import { defineConfig } from "vite";
+import checker from "vite-plugin-checker";
 
 const publicPort = Number(process.env.PORT ?? 8787);
 const rootDir = __dirname;
@@ -11,6 +12,11 @@ export default defineConfig({
     vue(),
     checker({ vueTsc: true }),
   ],
+  resolve: {
+    alias: {
+      "@contracts": resolve(rootDir, "../../contracts"),
+    },
+  },
   server: {
     host: true,
     port: 80,
