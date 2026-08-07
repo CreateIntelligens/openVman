@@ -436,10 +436,8 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
                         entry["name"] += tc_delta.function.name
                     if tc_delta.function.arguments:
                         entry["arguments_buf"] += tc_delta.function.arguments
-                extra = getattr(tc_delta, "model_extra", None) or {}
-                google_extra = (extra.get("extra_content") or {}).get("google") or {}
-                if sig := google_extra.get("thought_signature"):
-                    entry["thought_signature"] += sig
+                if sig := _extract_thought_signature(tc_delta):
+                    entry["thought_signature"] = sig
 
     if not text_buf and not tool_call_acc:
         raise ValueError("LLM 沒有回傳內容")
@@ -502,23 +500,37 @@ def _build_create_kwargs(tools: list[dict[str, Any]] | None, *, forced_tool_name
     return {"tools": tools, "tool_choice": tool_choice}
 
 
-def _now_ms() -> float:
-    """Return monotonic time in milliseconds."""
-    return monotonic() * 1000
+def _extract_thought_signature(obj: Any) -> str | None:
+    """Extract Google thought_signature from a tool call or delta object."""
+    if not obj:
+        return None
+    if isinstance(obj, dict):
+        if sig := obj.get("thought_signature") or obj.get("thought"):
+            return str(sig)
+        if google := obj.get("google"):
+            if isinstance(google, dict) and (sig := google.get("thought_signature")):
+                return str(sig)
+        if extra := obj.get("extra_content"):
+            return _extract_thought_signature(extra)
+        return None
+
+    if hasattr(obj, "thought_signature") and (sig := getattr(obj, "thought_signature", None)):
+        return str(sig)
+
+    for attr in ("extra_content", "model_extra"):
+        val = getattr(obj, attr, None)
+        if val and (sig := _extract_thought_signature(val)):
+            return sig
+
+    if hasattr(obj, "function"):
+        fn = getattr(obj, "function", None)
+        if fn and (sig := _extract_thought_signature(fn)):
+            return sig
+
+    return None
 
 
 def _extract_tool_call_extra_content(tool_call: Any) -> dict[str, Any] | None:
-    extra_content = getattr(tool_call, "extra_content", None)
-    if isinstance(extra_content, dict):
-        google = extra_content.get("google") or {}
-        if sig := google.get("thought_signature"):
-            return {"thought_signature": sig}
-        if sig := extra_content.get("thought_signature"):
-            return {"thought_signature": sig}
-
-    model_extra = getattr(tool_call, "model_extra", None) or {}
-    google_extra = (model_extra.get("extra_content") or {}).get("google") or {}
-    if sig := google_extra.get("thought_signature"):
+    if sig := _extract_thought_signature(tool_call):
         return {"thought_signature": sig}
-
     return None
