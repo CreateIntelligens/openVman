@@ -4,6 +4,7 @@ import ConfirmModal from "../components/ConfirmModal";
 import ChatHeader from "../components/chat/ChatHeader";
 import ChatInput from "../components/chat/ChatInput";
 import ChatMessage from "../components/chat/ChatMessage";
+import QuickQaModal from "../components/chat/QuickQaModal";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import { useProject } from "../context/ProjectContext";
 import { useChatSession } from "../hooks/useChatSession";
@@ -35,6 +36,7 @@ export default function Chat() {
     VOICE_SOURCES,
   );
   const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [quickQaOpen, setQuickQaOpen] = useState(false);
   const { projectId } = useProject();
   const {
     messages,
@@ -98,6 +100,7 @@ export default function Chat() {
     setDateTo,
     resetFilters,
   } = useChatSession();
+
   const liveClientIdRef = useRef<string>("");
   if (!liveClientIdRef.current) {
     liveClientIdRef.current = createLiveClientId(projectId);
@@ -121,6 +124,14 @@ export default function Chat() {
     toggleCamera: liveToggleCamera,
     toggleMicrophone: liveToggleMic,
   } = liveSession;
+
+  const handleSelectQuickQaQuestion = useCallback((question: string) => {
+    if (mode === "live") {
+      liveSendText(question);
+      return;
+    }
+    void submit(question);
+  }, [liveSendText, mode, submit]);
 
   const setVideoRef = useCallback((el: HTMLVideoElement | null) => {
     if (el && liveSession.cameraStream) {
@@ -287,6 +298,7 @@ export default function Chat() {
             mode={mode}
             onModeChange={handleModeChange}
             onOpenSessions={() => setSessionsOpen(true)}
+            onOpenQuickQa={() => setQuickQaOpen(true)}
           />
 
           {mode === "live" && (
@@ -473,22 +485,8 @@ export default function Chat() {
           />
         </div>
 
-        {/* Floating Webcam Preview */}
-        {liveSession.cameraActive && (
-          <div className="absolute right-4 bottom-24 z-50 w-64 overflow-hidden rounded-xl border border-border bg-surface-raised shadow-lg backdrop-blur-md">
-            <div className="flex items-center justify-between bg-surface-sunken/80 px-3 py-2 text-xs font-medium text-content border-b border-border">
-              <span className="flex items-center gap-1.5 truncate max-w-[11.25rem]">
-                <span className={`h-2 w-2 rounded-full bg-primary ${liveSession.cameraStatus ? 'animate-ping' : 'animate-pulse'}`} />
-                {liveSession.cameraStatus || "本機攝影機畫面"}
-              </span>
-              <button
-                onClick={handleLiveToggleCamera}
-                className="text-content-subtle hover:text-content transition-colors flex items-center justify-center"
-                title="關閉攝影機"
-              >
-                <span className="material-symbols-outlined text-[1rem]">close</span>
-              </button>
-            </div>
+                {mode === "live" && (
+          <div className="hidden w-80 shrink-0 border-l border-border bg-surface-sunken p-4 lg:block">
             <div className="relative aspect-video w-full bg-black">
               <video
                 ref={setVideoRef}
@@ -501,6 +499,12 @@ export default function Chat() {
           </div>
         )}
       </main>
+
+      <QuickQaModal
+        open={quickQaOpen}
+        onClose={() => setQuickQaOpen(false)}
+        onSelectQuestion={handleSelectQuickQaQuestion}
+      />
 
       <ConfirmModal
         open={deleteSessionTarget !== null}

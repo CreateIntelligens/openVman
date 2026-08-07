@@ -5,6 +5,7 @@ interface ChatHeaderProps {
   mode: "text" | "live";
   onModeChange: (mode: "text" | "live") => void;
   onOpenSessions: () => void;
+  onOpenQuickQa: () => void;
 }
 
 export default function ChatHeader({
@@ -14,6 +15,7 @@ export default function ChatHeader({
   mode,
   onModeChange,
   onOpenSessions,
+  onOpenQuickQa,
 }: ChatHeaderProps) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
@@ -31,6 +33,16 @@ export default function ChatHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenQuickQa}
+          className="flex items-center gap-1.5 rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs font-medium text-content transition-colors hover:border-primary/40 hover:bg-primary/5"
+          title="快速問答分類"
+        >
+          <span className="material-symbols-outlined text-primary text-[1.125rem]">quiz</span>
+          <span className="hidden sm:inline">快速問答</span>
+        </button>
+
         <div className="inline-flex rounded-md border border-border bg-surface-sunken p-0.5">
           <button
             type="button"

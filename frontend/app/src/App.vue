@@ -811,17 +811,33 @@ async function handleToggleCamera(): Promise<void> {
   }
 }
 
+function tryLockEscapeKeys(): void {
+  const nav = navigator as Record<string, any>;
+  if ("keyboard" in nav && typeof nav.keyboard?.lock === "function") {
+    void nav.keyboard.lock(["Escape"]).catch(() => {});
+  }
+}
+
+function tryUnlockKeyboard(): void {
+  const nav = navigator as Record<string, any>;
+  if ("keyboard" in nav && typeof nav.keyboard?.unlock === "function") {
+    nav.keyboard.unlock();
+  }
+}
+
 async function handleToggleImmersive(): Promise<void> {
   if (immersive.value) {
     if (document.fullscreenElement) {
       await document.exitFullscreen().catch(() => {});
     }
+    tryUnlockKeyboard();
     immersive.value = false;
     return;
   }
   immersive.value = true;
   try {
     await document.documentElement.requestFullscreen();
+    tryLockEscapeKeys();
   } catch (e) {
     console.warn("[App] requestFullscreen failed:", e);
   }
@@ -829,7 +845,22 @@ async function handleToggleImmersive(): Promise<void> {
 
 function handleFullscreenChange(): void {
   if (!document.fullscreenElement) {
-    immersive.value = false;
+    if (showSettings.value || showQuickQa.value) {
+      // Browser exited fullscreen on ESC while a modal was open.
+      // Sequential exit priority: close the open modal first and preserve fullscreen.
+      showSettings.value = false;
+      showQuickQa.value = false;
+      if (immersive.value) {
+        void document.documentElement.requestFullscreen().then(() => {
+          tryLockEscapeKeys();
+        }).catch(() => {
+          immersive.value = false;
+        });
+      }
+    } else {
+      immersive.value = false;
+      tryUnlockKeyboard();
+    }
   }
 }
 
@@ -875,7 +906,27 @@ watch(showSettings, () => {
   void fetchBackgrounds();
 });
 
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key === "Escape") {
+    if (showSettings.value || showQuickQa.value) {
+      event.preventDefault();
+      event.stopPropagation();
+      showSettings.value = false;
+      showQuickQa.value = false;
+    } else if (immersive.value || document.fullscreenElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+      }
+      immersive.value = false;
+      tryUnlockKeyboard();
+    }
+  }
+}
+
 onMounted(() => {
+  window.addEventListener("keydown", handleKeydown, true);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   void Promise.allSettled([
     fetchVrmAvatars(),
@@ -887,6 +938,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("keydown", handleKeydown, true);
   document.removeEventListener("fullscreenchange", handleFullscreenChange);
 });
 </script>
