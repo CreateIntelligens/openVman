@@ -364,6 +364,34 @@ def test_add_qa_entries_to_node_batch(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert node["qa_entries"][1]["hidden"] is True
 
 
+def test_create_node_for_csv_source_keeps_raw_question(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    root = _configure_workspace(monkeypatch, tmp_path)
+    qa_nodes = _import("knowledge.qa_nodes")
+    csv_path = root / "knowledge" / "qa" / "痛風.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_path.write_text(
+        "index,q,a,img,url\n1,如何預防痛風？,回答,,\n",
+        encoding="utf-8",
+    )
+
+    node = qa_nodes.create_node_for_source(
+        "knowledge/qa/痛風.csv",
+        "痛風",
+    )
+
+    assert node["qa_entries"] == [
+        {
+            "question": "如何預防痛風？",
+            "source_path": "knowledge/qa/痛風.csv",
+            "hidden": False,
+            "image_id": None,
+        }
+    ]
+
+
 def test_move_node_cycle_prevented(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     _configure_workspace(monkeypatch, tmp_path)
     qa_nodes = _import("knowledge.qa_nodes")
@@ -388,7 +416,6 @@ def test_move_node_cycle_prevented(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     # 4. Moving B to A is valid
     node = qa_nodes.move_node("node_b", ["node_a"])
     assert node["parent_ids"] == ["node_a"]
-
 
 
 

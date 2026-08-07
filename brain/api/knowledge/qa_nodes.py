@@ -471,26 +471,38 @@ def add_qa_entries_to_node(
         return node
 
 
-def _build_entries_for_source(source_path: str, project_id: str = "default") -> list[dict[str, Any]]:
-    """Parse a QA markdown doc into node qa_entries (deduped by question)."""
+def _build_entries_for_source(
+    source_path: str, project_id: str = "default"
+) -> list[dict[str, Any]]:
+    """Parse a QA markdown or CSV doc into node qa_entries (deduped by question)."""
     from knowledge.knowledge_admin import resolve_workspace_document
-    from knowledge.qa_csv import extract_image_id, parse_qa_markdown
+    from knowledge.qa_csv import (
+        convert_csv_to_qa_markdown,
+        extract_image_id,
+        parse_qa_markdown,
+    )
 
     doc_path = resolve_workspace_document(source_path, project_id)
-    parsed = (
-        parse_qa_markdown(doc_path.read_text(encoding="utf-8"))
-        if doc_path.exists()
-        else []
-    )
+    if not doc_path.exists():
+        return []
+
+    if source_path.lower().endswith(".csv"):
+        content = convert_csv_to_qa_markdown(doc_path.read_bytes())
+    else:
+        content = doc_path.read_text(encoding="utf-8", errors="ignore")
+
+    parsed = parse_qa_markdown(content)
 
     entries: list[dict[str, Any]] = []
     seen: set[str] = set()
+
     for item in parsed:
         question = item["q"].strip()
         if not question or question in seen:
             continue
         seen.add(question)
         image_id = extract_image_id(item.get("img") or "")
+
         entries.append(
             {
                 "question": question,
@@ -550,7 +562,9 @@ def adopt_orphan_qa_sources(project_id: str = "default") -> list[str]:
 
     referenced = referenced_source_paths(project_id)
     created: list[str] = []
-    for path, meta in load_doc_meta(project_id).items():
+    items = sorted(load_doc_meta(project_id).items(), key=lambda x: (1 if "_IMG_" in x[0] else 0, x[0]))
+
+    for path, meta in items:
         if meta.get("source_type") != "qa" or path in referenced:
             continue
         try:
@@ -560,7 +574,17 @@ def adopt_orphan_qa_sources(project_id: str = "default") -> list[str]:
         if not doc_path.exists():
             continue
         label = Path(path).stem
-        node = create_node_for_source(path, label, project_id)
+
+        parent_ids = None
+        if "_IMG_" in label:
+            base_label = label.split("_IMG_")[0].strip()
+            nodes = list_nodes(project_id)
+            for nid, n in nodes.items():
+                if n.get("label") == base_label:
+                    parent_ids = [nid]
+                    break
+
+        node = create_node_for_source(path, label, project_id, parent_ids=parent_ids)
         created.append(node["node_id"])
     return created
 
