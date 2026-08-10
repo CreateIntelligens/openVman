@@ -151,6 +151,17 @@ def _stub_config(monkeypatch: pytest.MonkeyPatch, llm_client: Any, *, api_key: s
 
 
 # ---------------------------------------------------------------------------
+# Monotonic request timing
+# ---------------------------------------------------------------------------
+
+def test_now_ms_returns_monotonic_milliseconds(monkeypatch: pytest.MonkeyPatch):
+    llm_client = _stub_deps(monkeypatch)
+    monkeypatch.setattr(llm_client, "monotonic", lambda: 12.345)
+
+    assert llm_client._now_ms() == pytest.approx(12345.0)
+
+
+# ---------------------------------------------------------------------------
 # 3.1: Text-only response
 # ---------------------------------------------------------------------------
 

@@ -500,6 +500,11 @@ def _build_create_kwargs(tools: list[dict[str, Any]] | None, *, forced_tool_name
     return {"tools": tools, "tool_choice": tool_choice}
 
 
+def _now_ms() -> float:
+    """Return monotonic time in milliseconds."""
+    return monotonic() * 1000
+
+
 def _extract_thought_signature(obj: Any) -> str | None:
     """Extract Google thought_signature from a tool call or delta object."""
     if not obj:
