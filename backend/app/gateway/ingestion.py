@@ -1,4 +1,4 @@
-"""Document ingestion via pdf-inspector, Docling, and MarkItDown fallback."""
+"""Document ingestion via pdf-inspector, Docling, and AnyDoc fallback."""
 
 from __future__ import annotations
 
@@ -11,12 +11,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import anydoc
+
 from app.config import TTSRouterConfig, get_tts_config
 
 logger = logging.getLogger("gateway.ingestion")
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
-_md_converter: Any = None
 _docling_converter: Any = None
 _DOCLING_SUPPORTED_SUFFIXES = frozenset({
     ".pdf",
@@ -59,6 +60,10 @@ class DocumentIngestionError(RuntimeError):
 
 class DoclingServiceError(DocumentIngestionError):
     """Raised when Docling cannot provide usable markdown."""
+
+
+class AnyDocServiceError(DocumentIngestionError):
+    """Raised when AnyDoc cannot provide usable markdown."""
 
 
 class PDFRepairError(DocumentIngestionError):
@@ -125,39 +130,29 @@ def _run_cmd(cmd: list[str], timeout_sec: float) -> bool:
         return False
 
 
-def _get_converter(name: str) -> Any:
-    """Lazy-load and return a converter by name."""
-    global _md_converter, _docling_converter
-    if name == "markitdown":
-        if _md_converter is None:
-            from markitdown import MarkItDown
+def _get_docling_converter() -> Any:
+    """Lazy-load the heavier Docling converter."""
+    global _docling_converter
+    if _docling_converter is None:
+        from docling.document_converter import DocumentConverter
 
-            _md_converter = MarkItDown()
-        return _md_converter
+        _docling_converter = DocumentConverter()
 
-    if name == "docling":
-        if _docling_converter is None:
-            from docling.document_converter import DocumentConverter
-
-            _docling_converter = DocumentConverter()
-        return _docling_converter
-
-    return None
+    return _docling_converter
 
 
 def _convert(file_path: str, trace_id: str, provider: str) -> str:
     logger.info("%s_ingest_start trace_id=%s path=%s", provider, trace_id, file_path)
-    converter = _get_converter(provider)
     try:
-        result = converter.convert(file_path)
         if provider == "docling":
+            result = _get_docling_converter().convert(file_path)
             markdown = result.document.export_to_markdown()
         else:
-            markdown = result.text_content or ""
+            markdown = anydoc.to_markdown(file_path) or ""
     except Exception as exc:
         if provider == "docling":
             raise DoclingServiceError(f"docling conversion failed: {exc}") from exc
-        raise DocumentIngestionError(f"markitdown conversion failed: {exc}") from exc
+        raise AnyDocServiceError(f"anydoc conversion failed: {exc}") from exc
 
     logger.info("%s_ingest_complete trace_id=%s chars=%d", provider, trace_id, len(markdown))
     return markdown
@@ -290,15 +285,15 @@ def _convert_with_docling_fallback(
     try:
         return _convert(file_path, trace_id, provider)
     except DoclingServiceError as exc:
-        if provider != "docling" or not cfg.docling_fallback_to_markitdown:
+        if provider != "docling" or not cfg.docling_fallback_to_anydoc:
             raise
 
         logger.warning(
-            "docling_ingest_failed trace_id=%s err=%s fallback=markitdown",
+            "docling_ingest_failed trace_id=%s err=%s fallback=anydoc",
             trace_id,
             exc,
         )
-        return _convert(file_path, trace_id, "markitdown")
+        return _convert(file_path, trace_id, "anydoc")
 
 
 def _ingest_without_repair(
@@ -480,7 +475,7 @@ def ingest_document(
 ) -> IngestionResult:
     cfg = cfg or get_tts_config()
     suffix = Path(file_path).suffix.lower()
-    provider = "docling" if suffix in _DOCLING_SUPPORTED_SUFFIXES else "markitdown"
+    provider = "docling" if suffix in _DOCLING_SUPPORTED_SUFFIXES else "anydoc"
 
     try:
         markdown = _ingest_without_repair(file_path, trace_id, cfg, provider)

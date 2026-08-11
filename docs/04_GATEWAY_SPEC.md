@@ -18,7 +18,7 @@
   > **實作現況**：Gateway 已整合進 Backend，以 Python FastAPI 實作，路由定義於 `backend/app/gateway/routes.py`。
 * **任務佇列**：BullMQ + Redis (Reliability)
   > **實作現況**：以 arq + Redis 實作非同步任務佇列，無 Redis 時自動 fallback 為同步處理。
-* **媒體處理**：OpenAI Vision/Whisper API, FFmpeg (Frames), Tesseract (OCR Backup), pdf-inspector PDF fast path, in-process Docling + MarkItDown fallback (Docs)
+* **媒體處理**：OpenAI Vision/Whisper API, FFmpeg (Frames), Tesseract (OCR Backup), pdf-inspector PDF fast path, in-process Docling + AnyDoc fallback (Docs)
 * **爬蟲**：Readability.js + JSDOM + Playwright (JS Rendering)
   > **實作現況**：以 Python httpx + BeautifulSoup 實作 web crawler plugin。
 * **可觀測性**：Pino (JSON Log), Prometheus (Metrics)

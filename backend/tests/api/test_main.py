@@ -19,34 +19,27 @@ if str(API_ROOT) not in sys.path:
 
 
 def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
-    fake_markitdown_mod = types.ModuleType("markitdown")
+    fake_anydoc_mod = types.ModuleType("anydoc")
+    fake_anydoc_mod.convert_paths = []
 
-    class FakeMarkItDown:
-        init_count = 0
-        convert_paths: list[str] = []
+    def _to_markdown(path: str) -> str:
+        fake_anydoc_mod.convert_paths.append(path)
+        return "converted markdown"
 
-        def __init__(self) -> None:
-            type(self).init_count += 1
+    fake_anydoc_mod.to_markdown = _to_markdown
+    monkeypatch.setitem(sys.modules, "anydoc", fake_anydoc_mod)
 
-        def convert(self, path: str):
-            type(self).convert_paths.append(path)
-            return types.SimpleNamespace(text_content="converted markdown")
-
-    fake_markitdown_mod.MarkItDown = FakeMarkItDown
-    monkeypatch.setitem(sys.modules, "markitdown", fake_markitdown_mod)
-
-    # Re-import app.main from scratch so the fake markitdown / config patches take.
+    # Re-import app.main from scratch so the fake anydoc / config patches take.
     # Use monkeypatch.delitem so the original module objects (or their absence) are
     # restored on teardown — otherwise the freshly re-imported modules leak into
     # later tests and break patch("app.routes.admin...") targeting.
     for name in ("app.gateway.websocket", "app.routes.admin", "app.main"):
         monkeypatch.delitem(sys.modules, name, raising=False)
     module = importlib.import_module("app.main")
-    monkeypatch.setattr(module, "_md_converter", None)
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=max_upload_bytes,
+        document_max_upload_bytes=max_upload_bytes,
     ))
-    return module, FakeMarkItDown
+    return module, fake_anydoc_mod
 
 
 def _get_tts_provider_payload(module) -> list[dict]:
@@ -93,7 +86,7 @@ def test_run_server_uses_configured_dev_mode(monkeypatch):
 
 
 def test_convert_rejects_oversized_upload(monkeypatch):
-    module, fake_markitdown = _load_main(monkeypatch, max_upload_bytes=4)
+    module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=4)
     client = TestClient(module.app)
 
     response = client.post(
@@ -103,22 +96,21 @@ def test_convert_rejects_oversized_upload(monkeypatch):
 
     assert response.status_code == 413
     assert response.json()["error_code"] == "UPLOAD_FAILED"
-    assert fake_markitdown.init_count == 0
+    assert fake_anydoc.convert_paths == []
 
 
 def test_convert_returns_upload_failed_code_when_conversion_crashes(monkeypatch):
-    module, _fake_markitdown = _load_main(monkeypatch, max_upload_bytes=1024)
+    module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=1024)
     client = TestClient(module.app)
 
-    class BrokenConverter:
-        def convert(self, path: str):
-            raise RuntimeError("boom")
+    def _raise_conversion_error(_path: str) -> str:
+        raise RuntimeError("boom")
 
-    module._md_converter = BrokenConverter()
+    fake_anydoc.to_markdown = _raise_conversion_error
 
     response = client.post(
         "/documents/convert",
-        files={"file": ("note.txt", b"hello", "text/plain")},
+        files={"file": ("data.csv", b"name\nhello\n", "text/csv")},
     )
 
     assert response.status_code == 500
@@ -127,27 +119,38 @@ def test_convert_returns_upload_failed_code_when_conversion_crashes(monkeypatch)
     assert response.json()["message"] == "檔案上傳失敗"
 
 
-def test_convert_lazily_initializes_markitdown_once(monkeypatch):
-    module, fake_markitdown = _load_main(monkeypatch, max_upload_bytes=1024)
+def test_convert_uses_anydoc_for_each_upload(monkeypatch):
+    module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=1024)
     client = TestClient(module.app)
-
-    assert fake_markitdown.init_count == 0
 
     first = client.post(
         "/documents/convert",
-        files={"file": ("note.txt", b"hello", "text/plain")},
+        files={"file": ("first.csv", b"name\nhello\n", "text/csv")},
     )
     second = client.post(
         "/documents/convert",
-        files={"file": ("note.txt", b"world", "text/plain")},
+        files={"file": ("second.csv", b"name\nworld\n", "text/csv")},
     )
 
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.json()["markdown"] == "converted markdown"
     assert second.json()["markdown"] == "converted markdown"
-    assert fake_markitdown.init_count == 1
-    assert len(fake_markitdown.convert_paths) == 2
+    assert len(fake_anydoc.convert_paths) == 2
+
+
+def test_convert_preserves_plaintext_without_anydoc(monkeypatch):
+    module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=1024)
+    client = TestClient(module.app)
+
+    response = client.post(
+        "/documents/convert",
+        files={"file": ("note.txt", b"plain text", "text/plain")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["markdown"] == "plain text"
+    assert fake_anydoc.convert_paths == []
 
 
 def test_openapi_merges_brain_request_schema(monkeypatch):
@@ -225,7 +228,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         close=_fake_close,
     )
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
         tts_gcp_enabled=False,
@@ -268,7 +271,7 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
         close=_fake_close,
     )
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
         tts_gcp_enabled=False,
@@ -306,7 +309,7 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
 
     module.admin_routes._health_http = FakeClient()
     monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
         tts_indextts_url="",
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
@@ -328,7 +331,7 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
 def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
         tts_cache_enabled=True,
         tts_cache_ttl_seconds=86400,
     ))
@@ -424,7 +427,7 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
     monkeypatch.setattr(module.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(module, "_get_service", lambda: fake_service)
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
     ))
@@ -471,7 +474,7 @@ def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
     monkeypatch.setattr(module, "_get_service", lambda: fake_service)
     # 無 IndexTTS → 直接進 fallback；Edge enabled → 走 streaming。
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
         tts_indextts_url="",
         tts_indextts_default_character="hayley",
     ))
@@ -508,7 +511,7 @@ def test_websocket_routes_user_speak_to_brain_relay_when_relay_is_active(monkeyp
     FakeRelay.instances.clear()
     module.websocket_routes.BrainLiveRelay = FakeRelay
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
     ))
 
     client = TestClient(module.app)
@@ -541,7 +544,7 @@ def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
     FakeRelay.instances.clear()
     module.websocket_routes.BrainLiveRelay = FakeRelay
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
     ))
 
     client = TestClient(module.app)
@@ -577,7 +580,7 @@ def test_websocket_drops_audio_before_client_init_and_uses_initialized_voice_sou
     FakeRelay.instances.clear()
     module.websocket_routes.BrainLiveRelay = FakeRelay
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
     ))
 
     client = TestClient(module.app)
@@ -683,7 +686,7 @@ def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(mon
             }
 
     monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        markitdown_max_upload_bytes=1024,
+        document_max_upload_bytes=1024,
     ))
 
     client = TestClient(module.app)

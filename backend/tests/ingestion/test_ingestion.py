@@ -30,7 +30,7 @@ def _cfg(*, fallback: bool = True):
         docling_serve_url="http://docling-serve:5001",
         docling_timeout_ms=5000,
         docling_api_key="",
-        docling_fallback_to_markitdown=fallback,
+        docling_fallback_to_anydoc=fallback,
         pdf_inspector_enabled=True,
         pdf_inspector_min_confidence=0.85,
         pdf_inspector_min_markdown_chars=10,
@@ -162,7 +162,7 @@ class TestIngestDocument:
         assert result.page_count is None
         mock_convert.assert_called_once_with(str(test_file), "test-trace", "docling")
 
-    def test_markitdown_non_docling_suffix_returns_markdown(self, tmp_path):
+    def test_anydoc_non_docling_suffix_returns_markdown(self, tmp_path):
         test_file = tmp_path / "page.txt"
         test_file.write_bytes(b"hello")
 
@@ -173,7 +173,7 @@ class TestIngestDocument:
             result = ingest_document(str(test_file), trace_id="test-trace", cfg=_cfg())
 
         assert result.content == "# Converted\n"
-        mock_convert.assert_called_once_with(str(test_file), "test-trace", "markitdown")
+        mock_convert.assert_called_once_with(str(test_file), "test-trace", "anydoc")
 
     def test_empty_content_returns_empty_string(self, tmp_path):
         test_file = tmp_path / "empty.pdf"
@@ -187,7 +187,7 @@ class TestIngestDocument:
 
         assert result.content == ""
 
-    def test_docling_failure_falls_back_to_markitdown(self, tmp_path):
+    def test_docling_failure_falls_back_to_anydoc(self, tmp_path):
         test_file = tmp_path / "fallback.docx"
         test_file.write_bytes(b"docx")
 

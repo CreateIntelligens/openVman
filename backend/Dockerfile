@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=cache,target=/usr/local/cargo/registry \
     uv pip install \
     "docling>=2.0.0" \
-    "markitdown[all]>=0.1,<1" \
+    "firecrawl-anydoc==0.1.7" \
     "pdf-inspector @ git+https://github.com/firecrawl/pdf-inspector.git@8b63ceb084f75dfd4425129d1d90d5bca45054e4"
 
 COPY requirements.txt .

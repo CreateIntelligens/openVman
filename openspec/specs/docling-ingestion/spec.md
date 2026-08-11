@@ -1,7 +1,7 @@
 # docling-ingestion Specification
 
 ## Purpose
-Define the pdf-inspector / Docling-backed ingestion pipeline that converts uploaded office documents into canonical Markdown knowledge while preserving the original source artifact.
+Define the pdf-inspector / Docling / AnyDoc ingestion pipeline that converts uploaded office documents into canonical Markdown knowledge while preserving the original source artifact.
 
 ## Requirements
 ### Requirement: Gateway converts office documents into canonical Markdown knowledge
@@ -12,6 +12,7 @@ The knowledge ingestion pipeline MUST convert PDF, DOCX, PPTX, and XLSX office d
 - **THEN** Backend 應保存原始檔案以對齊 `workspace/raw/` 的責任
 - **THEN** 若檔案是 text-based PDF 且 pdf-inspector 信心分數達門檻、輸出非空、無 OCR 頁與 encoding issue，Backend 應採用 pdf-inspector 的 Markdown
 - **THEN** 若 PDF 不符合 fast path 條件，或檔案是 DOCX / PPTX / XLSX，Backend 應使用 container 內的 Docling `DocumentConverter` 轉換
+- **THEN** 若 Docling 轉換失敗且 fallback 已啟用，Backend 應使用 container 內的 AnyDoc Rust binding 轉換，不得依賴 MarkItDown
 - **THEN** Backend 應將轉換後的 Markdown 內容以 `.md` 形式寫入 `workspace/knowledge/` 並供 Brain 索引
 
 ### Requirement: Markdown conversion preserves high-value table structure
@@ -38,10 +39,10 @@ The system MUST keep the original office document and the derived Markdown repre
 - **THEN** 知識庫管理與檢索流程應以 Markdown 衍生檔作為主要可編輯內容
 
 ### Requirement: Conversion failure is handled explicitly during upload
-The system MUST handle pdf-inspector and Docling conversion failures or invalid responses explicitly during upload instead of silently forwarding corrupted or empty markdown.
+The system MUST handle pdf-inspector, Docling, and AnyDoc conversion failures or invalid responses explicitly during upload instead of silently forwarding corrupted or empty markdown.
 
 #### Scenario: Conversion fails during upload
-- **WHEN** Backend 在文件上傳流程中無法使用 pdf-inspector fast path，且 Docling 轉換也失敗
+- **WHEN** Backend 在文件上傳流程中無法使用 pdf-inspector fast path，且 Docling 與 AnyDoc fallback 轉換也失敗
 - **THEN** 系統應記錄可診斷的錯誤日誌
 - **THEN** 系統應依既定策略回報 upload failure 或啟用 fallback
 - **THEN** 系統不得將空白或損壞的 Markdown 當作成功轉換結果轉發給 Brain

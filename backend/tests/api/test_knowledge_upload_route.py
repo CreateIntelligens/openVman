@@ -17,11 +17,11 @@ from app.gateway.ingestion import IngestionResult
 def _mock_cfg():
     return types.SimpleNamespace(
         brain_url="http://brain:8100",
-        markitdown_max_upload_bytes=10 * 1024 * 1024,
+        document_max_upload_bytes=10 * 1024 * 1024,
         docling_serve_url="http://docling-serve:5001",
         docling_timeout_ms=5000,
         docling_api_key="",
-        docling_fallback_to_markitdown=True,
+        docling_fallback_to_anydoc=True,
     )
 
 

@@ -14,9 +14,11 @@ _ENV_KEYS_TO_CLEAR = (
     "TTS_INDEXTTS_URL",
     "TTS_AWS_ENABLED",
     "TTS_EDGE_SAMPLE_RATE",
+    "DOCUMENT_MAX_UPLOAD_BYTES",
     "MARKITDOWN_MAX_UPLOAD_BYTES",
     "DOCLING_SERVE_URL",
     "DOCLING_TIMEOUT_MS",
+    "DOCLING_FALLBACK_TO_ANYDOC",
     "DOCLING_FALLBACK_TO_MARKITDOWN",
     "PDF_INSPECTOR_ENABLED",
     "PDF_INSPECTOR_MIN_CONFIDENCE",
@@ -56,10 +58,10 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
                 "TTS_INDEXTTS_URL=http://mock-index:8001",
                 "TTS_AWS_ENABLED=true",
                 "TTS_EDGE_SAMPLE_RATE=16000",
-                "MARKITDOWN_MAX_UPLOAD_BYTES=1234",
+                "DOCUMENT_MAX_UPLOAD_BYTES=1234",
                 "DOCLING_SERVE_URL=http://docling-serve:5001",
                 "DOCLING_TIMEOUT_MS=9999",
-                "DOCLING_FALLBACK_TO_MARKITDOWN=false",
+                "DOCLING_FALLBACK_TO_ANYDOC=false",
                 "PDF_INSPECTOR_ENABLED=false",
                 "PDF_INSPECTOR_MIN_CONFIDENCE=0.9",
                 "PDF_INSPECTOR_MIN_MARKDOWN_CHARS=25",
@@ -75,10 +77,10 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
     assert config.tts_indextts_url == "http://mock-index:8001"
     assert config.tts_aws_enabled is True
     assert config.edge_tts_sample_rate == 16000
-    assert config.markitdown_max_upload_bytes == 1234
+    assert config.document_max_upload_bytes == 1234
     assert config.docling_serve_url == "http://docling-serve:5001"
     assert config.docling_timeout_ms == 9999
-    assert config.docling_fallback_to_markitdown is False
+    assert config.docling_fallback_to_anydoc is False
     assert config.pdf_inspector_enabled is False
     assert config.pdf_inspector_min_confidence == 0.9
     assert config.pdf_inspector_min_markdown_chars == 25
@@ -86,6 +88,24 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
     assert config.pdf_repair_timeout_ms == 20000
     assert config.backend_port == 9999
     assert config.is_dev is True
+
+
+def test_legacy_markitdown_env_names_remain_compatible(tmp_path: Path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "MARKITDOWN_MAX_UPLOAD_BYTES=4321",
+                "DOCLING_FALLBACK_TO_MARKITDOWN=false",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = TTSRouterConfig(_env_file=env_file)
+
+    assert config.document_max_upload_bytes == 4321
+    assert config.docling_fallback_to_anydoc is False
 
 
 def test_legacy_uvicorn_reload_env_no_longer_changes_mode(tmp_path: Path):

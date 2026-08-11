@@ -18,18 +18,11 @@ def _dockerfile_text() -> str:
     return _backend_file("Dockerfile").read_text(encoding="utf-8").lower()
 
 
-def test_markitdown_pdf_extra_is_enabled():
-    # markitdown is pinned in the Dockerfile (its own cache layer), not requirements.txt.
-    markitdown_lines = [
-        line.strip()
-        for line in _dockerfile_text().splitlines()
-        if "markitdown" in line.lower()
-    ]
+def test_anydoc_python_binding_is_pinned():
+    dockerfile = _dockerfile_text()
 
-    assert markitdown_lines, "markitdown not pinned in backend/Dockerfile"
-    assert any(
-        "[pdf]" in line or "[all]" in line for line in markitdown_lines
-    ), f"markitdown pinned without [pdf]/[all] extra: {markitdown_lines}"
+    assert '"firecrawl-anydoc==0.1.7"' in dockerfile
+    assert "markitdown" not in dockerfile
 
 
 def test_pdf_inspector_is_installed_with_rust_build_dependencies():

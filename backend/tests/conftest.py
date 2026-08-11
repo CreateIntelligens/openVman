@@ -23,10 +23,13 @@ sys.modules.setdefault("google", types.ModuleType("google"))
 sys.modules.setdefault("google.cloud", types.ModuleType("google.cloud"))
 sys.modules.setdefault("google.cloud.texttospeech", _fake_tts_mod)
 
-# Stub markitdown (may not be installed in test env)
-_fake_markitdown = types.ModuleType("markitdown")
-_fake_markitdown.MarkItDown = MagicMock  # type: ignore[attr-defined]
-sys.modules.setdefault("markitdown", _fake_markitdown)
+# Stub AnyDoc when its native Python binding is not installed in the test env.
+try:
+    import anydoc  # noqa: F401
+except ImportError:
+    _fake_anydoc = types.ModuleType("anydoc")
+    _fake_anydoc.to_markdown = MagicMock(return_value="")  # type: ignore[attr-defined]
+    sys.modules.setdefault("anydoc", _fake_anydoc)
 
 # Stub openai if not installed
 try:

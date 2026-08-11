@@ -77,7 +77,7 @@ graph TD
 | **`admin`** | 管理後台前端 | React, Nginx | 輕量 (CPU) |
 | **`redis`** | 任務隊列與暫存 | Redis 7 | 輕量 (RAM) |
 
-文件解析不是獨立 compose service。PDF 上傳時由 `backend` container 內的 `pdf-inspector` 先判斷是否可走 text-based fast path；不適合 fast path 的 PDF，以及 DOCX / PPTX / XLSX，會交由 Python Docling 套件 in-process 轉成 Markdown，失敗時依設定 fallback 到 MarkItDown。
+文件解析不是獨立 compose service。PDF 上傳時由 `backend` container 內的 `pdf-inspector` 先判斷是否可走 text-based fast path；不適合 fast path 的 PDF，以及 DOCX / PPTX / XLSX，會交由 Python Docling 套件 in-process 轉成 Markdown，失敗時依設定 fallback 到 Rust-backed AnyDoc。
 
 ---
 

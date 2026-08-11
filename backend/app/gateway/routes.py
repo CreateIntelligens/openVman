@@ -408,7 +408,7 @@ async def upload_knowledge_documents(
                     brain_url=cfg.brain_url,
                     markdown_target_dir=markdown_target_dir,
                     project_id=project_id,
-                    max_bytes=cfg.markitdown_max_upload_bytes,
+                    max_bytes=cfg.document_max_upload_bytes,
                 )
                 forwarded_relative_path = _swap_extension_for_markdown(client_relative, forwarded[0])
             forwarded_files.append(("files", forwarded))

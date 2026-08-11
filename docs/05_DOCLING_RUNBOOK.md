@@ -3,7 +3,7 @@
 
 本文提供給協助處理環境與驗證的同事，說明如何在 openVman 專案中驗證知識庫文件 ingestion 流程是否正常。
 
-> 實作現況：目前不是透過獨立 `docling-serve` 容器轉檔。Backend container 內直接安裝 `pdf-inspector`、`docling` 與 `markitdown`。PDF 會先嘗試 `pdf-inspector` fast path；只有 text-based、高信心、Markdown 非空、無 OCR 頁與 encoding issue 時才採用。其餘 PDF / Office 文件會走 in-process Docling，失敗時依設定 fallback 到 MarkItDown。
+> 實作現況：目前不是透過獨立 `docling-serve` 容器轉檔。Backend container 內直接安裝 `pdf-inspector`、`docling` 與 Rust-backed `firecrawl-anydoc`。PDF 會先嘗試 `pdf-inspector` fast path；只有 text-based、高信心、Markdown 非空、無 OCR 頁與 encoding issue 時才採用。其餘 PDF / Office 文件會走 in-process Docling，失敗時依設定 fallback 到 AnyDoc。
 
 ### 1. 目標
 
@@ -13,7 +13,8 @@
 office/pdf source
   -> workspace/raw/
   -> PDF fast path: pdf-inspector when safe
-  -> fallback: Backend in-process Docling convert
+  -> Backend in-process Docling convert
+  -> fallback: AnyDoc convert
   -> workspace/knowledge/*.md
   -> Brain reindex
   -> LanceDB
@@ -48,10 +49,10 @@ docker compose up -d api backend
 docker compose ps
 ```
 
-確認 backend container 內可 import Docling：
+確認 backend container 內可 import 三個 parser：
 
 ```bash
-docker compose exec backend python -c "import pdf_inspector; from docling.document_converter import DocumentConverter; print('pdf-inspector and docling ok')"
+docker compose exec backend python -c "import anydoc, pdf_inspector; from docling.document_converter import DocumentConverter; print('parsers ok')"
 ```
 
 查看 Backend 日誌：
@@ -84,7 +85,7 @@ curl -s http://localhost:8200/healthz | jq
 #### 4.2 直接檢查 parser import
 
 ```bash
-docker compose exec backend python -c "import pdf_inspector; from docling.document_converter import DocumentConverter; print('parsers ok')"
+docker compose exec backend python -c "import anydoc, pdf_inspector; from docling.document_converter import DocumentConverter; print('parsers ok')"
 ```
 
 若 import 失敗，先重新 build backend image 並確認 `backend/Dockerfile` 的 parser install layer。
@@ -184,7 +185,7 @@ docker compose logs --tail=200 backend
 - `pdf_inspector_fallback`
 - `pdf_inspector_failed`
 - `docling_ingest_failed`
-- `fallback=markitdown`
+- `fallback=anydoc`
 - `document_ingest_failed`
 - `pdf_ingestion_failed_trigger_repair` (偵測到結構毀損，準備修復)
 - `pdf_repair_attempt` (嘗試特定修復後端)
@@ -192,7 +193,7 @@ docker compose logs --tail=200 backend
 - `pdf_repair_rebuilt_caveat` (Ghostscript fallback 重建警告)
 - `pdf_repair_failed_all_backends` (所有修復手段皆失敗)
 
-若有 `pdf_inspector_fallback`，表示 PDF fast path 沒被採用，系統會繼續走 Docling。若有 `fallback=markitdown`，表示 Docling 沒成功，但系統可能已退回 MarkItDown。修復層的紀錄會於轉換失敗時自動觸發。
+若有 `pdf_inspector_fallback`，表示 PDF fast path 沒被採用，系統會繼續走 Docling。若有 `fallback=anydoc`，表示 Docling 沒成功，但系統可能已退回 AnyDoc。修復層的紀錄會於轉換失敗時自動觸發。
 
 #### 7.3 raw 有保存，但 knowledge 沒有 `.md`
 
@@ -212,7 +213,7 @@ docker compose logs --tail=200 api
 
 同事驗證完成時，至少應能確認：
 
-1. Backend container 內可 import `pdf_inspector` 與 `docling.document_converter.DocumentConverter`
+1. Backend container 內可 import `anydoc`、`pdf_inspector` 與 `docling.document_converter.DocumentConverter`
 2. 上傳 office 文件後，原始檔會保存到 `raw/`
 3. 系統會產生可讀的 Markdown 到 `knowledge/`
 4. Markdown 中的表格仍保有基本結構
@@ -221,7 +222,7 @@ docker compose logs --tail=200 api
 ### 9. 備註
 
 - `openrag` 在本專案中僅作為 Docling ingestion 參考來源，不作整體平台導入。
-- 若現場需要進一步比對 Docling 與舊 MarkItDown 轉換品質，建議保留同一份文件的兩版輸出做人工比較。
+- 若現場需要進一步比對 Docling 與 AnyDoc 轉換品質，建議保留同一份文件的兩版輸出做人工比較。
 
 ### 10. 相關設定
 
@@ -229,7 +230,8 @@ docker compose logs --tail=200 api
 PDF_INSPECTOR_ENABLED=true
 PDF_INSPECTOR_MIN_CONFIDENCE=0.85
 PDF_INSPECTOR_MIN_MARKDOWN_CHARS=10
-DOCLING_FALLBACK_TO_MARKITDOWN=true
+DOCLING_FALLBACK_TO_ANYDOC=true
+DOCUMENT_MAX_UPLOAD_BYTES=104857600
 PDF_REPAIR_ENABLED=true
 PDF_REPAIR_TIMEOUT_MS=120000
 ```
@@ -242,7 +244,7 @@ PDF_REPAIR_TIMEOUT_MS=120000
 
 ### 11. PDF 結構修復與預檢層 (PDF Repair Layer)
 
-當 PDF 檔案因結構損毀或解析套件毀損，導致原始解析流程（pdf-inspector -> Docling -> MarkItDown）皆失敗時，系統會自動在 backend container 內嘗試多種修復工具。
+當 PDF 檔案因結構損毀或解析套件毀損，導致原始解析流程（pdf-inspector -> Docling -> AnyDoc）皆失敗時，系統會自動在 backend container 內嘗試多種修復工具。
 
 #### 修復手段與順序
 1. **qpdf 重寫**：透過 `qpdf` 進行輕量檔案重建，自動修復 cross-reference 與串流長度。

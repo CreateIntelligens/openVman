@@ -10,12 +10,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from time import monotonic
 
+import anydoc
 import httpx
 from fastapi import FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from markitdown import MarkItDown
 from pydantic import BaseModel, Field
 
 from app.observability import (
@@ -97,6 +97,7 @@ _ACCESS_LOG_SILENT_PATHS = frozenset({
     "/metrics/prometheus",
     "/brain/metrics/prometheus",
 })
+_PLAINTEXT_DOCUMENT_SUFFIXES = frozenset({".md", ".markdown", ".txt"})
 
 _DASHBOARD_POLLING_PATHS = frozenset({
     "/api/projects",
@@ -136,21 +137,20 @@ class _SilentAccessPathsFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(_SilentAccessPathsFilter())
 
 _service: TTSRouterService | None = None
-_md_converter: MarkItDown | None = None
 _health_http = SharedAsyncClient()
 _BRAIN_OPENAPI_TIMEOUT_SECONDS = 5
+
+
+def _convert_document_to_markdown(file_path: str) -> str:
+    if Path(file_path).suffix.lower() in _PLAINTEXT_DOCUMENT_SUFFIXES:
+        return Path(file_path).read_text(encoding="utf-8")
+    return anydoc.to_markdown(file_path)
 
 
 def _get_service() -> TTSRouterService:
     global _service
     _service = _service or TTSRouterService(get_tts_config())
     return _service
-
-
-def _get_md_converter() -> MarkItDown:
-    global _md_converter
-    _md_converter = _md_converter or MarkItDown()
-    return _md_converter
 
 
 async def _startup_gateway_resources() -> None:
@@ -530,12 +530,12 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
         tmp_path, total_bytes = await persist_upload_to_tempfile(
             file,
             suffix=suffix,
-            max_bytes=cfg.markitdown_max_upload_bytes,
+            max_bytes=cfg.document_max_upload_bytes,
         )
         logger.info("Converting file: %s (%d bytes)", file.filename, total_bytes)
-        result = _get_md_converter().convert(tmp_path)
+        markdown = _convert_document_to_markdown(tmp_path)
         from app.utils.chinese import convert_to_traditional
-        markdown = convert_to_traditional(result.text_content or "")
+        markdown = convert_to_traditional(markdown or "")
         return JSONResponse(content={"markdown": markdown, "page_count": None})
     except UploadTooLargeError as exc:
         limit_mb = exc.limit_bytes / (1024 * 1024)
