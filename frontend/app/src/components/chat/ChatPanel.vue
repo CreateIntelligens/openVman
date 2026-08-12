@@ -27,6 +27,24 @@
               :is-typing="isTyping && msg === messages[messages.length - 1]"
             />
           </p>
+          <div v-if="msg.role === 'ai' && (msg.imageId || safeHttpUrl(msg.url))" class="chat-msg__media">
+            <img
+              v-if="msg.imageId && !failedImages[mediaKey(i, msg)]"
+              :src="qaImageUrl(msg)"
+              :alt="`回覆參考圖片：${msg.imageId}`"
+              loading="lazy"
+              decoding="async"
+              @error="failedImages[mediaKey(i, msg)] = true"
+            />
+            <a
+              v-if="safeHttpUrl(msg.url)"
+              :href="safeHttpUrl(msg.url) || undefined"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              開啟相關連結
+            </a>
+          </div>
           <div v-if="!compact && msg.sourcePath" class="chat-msg__reference-container">
             <button
               type="button"
@@ -192,6 +210,27 @@ function formatSourcePath(path: string): string {
 }
 
 const expandedRefs = ref<Record<number, boolean>>({})
+const failedImages = ref<Record<string, boolean>>({})
+
+function mediaKey(index: number, message: ChatMessage): string {
+  return `${index}:${message.imageId || ""}`
+}
+
+function qaImageUrl(message: ChatMessage): string {
+  if (!message.imageId) return ""
+  const params = new URLSearchParams({ project_id: message.projectId || "default" })
+  return `/api/knowledge/qa/images/${encodeURIComponent(message.imageId)}?${params}`
+}
+
+function safeHttpUrl(value?: string): string | null {
+  if (!value) return null
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null
+  } catch {
+    return null
+  }
+}
 
 function toggleRef(idx: number): void {
   expandedRefs.value[idx] = !expandedRefs.value[idx]
@@ -323,6 +362,44 @@ useStickToBottom(messagesRef, contentRef)
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+.chat-msg__media {
+  display: flex;
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.chat-msg__media img {
+  width: auto;
+  max-width: 100%;
+  max-height: 55dvh;
+  border: var(--hairline) solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--bg-soft);
+  object-fit: contain;
+}
+
+.chat-msg__media a {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: var(--hairline) solid var(--line);
+  border-radius: 0.5rem;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color var(--ov-dur-micro) var(--ov-ease-out),
+    border-color var(--ov-dur-micro) var(--ov-ease-out);
+}
+
+.chat-msg__media a:hover {
+  border-color: var(--primary);
+  background: var(--bg-soft);
 }
 
 .chat-msg__ref-btn {

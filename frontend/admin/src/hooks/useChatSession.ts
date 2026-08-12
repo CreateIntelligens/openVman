@@ -4,6 +4,7 @@ import {
   fetchChatHistory,
   type ActionRequest,
   type ChatMessage as ChatMessageType,
+  type Citation,
   type RetrievalResult,
 } from "../api";
 import {
@@ -29,12 +30,15 @@ const ASR_IDLE_TIMEOUT_MS = 10000;
 type ChatResultPayload = {
   session_id: string;
   reply: string;
-  knowledge_results: RetrievalResult[];
-  memory_results: RetrievalResult[];
+  knowledge_results?: RetrievalResult[];
+  memory_results?: RetrievalResult[];
   history?: ChatMessageType[];
   tool_steps?: import("../api/chat").ToolStep[];
   response_time_s?: number;
   pii_pending?: boolean;
+  citations?: Citation[];
+  image_id?: string;
+  url?: string;
 };
 
 const PII_POLL_INTERVAL_MS = 2000;
@@ -79,6 +83,11 @@ function applyChatResultToMessages(
   sources: { knowledge: RetrievalResult[]; memory: RetrievalResult[] },
 ): ChatMessageType[] {
   const pendingActions = getLastAssistantActions(current);
+  const media = {
+    citations: payload.citations,
+    image_id: payload.image_id,
+    url: payload.url,
+  };
 
   if (payload.history) {
     const history = [...payload.history];
@@ -89,8 +98,8 @@ function applyChatResultToMessages(
       }
 
       history[index] = pendingActions
-        ? { ...message, sources, action_requests: pendingActions, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
-        : { ...message, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s };
+        ? { ...message, ...media, sources, action_requests: pendingActions, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
+        : { ...message, ...media, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s };
       break;
     }
     return history;
@@ -102,7 +111,7 @@ function applyChatResultToMessages(
 
   return current.map((message, index) => (
     index === current.length - 1 && message.role === "assistant"
-      ? { ...message, content: payload.reply, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
+      ? { ...message, ...media, content: payload.reply, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
       : message
   ));
 }
@@ -394,6 +403,9 @@ export function useChatSession() {
                 action_requests: last.action_requests ?? merged[idx].action_requests,
                 tool_steps: last.tool_steps ?? merged[idx].tool_steps,
                 response_time_s: last.response_time_s ?? merged[idx].response_time_s,
+                citations: last.citations ?? merged[idx].citations,
+                image_id: last.image_id ?? merged[idx].image_id,
+                url: last.url ?? merged[idx].url,
               };
             }
             return merged;

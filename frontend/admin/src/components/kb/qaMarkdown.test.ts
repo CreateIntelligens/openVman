@@ -4,7 +4,9 @@ import {
   createEmptyQaRow,
   hasIncompleteQaRows,
   hasUsableQaRow,
+  parseQaCsv,
   parseQaMarkdown,
+  qaRowsToCsv,
   qaRowsToMarkdown,
   type QaRow,
 } from "./qaMarkdown";
@@ -43,6 +45,35 @@ describe("qaRowsToMarkdown", () => {
 
   it("trim 前後空白", () => {
     expect(qaRowsToMarkdown([row({ question: "  Q  ", answer: "  A  " })])).toContain("## Q\n\nA\n");
+  });
+});
+
+describe("QA CSV", () => {
+  it("解析含逗號、換行與圖片欄位的 CSV", () => {
+    const csv = 'index,q,a,img,url,display,full_question\n1,"PRP 有哪些生長因子？","包含 PDGF, TGF。\n可協助修復。",PRP(1),https://example.com,true,完整問題';
+
+    const parsed = parseQaCsv(csv);
+
+    expect(parsed.rows[0]).toMatchObject({
+      question: "PRP 有哪些生長因子？",
+      answer: "包含 PDGF, TGF。\n可協助修復。",
+      img: "PRP(1)",
+      url: "https://example.com",
+      hidden: false,
+    });
+  });
+
+  it("儲存時保留原 CSV 的額外欄位", () => {
+    const csv = "index,q,a,img,url,display,full_question\n1,Q,A,,,true,保留我";
+    const parsed = parseQaCsv(csv);
+    const serialized = qaRowsToCsv(
+      [{ ...parsed.rows[0], answer: "新答案" }],
+      parsed.headers,
+    );
+
+    expect(serialized).toContain("full_question");
+    expect(parseQaCsv(serialized).rows[0].csvFields?.full_question).toBe("保留我");
+    expect(parseQaCsv(serialized).rows[0].answer).toBe("新答案");
   });
 });
 

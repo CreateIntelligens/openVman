@@ -182,6 +182,39 @@ describe("useChatSession TTS prefetch", () => {
     expect(playTtsMock).not.toHaveBeenCalled();
   });
 
+  it("attaches RAG citations, image, and URL to the assistant message", async () => {
+    fetchChatMock.mockResolvedValue({
+      session_id: "sess-media",
+      reply: "請掃描 QR code",
+      image_id: "B1-4",
+      url: "https://example.com/line",
+      citations: [
+        {
+          uri: "knowledge/qa/line.csv",
+          title: "官方 LINE",
+          text: "請掃描 QR code",
+          image_id: "B1-4",
+          url: "https://example.com/line",
+        },
+      ],
+      history: [
+        { role: "user", content: "官方 LINE" },
+        { role: "assistant", content: "請掃描 QR code" },
+      ],
+    });
+
+    const { result } = renderHook(() => useChatSession());
+
+    await act(async () => {
+      await result.current.submit("官方 LINE");
+    });
+
+    const assistant = result.current.messages[result.current.messages.length - 1];
+    expect(assistant?.image_id).toBe("B1-4");
+    expect(assistant?.url).toBe("https://example.com/line");
+    expect(assistant?.citations?.[0].image_id).toBe("B1-4");
+  });
+
   it("does not prefetch when the final reply is empty", async () => {
     fetchChatMock.mockResolvedValue({
       session_id: "sess-1",

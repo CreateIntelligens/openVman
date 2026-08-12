@@ -194,15 +194,141 @@ def test_qa_images_routes(client):
     image_id = data["image_id"]
     assert image_id.endswith(".png")
 
-    # 2. DELETE /brain/knowledge/qa/images/{id}
+    # 2. GET /brain/knowledge/qa/images/{id}
+    response = client.get(f"/brain/knowledge/qa/images/{image_id}")
+    assert response.status_code == 200
+    assert response.content == img_data
+    assert response.headers["content-type"] == "image/png"
+
+    # 3. DELETE /brain/knowledge/qa/images/{id}
     response = client.delete(f"/brain/knowledge/qa/images/{image_id}")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-    # 3. POST /brain/knowledge/qa/images/cleanup-unused
+    # 4. POST /brain/knowledge/qa/images/cleanup-unused
     response = client.post("/brain/knowledge/qa/images/cleanup-unused")
     assert response.status_code == 200
     assert "deleted_files" in response.json()
+
+
+@pytest.mark.parametrize(
+    ("suffix", "media_type"),
+    [
+        ("avif", "image/avif"),
+        ("bmp", "image/bmp"),
+        ("gif", "image/gif"),
+        ("ico", "image/vnd.microsoft.icon"),
+        ("jpeg", "image/jpeg"),
+        ("jpg", "image/jpeg"),
+        ("png", "image/png"),
+        ("webp", "image/webp"),
+    ],
+)
+def test_qa_image_routes_support_web_image_formats(client, suffix, media_type):
+    image_data = f"fake {suffix} image".encode()
+    response = client.post(
+        "/brain/knowledge/qa/images",
+        files={"file": (f"test.{suffix}", image_data, media_type)},
+    )
+    assert response.status_code == 200
+
+    image_id = response.json()["image_id"]
+    response = client.get(f"/brain/knowledge/qa/images/{image_id}")
+
+    assert response.status_code == 200
+    assert response.content == image_data
+    assert response.headers["content-type"] == media_type
+
+
+def test_qa_image_upload_rejects_active_svg_content(client):
+    response = client.post(
+        "/brain/knowledge/qa/images",
+        files={"file": ("unsafe.svg", b"<svg></svg>", "image/svg+xml")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unsupported image type"
+
+
+def test_qa_image_id_matches_filename_with_spacing(client):
+    from knowledge.workspace import resolve_workspace_artifact
+
+    image_path = resolve_workspace_artifact(
+        "knowledge/.qa_images/PRP (1).jpg",
+        "default",
+    )
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"prp image")
+
+    response = client.get("/brain/knowledge/qa/images/PRP(1)")
+
+    assert response.status_code == 200
+    assert response.content == b"prp image"
+    assert response.headers["content-type"] == "image/jpeg"
+
+
+def test_merged_route_reads_and_preserves_csv_media(client):
+    from knowledge.workspace import ensure_workspace_scaffold
+    from knowledge.qa_nodes import update_node
+
+    client.post(
+        "/brain/knowledge/qa/nodes",
+        json={
+            "node_id": "csv_node",
+            "label": "CSV Node",
+            "parent_ids": [],
+            "child_ids": [],
+            "order": 1.0,
+            "hidden": False,
+        },
+    )
+    source_file = "knowledge/qa/media.csv"
+    source_path = ensure_workspace_scaffold() / source_file
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_path.write_text(
+        (
+            "index,q,a,img,url,display\n"
+            "1,怎麼加入,掃描 QR code,B1-4,https://example.com/line,true\n"
+        ),
+        encoding="utf-8",
+    )
+    update_node(
+        "csv_node",
+        {
+            "qa_entries": [
+                {
+                    "question": "怎麼加入",
+                    "source_path": source_file,
+                    "hidden": False,
+                    "image_id": "B1-4",
+                }
+            ]
+        },
+    )
+
+    response = client.get("/brain/knowledge/qa/nodes/csv_node/merged")
+    assert response.status_code == 200
+    assert response.json()[0] == {
+        "index": "1",
+        "q": "怎麼加入",
+        "a": "掃描 QR code",
+        "img": "B1-4",
+        "url": "https://example.com/line",
+        "source_file": source_file,
+        "hidden": False,
+    }
+
+    payload = response.json()
+    payload[0]["a"] = "請掃描 QR code"
+    response = client.put(
+        "/brain/knowledge/qa/nodes/csv_node/merged",
+        json=payload,
+    )
+    assert response.status_code == 200
+
+    response = client.get("/brain/knowledge/qa/nodes/csv_node/merged")
+    assert response.json()[0]["a"] == "請掃描 QR code"
+    assert response.json()[0]["url"] == "https://example.com/line"
 
 
 def test_qa_markdown_code_block_exclusion(client):
@@ -658,5 +784,3 @@ def test_ingest_source_removes_empty_ghost_node(client, tmp_path):
     assert response.status_code == 200
 
     assert qa_nodes.get_node("n_ghost") is None
-
-

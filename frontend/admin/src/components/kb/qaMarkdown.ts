@@ -4,6 +4,12 @@ export interface QaRow {
   img: string;
   url: string;
   hidden: boolean;
+  csvFields?: Record<string, string>;
+}
+
+export interface QaCsvDocument {
+  headers: string[];
+  rows: QaRow[];
 }
 
 export function createEmptyQaRow(): QaRow {
@@ -94,4 +100,98 @@ export function parseQaMarkdown(content: string): QaRow[] {
   }
 
   return rows;
+}
+
+function parseCsvRecords(content: string): string[][] {
+  const records: string[][] = [];
+  let record: string[] = [];
+  let field = "";
+  let quoted = false;
+
+  for (let index = 0; index < content.length; index += 1) {
+    const char = content[index];
+    if (quoted) {
+      if (char === '"' && content[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = true;
+    } else if (char === ",") {
+      record.push(field);
+      field = "";
+    } else if (char === "\n") {
+      record.push(field);
+      records.push(record);
+      record = [];
+      field = "";
+    } else if (char !== "\r") {
+      field += char;
+    }
+  }
+
+  if (field || record.length > 0) {
+    record.push(field);
+    records.push(record);
+  }
+  return records;
+}
+
+export function parseQaCsv(content: string): QaCsvDocument {
+  const records = parseCsvRecords(content.replace(/^\uFEFF/, ""));
+  const headers = records.shift()?.map((header) => header.trim()) ?? [];
+  const rows = records.flatMap((values) => {
+    const csvFields = Object.fromEntries(
+      headers.map((header, index) => [header, values[index] ?? ""]),
+    );
+    const question = (csvFields.q ?? csvFields.question ?? "").trim();
+    const answer = (csvFields.a ?? csvFields.answer ?? "").trim();
+    if (!question && !answer) return [];
+
+    const display = (csvFields.display ?? "true").trim().toLowerCase();
+    return [{
+      question,
+      answer,
+      img: (csvFields.img ?? "").trim(),
+      url: (csvFields.url ?? "").trim(),
+      hidden: ["false", "0", "no", "hidden"].includes(display),
+      csvFields,
+    }];
+  });
+  return { headers, rows };
+}
+
+function escapeCsvField(value: string): string {
+  if (!/[",\r\n]/.test(value)) return value;
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+export function qaRowsToCsv(rows: QaRow[], originalHeaders: string[]): string {
+  const requiredHeaders = ["index", "q", "a", "img", "url", "display"];
+  const headers = [
+    ...originalHeaders,
+    ...requiredHeaders.filter((header) => !originalHeaders.includes(header)),
+  ];
+  const lines = rows
+    .filter((row) => !isBlankRow(row))
+    .map((row, index) => {
+      const fields: Record<string, string> = {
+        ...(row.csvFields ?? {}),
+        index: row.csvFields?.index || String(index + 1),
+        q: row.question.trim(),
+        a: row.answer.trim(),
+        img: row.img.trim(),
+        url: row.url.trim(),
+        display: row.hidden ? "false" : "true",
+      };
+      return headers.map((header) => escapeCsvField(fields[header] ?? "")).join(",");
+    });
+  return [headers.map(escapeCsvField).join(","), ...lines].join("\n");
 }

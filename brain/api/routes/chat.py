@@ -122,6 +122,14 @@ async def chat_history(session_id: str, project_id: str = "default", persona_id:
             pw = metadata.get("privacy_warning")
             if isinstance(pw, dict) and pw:
                 entry["privacy_warning"] = pw
+            citations = metadata.get("citations")
+            if isinstance(citations, list) and citations:
+                entry["citations"] = citations
+            image_id = metadata.get("image_id")
+            if isinstance(image_id, str) and image_id:
+                entry["image_id"] = image_id
+            url = metadata.get("url")
+            if isinstance(url, str) and url:
+                entry["url"] = url
         history.append(entry)
     return {"session_id": session_id, "persona_id": persona_id, "history": history}
-

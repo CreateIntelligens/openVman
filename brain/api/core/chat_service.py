@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -106,6 +107,12 @@ def _serialize_history_message(msg: dict[str, Any]) -> dict[str, Any]:
         entry["response_time_s"] = rts
     if pw := msg_meta.get("privacy_warning"):
         entry["privacy_warning"] = pw
+    if citations := msg_meta.get("citations"):
+        entry["citations"] = citations
+    if image_id := msg_meta.get("image_id"):
+        entry["image_id"] = image_id
+    if url := msg_meta.get("url"):
+        entry["url"] = url
     return entry
 
 
@@ -179,9 +186,16 @@ def _collect_citations_from_tool_steps(tool_steps: list[dict[str, Any]]) -> list
     by_uri: dict[str, dict[str, Any]] = {}
     for step in tool_steps:
         result = step.get("result") if isinstance(step, dict) else None
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except json.JSONDecodeError:
+                continue
         if not isinstance(result, dict):
             continue
-        for cite in result.get("citations") or []:
+        data = result.get("data")
+        citation_source = data if isinstance(data, dict) else result
+        for cite in citation_source.get("citations") or []:
             if not isinstance(cite, dict):
                 continue
             uri = str(cite.get("uri") or cite.get("title") or "")
@@ -192,6 +206,22 @@ def _collect_citations_from_tool_steps(tool_steps: list[dict[str, Any]]) -> list
             if existing is None or distance < float(existing.get("distance", 999.0)):
                 by_uri[uri] = dict(cite)
     return sorted(by_uri.values(), key=lambda c: float(c.get("distance", 999.0)))
+
+
+def _primary_media(citations: list[dict[str, Any]]) -> dict[str, str]:
+    """Project the first citation's media into the JTAI-compatible envelope."""
+    if not citations:
+        return {}
+
+    primary = citations[0]
+    media: dict[str, str] = {}
+    image_id = str(primary.get("image_id") or primary.get("image") or "").strip()
+    url = str(primary.get("url") or primary.get("source_url") or "").strip()
+    if image_id:
+        media["image_id"] = image_id
+    if url:
+        media["url"] = url
+    return media
 
 
 def finalize_generation(
@@ -232,11 +262,16 @@ def finalize_generation(
     else:
         user_pii_future = None
 
+    citations = _collect_citations_from_tool_steps(tool_steps or [])
+    primary_media = _primary_media(citations)
     meta: dict[str, Any] = {}
     if tool_steps:
         meta["tool_steps"] = tool_steps
     if response_time_s is not None:
         meta["response_time_s"] = response_time_s
+    if citations:
+        meta["citations"] = citations
+    meta.update(primary_media)
     _, assistant_message_id = append_session_message_with_id(
         context.session_id, context.persona_id, "assistant", cleaned_reply,
         project_id=context.project_id, metadata=meta or None,
@@ -275,9 +310,11 @@ def finalize_generation(
         assistant_entry["tool_steps"] = tool_steps
     if response_time_s is not None:
         assistant_entry["response_time_s"] = response_time_s
+    if citations:
+        assistant_entry["citations"] = citations
+    assistant_entry.update(primary_media)
     history.append(assistant_entry)
-    citations = _collect_citations_from_tool_steps(tool_steps or [])
-    return {
+    response = {
         "status": "ok",
         "trace_id": context.trace_id,
         "session_id": context.session_id,
@@ -287,6 +324,8 @@ def finalize_generation(
         "pii_pending": pii_pending,
         "citations": citations,
     }
+    response.update(primary_media)
+    return response
 
 
 _TOOL_FALLBACK_HINT = (

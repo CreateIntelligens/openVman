@@ -68,4 +68,25 @@ describe("MergedCsvPane", () => {
     expect(question.className).toContain("dark:focus:bg-slate-950/70");
     expect(question.className).not.toContain("dark:focus:bg-slate-850");
   });
+
+  it("shows the referenced image as a thumbnail", async () => {
+    qaNodeMocks.fetchMergedQa.mockResolvedValue([
+      {
+        index: "1",
+        q: "PRP 有哪些生長因子？",
+        a: "答案",
+        img: "PRP(1)",
+        url: "",
+        source_file: "knowledge/qa/prp.csv",
+        hidden: false,
+      },
+    ]);
+
+    render(<MergedCsvPane nodeId="root" nodeLabel="Root" />);
+
+    const image = await screen.findByRole("img", { name: /PRP 有哪些生長因子/ });
+    expect(image.getAttribute("src")).toBe(
+      "/api/knowledge/qa/images/PRP(1)?project_id=default",
+    );
+  });
 });

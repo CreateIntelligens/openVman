@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -71,6 +72,20 @@ def test_golden_csv_chunks_stable():
     assert all(metadata.get("kind") == "qa_csv" for _, metadata in tuples)
     questions = [metadata.get("question") for _, metadata in tuples]
     assert questions == ["什麼魚適合新手?", "要帶什麼?"]
+
+
+def test_csv_chunks_preserve_image_id_and_url(tmp_path):
+    source = tmp_path / "media.csv"
+    source.write_text(
+        "q,a,img,url\n怎麼加入,掃描 QR code,images/B1-4,https://example.com/line\n",
+        encoding="utf-8",
+    )
+
+    chunks = _extract_csv_chunks(source, tmp_path)
+
+    assert len(chunks) == 1
+    assert chunks[0].metadata["image_id"] == "B1-4"
+    assert chunks[0].metadata["url"] == "https://example.com/line"
 
 
 def test_csv_uses_streaming_reader(monkeypatch):
@@ -308,3 +323,39 @@ def test_rebuild_migrates_legacy_table_columns(tmp_path, monkeypatch):
     assert record["path"] == "a.md"
     assert record["chunk_id"] == "a.md::0"
     assert embedder.encoded_text_count == 0
+
+
+def test_rebuild_invalidates_pre_versioned_fingerprints(tmp_path, monkeypatch):
+    idx, workspace, db, _ = _install_pipeline_harness(monkeypatch, tmp_path)
+    source = workspace / "a.md"
+    source.write_text("# A\n\nAlpha.", encoding="utf-8")
+    legacy_fingerprint = hashlib.sha256(source.read_bytes()).hexdigest()
+    state_path = idx.resolve_embedding_index_state_path("proj")
+    state_path.write_text(
+        json.dumps({"documents": {"a.md": legacy_fingerprint}}),
+        encoding="utf-8",
+    )
+    db.tables["knowledge"] = _FakeTable(
+        [
+            {
+                "text": "legacy",
+                "vector": [0.1, 0.2, 0.3],
+                "source": "workspace",
+                "date": "2026-08-12",
+                "path": "a.md",
+                "chunk_id": "a.md::0",
+                "metadata": json.dumps(
+                    {
+                        "path": "a.md",
+                        "chunk_id": "a.md::0",
+                        "fingerprint": legacy_fingerprint,
+                    }
+                ),
+            }
+        ]
+    )
+
+    result = idx.rebuild_knowledge_index("proj")
+
+    assert result["changed_documents"] == 1
+    assert idx.load_index_state("proj")["a.md"] == idx._fingerprint_document(source)

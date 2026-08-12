@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 import pytest
@@ -56,3 +57,57 @@ def test_non_ephemeral_persists_both():
 
     assert "user" in appended and "assistant" in appended
     mock_archive.assert_called_once()
+
+
+def test_finalize_returns_and_persists_primary_citation_media():
+    assistant_metadata = {}
+
+    def fake_append(session_id, persona_id, role, content, **kwargs):
+        if role == "assistant":
+            assistant_metadata.update(kwargs.get("metadata") or {})
+        return (None, f"id-{role}")
+
+    tool_steps = [
+        {
+            "name": "search_knowledge",
+            "result": json.dumps(
+                {
+                    "status": "ok",
+                    "data": {
+                        "citations": [
+                            {
+                                "uri": "knowledge/qa/line.csv",
+                                "title": "官方 LINE",
+                                "text": "請掃描 QR code",
+                                "distance": 0.1,
+                                "image_id": "B1-4",
+                                "url": "https://example.com/line",
+                            }
+                        ]
+                    },
+                }
+            ),
+        }
+    ]
+
+    with (
+        patch.object(
+            chat_service,
+            "append_session_message_with_id",
+            side_effect=fake_append,
+        ),
+        patch.object(chat_service, "archive_session_turn"),
+        patch.object(chat_service, "_schedule_memory_writes"),
+    ):
+        response = chat_service.finalize_generation(
+            _ctx(),
+            "請掃描院內提供的 QR code。",
+            tool_steps,
+        )
+
+    assert response["image_id"] == "B1-4"
+    assert response["url"] == "https://example.com/line"
+    assert response["citations"][0]["image_id"] == "B1-4"
+    assert response["history"][-1]["image_id"] == "B1-4"
+    assert assistant_metadata["image_id"] == "B1-4"
+    assert assistant_metadata["url"] == "https://example.com/line"

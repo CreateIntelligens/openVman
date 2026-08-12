@@ -39,4 +39,45 @@ describe("ChatMessage privacy warning rendering", () => {
 
     expect(screen.queryByText("偵測到：電話 ×1")).toBeNull();
   });
+
+  it("renders the primary RAG image and link", () => {
+    render(
+      <ChatMessage
+        message={{
+          role: "assistant",
+          content: "請掃描院內提供的 QR code。",
+          image_id: "B1-4",
+          url: "https://example.com/line",
+          citations: [
+            {
+              uri: "knowledge/qa/line.csv",
+              title: "官方 LINE",
+              text: "請掃描 QR code",
+            },
+          ],
+        }}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "官方 LINE" });
+    expect(image.getAttribute("src")).toBe(
+      "/api/knowledge/qa/images/B1-4?project_id=default",
+    );
+    expect(screen.getByRole("link", { name: "開啟相關連結" }).getAttribute("href"))
+      .toBe("https://example.com/line");
+  });
+
+  it("does not render unsafe RAG links", () => {
+    render(
+      <ChatMessage
+        message={{
+          role: "assistant",
+          content: "不安全連結",
+          url: "javascript:alert(1)",
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: "開啟相關連結" })).toBeNull();
+  });
 });

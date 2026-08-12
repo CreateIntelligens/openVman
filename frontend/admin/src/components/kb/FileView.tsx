@@ -185,7 +185,11 @@ export default function FileView({
               spellCheck={false}
             />
           ) : (
-            <QaDocEditor content={editContent} onChange={setEditContent} />
+            <QaDocEditor
+              content={editContent}
+              onChange={setEditContent}
+              format={document.extension?.toLowerCase() === ".csv" ? "csv" : "markdown"}
+            />
           )}
         </div>
       ) : (

@@ -2,41 +2,58 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   createEmptyQaRow,
+  parseQaCsv,
   parseQaMarkdown,
+  qaRowsToCsv,
   qaRowsToMarkdown,
   type QaRow,
 } from "./qaMarkdown";
+import QaImagePreview from "./QaImagePreview";
 
 interface QaDocEditorProps {
   content: string;
   onChange: (content: string) => void;
+  format?: "markdown" | "csv";
 }
 
 type EditableField = "question" | "answer" | "img" | "url" | "hidden";
 
-function editableRowsFromContent(content: string): QaRow[] {
-  const parsedRows = parseQaMarkdown(content);
+function editableRowsFromContent(content: string, format: "markdown" | "csv"): QaRow[] {
+  const parsedRows = format === "csv" ? parseQaCsv(content).rows : parseQaMarkdown(content);
   return parsedRows.length > 0 ? parsedRows : [createEmptyQaRow()];
 }
 
-export default function QaDocEditor({ content, onChange }: QaDocEditorProps) {
-  const [rows, setRows] = useState<QaRow[]>(() => editableRowsFromContent(content));
+export default function QaDocEditor({ content, onChange, format = "markdown" }: QaDocEditorProps) {
+  const [rows, setRows] = useState<QaRow[]>(() => editableRowsFromContent(content, format));
+  const csvHeadersRef = useRef(format === "csv" ? parseQaCsv(content).headers : []);
   // Blank draft rows serialize to nothing, so re-parse only on external
   // content changes (document switch / cancel), not on our own emits.
   const lastEmittedRef = useRef(content);
 
   useEffect(() => {
     if (content !== lastEmittedRef.current) {
-      setRows(editableRowsFromContent(content));
+      if (format === "csv") {
+        const parsedCsv = parseQaCsv(content);
+        const nextRows = parsedCsv.rows.length > 0
+          ? parsedCsv.rows
+          : [createEmptyQaRow()];
+        setRows(nextRows);
+        csvHeadersRef.current = parsedCsv.headers;
+      } else {
+        setRows(editableRowsFromContent(content, format));
+        csvHeadersRef.current = [];
+      }
       lastEmittedRef.current = content;
     }
-  }, [content]);
+  }, [content, format]);
 
   const emit = (next: QaRow[]) => {
     setRows(next);
-    const markdown = qaRowsToMarkdown(next);
-    lastEmittedRef.current = markdown;
-    onChange(markdown);
+    const serialized = format === "csv"
+      ? qaRowsToCsv(next, csvHeadersRef.current)
+      : qaRowsToMarkdown(next);
+    lastEmittedRef.current = serialized;
+    onChange(serialized);
   };
 
   const handleCellChange = (
@@ -65,102 +82,85 @@ export default function QaDocEditor({ content, onChange }: QaDocEditorProps) {
             <p className="text-xs">點擊下方「新增一列」開始建立問答</p>
           </div>
         ) : (
-          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden min-w-[50rem]">
-            <table className="w-full text-left border-collapse table-fixed">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400">
-                  <th className="py-3 px-4 w-[4%] text-center">#</th>
-                  <th className="py-3 px-4 w-[28%]">問題 (Question)</th>
-                  <th className="py-3 px-4 w-[28%]">答案 (Answer)</th>
-                  <th className="py-3 px-4 w-[12%]">圖片 ID</th>
-                  <th className="py-3 px-4 w-[12%]">外部連結 URL</th>
-                  <th className="py-3 px-4 w-[8%] text-center">可見性</th>
-                  <th className="py-3 px-4 w-[8%] text-center">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
-                {rows.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors ${
-                      row.hidden ? "opacity-60 bg-slate-50/20 dark:bg-slate-950/10" : ""
-                    }`}
-                  >
-                    <td className="py-2 px-4 align-middle text-center text-xs font-mono text-slate-400 dark:text-slate-500">
-                      {idx + 1}
-                    </td>
-
-                    <td className="py-2 px-3 align-middle">
-                      <textarea
-                        value={row.question}
-                        onChange={(e) => handleCellChange(idx, "question", e.target.value)}
-                        placeholder="請輸入問題"
-                        rows={2}
-                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
-                      />
-                    </td>
-
-                    <td className="py-2 px-3 align-middle">
-                      <textarea
-                        value={row.answer}
-                        onChange={(e) => handleCellChange(idx, "answer", e.target.value)}
-                        placeholder="請輸入答案"
-                        rows={2}
-                        className="w-full resize-none bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs leading-relaxed text-slate-800 dark:text-slate-200 transition-all focus:shadow-sm"
-                      />
-                    </td>
-
-                    <td className="py-2 px-3 align-middle">
-                      <input
-                        type="text"
-                        value={row.img}
-                        onChange={(e) => handleCellChange(idx, "img", e.target.value)}
-                        placeholder="圖片 ID"
-                        className="w-full min-w-0 bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
-                      />
-                    </td>
-
-                    <td className="py-2 px-3 align-middle">
-                      <input
-                        type="text"
-                        value={row.url}
-                        onChange={(e) => handleCellChange(idx, "url", e.target.value)}
-                        placeholder="外部連結"
-                        className="w-full bg-transparent outline-none focus:bg-white dark:focus:bg-slate-950/70 p-1.5 border border-transparent focus:border-slate-300 dark:focus:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300 transition-all focus:shadow-sm"
-                      />
-                    </td>
-
-                    <td className="py-2 px-3 text-center align-middle">
-                      <button
-                        type="button"
-                        onClick={() => handleCellChange(idx, "hidden", !row.hidden)}
-                        className={`inline-flex items-center justify-center p-1.5 rounded-lg transition-colors ${
-                          row.hidden
-                            ? "bg-slate-100 hover:bg-slate-200 text-slate-400 dark:bg-slate-800 dark:hover:bg-slate-700"
-                            : "bg-success/10 text-success hover:bg-success/20 dark:bg-success/20 dark:text-success"
-                        }`}
-                        title={row.hidden ? "目前已隱藏，點擊以顯示" : "目前顯示中，點擊以隱藏"}
-                      >
-                        <span className="material-symbols-outlined text-[1.125rem]">
-                          {row.hidden ? "visibility_off" : "visibility"}
-                        </span>
-                      </button>
-                    </td>
-
-                    <td className="py-2 px-3 text-center align-middle">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveRow(idx)}
-                        className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-danger hover:bg-danger/10 transition-all"
-                        title="刪除此行"
-                      >
-                        <span className="material-symbols-outlined text-[1.125rem]">delete</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            {rows.map((row, idx) => (
+              <article
+                key={idx}
+                className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 ${row.hidden ? "opacity-60" : ""}`}
+              >
+                <header className="mb-4 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-slate-500">問答 {idx + 1}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCellChange(idx, "hidden", !row.hidden)}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ${row.hidden ? "bg-slate-100 text-slate-500 dark:bg-slate-800" : "bg-success/10 text-success"}`}
+                      title={row.hidden ? "目前已隱藏，點擊以顯示" : "目前顯示中，點擊以隱藏"}
+                    >
+                      <span className="material-symbols-outlined text-base">{row.hidden ? "visibility_off" : "visibility"}</span>
+                      {row.hidden ? "已隱藏" : "顯示中"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(idx)}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-400 transition-colors hover:bg-danger/10 hover:text-danger"
+                      title="刪除此行"
+                    >
+                      <span className="material-symbols-outlined text-base">delete</span>
+                      刪除
+                    </button>
+                  </div>
+                </header>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <label className="space-y-1.5 text-xs font-semibold text-slate-500">
+                    <span>問題</span>
+                    <textarea
+                      value={row.question}
+                      onChange={(e) => handleCellChange(idx, "question", e.target.value)}
+                      placeholder="請輸入問題"
+                      rows={3}
+                      className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-normal leading-relaxed text-slate-800 outline-none transition-colors focus:border-primary focus:bg-white dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-950/70"
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold text-slate-500">
+                    <span>答案</span>
+                    <textarea
+                      value={row.answer}
+                      onChange={(e) => handleCellChange(idx, "answer", e.target.value)}
+                      placeholder="請輸入答案"
+                      rows={5}
+                      className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-normal leading-relaxed text-slate-800 outline-none transition-colors focus:border-primary focus:bg-white dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-950/70"
+                    />
+                  </label>
+                </div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <label className="space-y-2 text-xs font-semibold text-slate-500">
+                    <span>圖片</span>
+                    <QaImagePreview
+                      imageId={row.img}
+                      alt={`${row.question || `問答 ${idx + 1}`}的參考圖片`}
+                    />
+                    <input
+                      type="text"
+                      value={row.img}
+                      onChange={(e) => handleCellChange(idx, "img", e.target.value)}
+                      placeholder="圖片 ID"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-xs font-normal text-slate-700 outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300"
+                    />
+                  </label>
+                  <label className="space-y-2 text-xs font-semibold text-slate-500">
+                    <span>外部連結</span>
+                    <input
+                      type="text"
+                      value={row.url}
+                      onChange={(e) => handleCellChange(idx, "url", e.target.value)}
+                      placeholder="外部連結"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs font-normal text-slate-700 outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300"
+                    />
+                  </label>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </div>

@@ -71,6 +71,24 @@ describe("FileView", () => {
     );
   });
 
+  it("shows CSV QA content and its image instead of an empty editor", () => {
+    renderFileView({
+      document: {
+        ...baseDocument,
+        path: "knowledge/prp.csv",
+        extension: ".csv",
+        content: "index,q,a,img,url,display\n1,PRP 有哪些生長因子？,答案,PRP(1),,true",
+      },
+      editContent: "index,q,a,img,url,display\n1,PRP 有哪些生長因子？,答案,PRP(1),,true",
+    });
+
+    expect(screen.getByDisplayValue("PRP 有哪些生長因子？")).toBeTruthy();
+    const image = screen.getByRole("img", { name: /PRP 有哪些生長因子/ });
+    expect(image.getAttribute("src")).toBe(
+      "/api/knowledge/qa/images/PRP(1)?project_id=default",
+    );
+  });
+
   it("keeps structured QA fields readable when focused in dark mode", () => {
     renderFileView({
       editContent: '## Q1\n\nA1\n<!-- qa_metadata: {"img":"","url":""} -->',

@@ -247,6 +247,10 @@ def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
         result["path"] = path
     if title := str(meta.get("title", "")).strip():
         result["title"] = title
+    if image_id := str(meta.get("image_id") or meta.get("image") or "").strip():
+        result["image_id"] = image_id
+    if url := str(meta.get("url") or meta.get("source_url") or "").strip():
+        result["url"] = url
     return result
 
 

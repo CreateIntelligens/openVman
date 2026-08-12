@@ -45,6 +45,21 @@ export interface ChatMessage {
   privacy_warning?: PiiWarningSummary;
   tool_steps?: ToolStep[];
   response_time_s?: number;
+  citations?: Citation[];
+  image_id?: string;
+  url?: string;
+}
+
+export interface Citation {
+  uri: string;
+  title: string;
+  text: string;
+  distance?: number;
+  matched_queries?: string[];
+  image_id?: string;
+  image?: string;
+  url?: string;
+  source_url?: string;
 }
 
 export interface ToolStep {
@@ -59,11 +74,14 @@ export interface ChatResponse {
   session_id: string;
   persona_id?: string;
   reply: string;
-  knowledge_results: RetrievalResult[];
-  memory_results: RetrievalResult[];
+  knowledge_results?: RetrievalResult[];
+  memory_results?: RetrievalResult[];
   history: ChatMessage[];
   tool_steps?: ToolStep[];
   pii_pending?: boolean;
+  citations?: Citation[];
+  image_id?: string;
+  url?: string;
 }
 
 
@@ -88,4 +106,3 @@ export async function fetchChatHistory(sessionId: string, personaId = "default")
     projectUrl("/chat/history", { session_id: sessionId, persona_id: personaId }),
   );
 }
-

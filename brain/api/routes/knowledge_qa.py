@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 from collections import defaultdict
 import logging
+import re
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from knowledge.doc_meta import upsert_document_meta
@@ -20,8 +22,10 @@ from knowledge.knowledge_admin import (
 )
 from knowledge.qa_csv import (
     extract_image_id,
+    parse_qa_csv,
     parse_qa_markdown,
     qa_markdown_block,
+    serialize_qa_csv,
 )
 from knowledge.qa_nodes import (
     adopt_orphan_qa_sources,
@@ -43,6 +47,18 @@ from routes.knowledge import schedule_reindex
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/brain/knowledge/qa", tags=["Knowledge QA"])
+
+_QA_IMAGE_MEDIA_TYPES = {
+    ".avif": "image/avif",
+    ".bmp": "image/bmp",
+    ".gif": "image/gif",
+    ".ico": "image/vnd.microsoft.icon",
+    ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+_ALLOWED_QA_IMAGE_SUFFIXES = frozenset(_QA_IMAGE_MEDIA_TYPES)
 
 
 class CreateNodeRequest(BaseModel):
@@ -367,8 +383,11 @@ def get_merged_qa_route(
         try:
             doc_path = resolve_workspace_document(source_path, project_id)
             if doc_path.exists():
-                content = doc_path.read_text(encoding="utf-8")
-                parsed_qas = parse_qa_markdown_with_metadata(content)
+                if doc_path.suffix.lower() == ".csv":
+                    parsed_qas = parse_qa_csv(doc_path.read_bytes())
+                else:
+                    content = doc_path.read_text(encoding="utf-8")
+                    parsed_qas = parse_qa_markdown_with_metadata(content)
                 qa_dict = {item["q"]: item for item in parsed_qas}
         except Exception:
             pass
@@ -413,6 +432,7 @@ async def put_merged_qa_route(
 
         for source_file, items in by_file.items():
             blocks: list[str] = []
+            csv_entries: list[dict[str, Any]] = []
             for item in items:
                 q = item.q.strip()
                 a = item.a.strip()
@@ -422,6 +442,16 @@ async def put_merged_qa_route(
 
                 hidden = item.hidden if item.hidden is not None else existing_hidden.get(q, False)
                 blocks.append(qa_markdown_block(q, a, img_val, url, hidden))
+                csv_entries.append(
+                    {
+                        "index": item.index,
+                        "q": q,
+                        "a": a,
+                        "img": img_val,
+                        "url": url,
+                        "hidden": hidden,
+                    }
+                )
                 new_qa_entries.append(
                     {
                         "question": q,
@@ -431,8 +461,11 @@ async def put_merged_qa_route(
                     }
                 )
 
-            markdown_content = "\n\n".join(blocks)
-            save_workspace_document(source_file, markdown_content, project_id)
+            if Path(source_file).suffix.lower() == ".csv":
+                content = serialize_qa_csv(csv_entries)
+            else:
+                content = "\n\n".join(blocks)
+            save_workspace_document(source_file, content, project_id)
             upsert_document_meta(source_file, project_id, source_type="qa")
 
         update_node(id, {"qa_entries": new_qa_entries}, project_id=project_id)
@@ -450,6 +483,8 @@ async def upload_image_route(
     file_bytes = await file.read()
 
     ext = Path(file.filename).suffix.lower()
+    if ext not in _ALLOWED_QA_IMAGE_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Unsupported image type")
     image_id = f"{uuid4()}{ext}"
 
     await asyncio.to_thread(
@@ -461,6 +496,45 @@ async def upload_image_route(
     )
 
     return {"image_id": image_id}
+
+
+def _resolve_qa_image(id: str, project_id: str) -> Path:
+    safe_id = Path(id).name
+    if not safe_id or safe_id != id:
+        raise HTTPException(status_code=400, detail="Invalid image ID")
+
+    images_dir = resolve_workspace_artifact("knowledge/.qa_images", project_id)
+    exact_path = resolve_workspace_artifact(
+        f"knowledge/.qa_images/{safe_id}", project_id
+    )
+    if (
+        exact_path.is_file()
+        and exact_path.suffix.lower() in _ALLOWED_QA_IMAGE_SUFFIXES
+    ):
+        return exact_path
+
+    if Path(safe_id).suffix:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # 匯入來源的圖片名稱可能在括號前含空白（例如 PRP (1).jpg），
+    # 但 CSV 的圖片 ID 是 PRP(1)。比對時忽略空白，避免同一資產因命名格式而 404。
+    normalized_id = re.sub(r"\s+", "", safe_id).casefold()
+    candidates = sorted(images_dir.iterdir()) if images_dir.is_dir() else []
+    for candidate in candidates:
+        if (
+            candidate.is_file()
+            and re.sub(r"\s+", "", candidate.stem).casefold() == normalized_id
+            and candidate.suffix.lower() in _ALLOWED_QA_IMAGE_SUFFIXES
+        ):
+            return candidate
+    raise HTTPException(status_code=404, detail="Image not found")
+
+
+@router.get("/images/{id}")
+def get_image_route(id: str, project_id: str = "default") -> FileResponse:
+    path = _resolve_qa_image(id, project_id)
+    media_type = _QA_IMAGE_MEDIA_TYPES[path.suffix.lower()]
+    return FileResponse(path, media_type=media_type)
 
 
 @router.delete("/images/{id}")

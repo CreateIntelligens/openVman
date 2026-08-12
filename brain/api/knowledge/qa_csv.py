@@ -222,6 +222,54 @@ def is_qa_csv(file_bytes: bytes) -> bool:
     return "q" in fieldnames and "a" in fieldnames
 
 
+def parse_qa_csv(file_bytes: bytes) -> list[dict[str, Any]]:
+    """Parse QA CSV bytes into the same entry shape as QA markdown."""
+    parsed = _parse_csv_rows(file_bytes)
+    if parsed is None:
+        return []
+
+    _, rows = parsed
+    entries: list[dict[str, Any]] = []
+    for row in rows:
+        question = (row.get("q") or "").strip()
+        answer = (row.get("a") or "").strip()
+        if not question and not answer:
+            continue
+        entries.append(
+            {
+                "q": question or "未命名問題",
+                "a": answer,
+                "img": extract_image_id(row.get("img") or ""),
+                "url": (row.get("url") or "").strip(),
+                "hidden": (
+                    (row.get("display") or "").strip().lower()
+                    in _HIDDEN_DISPLAY_VALUES
+                ),
+            }
+        )
+    return entries
+
+
+def serialize_qa_csv(entries: list[dict[str, Any]]) -> str:
+    """Serialize merged-editor QA entries without changing a CSV source to markdown."""
+    fieldnames = ["index", "q", "a", "img", "url", "display"]
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    for position, entry in enumerate(entries, start=1):
+        writer.writerow(
+            {
+                "index": entry.get("index") or str(position),
+                "q": entry.get("q") or "",
+                "a": entry.get("a") or "",
+                "img": extract_image_id(entry.get("img") or ""),
+                "url": entry.get("url") or "",
+                "display": "false" if entry.get("hidden") else "true",
+            }
+        )
+    return buffer.getvalue()
+
+
 def extract_image_id(raw: str) -> str:
     value = (raw or "").strip()
     if "=" in value:
@@ -252,18 +300,14 @@ def convert_csv_to_qa_markdown(csv_bytes: bytes) -> str:
     normalized = normalize_qa_csv_rows(csv_bytes)
     if normalized is not None:
         csv_bytes = normalized
-    parsed = _parse_csv_rows(csv_bytes)
-    if not parsed:
-        return ""
-    _, rows = parsed
-    blocks = []
-    for row in rows:
-        q = (row.get("q") or "").strip()
-        a = (row.get("a") or "").strip()
-        img = (row.get("img") or "").strip()
-        url = (row.get("url") or "").strip()
-        hidden = (row.get("display") or "").strip().lower() in _HIDDEN_DISPLAY_VALUES
-        if not q and not a:
-            continue
-        blocks.append(qa_markdown_block(q or "未命名問題", a, img, url, hidden))
+    blocks = [
+        qa_markdown_block(
+            entry["q"],
+            entry["a"],
+            entry["img"],
+            entry["url"],
+            entry["hidden"],
+        )
+        for entry in parse_qa_csv(csv_bytes)
+    ]
     return "\n\n".join(blocks)

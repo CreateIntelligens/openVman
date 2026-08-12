@@ -51,3 +51,11 @@ test("stacked RWD chat caps the message viewport instead of growing the page", (
     /padding-block:\s*0;/,
   );
 });
+
+test("assistant media is responsive and served from the active project", () => {
+  assert.match(source, /msg\.imageId/);
+  assert.match(source, /project_id: message\.projectId \|\| "default"/);
+  assert.match(source, /開啟相關連結/);
+  assert.match(cssBlock(".chat-msg__media img"), /max-width:\s*100%;/);
+  assert.match(cssBlock(".chat-msg__media img"), /object-fit:\s*contain;/);
+});

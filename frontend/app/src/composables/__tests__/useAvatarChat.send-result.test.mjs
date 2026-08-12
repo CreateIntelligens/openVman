@@ -44,3 +44,12 @@ test("automatic reconnect regenerates derived client URLs", () => {
   assert.match(source, /void connect\(url\)\.catch\(console\.error\)/);
   assert.doesNotMatch(source, /void connect\(wsUrl\)\.catch\(console\.error\)/);
 });
+
+test("text and live responses retain RAG images and links for the assistant bubble", () => {
+  assert.match(source, /case 'server_search_results'/);
+  assert.match(source, /applyResponseMedia\(\{ citations: data\.citations \}\)/);
+  assert.match(source, /applyResponseMedia\(data\)/);
+  assert.match(source, /source\.imageId = activeImageId/);
+  assert.match(source, /source\.projectId = currentProjectId/);
+  assert.match(source, /source\.url = activeUrl/);
+});

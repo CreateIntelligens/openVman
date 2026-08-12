@@ -2,11 +2,15 @@ import type { ActionRequest, ChatMessage as ChatMessageType, PiiWarningSummary, 
 import MarkdownPreview from "../MarkdownPreview";
 import SourceChips from "./SourceChips";
 import ActionRequestCard from "./ActionRequestCard";
+import ChatMedia from "./ChatMedia";
 import MessageMeta from "./MessageMeta";
 import { renderWithRedactions } from "./redactedText";
 import { formatPiiWarningSummary, hasPiiWarning } from "./privacyWarnings";
 
-type RenderableChatMessage = Pick<ChatMessageType, "role" | "content"> & {
+type RenderableChatMessage = Pick<
+  ChatMessageType,
+  "role" | "content" | "citations" | "image_id" | "url"
+> & {
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
   action_requests?: ActionRequest[];
   privacy_warning?: PiiWarningSummary;
@@ -129,6 +133,13 @@ export default function ChatMessage({
         </div>
       ) : (
         <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed relative z-10">{renderWithRedactions(message.content)}</p>
+      )}
+      {isAssistantMessage && (
+        <ChatMedia
+          citations={message.citations}
+          imageId={message.image_id}
+          url={message.url}
+        />
       )}
       {shouldShowPrivacyWarning && (
         <div className="mt-4 pt-3 border-t border-amber-200/60 dark:border-amber-700/40 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">

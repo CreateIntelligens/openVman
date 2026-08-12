@@ -32,6 +32,24 @@ export interface ChatMessage {
        timestamp: number
        sourcePath?: string
        sourcePathContent?: string
+       imageId?: string
+       url?: string
+       projectId?: string
+}
+
+interface Citation {
+       image_id?: unknown
+       image?: unknown
+       url?: unknown
+       source_url?: unknown
+}
+
+interface ChatResponse {
+       reply?: string
+       session_id?: string
+       citations?: unknown
+       image_id?: unknown
+       url?: unknown
 }
 
 export interface SendMessageResult {
@@ -141,6 +159,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
        const visualState = ref<VisualState>({ ...DEFAULT_VISUAL_STATE })
        let activeSourcePath: string | undefined = undefined
        let activeSourcePathContent: string | undefined = undefined
+       let activeImageId: string | undefined = undefined
+       let activeUrl: string | undefined = undefined
 
        let socket: WebSocket | null = null
        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -177,12 +197,42 @@ export function useAvatarChat(options: ChatOptions = {}) {
               if (next) visualState.value = next
        }
 
-       function consumeActiveSource(): Pick<ChatMessage, 'sourcePath' | 'sourcePathContent'> {
-              const source: Pick<ChatMessage, 'sourcePath' | 'sourcePathContent'> = {}
+       function optionalString(value: unknown): string | undefined {
+              return typeof value === 'string' && value.trim() ? value.trim() : undefined
+       }
+
+       function applyResponseMedia(data: ChatResponse): void {
+              const citations = Array.isArray(data.citations) ? data.citations : []
+              const primary = isRecord(citations[0]) ? citations[0] as Citation : undefined
+              const imageId = optionalString(data.image_id)
+                     ?? optionalString(primary?.image_id)
+                     ?? optionalString(primary?.image)
+              const url = optionalString(data.url)
+                     ?? optionalString(primary?.url)
+                     ?? optionalString(primary?.source_url)
+              if (imageId) activeImageId = imageId
+              if (url) activeUrl = url
+       }
+
+       function consumeActiveMetadata(): Pick<
+              ChatMessage,
+              'sourcePath' | 'sourcePathContent' | 'imageId' | 'url' | 'projectId'
+       > {
+              const source: Pick<
+                     ChatMessage,
+                     'sourcePath' | 'sourcePathContent' | 'imageId' | 'url' | 'projectId'
+              > = {}
               if (activeSourcePath) source.sourcePath = activeSourcePath
               if (activeSourcePathContent) source.sourcePathContent = activeSourcePathContent
+              if (activeImageId) {
+                     source.imageId = activeImageId
+                     source.projectId = currentProjectId
+              }
+              if (activeUrl) source.url = activeUrl
               activeSourcePath = undefined
               activeSourcePathContent = undefined
+              activeImageId = undefined
+              activeUrl = undefined
               return source
        }
 
@@ -350,6 +400,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             break
                      }
 
+                     case 'server_search_results':
+                            applyResponseMedia({ citations: data.citations })
+                            break
+
                      case 'server_stop_audio':
                             options.onStopAudio?.()
                             responsePlaybackActive = false
@@ -404,6 +458,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
                stopActiveResponse()
                activeSourcePath = sourcePath
                activeSourcePathContent = sourcePathContent
+               activeImageId = undefined
+               activeUrl = undefined
                if (currentMode === 'text') {
                       void _sendMessageText(trimmed)
                       return { accepted: true }
@@ -450,9 +506,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                              return
                       }
 
-                      const data = await res.json() as { reply: string; session_id: string }
+                      const data = await res.json() as ChatResponse
                       if (requestId !== textRequestId || abort.signal.aborted) return
                       if (data.session_id) sessionId.value = data.session_id
+                      applyResponseMedia(data)
                       state.value = 'IDLE'
                       if (data.reply?.trim()) {
                              responsePlaybackActive = true
@@ -659,14 +716,14 @@ export function useAvatarChat(options: ChatOptions = {}) {
        function beginAssistantMessage(): void {
               const last = messages.value[messages.value.length - 1]
               if (last && last.role === 'ai' && last.text === '') {
-                     Object.assign(last, consumeActiveSource())
+                     Object.assign(last, consumeActiveMetadata())
                      return
               }
               messages.value.push({
                      role: 'ai',
                      text: '',
                      timestamp: Date.now(),
-                     ...consumeActiveSource(),
+                     ...consumeActiveMetadata(),
               })
        }
 
@@ -681,7 +738,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                             role: 'ai',
                             text: chunk,
                             timestamp: Date.now(),
-                            ...consumeActiveSource(),
+                            ...consumeActiveMetadata(),
                      })
               }
        }

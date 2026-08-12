@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -196,6 +197,26 @@ class TestSearchDedup:
         assert [r["text"] for r in results] == ["a", "different"]
         # vector 欄位最終仍會被剝除
         assert all("vector" not in r for r in results)
+
+    def test_result_promotes_media_from_metadata(self, patched):
+        record = _rec(
+            "請掃描 QR code",
+            0.1,
+            metadata=json.dumps(
+                {
+                    "path": "knowledge/qa/line.csv",
+                    "title": "官方 LINE",
+                    "image_id": "B1-4",
+                    "url": "https://example.com/line",
+                }
+            ),
+        )
+        patched(_FakeTable(vector_records=[record], fts_records=[]))
+
+        result = _search()[0]
+
+        assert result["image_id"] == "B1-4"
+        assert result["url"] == "https://example.com/line"
 
 
 # ------------------------------------------------------------------

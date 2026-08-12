@@ -25,6 +25,7 @@ from infra.db import (
 )
 from infra.pipeline import CheckpointStore, PipelineConfig, run_pipeline
 from infra.project_context import resolve_embedding_index_state_path
+from knowledge.qa_csv import extract_image_id
 from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold, iter_indexable_documents
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
@@ -48,6 +49,7 @@ _ANSWER_RE = re.compile(
     re.IGNORECASE,
 )
 _MIN_QA_PAIRS_FOR_DETECTION = 1
+_KNOWLEDGE_INDEX_FORMAT_VERSION = "2"
 
 
 @dataclass(slots=True)
@@ -927,6 +929,7 @@ def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[
         q_index = alias_map.get("q")
         a_index = alias_map.get("a")
         img_index = alias_map.get("img")
+        url_index = alias_map.get("url")
         row_id_index = alias_map.get("index")
 
         def _cell(row: list[str], index: int | None) -> str:
@@ -952,7 +955,8 @@ def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[
                         "persona_id": persona_id,
                         "row_number": row_number,
                         "row_index": _cell(row, row_id_index),
-                        "image": _cell(row, img_index),
+                        "image_id": extract_image_id(_cell(row, img_index)),
+                        "url": _cell(row, url_index),
                         "fingerprint": fingerprint,
                         "chunk_id": f"{relative_path}::{row_number}",
                         "char_count": len(text),
@@ -1042,7 +1046,11 @@ def _pick_first(row: dict[str, Any], *keys: str) -> str:
 
 
 def _fingerprint_document(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    # 索引欄位或切塊規格改變時升版，讓內容未變的既有文件也會重建一次。
+    digest.update(f"openvman-knowledge-v{_KNOWLEDGE_INDEX_FORMAT_VERSION}\0".encode())
+    digest.update(path.read_bytes())
+    return digest.hexdigest()
 
 
 def _load_existing_knowledge_records(project_id: str = "default") -> list[dict[str, Any]]:
