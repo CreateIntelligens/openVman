@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQaNodes, type QaNode } from "../../hooks/useQaNodes";
 
-import { buildQuickQaQuestionText } from "./quickQaQuestion";
-
 interface QuickQaModalProps {
   open: boolean;
   onClose: () => void;
@@ -51,12 +49,10 @@ export default function QuickQaModal({ open, onClose, onSelectQuestion }: QuickQ
   };
 
   const handleSelect = (rawQuestion: string) => {
-    const { sendText } = buildQuickQaQuestionText(
-      rawQuestion,
-      currentNode?.label || "",
-    );
+    const topic = (currentNode?.label || currentNode?.node_id || "").trim();
+    const message = topic ? `${topic} ${rawQuestion}` : rawQuestion;
 
-    onSelectQuestion(sendText);
+    onSelectQuestion(message);
     onClose();
   };
 
@@ -136,23 +132,17 @@ export default function QuickQaModal({ open, onClose, onSelectQuestion }: QuickQ
               ))}
 
               {/* Question items */}
-              {currentQuestions.map((qa, idx) => {
-                const { displayText } = buildQuickQaQuestionText(
-                  qa.question,
-                  currentNode?.label || "",
-                );
-                return (
-                  <button
-                    key={`${qa.question}-${idx}`}
-                    type="button"
-                    onClick={() => handleSelect(qa.question)}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 text-left font-normal text-content transition-all hover:border-primary/50 hover:bg-primary/5 hover:shadow-xs"
-                  >
-                    <span className="material-symbols-outlined text-content-subtle text-[1.125rem]">help</span>
-                    <span className="text-sm leading-relaxed">{displayText}</span>
-                  </button>
-                );
-              })}
+              {currentQuestions.map((qa, idx) => (
+                <button
+                  key={`${qa.question}-${idx}`}
+                  type="button"
+                  onClick={() => handleSelect(qa.question)}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 text-left font-normal text-content transition-all hover:border-primary/50 hover:bg-primary/5 hover:shadow-xs"
+                >
+                  <span className="material-symbols-outlined text-content-subtle text-[1.125rem]">help</span>
+                  <span className="text-sm leading-relaxed">{qa.question}</span>
+                </button>
+              ))}
             </div>
           )}
         </div>

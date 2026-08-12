@@ -59,7 +59,7 @@
             class="qa-btn qa-btn--question"
             @click="selectQuestion(qa.question, qa.source_path)"
           >
-            <span class="qa-btn-text">{{ questionLabel(qa.question) }}</span>
+            <span class="qa-btn-text">{{ qa.question }}</span>
           </button>
         </div>
       </div>
@@ -69,8 +69,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-
-import { buildQuickQaQuestionText } from "../../utils/quickQaQuestion";
 
 export interface QaEntry {
   question: string;
@@ -156,20 +154,11 @@ function handleClose(): void {
 function selectQuestion(question: string, sourcePath?: string): void {
   const cached = mergedQaCache.value[question];
   const answerText = cached?.a || "";
-  const { sendText } = buildQuickQaQuestionText(
-    question,
-    currentNode.value?.label || "",
-  );
+  const topic = (currentNode.value?.label || currentNode.value?.node_id || "").trim();
+  const message = topic ? `${topic} ${question}` : question;
 
-  emit("select-question", sendText, sourcePath, answerText);
+  emit("select-question", message, sourcePath, answerText);
   emit("close");
-}
-
-function questionLabel(question: string): string {
-  return buildQuickQaQuestionText(
-    question,
-    currentNode.value?.label || "",
-  ).displayText;
 }
 
 function getErrorMessage(err: unknown): string {
