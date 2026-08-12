@@ -34,11 +34,12 @@ const emit = defineEmits<{
         <line x1="12" x2="12" y1="19" y2="22" />
       </svg>
     </span>
-    <span v-if="isListening" class="asr-btn__pulse" />
+    <span v-if="isListening" class="asr-btn__status" aria-hidden="true" />
   </button>
 </template>
 
 <style scoped>
+/* Hallmark · component: microphone button · genre: modern-minimal · theme: existing openVman */
 .asr-btn {
   display: inline-flex;
   align-items: center;
@@ -50,46 +51,59 @@ const emit = defineEmits<{
   background: var(--bg-soft, #fff);
   cursor: pointer;
   position: relative;
-  transition: background 0.2s, border-color 0.2s;
+  color: var(--text-soft);
+  transition:
+    background-color var(--ov-dur-micro) var(--ov-ease-out),
+    border-color var(--ov-dur-micro) var(--ov-ease-out),
+    color var(--ov-dur-micro) var(--ov-ease-out),
+    transform var(--ov-dur-micro) var(--ov-ease-out);
   flex-shrink: 0;
 }
-.asr-btn:hover:not(:disabled) {
-  background: #f0f4ff;
-  border-color: var(--primary, #0ea5e9);
-  color: var(--primary, #0ea5e9);
+
+@media (hover: hover) {
+  .asr-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary) 8%, var(--bg-soft));
+    border-color: var(--primary);
+    color: var(--primary);
+  }
 }
+
+.asr-btn:focus-visible {
+  outline: var(--focus-ring-size) solid var(--primary);
+  outline-offset: var(--ov-focus-ring-offset);
+}
+
+.asr-btn:active:not(:disabled) {
+  transform: translateY(0.0625rem);
+}
+
 .asr-btn--active {
-  background: #fee2e2;
-  border-color: #ef4444;
-  color: #ef4444;
+  background: rgb(var(--ov-color-danger) / 0.12);
+  border-color: rgb(var(--ov-color-danger));
+  color: rgb(var(--ov-color-danger));
 }
+
 .asr-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
+
 .asr-btn__icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-soft, #64748b);
-  transition: color 0.2s;
+  color: inherit;
 }
-.asr-btn:hover:not(:disabled) .asr-btn__icon {
-  color: var(--primary, #0ea5e9);
-}
-.asr-btn--active .asr-btn__icon {
-  color: #ef4444;
-}
-.asr-btn__pulse {
+
+.asr-btn__status {
   position: absolute;
-  inset: -0.1875rem;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 0.4rem;
+  height: 0.4rem;
   border-radius: 50%;
-  border: 0.125rem solid #ef4444;
-  animation: asr-pulse 1.2s ease infinite;
+  background: rgb(var(--ov-color-danger));
+  box-shadow: 0 0 0 0.125rem var(--bg-soft);
   pointer-events: none;
-}
-@keyframes asr-pulse {
-  0%   { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.5); }
 }
 </style>

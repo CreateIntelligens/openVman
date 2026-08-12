@@ -109,7 +109,11 @@
           @keydown.enter="handleSend"
         />
       </label>
-      <button :disabled="!canSend || !inputText.trim()" @click="handleSend">
+      <button
+        class="chat-send-btn"
+        :disabled="!canSend || !inputText.trim()"
+        @click="handleSend"
+      >
         送出
       </button>
       <p
@@ -583,7 +587,7 @@ useStickToBottom(messagesRef, contentRef)
   background: var(--bg);
 }
 
-.chat-input-bar button {
+.chat-send-btn {
   min-height: 2.75rem;
   padding: 0 1.25rem;
   border: none;
@@ -593,14 +597,22 @@ useStickToBottom(messagesRef, contentRef)
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    background-color var(--ov-dur-micro) var(--ov-ease-out),
+    transform var(--ov-dur-micro) var(--ov-ease-out);
 }
 
-.chat-input-bar button:hover:not(:disabled) {
-  background: var(--primary-hover);
+@media (hover: hover) {
+  .chat-send-btn:hover:not(:disabled) {
+    background: var(--primary-hover);
+  }
 }
 
-.chat-input-bar button:disabled {
+.chat-send-btn:active:not(:disabled) {
+  transform: translateY(0.0625rem);
+}
+
+.chat-send-btn:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }

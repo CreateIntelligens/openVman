@@ -59,3 +59,9 @@ test("assistant media is responsive and served from the active project", () => {
   assert.match(cssBlock(".chat-msg__media img"), /max-width:\s*100%;/);
   assert.match(cssBlock(".chat-msg__media img"), /object-fit:\s*contain;/);
 });
+
+test("send button styles do not leak into the microphone child component", () => {
+  assert.match(source, /class="chat-send-btn"/);
+  assert.match(source, /\.chat-send-btn\s*\{/);
+  assert.doesNotMatch(source, /\.chat-input-bar button\s*\{/);
+});
