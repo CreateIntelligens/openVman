@@ -10,7 +10,7 @@
 - **Dynamic Model Fallback Testing**: Added comprehensive pytest coverage for dynamic discovery, sorting logic, graceful degradation on error, and fallback chain integration (`test_llm_fallback_chain.py`).
 
 ### Changed / Fixed
-- **AnyDoc Document Conversion**: Replaced the Microsoft MarkItDown fallback and direct conversion dependency with Firecrawl AnyDoc's Rust-backed Python binding while retaining the existing pdf-inspector and Docling ingestion stages.
+- **AnyDoc Document Conversion**: Adopted Firecrawl AnyDoc's Rust-backed Python binding for fallback and direct conversion while retaining the existing pdf-inspector and Docling ingestion stages.
 - **Keyless Avatar SDK**: Changed the public Avatar JavaScript SDK to accept host-provided complete audio or 16 kHz mono PCM chunks through `playAudio()` and `pushPcm()`. Removed the public Embed backend API, API-key middleware/store/CLI, and Embed Keys admin page while preserving internal frontend API, WebSocket, and TTS routes.
 - **`.env` Consolidation**: Merged `backend/.env`, `brain/.env`, and the root `.env` into a single root-level `.env` / `.env.example`. `docker-compose.yml`'s `api` and `backend` services now both use `env_file: ./.env`, so deployment only requires maintaining one file (`cp .env.example .env`) instead of three. Along the way, removed a duplicated dead-write `TTS_GEMINI_URL` entry, backfilled missing documented settings (Docling, PDF Inspector/Repair, Avatar uploads, TTS Cache) that existed in `config.py` but not in any example file, and deleted `infra/.env.example` / `backend/index-tts-vllm/.env.example` (never actually wired to an `env_file:` — those values were always sourced via compose `${VAR}` interpolation from the root `.env`).
 
@@ -78,7 +78,7 @@
 - **Live System Instruction Injection**: Brain composes IDENTITY + SOUL + chat history + top-5 memory records into `system_instruction` for Gemini Live sessions, enabling persona-aware real-time conversations.
 - **Live Conversation Persistence**: Brain `internal_live_bridge` persists user and assistant turns to `SessionStore` via `_persisting_event_sink`, so Live conversations appear in session history.
 - **Gemini Live Tool Calling**: `save_memory` and `get_chat_history` tools available during Live sessions for on-the-fly memory writes and history retrieval.
-- **Docling Integration Config**: Added `docling_serve_url`, `docling_timeout_ms`, `docling_api_key`, and `docling_fallback_to_markitdown` settings to `TTSRouterConfig`.
+- **Docling Integration Config**: Added `docling_serve_url`, `docling_timeout_ms`, `docling_api_key`, and `docling_fallback_to_anydoc` settings to `TTSRouterConfig`.
 
 ### Removed
 - **Index-TTS (vLLM)**: Excised the legacy `index-tts-vllm` directory and all related code/dependencies, significantly reducing the backend container's footprint and complexity.
@@ -126,7 +126,7 @@
 - **Punctuation Chunker**: `backend/app/utils/chunker.py` splits text streams for natural TTS pacing.
 - **Frontend ASR & State Machine**: `frontend/app/src/services/asr.ts` and `frontend/app/src/store/avatarState.ts` manage speech input and avatar states.
 - **Frontend WebSocket Integration**: `frontend/app/src/services/websocket.ts` handles communication with the backend.
-- **MarkItDown Integration Test**: Added `backend/tests/test_markitdown.py` to validate document conversion.
+- **AnyDoc Integration Test**: Added `backend/tests/ingestion/test_anydoc.py` to validate native document conversion.
 - **Unit Tests**: Added comprehensive tests for `SessionManager`, `PunctuationChunker`, and `GuardAgent`.
 
 ### Changed
@@ -208,7 +208,7 @@
 
 ### Added
 - **RAG v2 Architecture**: Transitioned to a multi-modal, hybrid search architecture.
-- **MarkItDown Integration**: Support for PDF, DOCX, XLSX, and more via `MarkItDownService`.
+- **AnyDoc Integration**: Support for PDF, DOCX, XLSX, and more through the document ingestion service.
 - **Header-Based Chunker**: Semantic splitting based on Markdown headers (H1-H3).
 - **Hybrid Search (BM25)**: Enabled combined vector and text search in LanceDB.
 - **Backend Gateway**: New independent microservice handling multi-modal media ingestion (images, audio, video) to offload the core backend.

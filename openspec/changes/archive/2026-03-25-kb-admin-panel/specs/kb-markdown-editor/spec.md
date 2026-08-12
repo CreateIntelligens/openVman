@@ -15,7 +15,7 @@ The system SHALL automatically trigger a save operation and subsequent backgroun
 - **THEN** the system sends a `PUT` request to update the file content on the server
 - **THEN** the server automatically triggers the re-indexing pipeline for that document
 
-### Requirement: MarkItDown Abstraction
+### Requirement: Document Conversion Abstraction
 The system SHALL abstract the conversion of non-markdown files.
 
 #### Scenario: Viewing a PDF

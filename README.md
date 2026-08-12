@@ -1,7 +1,7 @@
 # openVman — 虛擬人系統架構總覽 (Architecture Index)
 
 > **版本**：v0.10.1
-> **最後更新**：2026-07-07
+> **最後更新**：2026-08-12
 > **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
 
 ---
@@ -15,7 +15,8 @@
 | 02 | [02_FRONTEND_SPEC.md](./docs/02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
 | 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
 | 04 | [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md) | 網關 (外圍)：媒體處理 · 任務佇列 · 插件 (Camera/Web) · 臨時儲存 · 計費備援 | ✅ 已完成 |
-| 05 | [avatar-embed/README.md](./docs/avatar-embed/README.md) | Avatar JavaScript SDK：直接 DOM · 外部音訊 · PCM 串流 · 公開錯誤碼 | ✅ 已完成 |
+| 05 | [05_DOCLING_RUNBOOK.md](./docs/05_DOCLING_RUNBOOK.md) | 文件解析：pdf-inspector fast path · Docling 主轉換 · AnyDoc fallback · 驗證與修復 | ✅ 已完成 |
+| -- | [avatar-embed/README.md](./docs/avatar-embed/README.md) | Avatar JavaScript SDK：直接 DOM · 外部音訊 · PCM 串流 · 公開錯誤碼 | ✅ 已完成 |
 | -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
 
 
@@ -49,6 +50,7 @@
 |----------|-------------|
 | 後端網路通訊 | `00` + `01` |
 | 大腦 RAG 邏輯 | `01` + `03` |
+| 知識文件解析 | `03` + `04` + `05` |
 | 網頁前端渲染 | `00` + `02` |
 | 全端整合/Debug | `00` + `01` + `02` + `03` |
 
@@ -228,6 +230,7 @@
 | 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
 | 網關 | **BullMQ + Redis 佇列** | 非同步處理多模態素材 (影像/語音) 的 CPU 密集型預處理管線 |
 | 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、Web Crawler 爬蟲等前置工具能力 |
+| 網關 | **pdf-inspector + Docling + AnyDoc** | PDF 安全 fast path、Office 文件主轉換與 Rust-backed fallback；Brain 只索引 canonical Markdown |
 | 大腦 | **LanceDB** (嵌入式向量 DB) | 無服務端、低延遲、本地部署 |
 | 大腦 | **BAAI/bge-m3** (本地 Embedding) | 1024 維、多語言、Dense+Sparse 混合檢索 |
 | 大腦 | Markdown 檔案系統 | 人類可讀、Git 可追蹤的知識庫 |
@@ -259,7 +262,7 @@
 - ✅ VideoSync 唯一時鐘源 + 徑向漸變羽化，杜絕嘴型漂移與生硬邊界
 - ✅ **Knowledge Base Admin Panel**：整合遞迴式檔案探索器與雙視窗 Markdown 編輯器，支援 LanceDB 同步狀態展示。
 - ✅ **Admin Web Light Mode**：整合專屬風格系統，支援深淺色模式切換與持久化儲存。
-- ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + Docling/Markdown 文件 ingestion 管線
+- ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + pdf-inspector / Docling / AnyDoc 文件 ingestion 管線
 - ✅ **Brain Skills 模組化擴充系統**：支援動態載入外部技能工具，技能註冊表在執行期同步（無須重啟）
 - ✅ **Forced Tool Call Routing**：可針對單次請求強制指定技能調用路徑，結合動態 skill registry 讓新註冊的技能立即可用
 - ✅ **Direct Chat Route**：純對話訊息跳過 tool-instruction 組裝，降低 prompt 體積與延遲

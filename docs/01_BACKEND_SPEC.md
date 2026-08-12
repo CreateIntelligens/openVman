@@ -321,4 +321,4 @@ process.on('SIGTERM', async () => {
 * `POST /brain/knowledge/move`：移動文件或資料夾，支援拖拽操作。
 
 #### 16.2 自動索引流程 (Auto-Indexing Pipeline)
-當文件被 `PUT` 或 Markdown `upload` 成功後，後端應非同步觸發 `LanceDB` 的重新索引任務，並透過 WebSocket 的 `gateway_status` 通知前端進度。原始檔的保存與文件轉換由 Gateway / Docling ingestion 管線負責。
+當文件被 `PUT` 或 Markdown `upload` 成功後，後端應非同步觸發 `LanceDB` 的重新索引任務，並透過 WebSocket 的 `gateway_status` 通知前端進度。原始檔保存與文件轉換由 Gateway 的 pdf-inspector / Docling / AnyDoc ingestion 管線負責；Brain 不直接解析 binary 辦公文件。

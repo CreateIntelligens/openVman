@@ -18,7 +18,7 @@
 | LLM | OpenAI / Claude / vLLM | 依 `BRAIN_LLM_PROVIDER` 環境變數切換 |
 | 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
 | 知識庫格式 | Markdown + Raw (多模態) | 人類可讀、保留原始檔，並以 Markdown 作為可編輯 canonical form |
-| 解析引擎 | **Gateway (pdf-inspector + Docling + fallback)** | 由 Gateway 負責轉檔並透過 API 注入 |
+| 解析引擎 | **Gateway (pdf-inspector + Docling + AnyDoc)** | Gateway 負責 fast path、主轉換與 fallback，再透過 API 注入 Markdown |
 | 路由層 | Provider Router + Key Pool | Key fallback、模型切換、限流保護 |
 
 #### 2.1 bge-m3 部署方式
@@ -100,7 +100,7 @@ memories_table = db.open_table("memories")
 ```
 
 **Ingestion 管線流程 (與 Gateway 協作)**：
-1. **Prepare (Gateway)**: Gateway 接收檔案或爬取網頁，先保存原始檔至 `workspace/raw/`。PDF 會先嘗試 **pdf-inspector** text-based fast path；不適合 fast path 的 PDF 與 Office 文件再使用 **Docling** 轉為 Markdown；必要時可回退至既有轉換器。
+1. **Prepare (Gateway)**: Gateway 接收檔案或爬取網頁，先保存原始檔至 `workspace/raw/`。PDF 會先嘗試 **pdf-inspector** text-based fast path；不適合 fast path 的 PDF 與 Office 文件使用 in-process **Docling** 轉為 Markdown；Docling 失敗且 fallback 啟用時改用 Rust-backed **AnyDoc**。`.md`、`.txt`、`.csv` 在知識上傳路徑直接轉發，不經文件解析器。
 2. **Ingest API (Brain)**: Gateway 將 Markdown 寫入 `workspace/knowledge/`，並呼叫 Brain 既有知識寫入 / reindex 流程。
 3. **Chunking**: 大腦使用 `HeaderBasedChunker` 切分片段 (200-500 字)。
 4. **Index**: 透過 bge-m3 生成向量並存入 LanceDB。

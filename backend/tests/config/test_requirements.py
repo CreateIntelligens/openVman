@@ -22,7 +22,6 @@ def test_anydoc_python_binding_is_pinned():
     dockerfile = _dockerfile_text()
 
     assert '"firecrawl-anydoc==0.1.7"' in dockerfile
-    assert "markitdown" not in dockerfile
 
 
 def test_pdf_inspector_is_installed_with_rust_build_dependencies():

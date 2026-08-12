@@ -23,7 +23,7 @@ openVman 採用三層（邏輯上為四層）解耦架構，將「低延遲的�
 
 #### 2.4 外部感官層 (Gateway / External Sensory Layer)
 * **角色**：外部連結器。
-* **職責**：文件預處理 (pdf-inspector fast path / Docling fallback / Markdown canonicalization)、視覺分析插件、非同步腳本執行。
+* **職責**：文件預處理 (pdf-inspector fast path / Docling 主轉換 / AnyDoc fallback / Markdown canonicalization)、視覺分析插件、非同步腳本執行。
 * **路徑**：`backend/app/gateway/`
 
 ---
@@ -67,11 +67,13 @@ graph TD
 ### 5. 關鍵工作流
 
 1. **對話流**：Frontend ASR -> Backend -> Brain (Stream Token) -> Backend (TTS Chunk) -> Frontend -> AI 對嘴播放。
-2. **知識庫流**：Admin 上傳檔案 -> Gateway 保存 `raw/` 原始檔 -> PDF 優先走 pdf-inspector fast path，其他文件或 fallback 走 Docling -> 存入 `knowledge/` 並通知 Brain 重新索引。
+2. **知識庫流**：Admin 上傳檔案 -> Gateway 保存 `raw/` 原始檔 -> PDF 優先走 pdf-inspector fast path，PDF / Office 文件走 Docling 主轉換，Docling 失敗時回退 AnyDoc -> 存入 `knowledge/` 並通知 Brain 重新索引。
 
 ### 5. 後續擴充
 開發者應優先在 `docs/` 下查看具體組件的詳細規格書：
 - `01_BACKEND_SPEC.md`
 - `02_FRONTEND_SPEC.md`
 - `03_BRAIN_SPEC.md`
+- `04_GATEWAY_SPEC.md`
+- `05_DOCLING_RUNBOOK.md`
 - `09_API_WS_LINKAGE.md`

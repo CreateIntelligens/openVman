@@ -272,7 +272,22 @@ def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
     merged_paths = merged.get("paths", {})
     for path, path_item in brain_schema.get("paths", {}).items():
         if path.startswith("/brain/"):
-            merged_paths[path.replace("/brain/", "/api/", 1)] = path_item
+            mapped_path = path.replace("/brain/", "/api/", 1)
+            local_path_item = merged_paths.get(mapped_path)
+            if local_path_item is None:
+                merged_paths[mapped_path] = path_item
+                continue
+
+            merged_path_item = path_item.copy()
+            for key, local_value in local_path_item.items():
+                brain_value = merged_path_item.get(key)
+                if isinstance(brain_value, dict) and isinstance(local_value, dict):
+                    # Brain fills missing schema fields while the Backend's
+                    # public route metadata remains authoritative.
+                    merged_path_item[key] = {**brain_value, **local_value}
+                else:
+                    merged_path_item[key] = local_value
+            merged_paths[mapped_path] = merged_path_item
     merged["paths"] = merged_paths
 
     # Merge components (schemas, securitySchemes, etc.)
@@ -521,7 +536,12 @@ async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
     return Response(content=output.result.audio_bytes, media_type=output.result.content_type)
 
 
-@app.post("/documents/convert", tags=["Documents"], summary="文件轉 Markdown")
+@app.post(
+    "/documents/convert",
+    tags=["Documents"],
+    summary="文件轉 Markdown",
+    description="`.md`、`.markdown`、`.txt` 以 UTF-8 直接讀取；其餘格式使用 Firecrawl AnyDoc 轉換。本端點不保存原始檔，也不觸發知識庫索引。",
+)
 async def convert(file: UploadFile = File(...)) -> JSONResponse:
     suffix = os.path.splitext(file.filename or "")[1]
     tmp_path: str | None = None

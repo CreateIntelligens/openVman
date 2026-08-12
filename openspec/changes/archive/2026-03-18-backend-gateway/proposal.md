@@ -19,7 +19,7 @@
 
 ### New Capabilities
 
-- `media-ingestion`: 多模態素材解析管線 — 圖片→視覺描述（Vision LLM）、影片→關鍵影格採樣+描述、音訊→Whisper 轉錄、文件→MarkItDown 轉 Markdown
+- `media-ingestion`: 多模態素材解析管線 — 圖片→視覺描述（Vision LLM）、影片→關鍵影格採樣+描述、音訊→Whisper 轉錄、文件→pdf-inspector / Docling / AnyDoc 轉 Markdown
 - `task-queue`: 非同步任務佇列與排程 — Bull/BullMQ、優先級控制、重試策略、Dead Letter Queue
 - `plugin-camera-live`: Camera Live 外掛 — RTSP/WebRTC 串流截圖、即時視覺感知
 - `plugin-api-tool`: API Tool 外掛 — 外部 REST API 代理、鑑權管理、請求限流
@@ -39,6 +39,6 @@
 - **外部依賴**：
   - 圖片／影片理解：Vision-capable LLM（GPT-4o Vision 或本地 LLaVA）
   - 音訊轉錄：OpenAI Whisper API 或本地 Whisper 模型
-  - 文件解析：MarkItDown（已在 Brain 層使用，可共用）
+  - 文件解析：pdf-inspector fast path、Docling 主轉換與 AnyDoc fallback
   - Camera：Playwright 或 RTSP 客戶端
 - **`00_CORE_PROTOCOL.md`**：需小幅增補事件定義（delta spec）。

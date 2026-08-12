@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
@@ -77,10 +77,7 @@ class TTSRouterConfig(BaseSettings):
     )
     document_max_upload_bytes: int = Field(
         default=100 * 1024 * 1024,
-        validation_alias=AliasChoices(
-            "DOCUMENT_MAX_UPLOAD_BYTES",
-            "MARKITDOWN_MAX_UPLOAD_BYTES",
-        ),
+        validation_alias="DOCUMENT_MAX_UPLOAD_BYTES",
     )
     avatar_assets_dir: str = Field(
         default="/data/avatar",
@@ -111,10 +108,7 @@ class TTSRouterConfig(BaseSettings):
     docling_api_key: str = Field(default="", validation_alias="DOCLING_API_KEY")
     docling_fallback_to_anydoc: bool = Field(
         default=True,
-        validation_alias=AliasChoices(
-            "DOCLING_FALLBACK_TO_ANYDOC",
-            "DOCLING_FALLBACK_TO_MARKITDOWN",
-        ),
+        validation_alias="DOCLING_FALLBACK_TO_ANYDOC",
     )
     pdf_inspector_enabled: bool = Field(
         default=True,

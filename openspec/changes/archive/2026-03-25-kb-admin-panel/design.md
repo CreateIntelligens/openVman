@@ -1,6 +1,6 @@
 ## Context
 
-Currently, the openVman system relies on backend file system manipulation to manage the knowledge base (RAG documents). As the system transitions to client use, a dedicated, user-friendly frontend interface is required. The system already has a robust backend infrastructure including `MarkItDown` for document conversion and LanceDB for vector storage.
+Currently, the openVman system relies on backend file system manipulation to manage the knowledge base (RAG documents). As the system transitions to client use, a dedicated, user-friendly frontend interface is required. The system already has a robust backend document ingestion pipeline and LanceDB for vector storage.
 
 ## Goals / Non-Goals
 
@@ -17,7 +17,7 @@ Currently, the openVman system relies on backend file system manipulation to man
 
 ## Decisions
 
-- **Universal Markdown Strategy**: All uploaded files (PDF, DOCX) will be converted to `.md` via the backend `MarkItDown` service. 
+- **Universal Markdown Strategy**: All uploaded files (PDF, DOCX) will be converted to `.md` via the backend document ingestion pipeline.
     - *Rationale*: Radically simplifies the frontend editor requirements and maintains a consistent, easily editable data format for the AI.
 - **Split-Pane Layout**: The UI will use a standard IDE/Notion layout.
     - *Rationale*: Provides the best balance between navigating a complex folder structure and editing content efficiently.
@@ -30,5 +30,5 @@ Currently, the openVman system relies on backend file system manipulation to man
 
 - [Risk] **Markdown formatting errors**: Users might struggle with raw Markdown syntax if they are used to MS Word.
   → *Mitigation*: Provide clear live-preview using `react-markdown` and potentially add simple toolbar buttons (bold, italic, link) that insert markdown syntax into the textarea.
-- [Risk] **Upload and conversion latency**: Large PDFs might take time to process via `MarkItDown`.
+- [Risk] **Upload and conversion latency**: Large PDFs might take time to process through the document ingestion pipeline.
   → *Mitigation*: Implement clear asynchronous status indicators (yellow spinner) so the user knows processing is happening in the background.

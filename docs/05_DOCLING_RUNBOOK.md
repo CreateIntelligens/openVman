@@ -1,9 +1,17 @@
 # 05_DOCLING_RUNBOOK.md
-## Docling 轉換與驗證手冊
+## 文件解析與驗證手冊（pdf-inspector / Docling / AnyDoc）
 
 本文提供給協助處理環境與驗證的同事，說明如何在 openVman 專案中驗證知識庫文件 ingestion 流程是否正常。
 
 > 實作現況：目前不是透過獨立 `docling-serve` 容器轉檔。Backend container 內直接安裝 `pdf-inspector`、`docling` 與 Rust-backed `firecrawl-anydoc`。PDF 會先嘗試 `pdf-inspector` fast path；只有 text-based、高信心、Markdown 非空、無 OCR 頁與 encoding issue 時才採用。其餘 PDF / Office 文件會走 in-process Docling，失敗時依設定 fallback 到 AnyDoc。
+
+| 入口或階段 | 目前行為 |
+|---|---|
+| 知識上傳 `.md` / `.txt` / `.csv` | 直接轉發，不經 parser |
+| 知識上傳 PDF | pdf-inspector 安全 fast path → Docling → AnyDoc fallback |
+| 知識上傳 DOCX / PPTX / XLSX | Docling → AnyDoc fallback |
+| `/documents/convert` 的 `.md` / `.markdown` / `.txt` | UTF-8 直接讀取 |
+| `/documents/convert` 其他格式 | AnyDoc 直接轉 Markdown |
 
 ### 1. 目標
 
@@ -49,10 +57,18 @@ docker compose up -d api backend
 docker compose ps
 ```
 
-確認 backend container 內可 import 三個 parser：
+確認 backend container 內可 import 三個 parser，並顯示 AnyDoc 套件版本：
 
 ```bash
-docker compose exec backend python -c "import anydoc, pdf_inspector; from docling.document_converter import DocumentConverter; print('parsers ok')"
+docker compose exec -T backend python - <<'PY'
+from importlib.metadata import version
+
+import anydoc
+import pdf_inspector
+from docling.document_converter import DocumentConverter
+
+print("firecrawl-anydoc", version("firecrawl-anydoc"))
+PY
 ```
 
 查看 Backend 日誌：
@@ -65,8 +81,11 @@ docker compose logs -f backend
 
 #### 4.1 檢查 Backend 聚合健康
 
+Backend 不公開 host port，健康檢查應在容器內執行：
+
 ```bash
-curl -s http://localhost:8200/healthz | jq
+docker compose exec -T backend python -c \
+  'import json, urllib.request; print(json.load(urllib.request.urlopen("http://127.0.0.1:8200/healthz")))'
 ```
 
 預期至少看到：
@@ -80,13 +99,11 @@ curl -s http://localhost:8200/healthz | jq
 }
 ```
 
-目前 pdf-inspector / Docling 都是 backend 內嵌套件，通常不會在 `/healthz` 以獨立 downstream service 呈現。若有設定舊版 `DOCLING_SERVE_URL`，health 才會額外探測該 endpoint。
+目前 pdf-inspector / Docling / AnyDoc 都是 backend 內嵌套件，不會在 `/healthz` 以獨立 downstream service 呈現。若有設定舊版 `DOCLING_SERVE_URL`，health 才會額外探測該 endpoint。
 
 #### 4.2 直接檢查 parser import
 
-```bash
-docker compose exec backend python -c "import anydoc, pdf_inspector; from docling.document_converter import DocumentConverter; print('parsers ok')"
-```
+使用 3. 節的 parser / package 檢查命令。預期三個 import 成功，且 `firecrawl-anydoc` 顯示已安裝版本。
 
 若 import 失敗，先重新 build backend image 並確認 `backend/Dockerfile` 的 parser install layer。
 
@@ -100,11 +117,21 @@ docker compose exec backend python -c "import anydoc, pdf_inspector; from doclin
 使用 Knowledge Upload route：
 
 ```bash
-curl -s -X POST http://localhost:8200/api/knowledge/upload \
+curl -s -X POST "http://localhost:${PORT:-8786}/api/knowledge/upload" \
   -F "target_dir=knowledge/ingested" \
   -F "project_id=default" \
   -F "files=@/absolute/path/to/sample-table.pdf;type=application/pdf"
 ```
+
+也可先用不入庫的轉換端點驗證 AnyDoc：
+
+```bash
+printf 'name,count\nalpha,3\n' | \
+  curl -s -X POST "http://localhost:${PORT:-8786}/documents/convert" \
+    -F 'file=@-;filename=sample.csv;type=text/csv' | jq
+```
+
+預期 HTTP 200，且 `markdown` 包含 Markdown table。此端點不保存原始檔、不寫入 `knowledge/`，也不觸發 reindex。
 
 ### 6. 驗證項目
 
@@ -154,14 +181,14 @@ docker compose exec api sh -lc 'grep -R "TX-500\\|---" /data 2>/dev/null | head 
 
 ### 7. 故障排除
 
-#### 7.1 Backend 無法 import Docling
+#### 7.1 Backend 無法 import parser
 
 先檢查：
 
 ```bash
 docker compose ps
 docker compose logs --tail=200 backend
-docker compose exec backend python -c "from docling.document_converter import DocumentConverter; print('docling ok')"
+docker compose exec -T backend python -c "import anydoc, pdf_inspector; from docling.document_converter import DocumentConverter; print('parsers ok')"
 ```
 
 若 import 失敗，重新 build backend：
@@ -254,6 +281,7 @@ PDF_REPAIR_TIMEOUT_MS=120000
 #### 相關設定 (環境變數)
 - `PDF_REPAIR_ENABLED`：是否啟用 PDF 自動修復層（預設為 `true`）。
 - `PDF_REPAIR_TIMEOUT_MS`：每個修復指令的最長執行時間（預設為 `120000` 毫秒 / 2 分鐘）。
+
 
 #### 修復驗證流程
 修復後，系統會先對新生成的 PDF 執行輕量驗證（檢查檔案是否存在、非空、pypdfium2 可開且頁數合理）。通過驗證後，才會將該修復檔**重新跑一次 Ingestion 流程**（只跑一次，不重複做 Docling 驗證以防效能翻倍）。修復成果與前後大小/頁數會完整記錄於 Log 中。

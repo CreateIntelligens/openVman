@@ -12,7 +12,7 @@
 - 辦公文件會先被轉換成 Markdown 再送入 Brain
 - 但 `raw -> knowledge` 這條路徑還沒有以 docs 所描述的形態完整落地
 
-這個邊界是合理的，因為文件格式解析本身屬於 ingestion concern，而不是檢索引擎 concern。現況的問題在於轉換器使用 in-process `MarkItDown`，對表格與複雜版面的還原品質有限，也把較重的解析責任綁在 Backend process 內。Docling 較適合處理這類辦公文件，因此本 change 應該補完整體 `raw -> knowledge -> index` 流程，而不是讓 Brain 直接接觸 binary 文件。
+這個邊界是合理的，因為文件格式解析本身屬於 ingestion concern，而不是檢索引擎 concern。複雜版面與表格需要由 Docling 主轉換處理，並以 AnyDoc 作為 fallback；本 change 應該補完整體 `raw -> knowledge -> index` 流程，而不是讓 Brain 直接接觸 binary 文件。
 
 `openrag` 的公開設計可作為參考，特別是 `docling-serve` 的服務化使用方式；但 openVman 已有自己的 Brain、Gateway、LanceDB 與 KB Admin 邊界，本 change 不應把 OpenRAG 視為待整合的基底平台。
 
@@ -73,4 +73,4 @@ Backend /api/knowledge/upload
 - **Latency increase**: 大型 PDF / PPTX 的 upload latency 會比現況更高。
 - **Storage duplication**: 同時保留 `raw` 與 `knowledge` 代表會有原始檔與 Markdown 衍生檔共存，需要明確 metadata 或命名規則來維持對應關係。
 - **Fallback complexity**: 若保留舊轉換器作為備援，程式邏輯與測試矩陣會變複雜；若不保留，Docling availability 就是單點依賴。
-- **Output variance**: Docling 產出的 Markdown 結構可能與現有 MarkItDown 不同，需驗證是否會影響既有 chunking 與檢索行為。
+- **Output variance**: Docling 與 AnyDoc 產出的 Markdown 結構可能不同，需驗證是否會影響既有 chunking 與檢索行為。

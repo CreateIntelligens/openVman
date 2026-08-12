@@ -380,7 +380,7 @@ async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
     "/api/knowledge/upload",
     tags=["Knowledge"],
     summary="上傳知識文件",
-    description="上傳文件到知識庫。UTF-8 文字檔會直接轉發給 Brain；PDF / DOCX 會先在 Backend 轉成 Markdown，再交由 Brain 存檔與重整索引。\n\n**所需欄位 (Form)**：\n- `files` (Form, list[UploadFile]): 要上傳的檔案\n- `target_dir` (Form, str, 預設 ''): 目標資料夾\n- `project_id` (Form, str, 預設 'default'): 專案 ID",
+    description="上傳文件到知識庫。`.md`、`.txt`、`.csv` 直接轉發；PDF 先嘗試 pdf-inspector fast path，其他 PDF / Office 文件由 Docling 轉成 Markdown，失敗時回退 AnyDoc，再交由 Brain 存檔與重整索引。\n\n**所需欄位 (Form)**：\n- `files` (Form, list[UploadFile]): 要上傳的檔案\n- `target_dir` (Form, str, 預設 ''): 目標資料夾\n- `project_id` (Form, str, 預設 'default'): 專案 ID",
 )
 async def upload_knowledge_documents(
     files: list[UploadFile] = File(...),

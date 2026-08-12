@@ -10,9 +10,9 @@
 
 ## Ingestion Flow (Pseudo-Code)
 1. **Detect**: `file_in_raw`
-2. **Convert**: `markitdown_result = MarkItDown().convert(file_in_raw)`
-3. **Save**: `write_to_knowledge(file_in_raw.name + ".md", markitdown_result.text_content)`
-4. **Chunk**: `chunks = HeaderBasedChunker().split(markitdown_result.text_content)`
+2. **Convert**: `markdown = anydoc.to_markdown(file_in_raw)`
+3. **Save**: `write_to_knowledge(file_in_raw.name + ".md", markdown)`
+4. **Chunk**: `chunks = HeaderBasedChunker().split(markdown)`
 5. **Index**: `for chunk in chunks: table.add([{"text": chunk, "vector": embed(chunk), "metadata": {source_file: file_in_raw}}])`
 6. **Refresh**: `table.create_fts_index("text", replace=True)`
 

@@ -12,7 +12,7 @@ The knowledge ingestion pipeline MUST convert PDF, DOCX, PPTX, and XLSX office d
 - **THEN** Backend 應保存原始檔案以對齊 `workspace/raw/` 的責任
 - **THEN** 若檔案是 text-based PDF 且 pdf-inspector 信心分數達門檻、輸出非空、無 OCR 頁與 encoding issue，Backend 應採用 pdf-inspector 的 Markdown
 - **THEN** 若 PDF 不符合 fast path 條件，或檔案是 DOCX / PPTX / XLSX，Backend 應使用 container 內的 Docling `DocumentConverter` 轉換
-- **THEN** 若 Docling 轉換失敗且 fallback 已啟用，Backend 應使用 container 內的 AnyDoc Rust binding 轉換，不得依賴 MarkItDown
+- **THEN** 若 Docling 轉換失敗且 fallback 已啟用，Backend 應使用 container 內的 AnyDoc Rust binding 轉換
 - **THEN** Backend 應將轉換後的 Markdown 內容以 `.md` 形式寫入 `workspace/knowledge/` 並供 Brain 索引
 
 ### Requirement: Markdown conversion preserves high-value table structure
@@ -46,3 +46,11 @@ The system MUST handle pdf-inspector, Docling, and AnyDoc conversion failures or
 - **THEN** 系統應記錄可診斷的錯誤日誌
 - **THEN** 系統應依既定策略回報 upload failure 或啟用 fallback
 - **THEN** 系統不得將空白或損壞的 Markdown 當作成功轉換結果轉發給 Brain
+
+### Requirement: Document conversion settings use provider-neutral names
+The system MUST expose provider-neutral upload limits and AnyDoc-specific fallback settings for current deployments.
+
+#### Scenario: Operator configures document conversion
+- **WHEN** operator 設定文件上傳限制與 Docling fallback
+- **THEN** 系統應使用 `DOCUMENT_MAX_UPLOAD_BYTES` 與 `DOCLING_FALLBACK_TO_ANYDOC`
+- **THEN** 系統不得接受已移除的舊 provider-specific 環境變數名稱

@@ -20,7 +20,7 @@
 - **THEN** 外掛 SHALL 立即回傳 `{ "error": "domain_blocked" }` 而不發起任何網路請求
 
 ### Requirement: Web Crawler 萃取結果自動注入 RAG 知識庫
-爬取完成後，外掛 SHALL 將正文 Markdown 自動觸發 Brain 層的知識索引管線（MarkItDown → Chunk → bge-m3 Embed → LanceDB），以 `source_url` 作為 metadata 欄位，避免重複索引已爬取的 URL。
+爬取完成後，外掛 SHALL 將正文 Markdown 自動觸發 Brain 層的知識索引管線（Markdown → Chunk → bge-m3 Embed → LanceDB），以 `source_url` 作為 metadata 欄位，避免重複索引已爬取的 URL。
 
 #### Scenario: 相同 URL 被要求再次爬取
 - **WHEN** 同一 URL 在 `CRAWLER_CACHE_TTL_MIN`（預設 60 分鐘）內被重複請求

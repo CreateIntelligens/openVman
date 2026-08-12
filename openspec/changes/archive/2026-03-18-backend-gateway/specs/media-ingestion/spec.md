@@ -17,7 +17,7 @@ Gateway 服務 SHALL 接收來自前端（透過 Backend 轉發）的多模態�
 
 #### Scenario: 使用者上傳文件（PDF/DOCX）
 - **WHEN** `user_media_upload` 事件中 `media.type` 為 `application/pdf` 或 `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
-- **THEN** Gateway SHALL 呼叫 MarkItDown 將文件轉為 Markdown，並分段加入 `enriched_context`
+- **THEN** Gateway SHALL 呼叫 pdf-inspector / Docling / AnyDoc ingestion pipeline 將文件轉為 Markdown，並分段加入 `enriched_context`
 
 #### Scenario: 媒體解析超時
 - **WHEN** 任何媒體解析模組在 `MEDIA_PROCESSING_TIMEOUT_MS`（預設 5000ms）內未完成

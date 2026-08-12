@@ -15,11 +15,9 @@ _ENV_KEYS_TO_CLEAR = (
     "TTS_AWS_ENABLED",
     "TTS_EDGE_SAMPLE_RATE",
     "DOCUMENT_MAX_UPLOAD_BYTES",
-    "MARKITDOWN_MAX_UPLOAD_BYTES",
     "DOCLING_SERVE_URL",
     "DOCLING_TIMEOUT_MS",
     "DOCLING_FALLBACK_TO_ANYDOC",
-    "DOCLING_FALLBACK_TO_MARKITDOWN",
     "PDF_INSPECTOR_ENABLED",
     "PDF_INSPECTOR_MIN_CONFIDENCE",
     "PDF_INSPECTOR_MIN_MARKDOWN_CHARS",
@@ -88,24 +86,6 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
     assert config.pdf_repair_timeout_ms == 20000
     assert config.backend_port == 9999
     assert config.is_dev is True
-
-
-def test_legacy_markitdown_env_names_remain_compatible(tmp_path: Path):
-    env_file = tmp_path / ".env"
-    env_file.write_text(
-        "\n".join(
-            [
-                "MARKITDOWN_MAX_UPLOAD_BYTES=4321",
-                "DOCLING_FALLBACK_TO_MARKITDOWN=false",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    config = TTSRouterConfig(_env_file=env_file)
-
-    assert config.document_max_upload_bytes == 4321
-    assert config.docling_fallback_to_anydoc is False
 
 
 def test_legacy_uvicorn_reload_env_no_longer_changes_mode(tmp_path: Path):

@@ -2,7 +2,7 @@
 
 `docs/03_BRAIN_SPEC.md` 與 Knowledge Base Admin 相關設計文件已經把最終形態定義得很清楚：知識庫應採用 `workspace/raw/` 保存原始檔、`workspace/knowledge/` 保存轉出的 Markdown，並由 Brain 只針對 Markdown / text / code files 做 chunking 與 LanceDB 索引。
 
-現況雖然已經有「文件上傳 -> 轉 Markdown -> Brain upload」這條路徑，但轉換器仍是 in-process `MarkItDown`，對複雜版面、表格與大型文件的還原品質有限。另一方面，若直接讓 Brain 的 workspace reindex 去讀 `.pdf`、`.docx`、`.pptx`，會違反 docs 中既定的責任邊界，也會和 Universal Markdown strategy 衝突。
+現況雖然已經有「文件上傳 -> 轉 Markdown -> Brain upload」這條路徑，但基礎轉換器對複雜版面、表格與大型文件的還原品質有限。另一方面，若直接讓 Brain 的 workspace reindex 去讀 `.pdf`、`.docx`、`.pptx`，會違反 docs 中既定的責任邊界，也會和 Universal Markdown strategy 衝突。
 
 因此，這個 change 的合理方向不是導入一整套新的 RAG 平台，而是補齊既有 docs 所描述、但目前還沒完全落地的 `raw -> high-quality markdown -> Brain index` 管線，並用 Docling 升級文件轉換品質。
 
@@ -10,7 +10,7 @@
 
 ## What Changes
 
-1. 在 `backend` / Gateway 層引入 `docling-serve` 作為文件解析服務，取代目前 in-process `MarkItDown` 的核心文檔轉換角色。
+1. 在 `backend` / Gateway 層引入 Docling 作為文件主解析器，並以 AnyDoc 作為 fallback。
 2. 對齊 docs 所描述的知識庫形態：原始辦公文件進入 `workspace/raw/`，轉換後的 Markdown 寫入 `workspace/knowledge/`，再由 Brain 進行索引。
 3. 調整 `/api/knowledge/upload` 與相關 ingestion 流程，讓 PDF / DOCX / PPTX / XLSX 等辦公文件先經 Docling 轉成 Markdown，再走既有 Brain 知識庫寫入與 reindex 流程。
 4. 保持 Brain 的 knowledge indexer 專注於 Markdown / text / code chunking，不新增 direct binary workspace indexing。

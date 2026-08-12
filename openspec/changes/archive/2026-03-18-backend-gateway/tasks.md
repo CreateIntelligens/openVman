@@ -30,7 +30,7 @@
 - [x] 4.1 實作圖片解析（`ImageIngestionService`）：呼叫 Vision LLM（OpenAI GPT-4o Vision），備援 Tesseract OCR
 - [x] 4.2 實作影片解析（`VideoIngestionService`）：以 `fluent-ffmpeg` 每秒採樣影格，逐影格送 Vision LLM
 - [x] 4.3 實作音訊轉錄（`AudioIngestionService`）：呼叫 OpenAI Whisper API，備援本地 Whisper 二進位
-- [x] 4.4 實作文件解析（`DocumentIngestionService`）：呼叫 MarkItDown，分段產生 Markdown
+- [x] 4.4 實作文件解析（`DocumentIngestionService`）：呼叫 pdf-inspector / Docling / AnyDoc pipeline，分段產生 Markdown
 - [x] 4.5 實作 `MediaDispatcher`：根據 `mime.type` 分派至對應 service，統一應用 `MEDIA_PROCESSING_TIMEOUT_MS`
 - [x] 4.6 實作 `POST /upload` 端點（`@fastify/multipart`）：驗證類型、寫入暫存、入佇列、回傳 `job_id`
 

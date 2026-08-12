@@ -202,6 +202,33 @@ def test_openapi_merges_brain_request_schema(monkeypatch):
     }
 
 
+def test_openapi_keeps_local_route_when_brain_remap_collides(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    local_schema = {
+        "paths": {
+            "/api/knowledge/upload": {
+                "post": {
+                    "summary": "Backend knowledge upload",
+                    "description": "AnyDoc fallback",
+                }
+            }
+        }
+    }
+    brain_schema = {
+        "paths": {
+            "/brain/knowledge/upload": {
+                "post": {"summary": "Brain knowledge upload"}
+            }
+        }
+    }
+
+    schema = module._merge_brain_openapi(local_schema, brain_schema)
+
+    operation = schema["paths"]["/api/knowledge/upload"]["post"]
+    assert operation["summary"] == "Backend knowledge upload"
+    assert operation["description"] == "AnyDoc fallback"
+
+
 def test_tts_providers_include_indextts_when_configured(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 

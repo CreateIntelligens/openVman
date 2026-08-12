@@ -5,7 +5,7 @@
 **Backend Gateway** 位於 Kiosk 前端與主後端 (Backend/Nervous System) 之間，負責處理高運算負載與非同步任務，確保主後端保持輕量與響應性。
 
 **核心職責**：
-1. **多模態素材介入**：處理圖片 (Vision LLM)、影片 (Sampling)、音訊 (Whisper)、文件 (pdf-inspector fast path + Docling Markdown conversion) 的解析。
+1. **多模態素材介入**：處理圖片 (Vision LLM)、影片 (Sampling)、音訊 (Whisper)、文件 (pdf-inspector fast path + Docling 主轉換 + AnyDoc fallback) 的解析。
 2. **非同步任務調度的**：使用 BullMQ + Redis 管理任務佇列，支援優先級與重試。
 3. **擴充插件系統**：
     * **Camera Live**：定時抓取即時畫面並透過 Vision LLM 轉為情境描述。
@@ -51,6 +51,13 @@
 #### 3.3 監測指標 (Metrics)
 * **GET `/metrics`**
 * **Format**: Prometheus Text Format
+
+#### 3.4 文件轉換與知識上傳 (Document Conversion & Knowledge Upload)
+* **POST `/documents/convert`**：單檔轉 Markdown。`.md`、`.markdown`、`.txt` 以 UTF-8 直接讀取，其餘格式交由 AnyDoc；不保存原始檔，也不觸發 Brain 索引。
+* **POST `/api/knowledge/upload`**：知識入庫。`.md`、`.txt`、`.csv` 直接轉發；PDF 先嘗試 pdf-inspector fast path，其餘 PDF / Office 文件以 Docling 轉換，Docling 失敗時依 `DOCLING_FALLBACK_TO_ANYDOC` 回退 AnyDoc。原始 binary 文件保存至 `workspace/raw/`，Markdown 衍生檔送至 `workspace/knowledge/` 並觸發索引。
+* **上傳上限**：由 `DOCUMENT_MAX_UPLOAD_BYTES` 控制，預設 100 MiB。
+
+Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-8786}` / `${HTTPS_PORT:-8787}` 入口；容器內診斷才使用 `http://127.0.0.1:8200`。
 
 ### 4. 插件系統協定 (Plugin Protocol)
 所有插件必須實作 `IPlugin` 介面，並在 `src/plugins/` 下註冊。

@@ -6,7 +6,7 @@ The openVman system requires a user-friendly Knowledge Base Admin Panel to allow
 
 - Introduce a new web-based admin interface for knowledge base management.
 - Implement a split-pane UI featuring a directory tree explorer and a main content area.
-- Establish a "Universal Markdown" workflow: all uploaded documents (PDF, DOCX, etc.) are automatically converted to Markdown via the backend `MarkItDown` service.
+- Establish a "Universal Markdown" workflow: all uploaded documents (PDF, DOCX, etc.) are automatically converted to Markdown via the backend document ingestion pipeline.
 - Integrate a Markdown editor in the frontend for direct content modification.
 - Automate the indexing process so that saving a document automatically triggers a background RAG re-index, hiding this complexity from the user.
 - Provide clear visual status indicators for document indexing readiness.

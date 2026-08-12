@@ -6,7 +6,7 @@ The system SHALL allow users to upload files into the currently selected directo
 #### Scenario: Bulk Upload via Dropzone
 - **WHEN** the user drags and drops multiple files into the main content area dropzone
 - **THEN** the system uploads each file to the backend `upload` endpoint
-- **THEN** the system triggers the backend conversion (MarkItDown) and indexing pipeline
+- **THEN** the system triggers the backend document conversion and indexing pipeline
 
 ### Requirement: Directory Navigation
 The system SHALL allow users to navigate the workspace directory structure.

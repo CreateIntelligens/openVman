@@ -25,6 +25,6 @@
 
 ## 5. End-to-End Workflows & Polish (kb-file-management)
 
-- [x] 5.1 Connect the Dropzone to the backend upload endpoint and handle the "processing" state while MarkItDown converts the file.
+- [x] 5.1 Connect the Dropzone to the backend upload endpoint and handle the "processing" state while the ingestion pipeline converts the file.
 - [x] 5.2 Implement optimistic UI updates (e.g., showing a file in the tree immediately upon successful upload, while it indexes in the background).
 - [x] 5.3 Implement Drag and Drop functionality within the Tree Component to allow moving files between folders.

@@ -32,7 +32,7 @@ graph TD
     Backend <-->|3. 異步任務| Redis
     
     %% Cross-service data flow
-    Backend -.->|pdf-inspector / Docling 轉 Markdown| Brain
+    Backend -.->|pdf-inspector / Docling / AnyDoc 轉 Markdown| Brain
     Frontend -.->|API 設定| Backend
 ```
 

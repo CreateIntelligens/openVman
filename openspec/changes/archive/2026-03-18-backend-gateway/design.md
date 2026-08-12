@@ -59,9 +59,9 @@ openVman 目前的三層解耦架構（Frontend ↔ Backend ↔ Brain）假設�
 | 圖片（JPEG/PNG/WEBP） | GPT-4o Vision API / 本地 LLaVA | 退回純 OCR（Tesseract） |
 | 影片（MP4/MOV ≤ 60s） | 每秒採樣關鍵影格 → Vision 描述 | 取首末影格 |
 | 音訊（MP3/WAV） | OpenAI Whisper API / 本地 Whisper | 標記為無法轉錄 |
-| 文件（PDF/DOCX/XLSX） | MarkItDown（Brain 層共用依賴） | pdftotext |
+| 文件（PDF/DOCX/XLSX） | Docling 主轉換 + AnyDoc fallback | pdf-inspector fast path |
 
-**理由**：利用已在 Brain 層使用的 MarkItDown，避免重複依賴；Vision LLM 複用 Brain 層的 LLM provider router。
+**理由**：文件解析集中在 Gateway / Backend，Brain 僅接收 canonical Markdown；Vision LLM 複用 Brain 層的 LLM provider router。
 
 ---
 
@@ -119,5 +119,5 @@ Gateway 完成媒體預處理後，以 `POST /internal/enrich` 呼叫 Backend，
 
 1. **Camera Live RTSP vs WebRTC**：首期以截圖方式（HTTP snapshot endpoint）還是直接接收 RTSP 串流？建議先以 HTTP Snapshot 降低複雜度，後期升級 RTSP。
 2. **Web Crawler 反爬機制**：是否需要代理 IP 池？首期假設爬取公開、無反爬的 URL，後期可插拔代理池 plugin。
-3. **MarkItDown 部署位置**：Gateway 和 Brain 是否共用同一個 MarkItDown 服務？或各自獨立部署？建議各自獨立避免跨服務依賴。
+3. **文件解析部署位置**：parser 固定由 Gateway / Backend 管理，Brain 不安裝 binary 文件轉換依賴。
 4. **前端上傳 UI**：多模態附件的前端上傳 UX（拖曳、預覽、進度條）將在 `02_FRONTEND_SPEC` delta 規格中補充。

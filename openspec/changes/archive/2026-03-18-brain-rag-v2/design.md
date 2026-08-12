@@ -1,4 +1,4 @@
-# Design: RAG v2 Architecture (LanceDB + BM25 + MarkItDown)
+# Design: RAG v2 Architecture (LanceDB + BM25 + AnyDoc)
 
 ## Context & Background
 目前大腦主要依賴手動撰寫 Markdown 文件。為支持企業級應用，大腦需要能處理各類辦公室文件與音頻資料，並透過更精確的「混合檢索」來強化對特定關鍵字的掌握（例如型號、編號、專業名稱）。
@@ -8,10 +8,10 @@
 ### Goals
 - 建立一個從 `Raw -> Markdown -> LanceDB` 的自動化 Ingestion 管線。
 - 在 `retrieval_service` 實作 **Hybrid Search (Vector + BM25)**。
-- 支援透過 `markitdown` 處理多種格式。
+- 支援透過 Gateway 文件 ingestion pipeline 處理多種格式。
 
 ### Non-Goals
-- 本次不實作多語言 OCR（依賴原生 `markitdown` 能力）。
+- 本次不在 Brain 實作多語言 OCR（由 Gateway 文件解析層負責）。
 - 不處理分散式 LanceDB（維持單機嵌入式模式）。
 
 ## Technical Decisions
@@ -19,7 +19,7 @@
 ### 1. Unified Ingestion Manager
 建立 `brain/api/knowledge/ingestion_manager.py` 作為核心協調器。
 - **Watchdog**: 監測 `workspace/raw/` 目錄變動。
-- **MarkItDownService**: 調用 Microsoft `markitdown` 進行格式轉換。
+- **DocumentIngestionService**: 調用 pdf-inspector、Docling 與 AnyDoc 進行格式轉換。
 - **MarkdownChunker**: 使用基於標題 (H1, H2, H3) 的語義切分，優於簡單的字數切分。
 
 ### 2. Hybrid Search Implementation
@@ -46,7 +46,7 @@
   [ Raw Files ] (PDF, Word, Voice...)
         │
         ▼
-  [ MarkItDown Service ] ────────────► [ Markdown Output ] (knowledge/*.md)
+  [ Document Ingestion ] ────────────► [ Markdown Output ] (knowledge/*.md)
         │                                     │
         ▼                                     ▼
   [ Markdown Chunker ] ◄──────────────────────┘

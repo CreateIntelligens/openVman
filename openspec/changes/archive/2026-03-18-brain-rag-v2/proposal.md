@@ -8,7 +8,7 @@
 
 ## What Changes
 本變更將引入一套完整的「知識與記憶」強化方案：
-1.  **MarkItDown 整合**: 引入 Microsoft 的 `markitdown` 程式庫，建立 `raw -> markdown` 的轉換管線。
+1.  **AnyDoc 整合**: 引入 Firecrawl 的 `firecrawl-anydoc` Python binding，建立 `raw -> markdown` 的轉換管線。
 2.  **LanceDB BM25 強化**: 正式化 FTS (Full-Text Search) 索引建立，並在 `retrieval_service` 中預設啟用 Hybrid Search。
 3.  **Workspace 結構正規化**: 
     - `brain/workspace/raw/`: 存放原始檔案。
@@ -21,5 +21,5 @@
 - **持久化知識庫**: 即使重啟系統，索引後的知識與記憶也能透過 LanceDB 持久化存儲。
 
 ## Impact
-- **新增依賴**: `markitdown` (建議安裝 `markitdown[all]`)。
+- **新增依賴**: `firecrawl-anydoc`。
 - **效能考量**: 首次啟動大量 ingestion 時會有 CPU/GPU 負擔，建議採非同步處理。
