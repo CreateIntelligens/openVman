@@ -39,6 +39,18 @@ import { useStatusState } from "./useStatusState";
 
 type UploadEntry = { file: File; relativePath: string };
 
+function selectedPathStorageKey(projectId: string): string {
+  return `kb-selected-file-path:${projectId}`;
+}
+
+function expandedDirsStorageKey(projectId: string): string {
+  return `kb-expanded-dirs:${projectId}`;
+}
+
+function selectedQaNodeStorageKey(projectId: string): string {
+  return `kb-selected-qa-node-id:${projectId}`;
+}
+
 function rawUploadTargetFor(currentDir: string): string {
   const relativeDir = currentDir.replace(/^knowledge(\/|$)/, "");
   return relativeDir ? `raw/${relativeDir}` : "raw";
@@ -89,11 +101,11 @@ export function useKnowledgeBase() {
   const { status, setStatus, setErrorStatus } = useStatusState();
   const [search, setSearch] = useState("");
   const [selectedPath, setSelectedPath] = useState<string>(() => {
-    return localStorage.getItem("kb-selected-file-path") ?? "knowledge";
+    return localStorage.getItem(selectedPathStorageKey(projectId)) ?? "knowledge";
   });
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem("kb-expanded-dirs");
+      const saved = localStorage.getItem(expandedDirsStorageKey(projectId));
       if (saved) {
         const arr = JSON.parse(saved);
         if (Array.isArray(arr)) {
@@ -129,6 +141,11 @@ export function useKnowledgeBase() {
 
   const dragCounterRef = useRef(0);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const activeProjectRef = useRef(projectId);
+  const restoredSelectionProjectRef = useRef<string | null>(null);
+  const [selectionProjectId, setSelectionProjectId] = useState(projectId);
+  const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null);
+  activeProjectRef.current = projectId;
 
   const isFileDragEvent = useCallback((event: DragEvent) => {
     return event.dataTransfer?.types?.includes("Files") ?? false;
@@ -139,20 +156,44 @@ export function useKnowledgeBase() {
   }, []);
 
   const loadDocuments = useCallback(async () => {
+    const requestedProjectId = projectId;
     setLoading(true);
     try {
       const response = await fetchKnowledgeBaseDocuments();
+      if (activeProjectRef.current !== requestedProjectId) return;
       setDocuments(response.documents);
       setServerDirs(response.directories ?? []);
+      setLoadedProjectId(requestedProjectId);
     } catch (error) {
-      setErrorStatus(error);
+      if (activeProjectRef.current === requestedProjectId) setErrorStatus(error);
     } finally {
-      setLoading(false);
+      if (activeProjectRef.current === requestedProjectId) setLoading(false);
     }
-  }, [setErrorStatus]);
+  }, [projectId, setErrorStatus]);
 
   useEffect(() => {
-    loadDocuments();
+    restoredSelectionProjectRef.current = null;
+    setLoadedProjectId(null);
+    setSelectionProjectId(projectId);
+    setDocuments([]);
+    setServerDirs([]);
+    setSelectedPath(
+      localStorage.getItem(selectedPathStorageKey(projectId)) ?? "knowledge",
+    );
+    try {
+      const saved = localStorage.getItem(expandedDirsStorageKey(projectId));
+      const parsed = saved ? JSON.parse(saved) : null;
+      setExpandedDirs(
+        Array.isArray(parsed) ? new Set(parsed) : new Set(["knowledge"]),
+      );
+    } catch {
+      setExpandedDirs(new Set(["knowledge"]));
+    }
+    setRightPane("folder");
+    setOpenDocument(null);
+    setEditLoading(false);
+    setEditorDirty(false);
+    void loadDocuments();
   }, [projectId, loadDocuments]);
 
   const normalizedSearch = useMemo(() => normalizeSearchTerm(search), [search]);
@@ -212,42 +253,79 @@ export function useKnowledgeBase() {
   }, []);
 
   const openFile = useCallback(async (path: string) => {
+    const requestedProjectId = projectId;
     setRightPane("file");
     setEditLoading(true);
     setEditorDirty(false);
     try {
       const document = await fetchKnowledgeDocument(path);
+      if (activeProjectRef.current !== requestedProjectId) return;
       setOpenDocument(document);
       setEditContent(document.content);
     } catch (error) {
-      setErrorStatus(error);
-      setRightPane("folder");
-    } finally {
-      setEditLoading(false);
-    }
-  }, [setErrorStatus]);
-
-  useEffect(() => {
-    if (selectedPath) {
-      localStorage.setItem("kb-selected-file-path", selectedPath);
-    }
-  }, [selectedPath]);
-
-  useEffect(() => {
-    const hasQaNodeSelected = !!localStorage.getItem("kb-selected-qa-node-id");
-    const initialPath = localStorage.getItem("kb-selected-file-path");
-    if (!hasQaNodeSelected && initialPath && initialPath !== "knowledge") {
-      if (initialPath.endsWith(".md")) {
-        void openFile(initialPath);
-      } else {
+      if (activeProjectRef.current === requestedProjectId) {
+        setErrorStatus(error);
         setRightPane("folder");
       }
+    } finally {
+      if (activeProjectRef.current === requestedProjectId) setEditLoading(false);
     }
-  }, [openFile]);
+  }, [projectId, setErrorStatus]);
 
   useEffect(() => {
-    localStorage.setItem("kb-expanded-dirs", JSON.stringify(Array.from(expandedDirs)));
-  }, [expandedDirs]);
+    if (selectedPath && selectionProjectId === projectId) {
+      localStorage.setItem(selectedPathStorageKey(projectId), selectedPath);
+    }
+  }, [projectId, selectedPath, selectionProjectId]);
+
+  useEffect(() => {
+    if (
+      loadedProjectId !== projectId
+      || selectionProjectId !== projectId
+      || restoredSelectionProjectRef.current === projectId
+    ) return;
+
+    restoredSelectionProjectRef.current = projectId;
+    const hasQaNodeSelected = !!localStorage.getItem(
+      selectedQaNodeStorageKey(projectId),
+    );
+    const key = selectedPathStorageKey(projectId);
+    const initialPath = localStorage.getItem(key);
+    if (hasQaNodeSelected || !initialPath || initialPath === "knowledge") return;
+
+    if (documents.some((document) => document.path === initialPath)) {
+      setSelectedPath(initialPath);
+      void openFile(initialPath);
+      return;
+    }
+    const directoryExists = serverDirs.includes(initialPath)
+      || documents.some((document) => document.path.startsWith(`${initialPath}/`));
+    if (directoryExists) {
+      setSelectedPath(initialPath);
+      setRightPane("folder");
+      return;
+    }
+
+    localStorage.removeItem(key);
+    setSelectedPath("knowledge");
+    setRightPane("folder");
+  }, [
+    documents,
+    loadedProjectId,
+    openFile,
+    projectId,
+    selectionProjectId,
+    serverDirs,
+  ]);
+
+  useEffect(() => {
+    if (selectionProjectId === projectId) {
+      localStorage.setItem(
+        expandedDirsStorageKey(projectId),
+        JSON.stringify(Array.from(expandedDirs)),
+      );
+    }
+  }, [expandedDirs, projectId, selectionProjectId]);
 
   const handleTreeSelect = useCallback((node: { type: string; path: string }) => {
     if (node.type === "folder") {
@@ -576,6 +654,7 @@ export function useKnowledgeBase() {
   }, [isFileDragEvent, uploadFiles]);
 
   return {
+    projectId,
     documents,
     serverDirs,
     loading,

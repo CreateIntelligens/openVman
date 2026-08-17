@@ -1,10 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   apiUrl,
-  del,
   fetchJson,
-  get,
   getActiveProjectId,
 } from "../api/common";
 import { errorMessage } from "../utils/errorMessage";
@@ -37,16 +35,21 @@ export interface MergedQaItem {
   hidden?: boolean;
 }
 
-function qaProjectUrl(path: string): string {
-  return apiUrl(path, { project_id: getActiveProjectId() });
+function qaProjectUrl(path: string, projectId: string): string {
+  return apiUrl(path, { project_id: projectId });
 }
 
 function nodePath(id: string, suffix = ""): string {
   return `/knowledge/qa/nodes/${encodeURIComponent(id)}${suffix}`;
 }
 
-function qaJson<T>(path: string, method: string, body?: unknown): Promise<T> {
-  return fetchJson<T>(qaProjectUrl(path), {
+function qaJson<T>(
+  projectId: string,
+  path: string,
+  method: string,
+  body?: unknown,
+): Promise<T> {
+  return fetchJson<T>(qaProjectUrl(path, projectId), {
     method,
     ...(body !== undefined && {
       headers: { "Content-Type": "application/json" },
@@ -55,31 +58,58 @@ function qaJson<T>(path: string, method: string, body?: unknown): Promise<T> {
   });
 }
 
-function qaFormData<T>(path: string, file: File): Promise<T> {
+function qaFormData<T>(
+  projectId: string,
+  path: string,
+  file: File,
+): Promise<T> {
   const formData = new FormData();
   formData.append("file", file);
-  return fetchJson<T>(qaProjectUrl(path), { method: "POST", body: formData });
+  return fetchJson<T>(qaProjectUrl(path, projectId), {
+    method: "POST",
+    body: formData,
+  });
 }
 
-export function useQaNodes() {
-  const [nodesTree, setNodesTree] = useState<QaNode[]>([]);
+export function useQaNodes(projectId = getActiveProjectId()) {
+  const [treeState, setTreeState] = useState<{
+    projectId: string;
+    nodes: QaNode[];
+  }>(() => ({ projectId, nodes: [] }));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const activeProjectRef = useRef(projectId);
+  activeProjectRef.current = projectId;
+  const nodesTree = treeState.projectId === projectId ? treeState.nodes : [];
+
+  useEffect(() => {
+    setTreeState({ projectId, nodes: [] });
+    setLoading(false);
+    setError(null);
+  }, [projectId]);
 
   const fetchTree = useCallback(async () => {
+    const requestedProjectId = projectId;
     setLoading(true);
     setError(null);
     try {
-      const data = await get<QaNode[]>("/knowledge/qa/nodes", { project_id: getActiveProjectId() });
-      setNodesTree(data);
+      const data = await qaJson<QaNode[]>(
+        requestedProjectId,
+        "/knowledge/qa/nodes",
+        "GET",
+      );
+      if (activeProjectRef.current !== requestedProjectId) return [];
+      setTreeState({ projectId: requestedProjectId, nodes: data });
       return data;
     } catch (error: unknown) {
-      setError(errorMessage(error, "Failed to fetch QA nodes tree"));
+      if (activeProjectRef.current === requestedProjectId) {
+        setError(errorMessage(error, "Failed to fetch QA nodes tree"));
+      }
       throw error;
     } finally {
-      setLoading(false);
+      if (activeProjectRef.current === requestedProjectId) setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   // Wraps a request with shared error handling; set refetch to also reload the
   // tree (and reflect the mutation) after a successful call.
@@ -89,80 +119,175 @@ export function useQaNodes() {
       fallback: string,
       refetch = false,
     ): Promise<T> => {
-      setError(null);
+      if (activeProjectRef.current === projectId) setError(null);
       try {
         const data = await fn();
-        if (refetch) await fetchTree();
+        if (refetch && activeProjectRef.current === projectId) {
+          await fetchTree();
+        }
         return data;
       } catch (error: unknown) {
-        setError(errorMessage(error, fallback));
+        if (activeProjectRef.current === projectId) {
+          setError(errorMessage(error, fallback));
+        }
         throw error;
       }
     },
-    [fetchTree],
+    [fetchTree, projectId],
   );
 
-  const createNode = useCallback((
-    nodeId: string,
-    label: string,
-    parentIds?: string[],
-    childIds?: string[],
-    order?: number,
-    hidden?: boolean
-  ) => run(() => qaJson<QaNode>("/knowledge/qa/nodes", "POST", {
-    node_id: nodeId,
-    label,
-    parent_ids: parentIds ?? [],
-    child_ids: childIds ?? [],
-    order: order ?? 1.0,
-    hidden: Boolean(hidden),
-  }), "Failed to create QA node", true), [run]);
+  const createNode = useCallback(
+    (
+      nodeId: string,
+      label: string,
+      parentIds?: string[],
+      childIds?: string[],
+      order?: number,
+      hidden?: boolean,
+    ) => run(
+      () => qaJson<QaNode>(projectId, "/knowledge/qa/nodes", "POST", {
+        node_id: nodeId,
+        label,
+        parent_ids: parentIds ?? [],
+        child_ids: childIds ?? [],
+        order: order ?? 1.0,
+        hidden: Boolean(hidden),
+      }),
+      "Failed to create QA node",
+      true,
+    ),
+    [projectId, run],
+  );
 
-  const updateNode = useCallback((
-    id: string,
-    updates: { label?: string; hidden?: boolean }
-  ) => run(() => qaJson<QaNode>(nodePath(id), "PATCH", updates),
-    "Failed to update QA node", true), [run]);
+  const updateNode = useCallback(
+    (id: string, updates: { label?: string; hidden?: boolean }) => run(
+      () => qaJson<QaNode>(projectId, nodePath(id), "PATCH", updates),
+      "Failed to update QA node",
+      true,
+    ),
+    [projectId, run],
+  );
 
-  const deleteNode = useCallback((id: string) => run(
-    () => del<{ status: string }>(nodePath(id)),
-    "Failed to delete QA node", true), [run]);
+  const deleteNode = useCallback(
+    (id: string) => run(
+      () => qaJson<{ status: string }>(projectId, nodePath(id), "DELETE"),
+      "Failed to delete QA node",
+      true,
+    ),
+    [projectId, run],
+  );
 
-  const moveNode = useCallback((id: string, parentIds: string[]) => run(
-    () => qaJson<QaNode>(nodePath(id, "/move"), "POST", { new_parent_ids: parentIds }),
-    "Failed to move QA node", true), [run]);
+  const moveNode = useCallback(
+    (id: string, parentIds: string[]) => run(
+      () => qaJson<QaNode>(projectId, nodePath(id, "/move"), "POST", {
+        new_parent_ids: parentIds,
+      }),
+      "Failed to move QA node",
+      true,
+    ),
+    [projectId, run],
+  );
 
-  const reorderNode = useCallback((id: string, siblingIdsOrdered: string[]) => run(
-    () => qaJson<QaNode>(nodePath(id, "/reorder"), "POST", { sibling_ids_ordered: siblingIdsOrdered }),
-    "Failed to reorder QA node", true), [run]);
+  const reorderNode = useCallback(
+    (id: string, siblingIdsOrdered: string[]) => run(
+      () => qaJson<QaNode>(projectId, nodePath(id, "/reorder"), "POST", {
+        sibling_ids_ordered: siblingIdsOrdered,
+      }),
+      "Failed to reorder QA node",
+      true,
+    ),
+    [projectId, run],
+  );
 
-  const fetchMergedQa = useCallback((id: string) => run(
-    () => get<MergedQaItem[]>(nodePath(id, "/merged")),
-    "Failed to fetch merged QA entries"), [run]);
+  const fetchMergedQa = useCallback(
+    (id: string) => run(
+      () => qaJson<MergedQaItem[]>(
+        projectId,
+        nodePath(id, "/merged"),
+        "GET",
+      ),
+      "Failed to fetch merged QA entries",
+    ),
+    [projectId, run],
+  );
 
-  const saveMergedQa = useCallback((id: string, rows: MergedQaItem[]) => run(
-    () => qaJson<{ status: string }>(nodePath(id, "/merged"), "PUT", rows),
-    "Failed to save merged QA entries", true), [run]);
+  const saveMergedQa = useCallback(
+    (id: string, rows: MergedQaItem[]) => run(
+      () => qaJson<{ status: string }>(
+        projectId,
+        nodePath(id, "/merged"),
+        "PUT",
+        rows,
+      ),
+      "Failed to save merged QA entries",
+      true,
+    ),
+    [projectId, run],
+  );
 
-  const uploadImage = useCallback((file: File) => run(
-    () => qaFormData<{ image_id: string }>("/knowledge/qa/images", file),
-    "Failed to upload image"), [run]);
+  const uploadImage = useCallback(
+    (file: File) => run(
+      () => qaFormData<{ image_id: string }>(
+        projectId,
+        "/knowledge/qa/images",
+        file,
+      ),
+      "Failed to upload image",
+    ),
+    [projectId, run],
+  );
 
-  const deleteImage = useCallback((id: string) => run(
-    () => del<{ status: string }>(`/knowledge/qa/images/${encodeURIComponent(id)}`),
-    "Failed to delete image"), [run]);
+  const deleteImage = useCallback(
+    (id: string) => run(
+      () => qaJson<{ status: string }>(
+        projectId,
+        `/knowledge/qa/images/${encodeURIComponent(id)}`,
+        "DELETE",
+      ),
+      "Failed to delete image",
+    ),
+    [projectId, run],
+  );
 
-  const cleanupImages = useCallback(() => run(
-    () => qaJson<{ deleted_files: string[] }>("/knowledge/qa/images/cleanup-unused", "POST"),
-    "Failed to cleanup images"), [run]);
+  const cleanupImages = useCallback(
+    () => run(
+      () => qaJson<{ deleted_files: string[] }>(
+        projectId,
+        "/knowledge/qa/images/cleanup-unused",
+        "POST",
+      ),
+      "Failed to cleanup images",
+    ),
+    [projectId, run],
+  );
 
-  const adoptSource = useCallback((path: string, parentId?: string) => run(
-    () => qaJson<{ node_id: string }>("/knowledge/qa/nodes/adopt-source", "POST", { path, parent_id: parentId }),
-    "Failed to adopt QA source", true), [run]);
+  const adoptSource = useCallback(
+    (path: string, parentId?: string) => run(
+      () => qaJson<{ node_id: string }>(
+        projectId,
+        "/knowledge/qa/nodes/adopt-source",
+        "POST",
+        { path, parent_id: parentId },
+      ),
+      "Failed to adopt QA source",
+      true,
+    ),
+    [projectId, run],
+  );
 
-  const ingestSource = useCallback((id: string, path: string) => run(
-    () => qaJson<{ added: number }>(nodePath(id, "/ingest-source"), "POST", { path }),
-    "Failed to ingest QA source", true), [run]);
+  const ingestSource = useCallback(
+    (id: string, path: string) => run(
+      () => qaJson<{ added: number }>(
+        projectId,
+        nodePath(id, "/ingest-source"),
+        "POST",
+        { path },
+      ),
+      "Failed to ingest QA source",
+      true,
+    ),
+    [projectId, run],
+  );
 
   return {
     nodesTree,

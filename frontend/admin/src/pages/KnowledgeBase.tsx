@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type SetStateAction,
 } from "react";
 import { useNavigation } from "../context/NavigationContext";
 import { useUnsavedChanges } from "../context/NavigationGuardContext";
@@ -97,6 +98,7 @@ function getQaNodeAncestors(nodes: QaNode[], targetId: string, ancestors: string
 
 export default function KnowledgeBase() {
   const {
+    projectId = "default",
     documents,
     serverDirs,
     loading,
@@ -205,18 +207,52 @@ export default function KnowledgeBase() {
     saveMergedQa,
     adoptSource,
     ingestSource,
-  } = useQaNodes();
-  const [selectedQaNodeId, setSelectedQaNodeId] = useState<string | null>(() => {
-    return localStorage.getItem("kb-selected-qa-node-id");
-  });
+  } = useQaNodes(projectId);
+  const [qaSelection, setQaSelection] = useState(() => ({
+    projectId,
+    nodeId: localStorage.getItem(`kb-selected-qa-node-id:${projectId}`),
+  }));
+  const selectedQaNodeId = qaSelection.projectId === projectId
+    ? qaSelection.nodeId
+    : null;
+  const setSelectedQaNodeId = useCallback(
+    (next: SetStateAction<string | null>) => {
+      setQaSelection((current) => {
+        const currentNodeId = current.projectId === projectId
+          ? current.nodeId
+          : null;
+        return {
+          projectId,
+          nodeId: typeof next === "function" ? next(currentNodeId) : next,
+        };
+      });
+    },
+    [projectId],
+  );
   const [qaNodeDialog, setQaNodeDialog] = useState<QaNodeDialog | null>(null);
   const [mergedRefreshKey, setMergedRefreshKey] = useState(0);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [orderModalParentNode, setOrderModalParentNode] = useState<QaNode | null>(null);
 
   useEffect(() => {
-    fetchQaTree();
-  }, [fetchQaTree]);
+    void fetchQaTree().catch(() => undefined);
+  }, [fetchQaTree, projectId]);
+
+  useEffect(() => {
+    setSelectedQaNodeId(
+      localStorage.getItem(`kb-selected-qa-node-id:${projectId}`),
+    );
+  }, [projectId]);
+
+  useEffect(() => {
+    if (
+      qaTreeLoading
+      || !selectedQaNodeId
+      || findQaNode(nodesTree, selectedQaNodeId)
+    ) return;
+    localStorage.removeItem(`kb-selected-qa-node-id:${projectId}`);
+    setSelectedQaNodeId(null);
+  }, [nodesTree, projectId, qaTreeLoading, selectedQaNodeId]);
 
   useEffect(() => {
     if (selectedQaNodeId && nodesTree.length > 0) {
@@ -310,18 +346,18 @@ export default function KnowledgeBase() {
 
   const handleSelectQaNode = useCallback((nodeId: string) => {
     setSelectedQaNodeId(nodeId);
-    localStorage.setItem("kb-selected-qa-node-id", nodeId);
-    localStorage.removeItem("kb-selected-file-path");
+    localStorage.setItem(`kb-selected-qa-node-id:${projectId}`, nodeId);
+    localStorage.removeItem(`kb-selected-file-path:${projectId}`);
     closeFileView();
     setMobileTreeOpen(false);
-  }, [closeFileView]);
+  }, [closeFileView, projectId]);
 
   const handleSelectTreeFile = useCallback((node: TreeNode) => {
     setSelectedQaNodeId(null);
-    localStorage.removeItem("kb-selected-qa-node-id");
+    localStorage.removeItem(`kb-selected-qa-node-id:${projectId}`);
     handleTreeSelect(node);
     setMobileTreeOpen(false);
-  }, [handleTreeSelect]);
+  }, [handleTreeSelect, projectId]);
 
   const openMobileTree = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {

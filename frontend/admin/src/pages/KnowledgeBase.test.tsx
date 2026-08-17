@@ -33,7 +33,7 @@ const qaNodeMocks = vi.hoisted(() => ({
     }>;
     children: unknown[];
   }>,
-  fetchTree: vi.fn(),
+  fetchTree: vi.fn(async () => []),
   createNode: vi.fn(),
   updateNode: vi.fn(),
   deleteNode: vi.fn(),
