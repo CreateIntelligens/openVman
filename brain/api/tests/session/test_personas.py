@@ -47,6 +47,8 @@ def _stub_db_module(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _configure_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     workspace = _import("knowledge.workspace")
+    personas = _import("personas.personas")
+    monkeypatch.setattr(personas, "workspace", workspace)
     root = tmp_path / "workspace"
     core_documents = {
         "soul": root / "SOUL.md",

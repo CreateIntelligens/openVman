@@ -204,7 +204,10 @@ def resolve_workspace_artifact(relative_path: str, project_id: str = "default") 
     return resolved
 
 
-CoreContextCacheValue = tuple[tuple[tuple[str, float], ...], dict[str, str]]
+CoreContextCacheValue = tuple[
+    tuple[tuple[str, str, float], ...],
+    dict[str, str],
+]
 
 _CORE_CONTEXT_CACHE: dict[tuple[str, str], CoreContextCacheValue] = {}
 
