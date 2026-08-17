@@ -103,9 +103,16 @@ def test_upload_invalid_char_id(client):
 
 
 def test_delete(client):
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
     _upload(client)
+    runtime = get_auth_runtime()
+    assert runtime.resources.get(ResourceType.AVATAR_CHARACTER, "008") is not None
+
     assert client.delete("/api/avatar/008").status_code == 200
     assert client.get("/api/avatar").json()["characters"] == []
+    assert runtime.resources.get(ResourceType.AVATAR_CHARACTER, "008") is None
 
 
 def test_delete_missing_404(client):
@@ -121,11 +128,17 @@ def test_delete_bound_conflict(client, monkeypatch):
 
 
 def test_rename(client):
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
     _upload(client, char_id="008")
     r = client.post("/api/avatar/008/rename", json={"new_char_id": "008b"})
     assert r.status_code == 200
     ids = [c["char_id"] for c in client.get("/api/avatar").json()["characters"]]
     assert ids == ["008b"]
+    resources = get_auth_runtime().resources
+    assert resources.get(ResourceType.AVATAR_CHARACTER, "008") is None
+    assert resources.get(ResourceType.AVATAR_CHARACTER, "008b") is not None
 
 
 def test_update_label(client):

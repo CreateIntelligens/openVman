@@ -51,8 +51,8 @@ def test_bcrypt_hashes_and_verifies_without_silent_truncation():
     assert verify_password(password, password_hash) is True
     assert verify_password("incorrect password", password_hash) is False
 
-    with pytest.raises(PasswordValidationError):
-        hash_password("sh")
+    with pytest.raises(PasswordValidationError, match="at least 8 UTF-8 bytes"):
+        hash_password("1234567")
     with pytest.raises(PasswordValidationError):
         hash_password("a" * 73)
     with pytest.raises(PasswordValidationError):

@@ -176,7 +176,7 @@ async def delete_character(
     try:
         store.delete_character(cid)
         try:
-            runtime.resources.delete(ResourceType.AVATAR_CHARACTER, cid)
+            runtime.resources.unregister(ResourceType.AVATAR_CHARACTER, cid)
         except Exception:
             pass
     except CharacterNotFound as exc:
@@ -217,7 +217,7 @@ async def rename_character(
     try:
         character = store.rename_character(cid, new_cid)
         try:
-            runtime.resources.delete(ResourceType.AVATAR_CHARACTER, cid)
+            runtime.resources.unregister(ResourceType.AVATAR_CHARACTER, cid)
         except Exception:
             pass
         try:

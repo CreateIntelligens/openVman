@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import bcrypt
 
-_MIN_PASSWORD_BYTES = 4
+_MIN_PASSWORD_BYTES = 8
 _MAX_PASSWORD_BYTES = 72
 
 
