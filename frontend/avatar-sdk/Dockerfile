@@ -12,7 +12,7 @@ RUN corepack enable \
 COPY src ./src
 COPY tests ./tests
 COPY tsconfig.json vite.config.ts ./
-RUN pnpm build
+RUN pnpm test
 
 FROM nginx:1.27-alpine AS runner
 
