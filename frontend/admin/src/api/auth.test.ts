@@ -53,7 +53,7 @@ describe("cookie auth API", () => {
       created_at: "2026-08-17T00:00:00Z",
       credentials: Array.from({ length: 5 }, (_, index) => ({
         user_id: `temporary-${index}`,
-        password: `OVT-code-${index}`,
+        password: `TempCode0${index}Ab`,
         expires_at: null,
       })),
     };

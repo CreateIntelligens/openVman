@@ -7,7 +7,7 @@
 
 ## 2. Passwords, JWT, and request authentication
 
-- [x] 2.1 Implement bcrypt hash／verify services with 8–72 UTF-8 byte validation and no silent truncation.
+- [x] 2.1 Implement bcrypt hashing with 8–72 UTF-8 byte creation validation, existing-hash verification without a minimum-length gate, and no silent truncation.
 - [x] 2.2 Implement HS256 JWT issue／decode using only `SESSION_JWT_SECRET` and validating `sub`, `role`, `ver`, `iat`, `exp`, `iss`, and `aud`.
 - [x] 2.3 Implement current-account dependencies for Bearer and `openvman_session` cookie transports, database revalidation, disabled checks, token-version revocation, and consistent 401 responses.
 - [x] 2.4 Add fail-closed route protection with an explicit public allowlist, cookie-auth same-origin mutation checks, and removal of query-string session token support.
@@ -16,7 +16,7 @@
 ## 3. Account administration
 
 - [x] 3.1 Add `POST /api/auth/login`, `POST /api/auth/logout`, and `GET /api/auth/me`, returning a CLI token while keeping browser auth in the HttpOnly cookie.
-- [x] 3.2 Add the container bootstrap CLI that creates exactly the first admin without logging credentials or replacing an existing administrator.
+- [x] 3.2 Add the container bootstrap CLI that creates exactly the initial `ai360`／`ai360` admin without logging credentials or replacing an existing administrator.
 - [x] 3.3 Add admin-only account list／create／enable／disable／revoke／delete APIs and enforce self-protection, last-admin, duplicate-username, and owned-resource deletion rules.
 - [x] 3.4 Add account administration tests covering normal-user denial, creator audit fields, immediate disable, revoke-all, resource-count 409, safe deletion, and last-admin invariants.
 
@@ -24,7 +24,7 @@
 
 - [x] 4.1 Extend auth persistence with formal／temporary account kinds, temporary batches and credentials, explicit resource grants, account defaults, and idempotent schema migrations.
 - [x] 4.2 Implement password-only temporary login with a non-secret locator, bcrypt verification, atomic first-use activation, a hard 72-hour expiry, per-request expiry revalidation, and JWT `kind` claims.
-- [x] 4.3 Add admin-only batch generation that always returns exactly five high-entropy plaintext passwords once, stores only hashes, accepts selected project／character／voice grants, records the creator, and supports list／revoke audit operations.
+- [x] 4.3 Add admin-only batch generation that always returns exactly five random 12-character alphanumeric plaintext passwords once, stores only hashes, accepts selected project／character／voice grants, records the creator, and supports list／revoke audit operations.
 - [x] 4.4 Return `expires_at` and `remaining_seconds` from temporary login and session bootstrap, and add concurrency／expiry／revocation／plaintext-non-persistence tests.
 - [x] 4.5 Resolve project, character, and voice access as system-public／owner access for formal accounts or explicit grants for temporary accounts, with no unauthorized fallback.
 

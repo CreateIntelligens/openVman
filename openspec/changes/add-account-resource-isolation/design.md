@@ -56,7 +56,7 @@ Backend 轉送 Brain 前 SHALL 移除外部提供的 `X-OpenVMan-*` 身分 heade
 
 ### 3. 沿用 JTAI session 形狀，但收緊 secret 與撤銷
 
-- Password 使用 bcrypt。建立／變更密碼時接受 8 至 72 UTF-8 bytes，超過即拒絕，不以靜默截斷製造等價密碼。
+- Password 使用 bcrypt。一般帳號建立／變更密碼時接受 8 至 72 UTF-8 bytes，超過即拒絕，不以靜默截斷製造等價密碼；首次 bootstrap 明確允許部署預設的 `ai360`／`ai360`，驗證既有 bcrypt hash 時也允許短於 8 bytes 的密碼。
 - JWT 使用 HS256，唯一 secret 為必要環境變數 `SESSION_JWT_SECRET`，不得 fallback 到 API key 或硬編碼預設值。
 - Claims 為 `sub`、`role`、`kind`、`ver`、`iat`、`exp`、`iss=openvman`、`aud=openvman-web`；正式帳號預設有效期 24 小時，臨時帳號的 JWT `exp` 不得晚於 credential 的 72 小時到期時間。
 - Browser login 設定 `openvman_session` cookie：`HttpOnly`、`SameSite=Lax`、`Path=/`，production 必須 `Secure`。Response body 同時回傳 token，供 CLI 使用；前端不得保存該 token。
@@ -68,11 +68,11 @@ Backend 轉送 Brain 前 SHALL 移除外部提供的 `X-OpenVMan-*` 身分 heade
 
 ### 4. 管理員 provision 正式與臨時帳號，不提供 public signup
 
-提供容器內 `python -m app.scripts.create_user --username ... --role admin` bootstrap CLI；只有在沒有 admin 時可建立第一位 admin。登入後的 admin 可 list、create、disable 與啟用帳號。一般 user 只能讀取自己的 `/api/auth/me`。
+提供容器內 `python -m app.scripts.create_user --username ai360 --role admin` bootstrap CLI，以 `ai360`／`ai360` 建立初始管理員；只有在沒有 admin 時可建立第一位 admin。登入後的 admin 可 list、create、disable 與啟用帳號。一般 user 只能讀取自己的 `/api/auth/me`。
 
 刪除帳號前若仍有 private resources SHALL 回 409，要求先刪除或轉移；一般停用不刪資料。Admin 不得停用或刪除自己，且系統不得移除最後一位啟用中的 admin。
 
-Admin 帳號頁另提供臨時帳號批次建立。每次 request 固定建立 5 個 `account_type=temporary` 帳號並套用同一組 resource grants。臨時密碼格式包含一段非祕密 locator 與至少 80 bits 隨機 secret；資料庫只保存完整密碼的 bcrypt hash。五組明文只在成功建立 response 顯示一次，不寫 log，也不提供取回 API。
+Admin 帳號頁另提供臨時帳號批次建立。每次 request 固定建立 5 個 `account_type=temporary` 帳號並套用同一組 resource grants。臨時密碼是隨機 12 碼英數字元，前 4 碼同時作為非祕密 locator；資料庫只保存完整密碼的 bcrypt hash。五組明文只在成功建立 response 顯示一次，不寫 log，也不提供取回 API。
 
 `POST /api/auth/temporary-login` 只接受 `password`。Backend 先用 locator 定位候選 row，再以 bcrypt 驗證完整密碼；第一次成功登入在同一 write transaction 寫入 `first_used_at` 與 `expires_at=first_used_at+72h`。之後重複登入不延長期限。Login 與 `/me` 回傳 `expires_at`、`remaining_seconds`，前端在登入完成時明確提醒剩餘時間。
 
@@ -128,7 +128,7 @@ Auth middleware 的 public allowlist 只包含 login、必要 health endpoint、
 - [既有 global asset URL 可能被當成 private 使用] → migration 明確把既有公開資產登記 system-public；新 private 資產只提供 authenticated URL，UI 不混用兩者。
 - [Admin 全域權限提高誤操作風險] → destructive API 保留明確 resource owner、稽核欄位與確認流程；一般 user 永遠不能跨 owner mutation。
 - [Custom voice 可能包含敏感生物特徵資料] → private by default、禁止 public URL、刪除時移除 reference audio 與 provider registry、logs 不記錄音檔內容或 JWT。
-- [臨時密碼被轉傳或多人共用] → 使用高熵隨機碼、只顯示一次、首次使用才開始 72 小時、admin 可立即 revoke；UI 持續顯示到期時間。
+- [臨時密碼被轉傳或多人共用] → 使用隨機 12 碼英數密碼、只顯示一次、首次使用才開始 72 小時、admin 可立即 revoke；UI 持續顯示到期時間。
 - [同時第一次登入造成期限被延後] → 在單一 `BEGIN IMMEDIATE` transaction 以 `first_used_at IS NULL` 條件更新，只允許第一個成功請求寫入期限。
 - [公開 Avatar SDK 與帳號隔離需求衝突] → 公開 SDK 僅看到 system-public characters；private character 的第三方分享不在本變更範圍。
 

@@ -28,6 +28,17 @@
 
 所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定，再執行 `./scripts/ensure-runtime-secrets.sh` 安全產生缺少的內部 token 與 session secret；不用分開維護多份。
 
+### 初始管理員
+
+空白安裝的初始管理員固定為帳號 `ai360`、密碼 `ai360`。服務啟動後，在 Backend 容器執行一次：
+
+```bash
+docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
+  python -m app.scripts.create_user --username ai360
+```
+
+若資料庫已存在管理員，指令會拒絕建立或覆蓋帳號。
+
 ### 部署前置：資料目錄權限
 
 `docker-compose.yml` 裡多個 volume 是 host 端 bind mount（如 `./data`、`./backend/data`）。若該目錄尚不存在，Docker 會以 root 自動建立，但容器內服務是以 `${UID:-1000}:${GID:-1000}` 非 root 身分執行，會導致寫入失敗（例如 `avatar-mascots dir not preparable at import: Permission denied`）。

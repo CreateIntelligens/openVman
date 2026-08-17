@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.auth.passwords import verify_password
 from app.auth.repositories import AdminAlreadyExistsError
 from app.auth.runtime import AuthRuntime, build_auth_runtime
 from app.config import TTSRouterConfig
@@ -43,3 +44,14 @@ def test_bootstrap_creates_only_the_first_admin(runtime: AuthRuntime):
         )
 
     assert [user.username for user in runtime.users.list()] == ["first-admin"]
+
+
+def test_bootstrap_accepts_the_deployment_default_admin(runtime: AuthRuntime):
+    created = bootstrap_admin(
+        username="ai360",
+        password="ai360",
+        runtime=runtime,
+    )
+
+    assert created.username == "ai360"
+    assert verify_password("ai360", created.password_hash) is True

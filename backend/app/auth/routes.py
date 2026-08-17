@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import re
-import secrets
 from datetime import datetime, timezone
 from math import ceil
+import re
+import secrets
+import string
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,11 +41,11 @@ from .runtime import AuthRuntime, get_auth_runtime
 _SESSION_COOKIE_NAME = "openvman_session"
 _INVALID_CREDENTIALS = "Invalid credentials"
 _DUMMY_PASSWORD_HASH = "$2b$12$RHUg9KKg90SMUGjfwS3QxeboW/TeCDDpAZQBOcOOnOfYB64TsIfGO"
-_TEMPORARY_PASSWORD_PATTERN = re.compile(
-    r"\AOVT-([A-Fa-f0-9]{8})-([A-Za-z0-9_-]{22})\Z"
-)
+_TEMPORARY_PASSWORD_PATTERN = re.compile(r"\A([A-Za-z0-9]{4})[A-Za-z0-9]{8}\Z")
 _TEMPORARY_DURATION_SECONDS = 72 * 60 * 60
-_TEMPORARY_SECRET_BYTES = 16
+_TEMPORARY_PASSWORD_ALPHABET = string.ascii_letters + string.digits
+_TEMPORARY_PASSWORD_LENGTH = 12
+_TEMPORARY_LOCATOR_LENGTH = 4
 
 auth_router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 users_router = APIRouter(prefix="/api/users", tags=["Accounts"])
@@ -292,7 +293,7 @@ def temporary_login(
 ) -> LoginResponse:
     match = _TEMPORARY_PASSWORD_PATTERN.fullmatch(body.password)
     located = (
-        runtime.temporary_accounts.get_credential_by_locator(match.group(1).lower())
+        runtime.temporary_accounts.get_credential_by_locator(match.group(1))
         if match is not None
         else None
     )
@@ -354,10 +355,11 @@ def me(
 
 
 def _new_temporary_password() -> tuple[str, str]:
-    locator = secrets.token_hex(4)
-    # 128 random bits exceed the 80-bit minimum; the locator is only an index.
-    secret = secrets.token_urlsafe(_TEMPORARY_SECRET_BYTES)
-    return locator, f"OVT-{locator}-{secret}"
+    password = "".join(
+        secrets.choice(_TEMPORARY_PASSWORD_ALPHABET)
+        for _ in range(_TEMPORARY_PASSWORD_LENGTH)
+    )
+    return password[:_TEMPORARY_LOCATOR_LENGTH], password
 
 
 def _temporary_account_state(
@@ -465,7 +467,11 @@ def create_temporary_batch(
     seen_locators: set[str] = set()
     while len(generated) < 5:
         locator, password = _new_temporary_password()
-        if locator in seen_locators:
+        if (
+            locator in seen_locators
+            or runtime.temporary_accounts.get_credential_by_locator(locator)
+            is not None
+        ):
             continue
         seen_locators.add(locator)
         generated.append((locator, password))

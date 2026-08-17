@@ -17,6 +17,7 @@ supervisord.pid
 data/avatar/
 data/backgrounds/
 data/mascots/
+data/auth/
 
 # Python
 __pycache__/

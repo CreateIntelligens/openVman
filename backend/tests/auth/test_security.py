@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import bcrypt
 import pytest
 
 from app.auth.database import AuthDatabase
@@ -58,6 +59,18 @@ def test_bcrypt_hashes_and_verifies_without_silent_truncation():
     with pytest.raises(PasswordValidationError):
         hash_password("密" * 25)
     assert verify_password("a" * 73, password_hash) is False
+
+
+def test_bcrypt_verifies_an_existing_short_bootstrap_password():
+    password = "ai360"
+    password_hash = bcrypt.hashpw(
+        password.encode("utf-8"),
+        bcrypt.gensalt(),
+    ).decode("utf-8")
+
+    assert verify_password(password, password_hash) is True
+    with pytest.raises(PasswordValidationError, match="at least 8 UTF-8 bytes"):
+        hash_password(password)
 
 
 def test_jwt_round_trip_contains_the_required_contract(tmp_path: Path):

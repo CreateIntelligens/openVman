@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: Temporary passwords are high-entropy and non-recoverable
-The system SHALL generate each temporary password with at least 80 bits of randomness, SHALL store only a bcrypt hash plus a non-secret lookup locator, and SHALL never write plaintext temporary passwords to logs or persistent storage.
+### Requirement: Temporary passwords are random 12-character codes and non-recoverable
+The system SHALL generate each temporary password as exactly 12 random alphanumeric characters, SHALL use its first four characters as a non-secret lookup locator, SHALL store only a bcrypt hash plus that locator, and SHALL never write plaintext temporary passwords to logs or persistent storage.
 
 #### Scenario: Batch creation is persisted
 - **WHEN** five temporary passwords are generated

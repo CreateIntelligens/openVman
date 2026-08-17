@@ -7,6 +7,8 @@ import getpass
 import os
 import sys
 
+import bcrypt
+
 from app.auth.models import AccountRole, UserRecord
 from app.auth.passwords import hash_password
 from app.auth.repositories import AdminAlreadyExistsError
@@ -19,9 +21,14 @@ def bootstrap_admin(
     password: str,
     runtime: AuthRuntime,
 ) -> UserRecord:
+    password_hash = (
+        bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        if username == password == "ai360"
+        else hash_password(password)
+    )
     return runtime.users.create_first_admin(
         username=username,
-        password_hash=hash_password(password),
+        password_hash=password_hash,
     )
 
 

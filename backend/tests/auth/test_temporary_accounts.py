@@ -118,6 +118,11 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
     credentials = payload["credentials"]
     assert len(credentials) == 5
     assert len({item["password"] for item in credentials}) == 5
+    assert all(
+        len(item["password"]) == 12 and item["password"].isascii()
+        and item["password"].isalnum()
+        for item in credentials
+    )
     assert all(item["expires_at"] is None for item in credentials)
 
     passwords = {item["password"] for item in credentials}
@@ -247,14 +252,14 @@ def test_expired_temporary_credential_is_revalidated_on_every_request(
 
 def test_concurrent_activation_keeps_the_first_expiry(runtime: AuthRuntime):
     admin = _bootstrap(runtime)
-    password = "OVT-1234abcd-mocktemporarypassword123"  # gitleaks:allow
+    password = "A00xPass0000"  # gitleaks:allow
     batch = runtime.temporary_accounts.create_batch(
         created_by=admin.id,
         credentials=[
             TemporaryCredentialCreate(
-                locator=f"1234abc{index}",
+                locator=f"A0{index}x",
                 password_hash=hash_password(
-                    f"OVT-1234abc{index}-mocktemporarypassword123"  # gitleaks:allow
+                    f"A0{index}xPass{index:04d}"  # gitleaks:allow
                 ),
             )
             for index in range(5)

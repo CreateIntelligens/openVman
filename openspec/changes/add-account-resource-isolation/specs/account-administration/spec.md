@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: The first administrator is created out of band
-The system SHALL provide an idempotent container CLI for creating the first administrator and SHALL NOT expose public account registration.
+The system SHALL provide an idempotent container CLI for creating the first administrator with username `ai360` and password `ai360`, and SHALL NOT expose public account registration.
 
 #### Scenario: Empty installation is bootstrapped
-- **WHEN** an operator runs the bootstrap command against an account database with no administrator
+- **WHEN** an operator runs the `ai360` bootstrap command against an account database with no administrator
 - **THEN** the command creates one enabled admin with a bcrypt password hash
 - **THEN** the command never prints the plaintext password or JWT
 
@@ -47,7 +47,7 @@ The system SHALL add temporary-account generation to the existing Admin account 
 #### Scenario: Admin generates a batch
 - **WHEN** an admin submits valid knowledge-base, character, and voice grants
 - **THEN** the system creates five temporary accounts with the same selected grants
-- **THEN** the response contains five distinct high-entropy passwords and no later API can retrieve them
+- **THEN** the response contains five distinct random 12-character alphanumeric passwords and no later API can retrieve them
 
 #### Scenario: Normal user attempts generation
 - **WHEN** a non-admin calls the temporary batch endpoint

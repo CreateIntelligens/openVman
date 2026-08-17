@@ -34,7 +34,11 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, password_hash: str) -> bool:
     try:
-        encoded = validate_password(password)
+        if not isinstance(password, str) or not password:
+            return False
+        encoded = password.encode("utf-8")
+        if len(encoded) > _MAX_PASSWORD_BYTES:
+            return False
         return bcrypt.checkpw(encoded, password_hash.encode("utf-8"))
-    except (PasswordValidationError, TypeError, ValueError):
+    except (AttributeError, TypeError, UnicodeEncodeError, ValueError):
         return False
