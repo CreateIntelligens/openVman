@@ -50,7 +50,9 @@ test("Avatar root bootstraps the cookie session before mounting the app", () => 
   assert.match(root, /auth\.bootstrap\(\)/);
   assert.match(root, /v-else-if="!auth\.account\.value"/);
   assert.match(root, /<App\s*\/>/);
-  assert.match(root, /@click="auth\.logout"/);
+  assert.match(root, /@click="handleLogout"/);
+  assert.match(root, /document\.exitFullscreen\(\)/);
+  assert.match(root, /if \(!loading && !account\) void leaveFullscreen\(\)/);
   assert.match(main, /import Root from ['"]\.\/Root\.vue['"]/);
 });
 

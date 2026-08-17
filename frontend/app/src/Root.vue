@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue"
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 
 import App from "./App.vue"
 import LoginScreen from "./components/auth/LoginScreen.vue"
@@ -7,6 +7,7 @@ import { useAuth } from "./composables/useAuth"
 
 const auth = useAuth()
 const now = ref(Date.now())
+const loggingOut = ref(false)
 const sessionStartedAt = Date.now()
 let clock: number | undefined
 
@@ -49,6 +50,34 @@ const expiresLabel = computed(() => {
       }).format(date)
 })
 
+async function leaveFullscreen(): Promise<void> {
+  if (document.fullscreenElement) {
+    await document.exitFullscreen().catch(() => {})
+  }
+  const nav = navigator as Navigator & {
+    keyboard?: { unlock?: () => void }
+  }
+  nav.keyboard?.unlock?.()
+}
+
+async function handleLogout(): Promise<void> {
+  if (loggingOut.value) return
+  loggingOut.value = true
+  try {
+    await leaveFullscreen()
+    await auth.logout()
+  } finally {
+    loggingOut.value = false
+  }
+}
+
+watch(
+  () => [auth.loading.value, auth.account.value] as const,
+  ([loading, account]) => {
+    if (!loading && !account) void leaveFullscreen()
+  },
+)
+
 onMounted(() => {
   void auth.bootstrap()
   clock = window.setInterval(() => {
@@ -73,7 +102,14 @@ onUnmounted(() => {
       <p>帳號「{{ auth.account.value.username }}」沒有存取這個功能的權限。</p>
       <div class="forbidden-actions">
         <button type="button" @click="auth.clearForbidden">返回</button>
-        <button type="button" @click="auth.logout">登出</button>
+        <button
+          class="forbidden-logout"
+          type="button"
+          :disabled="loggingOut"
+          @click="handleLogout"
+        >
+          {{ loggingOut ? "登出中…" : "登出" }}
+        </button>
       </div>
     </section>
   </main>
@@ -86,7 +122,14 @@ onUnmounted(() => {
         <span>{{ expiresLabel }} 到期</span>
       </span>
       <span v-else>{{ auth.account.value.username }}</span>
-      <button type="button" @click="auth.logout">登出</button>
+      <button
+        class="session-logout"
+        type="button"
+        :disabled="loggingOut"
+        @click="handleLogout"
+      >
+        {{ loggingOut ? "登出中…" : "登出" }}
+      </button>
     </div>
   </div>
 </template>
@@ -133,7 +176,6 @@ onUnmounted(() => {
   color: var(--text-soft);
 }
 
-.session-toolbar button,
 .forbidden-actions button {
   min-height: var(--ov-touch-target);
   padding: 0.4rem 0.75rem;
@@ -147,26 +189,69 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.session-toolbar button:hover,
 .forbidden-actions button:hover {
   background: var(--primary-hover);
 }
 
-.session-toolbar button:focus-visible,
 .forbidden-actions button:focus-visible {
   outline: var(--focus-ring-size) solid var(--primary);
   outline-offset: var(--ov-focus-ring-offset);
 }
 
-.session-toolbar button:active,
 .forbidden-actions button:active {
   filter: brightness(0.94);
 }
 
-.session-toolbar button:disabled,
 .forbidden-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.session-logout {
+  min-height: var(--ov-touch-target);
+  padding: 0.4rem 0.2rem 0.4rem 0.7rem;
+  border: 0;
+  border-left: var(--hairline) solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity var(--ov-dur-micro) var(--ov-ease-out);
+}
+
+.session-logout:hover:not(:disabled) {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.session-logout:focus-visible {
+  outline: var(--focus-ring-size) solid var(--primary);
+  outline-offset: var(--ov-focus-ring-offset);
+}
+
+.session-logout:active:not(:disabled) {
+  color: var(--primary-hover);
+}
+
+.session-logout:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.forbidden-actions .forbidden-logout {
+  border: var(--hairline) solid var(--line);
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.forbidden-actions .forbidden-logout:hover:not(:disabled) {
+  border-color: var(--text-soft);
+  background: var(--bg);
+  color: var(--text);
 }
 
 .session-state {
