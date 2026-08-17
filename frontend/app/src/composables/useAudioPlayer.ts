@@ -14,6 +14,10 @@ interface AudioPlayerOptions {
        onPlaybackVolume?: (volume: number) => void
        /** Called when the entire queued audio finishes playing */
        onPlaybackEnd?: () => void
+       /** Called when the first source in a playback queue is scheduled */
+       onPlaybackStart?: () => void
+       /** Called when playback is stopped before the queue drains naturally */
+       onPlaybackReset?: () => void
        /** Called when the audio queue drains (last scheduled chunk has played) */
        onQueueEmpty?: () => void
        /** Called when a chunk is dropped due to a decode/scheduling error */
@@ -126,9 +130,11 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
                      const now = ctx.currentTime
                      if (nextStartTime < now) nextStartTime = now
 
+                     const startsPlayback = liveSources.size === 0
                      source.start(nextStartTime)
                      isPlaying.value = true
                      liveSources.add(source)
+                     if (startsPlayback) options.onPlaybackStart?.()
                      startVolumeMonitor()
 
                      const duration = float32.length / 16000
@@ -166,6 +172,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
               liveSources.clear()
               nextStartTime = 0
               isPlaying.value = false
+              options.onPlaybackReset?.()
        }
 
        /** Reset scheduling without closing context (for new utterance) */
@@ -188,6 +195,7 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
               disconnectVolumeAnalyser()
               nextStartTime = 0
               isPlaying.value = false
+              options.onPlaybackReset?.()
        }
 
        onUnmounted(() => {

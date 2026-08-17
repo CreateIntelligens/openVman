@@ -43,6 +43,7 @@ export class AvatarAudio {
     if (generation !== this.playbackGeneration || this.destroyed) return;
     const decoded = await context.decodeAudioData(encoded);
     if (generation !== this.playbackGeneration || this.destroyed) return;
+    this.runtime.beginSpeaking();
     for (const chunk of decodedAudioBufferToPcmChunks(decoded)) {
       this.runtime.pushAudio(chunk);
     }
@@ -75,6 +76,7 @@ export class AvatarAudio {
         : chunk[index] / 32767;
     }
     buffer.copyToChannel(samples, 0);
+    this.runtime.beginSpeaking();
     this.runtime.pushAudio(chunk);
 
     this.scheduleSource(context, buffer);
@@ -124,6 +126,7 @@ export class AvatarAudio {
     this.settlePlayback = null;
     if (settle) settle();
     this.runtime.clearAudio();
+    this.runtime.resetSpeaking();
     this.setSpeaking(false);
   }
 
@@ -151,6 +154,7 @@ export class AvatarAudio {
   private finishIfIdle(): void {
     if (this.sources.size > 0) return;
     this.runtime.clearAudio();
+    this.runtime.endSpeaking();
     this.setSpeaking(false);
   }
 

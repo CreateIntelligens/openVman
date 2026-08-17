@@ -1,6 +1,10 @@
 import { inflate } from "pako";
 
 import { OpenVmanAvatarError } from "./errors";
+import {
+  installIdleLipSyncBypass,
+  type IdleLipSyncBypass,
+} from "./idleLipSyncBypass";
 
 export interface AvatarRuntimeInstance {
   HEAPU8: Uint8Array;
@@ -25,26 +29,38 @@ declare global {
 export class AvatarRuntime {
   private chunkIndex = 0;
   private readonly instance: AvatarRuntimeInstance;
+  private readonly idleLipSyncBypass: IdleLipSyncBypass | null;
 
-  private constructor(instance: AvatarRuntimeInstance) {
+  private constructor(
+    instance: AvatarRuntimeInstance,
+    idleLipSyncBypass: IdleLipSyncBypass | null,
+  ) {
     this.instance = instance;
+    this.idleLipSyncBypass = idleLipSyncBypass;
   }
 
   static async create(baseUrl: string): Promise<AvatarRuntime> {
     await loadRuntimeScript(`${baseUrl}/sdk/runtime/OpenVmanAvatarRuntime.js`);
+    const idleLipSyncBypass = installIdleLipSyncBypass();
     if (!window.createQtAppInstance) {
+      idleLipSyncBypass?.restore();
       throw new OpenVmanAvatarError(
         "RESOURCE_LOAD_FAILED",
         "Avatar runtime factory is unavailable.",
       );
     }
-    const instance = await window.createQtAppInstance({
-      locateFile: (path) => path.endsWith(".wasm")
-        ? `${baseUrl}/sdk/runtime/OpenVmanAvatarRuntime.wasm`
-        : path,
-      onRuntimeInitialized() {},
-    });
-    return new AvatarRuntime(instance);
+    try {
+      const instance = await window.createQtAppInstance({
+        locateFile: (path) => path.endsWith(".wasm")
+          ? `${baseUrl}/sdk/runtime/OpenVmanAvatarRuntime.wasm`
+          : path,
+        onRuntimeInitialized() {},
+      });
+      return new AvatarRuntime(instance, idleLipSyncBypass);
+    } catch (error) {
+      idleLipSyncBypass?.restore();
+      throw error;
+    }
   }
 
   async loadCharacter(characterId: string, assetsBaseUrl: string): Promise<void> {
@@ -98,6 +114,23 @@ export class AvatarRuntime {
   clearAudio(): void {
     this.instance._clearAudio();
     this.chunkIndex = 0;
+  }
+
+  beginSpeaking(): void {
+    this.idleLipSyncBypass?.beginSpeaking();
+  }
+
+  endSpeaking(): void {
+    this.idleLipSyncBypass?.endSpeaking();
+  }
+
+  resetSpeaking(): void {
+    this.idleLipSyncBypass?.resetSpeaking();
+  }
+
+  dispose(): void {
+    this.idleLipSyncBypass?.resetSpeaking();
+    this.idleLipSyncBypass?.restore();
   }
 
   pushAudio(pcm: Int16Array): void {

@@ -22,6 +22,7 @@ async function loadSdk({
   const elements = new Map();
   const requests = [];
   const runtimeCalls = {
+    canvasCalls: [],
     clearAudio: 0,
     pushedAudio: 0,
     resumeCalled: 0,
@@ -32,8 +33,20 @@ async function loadSdk({
   };
   let finishDecode;
   let finishVideoReady;
+  let renderingTime = 0;
   let context;
   const createElement = (tagName) => {
+    const canvasContext = {
+      globalAlpha: 1,
+      clearRect(_x, _y, width, height) {
+        runtimeCalls.canvasCalls.push(`clearRect ${width}x${height}`);
+      },
+      drawImage(...args) {
+        runtimeCalls.canvasCalls.push(
+          `drawImage ${args.length} alpha=${canvasContext.globalAlpha}`,
+        );
+      },
+    };
     const element = {
       children: [],
       className: "",
@@ -108,6 +121,9 @@ async function loadSdk({
       },
       tagName,
     };
+    if (tagName === "canvas") {
+      element.getContext = () => canvasContext;
+    }
     Object.defineProperty(element, "id", {
       get() {
         return this._id ?? "";
@@ -157,6 +173,9 @@ async function loadSdk({
       };
     },
     queueMicrotask,
+    performance: {
+      now: () => renderingTime,
+    },
     window: {
       clearTimeout,
       setTimeout,
@@ -219,6 +238,9 @@ async function loadSdk({
     requests,
     runtimeCalls,
     sdk: context.window.OpenVmanAvatar,
+    setRenderingTime(value) {
+      renderingTime = value;
+    },
   };
 }
 
@@ -438,6 +460,47 @@ test("pushPcm queues host chunks in order without backend requests", async () =>
   assert.equal(requests.some(({ url }) => url.includes("/api/embed/")), false);
   assert.equal(runtimeCalls.pushedAudio, 2);
   assert.deepEqual(runtimeCalls.scheduledStarts, [0, 0.1]);
+});
+
+test("idle rendering keeps the native frame until PCM playback begins", async () => {
+  const { document, runtimeCalls, sdk, setRenderingTime } = await loadSdk({
+    autoEnd: false,
+  });
+  const avatar = await sdk.init({ characterId: "000" });
+  const canvas = document.getElementById("canvas_video");
+  const context = canvas.getContext("2d");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const renderFrame = () => {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage({}, 0, 0, canvas.width, canvas.height);
+    context.clearRect(452, 486, 232, 232);
+    context.drawImage({}, 0, 0, 180, 180, 452, 486, 232, 232);
+  };
+
+  renderFrame();
+  assert.deepEqual(runtimeCalls.canvasCalls, [
+    "clearRect 1080x1920",
+    "drawImage 5 alpha=1",
+  ]);
+
+  runtimeCalls.canvasCalls.length = 0;
+  await avatar.pushPcm(new Int16Array(1600));
+  setRenderingTime(100);
+  renderFrame();
+  assert.deepEqual(runtimeCalls.canvasCalls, [
+    "clearRect 1080x1920",
+    "drawImage 5 alpha=1",
+    "drawImage 9 alpha=0.5",
+  ]);
+
+  runtimeCalls.canvasCalls.length = 0;
+  avatar.interrupt();
+  renderFrame();
+  assert.deepEqual(runtimeCalls.canvasCalls, [
+    "clearRect 1080x1920",
+    "drawImage 5 alpha=1",
+  ]);
 });
 
 test("a new playAudio call replaces current playback", async () => {

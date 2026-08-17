@@ -29,6 +29,8 @@ test("flush cancels a chunk that is waiting for AudioContext resume", async () =
   const previousConsoleWarn = console.warn;
 
   let resolveResume;
+  let playbackResets = 0;
+  let playbackStarts = 0;
   let startedSources = 0;
   let forwardedPcm = 0;
 
@@ -79,6 +81,12 @@ test("flush cancels a chunk that is waiting for AudioContext resume", async () =
       onPcmChunk: () => {
         forwardedPcm += 1;
       },
+      onPlaybackReset: () => {
+        playbackResets += 1;
+      },
+      onPlaybackStart: () => {
+        playbackStarts += 1;
+      },
     });
 
     const playPromise = audio.playChunk(new Int16Array([1, 2, 3, 4]).buffer);
@@ -90,6 +98,8 @@ test("flush cancels a chunk that is waiting for AudioContext resume", async () =
 
     assert.equal(startedSources, 0);
     assert.equal(forwardedPcm, 0);
+    assert.equal(playbackStarts, 0);
+    assert.equal(playbackResets, 1);
     assert.equal(audio.isPlaying.value, false);
   } finally {
     globalThis.AudioContext = previousAudioContext;
@@ -105,6 +115,9 @@ test("playback volume is sampled from the audio output graph", async () => {
   let animationFrameCallback;
   let connectedSourceTarget = null;
   let analyserDestination = null;
+  let playbackEnds = 0;
+  let playbackStarts = 0;
+  let scheduledSource = null;
   const volumes = [];
 
   class FakeAnalyser {
@@ -147,7 +160,7 @@ test("playback volume is sampled from the audio output graph", async () => {
     }
 
     createBufferSource() {
-      return {
+      scheduledSource = {
         buffer: null,
         connect(target) {
           connectedSourceTarget = target;
@@ -156,6 +169,7 @@ test("playback volume is sampled from the audio output graph", async () => {
         stop() {},
         onended: null,
       };
+      return scheduledSource;
     }
 
     close() {
@@ -175,6 +189,12 @@ test("playback volume is sampled from the audio output graph", async () => {
       onPlaybackVolume: (volume) => {
         volumes.push(volume);
       },
+      onPlaybackEnd: () => {
+        playbackEnds += 1;
+      },
+      onPlaybackStart: () => {
+        playbackStarts += 1;
+      },
     });
 
     await audio.playChunk(new Int16Array([1, 2, 3, 4]).buffer);
@@ -186,6 +206,10 @@ test("playback volume is sampled from the audio output graph", async () => {
     animationFrameCallback();
 
     assert.ok(volumes[0] > 0);
+    assert.equal(playbackStarts, 1);
+
+    scheduledSource.onended();
+    assert.equal(playbackEnds, 1);
   } finally {
     globalThis.AudioContext = previousAudioContext;
     globalThis.requestAnimationFrame = previousRequestAnimationFrame;

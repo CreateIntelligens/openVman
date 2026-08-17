@@ -471,8 +471,13 @@ const audio = useAudioPlayer({
     if (settings.renderMode === "2d") wasm.pushAudio(pcm);
   },
   onPlaybackVolume: driveStageAvatarMouth,
+  onPlaybackStart: () => {
+    if (settings.renderMode === "2d") wasm.beginSpeaking();
+  },
+  onPlaybackReset: wasm.resetSpeaking,
   onPlaybackEnd: () => {
     wasm.clearAudio();
+    wasm.endSpeaking();
     stopStageAvatarMouth();
   },
   onQueueEmpty: onAudioQueueEmpty,
@@ -647,6 +652,7 @@ function handleComposerSend(
 
 async function handleCharChange(charId: string): Promise<void> {
   wasm.clearAudio();
+  wasm.resetSpeaking();
   settings.characterId = charId;
   if (wasm.isReady.value) {
     await wasm.loadCharacter(charId);
@@ -682,6 +688,7 @@ function handleRenderModeChange(mode: '2d' | '3d'): void {
   settings.renderMode = mode;
   if (mode === "3d") {
     wasm.clearAudio();
+    wasm.resetSpeaking();
     return;
   }
   stopStageAvatarMouth();

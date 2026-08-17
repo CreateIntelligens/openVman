@@ -2,10 +2,15 @@ import { inflate } from 'pako'
 import { onUnmounted, readonly, ref } from 'vue'
 
 import type { OpenVmanAvatarRuntimeInstance } from '../types/openVmanAvatarRuntime'
+import {
+  installIdleLipSyncBypass,
+  type IdleLipSyncBypass,
+} from './idleLipSyncBypass'
 
 let runtimeInstance: OpenVmanAvatarRuntimeInstance | null = null
 let runtimeInitPromise: Promise<OpenVmanAvatarRuntimeInstance> | null = null
 let runtimeScriptPromise: Promise<void> | null = null
+let idleLipSyncBypass: IdleLipSyncBypass | null = null
 
 function isGzipPayload(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
@@ -102,6 +107,7 @@ export function useOpenVmanAvatarRuntime() {
     error.value = null
     try {
       await ensureAvatarRuntimeScript()
+      idleLipSyncBypass ??= installIdleLipSyncBypass()
       if (typeof window.createQtAppInstance !== 'function') {
         throw new Error('[OpenVmanAvatarRuntime] Runtime factory is unavailable')
       }
@@ -205,7 +211,22 @@ export function useOpenVmanAvatarRuntime() {
     chunkIndex = 0
   }
 
-  onUnmounted(clearAudio)
+  function beginSpeaking(): void {
+    idleLipSyncBypass?.beginSpeaking()
+  }
+
+  function endSpeaking(): void {
+    idleLipSyncBypass?.endSpeaking()
+  }
+
+  function resetSpeaking(): void {
+    idleLipSyncBypass?.resetSpeaking()
+  }
+
+  onUnmounted(() => {
+    clearAudio()
+    resetSpeaking()
+  })
 
   return {
     isReady: readonly(isReady),
@@ -216,5 +237,8 @@ export function useOpenVmanAvatarRuntime() {
     loadCharacter,
     pushAudio,
     clearAudio,
+    beginSpeaking,
+    endSpeaking,
+    resetSpeaking,
   }
 }

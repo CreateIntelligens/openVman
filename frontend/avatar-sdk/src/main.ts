@@ -132,7 +132,10 @@ async function createInstance(
     ).toString().replace(/\/$/, "");
     await runtime.loadCharacter(options.characterId ?? "000", assetsBaseUrl);
   } catch (error) {
-    if (runtime) runtimeDisposed = true;
+    if (runtime) {
+      runtime.dispose();
+      runtimeDisposed = true;
+    }
     removeAvatarDom(dom);
     throw error instanceof OpenVmanAvatarError
       ? error
@@ -179,6 +182,7 @@ async function createInstance(
       destroyed = true;
       runtimeDisposed = true;
       audio.destroy();
+      runtime.dispose();
       removeAvatarDom(dom);
       emit("destroyed", { type: "destroyed" });
       handlers.clear();
