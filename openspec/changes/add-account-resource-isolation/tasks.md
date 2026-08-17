@@ -26,7 +26,8 @@
 - [x] 4.2 Implement password-only temporary login with a non-secret locator, bcrypt verification, atomic first-use activation, a hard 72-hour expiry, per-request expiry revalidation, and JWT `kind` claims.
 - [x] 4.3 Add admin-only batch generation that always returns exactly five random 12-character alphanumeric plaintext passwords once, stores only hashes, accepts selected project／character／voice grants, records the creator, and supports list／revoke audit operations.
 - [x] 4.4 Return `expires_at` and `remaining_seconds` from temporary login and session bootstrap, and add concurrency／expiry／revocation／plaintext-non-persistence tests.
-- [x] 4.5 Resolve project, character, and voice access as system-public／owner access for formal accounts or explicit grants for temporary accounts, with no unauthorized fallback.
+- [x] 4.5 Resolve project, character, and voice access as unrestricted admin access, owner／explicit-grant access for formal non-admin accounts, or explicit grants for temporary accounts, with no unauthorized fallback.
+- [x] 4.6 Extend explicit grants and account defaults to formal non-admin accounts while preserving unrestricted administrator access and owner mutation rights.
 
 ## 5. Ownership registry and Backend／Brain trust boundary
 
@@ -68,6 +69,7 @@
 - [x] 9.5 Update project, persona, character, background, mascot, and voice selectors to consume only authenticated scoped list responses and reset inaccessible persisted selections.
 - [x] 9.6 Apply authorized defaults after login: `proj-b85afb8bb6`, character `0713`, provider `indextts`, and voice key `hayley`; if unavailable, select an authorized resource and visibly report the fallback.
 - [x] 9.7 Add frontend tests for session restore, both login modes, failed login, temporary expiry notice, logout, expired session redirect, role-gated batch UI, and selectors that never retain foreign resources.
+- [x] 9.8 Add formal-account resource editing and a shared registry-backed grant option source so unavailable providers cannot produce invalid temporary grants.
 
 ## 10. Existing-data migration and deployment wiring
 
@@ -85,3 +87,4 @@
 - [x] 11.2 Verify unauthenticated access is limited to formal login, temporary login, required health, frontend login assets, public SDK runtime, and system-public character assets.
 - [x] 11.3 Run Backend and Brain unit／integration suites, Admin and Avatar frontend tests／type-checks／production builds, SDK contract tests, and `git diff --check`.
 - [x] 11.4 Run migrations twice against a disposable copy of current data, verify unchanged counts and hashes on the second run, and confirm rollback preserves both legacy and new private files.
+- [x] 11.5 Verify formal-account grant replacement through API tests and a live create／login／list／cleanup smoke test.

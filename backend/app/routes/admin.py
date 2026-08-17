@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import CurrentAccount, get_current_account
-from app.auth.models import AccountType, ResourceRecord, ResourceType
+from app.auth.models import AccountRole, AccountType, ResourceRecord, ResourceType
 from app.auth.resources import (
     ResourceNotFoundError,
     list_accessible_resources,
@@ -146,15 +146,19 @@ def resolve_tts_voice(
 ) -> AuthorizedVoice | None:
     """Resolve a voice before cache or provider access.
 
-    Formal accounts retain the existing empty-voice provider defaults. Temporary
-    accounts must use their configured provider and an explicitly granted voice.
+    Administrators retain unrestricted provider access. Other accounts must use
+    their configured provider and an explicitly granted voice.
     """
     provider = requested_provider.strip()
     voice_id = requested_voice.strip()
     defaults = None
 
-    if current.user.account_type is AccountType.TEMPORARY:
-        defaults = runtime.temporary_accounts.get_defaults(current.user.id)
+    is_unrestricted_admin = (
+        current.user.account_type is AccountType.FORMAL
+        and current.user.role is AccountRole.ADMIN
+    )
+    if not is_unrestricted_admin:
+        defaults = runtime.account_access.get_defaults(current.user.id)
         if defaults is None:
             raise _not_found()
         provider = provider or defaults.voice_provider
@@ -184,9 +188,8 @@ def resolve_tts_voice(
             raise _not_found()
         provider = registered_provider
     elif defaults is not None:
-        # Temporary-account defaults are administrator-selected and persisted in
-        # the same transaction as the grants, so they remain authoritative for
-        # migrated voice rows that predate provider metadata.
+        # Account defaults are administrator-selected with the grants, so they
+        # remain authoritative for migrated rows that predate provider metadata.
         provider = defaults.voice_provider
 
     if not provider or provider == "auto":
@@ -202,11 +205,11 @@ def resolve_tts_voice(
     )
 
 
-def _temporary_tts_providers(
+def _scoped_tts_providers(
     current: CurrentAccount,
     runtime: AuthRuntime,
 ) -> list[dict[str, object]]:
-    defaults = runtime.temporary_accounts.get_defaults(current.user.id)
+    defaults = runtime.account_access.get_defaults(current.user.id)
     if defaults is None:
         return []
 
@@ -220,7 +223,10 @@ def _temporary_tts_providers(
             _voice_metadata(record),
             "provider",
         )
-        if registered_provider and registered_provider != defaults.voice_provider:
+        if (
+            registered_provider
+            and registered_provider != defaults.voice_provider
+        ):
             continue
         voices.append(record.resource_id)
 
@@ -269,8 +275,11 @@ async def get_tts_providers(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> JSONResponse:
-    if current.user.account_type is AccountType.TEMPORARY:
-        return JSONResponse(content=_temporary_tts_providers(current, runtime))
+    if not (
+        current.user.account_type is AccountType.FORMAL
+        and current.user.role is AccountRole.ADMIN
+    ):
+        return JSONResponse(content=_scoped_tts_providers(current, runtime))
 
     cfg = get_tts_config()
     providers: list[dict] = [

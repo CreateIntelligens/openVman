@@ -15,8 +15,8 @@ from .models import (
     AccountDefaultsRecord,
     AccountRole,
     AccountType,
-    ResourceRecord,
     ResourceGrantRecord,
+    ResourceRecord,
     ResourceType,
     ResourceVisibility,
     TemporaryBatchRecord,
@@ -177,6 +177,49 @@ def _resource_from_row(row: sqlite3.Row) -> ResourceRecord:
         created_at=row["created_at"],
         metadata_json=row["metadata_json"],
     )
+
+
+def _normalize_account_access(
+    grants: Iterable[tuple[ResourceType, str]],
+    defaults: tuple[str, str, str, str],
+) -> tuple[
+    tuple[tuple[ResourceType, str], ...],
+    tuple[str, str, str, str],
+]:
+    normalized_grants = tuple(
+        sorted(
+            {
+                (resource_type, resource_id.strip())
+                for resource_type, resource_id in grants
+                if resource_id.strip()
+            },
+            key=lambda item: (item[0].value, item[1]),
+        )
+    )
+    required_types = {
+        ResourceType.PROJECT,
+        ResourceType.AVATAR_CHARACTER,
+        ResourceType.CUSTOM_VOICE,
+    }
+    if {item[0] for item in normalized_grants} != required_types:
+        raise InvalidResourceGrantError(
+            "project, avatar character, and voice grants are required"
+        )
+
+    normalized_defaults = tuple(value.strip() for value in defaults)
+    if not all(normalized_defaults):
+        raise InvalidResourceGrantError("all account defaults are required")
+    project_id, character_id, _voice_provider, voice_id = normalized_defaults
+    default_resources = {
+        (ResourceType.PROJECT, project_id),
+        (ResourceType.AVATAR_CHARACTER, character_id),
+        (ResourceType.CUSTOM_VOICE, voice_id),
+    }
+    if not default_resources.issubset(set(normalized_grants)):
+        raise InvalidResourceGrantError(
+            "account defaults must be present in the selected grants"
+        )
+    return normalized_grants, normalized_defaults
 
 
 class UserRepository:
@@ -519,22 +562,27 @@ class ResourceRepository:
 
     def list_accessible(
         self,
-        owner_user_id: str,
+        user_id: str,
         *,
         resource_type: ResourceType,
     ) -> list[ResourceRecord]:
         with self.database.transaction() as connection:
             rows = connection.execute(
                 """
-                SELECT * FROM resources
-                WHERE resource_type = ?
+                SELECT DISTINCT resources.*
+                FROM resources
+                LEFT JOIN resource_grants
+                    ON resource_grants.resource_type = resources.resource_type
+                   AND resource_grants.resource_id = resources.resource_id
+                   AND resource_grants.grantee_user_id = ?
+                WHERE resources.resource_type = ?
                   AND (
-                      visibility = 'system_public'
-                      OR owner_user_id = ?
+                      resources.owner_user_id = ?
+                      OR resource_grants.grantee_user_id IS NOT NULL
                   )
-                ORDER BY resource_id
+                ORDER BY resources.resource_id
                 """,
-                (resource_type.value, owner_user_id),
+                (user_id, resource_type.value, user_id),
             ).fetchall()
         return [_resource_from_row(row) for row in rows]
 
@@ -555,28 +603,6 @@ class ResourceRepository:
                 (grantee_user_id, resource_type.value, resource_id),
             ).fetchone()
         return row is not None
-
-    def list_granted(
-        self,
-        grantee_user_id: str,
-        *,
-        resource_type: ResourceType,
-    ) -> list[ResourceRecord]:
-        with self.database.transaction() as connection:
-            rows = connection.execute(
-                """
-                SELECT resources.*
-                FROM resources
-                INNER JOIN resource_grants
-                    ON resource_grants.resource_type = resources.resource_type
-                   AND resource_grants.resource_id = resources.resource_id
-                WHERE resource_grants.grantee_user_id = ?
-                  AND resources.resource_type = ?
-                ORDER BY resources.resource_id
-                """,
-                (grantee_user_id, resource_type.value),
-            ).fetchall()
-        return [_resource_from_row(row) for row in rows]
 
     def count_private_by_owner(self, owner_user_id: str) -> dict[str, int]:
         with self.database.transaction() as connection:
@@ -608,6 +634,145 @@ class ResourceRepository:
         return deleted > 0
 
 
+class AccountAccessRepository:
+    """Manage explicit read grants and defaults for any non-admin account."""
+
+    def __init__(self, database: AuthDatabase) -> None:
+        self.database = database
+
+    def replace(
+        self,
+        *,
+        user_id: str,
+        granted_by: str,
+        grants: Iterable[tuple[ResourceType, str]],
+        defaults: tuple[str, str, str, str],
+    ) -> tuple[tuple[ResourceGrantRecord, ...], AccountDefaultsRecord]:
+        normalized_grants, normalized_defaults = _normalize_account_access(
+            grants,
+            defaults,
+        )
+        project_id, character_id, voice_provider, voice_id = (
+            normalized_defaults
+        )
+        now = _now_iso()
+        with self.database.transaction(write=True) as connection:
+            actor = connection.execute(
+                """
+                SELECT role, disabled, account_type FROM users WHERE id = ?
+                """,
+                (granted_by,),
+            ).fetchone()
+            if (
+                actor is None
+                or actor["role"] != AccountRole.ADMIN.value
+                or bool(actor["disabled"])
+                or actor["account_type"] != AccountType.FORMAL.value
+            ):
+                raise UserNotFoundError(
+                    "enabled formal administrator required"
+                )
+
+            target = connection.execute(
+                "SELECT role, account_type FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+            if target is None:
+                raise UserNotFoundError("account does not exist")
+            if target["account_type"] != AccountType.FORMAL.value:
+                raise InvalidResourceGrantError(
+                    "temporary account grants are managed by their batch"
+                )
+            if target["role"] == AccountRole.ADMIN.value:
+                raise InvalidResourceGrantError(
+                    "administrator accounts already have unrestricted access"
+                )
+
+            for resource_type, resource_id in normalized_grants:
+                resource = connection.execute(
+                    """
+                    SELECT 1 FROM resources
+                    WHERE resource_type = ? AND resource_id = ?
+                    """,
+                    (resource_type.value, resource_id),
+                ).fetchone()
+                if resource is None:
+                    raise InvalidResourceGrantError(
+                        "resource is not registered: "
+                        f"{resource_type.value}/{resource_id}"
+                    )
+
+            connection.execute(
+                "DELETE FROM resource_grants WHERE grantee_user_id = ?",
+                (user_id,),
+            )
+            connection.executemany(
+                """
+                INSERT INTO resource_grants(
+                    grantee_user_id, resource_type, resource_id,
+                    granted_by, created_at
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        user_id,
+                        resource_type.value,
+                        resource_id,
+                        granted_by,
+                        now,
+                    )
+                    for resource_type, resource_id in normalized_grants
+                ],
+            )
+            connection.execute(
+                """
+                INSERT INTO account_defaults(
+                    user_id, project_id, character_id,
+                    voice_provider, voice_id
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    project_id = excluded.project_id,
+                    character_id = excluded.character_id,
+                    voice_provider = excluded.voice_provider,
+                    voice_id = excluded.voice_id
+                """,
+                (
+                    user_id,
+                    project_id,
+                    character_id,
+                    voice_provider,
+                    voice_id,
+                ),
+            )
+
+        updated_defaults = self.get_defaults(user_id)
+        if updated_defaults is None:
+            raise RepositoryError(
+                "updated account defaults could not be reloaded"
+            )
+        return self.list_grants(user_id), updated_defaults
+
+    def get_defaults(self, user_id: str) -> AccountDefaultsRecord | None:
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                "SELECT * FROM account_defaults WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return _defaults_from_row(row) if row is not None else None
+
+    def list_grants(self, user_id: str) -> tuple[ResourceGrantRecord, ...]:
+        with self.database.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM resource_grants
+                WHERE grantee_user_id = ?
+                ORDER BY resource_type, resource_id
+                """,
+                (user_id,),
+            ).fetchall()
+        return tuple(_grant_from_row(row) for row in rows)
+
+
 class TemporaryAccountRepository:
     """Atomic temporary-credential, grant, and account-default persistence."""
 
@@ -628,40 +793,13 @@ class TemporaryAccountRepository:
         if duration_seconds <= 0:
             raise ValueError("duration_seconds must be positive")
 
-        normalized_grants = tuple(
-            sorted(
-                {
-                    (resource_type, resource_id.strip())
-                    for resource_type, resource_id in grants
-                    if resource_id.strip()
-                },
-                key=lambda item: (item[0].value, item[1]),
-            )
+        normalized_grants, normalized_defaults = _normalize_account_access(
+            grants,
+            defaults,
         )
-        required_types = {
-            ResourceType.PROJECT,
-            ResourceType.AVATAR_CHARACTER,
-            ResourceType.CUSTOM_VOICE,
-        }
-        if {item[0] for item in normalized_grants} != required_types:
-            raise InvalidResourceGrantError(
-                "project, avatar character, and voice grants are required"
-            )
-
         project_id, character_id, voice_provider, voice_id = (
-            value.strip() for value in defaults
+            normalized_defaults
         )
-        if not all((project_id, character_id, voice_provider, voice_id)):
-            raise InvalidResourceGrantError("all account defaults are required")
-        default_resources = {
-            (ResourceType.PROJECT, project_id),
-            (ResourceType.AVATAR_CHARACTER, character_id),
-            (ResourceType.CUSTOM_VOICE, voice_id),
-        }
-        if not default_resources.issubset(set(normalized_grants)):
-            raise InvalidResourceGrantError(
-                "account defaults must be present in the selected grants"
-            )
 
         locators = [credential.locator for credential in credentials]
         if len(set(locators)) != len(credentials) or any(
@@ -685,7 +823,9 @@ class TemporaryAccountRepository:
                     or bool(creator["disabled"])
                     or creator["account_type"] != AccountType.FORMAL.value
                 ):
-                    raise UserNotFoundError("enabled formal administrator required")
+                    raise UserNotFoundError(
+                        "enabled formal administrator required"
+                    )
 
                 for resource_type, resource_id in normalized_grants:
                     resource = connection.execute(
@@ -697,7 +837,8 @@ class TemporaryAccountRepository:
                     ).fetchone()
                     if resource is None:
                         raise InvalidResourceGrantError(
-                            f"resource is not registered: {resource_type.value}/{resource_id}"
+                            "resource is not registered: "
+                            f"{resource_type.value}/{resource_id}"
                         )
 
                 connection.execute(
@@ -885,26 +1026,6 @@ class TemporaryAccountRepository:
                     "temporary credential has expired"
                 )
             return _user_from_row(row), credential
-
-    def get_defaults(self, user_id: str) -> AccountDefaultsRecord | None:
-        with self.database.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM account_defaults WHERE user_id = ?",
-                (user_id,),
-            ).fetchone()
-        return _defaults_from_row(row) if row is not None else None
-
-    def list_grants(self, user_id: str) -> tuple[ResourceGrantRecord, ...]:
-        with self.database.transaction() as connection:
-            rows = connection.execute(
-                """
-                SELECT * FROM resource_grants
-                WHERE grantee_user_id = ?
-                ORDER BY resource_type, resource_id
-                """,
-                (user_id,),
-            ).fetchall()
-        return tuple(_grant_from_row(row) for row in rows)
 
     def get_batch(self, batch_id: str) -> TemporaryBatch | None:
         with self.database.transaction() as connection:

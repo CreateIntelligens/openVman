@@ -176,7 +176,7 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
     if requested_project_id:
         project_id = requested_project_id
     else:
-        defaults = runtime.temporary_accounts.get_defaults(current.user.id)
+        defaults = runtime.account_access.get_defaults(current.user.id)
         project_id = defaults.project_id if defaults is not None else "default"
     try:
         if not project_id:

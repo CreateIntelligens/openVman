@@ -236,7 +236,7 @@ function AppContent() {
           </div>
         </main>
 
-        <MascotWidget />
+        {route.tab !== "Accounts" && <MascotWidget />}
       </div>
     </NavigationProvider>
   );

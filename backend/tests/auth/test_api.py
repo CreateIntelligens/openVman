@@ -10,6 +10,11 @@ from fastapi.testclient import TestClient
 
 from app.auth.middleware import FailClosedAuthMiddleware
 from app.auth.models import ResourceType, ResourceVisibility
+from app.auth.resources import (
+    ResourceNotFoundError,
+    list_accessible_resources,
+    resolve_resource,
+)
 from app.auth.routes import auth_router, users_router
 from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.config import TTSRouterConfig
@@ -197,6 +202,161 @@ def test_admin_lifecycle_creator_revocation_and_immediate_disable(client, runtim
     )
     assert enabled.status_code == 200
     assert enabled.json()["disabled"] is False
+
+
+def test_admin_assigns_and_replaces_formal_account_resource_access(
+    client,
+    runtime,
+):
+    admin = _bootstrap_admin(runtime)
+    admin_headers = {
+        "Authorization": f"Bearer {_login(client, 'admin', _ADMIN_PASSWORD)['token']}",
+    }
+    resources = (
+        (ResourceType.PROJECT, "project-a", ResourceVisibility.PRIVATE, admin.id),
+        (ResourceType.PROJECT, "project-b", ResourceVisibility.PRIVATE, admin.id),
+        (
+            ResourceType.AVATAR_CHARACTER,
+            "character-a",
+            ResourceVisibility.SYSTEM_PUBLIC,
+            None,
+        ),
+        (
+            ResourceType.AVATAR_CHARACTER,
+            "character-b",
+            ResourceVisibility.SYSTEM_PUBLIC,
+            None,
+        ),
+        (
+            ResourceType.CUSTOM_VOICE,
+            "voice-a",
+            ResourceVisibility.SYSTEM_PUBLIC,
+            None,
+        ),
+        (
+            ResourceType.CUSTOM_VOICE,
+            "voice-b",
+            ResourceVisibility.SYSTEM_PUBLIC,
+            None,
+        ),
+    )
+    for resource_type, resource_id, visibility, owner_user_id in resources:
+        runtime.resources.register(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            visibility=visibility,
+            owner_user_id=owner_user_id,
+            metadata={
+                "label": resource_id,
+                **(
+                    {"provider": "indextts"}
+                    if resource_type is ResourceType.CUSTOM_VOICE
+                    else {}
+                ),
+            },
+        )
+
+    created = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "scoped-user",
+            "password": _USER_PASSWORD,
+            "role": "user",
+        },
+    ).json()
+    user = runtime.users.get_by_id(created["id"])
+    assert user is not None
+    assert list_accessible_resources(
+        runtime.resources,
+        user,
+        ResourceType.AVATAR_CHARACTER,
+    ) == []
+
+    options = client.get("/api/users/access-options", headers=admin_headers)
+    assert options.status_code == 200
+    assert {item["id"] for item in options.json()["projects"]} == {
+        "project-a",
+        "project-b",
+    }
+
+    first_access = {
+        "grants": {
+            "projects": ["project-a"],
+            "avatar_characters": ["character-a"],
+            "custom_voices": ["voice-a"],
+        },
+        "defaults": {
+            "project_id": "project-a",
+            "character_id": "character-a",
+            "voice_provider": "indextts",
+            "voice_id": "voice-a",
+        },
+    }
+    updated = client.put(
+        f"/api/users/{user.id}/access",
+        headers=admin_headers,
+        json=first_access,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["grants"] == first_access["grants"]
+    assert updated.json()["defaults"] == first_access["defaults"]
+    assert {
+        record.resource_id
+        for record in list_accessible_resources(
+            runtime.resources,
+            user,
+            ResourceType.AVATAR_CHARACTER,
+        )
+    } == {"character-a"}
+    with pytest.raises(ResourceNotFoundError):
+        resolve_resource(
+            runtime.resources,
+            user,
+            ResourceType.AVATAR_CHARACTER,
+            "character-b",
+        )
+
+    second_access = {
+        "grants": {
+            "projects": ["project-b"],
+            "avatar_characters": ["character-b"],
+            "custom_voices": ["voice-b"],
+        },
+        "defaults": {
+            "project_id": "project-b",
+            "character_id": "character-b",
+            "voice_provider": "indextts",
+            "voice_id": "voice-b",
+        },
+    }
+    replaced = client.put(
+        f"/api/users/{user.id}/access",
+        headers=admin_headers,
+        json=second_access,
+    )
+    assert replaced.status_code == 200
+    assert replaced.json()["grants"] == second_access["grants"]
+    with pytest.raises(ResourceNotFoundError):
+        resolve_resource(
+            runtime.resources,
+            user,
+            ResourceType.PROJECT,
+            "project-a",
+        )
+
+    user_headers = {
+        "Authorization": f"Bearer {_login(client, 'scoped-user', _USER_PASSWORD)['token']}",
+    }
+    assert client.get(
+        "/api/users/access-options",
+        headers=user_headers,
+    ).status_code == 403
+    assert client.put(
+        f"/api/users/{user.id}/access",
+        headers=user_headers,
+        json=first_access,
+    ).status_code == 403
 
 
 def test_account_deletion_resource_counts_and_admin_self_protection(client, runtime):

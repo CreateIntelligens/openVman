@@ -9,6 +9,7 @@ from app.config import TTSRouterConfig, get_tts_config
 
 from .database import AuthDatabase
 from .repositories import (
+    AccountAccessRepository,
     ResourceRepository,
     TemporaryAccountRepository,
     UserRepository,
@@ -22,6 +23,7 @@ class AuthRuntime:
     database: AuthDatabase
     users: UserRepository
     resources: ResourceRepository
+    account_access: AccountAccessRepository
     temporary_accounts: TemporaryAccountRepository
     tokens: SessionTokenService
 
@@ -40,6 +42,7 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
         database=database,
         users=UserRepository(database),
         resources=ResourceRepository(database),
+        account_access=AccountAccessRepository(database),
         temporary_accounts=TemporaryAccountRepository(database),
         tokens=tokens,
     )

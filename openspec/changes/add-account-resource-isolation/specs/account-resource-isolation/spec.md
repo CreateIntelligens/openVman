@@ -12,7 +12,7 @@ The system SHALL register every private project, Avatar character, background, m
 - **THEN** the operation proceeds using the server-resolved resource path and owner context
 
 ### Requirement: Administrator grants do not transfer resource ownership
-The system SHALL allow an admin to grant a temporary account access to selected projects／knowledge bases, Avatar characters, and voices while preserving the original resource owner and SHALL reject access to every ungranted private resource.
+The system SHALL allow an admin to grant a formal non-admin or temporary account access to selected projects／knowledge bases, Avatar characters, and voices while preserving the original resource owner and SHALL reject access to every ungranted resource in authenticated account selectors.
 
 #### Scenario: Temporary account uses a granted resource
 - **WHEN** a temporary account selects a project, character, or voice present in its grant rows
@@ -21,6 +21,10 @@ The system SHALL allow an admin to grant a temporary account access to selected 
 #### Scenario: Temporary account guesses an ungranted resource
 - **WHEN** a temporary account supplies an existing but ungranted project, persona, character, or voice ID
 - **THEN** the system returns 404 before any Brain, filesystem, provider, or cache access
+
+#### Scenario: Formal account selects an ungranted system-public resource
+- **WHEN** a formal non-admin supplies an existing but ungranted character or voice ID
+- **THEN** the system returns 404 before filesystem, provider, or cache access
 
 #### Scenario: Grant is removed or account expires
 - **WHEN** an admin removes the grant, revokes the account, or the 72-hour window expires
@@ -31,7 +35,7 @@ The system SHALL treat a project's owner as the owner of that project's knowledg
 
 #### Scenario: Project list is account-scoped
 - **WHEN** a normal user lists projects
-- **THEN** the response includes only projects owned by that user
+- **THEN** the response includes only projects owned by or explicitly granted to that user
 
 #### Scenario: Client supplies a foreign project to chat or search
 - **WHEN** a normal user submits another account's `project_id` to chat, search, memory, session, persona, skill, or knowledge routes
@@ -59,8 +63,8 @@ The system SHALL store newly uploaded Avatar characters, backgrounds, mascots, a
 - **WHEN** an unauthenticated client requests a private character, image, model, or voice reference URL
 - **THEN** the request returns 401 without streaming file bytes
 
-### Requirement: System-public resources remain shared and immutable to users
-The system SHALL allow all authenticated accounts to read system-public resources, SHALL prevent normal users from mutating them, and SHALL expose only complete system-public characters through the unauthenticated public Avatar SDK list.
+### Requirement: System-public resources remain grantable and immutable to users
+The system SHALL allow administrators to grant system-public resources without transferring ownership, SHALL prevent normal users from mutating them, and SHALL expose only complete system-public characters through the unauthenticated public Avatar SDK list.
 
 #### Scenario: Public SDK lists characters
 - **WHEN** an unauthenticated SDK client calls the public character list

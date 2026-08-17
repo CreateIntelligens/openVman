@@ -6,20 +6,18 @@ import {
   type ReactNode,
 } from "react";
 
-import { fetchAvatarCharacters, type AvatarCharacter } from "../../api/avatar";
 import {
   createTemporaryBatch,
+  fetchAccountAccessOptions,
   listTemporaryBatches,
   revokeTemporaryBatch,
+  type AccountAccessOption,
   type TemporaryBatchAudit,
   type TemporaryBatchResult,
 } from "../../api/auth";
-import { fetchProjects, type ProjectSummary } from "../../api/projects";
-import { fetchTtsProviders } from "../../api/tts";
 
 const PREFERRED_PROJECT = "proj-b85afb8bb6";
 const PREFERRED_CHARACTER = "0713";
-const PREFERRED_PROVIDER = "indextts";
 const PREFERRED_VOICE = "hayley";
 
 interface VoiceOption {
@@ -61,8 +59,8 @@ function remainingLabel(seconds: number | null): string {
 }
 
 export default function TemporaryBatchPanel() {
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [characters, setCharacters] = useState<AvatarCharacter[]>([]);
+  const [projects, setProjects] = useState<AccountAccessOption[]>([]);
+  const [characters, setCharacters] = useState<AccountAccessOption[]>([]);
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
@@ -96,50 +94,36 @@ export default function TemporaryBatchPanel() {
     setDefaultCharacter("");
     setDefaultVoiceKey("");
     setBatches([]);
-    const [projectsResult, charactersResult, providersResult, batchesResult] =
-      await Promise.allSettled([
-        fetchProjects(),
-        fetchAvatarCharacters(),
-        fetchTtsProviders(),
-        listTemporaryBatches(),
-      ]);
+    const [optionsResult, batchesResult] = await Promise.allSettled([
+      fetchAccountAccessOptions(),
+      listTemporaryBatches(),
+    ]);
 
-    if (projectsResult.status === "fulfilled") {
-      const items = projectsResult.value.projects;
-      const first = preferredId(items.map((item) => item.project_id), PREFERRED_PROJECT);
-      setProjects(items);
+    if (optionsResult.status === "fulfilled") {
+      const projectItems = optionsResult.value.projects;
+      const first = preferredId(
+        projectItems.map((item) => item.id),
+        PREFERRED_PROJECT,
+      );
+      setProjects(projectItems);
       setSelectedProjects(first ? [first] : []);
       setDefaultProject(first);
-    }
-    if (charactersResult.status === "fulfilled") {
-      const items = charactersResult.value.characters.filter(
-        (item) => item.has_video && item.has_data,
+
+      const characterItems = optionsResult.value.avatar_characters;
+      const firstCharacter = preferredId(
+        characterItems.map((item) => item.id),
+        PREFERRED_CHARACTER,
       );
-      const first = preferredId(items.map((item) => item.char_id), PREFERRED_CHARACTER);
-      setCharacters(items);
-      setSelectedCharacters(first ? [first] : []);
-      setDefaultCharacter(first);
-    }
-    if (providersResult.status === "fulfilled") {
-      const preferredProvider = providersResult.value.find(
-        (provider) => provider.id === PREFERRED_PROVIDER,
-      );
-      const providers = preferredProvider
-        ? [
-            preferredProvider,
-            ...providersResult.value.filter((provider) => provider !== preferredProvider),
-          ]
-        : providersResult.value;
-      const items = providers
-        .flatMap((provider) =>
-          provider.voices.map((voice) => ({ provider: provider.id, voice })),
-        )
-        .filter((option, index, all) =>
-          all.findIndex((candidate) => candidate.voice === option.voice) === index,
-        );
-      const preferred = items.find(
-        (item) => item.provider === PREFERRED_PROVIDER && item.voice === PREFERRED_VOICE,
-      ) ?? items[0];
+      setCharacters(characterItems);
+      setSelectedCharacters(firstCharacter ? [firstCharacter] : []);
+      setDefaultCharacter(firstCharacter);
+
+      const items = optionsResult.value.custom_voices.map((item) => ({
+        provider: item.provider ?? "indextts",
+        voice: item.id,
+      }));
+      const preferred = items.find((item) => item.voice === PREFERRED_VOICE)
+        ?? items[0];
       const firstKey = preferred ? `${preferred.provider}:${preferred.voice}` : "";
       setVoiceOptions(items);
       setSelectedVoices(preferred ? [preferred.voice] : []);
@@ -147,7 +131,7 @@ export default function TemporaryBatchPanel() {
     }
     if (batchesResult.status === "fulfilled") setBatches(batchesResult.value);
 
-    const failures = [projectsResult, charactersResult, providersResult, batchesResult]
+    const failures = [optionsResult, batchesResult]
       .filter((item) => item.status === "rejected");
     if (failures.length > 0) {
       setError("部分授權資源或批次紀錄無法載入，請重新整理後再試。");
@@ -290,19 +274,19 @@ export default function TemporaryBatchPanel() {
               value={defaultProject}
               onChange={setDefaultProject}
               options={projects
-                .filter((item) => selectedProjects.includes(item.project_id))
-                .map((item) => ({ value: item.project_id, label: item.label || item.project_id }))}
+                .filter((item) => selectedProjects.includes(item.id))
+                .map((item) => ({ value: item.id, label: item.label }))}
             />
           )}
         >
           {projects.map((project) => (
             <Choice
-              key={project.project_id}
-              checked={selectedProjects.includes(project.project_id)}
-              label={project.label || project.project_id}
-              detail={project.project_id}
+              key={project.id}
+              checked={selectedProjects.includes(project.id)}
+              label={project.label}
+              detail={project.id}
               onChange={() => toggle(
-                project.project_id,
+                project.id,
                 selectedProjects,
                 setSelectedProjects,
                 defaultProject,
@@ -323,19 +307,19 @@ export default function TemporaryBatchPanel() {
               value={defaultCharacter}
               onChange={setDefaultCharacter}
               options={characters
-                .filter((item) => selectedCharacters.includes(item.char_id))
-                .map((item) => ({ value: item.char_id, label: item.label || item.char_id }))}
+                .filter((item) => selectedCharacters.includes(item.id))
+                .map((item) => ({ value: item.id, label: item.label }))}
             />
           )}
         >
           {characters.map((character) => (
             <Choice
-              key={character.char_id}
-              checked={selectedCharacters.includes(character.char_id)}
-              label={character.label || character.char_id}
-              detail={character.char_id}
+              key={character.id}
+              checked={selectedCharacters.includes(character.id)}
+              label={character.label}
+              detail={character.id}
               onChange={() => toggle(
-                character.char_id,
+                character.id,
                 selectedCharacters,
                 setSelectedCharacters,
                 defaultCharacter,

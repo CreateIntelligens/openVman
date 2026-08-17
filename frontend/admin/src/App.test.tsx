@@ -176,4 +176,13 @@ describe("App tab mounting", () => {
     expect(await screen.findByText("權限不足")).toBeTruthy();
     expect(screen.queryByTestId("tab-accounts")).toBeNull();
   });
+
+  it("keeps the mascot from covering account administration controls", async () => {
+    window.history.replaceState(null, "", "/admin/accounts");
+
+    render(<App />);
+
+    expect(await screen.findByTestId("tab-accounts")).toBeTruthy();
+    expect(screen.queryByTitle("AI 虛擬人小助理")).toBeNull();
+  });
 });

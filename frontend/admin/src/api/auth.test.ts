@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createTemporaryBatch, login } from "./auth";
+import {
+  createTemporaryBatch,
+  fetchAccountAccessOptions,
+  login,
+  updateAccountAccess,
+} from "./auth";
 import {
   apiFetch,
   setUnauthorizedHandler,
@@ -98,5 +103,59 @@ describe("cookie auth API", () => {
         voice_id: "hayley",
       },
     });
+  });
+
+  it("loads grantable resources and updates formal account access", async () => {
+    const options = {
+      projects: [{ id: "project-a", label: "專案 A" }],
+      avatar_characters: [{ id: "character-a", label: "人物 A" }],
+      custom_voices: [{ id: "voice-a", label: "Voice A", provider: "indextts" }],
+    };
+    const updated = {
+      id: "user-a",
+      username: "alice",
+      role: "user",
+      kind: "formal",
+      disabled: false,
+      created_at: "2026-08-17T00:00:00Z",
+      grants: {
+        projects: ["project-a"],
+        avatar_characters: ["character-a"],
+        custom_voices: ["voice-a"],
+      },
+      defaults: {
+        project_id: "project-a",
+        character_id: "character-a",
+        voice_provider: "indextts",
+        voice_id: "voice-a",
+      },
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(options), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(updated), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchAccountAccessOptions()).resolves.toEqual(options);
+    await expect(updateAccountAccess("user-a", {
+      grants: updated.grants,
+      defaults: updated.defaults,
+    })).resolves.toEqual(updated);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/users/access-options",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/users/user-a/access",
+      expect.objectContaining({ method: "PUT", credentials: "include" }),
+    );
   });
 });

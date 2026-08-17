@@ -23,7 +23,7 @@ The system SHALL begin the lifetime only on the first successful password verifi
 - **THEN** exactly one transaction establishes the first-use timestamp and both successful sessions share the same expiry
 
 ### Requirement: Batch grants define the temporary account capability set
-The system SHALL attach selected project／knowledge-base, character, and voice grants to every account in the generated batch and SHALL record an accessible default for each resource category.
+The system SHALL attach selected project／knowledge-base, character, and voice grants to every account in the generated batch, SHALL record an accessible default for each resource category, and SHALL obtain selectable grants from the same authoritative registry endpoint used by formal account administration.
 
 #### Scenario: Default selections are available
 - **WHEN** the selected grants include `proj-b85afb8bb6`, character `0713`, and IndexTTS voice `hayley`

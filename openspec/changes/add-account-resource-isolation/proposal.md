@@ -7,7 +7,7 @@ openVman 目前以呼叫端提供的 `project_id`、`persona_id`、角色與聲�
 - 新增正式帳號與臨時帳號兩種登入機制。正式帳號由管理員建立並使用帳號＋密碼；臨時帳號只輸入管理員生成的隨機 12 碼英數密碼，第一次成功使用後啟動 72 小時有效期。
 - Admin 既有帳號頁新增臨時帳號區塊，每次固定產生 5 組只顯示一次的密碼，並同時選擇該批帳號可使用的知識庫、人物與聲音。
 - 新增 HS256 session JWT，瀏覽器使用 `HttpOnly` cookie，CLI／API client 可使用 `Authorization: Bearer`；每次請求仍回查帳號狀態，使停用、刪除或 token version 更新立即生效。
-- 新增伺服器端資源 ownership 與 grant registry：private resource 維持單一 owner，管理員另可把指定 project／知識庫、Avatar 人物與聲音授予臨時帳號使用。
+- 新增伺服器端資源 ownership 與 grant registry：private resource 維持單一 owner，管理員可把指定 project／知識庫、Avatar 人物與聲音授予正式非管理員或臨時帳號使用。
 - 將 project 與 persona 選擇改為「在登入者可存取集合中解析」，不再信任任意的 client-supplied ID；HTTP、SSE 與 WebSocket 使用相同授權規則。
 - 區分 system-public 與 account-private 資源：內建／既有公開 Avatar 與 provider voice 可維持共用唯讀，新的使用者上傳資產預設為私有；公開 Avatar SDK 只列出 system-public 角色。
 - 新增 Admin 與 Avatar 前端登入狀態、路由守衛、登出與 401 處理；JWT 不寫入 `localStorage`。

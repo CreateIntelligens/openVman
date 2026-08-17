@@ -12,7 +12,7 @@ JTAI 可重用的模式是管理員建帳、bcrypt、HS256 session JWT、`HttpOn
 
 - 讓 Backend 對 HTTP、SSE 與 WebSocket 使用一致的 session 驗證。
 - 支援管理員一次生成五組 password-only 臨時帳號，並從第一次成功登入起嚴格限制 72 小時。
-- 讓 admin 可把指定知識庫、人物與聲音授予臨時帳號，而不轉移資源 owner。
+- 讓 admin 可把指定知識庫、人物與聲音授予正式非管理員或臨時帳號，而不轉移資源 owner。
 - 讓 project 成為 Brain 內知識庫、persona、memory、session 與 project skill 的聚合所有權邊界。
 - 讓 Avatar character、background、mascot 與 custom voice 有明確 owner；內建資源維持 system-public 唯讀。
 - 阻止使用者藉由竄改 `project_id`、`persona_id`、`char_id` 或 `voice_id` 存取其他帳號資源。
@@ -22,7 +22,7 @@ JTAI 可重用的模式是管理員建帳、bcrypt、HS256 session JWT、`HttpOn
 **Non-Goals:**
 
 - 第一版不提供公開註冊、忘記密碼、電子郵件驗證、OAuth／OIDC 或 MFA。
-- 第一版不提供組織、一般正式帳號自行分享、邀請流程或任意 ACL；每個 private resource 仍只有一位 owner，只有 admin 可對臨時帳號建立唯讀／使用 grant。
+- 第一版不提供組織、一般正式帳號自行分享、邀請流程或任意 ACL；每個 private resource 仍只有一位 owner，只有 admin 可對正式非管理員與臨時帳號建立唯讀／使用 grant。
 - 第一版不把 JWT 放進 `localStorage`，也不讓 Brain 或 IndexTTS 對外簽發 session。
 - 第一版不把 system provider voices 複製成每位使用者各自一份。
 - 不改變公開 Avatar SDK 載入 runtime 與 system-public character 的既有合約。
@@ -46,7 +46,7 @@ Backend 轉送 Brain 前 SHALL 移除外部提供的 `X-OpenVMan-*` 身分 heade
 - `users(id, username, password_hash, role, account_type, disabled, token_version, created_at, updated_at, created_by)`；正式帳號 username 使用正規化後唯一索引，臨時帳號使用不含祕密的內部顯示名稱。
 - `resources(resource_type, resource_id, owner_user_id, visibility, created_at, metadata_json)`；主鍵為 `(resource_type, resource_id)`，`visibility` 僅允許 `private` 或 `system_public`。
 - `temporary_account_batches(id, created_by, created_at)` 與 `temporary_credentials(user_id, batch_id, code_locator, first_used_at, expires_at, duration_seconds)`；code locator 只用來定位 bcrypt row，不是登入祕密。
-- `resource_grants(grantee_user_id, resource_type, resource_id, granted_by, created_at)`；grant 必須引用已登記 resource，刪除臨時帳號時連帶移除。
+- `resource_grants(grantee_user_id, resource_type, resource_id, granted_by, created_at)`；grant 必須引用已登記 resource，刪除受授權帳號時連帶移除。
 - `account_defaults(user_id, project_id, character_id, voice_provider, voice_id)`；defaults 必須是該帳號可存取的資源。
 - `schema_migrations(version, applied_at, details_json)`；migration 必須可重跑。
 
@@ -78,7 +78,7 @@ Admin 帳號頁另提供臨時帳號批次建立。每次 request 固定建立 5
 
 ### 5. Project access 先在 Backend resolve，再交給 Brain
 
-所有包含 `project_id` 的 Backend facade route 都先以 `(resource_type='project', resource_id=project_id)` 查 ownership／grant。一般正式 user 可解析自己的 project，臨時帳號可解析 admin 明確授予的 project，admin 可管理所有 project。不存在或不可存取一律回 404，避免以回應差異枚舉 ID。
+所有包含 `project_id` 的 Backend facade route 都先以 `(resource_type='project', resource_id=project_id)` 查 ownership／grant。一般正式 user 可解析自己的 project 與 admin 明確授予的 project，臨時帳號可解析 admin 明確授予的 project，admin 可管理所有 project。不存在或不可存取一律回 404，避免以回應差異枚舉 ID。
 
 建立 project 時，由專用 Backend project facade 呼叫 Brain 建立，成功後登記 owner；若登記失敗，Backend 嘗試補償刪除新 project並回錯。刪除時先讓 Brain 成功刪除，再移除 registry。Generic Brain proxy 不再直接處理 project CRUD。
 
@@ -93,7 +93,7 @@ Avatar 資產採兩層 storage：
 - 現有 `/data/avatar`、`/data/backgrounds`、`/data/mascots` 保留為 `system_public`。
 - 新增 `/data/accounts/<user_id>/avatar|backgrounds|mascots/<resource_id>/` 保存 private uploads，並透過受保護 API route 串流；不得用未驗證的 global static mount 暴露。
 
-Authenticated list 回傳「system-public + 自己 private + 明確 grant」；mutation 只能操作自己 private，temporary account 所有 mutation 預設拒絕。公開 `/characters` 與 Avatar SDK 仍只讀 system-public complete characters。
+Authenticated admin list 回傳所有已登錄資源；正式非管理員 list 回傳「自己 private + 明確 grant」，臨時帳號 list 只回傳明確 grant。Mutation 只能操作自己 private，temporary account 所有 mutation 預設拒絕。公開 `/characters` 與 Avatar SDK 仍只讀 system-public complete characters。
 
 Voice 分為：
 
@@ -106,13 +106,13 @@ TTS cache key SHALL 包含 owner scope、provider 與 resolved voice resource ke
 
 `frontend/admin` 與 `frontend/app` 各有 `AuthProvider`，啟動時呼叫 `/api/auth/me`。共用 HTTP helper 統一 `credentials: 'include'`；401 清除 auth state 並導向 `/login`，403 顯示權限不足。登入成功後不保存 response token，登出呼叫 API 後清除本地 user state。
 
-登入頁提供「正式帳號」與「臨時密碼」兩種模式。臨時模式只有單一 password field；成功後顯示精確到分鐘的剩餘時間與絕對到期時間。Admin Accounts 頁內嵌臨時帳號批次建立區塊，預覽五組一次性顯示密碼並提供逐筆／全部複製，不另建後台。
+登入頁提供「正式帳號」與「臨時密碼」兩種模式。臨時模式只有單一 password field；成功後顯示精確到分鐘的剩餘時間與絕對到期時間。Admin Accounts 頁內嵌正式帳號資源權限編輯器與臨時帳號批次建立區塊；兩者共用 registry 提供的可授權清單。臨時批次預覽五組一次性顯示密碼並提供逐筆／全部複製，不另建後台。
 
 Project、persona、character、background、mascot 與 voice selectors 只使用受保護 list API 回傳值；UI 仍傳 ID 做選擇，但 server ownership check 才是授權依據。
 
 ### 8. Default selection 與 Quick Reply 都由授權集合解析
 
-未設定個人 defaults 時，Backend 建議 `project_id=proj-b85afb8bb6`、`character_id=0713`、`voice_provider=indextts`、`voice_id=hayley`。Admin 建立臨時帳號時預先選取這三項；若管理員改選，則把選取集合中的明確 primary choice 寫入 `account_defaults`。前端不得因 localStorage 殘值越過 server list；default 不可存取時改用 server 回傳的第一個可用資源並提示使用者。
+未設定個人 defaults 時，Backend 建議 `project_id=proj-b85afb8bb6`、`character_id=0713`、`voice_provider=indextts`、`voice_id=hayley`。Admin 設定正式非管理員或建立臨時帳號時預先選取這三項；若管理員改選，則把選取集合中的明確 primary choice 寫入 `account_defaults`。前端不得因 localStorage 殘值越過 server list；default 不可存取時改用 server 回傳的第一個可用資源並提示使用者。
 
 ESG project `esg-7dea843a0d` 的 Quick QA nodes 與 merged entries 是 project knowledge 的一部分。授予 ESG project 即同時允許讀取其 quick reply；未授予時所有 Quick QA tree、merged entry、image 與 mutation route 依同一 project resolver 拒絕。既有無關測試內容不自動刪除，seed／migration 只以穩定 ID upsert 使用者確認的 ESG quick reply。
 
@@ -145,4 +145,4 @@ Rollback 時可回退應用 image；既有 project 與 system-public physical pa
 
 ## Open Questions
 
-本提案已將第一版邊界固定為單一 owner、admin-to-temporary grants、不公開註冊、正式帳號 24 小時 session、臨時帳號首次使用後 72 小時 hard expiry、無 refresh token。組織共享、正式帳號自行分享、private Avatar 對外分享與 refresh rotation 留待獨立變更處理。
+本提案已將第一版邊界固定為單一 owner、admin-managed grants、不公開註冊、正式帳號 24 小時 session、臨時帳號首次使用後 72 小時 hard expiry、無 refresh token。組織共享、正式帳號自行分享、private Avatar 對外分享與 refresh rotation 留待獨立變更處理。

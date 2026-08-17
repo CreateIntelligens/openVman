@@ -9,7 +9,6 @@ from .models import (
     AccountType,
     ResourceRecord,
     ResourceType,
-    ResourceVisibility,
     UserRecord,
 )
 from .repositories import ResourceRepository
@@ -42,19 +41,15 @@ def resolve_resource(
     if record is None:
         raise ResourceNotFoundError
 
-    if account.account_type is AccountType.FORMAL:
-        if account.role is AccountRole.ADMIN:
-            return record
-        if record.owner_user_id == account.id:
-            return record
-        if (
-            access is ResourceAccess.READ
-            and record.visibility is ResourceVisibility.SYSTEM_PUBLIC
-        ):
-            return record
     if (
-        account.account_type is AccountType.TEMPORARY
-        and access is ResourceAccess.READ
+        account.account_type is AccountType.FORMAL
+        and account.role is AccountRole.ADMIN
+    ):
+        return record
+    if record.owner_user_id == account.id:
+        return record
+    if (
+        access is ResourceAccess.READ
         and resources.has_grant(account.id, resource_type, resource_id)
     ):
         return record
@@ -67,12 +62,10 @@ def list_accessible_resources(
     resource_type: ResourceType,
 ) -> list[ResourceRecord]:
     """List resources visible to an account using the same resolver rules."""
-    if account.account_type is AccountType.TEMPORARY:
-        return resources.list_granted(
-            account.id,
-            resource_type=resource_type,
-        )
-    if account.role is AccountRole.ADMIN:
+    if (
+        account.account_type is AccountType.FORMAL
+        and account.role is AccountRole.ADMIN
+    ):
         return resources.list_by_type(resource_type)
     return resources.list_accessible(
         account.id,

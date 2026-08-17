@@ -34,6 +34,7 @@ export interface Account extends AccountProfile {
   updated_at?: string;
   token_version?: number;
   resource_counts?: Record<string, number>;
+  grants?: AccountResourceGrants | null;
 }
 
 interface WrappedAccount {
@@ -50,10 +51,27 @@ export interface AccountListResponse {
   users?: Account[];
 }
 
-export interface TemporaryBatchGrants {
+export interface AccountResourceGrants {
   projects: string[];
   avatar_characters: string[];
   custom_voices: string[];
+}
+
+export interface AccountAccessOption {
+  id: string;
+  label: string;
+  provider?: string | null;
+}
+
+export interface AccountAccessOptions {
+  projects: AccountAccessOption[];
+  avatar_characters: AccountAccessOption[];
+  custom_voices: AccountAccessOption[];
+}
+
+export interface AccountAccessInput {
+  grants: AccountResourceGrants;
+  defaults: AccountDefaults;
 }
 
 export interface TemporaryCredential {
@@ -76,7 +94,7 @@ export interface TemporaryBatchAudit {
   first_used_at?: string | null;
   expires_at?: string | null;
   account_count?: number;
-  grants?: TemporaryBatchGrants;
+  grants?: AccountResourceGrants;
   defaults?: AccountDefaults;
   accounts?: TemporaryAccountAudit[];
 }
@@ -145,6 +163,21 @@ export async function createAccount(input: {
   });
 }
 
+export async function fetchAccountAccessOptions(): Promise<AccountAccessOptions> {
+  return fetchJson<AccountAccessOptions>(apiUrl("/users/access-options"));
+}
+
+export async function updateAccountAccess(
+  userId: string,
+  input: AccountAccessInput,
+): Promise<Account> {
+  return fetchJson<Account>(apiUrl(`${itemPath("/users", userId)}/access`), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export async function setAccountDisabled(
   userId: string,
   disabled: boolean,
@@ -177,7 +210,7 @@ export async function deleteAccount(userId: string): Promise<void> {
 const TEMPORARY_BATCHES_PATH = "/temporary-accounts/batches";
 
 export async function createTemporaryBatch(input: {
-  grants: TemporaryBatchGrants;
+  grants: AccountResourceGrants;
   defaults: AccountDefaults;
 }): Promise<TemporaryBatchResult> {
   return fetchJson<TemporaryBatchResult>(apiUrl(TEMPORARY_BATCHES_PATH), {

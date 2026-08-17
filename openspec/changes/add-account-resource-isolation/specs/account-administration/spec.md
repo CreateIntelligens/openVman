@@ -23,6 +23,19 @@ The system SHALL allow an authenticated admin to list, create, enable, disable, 
 - **WHEN** a non-admin calls any account-management endpoint
 - **THEN** the system returns 403 and performs no mutation
 
+### Requirement: Administrators configure formal account resources
+The system SHALL allow an authenticated admin to replace a formal non-admin account's project／knowledge-base, Avatar character, and voice grants plus accessible defaults, and SHALL source every selectable option from the authoritative resource registry.
+
+#### Scenario: Admin limits a formal account
+- **WHEN** an admin selects one project, one character, and one voice for a formal non-admin account
+- **THEN** the account sees those grants plus private resources it owns
+- **THEN** unselected system-public and private resources are not returned by authenticated selectors
+
+#### Scenario: Runtime provider list differs from the registry
+- **WHEN** a TTS provider is unavailable or reports a voice that is not registered
+- **THEN** the account editor and temporary batch form still list only registered grantable voices
+- **THEN** every selectable grant set passes backend resource validation
+
 ### Requirement: Account deletion preserves owned data safety
 The system SHALL block deletion of an account that owns private resources and SHALL require those resources to be transferred or deleted first.
 

@@ -9,6 +9,7 @@ import {
   type Account,
   type AccountRole,
 } from "../api/auth";
+import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
 
@@ -23,12 +24,21 @@ function ownedResourceCount(account: Account): number {
   );
 }
 
+function grantedResourceCount(account: Account): number {
+  if (!account.grants) return 0;
+  return Object.values(account.grants).reduce(
+    (total, resourceIds) => total + resourceIds.length,
+    0,
+  );
+}
+
 export default function Accounts() {
   const { account: currentAccount } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AccountRole>("user");
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +65,12 @@ export default function Accounts() {
     setSubmitting(true);
     setError(null);
     try {
-      await createAccount({ username: username.trim(), password, role });
+      const created = await createAccount({ username: username.trim(), password, role });
       setUsername("");
       setPassword("");
       setRole("user");
       await reload();
+      if (created.role === "user") setEditingAccountId(created.id);
     } catch (nextError) {
       setError(errorMessage(nextError, "建立帳號失敗"));
     } finally {
@@ -154,56 +165,114 @@ export default function Accounts() {
             {accounts.map((account) => {
               const isSelf = account.id === currentAccount?.id;
               const resourceCount = ownedResourceCount(account);
+              const grantCount = grantedResourceCount(account);
+              const canEditAccess = account.role === "user"
+                && (account.kind ?? account.account_type ?? "formal") === "formal";
+              const editingAccess = editingAccountId === account.id;
               return (
-                <article key={account.id} className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium">{account.username}</span>
-                      <span className="chip">{account.role}</span>
-                      {account.kind === "temporary" && <span className="chip">臨時</span>}
-                      {isSelf && <span className="chip border-primary/30 text-primary">目前帳號</span>}
-                      {account.disabled && <span className="chip border-danger/30 text-danger">已停用</span>}
+                <article key={account.id} className="px-5 py-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{account.username}</span>
+                        <span className="chip">{account.role}</span>
+                        {account.kind === "temporary" && (
+                          <span className="chip">臨時</span>
+                        )}
+                        {canEditAccess && (
+                          <span className="chip">
+                            {grantCount > 0
+                              ? `已授權 ${grantCount} 項`
+                              : "尚未授權"}
+                          </span>
+                        )}
+                        {isSelf && (
+                          <span className="chip border-primary/30 text-primary">
+                            目前帳號
+                          </span>
+                        )}
+                        {account.disabled && (
+                          <span className="chip border-danger/30 text-danger">
+                            已停用
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-content-subtle">
+                        建立於 {new Date(account.created_at).toLocaleString("zh-TW")}
+                        {resourceCount > 0
+                          ? ` · 私有資源 ${resourceCount} 項`
+                          : ""}
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-content-subtle">
-                      建立於 {new Date(account.created_at).toLocaleString("zh-TW")}
-                      {resourceCount > 0 ? ` · 私有資源 ${resourceCount} 項` : ""}
-                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {canEditAccess && (
+                        <button
+                          className={editingAccess
+                            ? "btn btn-primary"
+                            : "btn btn-ghost"}
+                          type="button"
+                          aria-expanded={editingAccess}
+                          onClick={() => setEditingAccountId(
+                            editingAccess ? null : account.id,
+                          )}
+                        >
+                          資源權限
+                        </button>
+                      )}
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        disabled={isSelf}
+                        onClick={() => void runAction(
+                          () => setAccountDisabled(account.id, !account.disabled),
+                          account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
+                        )}
+                      >
+                        {account.disabled ? "啟用" : "停用"}
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        onClick={() => void runAction(
+                          () => revokeAccountSessions(account.id),
+                          "撤銷登入階段失敗",
+                        )}
+                      >
+                        登出所有裝置
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        type="button"
+                        disabled={isSelf || !account.disabled || resourceCount > 0}
+                        title={resourceCount > 0
+                          ? "請先移除或轉移帳號擁有的私有資源"
+                          : undefined}
+                        onClick={() => {
+                          if (!window.confirm(
+                            `確定刪除帳號「${account.username}」？`,
+                          )) return;
+                          void runAction(
+                            () => deleteAccount(account.id),
+                            "刪除帳號失敗",
+                          );
+                        }}
+                      >
+                        刪除
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      disabled={isSelf}
-                      onClick={() => void runAction(
-                        () => setAccountDisabled(account.id, !account.disabled),
-                        account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
-                      )}
-                    >
-                      {account.disabled ? "啟用" : "停用"}
-                    </button>
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      onClick={() => void runAction(
-                        () => revokeAccountSessions(account.id),
-                        "撤銷登入階段失敗",
-                      )}
-                    >
-                      登出所有裝置
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      type="button"
-                      disabled={isSelf || !account.disabled || resourceCount > 0}
-                      title={resourceCount > 0 ? "請先移除或轉移帳號擁有的私有資源" : undefined}
-                      onClick={() => {
-                        if (!window.confirm(`確定刪除帳號「${account.username}」？`)) return;
-                        void runAction(() => deleteAccount(account.id), "刪除帳號失敗");
+                  {editingAccess && (
+                    <FormalAccountAccessPanel
+                      account={account}
+                      onCancel={() => setEditingAccountId(null)}
+                      onSaved={(updated) => {
+                        setAccounts((current) => current.map((item) => (
+                          item.id === updated.id ? updated : item
+                        )));
+                        setEditingAccountId(null);
                       }}
-                    >
-                      刪除
-                    </button>
-                  </div>
+                    />
+                  )}
                 </article>
               );
             })}

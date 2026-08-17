@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from math import ceil
+import json
 import re
 import secrets
 import string
+from datetime import datetime, timezone
+from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,6 +18,7 @@ from .models import (
     AccountRole,
     AccountType,
     ResourceGrantRecord,
+    ResourceRecord,
     ResourceType,
     TemporaryCredentialRecord,
     UserRecord,
@@ -66,13 +68,54 @@ class AccountDefaultsProfile(_StrictModel):
     voice_id: str
 
     @classmethod
-    def from_record(cls, record: AccountDefaultsRecord) -> "AccountDefaultsProfile":
+    def from_record(cls, record: AccountDefaultsRecord) -> AccountDefaultsProfile:
         return cls(
             project_id=record.project_id,
             character_id=record.character_id,
             voice_provider=record.voice_provider,
             voice_id=record.voice_id,
         )
+
+
+class AccountResourceGrants(_StrictModel):
+    projects: list[str] = Field(min_length=1)
+    avatar_characters: list[str] = Field(min_length=1)
+    custom_voices: list[str] = Field(min_length=1)
+
+    @classmethod
+    def from_records(
+        cls,
+        records: tuple[ResourceGrantRecord, ...],
+    ) -> AccountResourceGrants:
+        values: dict[ResourceType, list[str]] = {
+            ResourceType.PROJECT: [],
+            ResourceType.AVATAR_CHARACTER: [],
+            ResourceType.CUSTOM_VOICE: [],
+        }
+        for record in records:
+            if record.resource_type in values:
+                values[record.resource_type].append(record.resource_id)
+        return cls(
+            projects=values[ResourceType.PROJECT],
+            avatar_characters=values[ResourceType.AVATAR_CHARACTER],
+            custom_voices=values[ResourceType.CUSTOM_VOICE],
+        )
+
+
+def _resource_grants(
+    grants: AccountResourceGrants,
+) -> list[tuple[ResourceType, str]]:
+    return [
+        *((ResourceType.PROJECT, value) for value in grants.projects),
+        *(
+            (ResourceType.AVATAR_CHARACTER, value)
+            for value in grants.avatar_characters
+        ),
+        *(
+            (ResourceType.CUSTOM_VOICE, value)
+            for value in grants.custom_voices
+        ),
+    ]
 
 
 class AccountProfile(_StrictModel):
@@ -95,8 +138,10 @@ class AccountProfile(_StrictModel):
         runtime: AuthRuntime | None = None,
         credential: TemporaryCredentialRecord | None = None,
         now: datetime | None = None,
-    ) -> "AccountProfile":
-        defaults = runtime.temporary_accounts.get_defaults(user.id) if runtime else None
+    ) -> AccountProfile:
+        defaults = (
+            runtime.account_access.get_defaults(user.id) if runtime else None
+        )
         expires_at = credential.expires_at if credential is not None else None
         remaining_seconds = None
         if expires_at is not None:
@@ -130,16 +175,23 @@ class AccountProfile(_StrictModel):
 
 class AdminAccountProfile(AccountProfile):
     resource_counts: dict[str, int]
+    grants: AccountResourceGrants | None
 
     @classmethod
     def from_record(
         cls,
         user: UserRecord,
         runtime: AuthRuntime,
-    ) -> "AdminAccountProfile":
+    ) -> AdminAccountProfile:
+        grant_records = runtime.account_access.list_grants(user.id)
         return cls(
             **AccountProfile.from_record(user, runtime=runtime).model_dump(),
             resource_counts=runtime.resources.count_private_by_owner(user.id),
+            grants=(
+                AccountResourceGrants.from_records(grant_records)
+                if grant_records
+                else None
+            ),
         )
 
 
@@ -171,15 +223,26 @@ class LogoutResponse(_StrictModel):
     ok: bool
 
 
-class TemporaryBatchGrants(_StrictModel):
-    projects: list[str] = Field(min_length=1)
-    avatar_characters: list[str] = Field(min_length=1)
-    custom_voices: list[str] = Field(min_length=1)
-
-
 class CreateTemporaryBatchRequest(_StrictModel):
-    grants: TemporaryBatchGrants
+    grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
+
+
+class UpdateAccountAccessRequest(_StrictModel):
+    grants: AccountResourceGrants
+    defaults: AccountDefaultsProfile
+
+
+class AccountAccessOption(_StrictModel):
+    id: str
+    label: str
+    provider: str | None = None
+
+
+class AccountAccessOptions(_StrictModel):
+    projects: list[AccountAccessOption]
+    avatar_characters: list[AccountAccessOption]
+    custom_voices: list[AccountAccessOption]
 
 
 class TemporaryCredentialCreated(_StrictModel):
@@ -199,7 +262,7 @@ class ResourceGrantProfile(_StrictModel):
     resource_id: str
 
     @classmethod
-    def from_record(cls, record: ResourceGrantRecord) -> "ResourceGrantProfile":
+    def from_record(cls, record: ResourceGrantRecord) -> ResourceGrantProfile:
         return cls(
             resource_type=record.resource_type,
             resource_id=record.resource_id,
@@ -227,7 +290,7 @@ class TemporaryBatchAudit(_StrictModel):
     first_used_at: str | None
     expires_at: str | None
     account_count: int
-    grants: TemporaryBatchGrants
+    grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
     accounts: list[TemporaryAccountAudit]
 
@@ -443,7 +506,7 @@ def _temporary_batch_audit(
         first_used_at=min(first_used_values) if first_used_values else None,
         expires_at=max(expires_values) if expires_values else None,
         account_count=len(accounts),
-        grants=TemporaryBatchGrants(
+        grants=AccountResourceGrants(
             projects=grant_values[ResourceType.PROJECT],
             avatar_characters=grant_values[ResourceType.AVATAR_CHARACTER],
             custom_voices=grant_values[ResourceType.CUSTOM_VOICE],
@@ -483,19 +546,11 @@ def create_temporary_batch(
         )
         for locator, password in generated
     ]
-    grants = [
-        *((ResourceType.PROJECT, value) for value in body.grants.projects),
-        *(
-            (ResourceType.AVATAR_CHARACTER, value)
-            for value in body.grants.avatar_characters
-        ),
-        *((ResourceType.CUSTOM_VOICE, value) for value in body.grants.custom_voices),
-    ]
     try:
         batch = runtime.temporary_accounts.create_batch(
             created_by=admin.user.id,
             credentials=credentials,
-            grants=grants,
+            grants=_resource_grants(body.grants),
             defaults=(
                 body.defaults.project_id,
                 body.defaults.character_id,
@@ -564,6 +619,88 @@ def list_accounts(
     return [
         AdminAccountProfile.from_record(user, runtime) for user in runtime.users.list()
     ]
+
+
+def _resource_option(record: ResourceRecord) -> AccountAccessOption:
+    try:
+        metadata = json.loads(record.metadata_json)
+    except (TypeError, ValueError):
+        metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    label = metadata.get("label")
+    provider = metadata.get("provider")
+    return AccountAccessOption(
+        id=record.resource_id,
+        label=(
+            label.strip()
+            if isinstance(label, str) and label.strip()
+            else record.resource_id
+        ),
+        provider=(
+            provider.strip()
+            if isinstance(provider, str) and provider.strip()
+            else None
+        ),
+    )
+
+
+@users_router.get("/access-options", response_model=AccountAccessOptions)
+def list_account_access_options(
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AccountAccessOptions:
+    return AccountAccessOptions(
+        projects=[
+            _resource_option(record)
+            for record in runtime.resources.list_by_type(ResourceType.PROJECT)
+        ],
+        avatar_characters=[
+            _resource_option(record)
+            for record in runtime.resources.list_by_type(
+                ResourceType.AVATAR_CHARACTER
+            )
+        ],
+        custom_voices=[
+            _resource_option(record)
+            for record in runtime.resources.list_by_type(
+                ResourceType.CUSTOM_VOICE
+            )
+        ],
+    )
+
+
+@users_router.put("/{user_id}/access", response_model=AdminAccountProfile)
+def update_account_access(
+    user_id: str,
+    body: UpdateAccountAccessRequest,
+    admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AdminAccountProfile:
+    try:
+        runtime.account_access.replace(
+            user_id=user_id,
+            granted_by=admin.user.id,
+            grants=_resource_grants(body.grants),
+            defaults=(
+                body.defaults.project_id,
+                body.defaults.character_id,
+                body.defaults.voice_provider,
+                body.defaults.voice_id,
+            ),
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Account not found",
+        ) from exc
+    except InvalidResourceGrantError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    user = runtime.users.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return AdminAccountProfile.from_record(user, runtime)
 
 
 @users_router.post(
