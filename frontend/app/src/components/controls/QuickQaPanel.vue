@@ -69,6 +69,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { apiFetch } from "../../api/http";
 
 export interface QaEntry {
   question: string;
@@ -172,7 +173,7 @@ async function fetchNodes(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    const res = await fetch(`/api/knowledge/qa/nodes?project_id=${encodeURIComponent(props.projectId)}`);
+    const res = await apiFetch(`/api/knowledge/qa/nodes?project_id=${encodeURIComponent(props.projectId)}`);
     if (!res.ok) throw new Error("無法取得問答分類");
     const data = await res.json();
     nodes.value = data ?? [];
@@ -212,7 +213,7 @@ watch(
 watch(currentNode, async (newNode) => {
   if (!newNode) return;
   try {
-    const res = await fetch(`/api/knowledge/qa/nodes/${encodeURIComponent(newNode.node_id)}/merged?project_id=${encodeURIComponent(props.projectId)}`);
+    const res = await apiFetch(`/api/knowledge/qa/nodes/${encodeURIComponent(newNode.node_id)}/merged?project_id=${encodeURIComponent(props.projectId)}`);
     if (res.ok) {
       const items = await res.json() as MergedQaItem[];
       for (const item of items) {

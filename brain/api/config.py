@@ -157,6 +157,7 @@ class BrainSettings(BaseSettings):
     voyage_api_key: str = ""
 
     # === 安全設定 ===
+    gateway_internal_token: str = ""
     max_input_length: int = 500
     enable_content_filter: bool = True
     request_rate_limit_per_minute: int = 90

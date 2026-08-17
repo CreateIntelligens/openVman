@@ -10,7 +10,26 @@ class DisconnectedReceiveWebSocket:
     client_state = type("State", (), {"name": "DISCONNECTED"})()
 
     def __init__(self) -> None:
+        from app.auth.models import AccountRole
+        from app.auth.passwords import hash_password
+        from app.auth.runtime import get_auth_runtime
+
+        runtime = get_auth_runtime()
+        admin = runtime.users.get_by_username("admin")
+        if not admin:
+            admin = runtime.users.create(
+                username="admin",
+                password_hash=hash_password("admin-password"),
+                role=AccountRole.ADMIN,
+            )
+        token = runtime.tokens.issue(admin)
+
         self.accepted = False
+        self.headers = {"authorization": f"Bearer {token}"}
+        self.cookies = {}
+        self.query_params = {}
+        self.url = type("URL", (), {"scheme": "http", "query": ""})()
+        self.state = type("State", (), {})()
 
     async def accept(self) -> None:
         self.accepted = True

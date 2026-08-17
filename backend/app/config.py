@@ -180,7 +180,31 @@ class TTSRouterConfig(BaseSettings):
 
     # --- Internal ---
     brain_url: str = "http://api:8100"
-    gateway_internal_token: str = "change-me-in-production"
+    gateway_internal_token: str = ""
+
+    # --- Authentication ---
+    session_jwt_secret: str = Field(default="", validation_alias="SESSION_JWT_SECRET")
+    auth_database_path: str = Field(
+        default="/data/auth/accounts.db",
+        validation_alias="AUTH_DATABASE_PATH",
+    )
+    auth_cookie_secure: bool | None = Field(
+        default=None,
+        validation_alias="AUTH_COOKIE_SECURE",
+    )
+    auth_jwt_issuer: str = Field(
+        default="openvman",
+        validation_alias="AUTH_JWT_ISSUER",
+    )
+    auth_jwt_audience: str = Field(
+        default="openvman-web",
+        validation_alias="AUTH_JWT_AUDIENCE",
+    )
+    auth_session_lifetime_seconds: int = Field(
+        default=86400,
+        ge=60,
+        validation_alias="AUTH_SESSION_LIFETIME_SECONDS",
+    )
 
     @property
     def supported_mime_types(self) -> frozenset[str]:
@@ -189,6 +213,10 @@ class TTSRouterConfig(BaseSettings):
     @property
     def is_dev(self) -> bool:
         return self.env == "dev"
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        return not self.is_dev or self.auth_cookie_secure is True
 
     @property
     def blocked_domain_set(self) -> frozenset[str]:

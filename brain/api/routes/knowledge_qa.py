@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -43,10 +43,15 @@ from knowledge.qa_nodes import (
 )
 
 from routes.knowledge import schedule_reindex
+from safety.internal_auth import require_internal_token
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/brain/knowledge/qa", tags=["Knowledge QA"])
+router = APIRouter(
+    prefix="/brain/knowledge/qa",
+    tags=["Knowledge QA"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 _QA_IMAGE_MEDIA_TYPES = {
     ".avif": "image/avif",

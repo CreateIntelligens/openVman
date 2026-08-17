@@ -11,6 +11,12 @@ _ORIGINAL_ENV: dict[str, str] = {}
 _ENV_KEYS_TO_CLEAR = (
     "ENV",
     "BACKEND_PORT",
+    "SESSION_JWT_SECRET",
+    "AUTH_DATABASE_PATH",
+    "AUTH_COOKIE_SECURE",
+    "AUTH_JWT_ISSUER",
+    "AUTH_JWT_AUDIENCE",
+    "AUTH_SESSION_LIFETIME_SECONDS",
     "TTS_INDEXTTS_URL",
     "TTS_AWS_ENABLED",
     "TTS_EDGE_SAMPLE_RATE",
@@ -53,6 +59,12 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
             [
                 "ENV=dev",
                 "BACKEND_PORT=9999",
+                "SESSION_JWT_SECRET=test-secret",
+                "AUTH_DATABASE_PATH=/tmp/test-accounts.db",
+                "AUTH_COOKIE_SECURE=false",
+                "AUTH_JWT_ISSUER=test-issuer",
+                "AUTH_JWT_AUDIENCE=test-audience",
+                "AUTH_SESSION_LIFETIME_SECONDS=7200",
                 "TTS_INDEXTTS_URL=http://mock-index:8001",
                 "TTS_AWS_ENABLED=true",
                 "TTS_EDGE_SAMPLE_RATE=16000",
@@ -86,6 +98,22 @@ def test_settings_can_load_from_env_file(tmp_path: Path):
     assert config.pdf_repair_timeout_ms == 20000
     assert config.backend_port == 9999
     assert config.is_dev is True
+    assert config.session_jwt_secret == "test-secret"
+    assert config.auth_database_path == "/tmp/test-accounts.db"
+    assert config.session_cookie_secure is False
+    assert config.auth_jwt_issuer == "test-issuer"
+    assert config.auth_jwt_audience == "test-audience"
+    assert config.auth_session_lifetime_seconds == 7200
+
+
+def test_production_cookies_cannot_be_configured_insecurely():
+    config = TTSRouterConfig(
+        _env_file=None,
+        env="prod",
+        auth_cookie_secure=False,
+    )
+
+    assert config.session_cookie_secure is True
 
 
 def test_legacy_uvicorn_reload_env_no_longer_changes_mode(tmp_path: Path):

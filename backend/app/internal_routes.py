@@ -38,13 +38,19 @@ async def internal_enrich(
 ) -> dict[str, Any]:
     cfg = get_tts_config()
 
+    if not cfg.gateway_internal_token:
+        raise HTTPException(status_code=503, detail="internal token is not configured")
     if not hmac.compare_digest(x_internal_token, cfg.gateway_internal_token):
         raise HTTPException(status_code=403, detail="invalid internal token")
 
     brain_url = f"{cfg.brain_url}/internal/enrich"
 
     try:
-        resp = await _http.get().post(brain_url, json=payload.model_dump())
+        resp = await _http.get().post(
+            brain_url,
+            json=payload.model_dump(),
+            headers={INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
+        )
         resp.raise_for_status()
         result = resp.json()
         logger.info(

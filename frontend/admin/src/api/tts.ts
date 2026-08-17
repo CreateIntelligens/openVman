@@ -1,4 +1,4 @@
-import { fetchJson } from "./common";
+import { apiFetch, fetchJson } from "./common";
 
 export interface TtsProvider {
   id: string;
@@ -24,7 +24,7 @@ export async function synthesizeSpeech(
   if (opts?.provider) body.provider = opts.provider;
   if (opts?.voice) body.voice = opts.voice;
 
-  const res = await fetch("/v1/audio/speech", {
+  const res = await apiFetch("/v1/audio/speech", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

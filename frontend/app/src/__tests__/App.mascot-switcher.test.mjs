@@ -35,7 +35,7 @@ test("main stage background is shared behind the VRM renderer", () => {
 
 test("VRM choices are loaded from the avatar mascot catalog", () => {
   assert.match(source, /async function fetchVrmAvatars\(\):\s*Promise<void>/);
-  assert.match(source, /fetch\("\/api\/avatar\/mascots"\)/);
+  assert.match(source, /apiFetch\("\/api\/avatar\/mascots"\)/);
   assert.match(source, /toMascotOption/);
   assert.match(source, /\.filter\(\(mascot\) => mascot\.engine === "3d" && Boolean\(mascot\.vrmUrl\)\)/);
 });

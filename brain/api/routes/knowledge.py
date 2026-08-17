@@ -5,7 +5,15 @@ import json
 from typing import Any
 
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import HTMLResponse
 
 from core.chat_service import record_generation_failure
@@ -54,9 +62,14 @@ from protocol.schemas import (
     KnowledgeDocumentPutRequest,
     KnowledgeNoteCreateRequest,
 )
+from safety.internal_auth import require_internal_token
 from safety.observability import log_event, log_exception
 
-router = APIRouter(prefix="/brain", tags=["Knowledge"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Knowledge"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 _REINDEX_DEBOUNCE_SECONDS = 2.0

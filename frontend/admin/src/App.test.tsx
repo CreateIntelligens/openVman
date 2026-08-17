@@ -25,8 +25,23 @@ vi.mock("./api/metrics", () => ({
   fetchHealth: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("./api/auth", () => ({
+  getCurrentAccount: vi.fn().mockResolvedValue({
+    id: "admin-1",
+    username: "admin",
+    role: "admin",
+    disabled: false,
+    created_at: "2026-08-17T00:00:00Z",
+  }),
+  login: vi.fn(),
+  logout: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("./pages/Avatar", () => ({
   default: () => <div data-testid="tab-avatar">Avatar tab</div>,
+}));
+vi.mock("./pages/Accounts", () => ({
+  default: () => <div data-testid="tab-accounts">Accounts tab</div>,
 }));
 vi.mock("./pages/Chat", () => ({
   default: () => <div data-testid="tab-chat">Chat tab</div>,
@@ -61,6 +76,7 @@ vi.mock("./pages/Workspace", () => ({
 
 import App from "./App";
 import { fetchProjects } from "./api";
+import { getCurrentAccount } from "./api/auth";
 import { allTabs } from "./components/app/navigation";
 
 describe("App tab mounting", () => {
@@ -68,6 +84,13 @@ describe("App tab mounting", () => {
     window.localStorage.clear();
     window.history.replaceState(null, "", "/admin/");
     vi.clearAllMocks();
+    vi.mocked(getCurrentAccount).mockResolvedValue({
+      id: "admin-1",
+      username: "admin",
+      role: "admin",
+      disabled: false,
+      created_at: "2026-08-17T00:00:00Z",
+    });
     vi.mocked(fetchProjects).mockResolvedValue({
       project_count: 1,
       projects: [
@@ -136,5 +159,21 @@ describe("App tab mounting", () => {
     expect(
       await screen.findByRole("button", { name: "目前專案：Default" }),
     ).toBeTruthy();
+  });
+
+  it("blocks the account page for a normal user", async () => {
+    window.history.replaceState(null, "", "/admin/accounts");
+    vi.mocked(getCurrentAccount).mockResolvedValue({
+      id: "user-1",
+      username: "viewer",
+      role: "user",
+      disabled: false,
+      created_at: "2026-08-17T00:00:00Z",
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("權限不足")).toBeTruthy();
+    expect(screen.queryByTestId("tab-accounts")).toBeNull();
   });
 });

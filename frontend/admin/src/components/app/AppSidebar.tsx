@@ -1,15 +1,22 @@
 import { useState } from "react";
 import TabGroup from "./TabGroup";
-import { tabGroups, type Tab } from "./navigation";
+import { isTabVisible, tabGroups, type Tab } from "./navigation";
 
 interface AppSidebarProps {
   active: Tab;
   isPinned: boolean;
+  isAdmin: boolean;
   onSelectTab: (tab: Tab) => void;
   onTogglePin: () => void;
 }
 
-export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin }: AppSidebarProps) {
+export default function AppSidebar({
+  active,
+  isPinned,
+  isAdmin,
+  onSelectTab,
+  onTogglePin,
+}: AppSidebarProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocus, setHasFocus] = useState(false);
   const isExpanded = isPinned || isHovered || hasFocus;
@@ -47,7 +54,7 @@ export default function AppSidebar({ active, isPinned, onSelectTab, onTogglePin 
             <TabGroup
               key={group.label}
               label={group.label}
-              tabs={group.tabs}
+              tabs={group.tabs.filter((tab) => isTabVisible(tab, isAdmin))}
               active={active}
               onSelect={onSelectTab}
               isExpanded={isExpanded}

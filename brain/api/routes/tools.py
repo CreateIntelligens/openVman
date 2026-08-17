@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from protocol.schemas import SkillCreateRequest, SkillFilesUpdateRequest
+from safety.internal_auth import require_internal_token
 from tools.skill import SkillRef, SkillScope
 from tools.skill_manager import get_skill_manager
 from tools.tool_registry import (
@@ -13,7 +14,11 @@ from tools.tool_registry import (
     invalidate_skill_tools_sync,
 )
 
-router = APIRouter(prefix="/brain", tags=["Tools & Skills"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Tools & Skills"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 def _skill_deps() -> tuple[Any, Any]:

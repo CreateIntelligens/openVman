@@ -10,19 +10,23 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
+from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.models import ResourceType
+from app.auth.resources import ResourceAccess, ResourceNotFoundError, resolve_resource
+from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.brain_proxy import _http as _brain_http
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
 from app.gateway.crawl_adapter import CrawlResult, fetch_page
-from app.gateway.ingestion import IngestionResult, ingest_document
+from app.gateway.ingestion import ingest_document
 from app.gateway.ingestion_youtube import (
     YouTubeTranscriptError,
-    fetch_video_metadata,
     fetch_transcript,
+    fetch_video_metadata,
     is_youtube_url,
 )
 from app.gateway.job_status import get_job_status, set_job_status
@@ -30,12 +34,46 @@ from app.gateway.queue import DLQ_KEY, enqueue_job
 from app.gateway.redis_pool import get_redis
 from app.gateway.temp_storage import get_temp_storage
 from app.gateway.worker import process_media
-from app.utils.upload import UPLOAD_CHUNK_SIZE, UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
+from app.utils.upload import (
+    UploadTooLargeError,
+    cleanup_temp_path,
+    persist_upload_to_tempfile,
+)
 
 logger = logging.getLogger("gateway.routes")
 router = APIRouter()
 
 _KNOWLEDGE_PASSTHROUGH_SUFFIXES = frozenset({".md", ".txt", ".csv"})
+
+
+def _trusted_brain_headers(
+    current: CurrentAccount,
+    project_id: str,
+    internal_token: str,
+) -> dict[str, str]:
+    return {
+        "X-Internal-Token": internal_token,
+        "X-OpenVMan-User-ID": current.user.id,
+        "X-OpenVMan-Role": current.user.role.value,
+        "X-OpenVMan-Project-ID": project_id,
+    }
+
+
+def _require_project_mutation(
+    runtime: AuthRuntime,
+    current: CurrentAccount,
+    project_id: str,
+) -> None:
+    try:
+        resolve_resource(
+            runtime.resources,
+            current.user,
+            ResourceType.PROJECT,
+            project_id,
+            access=ResourceAccess.MUTATE,
+        )
+    except ResourceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Resource not found") from exc
 
 
 async def _process_media_sync(data: dict[str, Any]) -> None:
@@ -67,6 +105,7 @@ async def _prepare_document_upload(
     markdown_target_dir: str,
     project_id: str,
     max_bytes: int,
+    headers: dict[str, str],
 ) -> tuple[str, bytes, str]:
     suffix = Path(upload.filename or "").suffix
     safe_stem = Path(upload.filename or "document").stem or "document"
@@ -86,6 +125,7 @@ async def _prepare_document_upload(
             original_filename=upload.filename or Path(tmp_path).name,
             target_dir=markdown_target_dir,
             project_id=project_id,
+            headers=headers,
         )
         result = await asyncio.to_thread(ingest_document, tmp_path, trace_id=trace_id, cfg=cfg)
         return (
@@ -142,6 +182,7 @@ async def _upload_raw_artifact(
     original_filename: str,
     target_dir: str,
     project_id: str,
+    headers: dict[str, str],
 ) -> None:
     raw_path = Path(file_path)
     response = await client.post(
@@ -157,6 +198,7 @@ async def _upload_raw_artifact(
             "target_dir": _build_raw_target_dir(target_dir),
             "project_id": project_id,
         },
+        headers=headers,
     )
     response.raise_for_status()
 
@@ -387,9 +429,17 @@ async def upload_knowledge_documents(
     target_dir: str = Form(""),
     project_id: str = Form("default"),
     relative_paths: list[str] = Form(default_factory=list),
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> Response:
     cfg = get_tts_config()
     client = _brain_http.get()
+    _require_project_mutation(runtime, current, project_id)
+    trusted_headers = _trusted_brain_headers(
+        current,
+        project_id,
+        cfg.gateway_internal_token,
+    )
 
     try:
         markdown_target_dir = _build_markdown_target_dir(target_dir)
@@ -409,6 +459,7 @@ async def upload_knowledge_documents(
                     markdown_target_dir=markdown_target_dir,
                     project_id=project_id,
                     max_bytes=cfg.document_max_upload_bytes,
+                    headers=trusted_headers,
                 )
                 forwarded_relative_path = _swap_extension_for_markdown(client_relative, forwarded[0])
             forwarded_files.append(("files", forwarded))
@@ -423,6 +474,7 @@ async def upload_knowledge_documents(
             f"{cfg.brain_url}/brain/knowledge/upload",
             files=forwarded_files,
             data=post_data,
+            headers=trusted_headers,
         )
         return _relay_brain_response(resp)
     except UploadTooLargeError as exc:
@@ -472,7 +524,11 @@ async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
     summary="擷取 YouTube 字幕",
     description="從 YouTube 影片擷取字幕文字，可選擇存入知識庫。\n\n**所需欄位**：\n- `url` (Body, str): YouTube 影片網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID\n- `save_to_knowledge` (Body, bool, 預設 false): 是否存入知識庫\n- `target_dir` (Body, str, 預設 ''): 知識庫目標資料夾",
 )
-async def ingest_youtube_transcript(req: YouTubeIngestRequest) -> JSONResponse:
+async def ingest_youtube_transcript(
+    req: YouTubeIngestRequest,
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> JSONResponse:
     """擷取 YouTube 字幕，可選存入知識庫。"""
     result = await _fetch_youtube_transcript(req.url)
     if isinstance(result, JSONResponse):
@@ -480,6 +536,8 @@ async def ingest_youtube_transcript(req: YouTubeIngestRequest) -> JSONResponse:
 
     if not req.save_to_knowledge:
         return JSONResponse(content=result)
+
+    _require_project_mutation(runtime, current, req.project_id)
 
     filename = f"{result['title']}.md"
     markdown_bytes = f"# {result['title']}\n\n{result['content']}".encode("utf-8")
@@ -493,6 +551,11 @@ async def ingest_youtube_transcript(req: YouTubeIngestRequest) -> JSONResponse:
             f"{cfg.brain_url}/brain/knowledge/upload",
             files=[("files", (filename, markdown_bytes, "text/markdown"))],
             data={"target_dir": target_dir, "project_id": req.project_id},
+            headers=_trusted_brain_headers(
+                current,
+                req.project_id,
+                cfg.gateway_internal_token,
+            ),
         )
         resp.raise_for_status()
     except Exception as exc:

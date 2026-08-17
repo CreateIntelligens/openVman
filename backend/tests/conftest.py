@@ -2,9 +2,38 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import types
 from unittest.mock import MagicMock
+
+import pytest
+
+os.environ.setdefault("SESSION_JWT_SECRET", "test-session-jwt-secret-for-backend-unit-tests")
+os.environ.setdefault("AUTH_COOKIE_SECURE", "false")
+
+
+@pytest.fixture(autouse=True)
+def _clear_auth_and_config_caches(tmp_path_factory):
+    from unittest.mock import patch
+    from app.auth.runtime import get_auth_runtime
+    from app.config import get_tts_config
+
+    test_db = str(tmp_path_factory.mktemp("auth") / "accounts.db")
+    with patch.dict(
+        os.environ,
+        {
+            "SESSION_JWT_SECRET": "test-session-jwt-secret-for-backend-unit-tests",
+            "AUTH_DATABASE_PATH": test_db,
+            "AUTH_COOKIE_SECURE": "false",
+        },
+        clear=False,
+    ):
+        get_tts_config.cache_clear()
+        get_auth_runtime.cache_clear()
+        yield
+        get_tts_config.cache_clear()
+        get_auth_runtime.cache_clear()
 
 # ---------------------------------------------------------------------------
 # Stub heavy external dependencies that are not installed in test env

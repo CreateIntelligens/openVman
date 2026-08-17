@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiUrl, projectUrl } from "../../api/common";
+import { apiFetch, apiUrl, projectUrl } from "../../api/common";
 import type { ActionRequest, ActionRisk } from "../../api";
 import { useNavigation } from "../../context/NavigationContext";
 import type { Tab } from "../app/navigation";
@@ -55,7 +55,7 @@ export default function ActionRequestCard({
     setStatus("confirming");
     setErrorMsg("");
     try {
-      const res = await fetch(apiUrl(request.endpoint), {
+      const res = await apiFetch(apiUrl(request.endpoint), {
         method: request.method || "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request.params ?? {}),

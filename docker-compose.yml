@@ -48,6 +48,7 @@ services:
       - MODEL_DIR=assets/checkpoints
       - PORT=8011
       - GPU_MEMORY_UTILIZATION=${INDEXTTS_GPU_MEM:-0.1}
+      - INTERNAL_API_TOKEN=${GATEWAY_INTERNAL_TOKEN:-}
     volumes:
       - ./backend/index-tts-vllm:/app
       - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
@@ -194,6 +195,9 @@ services:
       - ./backend/requirements.txt:/app/requirements.txt
       - ./backend/scripts:/app/scripts
       - ./data:/data
+      - ./brain/data:/brain-data:ro
+      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
+      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
     env_file:
       - ./.env
     environment:

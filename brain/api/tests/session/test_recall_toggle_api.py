@@ -6,13 +6,16 @@ from fastapi.testclient import TestClient
 from memory.session_store import SessionStore
 
 
-def _client(store: SessionStore) -> TestClient:
+def _client() -> TestClient:
+    from config import get_settings
     from routes.sessions import router
 
     app = FastAPI()
     app.include_router(router)
-    app.dependency_overrides = {}
-    return TestClient(app)
+    return TestClient(
+        app,
+        headers={"X-Internal-Token": get_settings().gateway_internal_token},
+    )
 
 
 def test_recall_toggle_endpoint_persists_disable_enable(tmp_path, monkeypatch):
@@ -24,7 +27,7 @@ def test_recall_toggle_endpoint_persists_disable_enable(tmp_path, monkeypatch):
     monkeypatch.setattr(sessions_routes, "get_session_store", lambda project_id="default": store)
     monkeypatch.setattr(sessions_routes, "log_event", lambda *args, **kwargs: None)
 
-    with _client(store) as client:
+    with _client() as client:
         disable = client.post("/brain/sessions/s1/recall-toggle", json={"disabled": True})
         enable = client.post("/brain/sessions/s1/recall-toggle", json={"disabled": False})
 

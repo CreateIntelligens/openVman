@@ -1,5 +1,9 @@
 const API_BASE = "/api";
-type ApiErrorPayload = { detail?: string; message?: string; error?: string };
+type ApiErrorPayload = {
+  detail?: string | { message?: string; resource_counts?: Record<string, number> };
+  message?: string;
+  error?: string;
+};
 export type QueryParams = Record<string, string>;
 export type JsonBody = Record<string, unknown>;
 
@@ -14,6 +18,29 @@ export const AVATAR_PATH = "/avatar";
 export const AVATAR_BACKGROUNDS_PATH = "/backgrounds";
 export const AVATAR_MASCOTS_PATH = "/avatar/mascots";
 
+type HttpStatusHandler = () => void;
+
+let unauthorizedHandler: HttpStatusHandler | null = null;
+let forbiddenHandler: HttpStatusHandler | null = null;
+
+export function setUnauthorizedHandler(
+  handler: HttpStatusHandler | null,
+): () => void {
+  unauthorizedHandler = handler;
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null;
+  };
+}
+
+export function setForbiddenHandler(
+  handler: HttpStatusHandler | null,
+): () => void {
+  forbiddenHandler = handler;
+  return () => {
+    if (forbiddenHandler === handler) forbiddenHandler = null;
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Active Project
 // ---------------------------------------------------------------------------
@@ -27,7 +54,22 @@ export const setActiveProjectId = (id: string) => { activeProjectId = id; };
 // ---------------------------------------------------------------------------
 
 function getApiErrorMessage(payload: ApiErrorPayload, status: number) {
-  if (payload.detail) return payload.detail;
+  if (typeof payload.detail === "string") return payload.detail;
+  if (payload.detail && typeof payload.detail === "object") {
+    const counts = payload.detail.resource_counts;
+    const countSummary = counts
+      ? Object.entries(counts)
+        .filter(([, count]) => count > 0)
+        .map(([resource, count]) => `${resource}: ${count}`)
+        .join("、")
+      : "";
+    if (payload.detail.message && countSummary) {
+      return `${payload.detail.message}（${countSummary}）`;
+    }
+    if (payload.detail.message || countSummary) {
+      return payload.detail.message || countSummary;
+    }
+  }
   const message = payload.message ?? "";
   const error = payload.error ?? "";
   if (message && error) return `${message}：${error}`;
@@ -82,8 +124,18 @@ export function sessionPath(sessionId: string): string {
 }
 
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  const res = await apiFetch(url, init);
   return parseJson<T>(res);
+}
+
+export async function apiFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const res = await fetch(input, { ...init, credentials: "include" });
+  if (res.status === 401) unauthorizedHandler?.();
+  if (res.status === 403) forbiddenHandler?.();
+  return res;
 }
 
 export async function jsonRequest<T>(

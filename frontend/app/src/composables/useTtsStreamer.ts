@@ -9,6 +9,8 @@
  *     Response: provider-native audio. Encoded formats are decoded to 16 kHz mono PCM.
  */
 
+import { apiFetch } from '../api/http'
+
 const STREAM_ENDPOINT = "/tts/stream";
 const SPEECH_ENDPOINT = "/v1/audio/speech";
 const DEFAULT_CHARACTER = "hayley";
@@ -132,7 +134,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
 
     try {
       const useStream = shouldUseStream(provider);
-      const response = await fetch(
+      const response = await apiFetch(
         useStream ? streamEndpoint : speechEndpoint,
         {
           method: "POST",

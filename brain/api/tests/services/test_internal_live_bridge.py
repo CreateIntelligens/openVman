@@ -16,6 +16,12 @@ def _client() -> TestClient:
     return TestClient(app)
 
 
+def _internal_headers() -> dict[str, str]:
+    from config import get_settings
+
+    return {"X-Internal-Token": get_settings().gateway_internal_token}
+
+
 class FakeLiveSession:
     def __init__(self) -> None:
         self.text_turns: list[str] = []
@@ -52,7 +58,10 @@ def test_internal_live_bridge_routes_text_audio_and_close():
         patch("internal_routes.append_session_message"),
     ):
         with _client() as client:
-            with client.websocket_connect("/brain/internal/live/relay-1") as websocket:
+            with client.websocket_connect(
+                "/brain/internal/live/relay-1",
+                headers=_internal_headers(),
+            ) as websocket:
                 websocket.send_json(
                     {
                         "event": "relay_init",
@@ -93,7 +102,10 @@ def test_internal_live_bridge_ephemeral_user_speak_not_persisted():
         patch("internal_routes.append_session_message") as append_msg,
     ):
         with _client() as client:
-            with client.websocket_connect("/brain/internal/live/relay-1") as websocket:
+            with client.websocket_connect(
+                "/brain/internal/live/relay-1",
+                headers=_internal_headers(),
+            ) as websocket:
                 websocket.send_json(
                     {
                         "event": "relay_init",
@@ -127,6 +139,7 @@ async def test_internal_live_bridge_event_sink_ignores_disconnected_websocket(mo
 
     class FakeWebSocket:
         def __init__(self) -> None:
+            self.headers = _internal_headers()
             self._messages = [
                 {
                     "event": "relay_init",
@@ -174,3 +187,30 @@ async def test_internal_live_bridge_event_sink_ignores_disconnected_websocket(mo
         }
     )
     await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_internal_live_bridge_rejects_invalid_internal_token_before_accept():
+    import internal_routes
+
+    class RejectingWebSocket:
+        headers = {"X-Internal-Token": "wrong"}
+
+        def __init__(self) -> None:
+            self.accepted = False
+            self.close_code = None
+
+        async def accept(self) -> None:
+            self.accepted = True
+
+        async def close(self, code: int, reason: str) -> None:
+            self.close_code = code
+            self.close_reason = reason
+
+    websocket = RejectingWebSocket()
+
+    await internal_routes.internal_live_bridge(websocket, "relay-rejected")
+
+    assert websocket.accepted is False
+    assert websocket.close_code == 1008
+    assert websocket.close_reason == "invalid internal token"

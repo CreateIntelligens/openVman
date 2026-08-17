@@ -1,11 +1,20 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from protocol.protocol_events import ProtocolValidationError, validate_client_event, validate_server_event
+from protocol.protocol_events import (
+    ProtocolValidationError,
+    validate_client_event,
+    validate_server_event,
+)
 from protocol.schemas import ProtocolValidateRequest
+from safety.internal_auth import require_internal_token
 
-router = APIRouter(prefix="/brain", tags=["Protocol"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Protocol"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 @router.post("/protocol/validate", summary="驗證傳輸協定格式")
@@ -24,4 +33,3 @@ async def protocol_validate(payload: ProtocolValidateRequest):
             "details": exc.details,
         }
     return {"valid": True, "event": event.event, "version": payload.version}
-

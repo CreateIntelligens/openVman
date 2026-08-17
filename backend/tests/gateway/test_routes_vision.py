@@ -1,15 +1,47 @@
 import base64
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account
+from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+from app.auth.passwords import hash_password
+from app.auth.runtime import get_auth_runtime
 from app.gateway.plugins.vision_events import EVENT_DEFINITION_BY_KEY
 from app.gateway.routes_vision import router
 
-app = FastAPI()
-app.include_router(router)
-client = TestClient(app)
+@pytest.fixture
+def client():
+    from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account
+    from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+    from app.auth.passwords import hash_password
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("admin")
+    if not admin:
+        admin = runtime.users.create(
+            username="admin",
+            password_hash=hash_password("admin-password"),
+            role=AccountRole.ADMIN,
+        )
+    try:
+        runtime.resources.register(
+            resource_type=ResourceType.PROJECT,
+            resource_id="default",
+            owner_user_id=admin.id,
+            visibility=ResourceVisibility.PRIVATE,
+        )
+    except Exception:
+        pass
+    current = CurrentAccount(user=admin, transport=AuthTransport.BEARER)
+
+    app = FastAPI()
+    app.dependency_overrides[get_current_account] = lambda: current
+    app.include_router(router)
+    return TestClient(app)
 
 _B64 = base64.b64encode(b"\xff\xd8\xff\xe0jpeg").decode()
 _PERSON_CONTEXT = EVENT_DEFINITION_BY_KEY["person"].context_text
@@ -33,7 +65,7 @@ _RED_SIGNAL = {
 }
 
 
-def test_no_event_returns_empty_reply_and_skips_brain():
+def test_no_event_returns_empty_reply_and_skips_brain(client):
     cam = MagicMock()
     cam.describe_frame = AsyncMock(
         return_value={"status": "processed", "events": [], "visual_state": _GREEN_SIGNAL}
@@ -51,7 +83,7 @@ def test_no_event_returns_empty_reply_and_skips_brain():
     gen.assert_not_awaited()
 
 
-def test_fired_event_calls_brain_with_context_text():
+def test_fired_event_calls_brain_with_context_text(client):
     cam = MagicMock()
     cam.describe_frame = AsyncMock(return_value={
         "status": "processed",
@@ -70,7 +102,7 @@ def test_fired_event_calls_brain_with_context_text():
     assert "不是使用者提問" in args[1]
 
 
-def test_generate_reply_allocates_unique_session_id_when_none():
+def test_generate_reply_allocates_unique_session_id_when_none(client):
     """前端未傳 session_id 時，不可落到所有裝置共用的固定 session。"""
     cam = MagicMock()
     cam.describe_frame = AsyncMock(return_value={
@@ -106,7 +138,7 @@ def test_generate_reply_allocates_unique_session_id_when_none():
     assert cam.describe_frame.await_args.args[2] == resp.json()["session_id"]
 
 
-def test_vision_reset_clears_session_event_state():
+def test_vision_reset_clears_session_event_state(client):
     cam = MagicMock()
     cam.session_visual_state.return_value = _GREEN_SIGNAL
     with patch("app.gateway.routes_vision.get_camera_plugin", return_value=cam):

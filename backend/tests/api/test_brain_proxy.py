@@ -5,13 +5,35 @@ from __future__ import annotations
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import httpx
+import pytest
 from fastapi.testclient import TestClient
+from starlette.requests import Request
+
+from app.auth.models import AccountRole
 
 
 def _mock_cfg():
-    return MagicMock(brain_url="http://brain:8100")
+    return MagicMock(
+        brain_url="http://brain:8100",
+        gateway_internal_token="internal-secret",
+    )
+
+
+def _request_with_headers(headers: list[tuple[bytes, bytes]]) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/api/search",
+            "raw_path": b"/api/search",
+            "query_string": b"",
+            "headers": headers,
+            "client": ("testclient", 50000),
+            "server": ("testserver", 80),
+        }
+    )
 
 
 def _make_response(
@@ -59,6 +81,62 @@ def test_gateway_brain_proxy_forwards_to_brain_api(client: TestClient):
     mock_client.build_request.assert_called_once()
     build_kwargs = mock_client.build_request.call_args.kwargs
     assert build_kwargs["url"] == "http://brain:8100/brain/health?project_id=default"
+    assert build_kwargs["headers"]["X-Internal-Token"] == "internal-secret"
+
+
+def test_trusted_headers_replace_forged_external_identity() -> None:
+    from app.brain_proxy import _trusted_upstream_headers
+
+    request = _request_with_headers(
+        [
+            (b"x-openvman-user-id", b"forged-user"),
+            (b"x-openvman-role", b"admin"),
+            (b"x-openvman-project-id", b"forged-project"),
+            (b"x-internal-token", b"forged-token"),
+            (b"authorization", b"Bearer end-user-token"),
+            (b"cookie", b"openvman_session=end-user-token"),
+            (b"x-trace-id", b"trace-1"),
+        ]
+    )
+    current = MagicMock()
+    current.user.id = "verified-user"
+    current.user.role = AccountRole.USER
+
+    with patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()):
+        headers = _trusted_upstream_headers(
+            request,
+            current=current,
+            project_id="verified-project",
+        )
+
+    assert headers["X-Internal-Token"] == "internal-secret"
+    assert headers["X-OpenVMan-User-ID"] == "verified-user"
+    assert headers["X-OpenVMan-Role"] == "user"
+    assert headers["X-OpenVMan-Project-ID"] == "verified-project"
+    assert headers["x-trace-id"] == "trace-1"
+    assert "forged-user" not in headers.values()
+    assert "forged-project" not in headers.values()
+    assert "forged-token" not in headers.values()
+    assert "authorization" not in headers
+    assert "cookie" not in headers
+
+
+def test_trusted_headers_do_not_invent_default_project() -> None:
+    from app.brain_proxy import _trusted_upstream_headers
+
+    request = _request_with_headers([])
+    current = MagicMock()
+    current.user.id = "verified-user"
+    current.user.role = AccountRole.USER
+
+    with patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()):
+        headers = _trusted_upstream_headers(
+            request,
+            current=current,
+            project_id=None,
+        )
+
+    assert "X-OpenVMan-Project-ID" not in headers
 
 
 def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):

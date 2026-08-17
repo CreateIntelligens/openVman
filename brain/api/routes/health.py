@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 
 from health_payload import build_health_payload, build_readiness_payload
 from knowledge.workspace import parse_identity
+from safety.internal_auth import require_internal_token
 from safety.observability import get_metrics_store, render_prometheus
 
 router = APIRouter(prefix="/brain", tags=["System"])
@@ -19,17 +20,29 @@ async def health_ready():
     return build_readiness_payload()
 
 
-@router.get("/health/detailed", summary="詳細健康報告（含 DB 狀態、embedding、metrics）")
+@router.get(
+    "/health/detailed",
+    summary="詳細健康報告（含 DB 狀態、embedding、metrics）",
+    dependencies=[Depends(require_internal_token)],
+)
 async def health_detailed(project_id: str = "default"):
     return build_health_payload(project_id)
 
 
-@router.get("/metrics", summary="大腦層監控指標")
+@router.get(
+    "/metrics",
+    summary="大腦層監控指標",
+    dependencies=[Depends(require_internal_token)],
+)
 async def metrics():
     return get_metrics_store().snapshot()
 
 
-@router.get("/metrics/prometheus", summary="Prometheus text exposition format")
+@router.get(
+    "/metrics/prometheus",
+    summary="Prometheus text exposition format",
+    dependencies=[Depends(require_internal_token)],
+)
 async def metrics_prometheus():
     return Response(
         content=render_prometheus(get_metrics_store()),
@@ -37,6 +50,10 @@ async def metrics_prometheus():
     )
 
 
-@router.get("/identity", summary="解析前端身份")
+@router.get(
+    "/identity",
+    summary="解析前端身份",
+    dependencies=[Depends(require_internal_token)],
+)
 async def get_identity(persona_id: str = "default", project_id: str = "default"):
     return parse_identity(project_id, persona_id)

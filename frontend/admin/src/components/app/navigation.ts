@@ -20,6 +20,7 @@ export const knowledgeTabs = [
 
 export const systemTabs = [
   { key: "Projects", label: "Projects", icon: "folder_copy" },
+  { key: "Accounts", label: "Accounts", icon: "manage_accounts" },
   { key: "Health", label: "Health", icon: "health_metrics" },
   { key: "Monitoring", label: "Monitoring", icon: "monitoring" },
 ] as const;
@@ -49,6 +50,7 @@ export const pageComponents: Record<
   Avatar: lazy(() => import("../../pages/Avatar")),
   Tools: lazy(() => import("../../pages/Tools")),
   Projects: lazy(() => import("../../pages/Projects")),
+  Accounts: lazy(() => import("../../pages/Accounts")),
   Health: lazy(() => import("../../pages/Health")),
   Monitoring: lazy(() => import("../../pages/Monitoring")),
 };
@@ -63,6 +65,7 @@ const tabPathSegments: Record<Tab, string> = {
   Avatar: "avatar",
   Tools: "tools",
   Projects: "projects",
+  Accounts: "accounts",
   Health: "health",
   Monitoring: "monitoring",
 };
@@ -78,6 +81,10 @@ export interface AdminRoute {
 
 export function isTab(value: string | null): value is Tab {
   return value !== null && allTabs.some((tab) => tab.key === value);
+}
+
+export function isTabVisible(tab: TabConfig, isAdmin: boolean): boolean {
+  return tab.key !== "Accounts" || isAdmin;
 }
 
 export function parseAdminRoute(

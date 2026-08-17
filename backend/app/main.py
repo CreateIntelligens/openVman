@@ -16,30 +16,18 @@ from fastapi import FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from app.observability import (
-    normalize_http_metrics_endpoint,
-    record_http_request,
-    should_record_http_metrics,
-)
+from app.auth.middleware import FailClosedAuthMiddleware
+from app.auth.routes import auth_router, temporary_accounts_router, users_router
+from app.auth.runtime import get_auth_runtime
 from app.brain_proxy import _http as _brain_proxy_http
 from app.brain_proxy import router as brain_proxy_router
 from app.config import get_tts_config
-from app.http_client import SharedAsyncClient
+from app.error_payloads import upload_failed_response
 from app.gateway import websocket as websocket_routes
 from app.gateway.crawl_adapter import _http as _crawl_http
 from app.gateway.forward import _http as _forward_http
-from app.internal_routes import _http as _internal_http
-from app.internal_routes import router as internal_router
-from app.routes import admin as admin_routes
-from app.routes import avatar as avatar_routes
-from app.routes import backgrounds as background_routes
-from app.routes import mascots as mascot_routes
-from app.routes import public_characters as public_characters_routes
-from app.error_payloads import upload_failed_response
-from app.tts_text_cleaner import clean_for_tts
-from app.utils.upload import UploadTooLargeError, cleanup_temp_path, persist_upload_to_tempfile
 from app.gateway.redis_pool import close_redis, get_redis
 from app.gateway.routes import router as gateway_router
 from app.gateway.routes_vision import _http as _vision_http
@@ -51,13 +39,33 @@ from app.gateway.worker import (
     get_web_crawler_plugin,
     reset_plugins,
 )
+from app.http_client import SharedAsyncClient
+from app.internal_routes import _http as _internal_http
+from app.internal_routes import router as internal_router
+from app.observability import (
+    normalize_http_metrics_endpoint,
+    record_http_request,
+    should_record_http_metrics,
+)
+from app.project_routes import router as project_router
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 from app.providers.gemini_tts_adapter import (
     GEMINI_STREAM_CONTENT_TYPE,
     GeminiTTSHTTPError,
 )
-from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
+from app.routes import admin as admin_routes
+from app.routes import avatar as avatar_routes
+from app.routes import backgrounds as background_routes
+from app.routes import mascots as mascot_routes
+from app.routes import public_characters as public_characters_routes
 from app.service import TTSRouterService
+from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
+from app.tts_text_cleaner import clean_for_tts
+from app.utils.upload import (
+    UploadTooLargeError,
+    cleanup_temp_path,
+    persist_upload_to_tempfile,
+)
 
 logger = logging.getLogger("backend")
 
@@ -175,6 +183,7 @@ async def _shutdown_gateway_resources() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    get_auth_runtime()
     await _startup_gateway_resources()
     await _build_openapi_schema()
     logger.info("backend startup complete")
@@ -188,6 +197,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="openVman Backend", lifespan=lifespan)
+app.add_middleware(FailClosedAuthMiddleware)
 
 
 @app.middleware("http")
@@ -255,11 +265,15 @@ def _mount_avatar_assets(app_instance: FastAPI) -> None:
 app.include_router(gateway_router)
 app.include_router(vision_router)
 app.include_router(internal_router)
+app.include_router(auth_router)
+app.include_router(users_router)
+app.include_router(temporary_accounts_router)
 app.include_router(admin_routes.router)
 app.include_router(avatar_routes.router)
 app.include_router(public_characters_routes.router)
 app.include_router(background_routes.router)
 app.include_router(mascot_routes.router)
+app.include_router(project_router)
 app.include_router(brain_proxy_router)
 app.include_router(websocket_routes.router)
 _mount_avatar_assets(app)
@@ -435,12 +449,14 @@ async def _proxy_indextts_stream(
     text: str,
     character: str,
 ) -> StreamingResponse | None:
+    cfg = get_tts_config()
     client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
     try:
         request = client.build_request(
             "POST",
             indextts_stream_url,
             json={"text": text, "character": character},
+            headers={"X-Internal-Token": cfg.gateway_internal_token},
         )
         resp = await client.send(request, stream=True)
     except Exception as exc:

@@ -43,7 +43,12 @@ def client(monkeypatch, tmp_path):
     sys.modules.pop("knowledge.qa_nodes", None)
     import knowledge.qa_nodes
     
-    return TestClient(app)
+    from config import get_settings
+
+    return TestClient(
+        app,
+        headers={"X-Internal-Token": get_settings().gateway_internal_token},
+    )
 
 
 

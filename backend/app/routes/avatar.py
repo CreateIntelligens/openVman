@@ -5,15 +5,19 @@ from __future__ import annotations
 import logging
 
 import httpx
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from app.config import get_tts_config
+from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
+from app.auth.models import ResourceType, ResourceVisibility
+from app.auth.resources import list_accessible_resources
+from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.avatar.store import (
     AvatarStore,
     CharacterExists,
     CharacterNotFound,
 )
+from app.config import get_tts_config
 from app.avatar.validation import (
     InvalidCharId,
     InvalidUpload,
@@ -70,7 +74,12 @@ def _personas_bound_to(char_id: str) -> list[str]:
     cfg = get_tts_config()
     url = f"{cfg.brain_url}/brain/personas"
     try:
-        resp = httpx.get(url, params={"project_id": "default"}, timeout=5.0)
+        resp = httpx.get(
+            url,
+            params={"project_id": "default"},
+            headers={"X-Internal-Token": cfg.gateway_internal_token},
+            timeout=5.0,
+        )
         resp.raise_for_status()
     except httpx.HTTPError as exc:
         raise HTTPException(
@@ -91,8 +100,25 @@ def _guard_not_bound(char_id: str) -> None:
 
 
 @router.get("/api/avatar", summary="列出 Avatar 角色")
-async def list_characters():
-    return {"characters": get_store().list_characters()}
+async def list_characters(
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+):
+    accessible_ids = {
+        resource.resource_id
+        for resource in list_accessible_resources(
+            runtime.resources,
+            current.user,
+            ResourceType.AVATAR_CHARACTER,
+        )
+    }
+    return {
+        "characters": [
+            character
+            for character in get_store().list_characters()
+            if character.get("char_id") in accessible_ids
+        ]
+    }
 
 
 @router.post("/api/avatar", summary="上傳新 Avatar 角色")
@@ -101,6 +127,8 @@ async def create_character(
     label: str = Form(""),
     video: UploadFile = File(...),
     data: UploadFile = File(...),
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
 ):
     cfg = get_tts_config()
     cid = _normalize_char_id_or_400(char_id)
@@ -120,13 +148,26 @@ async def create_character(
         character = get_store().create_character(
             char_id=cid, label=label, video_bytes=video_bytes, data_bytes=data_bytes
         )
+        try:
+            runtime.resources.register(
+                resource_type=ResourceType.AVATAR_CHARACTER,
+                resource_id=cid,
+                owner_user_id=None,
+                visibility=ResourceVisibility.SYSTEM_PUBLIC,
+            )
+        except Exception:
+            pass
     except CharacterExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return {"status": "ok", "character": character}
 
 
 @router.delete("/api/avatar/{char_id}", summary="刪除 Avatar 角色")
-async def delete_character(char_id: str):
+async def delete_character(
+    char_id: str,
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+):
     cid = _normalize_char_id_or_400(char_id)
     store = get_store()
     if not store.exists(cid):
@@ -134,13 +175,21 @@ async def delete_character(char_id: str):
     _guard_not_bound(cid)
     try:
         store.delete_character(cid)
+        try:
+            runtime.resources.delete(ResourceType.AVATAR_CHARACTER, cid)
+        except Exception:
+            pass
     except CharacterNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"status": "ok", "char_id": cid}
 
 
 @router.patch("/api/avatar/{char_id}", summary="更新 Avatar 角色顯示名稱")
-async def update_character_label(char_id: str, payload: UpdateLabelRequest):
+async def update_character_label(
+    char_id: str,
+    payload: UpdateLabelRequest,
+    _admin: CurrentAccount = Depends(require_admin),
+):
     cid = _normalize_char_id_or_400(char_id)
     label = payload.label.strip()
     if not label:
@@ -153,7 +202,12 @@ async def update_character_label(char_id: str, payload: UpdateLabelRequest):
 
 
 @router.post("/api/avatar/{char_id}/rename", summary="重命名 Avatar 角色")
-async def rename_character(char_id: str, payload: RenameRequest):
+async def rename_character(
+    char_id: str,
+    payload: RenameRequest,
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+):
     cid = _normalize_char_id_or_400(char_id)
     new_cid = _normalize_char_id_or_400(payload.new_char_id)
     store = get_store()
@@ -162,6 +216,19 @@ async def rename_character(char_id: str, payload: RenameRequest):
     _guard_not_bound(cid)
     try:
         character = store.rename_character(cid, new_cid)
+        try:
+            runtime.resources.delete(ResourceType.AVATAR_CHARACTER, cid)
+        except Exception:
+            pass
+        try:
+            runtime.resources.register(
+                resource_type=ResourceType.AVATAR_CHARACTER,
+                resource_id=new_cid,
+                owner_user_id=None,
+                visibility=ResourceVisibility.SYSTEM_PUBLIC,
+            )
+        except Exception:
+            pass
     except CharacterExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except CharacterNotFound as exc:

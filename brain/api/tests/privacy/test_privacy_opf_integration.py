@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 from privacy.model import (
     PII_CATEGORIES,
     detect_and_mask,

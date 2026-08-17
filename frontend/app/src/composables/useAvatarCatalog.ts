@@ -11,6 +11,7 @@
  * unit-tested without a Vue runtime.
  */
 import { ref, readonly, type Ref } from 'vue'
+import { apiFetch } from '../api/http'
 import {
        DEFAULT_AVATAR_CATALOG_ENDPOINT,
        parseAvatarCatalog,
@@ -23,7 +24,7 @@ export { DEFAULT_AVATAR_CATALOG_ENDPOINT, type AvatarCharacter }
 export interface AvatarCatalogOptions {
        /** Override the catalog endpoint (default: '/api/avatar'). */
        endpoint?: string
-       /** Inject a fetch implementation (default: global fetch). */
+       /** Inject a fetch implementation (default: centralized cookie API). */
        fetchImpl?: typeof fetch
 }
 
@@ -37,7 +38,7 @@ export interface AvatarCatalog {
 
 export function useAvatarCatalog(options: AvatarCatalogOptions = {}): AvatarCatalog {
        const endpoint = options.endpoint ?? DEFAULT_AVATAR_CATALOG_ENDPOINT
-       const doFetch = options.fetchImpl ?? globalThis.fetch
+       const doFetch = options.fetchImpl ?? apiFetch
 
        const characters = ref<AvatarCharacter[]>([])
        const loading = ref(false)

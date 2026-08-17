@@ -1,23 +1,19 @@
-import os
-import asyncio
-import io
-import logging
-import struct
-import traceback
-import tempfile
-import uuid
-import subprocess
-from fastapi import FastAPI, Request, Response, UploadFile, File
-from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
-from contextlib import asynccontextmanager
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
 import argparse
+import asyncio
+import hmac
+import io
 import json
+import logging
+import os
+import struct
 import time
-import numpy as np
-import soundfile as sf
+from contextlib import asynccontextmanager
 
+import soundfile as sf
+import uvicorn
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from indextts.infer_vllm import IndexTTS
 
 
@@ -87,6 +83,29 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+
+
+@app.middleware("http")
+async def require_internal_token(request: Request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+
+    expected_token = os.getenv("INTERNAL_API_TOKEN", "")
+    supplied_token = request.headers.get(INTERNAL_TOKEN_HEADER, "")
+    if not expected_token:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "internal API token is not configured"},
+        )
+    if not hmac.compare_digest(supplied_token, expected_token):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "invalid internal token"},
+        )
+    return await call_next(request)
+
 
 def make_wav_header(sample_rate=24000, channels=1, bits_per_sample=16):
     """Build a streaming-friendly WAV header with unknown data size (0xFFFFFFFF)."""

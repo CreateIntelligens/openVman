@@ -14,7 +14,7 @@ test("text-mode chat defaults to the backend Brain facade endpoint", () => {
   );
   assert.match(
     source,
-    /fetch\(options\.chatEndpoint \?\? DEFAULT_TEXT_CHAT_ENDPOINT,/,
+    /apiFetch\(options\.chatEndpoint \?\? DEFAULT_TEXT_CHAT_ENDPOINT,/,
   );
   assert.doesNotMatch(source, /['"]\/api\/brain\/chat['"]/);
 });

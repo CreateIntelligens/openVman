@@ -13,6 +13,7 @@ from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 logger = logging.getLogger("provider.indextts")
 
 _NOT_LOADED = object()
+_INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 
 
 class IndexTTSAdapter:
@@ -23,6 +24,9 @@ class IndexTTSAdapter:
         base = config.tts_indextts_url.rstrip("/") if config.tts_indextts_url else ""
         self._url = f"{base}/tts" if base else ""
         self._default_character = config.tts_indextts_default_character
+        self._internal_headers = {
+            _INTERNAL_TOKEN_HEADER: config.gateway_internal_token,
+        }
         self._client = httpx.Client(timeout=60.0)
         self._opencc_t2s = _NOT_LOADED
 
@@ -60,7 +64,11 @@ class IndexTTSAdapter:
 
         t0 = monotonic()
         try:
-            resp = self._client.post(self._url, json=payload)
+            resp = self._client.post(
+                self._url,
+                json=payload,
+                headers=self._internal_headers,
+            )
             latency_ms = (monotonic() - t0) * 1000
 
             if resp.status_code >= 400:

@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { allTabs, type ProjectSummary, type Tab } from "./navigation";
+import type { AccountProfile } from "../../api/auth";
+import {
+  allTabs,
+  isTabVisible,
+  type ProjectSummary,
+  type Tab,
+} from "./navigation";
 
 interface TopBarProps {
   active: Tab;
@@ -8,10 +14,12 @@ interface TopBarProps {
   loadingProjects: boolean;
   projectError: string | null;
   theme: "light" | "dark";
+  account: AccountProfile;
   onSelectProject: (id: string) => void;
   onRetryProjects: () => void;
   onToggleTheme: () => void;
   onOpenMobileNav: () => void;
+  onLogout: () => void;
 }
 
 export default function TopBar({
@@ -21,10 +29,12 @@ export default function TopBar({
   loadingProjects,
   projectError,
   theme,
+  account,
   onSelectProject,
   onRetryProjects,
   onToggleTheme,
   onOpenMobileNav,
+  onLogout,
 }: TopBarProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -50,6 +60,21 @@ export default function TopBar({
       >
         <span className="material-symbols-outlined text-[1.25rem]">menu</span>
       </button>
+
+      <div className="hidden items-center gap-2 border-l border-border pl-3 sm:flex">
+        <span className="max-w-[9rem] truncate text-sm text-content-muted">
+          {account.username}
+        </span>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex h-9 items-center gap-2 rounded-md px-3 text-sm text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
+          aria-label="登出"
+        >
+          <span className="material-symbols-outlined text-[1.125rem]">logout</span>
+          <span>登出</span>
+        </button>
+      </div>
 
       <div className="flex items-center gap-2 text-sm font-medium text-content md:hidden">
         {activeTab && <span className="material-symbols-outlined text-[1rem] text-primary">{activeTab.icon}</span>}
@@ -170,9 +195,20 @@ interface MobileNavDrawerProps {
   active: Tab;
   onClose: () => void;
   onSelectTab: (tab: Tab) => void;
+  isAdmin: boolean;
+  username: string;
+  onLogout: () => void;
 }
 
-export function MobileNavDrawer({ open, active, onClose, onSelectTab }: MobileNavDrawerProps) {
+export function MobileNavDrawer({
+  open,
+  active,
+  onClose,
+  onSelectTab,
+  isAdmin,
+  username,
+  onLogout,
+}: MobileNavDrawerProps) {
   const drawerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -236,7 +272,7 @@ export function MobileNavDrawer({ open, active, onClose, onSelectTab }: MobileNa
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          {allTabs.map((tab) => {
+          {allTabs.filter((tab) => isTabVisible(tab, isAdmin)).map((tab) => {
             const isActive = active === tab.key;
             return (
               <button
@@ -257,6 +293,17 @@ export function MobileNavDrawer({ open, active, onClose, onSelectTab }: MobileNa
               </button>
             );
           })}
+        </div>
+        <div className="border-t border-border p-3">
+          <div className="mb-2 truncate px-2 text-xs text-content-subtle">{username}</div>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-content-muted hover:bg-surface hover:text-content"
+          >
+            <span className="material-symbols-outlined text-[1.25rem]">logout</span>
+            登出
+          </button>
         </div>
       </aside>
     </div>

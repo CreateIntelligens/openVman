@@ -104,8 +104,34 @@ def test_http_metrics_middleware_uses_route_template_for_proxy_paths(monkeypatch
         lambda: _FailingClient(),
     )
 
+    from app.auth.runtime import get_auth_runtime
+    from app.auth.models import AccountRole
+    from app.auth.passwords import hash_password
+
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("admin")
+    if not admin:
+        admin = runtime.users.create(
+            username="admin",
+            password_hash=hash_password("admin-password"),
+            role=AccountRole.ADMIN,
+        )
+    token = runtime.tokens.issue(admin)
+
+    from app.auth.models import ResourceType, ResourceVisibility
+    try:
+        runtime.resources.register(
+            resource_type=ResourceType.PROJECT,
+            resource_id="default",
+            owner_user_id=admin.id,
+            visibility=ResourceVisibility.PRIVATE,
+        )
+    except Exception:
+        pass
+
     with TestClient(main.app, raise_server_exceptions=False) as client:
-        response = client.get("/api/skills/demo/files")
+        client.headers["Authorization"] = f"Bearer {token}"
+        response = client.get("/api/skills/demo/files?project_id=default")
 
     assert response.status_code == 502
     assert captured[0]["endpoint"] == "/api/skills/{skill_id}/files"

@@ -11,6 +11,7 @@
  * Text mode: uses /api/chat (standard chat completions, any provider)
  */
 import { ref, readonly, onUnmounted } from 'vue'
+import { apiFetch } from '../api/http'
 
 export type AvatarState = 'DISCONNECTED' | 'CONNECTING' | 'RECONNECTING' | 'IDLE' | 'THINKING' | 'SPEAKING' | 'ERROR'
 export type VisualSignalState = 'clear' | 'detecting' | 'locked'
@@ -242,7 +243,6 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      event: 'client_init',
                      client_id: clientId,
                      protocol_version: '1.0.0',
-                     auth_token: 'openvman-admin',
                      capabilities: {
                             mode: 'gemini_live',
                             project_id: currentProjectId,
@@ -484,7 +484,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                state.value = 'THINKING'
 
                try {
-                      const res = await fetch(options.chatEndpoint ?? DEFAULT_TEXT_CHAT_ENDPOINT, {
+                      const res = await apiFetch(options.chatEndpoint ?? DEFAULT_TEXT_CHAT_ENDPOINT, {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
                              body: JSON.stringify({
@@ -567,7 +567,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
               if (visionInFlight) return
               visionInFlight = true
               try {
-                     const res = await fetch(options.visionEndpoint ?? DEFAULT_VISION_ENDPOINT, {
+                     const res = await apiFetch(options.visionEndpoint ?? DEFAULT_VISION_ENDPOINT, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
                             body: JSON.stringify({
@@ -613,7 +613,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
        async function _resetVisualInputText(): Promise<void> {
               if (!sessionId.value) return
               try {
-                     const res = await fetch(options.visionResetEndpoint ?? DEFAULT_VISION_RESET_ENDPOINT, {
+                     const res = await apiFetch(options.visionResetEndpoint ?? DEFAULT_VISION_RESET_ENDPOINT, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...(options.requestHeaders?.() ?? {}) },
                             body: JSON.stringify({ session_id: sessionId.value }),

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from personas.personas import (
     clone_persona_scaffold,
@@ -15,9 +15,14 @@ from protocol.schemas import (
     PersonaCreateRequest,
     PersonaDeleteRequest,
 )
+from safety.internal_auth import require_internal_token
 from safety.observability import log_event
 
-router = APIRouter(prefix="/brain", tags=["Personas"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Personas"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 @router.get("/personas", summary="列出人設清單")

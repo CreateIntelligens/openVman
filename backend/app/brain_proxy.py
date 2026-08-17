@@ -7,10 +7,22 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
+from app.auth.dependencies import (
+    CurrentAccount,
+    authenticate_request,
+    get_current_account,
+)
+from app.auth.models import ResourceType
+from app.auth.resources import (
+    ResourceAccess,
+    ResourceNotFoundError,
+    resolve_resource,
+)
+from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
 
@@ -29,6 +41,7 @@ _TAG_SEARCH = ["Brain / Search & Embeddings"]
 _TAG_MEMORY = ["Brain / Memory & Sessions"]
 _TAG_KNOWLEDGE = ["Brain / Knowledge"]
 _TAG_PROTOCOL = ["Brain / Protocol"]
+_PUBLIC_BRAIN_PATHS = frozenset({f"{_PUBLIC_API_PREFIX}/health"})
 
 _BRAIN_ROUTE_DEFS = [
     {"path": f"{_PUBLIC_API_PREFIX}/health", "methods": ["GET"], "tags": _TAG_BRAIN_SYSTEM, "summary": "Brain Health"},
@@ -92,6 +105,25 @@ _HOP_BY_HOP = frozenset({
     "te",
     "trailers",
 })
+_INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+_OPENVMAN_HEADER_PREFIX = "x-openvman-"
+_USER_ID_HEADER = "X-OpenVMan-User-ID"
+_USER_ROLE_HEADER = "X-OpenVMan-Role"
+_PROJECT_ID_HEADER = "X-OpenVMan-Project-ID"
+_END_USER_AUTH_HEADERS = frozenset({"authorization", "cookie"})
+_PROJECT_SCOPED_PREFIXES = (
+    "chat",
+    "embed",
+    "identity",
+    "knowledge",
+    "memories",
+    "personas",
+    "search",
+    "sessions",
+    "skills",
+    "tools",
+)
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 _http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
 
@@ -102,6 +134,124 @@ def _filter_headers(headers: httpx.Headers | dict | Any) -> dict[str, str]:
         for k, v in headers.items()
         if k.lower() not in _HOP_BY_HOP
     }
+
+
+def _filter_external_request_headers(
+    headers: httpx.Headers | dict | Any,
+) -> dict[str, str]:
+    """Remove transport and caller-controlled service identity headers."""
+    return {
+        key: value
+        for key, value in headers.items()
+        if key.lower() not in _HOP_BY_HOP
+        and key.lower() not in _END_USER_AUTH_HEADERS
+        and key.lower() != _INTERNAL_TOKEN_HEADER.lower()
+        and not key.lower().startswith(_OPENVMAN_HEADER_PREFIX)
+    }
+
+
+def _resolved_project_id(request: Request) -> str | None:
+    project_id = getattr(request.state, "resolved_project_id", None)
+    if not isinstance(project_id, str):
+        return None
+    project_id = project_id.strip()
+    return project_id or None
+
+
+async def _request_project_id(request: Request) -> str | None:
+    candidates: list[str] = []
+    query_project_id = request.query_params.get("project_id", "").strip()
+    if query_project_id:
+        candidates.append(query_project_id)
+
+    content_type = request.headers.get("content-type", "").casefold()
+    if "application/json" in content_type:
+        try:
+            payload = await request.json()
+        except (UnicodeDecodeError, ValueError):
+            payload = None
+        if isinstance(payload, dict):
+            body_project_id = payload.get("project_id")
+            if isinstance(body_project_id, str) and body_project_id.strip():
+                candidates.append(body_project_id.strip())
+
+    if not candidates:
+        return None
+    if len(set(candidates)) != 1:
+        raise ResourceNotFoundError
+    return candidates[0]
+
+
+def _requires_project_context(path: str) -> bool:
+    normalized = path.strip("/")
+    return any(
+        normalized == prefix or normalized.startswith(f"{prefix}/")
+        for prefix in _PROJECT_SCOPED_PREFIXES
+    )
+
+
+def _project_access(path: str, method: str) -> ResourceAccess:
+    normalized = path.strip("/")
+    if method.upper() in _SAFE_METHODS:
+        return ResourceAccess.READ
+    if normalized.startswith(("knowledge/", "personas/", "skills/", "tools/")):
+        return ResourceAccess.MUTATE
+    if normalized == "knowledge" or normalized in {"personas", "skills", "tools"}:
+        return ResourceAccess.MUTATE
+    if normalized == "memories/maintain":
+        return ResourceAccess.MUTATE
+    return ResourceAccess.READ
+
+
+async def _authorize_project_context(
+    request: Request,
+    path: str,
+    current: CurrentAccount | None,
+    explicit_project_id: str | None,
+) -> str | None:
+    if current is None or not _requires_project_context(path):
+        return explicit_project_id
+
+    supplied_project_id = await _request_project_id(request)
+    resolved_project_id = explicit_project_id or supplied_project_id
+    if (
+        explicit_project_id is not None
+        and supplied_project_id is not None
+        and supplied_project_id != explicit_project_id
+    ):
+        raise ResourceNotFoundError
+    if resolved_project_id is None:
+        raise ResourceNotFoundError
+
+    runtime = get_auth_runtime()
+    resolve_resource(
+        runtime.resources,
+        current.user,
+        ResourceType.PROJECT,
+        resolved_project_id,
+        access=_project_access(path, request.method),
+    )
+    request.state.resolved_project_id = resolved_project_id
+    return resolved_project_id
+
+
+def _trusted_upstream_headers(
+    request: Request,
+    *,
+    current: CurrentAccount | None,
+    project_id: str | None,
+) -> dict[str, str]:
+    headers = _filter_external_request_headers(request.headers)
+    headers[_INTERNAL_TOKEN_HEADER] = get_tts_config().gateway_internal_token
+    if current is None:
+        return headers
+
+    headers[_USER_ID_HEADER] = current.user.id
+    headers[_USER_ROLE_HEADER] = current.user.role.value
+    resolved_project_id = project_id or _resolved_project_id(request)
+    if resolved_project_id:
+        headers[_PROJECT_ID_HEADER] = resolved_project_id
+    return headers
 
 
 def _target_url(path: str, query: str) -> str:
@@ -120,8 +270,31 @@ async def _stream_upstream_bytes(upstream: httpx.Response) -> AsyncIterator[byte
         await upstream.aclose()
 
 
-async def _proxy_to_brain(request: Request, path: str) -> Response:
-    headers = _filter_headers(request.headers)
+async def proxy_to_brain(
+    request: Request,
+    path: str,
+    *,
+    current: CurrentAccount | None,
+    project_id: str | None = None,
+) -> Response:
+    """Forward a request with identity supplied only by trusted Backend state."""
+    try:
+        project_id = await _authorize_project_context(
+            request,
+            path,
+            current,
+            project_id,
+        )
+    except ResourceNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Resource not found"},
+        )
+    headers = _trusted_upstream_headers(
+        request,
+        current=current,
+        project_id=project_id,
+    )
     body = await request.body()
     client = _http.get()
 
@@ -191,8 +364,25 @@ async def _proxy_to_brain(request: Request, path: str) -> Response:
         )
 
 
+async def _proxy_to_brain(request: Request, path: str) -> Response:
+    """Compatibility wrapper for existing facade callers and tests."""
+    current = getattr(request.state, "current_account", None)
+    if not isinstance(current, CurrentAccount):
+        current = None
+    return await proxy_to_brain(request, path, current=current)
+
+
 def _request_brain_path(request: Request) -> str:
     return request.url.path.removeprefix(f"{_PUBLIC_API_PREFIX}/").lstrip("/")
+
+
+def _catchall_current_account(request: Request) -> CurrentAccount | None:
+    if request.url.path in _PUBLIC_BRAIN_PATHS:
+        return None
+    existing = getattr(request.state, "current_account", None)
+    if isinstance(existing, CurrentAccount):
+        return existing
+    return authenticate_request(request, get_auth_runtime())
 
 
 async def documented_brain_proxy(request: Request) -> Response:
@@ -207,6 +397,11 @@ for route_def in _BRAIN_ROUTE_DEFS:
         tags=route_def["tags"],
         summary=route_def["summary"],
         name=f"mirror_{route_def['methods'][0].lower()}_{route_def['path']}",
+        dependencies=(
+            []
+            if route_def["path"] in _PUBLIC_BRAIN_PATHS
+            else [Depends(get_current_account)]
+        ),
     )
 
 
@@ -215,5 +410,9 @@ for route_def in _BRAIN_ROUTE_DEFS:
     methods=_PROXY_METHODS,
     include_in_schema=False,
 )
-async def brain_proxy(request: Request, path: str) -> Response:
+async def brain_proxy(
+    request: Request,
+    path: str,
+    _current: CurrentAccount | None = Depends(_catchall_current_account),
+) -> Response:
     return await _proxy_to_brain(request, path)

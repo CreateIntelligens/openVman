@@ -7,13 +7,23 @@ import json
 import logging
 from typing import Any
 
-logger = logging.getLogger("brain.internal_routes")
-
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    WebSocket,
+    WebSocketDisconnect,
+)
 
 from protocol.schemas import InternalEnrichRequest
+from safety.internal_auth import INTERNAL_TOKEN_HEADER, require_internal_token
 
-router = APIRouter(tags=["Internal"])
+logger = logging.getLogger("brain.internal_routes")
+
+router = APIRouter(
+    tags=["Internal"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 def get_or_create_session(
@@ -211,6 +221,11 @@ async def internal_enrich(payload: InternalEnrichRequest):
 
 @router.websocket("/brain/internal/live/{relay_session_id}")
 async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
+    try:
+        require_internal_token(websocket.headers.get(INTERNAL_TOKEN_HEADER, ""))
+    except HTTPException:
+        await websocket.close(code=1008, reason="invalid internal token")
+        return
     await websocket.accept()
     state: dict[str, Any] = {
         "live_session": None,

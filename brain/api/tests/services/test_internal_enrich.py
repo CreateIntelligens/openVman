@@ -8,11 +8,15 @@ from fastapi.testclient import TestClient
 
 
 def _client() -> TestClient:
+    from config import get_settings
     from internal_routes import router
 
     app = FastAPI()
     app.include_router(router)
-    return TestClient(app)
+    return TestClient(
+        app,
+        headers={"X-Internal-Token": get_settings().gateway_internal_token},
+    )
 
 
 def test_internal_enrich_accepts_forward_payload_and_stores_system_message():

@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 from types import ModuleType
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -34,13 +32,9 @@ _STUBS = {
     "lancedb": MagicMock(),
     "sentence_transformers": MagicMock(),
     "FlagEmbedding": MagicMock(),
-    "infra": ModuleType("infra"),
     "infra.db": _fake_infra_db,
     "memory.embedder": _fake_embedder,
     "memory.importance": _fake_importance,
-    "config": ModuleType("config"),
-    "knowledge": ModuleType("knowledge"),
-    "knowledge.workspace": ModuleType("knowledge.workspace"),
 }
 
 # Build config mock with all needed attributes
@@ -56,60 +50,37 @@ _cfg_mock.dreaming_candidate_limit = 100
 _cfg_mock.dreaming_similarity_threshold = 0.90
 _cfg_mock.max_session_ttl_minutes = 30 * 24 * 60
 _cfg_mock.rag_distance_cutoff = 1.2
+_cfg_mock.gateway_internal_token = "test-internal-token"
 
-_ws_root = Path("/tmp/test_scheduler_ws")
-
-# Temporarily apply stubs to import the scheduler module, then restore originals
-_saved_modules = {}
 for mod_name, stub in _STUBS.items():
-    _saved_modules[mod_name] = sys.modules.get(mod_name)
-    sys.modules[mod_name] = stub
-sys.modules["config"].get_settings = lambda: _cfg_mock  # type: ignore[attr-defined]
-sys.modules["knowledge.workspace"].get_workspace_root = lambda pid="default": _ws_root  # type: ignore[attr-defined]
+    if mod_name not in sys.modules:
+        sys.modules[mod_name] = stub
 
-# Now import the module under test
 from memory.dreaming.scheduler import (
     CronSpec,
-    _parse_cron,
-    _get_tz,
     _compute_next_run,
     _extract_phase_stats,
+    _get_tz,
     _last_run,
-    run_dreaming_cycle,
+    _parse_cron,
     get_dreaming_status,
+    run_dreaming_cycle,
 )
-
-# Restore originals so other test files in the same session see real modules
-for mod_name, orig in _saved_modules.items():
-    if orig is None:
-        sys.modules.pop(mod_name, None)
-    else:
-        sys.modules[mod_name] = orig
 
 
 @pytest.fixture(autouse=True)
-def _ensure_stubs():
-    """Re-apply module stubs before each test, restore originals after."""
-    # Save originals
-    originals = {mod_name: sys.modules.get(mod_name) for mod_name in _STUBS}
+def _configure_scheduler_state(monkeypatch, tmp_path):
+    """Reset scheduler state and route filesystem access to this test."""
+    ws = tmp_path / "workspace"
+    ws.mkdir(parents=True, exist_ok=True)
+    (ws / "dreaming" / ".dreams").mkdir(parents=True, exist_ok=True)
 
-    for mod_name, stub in _STUBS.items():
-        sys.modules[mod_name] = stub
-    sys.modules["config"].get_settings = lambda: _cfg_mock  # type: ignore[attr-defined]
-    sys.modules["knowledge.workspace"].get_workspace_root = lambda pid="default": _ws_root  # type: ignore[attr-defined]
-    # Clear cached dreaming submodules so they reimport with fresh stubs
-    for mod_name in list(sys.modules):
-        if mod_name.startswith("memory.dreaming.") and mod_name != "memory.dreaming.scheduler":
-            sys.modules.pop(mod_name, None)
+    import config
+    import knowledge.workspace as kw
+    monkeypatch.setattr(config, "get_settings", lambda: _cfg_mock)
+    monkeypatch.setattr(kw, "get_workspace_root", lambda pid="default": ws)
 
-    yield
-
-    # Restore originals so subsequent test files aren't poisoned
-    for mod_name, orig in originals.items():
-        if orig is None:
-            sys.modules.pop(mod_name, None)
-        else:
-            sys.modules[mod_name] = orig
+    _last_run.clear()
 
 
 # ===== CronSpec Tests =====
@@ -293,8 +264,8 @@ class TestForceSkip:
         mock_deep = MagicMock(return_value={"status": "ok", "promoted_count": 0})
         mock_rem = MagicMock(return_value={"status": "ok", "theme_count": 0})
 
-        import memory.dreaming.light_phase as lp
         import memory.dreaming.deep_phase as dp
+        import memory.dreaming.light_phase as lp
         import memory.dreaming.rem_phase as rp
 
         lp.run_light_phase = mock_light

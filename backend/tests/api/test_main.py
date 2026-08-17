@@ -18,6 +18,27 @@ if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
 
+def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
+    base = {
+        "document_max_upload_bytes": max_upload_bytes,
+        "gateway_internal_token": "test-internal-token",
+        "brain_url": "http://brain:8100",
+        "tts_indextts_url": "http://index-tts-vllm:8011",
+        "tts_indextts_default_character": "hayley",
+        "tts_gcp_enabled": False,
+        "tts_aws_enabled": False,
+        "tts_gemini_url": "",
+        "edge_tts_enabled": True,
+        "edge_tts_voice": "zh-TW-HsiaoChenNeural",
+        "is_dev": False,
+        "backend_port": 8000,
+        "tts_cache_enabled": False,
+        "tts_cache_ttl_seconds": 86400,
+    }
+    base.update(overrides)
+    return types.SimpleNamespace(**base)
+
+
 def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
     fake_anydoc_mod = types.ModuleType("anydoc")
     fake_anydoc_mod.convert_paths = []
@@ -36,14 +57,69 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
     for name in ("app.gateway.websocket", "app.routes.admin", "app.main"):
         monkeypatch.delitem(sys.modules, name, raising=False)
     module = importlib.import_module("app.main")
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
-        document_max_upload_bytes=max_upload_bytes,
+    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
+        max_upload_bytes=max_upload_bytes,
     ))
     return module, fake_anydoc_mod
 
 
+def _authenticated_client(module, *, admin: bool = True) -> tuple[TestClient, str]:
+    from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+    from app.auth.passwords import hash_password
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    username = "test-admin" if admin else "test-user"
+    user = runtime.users.get_by_username(username)
+    if not user:
+        user = runtime.users.create(
+            username=username,
+            password_hash=hash_password("admin-password"),
+            role=AccountRole.ADMIN if admin else AccountRole.USER,
+        )
+    try:
+        runtime.resources.register(
+            resource_type=ResourceType.CUSTOM_VOICE,
+            resource_id="hayley",
+            owner_user_id=None,
+            visibility=ResourceVisibility.SYSTEM_PUBLIC,
+            metadata={"provider": "indextts"},
+        )
+    except Exception:
+        pass
+    try:
+        runtime.resources.register(
+            resource_type=ResourceType.PROJECT,
+            resource_id="default",
+            owner_user_id=user.id,
+            visibility=ResourceVisibility.PRIVATE,
+        )
+    except Exception:
+        pass
+    token = runtime.tokens.issue(user)
+    client = TestClient(module.app, raise_server_exceptions=False)
+    client.cookies.set("openvman_session", token)
+    client.headers["Authorization"] = f"Bearer {token}"
+    client.headers["Origin"] = "http://testserver"
+    return client, token
+
+
 def _get_tts_provider_payload(module) -> list[dict]:
-    response = asyncio.run(module.admin_routes.get_tts_providers())
+    from app.auth.dependencies import AuthTransport, CurrentAccount
+    from app.auth.models import AccountRole
+    from app.auth.passwords import hash_password
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("test-admin")
+    if not admin:
+        admin = runtime.users.create(
+            username="test-admin",
+            password_hash=hash_password("admin-password"),
+            role=AccountRole.ADMIN,
+        )
+    current = CurrentAccount(user=admin, transport=AuthTransport.BEARER)
+    response = asyncio.run(module.admin_routes.get_tts_providers(current=current, runtime=runtime))
     assert response.status_code == 200
     return json.loads(response.body)
 
@@ -87,7 +163,7 @@ def test_run_server_uses_configured_dev_mode(monkeypatch):
 
 def test_convert_rejects_oversized_upload(monkeypatch):
     module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=4)
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
 
     response = client.post(
         "/documents/convert",
@@ -101,7 +177,7 @@ def test_convert_rejects_oversized_upload(monkeypatch):
 
 def test_convert_returns_upload_failed_code_when_conversion_crashes(monkeypatch):
     module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=1024)
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
 
     def _raise_conversion_error(_path: str) -> str:
         raise RuntimeError("boom")
@@ -121,7 +197,7 @@ def test_convert_returns_upload_failed_code_when_conversion_crashes(monkeypatch)
 
 def test_convert_uses_anydoc_for_each_upload(monkeypatch):
     module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=1024)
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
 
     first = client.post(
         "/documents/convert",
@@ -141,7 +217,7 @@ def test_convert_uses_anydoc_for_each_upload(monkeypatch):
 
 def test_convert_preserves_plaintext_without_anydoc(monkeypatch):
     module, fake_anydoc = _load_main(monkeypatch, max_upload_bytes=1024)
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
 
     response = client.post(
         "/documents/convert",
@@ -243,8 +319,9 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
             }
 
     class FakeClient:
-        async def get(self, url: str, timeout=None):
+        async def get(self, url: str, timeout=None, headers=None):
             assert url == "http://index-tts-vllm:8011/audio/voices"
+            assert headers == {"X-Internal-Token": "test-internal-token"}
             return FakeResponse()
 
     async def _fake_close() -> None:
@@ -258,6 +335,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         document_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
+        gateway_internal_token="test-internal-token",
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
         tts_gemini_url="",
@@ -287,7 +365,7 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 
     class FakeClient:
-        async def get(self, url: str, timeout=None):
+        async def get(self, url: str, timeout=None, headers=None):
             raise ConnectionError("index-tts-vllm unreachable")
 
     async def _fake_close() -> None:
@@ -301,6 +379,7 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
         document_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
+        gateway_internal_token="test-internal-token",
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
         tts_gemini_url="",
@@ -383,7 +462,7 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
     module.cache_put = _fake_cache_put
     module._get_service = lambda: BrokenService()
 
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
     response = client.post(
         "/v1/audio/speech",
         json={"input": "你好", "voice": "hayley", "provider": "indextts"},
@@ -420,8 +499,8 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
             self.requests: list[object] = []
             type(self).instances.append(self)
 
-        def build_request(self, method: str, url: str, *, json: dict[str, str]):
-            request = types.SimpleNamespace(method=method, url=url, json=json)
+        def build_request(self, method: str, url: str, *, json: dict[str, str], **kwargs):
+            request = types.SimpleNamespace(method=method, url=url, json=json, **kwargs)
             self.requests.append(request)
             return request
 
@@ -453,13 +532,13 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
     fake_service = FakeService()
     monkeypatch.setattr(module.httpx, "AsyncClient", FakeAsyncClient)
     monkeypatch.setattr(module, "_get_service", lambda: fake_service)
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
     ))
 
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
     response = client.post("/tts/stream", json={"text": "你好", "character": "hayley"})
 
     assert response.status_code == 200
@@ -500,13 +579,13 @@ def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
     fake_service = FakeService()
     monkeypatch.setattr(module, "_get_service", lambda: fake_service)
     # 無 IndexTTS → 直接進 fallback；Edge enabled → 走 streaming。
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
         tts_indextts_url="",
         tts_indextts_default_character="hayley",
     ))
 
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
     response = client.post("/tts/stream", json={"text": "你好", "character": "hayley"})
 
     assert response.status_code == 200
@@ -537,11 +616,11 @@ def test_websocket_routes_user_speak_to_brain_relay_when_relay_is_active(monkeyp
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
     module.websocket_routes.BrainLiveRelay = FakeRelay
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
     ))
 
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
     with client.websocket_connect("/ws/client-1") as websocket:
         websocket.send_text(json.dumps({"event": "client_init"}))
         ack = websocket.receive_json()
@@ -570,11 +649,11 @@ def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
     module.websocket_routes.BrainLiveRelay = FakeRelay
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
     ))
 
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
     with client.websocket_connect("/ws/client-2") as websocket:
         websocket.send_text(json.dumps({"event": "client_init"}))
         ack = websocket.receive_json()
@@ -606,11 +685,11 @@ def test_websocket_drops_audio_before_client_init_and_uses_initialized_voice_sou
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     FakeRelay.instances.clear()
     module.websocket_routes.BrainLiveRelay = FakeRelay
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
     ))
 
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
     with client.websocket_connect("/ws/client-preinit") as websocket:
         websocket.send_text(
             json.dumps(
@@ -661,13 +740,36 @@ def test_websocket_drops_audio_before_client_init_and_uses_initialized_voice_sou
 
 def test_handle_client_init_stores_voice_source_from_capabilities(monkeypatch):
     import asyncio
+    from app.auth.dependencies import AuthTransport, CurrentAccount
+    from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+    from app.auth.passwords import hash_password
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("test-admin")
+    if not admin:
+        admin = runtime.users.create(
+            username="test-admin",
+            password_hash=hash_password("admin-password"),
+            role=AccountRole.ADMIN,
+        )
+    try:
+        runtime.resources.register(
+            resource_type=ResourceType.PROJECT,
+            resource_id="default",
+            owner_user_id=admin.id,
+            visibility=ResourceVisibility.PRIVATE,
+        )
+    except Exception:
+        pass
+    current = CurrentAccount(user=admin, transport=AuthTransport.BEARER)
 
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     session = types.SimpleNamespace(
         session_id="session-1",
-        metadata={},
+        metadata={"_current_account": current},
     )
-    websocket = types.SimpleNamespace(send_json=AsyncMock())
+    websocket = types.SimpleNamespace(send_json=AsyncMock(), close=AsyncMock())
 
     asyncio.run(
         module.websocket_routes._handle_client_init(
@@ -712,11 +814,11 @@ def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(mon
                 "is_final": True,
             }
 
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
     ))
 
-    client = TestClient(module.app)
+    client, _ = _authenticated_client(module)
     with client.websocket_connect("/ws/client-3") as websocket:
         websocket.send_text(json.dumps({"event": "client_init"}))
         ack = websocket.receive_json()

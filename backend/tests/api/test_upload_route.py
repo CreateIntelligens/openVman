@@ -34,10 +34,22 @@ def client(tmp_path):
         from app.config import get_tts_config
 
         get_tts_config.cache_clear()
+        from app.auth.models import AccountRole
+        from app.auth.passwords import hash_password
+        from app.auth.runtime import get_auth_runtime
         from app.gateway.queue import EnqueueResult
         from app.main import app
 
-        # Patch enqueue_job at the module where it's imported
+        runtime = get_auth_runtime()
+        admin = runtime.users.get_by_username("admin")
+        if not admin:
+            admin = runtime.users.create(
+                username="admin",
+                password_hash=hash_password("admin-password"),
+                role=AccountRole.ADMIN,
+            )
+        token = runtime.tokens.issue(admin)
+
         with (
             patch(
                 "app.gateway.routes.enqueue_job",
@@ -47,6 +59,8 @@ def client(tmp_path):
             patch("app.gateway.routes.set_job_status", new_callable=AsyncMock),
         ):
             with TestClient(app, raise_server_exceptions=False) as c:
+                c.headers["Authorization"] = f"Bearer {token}"
+                c.headers["Origin"] = "http://testserver"
                 yield c
 
 

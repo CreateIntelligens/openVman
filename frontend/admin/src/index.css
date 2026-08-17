@@ -142,6 +142,9 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
   }
+  .btn:active:not(:disabled) {
+    filter: brightness(0.96);
+  }
 
   .btn-primary {
     background: rgb(var(--color-accent));
@@ -184,6 +187,13 @@ body {
     outline: none;
     border-color: rgb(var(--color-accent));
     box-shadow: 0 0 0 var(--focus-ring-size) color-mix(in srgb, rgb(var(--color-accent)) 20%, transparent);
+  }
+  .input:hover:not(:disabled) {
+    border-color: rgb(var(--color-border-strong));
+  }
+  .input:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
   }
 
   .chip {

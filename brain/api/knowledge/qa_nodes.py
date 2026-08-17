@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-from pathlib import Path
 import tempfile
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
-from knowledge.workspace import ensure_workspace_scaffold
+from knowledge.workspace import ensure_workspace_scaffold, resolve_workspace_document
 
 logger = logging.getLogger(__name__)
 
@@ -475,7 +475,6 @@ def _build_entries_for_source(
     source_path: str, project_id: str = "default"
 ) -> list[dict[str, Any]]:
     """Parse a QA markdown or CSV doc into node qa_entries (deduped by question)."""
-    from knowledge.knowledge_admin import resolve_workspace_document
     from knowledge.qa_csv import (
         convert_csv_to_qa_markdown,
         extract_image_id,
@@ -558,8 +557,6 @@ def adopt_orphan_qa_sources(project_id: str = "default") -> list[str]:
     adopted on read. Returns the created node ids.
     """
     from knowledge.doc_meta import load_doc_meta
-    from knowledge.knowledge_admin import resolve_workspace_document
-
     referenced = referenced_source_paths(project_id)
     created: list[str] = []
     items = sorted(load_doc_meta(project_id).items(), key=lambda x: (1 if "_IMG_" in x[0] else 0, x[0]))

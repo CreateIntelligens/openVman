@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import dataclass
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
+from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.models import AccountType, ResourceRecord, ResourceType
+from app.auth.resources import (
+    ResourceNotFoundError,
+    list_accessible_resources,
+    resolve_resource,
+)
+from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.config import get_tts_config
 from app.gateway.redis_pool import redis_available
 from app.gateway.temp_storage import get_temp_storage
@@ -17,6 +27,27 @@ logger = logging.getLogger("backend")
 router = APIRouter()
 _health_http = SharedAsyncClient()
 _TTS_PROVIDER_TIMEOUT_SECONDS = 5
+_INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+_RESOURCE_NOT_FOUND = "Resource not found"
+_PROVIDER_NAMES = {
+    "aws": "AWS Polly",
+    "aws-polly": "AWS Polly",
+    "edge-tts": "Edge TTS",
+    "gcp": "GCP TTS",
+    "gcp-tts": "GCP TTS",
+    GEMINI_PROVIDER_NAME: "Gemini TTS",
+    "indextts": "IndexTTS",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorizedVoice:
+    """A voice resolved to the provider-facing identity and cache scope."""
+
+    provider: str
+    resource_id: str
+    runtime_key: str
+    cache_scope: str
 
 
 async def close_http() -> None:
@@ -27,10 +58,22 @@ async def _fetch_provider_voices(
     base_url: str,
     voices_path: str,
     provider_name: str,
+    *,
+    headers: dict[str, str] | None = None,
 ) -> list[str]:
     voices_url = f"{base_url.rstrip('/')}{voices_path}"
     try:
-        response = await _health_http.get().get(voices_url, timeout=_TTS_PROVIDER_TIMEOUT_SECONDS)
+        if headers is None:
+            response = await _health_http.get().get(
+                voices_url,
+                timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
+            )
+        else:
+            response = await _health_http.get().get(
+                voices_url,
+                timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
+                headers=headers,
+            )
         response.raise_for_status()
         return _extract_voice_names(response.json())
     except Exception as exc:
@@ -38,8 +81,13 @@ async def _fetch_provider_voices(
         return []
 
 
-async def _fetch_indextts_voices(base_url: str) -> list[str]:
-    return await _fetch_provider_voices(base_url, "/audio/voices", "indextts")
+async def _fetch_indextts_voices(base_url: str, internal_token: str) -> list[str]:
+    return await _fetch_provider_voices(
+        base_url,
+        "/audio/voices",
+        "indextts",
+        headers={_INTERNAL_TOKEN_HEADER: internal_token},
+    )
 
 
 async def _fetch_gemini_voices(base_url: str) -> list[str]:
@@ -72,6 +120,128 @@ def _prepend_default_voice(voices: list[str], default_voice: str) -> list[str]:
     return [default_voice, *voices]
 
 
+def _voice_metadata(record: ResourceRecord) -> dict[str, object]:
+    try:
+        payload = json.loads(record.metadata_json)
+    except (TypeError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _metadata_string(metadata: dict[str, object], key: str) -> str:
+    value = metadata.get(key)
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail=_RESOURCE_NOT_FOUND)
+
+
+def resolve_tts_voice(
+    current: CurrentAccount,
+    runtime: AuthRuntime,
+    *,
+    requested_provider: str,
+    requested_voice: str,
+) -> AuthorizedVoice | None:
+    """Resolve a voice before cache or provider access.
+
+    Formal accounts retain the existing empty-voice provider defaults. Temporary
+    accounts must use their configured provider and an explicitly granted voice.
+    """
+    provider = requested_provider.strip()
+    voice_id = requested_voice.strip()
+    defaults = None
+
+    if current.user.account_type is AccountType.TEMPORARY:
+        defaults = runtime.temporary_accounts.get_defaults(current.user.id)
+        if defaults is None:
+            raise _not_found()
+        provider = provider or defaults.voice_provider
+        voice_id = voice_id or defaults.voice_id
+        if provider != defaults.voice_provider:
+            raise _not_found()
+    elif not voice_id:
+        return None
+
+    if not voice_id:
+        raise _not_found()
+
+    try:
+        record = resolve_resource(
+            runtime.resources,
+            current.user,
+            ResourceType.CUSTOM_VOICE,
+            voice_id,
+        )
+    except ResourceNotFoundError as exc:
+        raise _not_found() from exc
+
+    metadata = _voice_metadata(record)
+    registered_provider = _metadata_string(metadata, "provider")
+    if registered_provider:
+        if provider and provider != "auto" and provider != registered_provider:
+            raise _not_found()
+        provider = registered_provider
+    elif defaults is not None:
+        # Temporary-account defaults are administrator-selected and persisted in
+        # the same transaction as the grants, so they remain authoritative for
+        # migrated voice rows that predate provider metadata.
+        provider = defaults.voice_provider
+
+    if not provider or provider == "auto":
+        raise _not_found()
+
+    runtime_key = _metadata_string(metadata, "runtime_key") or record.resource_id
+    cache_owner = record.owner_user_id or "system"
+    return AuthorizedVoice(
+        provider=provider,
+        resource_id=record.resource_id,
+        runtime_key=runtime_key,
+        cache_scope=f"{cache_owner}:{record.resource_id}",
+    )
+
+
+def _temporary_tts_providers(
+    current: CurrentAccount,
+    runtime: AuthRuntime,
+) -> list[dict[str, object]]:
+    defaults = runtime.temporary_accounts.get_defaults(current.user.id)
+    if defaults is None:
+        return []
+
+    voices: list[str] = []
+    for record in list_accessible_resources(
+        runtime.resources,
+        current.user,
+        ResourceType.CUSTOM_VOICE,
+    ):
+        registered_provider = _metadata_string(
+            _voice_metadata(record),
+            "provider",
+        )
+        if registered_provider and registered_provider != defaults.voice_provider:
+            continue
+        voices.append(record.resource_id)
+
+    if not voices:
+        return []
+    default_voice = (
+        defaults.voice_id if defaults.voice_id in voices else voices[0]
+    )
+    return [
+        {
+            "id": defaults.voice_provider,
+            "name": _PROVIDER_NAMES.get(
+                defaults.voice_provider,
+                defaults.voice_provider,
+            ),
+            "default_voice": default_voice,
+            "voices": voices,
+        }
+    ]
+
+
 @router.get("/healthz", tags=["System"], summary="服務健康檢查")
 async def healthz() -> dict:
     storage = get_temp_storage()
@@ -95,7 +265,13 @@ async def metrics_prometheus():
 
 
 @router.get("/v1/tts/providers", tags=["TTS"], summary="取得 TTS Provider 清單")
-async def get_tts_providers() -> JSONResponse:
+async def get_tts_providers(
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> JSONResponse:
+    if current.user.account_type is AccountType.TEMPORARY:
+        return JSONResponse(content=_temporary_tts_providers(current, runtime))
+
     cfg = get_tts_config()
     providers: list[dict] = [
         {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
@@ -104,7 +280,10 @@ async def get_tts_providers() -> JSONResponse:
     if cfg.tts_indextts_url:
         # 探測 IndexTTS 健康狀態：抓不到 voices（容器掛掉/不可達）就不顯示，
         # 避免選單列出一個會 502 的 provider。auto 仍由 backend fallback 處理。
-        fetched_voices = await _fetch_indextts_voices(cfg.tts_indextts_url)
+        fetched_voices = await _fetch_indextts_voices(
+            cfg.tts_indextts_url,
+            cfg.gateway_internal_token,
+        )
         if fetched_voices:
             providers.append({
                 "id": "indextts",

@@ -51,6 +51,27 @@ def test_internal_enrich_returns_504_when_brain_times_out():
 
     assert response.status_code == 504
     assert response.json() == {"detail": "brain enrich timeout"}
+    assert mock_client.post.await_args.kwargs["headers"] == {
+        internal_routes.INTERNAL_TOKEN_HEADER: "test-token"
+    }
+
+
+def test_internal_enrich_fails_closed_when_token_is_not_configured():
+    with (
+        patch.object(
+            internal_routes,
+            "get_tts_config",
+            return_value=SimpleNamespace(
+                brain_url="http://brain:8100",
+                gateway_internal_token="",
+            ),
+        ),
+        _client() as client,
+    ):
+        response = client.post("/internal/enrich", json=_payload())
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "internal token is not configured"}
 
 
 def test_internal_enrich_brain_timeout_is_shorter_than_gateway_forward_timeout():

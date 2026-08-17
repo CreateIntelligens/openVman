@@ -22,6 +22,7 @@ def _mock_cfg():
         docling_timeout_ms=5000,
         docling_api_key="",
         docling_fallback_to_anydoc=True,
+        gateway_internal_token="internal-secret",
     )
 
 
@@ -39,11 +40,35 @@ def client():
     env = {"BRAIN_URL": "http://brain:8100"}
     with patch.dict(os.environ, env, clear=False):
         from app.config import get_tts_config
+        from app.auth.runtime import get_auth_runtime
+        from app.auth.models import AccountRole, ResourceType, ResourceVisibility
+        from app.auth.passwords import hash_password
 
         get_tts_config.cache_clear()
+        get_auth_runtime.cache_clear()
+        runtime = get_auth_runtime()
+        admin = runtime.users.get_by_username("admin")
+        if not admin:
+            admin = runtime.users.create(
+                username="admin",
+                password_hash=hash_password("admin-password"),
+                role=AccountRole.ADMIN,
+            )
+        try:
+            runtime.resources.register(
+                resource_type=ResourceType.PROJECT,
+                resource_id="default",
+                owner_user_id=admin.id,
+                visibility=ResourceVisibility.PRIVATE,
+            )
+        except Exception:
+            pass
+        token = runtime.tokens.issue(admin)
         from app.main import app
 
         with TestClient(app, raise_server_exceptions=False) as c:
+            c.headers["Authorization"] = f"Bearer {token}"
+            c.headers["Origin"] = "http://testserver"
             yield c
 
 

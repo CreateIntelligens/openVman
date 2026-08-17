@@ -12,7 +12,10 @@ const compiled = ts.transpileModule(source, {
     module: ts.ModuleKind.ES2022,
     target: ts.ScriptTarget.ES2022,
   },
-}).outputText;
+}).outputText.replace(
+  /import\s*\{\s*apiFetch\s*\}\s*from\s*['"][^'"]+['"];?/,
+  "const apiFetch = (url, init) => fetch(url, { ...init, credentials: 'include' });",
+);
 
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
 const { useTtsStreamer } = await import(moduleUrl);

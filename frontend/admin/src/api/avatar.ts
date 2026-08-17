@@ -5,7 +5,6 @@ import {
   apiUrl,
   fetchJson,
   itemPath,
-  parseJson,
 } from "./common";
 
 export interface AvatarCharacter {
@@ -85,39 +84,44 @@ export async function uploadAvatarCharacter(
   form.append("label", args.label);
   form.append("video", args.video);
   form.append("data", args.data);
-  const res = await fetch(apiUrl(AVATAR_PATH), { method: "POST", body: form });
-  return parseJson<AvatarMutationResponse>(res);
+  return fetchJson<AvatarMutationResponse>(apiUrl(AVATAR_PATH), {
+    method: "POST",
+    body: form,
+  });
 }
 
 export async function deleteAvatarCharacter(
   charId: string,
 ): Promise<{ status: string; char_id: string }> {
-  const res = await fetch(apiUrl(itemPath(AVATAR_PATH, charId)), { method: "DELETE" });
-  return parseJson<{ status: string; char_id: string }>(res);
+  return fetchJson<{ status: string; char_id: string }>(
+    apiUrl(itemPath(AVATAR_PATH, charId)),
+    { method: "DELETE" },
+  );
 }
 
 export async function renameAvatarCharacter(
   charId: string,
   newCharId: string,
 ): Promise<AvatarMutationResponse> {
-  const res = await fetch(apiUrl(`${itemPath(AVATAR_PATH, charId)}/rename`), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ new_char_id: newCharId }),
-  });
-  return parseJson<AvatarMutationResponse>(res);
+  return fetchJson<AvatarMutationResponse>(
+    apiUrl(`${itemPath(AVATAR_PATH, charId)}/rename`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ new_char_id: newCharId }),
+    },
+  );
 }
 
 export async function updateAvatarCharacterLabel(
   charId: string,
   label: string,
 ): Promise<AvatarMutationResponse> {
-  const res = await fetch(apiUrl(itemPath(AVATAR_PATH, charId)), {
+  return fetchJson<AvatarMutationResponse>(apiUrl(itemPath(AVATAR_PATH, charId)), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ label }),
   });
-  return parseJson<AvatarMutationResponse>(res);
 }
 
 export async function fetchAvatarBackgrounds(): Promise<AvatarBackgroundListResponse> {
@@ -137,29 +141,33 @@ export async function uploadAvatarBackground(
   form.append("background_id", args.backgroundId);
   form.append("label", args.label);
   form.append("image", args.image);
-  const res = await fetch(apiUrl(AVATAR_BACKGROUNDS_PATH), { method: "POST", body: form });
-  return parseJson<AvatarBackgroundMutationResponse>(res);
+  return fetchJson<AvatarBackgroundMutationResponse>(apiUrl(AVATAR_BACKGROUNDS_PATH), {
+    method: "POST",
+    body: form,
+  });
 }
 
 export async function deleteAvatarBackground(
   backgroundId: string,
 ): Promise<{ status: string; background_id: string }> {
-  const res = await fetch(apiUrl(itemPath(AVATAR_BACKGROUNDS_PATH, backgroundId)), {
-    method: "DELETE",
-  });
-  return parseJson<{ status: string; background_id: string }>(res);
+  return fetchJson<{ status: string; background_id: string }>(
+    apiUrl(itemPath(AVATAR_BACKGROUNDS_PATH, backgroundId)),
+    { method: "DELETE" },
+  );
 }
 
 export async function updateAvatarBackgroundLabel(
   backgroundId: string,
   label: string,
 ): Promise<AvatarBackgroundMutationResponse> {
-  const res = await fetch(apiUrl(itemPath(AVATAR_BACKGROUNDS_PATH, backgroundId)), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label }),
-  });
-  return parseJson<AvatarBackgroundMutationResponse>(res);
+  return fetchJson<AvatarBackgroundMutationResponse>(
+    apiUrl(itemPath(AVATAR_BACKGROUNDS_PATH, backgroundId)),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    },
+  );
 }
 
 export async function fetchAvatarMascots(): Promise<AvatarMascotListResponse> {
@@ -183,32 +191,33 @@ export async function uploadAvatarMascot(
   if (args.thumbnail) {
     form.append("thumbnail", args.thumbnail);
   }
-  const res = await fetch(apiUrl(AVATAR_MASCOTS_PATH), {
+  return fetchJson<AvatarMascotMutationResponse>(apiUrl(AVATAR_MASCOTS_PATH), {
     method: "POST",
     body: form,
   });
-  return parseJson<AvatarMascotMutationResponse>(res);
 }
 
 export async function deleteAvatarMascot(
   mascotId: string,
 ): Promise<{ status: string; mascot_id: string }> {
-  const res = await fetch(apiUrl(itemPath(AVATAR_MASCOTS_PATH, mascotId)), {
-    method: "DELETE",
-  });
-  return parseJson<{ status: string; mascot_id: string }>(res);
+  return fetchJson<{ status: string; mascot_id: string }>(
+    apiUrl(itemPath(AVATAR_MASCOTS_PATH, mascotId)),
+    { method: "DELETE" },
+  );
 }
 
 export async function updateAvatarMascotLabel(
   mascotId: string,
   label: string,
 ): Promise<AvatarMascotMutationResponse> {
-  const res = await fetch(apiUrl(itemPath(AVATAR_MASCOTS_PATH, mascotId)), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label }),
-  });
-  return parseJson<AvatarMascotMutationResponse>(res);
+  return fetchJson<AvatarMascotMutationResponse>(
+    apiUrl(itemPath(AVATAR_MASCOTS_PATH, mascotId)),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label }),
+    },
+  );
 }
 
 export async function uploadAvatarMascotThumbnail(
@@ -217,9 +226,11 @@ export async function uploadAvatarMascotThumbnail(
 ): Promise<AvatarMascotMutationResponse> {
   const form = new FormData();
   form.append("thumbnail", thumbnail);
-  const res = await fetch(apiUrl(`${itemPath(AVATAR_MASCOTS_PATH, mascotId)}/thumbnail`), {
-    method: "POST",
-    body: form,
-  });
-  return parseJson<AvatarMascotMutationResponse>(res);
+  return fetchJson<AvatarMascotMutationResponse>(
+    apiUrl(`${itemPath(AVATAR_MASCOTS_PATH, mascotId)}/thumbnail`),
+    {
+      method: "POST",
+      body: form,
+    },
+  );
 }

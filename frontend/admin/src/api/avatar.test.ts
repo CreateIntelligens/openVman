@@ -31,7 +31,10 @@ describe("avatar api", () => {
   it("fetchAvatarCharacters GETs /api/avatar", async () => {
     const f = mockFetch({ characters: [{ char_id: "008" }] });
     const res = await fetchAvatarCharacters();
-    expect(f).toHaveBeenCalledWith("/api/avatar", undefined);
+    expect(f).toHaveBeenCalledWith(
+      "/api/avatar",
+      expect.objectContaining({ credentials: "include" }),
+    );
     expect(res.characters[0].char_id).toBe("008");
   });
 
@@ -74,7 +77,10 @@ describe("avatar api", () => {
   it("fetchAvatarBackgrounds GETs /api/backgrounds", async () => {
     const f = mockFetch({ backgrounds: [{ background_id: "clinic" }] });
     const res = await fetchAvatarBackgrounds();
-    expect(f).toHaveBeenCalledWith("/api/backgrounds", undefined);
+    expect(f).toHaveBeenCalledWith(
+      "/api/backgrounds",
+      expect.objectContaining({ credentials: "include" }),
+    );
     expect(res.backgrounds[0].background_id).toBe("clinic");
   });
 
@@ -108,7 +114,10 @@ describe("avatar api", () => {
   it("fetchAvatarMascots GETs /api/avatar/mascots", async () => {
     const f = mockFetch({ mascots: [{ mascot_id: "qqman" }] });
     const res = await fetchAvatarMascots();
-    expect(f).toHaveBeenCalledWith("/api/avatar/mascots", undefined);
+    expect(f).toHaveBeenCalledWith(
+      "/api/avatar/mascots",
+      expect.objectContaining({ credentials: "include" }),
+    );
     expect(res.mascots[0].mascot_id).toBe("qqman");
   });
 

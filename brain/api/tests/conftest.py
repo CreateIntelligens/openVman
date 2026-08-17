@@ -22,6 +22,23 @@ for _mod_name in ("lancedb", "sentence_transformers", "FlagEmbedding"):
         sys.modules[_mod_name] = MagicMock()
 
 
+@pytest.fixture(autouse=True)
+def default_internal_token_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("GATEWAY_INTERNAL_TOKEN", "test-internal-token")
+    from config import get_settings
+    if hasattr(get_settings, "cache_clear"):
+        get_settings.cache_clear()
+
+    data_root = tmp_path / "data" / "projects"
+    data_root.mkdir(parents=True, exist_ok=True)
+    import infra.project_context as pc
+    monkeypatch.setattr(pc, "_DATA_ROOT", data_root)
+
+    import knowledge.workspace as kw
+    if hasattr(kw, "_CORE_CONTEXT_CACHE"):
+        kw._CORE_CONTEXT_CACHE.clear()
+
+
 _MOCK_TOOL_MODULES = ("tools.tool_executor", "tools.tool_registry", "tools.mock_data")
 
 

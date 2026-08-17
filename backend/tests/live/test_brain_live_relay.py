@@ -109,14 +109,27 @@ async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send
     websocket = ConnectableFakeWebSocket()
     connect_calls = 0
 
-    async def websocket_factory(*_args, **_kwargs):
+    connect_kwargs = None
+
+    async def websocket_factory(*_args, **kwargs):
         nonlocal connect_calls
+        nonlocal connect_kwargs
         connect_calls += 1
+        connect_kwargs = kwargs
         await asyncio.sleep(0)
         return websocket
 
+    config = type(
+        "Config",
+        (),
+        {
+            "brain_url": "http://brain:8100",
+            "gateway_internal_token": "internal-secret",
+        },
+    )()
     relay = BrainLiveRelay(
         session,
+        config=config,
         websocket_factory=websocket_factory,
     )
 
@@ -127,6 +140,13 @@ async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send
     await relay.close()
 
     assert connect_calls == 1
+    assert connect_kwargs is not None
+    assert connect_kwargs["additional_headers"] == {
+        "X-Internal-Token": "internal-secret",
+        "X-OpenVMan-User-ID": "",
+        "X-OpenVMan-Role": "",
+        "X-OpenVMan-Project-ID": "",
+    }
     assert [payload["event"] for payload in websocket.sent_messages] == [
         "relay_init",
         "client_audio_chunk",

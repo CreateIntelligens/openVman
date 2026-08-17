@@ -7,6 +7,11 @@ import {
 } from "react";
 
 import AppSidebar from "./components/app/AppSidebar";
+import {
+  AuthLoadingState,
+  ForbiddenState,
+  LoginScreen,
+} from "./components/auth/AuthStates";
 import MascotWidget from "./components/app/MascotWidget";
 import OfflineBanner from "./components/app/OfflineBanner";
 import TopBar, { MobileNavDrawer } from "./components/app/TopBar";
@@ -27,6 +32,7 @@ import {
 } from "./context/NavigationGuardContext";
 import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 function initialRoute(): AdminRoute {
   const route = parseAdminRoute(window.location.pathname, window.location.search);
@@ -39,6 +45,7 @@ function initialRoute(): AdminRoute {
 }
 
 function AppContent() {
+  const { account, logout } = useAuth();
   const [route, setRoute] = useState<AdminRoute>(initialRoute);
   const [isPinned, setIsPinned] = useState(
     () => window.localStorage.getItem("brain-sidebar-pinned") === "true",
@@ -58,6 +65,7 @@ function AppContent() {
     buildAdminPath(route.tab, projectId, route.subView),
   );
   const ActiveComponent = pageComponents[route.tab];
+  const isAdmin = account?.role === "admin";
 
   const applyRoute = useCallback(
     (
@@ -155,6 +163,10 @@ function AppContent() {
     [applyRoute, projectId, requestNavigation, route],
   );
 
+  if (route.tab === "Accounts" && !isAdmin) {
+    return <ForbiddenState />;
+  }
+
   return (
     <NavigationProvider
       currentTab={route.tab}
@@ -165,6 +177,7 @@ function AppContent() {
         <AppSidebar
           active={route.tab}
           isPinned={isPinned}
+          isAdmin={isAdmin}
           onSelectTab={switchTab}
           onTogglePin={() =>
             setIsPinned((value) => {
@@ -187,10 +200,12 @@ function AppContent() {
             loadingProjects={loadingProjects}
             projectError={projectError}
             theme={theme}
+            account={account!}
             onSelectProject={switchProject}
             onRetryProjects={() => void refreshProjects()}
             onToggleTheme={toggleTheme}
             onOpenMobileNav={() => setMobileNavOpen(true)}
+            onLogout={() => void logout()}
           />
 
           <MobileNavDrawer
@@ -198,6 +213,9 @@ function AppContent() {
             active={route.tab}
             onClose={() => setMobileNavOpen(false)}
             onSelectTab={switchTab}
+            isAdmin={isAdmin}
+            username={account!.username}
+            onLogout={() => void logout()}
           />
 
           <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -224,7 +242,7 @@ function AppContent() {
   );
 }
 
-export default function App() {
+function AuthenticatedApp() {
   return (
     <ThemeProvider>
       <BackendHealthProvider>
@@ -237,5 +255,34 @@ export default function App() {
         </ProjectProvider>
       </BackendHealthProvider>
     </ThemeProvider>
+  );
+}
+
+function AuthGate() {
+  const { account, loading, forbidden } = useAuth();
+
+  useEffect(() => {
+    if (!loading && account && window.location.pathname === "/admin/login") {
+      window.history.replaceState(null, "", "/admin/chat");
+    }
+  }, [account, loading]);
+
+  if (loading) return <AuthLoadingState />;
+  if (!account) return <LoginScreen />;
+  if (forbidden) {
+    return (
+      <div className="h-dvh bg-surface text-content">
+        <ForbiddenState />
+      </div>
+    );
+  }
+  return <AuthenticatedApp />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
   );
 }

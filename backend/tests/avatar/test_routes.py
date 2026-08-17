@@ -14,7 +14,25 @@ def client(tmp_path, monkeypatch):
     get_tts_config.cache_clear()
     avatar_routes.reset_store()
     monkeypatch.setattr(avatar_routes, "_personas_bound_to", lambda char_id: [])
+
+    from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account, require_admin
+    from app.auth.models import AccountRole
+    from app.auth.passwords import hash_password
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    admin = runtime.users.get_by_username("admin")
+    if not admin:
+        admin = runtime.users.create(
+            username="admin",
+            password_hash=hash_password("admin-password"),
+            role=AccountRole.ADMIN,
+        )
+    current = CurrentAccount(user=admin, transport=AuthTransport.BEARER)
+
     app = FastAPI()
+    app.dependency_overrides[get_current_account] = lambda: current
+    app.dependency_overrides[require_admin] = lambda: current
     app.include_router(avatar_routes.router)
     return TestClient(app)
 

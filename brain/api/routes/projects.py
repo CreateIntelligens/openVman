@@ -1,12 +1,22 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from infra.project_admin import create_project, delete_project, get_project_info, list_projects
+from infra.project_admin import (
+    create_project,
+    delete_project,
+    get_project_info,
+    list_projects,
+)
 from protocol.schemas import ProjectCreateRequest, ProjectDeleteRequest
+from safety.internal_auth import require_internal_token
 from safety.observability import log_event
 
-router = APIRouter(prefix="/brain", tags=["Projects"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Projects"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 @router.get("/projects", summary="列出所有專案")
@@ -41,4 +51,3 @@ async def get_project_route(project_id: str):
         return get_project_info(project_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-

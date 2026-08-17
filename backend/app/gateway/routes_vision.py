@@ -10,9 +10,13 @@ from __future__ import annotations
 import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.models import ResourceType
+from app.auth.resources import ResourceNotFoundError, resolve_resource
+from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.config import get_tts_config
 from app.gateway.plugins.camera_live import InvalidFrameError, decode_frame_base64
 from app.gateway.worker import get_camera_plugin
@@ -43,7 +47,20 @@ class VisionResetRequest(BaseModel):
 
 
 @router.post("/api/vision/describe", summary="視覺事件（text 模式）")
-async def vision_describe(payload: VisionDescribeRequest) -> dict[str, object]:
+async def vision_describe(
+    payload: VisionDescribeRequest,
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> dict[str, object]:
+    try:
+        resolve_resource(
+            runtime.resources,
+            current.user,
+            ResourceType.PROJECT,
+            payload.project_id,
+        )
+    except ResourceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Resource not found") from exc
     try:
         image_bytes = decode_frame_base64(payload.frame_base64)
     except InvalidFrameError as exc:
@@ -66,7 +83,12 @@ async def vision_describe(payload: VisionDescribeRequest) -> dict[str, object]:
     if not context_text:
         return {"reply": "", "session_id": session_id, "visual_state": visual_state}
 
-    reply = await _generate_reply(payload, context_text, session_id)
+    reply = await _generate_reply(
+        payload,
+        context_text,
+        session_id,
+        current,
+    )
     return {"reply": reply, "session_id": session_id, "visual_state": visual_state}
 
 
@@ -86,6 +108,7 @@ async def _generate_reply(
     payload: VisionDescribeRequest,
     context_text: str,
     session_id: str,
+    current: CurrentAccount,
 ) -> str:
     """把中性視覺脈絡當一則 ephemeral 訊息送進 brain chat（不落歷史），回傳 AI 回覆。"""
     cfg = get_tts_config()
@@ -99,6 +122,12 @@ async def _generate_reply(
                 "project_id": payload.project_id,
                 "session_id": session_id,
                 "metadata": {"ephemeral_user_message": True},
+            },
+            headers={
+                "X-Internal-Token": cfg.gateway_internal_token,
+                "X-OpenVMan-User-ID": current.user.id,
+                "X-OpenVMan-Role": current.user.role.value,
+                "X-OpenVMan-Project-ID": payload.project_id,
             },
         )
         resp.raise_for_status()

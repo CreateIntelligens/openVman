@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Any, NoReturn
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from core.chat_service import (
     execute_generation,
@@ -26,12 +26,17 @@ from protocol.message_envelope import (
 )
 from protocol.protocol_events import ProtocolValidationError
 from protocol.schemas import ChatRequest
+from safety.internal_auth import require_internal_token
 from safety.observability import get_metrics_store, log_event, log_exception
 from tools.skill_manager import get_skill_manager
 
 logger = logging.getLogger("brain.chat")
 
-router = APIRouter(prefix="/brain", tags=["Chat"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Chat"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 def _maybe_rewrite_slash(payload: ChatRequest) -> dict[str, Any]:

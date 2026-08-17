@@ -28,6 +28,7 @@ EventSink = Callable[[dict[str, Any]], Awaitable[None]]
 # The relay does not branch on these — frontend decides TTS behavior.
 DEFAULT_VOICE_SOURCE = "gemini"
 CUSTOM_VOICE_SOURCE = "custom"
+INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 
 
 def _normalize_voice_source(voice_source: str) -> str:
@@ -77,6 +78,18 @@ class BrainLiveRelay:
             )
             self._ws = await self._websocket_factory(
                 url,
+                additional_headers={
+                    INTERNAL_TOKEN_HEADER: self.config.gateway_internal_token,
+                    "X-OpenVMan-User-ID": str(
+                        self.session.metadata.get("user_id", "")
+                    ),
+                    "X-OpenVMan-Role": str(
+                        self.session.metadata.get("user_role", "")
+                    ),
+                    "X-OpenVMan-Project-ID": str(
+                        self.session.metadata.get("project_id", "")
+                    ),
+                },
                 open_timeout=10,
                 max_size=4 * 1024 * 1024,
             )

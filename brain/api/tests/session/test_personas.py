@@ -60,6 +60,26 @@ def _configure_workspace(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pat
     }
     monkeypatch.setattr(workspace, "get_workspace_root", lambda project_id="default": root)
     monkeypatch.setattr(workspace, "get_core_documents", lambda project_id="default": core_documents)
+    monkeypatch.setattr(
+        workspace,
+        "ensure_workspace_scaffold",
+        lambda project_id="default": root,
+    )
+
+    import infra.project_context as pc
+    monkeypatch.setattr(
+        pc,
+        "resolve_project_context",
+        lambda project_id="default": pc.ProjectContext(
+            project_id=project_id,
+            project_root=root.parent,
+            workspace_root=root,
+            lancedb_path=root.parent / "lancedb",
+            session_db_path=root.parent / "sessions.db",
+            index_state_path=root.parent / "knowledge_index_state.json",
+        ),
+    )
+
     root.mkdir(parents=True, exist_ok=True)
     (root / "memory").mkdir(parents=True, exist_ok=True)
     (root / ".learnings").mkdir(parents=True, exist_ok=True)

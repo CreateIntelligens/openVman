@@ -2,16 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from memory.embedder import encode_query_with_fallback
 from memory.retrieval import search_records
 from protocol.message_envelope import build_message_envelope
 from protocol.schemas import SearchRequest
 from safety.guardrails import enforce_guardrails
+from safety.internal_auth import require_internal_token
 from safety.observability import get_metrics_store, log_event
 
-router = APIRouter(prefix="/brain", tags=["Search & Embeddings"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Search & Embeddings"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 def _log_search_complete(context: Any, payload: SearchRequest, route: Any, count: int) -> None:
@@ -86,4 +91,3 @@ def _maybe_expand_query(query: str, payload: SearchRequest, trace_id: str) -> li
         model=cfg.rag_query_expansion_model or None,
         trace_id=trace_id,
     )
-

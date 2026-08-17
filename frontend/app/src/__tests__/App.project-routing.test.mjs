@@ -14,7 +14,7 @@ test("settings modal receives project options and emits project changes", () => 
 });
 
 test("avatar frontend loads personas from the selected project", () => {
-  assert.match(source, /fetch\("\/api\/projects"\)/);
+  assert.match(source, /apiFetch\("\/api\/projects"\)/);
   assert.match(source, /project_id=\$\{encodeURIComponent\(targetProjectId\)\}/);
   assert.doesNotMatch(source, /\/api\/personas\?project_id=default/);
 });
@@ -51,7 +51,7 @@ test("avatar stage background is wired through settings", () => {
 });
 
 test("avatar frontend loads uploaded backgrounds for settings", () => {
-  assert.match(source, /fetch\("\/api\/backgrounds"\)/);
+  assert.match(source, /apiFetch\("\/api\/backgrounds"\)/);
   assert.match(source, /backgrounds\.value = data\.backgrounds \?\? \[\]/);
   assert.match(source, /void fetchBackgrounds\(\)/);
 });

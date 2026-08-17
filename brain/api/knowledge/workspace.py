@@ -221,7 +221,7 @@ def load_core_workspace_context(persona_id: str = "default", project_id: str = "
     ensure_workspace_scaffold(project_id)
     document_paths = resolve_core_document_paths(persona_id, project_id=project_id)
     signature = tuple(
-        (key, path.stat().st_mtime if path.exists() else 0.0)
+        (key, str(path), path.stat().st_mtime if path.exists() else 0.0)
         for key, path in document_paths.items()
     )
     cache_key = (persona_id, project_id)

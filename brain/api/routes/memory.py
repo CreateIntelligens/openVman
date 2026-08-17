@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from memory.embedder import encode_text
 from memory.memory import add_memory as store_memory
@@ -12,10 +12,15 @@ from memory.memory_governance import maybe_run_memory_maintenance
 from protocol.message_envelope import build_message_envelope
 from protocol.schemas import AddMemoryRequest, AdminActionRequest
 from safety.guardrails import enforce_guardrails
+from safety.internal_auth import require_internal_token
 from safety.observability import get_metrics_store, log_event, log_exception
 from core.chat_service import record_generation_failure
 
-router = APIRouter(prefix="/brain", tags=["Memory & Sessions"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Memory & Sessions"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 @router.get("/memories", summary="列出記憶")
@@ -76,4 +81,3 @@ async def maintain_memory_route(payload: AdminActionRequest):
         raise HTTPException(status_code=500, detail="記憶整理失敗") from exc
     log_event("memory_maintenance", project_id=payload.project_id, **result)
     return result
-

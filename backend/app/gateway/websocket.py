@@ -5,11 +5,15 @@ import json
 import logging
 import time
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
+from app.auth.dependencies import CurrentAccount, authenticate_websocket
+from app.auth.models import ResourceType
+from app.auth.resources import ResourceNotFoundError, resolve_resource
+from app.auth.runtime import get_auth_runtime
 from app.gateway.brain_live_relay import (
-    BrainLiveRelay,
     DEFAULT_VOICE_SOURCE,
+    BrainLiveRelay,
     _normalize_voice_source,
 )
 from app.gateway.plugins.camera_live import InvalidFrameError, decode_frame_base64
@@ -53,12 +57,21 @@ def _is_closed_websocket_runtime_error(exc: RuntimeError) -> bool:
 
 @router.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    try:
+        current = authenticate_websocket(websocket, get_auth_runtime())
+    except HTTPException:
+        await websocket.close(code=1008, reason="authentication required")
+        return
     await websocket.accept()
     is_reconnect = any(
         s.metadata.get("client_id") == client_id
         for s in _session_manager.active_sessions.values()
     )
     session = _session_manager.create_session(client_id, websocket=websocket)
+    session.metadata["_current_account"] = current
+    session.metadata["user_id"] = current.user.id
+    session.metadata["user_role"] = current.user.role.value
+    session.metadata["account_type"] = current.user.account_type.value
     if is_reconnect:
         record_ws_reconnect()
     set_active_sessions(len(_session_manager.active_sessions))
@@ -139,15 +152,11 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
     previous_chat_session_id = str(session.metadata.get("chat_session_id", "")).strip()
     previous_persona_id = str(session.metadata.get("persona_id", "default")).strip()
 
-    await websocket.send_json(
-        {
-            "event": "server_init_ack",
-            "session_id": session.session_id,
-            "server_version": "1.0.0",
-            "status": "ok",
-            "timestamp": _now_ms(),
-        }
-    )
+    current = session.metadata.get("_current_account")
+    if not isinstance(current, CurrentAccount):
+        await websocket.close(code=1008, reason="authentication required")
+        return
+
     session.metadata["client_id"] = data.get("client_id", session.session_id)
     session.metadata["voice_source"] = _get_requested_voice_source(data)
     session.metadata["client_initialized"] = True
@@ -162,8 +171,44 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
     chat_mode = str(capabilities.get("chat_mode", "live")).strip() or "live"
     session.metadata["chat_mode"] = chat_mode
 
-    project_id = str(capabilities.get("project_id", "default")).strip() or "default"
+    runtime = get_auth_runtime()
+    requested_project_id = str(capabilities.get("project_id", "")).strip()
+    if requested_project_id:
+        project_id = requested_project_id
+    else:
+        defaults = runtime.temporary_accounts.get_defaults(current.user.id)
+        project_id = defaults.project_id if defaults is not None else "default"
+    try:
+        if not project_id:
+            raise ResourceNotFoundError
+        resolve_resource(
+            runtime.resources,
+            current.user,
+            ResourceType.PROJECT,
+            project_id,
+        )
+    except ResourceNotFoundError:
+        await websocket.send_json(
+            {
+                "event": "server_error",
+                "error": "resource_not_found",
+                "message": "Resource not found",
+                "timestamp": _now_ms(),
+            }
+        )
+        await websocket.close(code=1008, reason="resource not found")
+        return
     session.metadata["project_id"] = project_id
+
+    await websocket.send_json(
+        {
+            "event": "server_init_ack",
+            "session_id": session.session_id,
+            "server_version": "1.0.0",
+            "status": "ok",
+            "timestamp": _now_ms(),
+        }
+    )
 
     existing_relay = getattr(session, "brain_live_relay", None)
     relay_needs_refresh = existing_relay is not None and (

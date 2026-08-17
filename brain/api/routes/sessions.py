@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from memory.memory import (
@@ -8,9 +8,14 @@ from memory.memory import (
     get_session_store,
     list_sessions_for_project,
 )
+from safety.internal_auth import require_internal_token
 from safety.observability import log_event, log_exception
 
-router = APIRouter(prefix="/brain", tags=["Memory & Sessions"])
+router = APIRouter(
+    prefix="/brain",
+    tags=["Memory & Sessions"],
+    dependencies=[Depends(require_internal_token)],
+)
 
 
 @router.get("/sessions", summary="列出對話 Session")
