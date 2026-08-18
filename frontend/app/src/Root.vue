@@ -4,6 +4,11 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import App from "./App.vue"
 import LoginScreen from "./components/auth/LoginScreen.vue"
 import { useAuth } from "./composables/useAuth"
+import {
+  cleanupLoggedOutSession,
+  leaveFullscreen,
+  runLogout,
+} from "./sessionCleanup"
 
 const auth = useAuth()
 const now = ref(Date.now())
@@ -50,31 +55,21 @@ const expiresLabel = computed(() => {
       }).format(date)
 })
 
-async function leaveFullscreen(): Promise<void> {
-  if (document.fullscreenElement) {
-    await document.exitFullscreen().catch(() => {})
-  }
-  const nav = navigator as Navigator & {
-    keyboard?: { unlock?: () => void }
-  }
-  nav.keyboard?.unlock?.()
-}
-
 async function handleLogout(): Promise<void> {
-  if (loggingOut.value) return
-  loggingOut.value = true
-  try {
-    await leaveFullscreen()
-    await auth.logout()
-  } finally {
-    loggingOut.value = false
-  }
+  await runLogout({
+    isLoggingOut: () => loggingOut.value,
+    setLoggingOut: (value) => {
+      loggingOut.value = value
+    },
+    cleanup: leaveFullscreen,
+    logout: auth.logout,
+  })
 }
 
 watch(
   () => [auth.loading.value, auth.account.value] as const,
   ([loading, account]) => {
-    if (!loading && !account) void leaveFullscreen()
+    cleanupLoggedOutSession(loading, account)
   },
 )
 

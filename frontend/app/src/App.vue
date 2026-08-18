@@ -169,6 +169,7 @@ import {
 import { useAsr } from "./composables/useAsr";
 import { useAuth } from "./composables/useAuth";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
+import { leaveFullscreen, unlockKeyboard } from "./sessionCleanup";
 import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useWebcamCapture } from "./composables/useWebcamCapture";
@@ -901,18 +902,12 @@ function tryLockEscapeKeys(): void {
 }
 
 function tryUnlockKeyboard(): void {
-  const nav = navigator as Record<string, any>;
-  if ("keyboard" in nav && typeof nav.keyboard?.unlock === "function") {
-    nav.keyboard.unlock();
-  }
+  unlockKeyboard();
 }
 
 async function handleToggleImmersive(): Promise<void> {
   if (immersive.value) {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen().catch(() => {});
-    }
-    tryUnlockKeyboard();
+    await leaveFullscreen();
     immersive.value = false;
     return;
   }

@@ -51,9 +51,122 @@ test("Avatar root bootstraps the cookie session before mounting the app", () => 
   assert.match(root, /v-else-if="!auth\.account\.value"/);
   assert.match(root, /<App\s*\/>/);
   assert.match(root, /@click="handleLogout"/);
-  assert.match(root, /document\.exitFullscreen\(\)/);
-  assert.match(root, /if \(!loading && !account\) void leaveFullscreen\(\)/);
+  assert.match(root, /runLogout/);
+  assert.match(root, /cleanupLoggedOutSession/);
   assert.match(main, /import Root from ['"]\.\/Root\.vue['"]/);
+});
+
+async function loadSessionCleanup() {
+  const source = read("sessionCleanup.ts");
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
+  return import(moduleUrl);
+}
+
+test("logout cleans up fullscreen before calling the auth API", async () => {
+  const { runLogout } = await loadSessionCleanup();
+  const calls = [];
+  let loggingOut = false;
+
+  await runLogout({
+    isLoggingOut: () => loggingOut,
+    setLoggingOut: (value) => {
+      loggingOut = value;
+    },
+    cleanup: async () => {
+      calls.push("cleanup");
+    },
+    logout: async () => {
+      calls.push("logout");
+    },
+  });
+
+  assert.deepEqual(calls, ["cleanup", "logout"]);
+  assert.equal(loggingOut, false);
+});
+
+test("fullscreen and keyboard cleanup failures do not block logout", async () => {
+  const { leaveFullscreen, runLogout } = await loadSessionCleanup();
+  const calls = [];
+  let loggingOut = false;
+  const doc = {
+    fullscreenElement: {},
+    exitFullscreen: async () => {
+      calls.push("exitFullscreen");
+      throw new Error("browser failure");
+    },
+  };
+  const nav = {
+    keyboard: {
+      unlock: () => {
+        calls.push("unlock");
+        throw new Error("browser failure");
+      },
+    },
+  };
+
+  await runLogout({
+    isLoggingOut: () => loggingOut,
+    setLoggingOut: (value) => {
+      loggingOut = value;
+    },
+    cleanup: () => leaveFullscreen(doc, nav),
+    logout: async () => {
+      calls.push("logout");
+    },
+  });
+
+  assert.deepEqual(calls, ["exitFullscreen", "unlock", "logout"]);
+});
+
+test("session loss after loading requests fullscreen cleanup", async () => {
+  const { cleanupLoggedOutSession } = await loadSessionCleanup();
+  let cleanupCalls = 0;
+  const cleanup = async () => {
+    cleanupCalls += 1;
+  };
+
+  cleanupLoggedOutSession(true, null, cleanup);
+  cleanupLoggedOutSession(false, { id: "user-a" }, cleanup);
+  cleanupLoggedOutSession(false, null, cleanup);
+  await Promise.resolve();
+
+  assert.equal(cleanupCalls, 1);
+});
+
+test("repeated logout calls share the in-progress guard", async () => {
+  const { runLogout } = await loadSessionCleanup();
+  let loggingOut = false;
+  let releaseCleanup;
+  let logoutCalls = 0;
+  const cleanupGate = new Promise((resolve) => {
+    releaseCleanup = resolve;
+  });
+  const operation = {
+    isLoggingOut: () => loggingOut,
+    setLoggingOut: (value) => {
+      loggingOut = value;
+    },
+    cleanup: () => cleanupGate,
+    logout: async () => {
+      logoutCalls += 1;
+    },
+  };
+
+  const first = runLogout(operation);
+  const second = runLogout(operation);
+  await second;
+  assert.equal(logoutCalls, 0);
+  releaseCleanup();
+  await first;
+
+  assert.equal(logoutCalls, 1);
+  assert.equal(loggingOut, false);
 });
 
 test("auth API uses cookie endpoints without storing the returned JWT", () => {
