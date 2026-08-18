@@ -214,7 +214,7 @@ services:
       - ./.env
     environment:
       - REDIS_URL=redis://redis:6379
-      - TTS_INDEXTTS_URL=http://index-tts-vllm:8011
+      - TTS_INDEXTTS_URL=${TTS_INDEXTTS_URL:-http://index-tts-vllm:8011}
       - AVATAR_ASSETS_DIR=/data/avatar
       - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
       - AVATAR_MASCOTS_DIR=/data/mascots
