@@ -118,6 +118,18 @@ def _resource_grants(
     ]
 
 
+def _defaults_tuple(
+    defaults: AccountDefaultsProfile,
+) -> tuple[str, str, str, str]:
+    return (
+        defaults.project_id,
+        defaults.character_id,
+        defaults.voice_provider,
+        defaults.voice_id,
+    )
+
+
+
 class AccountProfile(_StrictModel):
     id: str
     username: str
@@ -209,12 +221,6 @@ class LoginResponse(_StrictModel):
     token: str
 
 
-class CreateAccountRequest(_StrictModel):
-    username: str
-    password: str
-    role: AccountRole = AccountRole.USER
-
-
 class SetDisabledRequest(_StrictModel):
     disabled: bool
 
@@ -231,6 +237,13 @@ class CreateTemporaryBatchRequest(_StrictModel):
 class UpdateAccountAccessRequest(_StrictModel):
     grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
+
+
+class CreateAccountRequest(_StrictModel):
+    username: str
+    password: str
+    role: AccountRole = AccountRole.USER
+    access: UpdateAccountAccessRequest | None = None
 
 
 class AccountAccessOption(_StrictModel):
@@ -551,12 +564,7 @@ def create_temporary_batch(
             created_by=admin.user.id,
             credentials=credentials,
             grants=_resource_grants(body.grants),
-            defaults=(
-                body.defaults.project_id,
-                body.defaults.character_id,
-                body.defaults.voice_provider,
-                body.defaults.voice_id,
-            ),
+            defaults=_defaults_tuple(body.defaults),
             duration_seconds=_TEMPORARY_DURATION_SECONDS,
         )
     except (InvalidResourceGrantError, UserNotFoundError, ValueError) as exc:
@@ -682,12 +690,7 @@ def update_account_access(
             user_id=user_id,
             granted_by=admin.user.id,
             grants=_resource_grants(body.grants),
-            defaults=(
-                body.defaults.project_id,
-                body.defaults.character_id,
-                body.defaults.voice_provider,
-                body.defaults.voice_id,
-            ),
+            defaults=_defaults_tuple(body.defaults),
         )
     except UserNotFoundError as exc:
         raise HTTPException(
@@ -715,13 +718,16 @@ def create_account(
 ) -> AdminAccountProfile:
     try:
         password_hash = hash_password(body.password)
+        access = body.access
         user = runtime.users.create(
             username=body.username,
             password_hash=password_hash,
             role=body.role,
             created_by=admin.user.id,
+            grants=_resource_grants(access.grants) if access is not None else None,
+            defaults=_defaults_tuple(access.defaults) if access is not None else None,
         )
-    except (PasswordValidationError, ValueError) as exc:
+    except (InvalidResourceGrantError, PasswordValidationError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except UsernameConflictError as exc:
         raise HTTPException(status_code=409, detail="Username already exists") from exc

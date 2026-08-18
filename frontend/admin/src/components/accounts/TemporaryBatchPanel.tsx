@@ -1,36 +1,22 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
-  type ReactNode,
 } from "react";
 
 import {
   createTemporaryBatch,
-  fetchAccountAccessOptions,
   listTemporaryBatches,
   revokeTemporaryBatch,
-  type AccountAccessOption,
   type TemporaryBatchAudit,
   type TemporaryBatchResult,
 } from "../../api/auth";
-
-const PREFERRED_PROJECT = "proj-b85afb8bb6";
-const PREFERRED_CHARACTER = "0713";
-const PREFERRED_VOICE = "hayley";
-
-interface VoiceOption {
-  provider: string;
-  voice: string;
-}
+import AccountAccessFields, {
+  useAccountAccessForm,
+} from "./AccountAccessFields";
 
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function preferredId(ids: string[], preferred: string): string {
-  return ids.includes(preferred) ? preferred : ids[0] ?? "";
 }
 
 function batchStateLabel(batch: TemporaryBatchAudit): string {
@@ -58,129 +44,41 @@ function remainingLabel(seconds: number | null): string {
   return hours > 0 ? `剩餘 ${hours} 小時 ${minutes % 60} 分` : `剩餘 ${minutes} 分`;
 }
 
+function revokeButtonLabel(isRevoking: boolean, isRevoked: boolean): string {
+  if (isRevoking) return "撤銷中…";
+  if (isRevoked) return "已撤銷";
+  return "撤銷整批";
+}
+
+
 export default function TemporaryBatchPanel() {
-  const [projects, setProjects] = useState<AccountAccessOption[]>([]);
-  const [characters, setCharacters] = useState<AccountAccessOption[]>([]);
-  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
-  const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
-  const [selectedVoices, setSelectedVoices] = useState<string[]>([]);
-  const [defaultProject, setDefaultProject] = useState("");
-  const [defaultCharacter, setDefaultCharacter] = useState("");
-  const [defaultVoiceKey, setDefaultVoiceKey] = useState("");
+  const accessForm = useAccountAccessForm("temporary-account-batch");
   const [batches, setBatches] = useState<TemporaryBatchAudit[]>([]);
   const [result, setResult] = useState<TemporaryBatchResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const voiceByKey = useMemo(
-    () => new Map(voiceOptions.map((option) => [`${option.provider}:${option.voice}`, option])),
-    [voiceOptions],
-  );
-
-  const load = useCallback(async () => {
-    setLoading(true);
+  const loadBatches = useCallback(async () => {
+    setHistoryLoading(true);
     setError(null);
-    setProjects([]);
-    setCharacters([]);
-    setVoiceOptions([]);
-    setSelectedProjects([]);
-    setSelectedCharacters([]);
-    setSelectedVoices([]);
-    setDefaultProject("");
-    setDefaultCharacter("");
-    setDefaultVoiceKey("");
-    setBatches([]);
-    const [optionsResult, batchesResult] = await Promise.allSettled([
-      fetchAccountAccessOptions(),
-      listTemporaryBatches(),
-    ]);
-
-    if (optionsResult.status === "fulfilled") {
-      const projectItems = optionsResult.value.projects;
-      const first = preferredId(
-        projectItems.map((item) => item.id),
-        PREFERRED_PROJECT,
-      );
-      setProjects(projectItems);
-      setSelectedProjects(first ? [first] : []);
-      setDefaultProject(first);
-
-      const characterItems = optionsResult.value.avatar_characters;
-      const firstCharacter = preferredId(
-        characterItems.map((item) => item.id),
-        PREFERRED_CHARACTER,
-      );
-      setCharacters(characterItems);
-      setSelectedCharacters(firstCharacter ? [firstCharacter] : []);
-      setDefaultCharacter(firstCharacter);
-
-      const items = optionsResult.value.custom_voices.map((item) => ({
-        provider: item.provider ?? "indextts",
-        voice: item.id,
-      }));
-      const preferred = items.find((item) => item.voice === PREFERRED_VOICE)
-        ?? items[0];
-      const firstKey = preferred ? `${preferred.provider}:${preferred.voice}` : "";
-      setVoiceOptions(items);
-      setSelectedVoices(preferred ? [preferred.voice] : []);
-      setDefaultVoiceKey(firstKey);
+    try {
+      setBatches(await listTemporaryBatches());
+    } catch (reason) {
+      setError(messageFrom(reason, "無法載入臨時帳號批次紀錄"));
+    } finally {
+      setHistoryLoading(false);
     }
-    if (batchesResult.status === "fulfilled") setBatches(batchesResult.value);
-
-    const failures = [optionsResult, batchesResult]
-      .filter((item) => item.status === "rejected");
-    if (failures.length > 0) {
-      setError("部分授權資源或批次紀錄無法載入，請重新整理後再試。");
-    }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
-
-  function toggle(
-    id: string,
-    selected: string[],
-    setSelected: (next: string[]) => void,
-    currentDefault: string,
-    setDefault: (next: string) => void,
-  ) {
-    const next = selected.includes(id)
-      ? selected.filter((item) => item !== id)
-      : [...selected, id];
-    setSelected(next);
-    if (!next.includes(currentDefault)) setDefault(next[0] ?? "");
-  }
-
-  function toggleVoice(option: VoiceOption) {
-    const key = `${option.provider}:${option.voice}`;
-    const next = selectedVoices.includes(option.voice)
-      ? selectedVoices.filter((voice) => voice !== option.voice)
-      : [...selectedVoices, option.voice];
-    setSelectedVoices(next);
-    if (!next.includes(voiceByKey.get(defaultVoiceKey)?.voice ?? "")) {
-      const fallback = voiceOptions.find((item) => next.includes(item.voice));
-      setDefaultVoiceKey(fallback ? `${fallback.provider}:${fallback.voice}` : "");
-    } else if (!defaultVoiceKey) {
-      setDefaultVoiceKey(key);
-    }
-  }
+    void loadBatches();
+  }, [loadBatches]);
 
   async function generateBatch() {
-    const defaultVoice = voiceByKey.get(defaultVoiceKey);
-    if (
-      selectedProjects.length === 0
-      || selectedCharacters.length === 0
-      || selectedVoices.length === 0
-      || !defaultProject
-      || !defaultCharacter
-      || !defaultVoice
-    ) {
+    if (!accessForm.complete) {
       setError("每一類至少選擇一項授權資源，並指定登入後預設值。");
       return;
     }
@@ -188,19 +86,7 @@ export default function TemporaryBatchPanel() {
     setSubmitting(true);
     setError(null);
     try {
-      const created = await createTemporaryBatch({
-        grants: {
-          projects: selectedProjects,
-          avatar_characters: selectedCharacters,
-          custom_voices: selectedVoices,
-        },
-        defaults: {
-          project_id: defaultProject,
-          character_id: defaultCharacter,
-          voice_provider: defaultVoice.provider,
-          voice_id: defaultVoice.voice,
-        },
-      });
+      const created = await createTemporaryBatch(accessForm.access);
       setResult(created);
       try {
         setBatches(await listTemporaryBatches());
@@ -213,6 +99,13 @@ export default function TemporaryBatchPanel() {
       setSubmitting(false);
     }
   }
+
+  function reload() {
+    accessForm.reload();
+    void loadBatches();
+  }
+
+  const displayedError = error ?? accessForm.error;
 
   async function copy(value: string, key: string) {
     try {
@@ -251,119 +144,22 @@ export default function TemporaryBatchPanel() {
             密碼在首次登入後啟動 72 小時效期；請先選擇這批帳號可使用的資源。
           </p>
         </div>
-        <button className="btn btn-ghost self-start" type="button" onClick={() => void load()} disabled={loading}>
+        <button className="btn btn-ghost self-start" type="button" onClick={reload} disabled={accessForm.loading || historyLoading}>
           重新整理資源
         </button>
       </header>
 
-      {error && (
+      {displayedError && (
         <div className="mx-5 mt-5 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
-          {error}
+          {displayedError}
         </div>
       )}
 
-      <div className="grid gap-0 lg:grid-cols-[1.15fr_1fr_0.85fr]">
-        <ResourceGroup
-          title="知識庫專案"
-          description="選取這批帳號可查詢的專案。"
-          loading={loading}
-          empty={projects.length === 0}
-          footer={(
-            <DefaultSelect
-              label="登入後預設專案"
-              value={defaultProject}
-              onChange={setDefaultProject}
-              options={projects
-                .filter((item) => selectedProjects.includes(item.id))
-                .map((item) => ({ value: item.id, label: item.label }))}
-            />
-          )}
-        >
-          {projects.map((project) => (
-            <Choice
-              key={project.id}
-              checked={selectedProjects.includes(project.id)}
-              label={project.label}
-              detail={project.id}
-              onChange={() => toggle(
-                project.id,
-                selectedProjects,
-                setSelectedProjects,
-                defaultProject,
-                setDefaultProject,
-              )}
-            />
-          ))}
-        </ResourceGroup>
-
-        <ResourceGroup
-          title="虛擬人物"
-          description="僅顯示素材完整、可以播放的人物。"
-          loading={loading}
-          empty={characters.length === 0}
-          footer={(
-            <DefaultSelect
-              label="登入後預設人物"
-              value={defaultCharacter}
-              onChange={setDefaultCharacter}
-              options={characters
-                .filter((item) => selectedCharacters.includes(item.id))
-                .map((item) => ({ value: item.id, label: item.label }))}
-            />
-          )}
-        >
-          {characters.map((character) => (
-            <Choice
-              key={character.id}
-              checked={selectedCharacters.includes(character.id)}
-              label={character.label}
-              detail={character.id}
-              onChange={() => toggle(
-                character.id,
-                selectedCharacters,
-                setSelectedCharacters,
-                defaultCharacter,
-                setDefaultCharacter,
-              )}
-            />
-          ))}
-        </ResourceGroup>
-
-        <ResourceGroup
-          title="自訂聲音"
-          description="授權可使用的 provider 與 voice。"
-          loading={loading}
-          empty={voiceOptions.length === 0}
-          last
-          footer={(
-            <DefaultSelect
-              label="登入後預設聲音"
-              value={defaultVoiceKey}
-              onChange={setDefaultVoiceKey}
-              options={voiceOptions
-                .filter((item) => selectedVoices.includes(item.voice))
-                .map((item) => ({
-                  value: `${item.provider}:${item.voice}`,
-                  label: `${item.voice} · ${item.provider}`,
-                }))}
-            />
-          )}
-        >
-          {voiceOptions.map((option) => (
-            <Choice
-              key={`${option.provider}:${option.voice}`}
-              checked={selectedVoices.includes(option.voice)}
-              label={option.voice}
-              detail={option.provider}
-              onChange={() => toggleVoice(option)}
-            />
-          ))}
-        </ResourceGroup>
-      </div>
+      <AccountAccessFields form={accessForm} />
 
       <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-content-muted">偏好值不可用時，已自動改用目前授權清單的第一項。</p>
-        <button className="btn btn-primary" type="button" onClick={() => void generateBatch()} disabled={loading || submitting}>
+        <button className="btn btn-primary" type="button" onClick={() => void generateBatch()} disabled={accessForm.loading || submitting || !accessForm.complete}>
           {submitting ? "產生中…" : "產生 5 組帳號"}
         </button>
       </div>
@@ -436,7 +232,7 @@ export default function TemporaryBatchPanel() {
                       void revoke(batch.batch_id);
                     }}
                   >
-                    {revoking === batch.batch_id ? "撤銷中…" : revoked ? "已撤銷" : "撤銷整批"}
+                    {revokeButtonLabel(revoking === batch.batch_id, revoked)}
                   </button>
                 </div>
                 {batch.accounts && batch.accounts.length > 0 && (
@@ -455,86 +251,11 @@ export default function TemporaryBatchPanel() {
               </article>
             );
           })}
-          {!loading && batches.length === 0 && (
+          {!historyLoading && batches.length === 0 && (
             <p className="px-5 py-6 text-center text-sm text-content-muted">尚無臨時帳號批次</p>
           )}
         </div>
       </section>
     </section>
-  );
-}
-
-function ResourceGroup({
-  title,
-  description,
-  loading,
-  empty,
-  footer,
-  last = false,
-  children,
-}: {
-  title: string;
-  description: string;
-  loading: boolean;
-  empty: boolean;
-  footer: ReactNode;
-  last?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <fieldset className={`min-w-0 px-5 py-5 ${last ? "" : "border-b border-border lg:border-b-0 lg:border-r"}`}>
-      <legend className="font-semibold">{title}</legend>
-      <p className="mt-1 text-xs text-content-muted">{description}</p>
-      <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
-        {children}
-        {loading && <p className="text-sm text-content-muted" role="status">載入中…</p>}
-        {!loading && empty && <p className="text-sm text-content-muted">目前沒有可授權項目</p>}
-      </div>
-      {footer}
-    </fieldset>
-  );
-}
-
-function Choice({
-  checked,
-  label,
-  detail,
-  onChange,
-}: {
-  checked: boolean;
-  label: string;
-  detail: string;
-  onChange: () => void;
-}) {
-  return (
-    <label className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-2 py-2 last:border-b-0 hover:bg-surface-sunken">
-      <input className="h-4 w-4 accent-primary" type="checkbox" checked={checked} onChange={onChange} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{label}</span>
-        <span className="block truncate text-xs text-content-subtle">{detail}</span>
-      </span>
-    </label>
-  );
-}
-
-function DefaultSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <label className="mt-4 block border-t border-border pt-4 text-xs font-medium text-content-muted">
-      {label}
-      <select className="input mt-2" value={value} onChange={(event) => onChange(event.target.value)} disabled={options.length === 0}>
-        {options.length === 0 && <option value="">尚未選擇授權</option>}
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
-    </label>
   );
 }

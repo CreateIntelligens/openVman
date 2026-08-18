@@ -9,6 +9,9 @@ import {
   type Account,
   type AccountRole,
 } from "../api/auth";
+import AccountAccessFields, {
+  useAccountAccessForm,
+} from "../components/accounts/AccountAccessFields";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
@@ -38,10 +41,14 @@ export default function Accounts() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AccountRole>("user");
+  const [creationMode, setCreationMode] = useState<"formal" | "temporary">(
+    "formal",
+  );
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const accessForm = useAccountAccessForm("formal-account-create");
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -62,15 +69,24 @@ export default function Accounts() {
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!username.trim() || !password) return;
+    if (role === "user" && !accessForm.complete) {
+      setError("一般使用者必須先選好知識庫、人物、聲音與登入後預設值。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      const created = await createAccount({ username: username.trim(), password, role });
+      await createAccount({
+        username: username.trim(),
+        password,
+        role,
+        ...(role === "user" ? { access: accessForm.access } : {}),
+      });
       setUsername("");
       setPassword("");
       setRole("user");
+      accessForm.reload();
       await reload();
-      if (created.role === "user") setEditingAccountId(created.id);
     } catch (nextError) {
       setError(errorMessage(nextError, "建立帳號失敗"));
     } finally {
@@ -93,7 +109,7 @@ export default function Accounts() {
       <header className="page-header">
         <div>
           <h1 className="page-title">帳號管理</h1>
-          <p className="page-subtitle">建立帳號並管理登入狀態；資源歸屬由後端強制隔離。</p>
+          <p className="page-subtitle">先設定可用資源，再建立正式或臨時帳號；建立後仍可隨時調整。</p>
         </div>
       </header>
 
@@ -103,53 +119,129 @@ export default function Accounts() {
         </div>
       )}
 
-      <section className="card mb-6 p-5">
-        <h2 className="text-base font-semibold">新增帳號</h2>
-        <form className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_0.75fr_auto] md:items-end" onSubmit={handleCreate}>
-          <label className="text-sm font-medium">
-            帳號
-            <input
-              className="input mt-2"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              autoComplete="off"
-              disabled={submitting}
-              required
-            />
-          </label>
-          <label className="text-sm font-medium">
-            密碼
-            <input
-              className="input mt-2"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              minLength={8}
-              maxLength={72}
-              autoComplete="new-password"
-              disabled={submitting}
-              required
-            />
-          </label>
-          <label className="text-sm font-medium">
-            角色
-            <select
-              className="input mt-2"
-              value={role}
-              onChange={(event) => setRole(event.target.value as AccountRole)}
-              disabled={submitting}
-            >
-              <option value="user">一般使用者</option>
-              <option value="admin">管理員</option>
-            </select>
-          </label>
-          <button className="btn btn-primary" type="submit" disabled={submitting}>
-            {submitting ? "建立中…" : "建立帳號"}
-          </button>
-        </form>
-      </section>
+      <nav className="mb-4 flex border-b border-border" aria-label="選擇帳號建立方式">
+        <button
+          className={`-mb-px flex-1 border-b-2 px-4 py-3 text-left sm:flex-none ${
+            creationMode === "formal"
+              ? "border-primary text-content"
+              : "border-transparent text-content-muted hover:text-content"
+          }`}
+          type="button"
+          aria-pressed={creationMode === "formal"}
+          onClick={() => setCreationMode("formal")}
+        >
+          <span className="block text-sm font-semibold">正式帳號</span>
+          <span className="mt-1 block text-xs">持續使用，可個別管理權限</span>
+        </button>
+        <button
+          className={`-mb-px flex-1 border-b-2 px-4 py-3 text-left sm:flex-none ${
+            creationMode === "temporary"
+              ? "border-primary text-content"
+              : "border-transparent text-content-muted hover:text-content"
+          }`}
+          type="button"
+          aria-pressed={creationMode === "temporary"}
+          onClick={() => setCreationMode("temporary")}
+        >
+          <span className="block text-sm font-semibold">臨時帳號</span>
+          <span className="mt-1 block text-xs">每批 5 組，首次登入後 72 小時</span>
+        </button>
+      </nav>
 
-      <TemporaryBatchPanel />
+      {creationMode === "formal" && (
+        <section className="card mb-6 overflow-hidden">
+          <header className="border-b border-border px-5 py-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold">新增正式帳號</h2>
+              <span className="chip">1 帳號資料</span>
+              <span className="chip">2 資源權限</span>
+            </div>
+            <p className="mt-1 text-sm text-content-muted">
+              一般使用者會在建立當下取得所選權限，不需要再到帳號列表補設定。
+            </p>
+          </header>
+          <form onSubmit={handleCreate}>
+            <div className="grid gap-4 px-5 py-5 md:grid-cols-[1fr_1fr_0.75fr]">
+              <label className="text-sm font-medium">
+                帳號
+                <input
+                  className="input mt-2"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  autoComplete="off"
+                  disabled={submitting}
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium">
+                密碼
+                <input
+                  className="input mt-2"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  minLength={8}
+                  maxLength={72}
+                  autoComplete="new-password"
+                  disabled={submitting}
+                  required
+                />
+              </label>
+              <label className="text-sm font-medium">
+                角色
+                <select
+                  className="input mt-2"
+                  value={role}
+                  onChange={(event) => setRole(event.target.value as AccountRole)}
+                  disabled={submitting}
+                >
+                  <option value="user">一般使用者</option>
+                  <option value="admin">管理員</option>
+                </select>
+              </label>
+            </div>
+
+            {role === "user" ? (
+              <section className="border-t border-border" aria-labelledby="new-account-access-title">
+                <div className="px-5 py-4">
+                  <h3 id="new-account-access-title" className="font-semibold">資源權限</h3>
+                  <p className="mt-1 text-xs text-content-muted">
+                    每一類至少選一項；預設值只能從已授權的項目中指定。
+                  </p>
+                </div>
+                {accessForm.error && (
+                  <div className="mx-5 mb-4 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
+                    {accessForm.error}
+                  </div>
+                )}
+                <AccountAccessFields form={accessForm} />
+              </section>
+            ) : (
+              <div className="border-t border-border bg-surface-sunken px-5 py-4 text-sm text-content-muted">
+                管理員可使用所有已登錄資源，因此不需要另外設定資源權限。
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-content-muted">
+                建立後可從下方帳號列表重新調整一般使用者的資源權限。
+              </p>
+              <button
+                className="btn btn-primary self-start sm:self-auto"
+                type="submit"
+                disabled={
+                  submitting
+                  || (role === "user" && (accessForm.loading || !accessForm.complete))
+                }
+              >
+                {submitting ? "建立中…" : "建立正式帳號"}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {creationMode === "temporary" && <TemporaryBatchPanel />}
 
       <section className="card overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">

@@ -204,6 +204,76 @@ def test_admin_lifecycle_creator_revocation_and_immediate_disable(client, runtim
     assert enabled.json()["disabled"] is False
 
 
+def test_admin_creates_formal_account_with_access_atomically(client, runtime):
+    admin = _bootstrap_admin(runtime)
+    admin_headers = {
+        "Authorization": f"Bearer {_login(client, 'admin', _ADMIN_PASSWORD)['token']}",
+    }
+    for resource_type, resource_id in (
+        (ResourceType.PROJECT, "project-a"),
+        (ResourceType.AVATAR_CHARACTER, "character-a"),
+        (ResourceType.CUSTOM_VOICE, "voice-a"),
+    ):
+        runtime.resources.register(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            visibility=ResourceVisibility.SYSTEM_PUBLIC,
+            owner_user_id=None,
+            metadata={"label": resource_id},
+        )
+
+    access = {
+        "grants": {
+            "projects": ["project-a"],
+            "avatar_characters": ["character-a"],
+            "custom_voices": ["voice-a"],
+        },
+        "defaults": {
+            "project_id": "project-a",
+            "character_id": "character-a",
+            "voice_provider": "indextts",
+            "voice_id": "voice-a",
+        },
+    }
+    created = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "ready-user",
+            "password": _USER_PASSWORD,
+            "role": "user",
+            "access": access,
+        },
+    )
+
+    assert created.status_code == 201
+    assert created.json()["grants"] == access["grants"]
+    assert created.json()["defaults"] == access["defaults"]
+
+    invalid = client.post(
+        "/api/users",
+        headers=admin_headers,
+        json={
+            "username": "incomplete-user",
+            "password": _USER_PASSWORD,
+            "role": "user",
+            "access": {
+                **access,
+                "grants": {
+                    **access["grants"],
+                    "projects": ["missing-project"],
+                },
+                "defaults": {
+                    **access["defaults"],
+                    "project_id": "missing-project",
+                },
+            },
+        },
+    )
+    assert invalid.status_code == 422
+    assert runtime.users.get_by_username("incomplete-user") is None
+
+
 def test_admin_assigns_and_replaces_formal_account_resource_access(
     client,
     runtime,

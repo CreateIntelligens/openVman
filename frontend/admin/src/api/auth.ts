@@ -155,6 +155,7 @@ export async function createAccount(input: {
   username: string;
   password: string;
   role: AccountRole;
+  access?: AccountAccessInput;
 }): Promise<Account> {
   return fetchJson<Account>(apiUrl("/users"), {
     method: "POST",
@@ -209,10 +210,9 @@ export async function deleteAccount(userId: string): Promise<void> {
 
 const TEMPORARY_BATCHES_PATH = "/temporary-accounts/batches";
 
-export async function createTemporaryBatch(input: {
-  grants: AccountResourceGrants;
-  defaults: AccountDefaults;
-}): Promise<TemporaryBatchResult> {
+export async function createTemporaryBatch(
+  input: AccountAccessInput,
+): Promise<TemporaryBatchResult> {
   return fetchJson<TemporaryBatchResult>(apiUrl(TEMPORARY_BATCHES_PATH), {
     method: "POST",
     headers: { "Content-Type": "application/json" },

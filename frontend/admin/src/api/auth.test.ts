@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createAccount,
   createTemporaryBatch,
   fetchAccountAccessOptions,
   login,
@@ -102,6 +103,55 @@ describe("cookie auth API", () => {
         voice_provider: "indextts",
         voice_id: "hayley",
       },
+    });
+  });
+
+  it("creates a formal account with its selected access in one request", async () => {
+    const access = {
+      grants: {
+        projects: ["project-a"],
+        avatar_characters: ["character-a"],
+        custom_voices: ["voice-a"],
+      },
+      defaults: {
+        project_id: "project-a",
+        character_id: "character-a",
+        voice_provider: "indextts",
+        voice_id: "voice-a",
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: "user-a",
+      username: "alice",
+      role: "user",
+      kind: "formal",
+      disabled: false,
+      created_at: "2026-08-18T00:00:00Z",
+      grants: access.grants,
+      defaults: access.defaults,
+    }), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createAccount({
+      username: "alice",
+      password: "correct horse battery staple",
+      role: "user",
+      access,
+    });
+
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/users",
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    expect(JSON.parse(String(request.body))).toEqual({
+      username: "alice",
+      password: "correct horse battery staple",
+      role: "user",
+      access,
     });
   });
 

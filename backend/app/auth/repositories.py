@@ -222,6 +222,78 @@ def _normalize_account_access(
     return normalized_grants, normalized_defaults
 
 
+def _persist_account_access(
+    connection: sqlite3.Connection,
+    *,
+    user_id: str,
+    granted_by: str | None,
+    normalized_grants: Sequence[tuple[ResourceType, str]],
+    normalized_defaults: tuple[str, str, str, str],
+    now: str,
+    clear_existing: bool = False,
+) -> None:
+    for resource_type, resource_id in normalized_grants:
+        resource = connection.execute(
+            """
+            SELECT 1 FROM resources
+            WHERE resource_type = ? AND resource_id = ?
+            """,
+            (resource_type.value, resource_id),
+        ).fetchone()
+        if resource is None:
+            raise InvalidResourceGrantError(
+                "resource is not registered: "
+                f"{resource_type.value}/{resource_id}"
+            )
+
+    if clear_existing:
+        connection.execute(
+            "DELETE FROM resource_grants WHERE grantee_user_id = ?",
+            (user_id,),
+        )
+
+    connection.executemany(
+        """
+        INSERT INTO resource_grants(
+            grantee_user_id, resource_type, resource_id,
+            granted_by, created_at
+        ) VALUES (?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                user_id,
+                resource_type.value,
+                resource_id,
+                granted_by,
+                now,
+            )
+            for resource_type, resource_id in normalized_grants
+        ],
+    )
+    project_id, character_id, voice_provider, voice_id = normalized_defaults
+    connection.execute(
+        """
+        INSERT INTO account_defaults(
+            user_id, project_id, character_id,
+            voice_provider, voice_id
+        ) VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            project_id = excluded.project_id,
+            character_id = excluded.character_id,
+            voice_provider = excluded.voice_provider,
+            voice_id = excluded.voice_id
+        """,
+        (
+            user_id,
+            project_id,
+            character_id,
+            voice_provider,
+            voice_id,
+        ),
+    )
+
+
+
 class UserRepository:
     def __init__(self, database: AuthDatabase) -> None:
         self.database = database
@@ -234,7 +306,23 @@ class UserRepository:
         role: AccountRole,
         created_by: str | None = None,
         account_type: AccountType = AccountType.FORMAL,
+        grants: Iterable[tuple[ResourceType, str]] | None = None,
+        defaults: tuple[str, str, str, str] | None = None,
     ) -> UserRecord:
+        if (grants is None) != (defaults is None):
+            raise InvalidResourceGrantError(
+                "account grants and defaults must be provided together"
+            )
+        normalized_access = (
+            _normalize_account_access(grants, defaults)
+            if grants is not None and defaults is not None
+            else None
+        )
+        if normalized_access is not None and role is AccountRole.ADMIN:
+            raise InvalidResourceGrantError(
+                "administrator accounts already have unrestricted access"
+            )
+
         user_id = f"usr_{uuid4().hex}"
         display_username = _display_username(username)
         normalized_username = normalize_username(username)
@@ -269,6 +357,17 @@ class UserRepository:
                         created_by,
                     ),
                 )
+                if normalized_access is not None:
+                    normalized_grants, normalized_defaults = normalized_access
+                    _persist_account_access(
+                        connection,
+                        user_id=user_id,
+                        granted_by=created_by,
+                        normalized_grants=normalized_grants,
+                        normalized_defaults=normalized_defaults,
+                        now=now,
+                        clear_existing=False,
+                    )
         except sqlite3.IntegrityError as exc:
             if "username_normalized" in str(exc):
                 raise UsernameConflictError("username already exists") from exc
@@ -652,9 +751,6 @@ class AccountAccessRepository:
             grants,
             defaults,
         )
-        project_id, character_id, voice_provider, voice_id = (
-            normalized_defaults
-        )
         now = _now_iso()
         with self.database.transaction(write=True) as connection:
             actor = connection.execute(
@@ -688,61 +784,14 @@ class AccountAccessRepository:
                     "administrator accounts already have unrestricted access"
                 )
 
-            for resource_type, resource_id in normalized_grants:
-                resource = connection.execute(
-                    """
-                    SELECT 1 FROM resources
-                    WHERE resource_type = ? AND resource_id = ?
-                    """,
-                    (resource_type.value, resource_id),
-                ).fetchone()
-                if resource is None:
-                    raise InvalidResourceGrantError(
-                        "resource is not registered: "
-                        f"{resource_type.value}/{resource_id}"
-                    )
-
-            connection.execute(
-                "DELETE FROM resource_grants WHERE grantee_user_id = ?",
-                (user_id,),
-            )
-            connection.executemany(
-                """
-                INSERT INTO resource_grants(
-                    grantee_user_id, resource_type, resource_id,
-                    granted_by, created_at
-                ) VALUES (?, ?, ?, ?, ?)
-                """,
-                [
-                    (
-                        user_id,
-                        resource_type.value,
-                        resource_id,
-                        granted_by,
-                        now,
-                    )
-                    for resource_type, resource_id in normalized_grants
-                ],
-            )
-            connection.execute(
-                """
-                INSERT INTO account_defaults(
-                    user_id, project_id, character_id,
-                    voice_provider, voice_id
-                ) VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(user_id) DO UPDATE SET
-                    project_id = excluded.project_id,
-                    character_id = excluded.character_id,
-                    voice_provider = excluded.voice_provider,
-                    voice_id = excluded.voice_id
-                """,
-                (
-                    user_id,
-                    project_id,
-                    character_id,
-                    voice_provider,
-                    voice_id,
-                ),
+            _persist_account_access(
+                connection,
+                user_id=user_id,
+                granted_by=granted_by,
+                normalized_grants=normalized_grants,
+                normalized_defaults=normalized_defaults,
+                now=now,
+                clear_existing=True,
             )
 
         updated_defaults = self.get_defaults(user_id)
@@ -883,36 +932,14 @@ class TemporaryAccountRepository:
                             duration_seconds,
                         ),
                     )
-                    for resource_type, resource_id in normalized_grants:
-                        connection.execute(
-                            """
-                            INSERT INTO resource_grants(
-                                grantee_user_id, resource_type, resource_id,
-                                granted_by, created_at
-                            ) VALUES (?, ?, ?, ?, ?)
-                            """,
-                            (
-                                user_id,
-                                resource_type.value,
-                                resource_id,
-                                created_by,
-                                now,
-                            ),
-                        )
-                    connection.execute(
-                        """
-                        INSERT INTO account_defaults(
-                            user_id, project_id, character_id,
-                            voice_provider, voice_id
-                        ) VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (
-                            user_id,
-                            project_id,
-                            character_id,
-                            voice_provider,
-                            voice_id,
-                        ),
+                    _persist_account_access(
+                        connection,
+                        user_id=user_id,
+                        granted_by=created_by,
+                        normalized_grants=normalized_grants,
+                        normalized_defaults=normalized_defaults,
+                        now=now,
+                        clear_existing=False,
                     )
         except sqlite3.IntegrityError as exc:
             raise RepositoryError("temporary batch could not be created") from exc
