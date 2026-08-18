@@ -109,10 +109,10 @@ function selectMode(nextMode: "formal" | "temporary"): void {
             />
           </label>
           <label>
-            <span>密碼</span>
+            <span>{{ mode === "formal" ? "密碼" : "臨時密碼" }}</span>
             <input
               v-model="password"
-              type="password"
+              :type="mode === 'formal' ? 'password' : 'text'"
               :autocomplete="mode === 'formal' ? 'current-password' : 'one-time-code'"
               :disabled="submitting"
             />

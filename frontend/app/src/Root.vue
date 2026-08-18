@@ -94,7 +94,8 @@ onUnmounted(() => {
     <section class="forbidden-card">
       <p class="forbidden-symbol" aria-hidden="true">!</p>
       <h1>權限不足</h1>
-      <p>帳號「{{ auth.account.value.username }}」沒有存取這個功能的權限。</p>
+      <p v-if="isTemporary">此臨時存取沒有存取這個功能的權限。</p>
+      <p v-else>帳號「{{ auth.account.value.username }}」沒有存取這個功能的權限。</p>
       <div class="forbidden-actions">
         <button type="button" @click="auth.clearForbidden">返回</button>
         <button

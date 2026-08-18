@@ -237,10 +237,10 @@ export default function TemporaryBatchPanel() {
                 </div>
                 {batch.accounts && batch.accounts.length > 0 && (
                   <div className="mt-3 grid gap-x-5 gap-y-2 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {batch.accounts.map((account) => (
+                    {batch.accounts.map((account, index) => (
                       <div key={account.user_id} className="flex min-w-0 items-center justify-between gap-3 text-xs">
                         <span className="min-w-0">
-                          <span className="block truncate text-content-muted">{account.username}</span>
+                          <span className="block truncate text-content-muted">第 {index + 1} 組</span>
                           <span className="block text-content-subtle">{remainingLabel(account.remaining_seconds)}</span>
                         </span>
                         <span className="chip shrink-0">{stateLabel(account.state)}</span>

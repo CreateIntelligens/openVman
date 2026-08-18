@@ -899,7 +899,7 @@ class TemporaryAccountRepository:
                 )
                 for credential in credentials:
                     user_id = f"usr_{uuid4().hex}"
-                    username = f"Temporary {credential.locator}"
+                    username = credential.locator
                     connection.execute(
                         """
                         INSERT INTO users(
