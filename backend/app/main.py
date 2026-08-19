@@ -15,7 +15,6 @@ import httpx
 from fastapi import FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.auth.middleware import FailClosedAuthMiddleware
@@ -58,6 +57,7 @@ from app.routes import avatar as avatar_routes
 from app.routes import backgrounds as background_routes
 from app.routes import mascots as mascot_routes
 from app.routes import public_characters as public_characters_routes
+from app.routes import static_assets as static_assets_routes
 from app.service import TTSRouterService
 from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.tts_text import clean_for_tts, prepare_tts_text_async
@@ -183,9 +183,10 @@ async def _shutdown_gateway_resources() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    get_auth_runtime()
+    runtime = get_auth_runtime()
     await _startup_gateway_resources()
     await _build_openapi_schema()
+    await admin_routes.sync_tts_custom_voices(runtime)
     logger.info("backend startup complete")
     try:
         yield
@@ -216,52 +217,6 @@ async def http_metrics_middleware(request: Request, call_next):
     return response
 
 
-def _mount_static_assets(
-    app_instance: FastAPI,
-    *,
-    route_path: str,
-    directory: str,
-    name: str,
-) -> None:
-    asset_dir = Path(directory)
-    try:
-        asset_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as exc:
-        # The configured dir may not be writable at import time outside the
-        # container (local dev / CI). Don't crash import; StaticFiles below is
-        # mounted with check_dir=False so it tolerates a missing directory and
-        # the dir is created at runtime where the volume is writable.
-        logger.warning("%s dir not preparable at import: %s", name, exc)
-
-    app_instance.mount(
-        route_path,
-        StaticFiles(directory=str(asset_dir), check_dir=False),
-        name=name,
-    )
-
-
-def _mount_avatar_assets(app_instance: FastAPI) -> None:
-    cfg = get_tts_config()
-    _mount_static_assets(
-        app_instance,
-        route_path="/assets",
-        directory=cfg.avatar_assets_dir,
-        name="avatar-assets",
-    )
-    _mount_static_assets(
-        app_instance,
-        route_path="/backgrounds",
-        directory=cfg.avatar_backgrounds_dir,
-        name="avatar-backgrounds",
-    )
-    _mount_static_assets(
-        app_instance,
-        route_path="/mascots",
-        directory=cfg.avatar_mascots_dir,
-        name="avatar-mascots",
-    )
-
-
 app.include_router(gateway_router)
 app.include_router(vision_router)
 app.include_router(internal_router)
@@ -273,10 +228,10 @@ app.include_router(avatar_routes.router)
 app.include_router(public_characters_routes.router)
 app.include_router(background_routes.router)
 app.include_router(mascot_routes.router)
+app.include_router(static_assets_routes.router)
 app.include_router(project_router)
 app.include_router(brain_proxy_router)
 app.include_router(websocket_routes.router)
-_mount_avatar_assets(app)
 
 
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:

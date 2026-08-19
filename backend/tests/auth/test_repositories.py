@@ -39,7 +39,7 @@ def test_migration_is_idempotent_and_enables_sqlite_safety_pragmas(tmp_path: Pat
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()[0]
         busy_timeout = connection.execute("PRAGMA busy_timeout").fetchone()[0]
 
-    assert [row["version"] for row in migrations] == [1, 2]
+    assert [row["version"] for row in migrations] == [1, 2, 3]
     assert journal_mode == "wal"
     assert foreign_keys == 1
     assert busy_timeout == 5000
@@ -60,7 +60,7 @@ def test_temporary_migration_recovers_when_column_already_exists(tmp_path: Path)
         columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(users)")
         }
-    assert [row["version"] for row in migrations] == [1, 2]
+    assert [row["version"] for row in migrations] == [1, 2, 3]
     assert "account_type" in columns
 
 

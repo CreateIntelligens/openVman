@@ -183,6 +183,7 @@ import {
 import { useSettingsStore } from "./stores/useSettingsStore";
 import {
   isUploadedAvatarBackgroundId,
+  normalizeAvatarBackgroundId,
   type AvatarBackgroundFit,
   type AvatarBackgroundId,
 } from "./types/avatarBackground";
@@ -374,14 +375,14 @@ async function fetchVrmAvatars(): Promise<void> {
     const items = (data.mascots ?? [])
       .map(toMascotOption)
       .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
-    vrmAvatarOptions.value = items.length > 0 ? items : fallbackVrmAvatarOptions;
+    vrmAvatarOptions.value = items;
   } catch {
-    vrmAvatarOptions.value = fallbackVrmAvatarOptions;
+    vrmAvatarOptions.value = [];
   } finally {
-    settings.vrmAvatarId = resolveVrmAvatarOption(
-      settings.vrmAvatarId,
-      vrmAvatarOptions.value,
-    ).id;
+    const preferred = accountDefault("mascot_id", "");
+    const preferredOption = vrmAvatarOptions.value.find((m) => m.id === preferred);
+    const selected = preferredOption ?? vrmAvatarOptions.value[0];
+    settings.vrmAvatarId = selected?.id ?? "";
   }
 }
 
@@ -510,7 +511,7 @@ async function fetchTtsProviders(): Promise<void> {
         `預設聲音 ${preferredProvider}/${preferredVoice} 未獲授權，已改用 ${selectedProvider.id}/${selectedVoice}。`,
       );
     } else if (!selectedProvider) {
-      addSelectionNotice("目前帳號沒有可使用的自訂聲音。");
+      addSelectionNotice("目前沒有可用的語音");
     }
   } catch {
     // silently keep empty — SettingsModal falls back to showing nothing
@@ -522,7 +523,12 @@ async function fetchBackgrounds(): Promise<void> {
     const res = await apiFetch("/api/backgrounds");
     if (!res.ok) return;
     const data = await res.json();
-    backgrounds.value = data.backgrounds ?? [];
+    const items = data.backgrounds ?? [];
+    backgrounds.value = items;
+    const preferred = accountDefault("background_id", "");
+    if (preferred && items.some((b: { background_id: string }) => b.background_id === preferred)) {
+      settings.backgroundId = normalizeAvatarBackgroundId(`uploaded:${preferred}`);
+    }
   } catch {
     backgrounds.value = [];
   }

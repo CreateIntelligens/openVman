@@ -240,11 +240,12 @@ def load_core_workspace_context(persona_id: str = "default", project_id: str = "
     return content
 
 
-def is_indexable_document(path: Path, project_id: str = "default") -> bool:
+def is_indexable_document(path: Path, project_id: str = "default", root: Path | None = None) -> bool:
     """Return whether a workspace file should be embedded into knowledge."""
     from personas.personas import is_persona_core_relative_path
 
-    relative = path.relative_to(ensure_workspace_scaffold(project_id)).as_posix()
+    workspace_root = root if root is not None else get_workspace_root(project_id)
+    relative = path.relative_to(workspace_root).as_posix()
     if relative in RESERVED_INDEX_PATHS:
         return False
     if is_persona_core_relative_path(relative):
@@ -270,7 +271,7 @@ def iter_indexable_documents(project_id: str = "default") -> list[Path]:
         for path in root.rglob("*")
         if path.is_file() and path.suffix.lower() in ALLOWED_INDEX_SUFFIXES
     )
-    return [path for path in all_files if is_indexable_document(path, project_id)]
+    return [path for path in all_files if is_indexable_document(path, project_id, root=root)]
 
 
 def iter_knowledge_documents(project_id: str = "default") -> list[Path]:

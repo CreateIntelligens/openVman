@@ -28,6 +28,7 @@ def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
         "tts_gcp_enabled": False,
         "tts_aws_enabled": False,
         "tts_gemini_url": "",
+        "normalize_api_url": "",
         "edge_tts_enabled": True,
         "edge_tts_voice": "zh-TW-HsiaoChenNeural",
         "is_dev": False,
@@ -57,9 +58,15 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
     for name in ("app.gateway.websocket", "app.routes.admin", "app.main"):
         monkeypatch.delitem(sys.modules, name, raising=False)
     module = importlib.import_module("app.main")
-    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
-        max_upload_bytes=max_upload_bytes,
-    ))
+    _cfg = lambda: _make_test_config(max_upload_bytes=max_upload_bytes)
+    monkeypatch.setattr(module, "get_tts_config", _cfg)
+
+    # tts_text 綁定了自己的 get_tts_config，且會回退讀 NORMALIZE_API_URL。
+    # 兩條路都要擋，否則正規化會另開一個 httpx client 干擾測試斷言。
+    import app.tts_text
+    monkeypatch.setattr(app.tts_text, "get_tts_config", _cfg)
+    monkeypatch.delenv("NORMALIZE_API_URL", raising=False)
+
     return module, fake_anydoc_mod
 
 
@@ -319,7 +326,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
             }
 
     class FakeClient:
-        async def get(self, url: str, timeout=None, headers=None):
+        async def get(self, url: str, timeout=None, headers=None, follow_redirects=None):
             assert url == "http://index-tts-vllm:8011/audio/voices"
             assert headers == {"X-Internal-Token": "test-internal-token"}
             return FakeResponse()
@@ -365,7 +372,7 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 
     class FakeClient:
-        async def get(self, url: str, timeout=None, headers=None):
+        async def get(self, url: str, timeout=None, headers=None, follow_redirects=None):
             raise ConnectionError("index-tts-vllm unreachable")
 
     async def _fake_close() -> None:
@@ -398,7 +405,7 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
     class FakeClient:
         def get(self):
             class FakeAsyncClient:
-                async def get(self, url: str, timeout=None):
+                async def get(self, url: str, timeout=None, follow_redirects=None):
                     class FakeResponse:
                         def raise_for_status(self):
                             pass

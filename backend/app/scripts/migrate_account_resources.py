@@ -40,6 +40,8 @@ _DEFAULT_PROJECT_ID = "proj-b85afb8bb6"
 _DEFAULT_CHARACTER_ID = "0713"
 _DEFAULT_VOICE_PROVIDER = "indextts"
 _DEFAULT_VOICE_ID = "hayley"
+_DEFAULT_MASCOT_ID = "haru-live2d"
+_DEFAULT_BACKGROUND_ID = "8881"
 
 
 @dataclass(frozen=True, slots=True)
@@ -566,6 +568,8 @@ def _reconcile_formal_defaults(
         _DEFAULT_CHARACTER_ID,
         _DEFAULT_VOICE_PROVIDER,
         _DEFAULT_VOICE_ID,
+        _DEFAULT_MASCOT_ID,
+        _DEFAULT_BACKGROUND_ID,
     )
     required_resources = (
         (ResourceType.PROJECT, _DEFAULT_PROJECT_ID),
@@ -613,6 +617,8 @@ def _reconcile_formal_defaults(
             "character_id": desired[1],
             "voice_provider": desired[2],
             "voice_id": desired[3],
+            "mascot_id": desired[4],
+            "background_id": desired[5],
         }
         if dry_run:
             report["defaults"]["would_create"].append(entry)
@@ -621,8 +627,9 @@ def _reconcile_formal_defaults(
             inserted = connection.execute(
                 """
                 INSERT OR IGNORE INTO account_defaults(
-                    user_id, project_id, character_id, voice_provider, voice_id
-                ) VALUES (?, ?, ?, ?, ?)
+                    user_id, project_id, character_id, voice_provider, voice_id,
+                    mascot_id, background_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (user.id, *desired),
             ).rowcount

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime, timezone
-import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -58,12 +58,25 @@ def list_knowledge_base_directories(project_id: str = "default") -> list[str]:
 
 def _list_document_summaries(paths: Iterable[Path], project_id: str) -> list[dict[str, Any]]:
     """Build summaries with per-list shared index/QA-reference state."""
+    from knowledge.doc_meta import load_doc_meta
     from knowledge.qa_nodes import referenced_source_paths
 
+    root = ensure_workspace_scaffold(project_id)
+    core_docs = get_core_documents(project_id)
+    core_paths = {core_path.relative_to(root).as_posix() for core_path in core_docs.values()}
     index_state = load_index_state(project_id)
     qa_paths = referenced_source_paths(project_id)
+    doc_meta = load_doc_meta(project_id)
     return [
-        _build_document_summary(path, project_id, index_state=index_state, qa_referenced_paths=qa_paths)
+        _build_document_summary(
+            path,
+            project_id,
+            root=root,
+            core_paths=core_paths,
+            index_state=index_state,
+            qa_referenced_paths=qa_paths,
+            doc_meta=doc_meta,
+        )
         for path in paths
     ]
 
@@ -410,14 +423,31 @@ def _build_document_summary(
     content: str | None = None,
     index_state: dict[str, str] | None = None,
     qa_referenced_paths: set[str] | None = None,
+    root: Path | None = None,
+    core_paths: set[str] | None = None,
+    doc_meta: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    root = ensure_workspace_scaffold(project_id)
+    from knowledge.doc_meta import _resolved_entry
+
+    if root is None:
+        root = ensure_workspace_scaffold(project_id)
     relative_path = path.relative_to(root)
     stat = path.stat()
     relative_text = relative_path.as_posix()
-    core_docs = get_core_documents(project_id)
-    core_paths = {core_path.relative_to(root).as_posix() for core_path in core_docs.values()}
-    preview_text = content if content is not None else path.read_text(encoding="utf-8-sig")
+    if core_paths is None:
+        core_docs = get_core_documents(project_id)
+        core_paths = {core_path.relative_to(root).as_posix() for core_path in core_docs.values()}
+
+    if content is not None:
+        preview_text = content
+    else:
+        try:
+            with path.open("rb") as f:
+                raw = f.read(1024)
+            preview_text = raw.decode("utf-8-sig", errors="replace")
+        except Exception:
+            preview_text = ""
+
     is_indexable = is_indexable_document(path, project_id)
 
     # Determine if the file has been indexed by comparing its fingerprint
@@ -428,7 +458,12 @@ def _build_document_summary(
         stored_fp = state.get(relative_text, "")
         if stored_fp:
             is_indexed = stored_fp == fingerprint_document(path)
-    document_meta = get_document_meta(relative_text, project_id)
+
+    if doc_meta is not None:
+        raw_entry = doc_meta.get(relative_text, {})
+        document_meta = _resolved_entry(raw_entry)
+    else:
+        document_meta = get_document_meta(relative_text, project_id)
 
     qa_attached = False
     if document_meta["source_type"] == "qa":

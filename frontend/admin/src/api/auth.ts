@@ -14,6 +14,8 @@ export interface AccountDefaults {
   character_id: string;
   voice_provider: string;
   voice_id: string;
+  mascot_id?: string;
+  background_id?: string;
 }
 
 export interface AccountProfile {
@@ -55,6 +57,8 @@ export interface AccountResourceGrants {
   projects: string[];
   avatar_characters: string[];
   custom_voices: string[];
+  avatar_mascots?: string[];
+  avatar_backgrounds?: string[];
 }
 
 export interface AccountAccessOption {
@@ -67,6 +71,8 @@ export interface AccountAccessOptions {
   projects: AccountAccessOption[];
   avatar_characters: AccountAccessOption[];
   custom_voices: AccountAccessOption[];
+  avatar_mascots?: AccountAccessOption[];
+  avatar_backgrounds?: AccountAccessOption[];
 }
 
 export interface AccountAccessInput {

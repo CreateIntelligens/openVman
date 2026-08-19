@@ -128,13 +128,29 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
   return parseJson<T>(res);
 }
 
+const AUTH_WHITELIST = [
+  "/api/auth/login",
+  "/api/auth/temporary-login",
+];
+
+function isAuthEndpoint(input: RequestInfo | URL): boolean {
+  const url = typeof input === "string"
+    ? input
+    : input instanceof URL
+      ? input.pathname
+      : input.url;
+  return AUTH_WHITELIST.some((path) => url.includes(path));
+}
+
 export async function apiFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
   const res = await fetch(input, { ...init, credentials: "include" });
-  if (res.status === 401) unauthorizedHandler?.();
-  if (res.status === 403) forbiddenHandler?.();
+  if (!isAuthEndpoint(input)) {
+    if (res.status === 401) unauthorizedHandler?.();
+    if (res.status === 403) forbiddenHandler?.();
+  }
   return res;
 }
 

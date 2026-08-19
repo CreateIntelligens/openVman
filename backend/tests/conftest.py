@@ -5,12 +5,38 @@ from __future__ import annotations
 import os
 import sys
 import types
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 os.environ.setdefault("SESSION_JWT_SECRET", "test-session-jwt-secret-for-backend-unit-tests")
 os.environ.setdefault("AUTH_COOKIE_SECURE", "false")
+
+# Repo-structure tests read docker-compose.yml / Dockerfile / .env.example from
+# the project root. Only the backend subtree is mounted into the container, so
+# they can only run on the host.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT_AVAILABLE = (_REPO_ROOT / "docker-compose.yml").is_file()
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "requires_repo_root: needs project-root files (host only, not mounted in container)",
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config,
+    items: list[pytest.Item],
+) -> None:
+    if REPO_ROOT_AVAILABLE:
+        return
+    skip = pytest.mark.skip(reason="project root not available (running inside container)")
+    for item in items:
+        if "requires_repo_root" in item.keywords:
+            item.add_marker(skip)
 
 
 @pytest.fixture(autouse=True)

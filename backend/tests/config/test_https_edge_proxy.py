@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.requires_repo_root
 
 ROOT = Path(__file__).resolve().parents[3]
 

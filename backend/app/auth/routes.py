@@ -66,6 +66,8 @@ class AccountDefaultsProfile(_StrictModel):
     character_id: str
     voice_provider: str
     voice_id: str
+    mascot_id: str = ""
+    background_id: str = ""
 
     @classmethod
     def from_record(cls, record: AccountDefaultsRecord) -> AccountDefaultsProfile:
@@ -74,6 +76,8 @@ class AccountDefaultsProfile(_StrictModel):
             character_id=record.character_id,
             voice_provider=record.voice_provider,
             voice_id=record.voice_id,
+            mascot_id=record.mascot_id,
+            background_id=record.background_id,
         )
 
 
@@ -81,6 +85,8 @@ class AccountResourceGrants(_StrictModel):
     projects: list[str] = Field(min_length=1)
     avatar_characters: list[str] = Field(min_length=1)
     custom_voices: list[str] = Field(min_length=1)
+    avatar_mascots: list[str] = Field(default_factory=list)
+    avatar_backgrounds: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_records(
@@ -91,6 +97,8 @@ class AccountResourceGrants(_StrictModel):
             ResourceType.PROJECT: [],
             ResourceType.AVATAR_CHARACTER: [],
             ResourceType.CUSTOM_VOICE: [],
+            ResourceType.AVATAR_MASCOT: [],
+            ResourceType.AVATAR_BACKGROUND: [],
         }
         for record in records:
             if record.resource_type in values:
@@ -99,6 +107,8 @@ class AccountResourceGrants(_StrictModel):
             projects=values[ResourceType.PROJECT],
             avatar_characters=values[ResourceType.AVATAR_CHARACTER],
             custom_voices=values[ResourceType.CUSTOM_VOICE],
+            avatar_mascots=values[ResourceType.AVATAR_MASCOT],
+            avatar_backgrounds=values[ResourceType.AVATAR_BACKGROUND],
         )
 
 
@@ -115,17 +125,27 @@ def _resource_grants(
             (ResourceType.CUSTOM_VOICE, value)
             for value in grants.custom_voices
         ),
+        *(
+            (ResourceType.AVATAR_MASCOT, value)
+            for value in grants.avatar_mascots
+        ),
+        *(
+            (ResourceType.AVATAR_BACKGROUND, value)
+            for value in grants.avatar_backgrounds
+        ),
     ]
 
 
 def _defaults_tuple(
     defaults: AccountDefaultsProfile,
-) -> tuple[str, str, str, str]:
+) -> tuple[str, str, str, str, str, str]:
     return (
         defaults.project_id,
         defaults.character_id,
         defaults.voice_provider,
         defaults.voice_id,
+        defaults.mascot_id,
+        defaults.background_id,
     )
 
 
@@ -256,6 +276,8 @@ class AccountAccessOptions(_StrictModel):
     projects: list[AccountAccessOption]
     avatar_characters: list[AccountAccessOption]
     custom_voices: list[AccountAccessOption]
+    avatar_mascots: list[AccountAccessOption] = Field(default_factory=list)
+    avatar_backgrounds: list[AccountAccessOption] = Field(default_factory=list)
 
 
 class TemporaryCredentialCreated(_StrictModel):
@@ -385,7 +407,12 @@ def temporary_login(
             user_id=user.id,
             now=now,
         )
-    except (TemporaryCredentialExpiredError, TemporaryCredentialNotFoundError) as exc:
+    except TemporaryCredentialExpiredError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="此批次已過期或被撤銷",
+        ) from exc
+    except TemporaryCredentialNotFoundError as exc:
         raise HTTPException(status_code=401, detail=_INVALID_CREDENTIALS) from exc
 
     expires_at = datetime.fromisoformat(credential.expires_at or "")
@@ -502,14 +529,6 @@ def _temporary_batch_audit(
         account.expires_at for account in accounts if account.expires_at is not None
     ]
     first_account = batch.accounts[0]
-    grant_values: dict[ResourceType, list[str]] = {
-        ResourceType.PROJECT: [],
-        ResourceType.AVATAR_CHARACTER: [],
-        ResourceType.CUSTOM_VOICE: [],
-    }
-    for grant in first_account.grants:
-        if grant.resource_type in grant_values:
-            grant_values[grant.resource_type].append(grant.resource_id)
     return TemporaryBatchAudit(
         batch_id=batch.batch.id,
         created_by=batch.batch.created_by,
@@ -519,11 +538,7 @@ def _temporary_batch_audit(
         first_used_at=min(first_used_values) if first_used_values else None,
         expires_at=max(expires_values) if expires_values else None,
         account_count=len(accounts),
-        grants=AccountResourceGrants(
-            projects=grant_values[ResourceType.PROJECT],
-            avatar_characters=grant_values[ResourceType.AVATAR_CHARACTER],
-            custom_voices=grant_values[ResourceType.CUSTOM_VOICE],
-        ),
+        grants=AccountResourceGrants.from_records(first_account.grants),
         defaults=AccountDefaultsProfile.from_record(first_account.defaults),
         accounts=accounts,
     )
@@ -674,6 +689,18 @@ def list_account_access_options(
             _resource_option(record)
             for record in runtime.resources.list_by_type(
                 ResourceType.CUSTOM_VOICE
+            )
+        ],
+        avatar_mascots=[
+            _resource_option(record)
+            for record in runtime.resources.list_by_type(
+                ResourceType.AVATAR_MASCOT
+            )
+        ],
+        avatar_backgrounds=[
+            _resource_option(record)
+            for record in runtime.resources.list_by_type(
+                ResourceType.AVATAR_BACKGROUND
             )
         ],
     )

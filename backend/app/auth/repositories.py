@@ -159,12 +159,15 @@ def _grant_from_row(row: sqlite3.Row) -> ResourceGrantRecord:
 
 
 def _defaults_from_row(row: sqlite3.Row) -> AccountDefaultsRecord:
+    keys = set(row.keys())
     return AccountDefaultsRecord(
         user_id=row["user_id"],
         project_id=row["project_id"],
         character_id=row["character_id"],
         voice_provider=row["voice_provider"],
         voice_id=row["voice_id"],
+        mascot_id=row["mascot_id"] or "" if "mascot_id" in keys and row["mascot_id"] else "",
+        background_id=row["background_id"] or "" if "background_id" in keys and row["background_id"] else "",
     )
 
 
@@ -180,46 +183,62 @@ def _resource_from_row(row: sqlite3.Row) -> ResourceRecord:
 
 
 def _normalize_account_access(
-    grants: Iterable[tuple[ResourceType, str]],
-    defaults: tuple[str, str, str, str],
-) -> tuple[
-    tuple[tuple[ResourceType, str], ...],
-    tuple[str, str, str, str],
-]:
+    grants: Sequence[tuple[ResourceType, str]],
+    defaults: tuple[str, ...],
+) -> tuple[tuple[tuple[ResourceType, str], ...], tuple[str, str, str, str, str, str]]:
     normalized_grants = tuple(
         sorted(
             {
-                (resource_type, resource_id.strip())
-                for resource_type, resource_id in grants
-                if resource_id.strip()
+                (item[0], item[1].strip())
+                for item in grants
+                if item[1].strip()
             },
             key=lambda item: (item[0].value, item[1]),
         )
     )
+    grant_types = {item[0] for item in normalized_grants}
     required_types = {
         ResourceType.PROJECT,
         ResourceType.AVATAR_CHARACTER,
         ResourceType.CUSTOM_VOICE,
     }
-    if {item[0] for item in normalized_grants} != required_types:
+    if not required_types.issubset(grant_types):
         raise InvalidResourceGrantError(
             "project, avatar character, and voice grants are required"
         )
 
     normalized_defaults = tuple(value.strip() for value in defaults)
-    if not all(normalized_defaults):
-        raise InvalidResourceGrantError("all account defaults are required")
-    project_id, character_id, _voice_provider, voice_id = normalized_defaults
+    if len(normalized_defaults) < 4 or not all(normalized_defaults[:4]):
+        raise InvalidResourceGrantError("all required account defaults are required")
+    project_id = normalized_defaults[0]
+    character_id = normalized_defaults[1]
+    voice_provider = normalized_defaults[2]
+    voice_id = normalized_defaults[3]
+    mascot_id = normalized_defaults[4] if len(normalized_defaults) > 4 else ""
+    background_id = normalized_defaults[5] if len(normalized_defaults) > 5 else ""
+
     default_resources = {
         (ResourceType.PROJECT, project_id),
         (ResourceType.AVATAR_CHARACTER, character_id),
         (ResourceType.CUSTOM_VOICE, voice_id),
     }
+    if mascot_id:
+        default_resources.add((ResourceType.AVATAR_MASCOT, mascot_id))
+    if background_id:
+        default_resources.add((ResourceType.AVATAR_BACKGROUND, background_id))
+
     if not default_resources.issubset(set(normalized_grants)):
         raise InvalidResourceGrantError(
             "account defaults must be present in the selected grants"
         )
-    return normalized_grants, normalized_defaults
+    return normalized_grants, (
+        project_id,
+        character_id,
+        voice_provider,
+        voice_id,
+        mascot_id,
+        background_id,
+    )
 
 
 def _persist_account_access(
@@ -228,7 +247,7 @@ def _persist_account_access(
     user_id: str,
     granted_by: str | None,
     normalized_grants: Sequence[tuple[ResourceType, str]],
-    normalized_defaults: tuple[str, str, str, str],
+    normalized_defaults: tuple[str, ...],
     now: str,
     clear_existing: bool = False,
 ) -> None:
@@ -270,18 +289,26 @@ def _persist_account_access(
             for resource_type, resource_id in normalized_grants
         ],
     )
-    project_id, character_id, voice_provider, voice_id = normalized_defaults
+    project_id = normalized_defaults[0]
+    character_id = normalized_defaults[1]
+    voice_provider = normalized_defaults[2]
+    voice_id = normalized_defaults[3]
+    mascot_id = normalized_defaults[4] if len(normalized_defaults) > 4 else ""
+    background_id = normalized_defaults[5] if len(normalized_defaults) > 5 else ""
     connection.execute(
         """
         INSERT INTO account_defaults(
             user_id, project_id, character_id,
-            voice_provider, voice_id
-        ) VALUES (?, ?, ?, ?, ?)
+            voice_provider, voice_id,
+            mascot_id, background_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
             project_id = excluded.project_id,
             character_id = excluded.character_id,
             voice_provider = excluded.voice_provider,
-            voice_id = excluded.voice_id
+            voice_id = excluded.voice_id,
+            mascot_id = excluded.mascot_id,
+            background_id = excluded.background_id
         """,
         (
             user_id,
@@ -289,9 +316,10 @@ def _persist_account_access(
             character_id,
             voice_provider,
             voice_id,
+            mascot_id,
+            background_id,
         ),
     )
-
 
 
 class UserRepository:
@@ -621,6 +649,41 @@ class ResourceRepository:
             raise RepositoryError("registered resource could not be reloaded")
         return record
 
+    def upsert_system_resource(
+        self,
+        *,
+        resource_type: ResourceType,
+        resource_id: str,
+        metadata: dict[str, object] | None = None,
+    ) -> ResourceRecord:
+        normalized_id = resource_id.strip()
+        if not normalized_id:
+            raise ValueError("resource_id must not be empty")
+
+        with self.database.transaction(write=True) as connection:
+            connection.execute(
+                """
+                INSERT INTO resources(
+                    resource_type, resource_id, owner_user_id, visibility,
+                    created_at, metadata_json
+                ) VALUES (?, ?, NULL, 'system_public', ?, ?)
+                ON CONFLICT(resource_type, resource_id) DO UPDATE SET
+                    metadata_json = excluded.metadata_json
+                """,
+                (
+                    resource_type.value,
+                    normalized_id,
+                    _now_iso(),
+                    json.dumps(
+                        metadata or {}, separators=(",", ":"), sort_keys=True
+                    ),
+                ),
+            )
+        record = self.get(resource_type, normalized_id)
+        if record is None:
+            raise RepositoryError("upserted resource could not be reloaded")
+        return record
+
     def get(
         self,
         resource_type: ResourceType,
@@ -854,9 +917,14 @@ class TemporaryAccountRepository:
             grants,
             defaults,
         )
-        project_id, character_id, voice_provider, voice_id = (
-            normalized_defaults
-        )
+        (
+            project_id,
+            character_id,
+            voice_provider,
+            voice_id,
+            mascot_id,
+            background_id,
+        ) = normalized_defaults
 
         locators = [credential.locator for credential in credentials]
         if len(set(locators)) != len(credentials) or any(
@@ -1018,8 +1086,8 @@ class TemporaryAccountRepository:
                     "temporary credential does not exist"
                 )
             if bool(row["disabled"]):
-                raise TemporaryCredentialNotFoundError(
-                    "temporary credential does not exist"
+                raise TemporaryCredentialExpiredError(
+                    "temporary credential batch has been revoked"
                 )
 
             if row["first_used_at"] is None:

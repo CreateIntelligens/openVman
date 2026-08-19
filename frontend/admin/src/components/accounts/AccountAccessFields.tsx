@@ -11,6 +11,8 @@ import {
 const PREFERRED_PROJECT = "proj-b85afb8bb6";
 const PREFERRED_CHARACTER = "0713";
 const PREFERRED_VOICE = "hayley";
+const PREFERRED_MASCOT = "qqman";
+const PREFERRED_BACKGROUND = "8881";
 
 type GrantType = keyof AccountResourceGrants;
 
@@ -19,12 +21,16 @@ const EMPTY_ACCESS: AccountAccessInput = {
     projects: [],
     avatar_characters: [],
     custom_voices: [],
+    avatar_mascots: [],
+    avatar_backgrounds: [],
   },
   defaults: {
     project_id: "",
     character_id: "",
     voice_provider: "",
     voice_id: "",
+    mascot_id: "",
+    background_id: "",
   },
 };
 
@@ -47,6 +53,16 @@ const GROUPS: Array<{
     grantType: "custom_voices",
     title: "自訂聲音",
     description: "選擇可使用的聲音，並指定登入後預設聲音。",
+  },
+  {
+    grantType: "avatar_mascots",
+    title: "右下角小助理 (VRM)",
+    description: "選擇可使用的小助理，並指定登入後預設小助理。",
+  },
+  {
+    grantType: "avatar_backgrounds",
+    title: "舞台背景",
+    description: "選擇可使用的背景，並指定登入後預設背景。",
   },
 ];
 
@@ -89,6 +105,16 @@ function accessFromOptions(
     options.custom_voices,
     PREFERRED_VOICE,
   );
+  const mascots = initialSelection(
+    current?.grants.avatar_mascots,
+    options.avatar_mascots ?? [],
+    PREFERRED_MASCOT,
+  );
+  const backgrounds = initialSelection(
+    current?.grants.avatar_backgrounds,
+    options.avatar_backgrounds ?? [],
+    PREFERRED_BACKGROUND,
+  );
   const voiceId = initialDefault(current?.defaults.voice_id, voices);
   const voice = options.custom_voices.find((option) => option.id === voiceId);
   return {
@@ -96,6 +122,8 @@ function accessFromOptions(
       projects,
       avatar_characters: characters,
       custom_voices: voices,
+      avatar_mascots: mascots,
+      avatar_backgrounds: backgrounds,
     },
     defaults: {
       project_id: initialDefault(current?.defaults.project_id, projects),
@@ -105,6 +133,8 @@ function accessFromOptions(
       ),
       voice_provider: voice?.provider ?? "indextts",
       voice_id: voiceId,
+      mascot_id: initialDefault(current?.defaults.mascot_id, mascots),
+      background_id: initialDefault(current?.defaults.background_id, backgrounds),
     },
   };
 }
@@ -169,13 +199,23 @@ export function useAccountAccessForm(
             },
           };
         }
+        case "avatar_mascots":
+          return {
+            ...current,
+            defaults: { ...current.defaults, mascot_id: value },
+          };
+        case "avatar_backgrounds":
+          return {
+            ...current,
+            defaults: { ...current.defaults, background_id: value },
+          };
       }
     });
   }
 
   function toggle(grantType: GrantType, id: string) {
     setAccess((current) => {
-      const selected = current.grants[grantType];
+      const selected = current.grants[grantType] ?? [];
       const next = selected.includes(id)
         ? selected.filter((item) => item !== id)
         : [...selected, id];
@@ -202,6 +242,16 @@ export function useAccountAccessForm(
             nextDefaults.voice_id = nextVoiceId;
           }
           break;
+        case "avatar_mascots":
+          if (!next.includes(current.defaults.mascot_id ?? "")) {
+            nextDefaults.mascot_id = next[0] ?? "";
+          }
+          break;
+        case "avatar_backgrounds":
+          if (!next.includes(current.defaults.background_id ?? "")) {
+            nextDefaults.background_id = next[0] ?? "";
+          }
+          break;
       }
 
       return {
@@ -212,6 +262,11 @@ export function useAccountAccessForm(
     });
   }
 
+  const hasMascots = (options?.avatar_mascots?.length ?? 0) === 0
+    || ((access.grants.avatar_mascots?.length ?? 0) > 0 && Boolean(access.defaults.mascot_id));
+  const hasBackgrounds = (options?.avatar_backgrounds?.length ?? 0) === 0
+    || ((access.grants.avatar_backgrounds?.length ?? 0) > 0 && Boolean(access.defaults.background_id));
+
   const complete = Boolean(
     options
       && access.grants.projects.length > 0
@@ -220,7 +275,9 @@ export function useAccountAccessForm(
       && access.defaults.project_id
       && access.defaults.character_id
       && access.defaults.voice_provider
-      && access.defaults.voice_id,
+      && access.defaults.voice_id
+      && hasMascots
+      && hasBackgrounds,
   );
 
   return {
@@ -248,6 +305,10 @@ function defaultOptionValue(
       return defaults.character_id;
     case "custom_voices":
       return defaults.voice_id;
+    case "avatar_mascots":
+      return defaults.mascot_id ?? "";
+    case "avatar_backgrounds":
+      return defaults.background_id ?? "";
   }
 }
 
@@ -257,7 +318,7 @@ export default function AccountAccessFields({
   form: AccountAccessForm;
 }) {
   return (
-    <div className="grid border-y border-border lg:grid-cols-3 lg:divide-x lg:divide-border">
+    <div className="grid border-y border-border grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-0">
       {GROUPS.map((group) => (
         <AccessGroup key={group.grantType} form={form} {...group} />
       ))}
@@ -277,7 +338,7 @@ function AccessGroup({
   description: string;
 }) {
   const options = form.options?.[grantType] ?? [];
-  const selected = form.access.grants[grantType];
+  const selected = form.access.grants[grantType] ?? [];
   const defaultValue = defaultOptionValue(form.access.defaults, grantType);
   const selectedOptions = options.filter((option) => selected.includes(option.id));
 

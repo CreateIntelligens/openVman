@@ -27,13 +27,29 @@ export function setForbiddenHandler(
   }
 }
 
+const AUTH_WHITELIST = [
+  "/api/auth/login",
+  "/api/auth/temporary-login",
+]
+
+function isAuthEndpoint(input: RequestInfo | URL): boolean {
+  const url = typeof input === "string"
+    ? input
+    : input instanceof URL
+      ? input.pathname
+      : input.url
+  return AUTH_WHITELIST.some((path) => url.includes(path))
+}
+
 export async function apiFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
 ): Promise<Response> {
   const response = await fetch(input, { ...init, credentials: "include" })
-  if (response.status === 401) unauthorizedHandler?.()
-  if (response.status === 403) forbiddenHandler?.()
+  if (!isAuthEndpoint(input)) {
+    if (response.status === 401) unauthorizedHandler?.()
+    if (response.status === 403) forbiddenHandler?.()
+  }
   return response
 }
 

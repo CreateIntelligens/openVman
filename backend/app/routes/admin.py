@@ -67,12 +67,14 @@ async def _fetch_provider_voices(
             response = await _health_http.get().get(
                 voices_url,
                 timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
+                follow_redirects=True,
             )
         else:
             response = await _health_http.get().get(
                 voices_url,
                 timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
                 headers=headers,
+                follow_redirects=True,
             )
         response.raise_for_status()
         return _extract_voice_names(response.json())
@@ -92,6 +94,108 @@ async def _fetch_indextts_voices(base_url: str, internal_token: str) -> list[str
 
 async def _fetch_gemini_voices(base_url: str) -> list[str]:
     return await _fetch_provider_voices(base_url, "/api/voices", "gemini")
+
+
+_EDGE_TTS_VOICE_LABELS = {
+    "zh-TW-HsiaoChenNeural": "曉臻 (Edge-TTS)",
+    "zh-TW-YunJheNeural": "雲哲 (Edge-TTS)",
+    "zh-CN-XiaoyiNeural": "曉伊 (Edge-TTS)",
+}
+
+
+async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:
+    """Register voices from enabled providers into the resource ownership registry."""
+    cfg = get_tts_config()
+
+    if cfg.edge_tts_enabled:
+        edge_voices = ["zh-TW-HsiaoChenNeural", "zh-TW-YunJheNeural", "zh-CN-XiaoyiNeural"]
+        if cfg.edge_tts_voice and cfg.edge_tts_voice not in edge_voices:
+            edge_voices.insert(0, cfg.edge_tts_voice)
+        for voice_id in edge_voices:
+            label = _EDGE_TTS_VOICE_LABELS.get(voice_id, f"{voice_id} (Edge-TTS)")
+            try:
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.CUSTOM_VOICE,
+                    resource_id=voice_id,
+                    metadata={"provider": "edge-tts", "label": label},
+                )
+            except Exception as exc:
+                logger.warning("failed to register edge-tts voice %s: %s", voice_id, exc)
+
+    if cfg.tts_indextts_url:
+        try:
+            fetched_voices = await _fetch_indextts_voices(
+                cfg.tts_indextts_url,
+                cfg.gateway_internal_token,
+            )
+            for voice_id in fetched_voices:
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.CUSTOM_VOICE,
+                    resource_id=voice_id,
+                    metadata={"provider": "indextts", "label": voice_id},
+                )
+        except Exception as exc:
+            logger.warning("failed to sync indextts voices: %s", exc)
+
+    if cfg.tts_gemini_url:
+        try:
+            gemini_voices = await _fetch_gemini_voices(cfg.tts_gemini_url)
+            for voice_id in gemini_voices:
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.CUSTOM_VOICE,
+                    resource_id=voice_id,
+                    metadata={"provider": GEMINI_PROVIDER_NAME, "label": voice_id},
+                )
+        except Exception as exc:
+            logger.warning("failed to sync gemini voices: %s", exc)
+
+    if cfg.tts_gcp_enabled and cfg.tts_gcp_voice_name:
+        try:
+            runtime.resources.upsert_system_resource(
+                resource_type=ResourceType.CUSTOM_VOICE,
+                resource_id=cfg.tts_gcp_voice_name,
+                metadata={"provider": "gcp", "label": f"{cfg.tts_gcp_voice_name} (GCP)"},
+            )
+        except Exception as exc:
+            logger.warning("failed to register gcp voice: %s", exc)
+
+    if cfg.tts_aws_enabled and cfg.tts_aws_polly_voice_id:
+        try:
+            runtime.resources.upsert_system_resource(
+                resource_type=ResourceType.CUSTOM_VOICE,
+                resource_id=cfg.tts_aws_polly_voice_id,
+                metadata={"provider": "aws", "label": f"{cfg.tts_aws_polly_voice_id} (AWS)"},
+            )
+        except Exception as exc:
+            logger.warning("failed to register aws voice: %s", exc)
+
+    try:
+        from app.routes.mascots import get_store as get_mascot_store
+        for mascot in get_mascot_store().list_mascots():
+            mid = mascot.get("mascot_id")
+            mlabel = mascot.get("label") or mid
+            if mid:
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.AVATAR_MASCOT,
+                    resource_id=mid,
+                    metadata={"label": mlabel},
+                )
+    except Exception as exc:
+        logger.warning("failed to sync mascots: %s", exc)
+
+    try:
+        from app.routes.backgrounds import get_store as get_background_store
+        for bg in get_background_store().list_backgrounds():
+            bid = bg.get("background_id")
+            blabel = bg.get("label") or bid
+            if bid:
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.AVATAR_BACKGROUND,
+                    resource_id=bid,
+                    metadata={"label": blabel},
+                )
+    except Exception as exc:
+        logger.warning("failed to sync backgrounds: %s", exc)
 
 
 def _extract_voice_names(payload: object) -> list[str]:

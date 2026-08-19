@@ -80,6 +80,8 @@ class AccountDefaultsRecord:
     character_id: str
     voice_provider: str
     voice_id: str
+    mascot_id: str = ""
+    background_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)

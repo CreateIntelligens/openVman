@@ -283,8 +283,8 @@ class TestCameraLivePlugin:
 
     @pytest.mark.asyncio
     async def test_describe_image_no_api_key(self, plugin):
-        with patch("app.gateway.plugins.camera_live.get_tts_config") as mock_cfg:
-            mock_cfg.return_value = MagicMock(vision_llm_api_key="")
+        # 描述路徑已改走 vlm_client；未設定時 get_vlm_client() 回 None。
+        with patch("app.gateway.vlm_client.get_vlm_client", return_value=None):
             result = await plugin._describe_image("base64data", "image/jpeg")
 
         assert "未設定" in result

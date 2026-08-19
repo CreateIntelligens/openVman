@@ -6,6 +6,10 @@ from pathlib import Path
 
 import yaml
 
+import pytest
+
+pytestmark = pytest.mark.requires_repo_root
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / "backend"
 

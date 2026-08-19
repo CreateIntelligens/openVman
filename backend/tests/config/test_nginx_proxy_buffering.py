@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.requires_repo_root
+
 
 def test_grafana_proxy_disables_buffering():
     config_path = Path(__file__).resolve().parents[3] / "frontend" / "admin" / "nginx" / "http.d" / "default.conf"

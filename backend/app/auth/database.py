@@ -119,14 +119,32 @@ _TEMPORARY_ACCOUNT_STATEMENTS = (
         project_id TEXT NOT NULL,
         character_id TEXT NOT NULL,
         voice_provider TEXT NOT NULL,
-        voice_id TEXT NOT NULL
+        voice_id TEXT NOT NULL,
+        mascot_id TEXT NOT NULL DEFAULT '',
+        background_id TEXT NOT NULL DEFAULT ''
     )
+    """,
+)
+
+_ACCOUNT_DEFAULTS_MASCOT_BACKGROUND_STATEMENTS = (
+    """
+    ALTER TABLE account_defaults
+    ADD COLUMN mascot_id TEXT NOT NULL DEFAULT ''
+    """,
+    """
+    ALTER TABLE account_defaults
+    ADD COLUMN background_id TEXT NOT NULL DEFAULT ''
     """,
 )
 
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
     (2, "temporary_accounts_grants_and_defaults", _TEMPORARY_ACCOUNT_STATEMENTS),
+    (
+        3,
+        "account_defaults_mascot_and_background",
+        _ACCOUNT_DEFAULTS_MASCOT_BACKGROUND_STATEMENTS,
+    ),
 )
 
 
@@ -197,6 +215,17 @@ class AuthDatabase:
                             ).fetchall()
                         }
                         if "account_type" in user_columns:
+                            continue
+                    if version == 3:
+                        defaults_columns = {
+                            row["name"]
+                            for row in connection.execute(
+                                "PRAGMA table_info(account_defaults)"
+                            ).fetchall()
+                        }
+                        if index == 0 and "mascot_id" in defaults_columns:
+                            continue
+                        if index == 1 and "background_id" in defaults_columns:
                             continue
                     connection.execute(statement)
                 connection.execute(

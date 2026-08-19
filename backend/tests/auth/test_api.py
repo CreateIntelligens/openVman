@@ -227,12 +227,16 @@ def test_admin_creates_formal_account_with_access_atomically(client, runtime):
             "projects": ["project-a"],
             "avatar_characters": ["character-a"],
             "custom_voices": ["voice-a"],
+            "avatar_mascots": [],
+            "avatar_backgrounds": [],
         },
         "defaults": {
             "project_id": "project-a",
             "character_id": "character-a",
             "voice_provider": "indextts",
             "voice_id": "voice-a",
+            "mascot_id": "",
+            "background_id": "",
         },
     }
     created = client.post(
@@ -355,12 +359,16 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
             "projects": ["project-a"],
             "avatar_characters": ["character-a"],
             "custom_voices": ["voice-a"],
+            "avatar_mascots": [],
+            "avatar_backgrounds": [],
         },
         "defaults": {
             "project_id": "project-a",
             "character_id": "character-a",
             "voice_provider": "indextts",
             "voice_id": "voice-a",
+            "mascot_id": "",
+            "background_id": "",
         },
     }
     updated = client.put(
@@ -392,12 +400,16 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
             "projects": ["project-b"],
             "avatar_characters": ["character-b"],
             "custom_voices": ["voice-b"],
+            "avatar_mascots": [],
+            "avatar_backgrounds": [],
         },
         "defaults": {
             "project_id": "project-b",
             "character_id": "character-b",
             "voice_provider": "indextts",
             "voice_id": "voice-b",
+            "mascot_id": "",
+            "background_id": "",
         },
     }
     replaced = client.put(

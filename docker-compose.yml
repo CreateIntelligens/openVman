@@ -193,6 +193,7 @@ services:
 
   avatar:
     <<: *shared
+    init: true
     build:
       context: .
       dockerfile: frontend/app/Dockerfile
@@ -203,12 +204,14 @@ services:
 
   avatar-sdk:
     <<: *shared
+    init: true
     build:
       context: ./frontend/avatar-sdk
       dockerfile: Dockerfile
 
   admin:
     <<: *shared
+    init: true
     build:
       context: .
       dockerfile: frontend/admin/Dockerfile
@@ -276,6 +279,7 @@ services:
       - ./data:/data
       - ./brain/data:/brain-data:ro
       - ./backend/index-tts-vllm/assets:/indextts-assets:ro
+      - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
       - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
     env_file:
       - ./.env

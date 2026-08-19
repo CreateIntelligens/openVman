@@ -16,6 +16,7 @@ def _make_config() -> TTSRouterConfig:
     return TTSRouterConfig(
         _env_file=None,
         tts_indextts_url="",
+        tts_gemini_url="",
         tts_aws_enabled=True,
         tts_aws_region="ap-northeast-1",
         tts_aws_access_key_id="key",

@@ -13,12 +13,32 @@ PNG_BYTES = b"\x89PNG\r\n\x1a\nimage"
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("AVATAR_BACKGROUNDS_DIR", str(tmp_path))
+    from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account, require_admin
+    from app.auth.models import AccountRole, AccountType, UserRecord
     from app.config import get_tts_config
 
     get_tts_config.cache_clear()
     background_routes.reset_store()
+
+    admin_user = UserRecord(
+        id="test-admin",
+        username="admin",
+        username_normalized="admin",
+        password_hash="",
+        role=AccountRole.ADMIN,
+        account_type=AccountType.FORMAL,
+        disabled=False,
+        token_version=1,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+        created_by=None,
+    )
+    admin_account = CurrentAccount(user=admin_user, transport=AuthTransport.BEARER)
+
     app = FastAPI()
     app.include_router(background_routes.router)
+    app.dependency_overrides[get_current_account] = lambda: admin_account
+    app.dependency_overrides[require_admin] = lambda: admin_account
     return TestClient(app)
 
 

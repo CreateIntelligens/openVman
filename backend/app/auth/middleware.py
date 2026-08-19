@@ -27,7 +27,6 @@ _PUBLIC_EXACT_PATHS = frozenset(
 )
 _INTERNAL_AUTH_BYPASS_PATHS = frozenset({"/internal/enrich"})
 _PUBLIC_PREFIXES = (
-    "/assets/",
     "/avatar-sdk/",
     "/favicon",
     "/login",

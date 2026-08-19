@@ -35,7 +35,7 @@ export default function FormalAccountAccessPanel({
 
   async function save() {
     if (!accessForm.complete) {
-      setError("知識庫、人物與聲音都至少要選一項，並指定預設值。");
+      setError("每一類都至少要選一項授權資源，並指定預設值。");
       return;
     }
 

@@ -70,7 +70,7 @@ export default function Accounts() {
     event.preventDefault();
     if (!username.trim() || !password) return;
     if (role === "user" && !accessForm.complete) {
-      setError("一般使用者必須先選好知識庫、人物、聲音與登入後預設值。");
+      setError("一般使用者必須先選好各類資源授權與登入後預設值。");
       return;
     }
     setSubmitting(true);

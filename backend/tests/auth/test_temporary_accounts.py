@@ -92,12 +92,16 @@ def _batch_body() -> dict[str, object]:
             "projects": ["proj-b85afb8bb6"],
             "avatar_characters": ["0713"],
             "custom_voices": ["hayley"],
+            "avatar_mascots": [],
+            "avatar_backgrounds": [],
         },
         "defaults": {
             "project_id": "proj-b85afb8bb6",
             "character_id": "0713",
             "voice_provider": "indextts",
             "voice_id": "hayley",
+            "mascot_id": "",
+            "background_id": "",
         },
     }
 

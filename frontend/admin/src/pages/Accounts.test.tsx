@@ -81,12 +81,16 @@ describe("Accounts", () => {
           projects: ["project-a"],
           avatar_characters: ["character-a"],
           custom_voices: ["voice-a"],
+          avatar_mascots: [],
+          avatar_backgrounds: [],
         },
         defaults: {
           project_id: "project-a",
           character_id: "character-a",
           voice_provider: "indextts",
           voice_id: "voice-a",
+          mascot_id: "",
+          background_id: "",
         },
       },
     }));

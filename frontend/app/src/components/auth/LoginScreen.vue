@@ -25,9 +25,14 @@ async function submit(): Promise<void> {
       await auth.login(username.value.trim(), password.value)
     }
   } catch (reason) {
-    error.value = reason instanceof Error && reason.message
-      ? reason.message
-      : "登入失敗，請稍後再試"
+    const rawMsg = reason instanceof Error && reason.message ? reason.message : ""
+    if (rawMsg === "Invalid credentials") {
+      error.value = mode.value === "temporary"
+        ? "密碼錯誤，或該批次已被撤銷"
+        : "帳號或密碼錯誤"
+    } else {
+      error.value = rawMsg || "登入失敗，請稍後再試"
+    }
   } finally {
     submitting.value = false
   }
