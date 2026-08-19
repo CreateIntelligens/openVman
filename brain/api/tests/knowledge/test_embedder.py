@@ -1,319 +1,202 @@
-"""Tests for provider-aware embedding adapters."""
+"""Tests for Brain's remote embedding gateway client and fallback routing."""
 
 from __future__ import annotations
 
-import importlib
 import sys
 import types
 from pathlib import Path
+import pytest
 
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
+from config import BrainSettings
+from memory.embedder import (
+    GatewayRemoteTextEmbedder,
+    encode_query_with_fallback,
+    get_embedder,
+)
 
-def _load_embedder(monkeypatch, backend, *, settings=None):
-    fake_settings = settings or types.SimpleNamespace(
-        resolved_embedding_active_version=backend.version,
-        resolved_embedding_version_order=[backend.version],
-        resolve_embedding_backend=lambda version=None: backend,
+
+def test_gateway_remote_embedder_calls_gateway_and_parses_spec(monkeypatch):
+    embedder = GatewayRemoteTextEmbedder(
+        base_url="http://fake-embedding:8009",
+        expected_model="BAAI/bge-m3",
+        expected_dimension=1024,
     )
-    fake_config_mod = types.ModuleType("config")
-    fake_config_mod.get_settings = lambda: fake_settings
-    monkeypatch.setitem(sys.modules, "config", fake_config_mod)
 
-    fake_flag_mod = types.ModuleType("FlagEmbedding")
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
 
-    class FakeBGEM3FlagModel:
-        init_calls: list[tuple[str, bool, str]] = []
-
-        def __init__(self, model_name, *, use_fp16, device):
-            self.init_calls.append((model_name, use_fp16, device))
-
-        def encode(self, texts):
+        def json(self):
             return {
-                "dense_vecs": [
-                    types.SimpleNamespace(tolist=lambda: [float(len(texts[0]))])
-                    for _ in texts
-                ]
+                "vectors": [[0.1] * 1024],
+                "model": "BAAI/bge-m3",
+                "embedding_spec": {
+                    "identity": "bge:BAAI/bge-m3:1024:float32:l2:document:default",
+                    "provider": "bge",
+                    "model": "BAAI/bge-m3",
+                    "dimensions": 1024,
+                    "dtype": "float32",
+                    "normalization": "l2",
+                    "input_semantics": "document",
+                    "model_revision": "default",
+                },
+                "attempts": [{"provider": "bge", "status": "selected"}],
             }
 
-    fake_flag_mod.BGEM3FlagModel = FakeBGEM3FlagModel
-    monkeypatch.setitem(sys.modules, "FlagEmbedding", fake_flag_mod)
+    class FakeClient:
+        def post(self, url, json=None):
+            assert url == "/embed"
+            assert json["texts"] == ["hello"]
+            return FakeResponse()
 
-    sys.modules.pop("memory.embedder", None)
-    module = importlib.import_module("memory.embedder")
-    return module, FakeBGEM3FlagModel
+    monkeypatch.setattr(embedder, "_get_client", lambda: FakeClient())
+
+    vectors, spec, attempts = embedder.encode_with_metadata(["hello"])
+    assert len(vectors) == 1
+    assert len(vectors[0]) == 1024
+    assert spec["provider"] == "bge"
+    assert spec["dimensions"] == 1024
+    assert attempts[0]["status"] == "selected"
 
 
-def test_bge_embedder_builds_local_model(monkeypatch):
-    backend = types.SimpleNamespace(
-        version="bge",
-        provider="bge",
-        model="BAAI/bge-m3",
-        api_key="",
-        base_url="",
-        dimensions=None,
-        use_fp16=False,
-        device="cpu",
-        multimodal=False,
+def test_gateway_remote_embedder_rejects_identity_drift_across_chunks(monkeypatch):
+    embedder = GatewayRemoteTextEmbedder(
+        base_url="http://fake-embedding:8009",
+        chunk_size=2,
+        expected_dimension=1024,
     )
 
-    module, fake_bge = _load_embedder(monkeypatch, backend)
+    call_count = 0
 
-    vectors = module.get_embedder().encode(["hello"])
+    class FakeResponse:
+        def __init__(self, spec, vectors):
+            self._spec = spec
+            self._vectors = vectors
 
-    assert vectors == [[5.0]]
-    assert fake_bge.init_calls == [("BAAI/bge-m3", False, "cpu")]
+        def raise_for_status(self):
+            pass
 
+        def json(self):
+            return {
+                "vectors": self._vectors,
+                "model": self._spec["model"],
+                "embedding_spec": self._spec,
+                "attempts": [],
+            }
 
-def test_openai_embedder_uses_embeddings_client(monkeypatch):
-    backend = types.SimpleNamespace(
-        version="openai",
-        provider="openai",
-        model="text-embedding-3-small",
-        api_key="ok",
-        base_url="",
-        dimensions=256,
-        use_fp16=False,
-        device="cpu",
-        multimodal=False,
-    )
-
-    module, _ = _load_embedder(monkeypatch, backend)
-    captured: dict[str, object] = {}
-
-    class FakeOpenAIClient:
-        def __init__(self, *, api_key, base_url=None):
-            captured["api_key"] = api_key
-            captured["base_url"] = base_url
-            self.embeddings = self
-
-        def create(self, **kwargs):
-            captured["request"] = kwargs
-            return types.SimpleNamespace(
-                data=[types.SimpleNamespace(embedding=[0.1, 0.2])]
+    class FakeClient:
+        def post(self, url, json=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First chunk returns BGE
+                return FakeResponse(
+                    spec={
+                        "identity": "bge:BAAI/bge-m3:1024:float32:l2:document:default",
+                        "provider": "bge",
+                        "model": "BAAI/bge-m3",
+                        "dimensions": 1024,
+                    },
+                    vectors=[[0.1] * 1024, [0.2] * 1024],
+                )
+            # Second chunk returns drifted Gemini
+            return FakeResponse(
+                spec={
+                    "identity": "gemini:text-embedding-004:768:float32:l2:document:default",
+                    "provider": "gemini",
+                    "model": "text-embedding-004",
+                    "dimensions": 768,
+                },
+                vectors=[[0.3] * 768, [0.4] * 768],
             )
 
-    monkeypatch.setattr(module, "OpenAI", FakeOpenAIClient)
+    monkeypatch.setattr(embedder, "_get_client", lambda: FakeClient())
 
-    vectors = module.get_embedder().encode(["hello"], input_type="query")
+    with pytest.raises(RuntimeError) as exc_info:
+        embedder.encode_with_metadata(["a", "b", "c", "d"])
 
-    assert vectors == [[0.1, 0.2]]
-    assert captured["api_key"] == "ok"
-    assert captured["request"] == {
-        "model": "text-embedding-3-small",
-        "input": ["hello"],
-        "dimensions": 256,
-    }
+    assert "specification drift across chunks" in str(exc_info.value)
 
 
-def test_gemini_embedder_uses_batch_embed_request(monkeypatch):
-    backend = types.SimpleNamespace(
-        version="gemini",
-        provider="gemini",
-        model="gemini-embedding-001",
-        api_key="gk",
-        base_url="",
-        dimensions=128,
-        use_fp16=False,
-        device="cpu",
-        multimodal=True,
+def test_encode_query_with_fallback_passes_acceptable_identities_and_selects_provider(monkeypatch):
+    settings = BrainSettings(
+        embedding_active_version="bge",
+        embedding_version_order="bge,gemini,openai",
     )
+    monkeypatch.setattr("config.get_settings", lambda: settings)
 
-    module, _ = _load_embedder(monkeypatch, backend)
-    captured: dict[str, object] = {}
-
-    def fake_post_json(*, url, headers, payload):
-        captured["url"] = url
-        captured["headers"] = headers
-        captured["payload"] = payload
-        return {"embeddings": [{"values": [0.3, 0.4]}]}
-
-    monkeypatch.setattr(module, "_post_json", fake_post_json)
-
-    vectors = module.get_embedder().encode(["hello"], input_type="query")
-
-    assert vectors == [[0.3, 0.4]]
-    assert str(captured["url"]).endswith(
-        "/models/gemini-embedding-001:batchEmbedContents"
-    )
-    assert captured["payload"] == {
-        "requests": [
-            {
-                "model": "models/gemini-embedding-001",
-                "content": {"parts": [{"text": "hello"}]},
-                "taskType": "RETRIEVAL_QUERY",
-                "outputDimensionality": 128,
-            }
-        ]
-    }
-
-
-def test_voyage_embedder_uses_query_input_type(monkeypatch):
-    backend = types.SimpleNamespace(
-        version="voyage",
-        provider="voyage",
-        model="voyage-3-large",
-        api_key="vk",
-        base_url="",
-        dimensions=512,
-        use_fp16=False,
-        device="cpu",
-        multimodal=True,
-    )
-
-    module, _ = _load_embedder(monkeypatch, backend)
-    captured: dict[str, object] = {}
-
-    def fake_post_json(*, url, headers, payload):
-        captured["url"] = url
-        captured["headers"] = headers
-        captured["payload"] = payload
-        return {"data": [{"embedding": [0.5, 0.6]}]}
-
-    monkeypatch.setattr(module, "_post_json", fake_post_json)
-
-    vectors = module.get_embedder().encode(["hello"], input_type="query")
-
-    assert vectors == [[0.5, 0.6]]
-    assert captured["url"] == "https://api.voyageai.com/v1/embeddings"
-    assert captured["payload"] == {
-        "input": ["hello"],
-        "model": "voyage-3-large",
-        "input_type": "query",
-        "output_dimension": 512,
-    }
-
-
-def test_encode_query_with_fallback_uses_next_version_after_error(monkeypatch):
-    backends = {
-        "bge": types.SimpleNamespace(
-            version="bge",
-            provider="bge",
-            model="BAAI/bge-m3",
-            api_key="",
-            base_url="",
-            dimensions=None,
-            use_fp16=False,
-            device="cpu",
-            multimodal=False,
-        ),
-        "gemini": types.SimpleNamespace(
-            version="gemini",
-            provider="gemini",
-            model="gemini-embedding-001",
-            api_key="gk",
-            base_url="",
-            dimensions=128,
-            use_fp16=False,
-            device="api",
-            multimodal=False,
-        ),
-    }
-    settings = types.SimpleNamespace(
-        resolved_embedding_active_version="bge",
-        resolved_embedding_version_order=["bge", "gemini"],
-        resolve_embedding_backend=lambda version=None: backends[(version or "bge")],
-    )
-
-    module, _ = _load_embedder(monkeypatch, backends["bge"], settings=settings)
     fake_db_mod = types.ModuleType("infra.db")
     fake_db_mod.vector_table_exists = (
-        lambda table_name, project_id="default", embedding_version=None: embedding_version == "gemini"
+        lambda table_name, project_id="default", embedding_version=None: embedding_version in ("bge", "gemini")
     )
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
 
-    def fake_get_embedder(version=None):
-        if version == "bge":
-            raise RuntimeError("bge unavailable")
-        return types.SimpleNamespace(
-            encode=lambda texts, input_type="document": [[0.9, 0.8]]
-        )
+    class FakeEmbedder:
+        def encode_with_metadata(self, texts, input_type="document", acceptable_identities=None, forced_identity=None):
+            assert input_type == "query"
+            assert acceptable_identities == ["bge", "gemini"]
+            return (
+                [[0.4] * 768],
+                {
+                    "identity": "gemini:text-embedding-004:768:float32:l2:query:default",
+                    "provider": "gemini",
+                    "model": "text-embedding-004",
+                    "dimensions": 768,
+                },
+                [
+                    {"provider": "bge", "status": "error", "reason": "timeout"},
+                    {"provider": "gemini", "status": "selected"},
+                ],
+            )
 
-    monkeypatch.setattr(module, "get_embedder", fake_get_embedder)
+    monkeypatch.setattr("memory.embedder.get_embedder", lambda version=None: FakeEmbedder())
 
-    route = module.encode_query_with_fallback(
-        "hello",
-        project_id="proj-1",
-        table_names=("knowledge",),
-    )
-
+    route = encode_query_with_fallback("什麼是 ESG？", project_id="test-proj")
     assert route.version == "gemini"
-    assert route.vector == [0.9, 0.8]
-    assert route.attempted_versions == [
-        {"version": "bge", "status": "error", "reason": "RuntimeError"},
-        {"version": "gemini", "status": "selected"},
-    ]
+    assert len(route.vector) == 768
+    assert len(route.attempted_versions) == 2
+    assert route.attempted_versions[1]["status"] == "selected"
 
 
 def test_encode_query_with_fallback_skips_versions_without_tables(monkeypatch):
-    backends = {
-        "bge": types.SimpleNamespace(
-            version="bge",
-            provider="bge",
-            model="BAAI/bge-m3",
-            api_key="",
-            base_url="",
-            dimensions=None,
-            use_fp16=False,
-            device="cpu",
-            multimodal=False,
-        ),
-        "gemini": types.SimpleNamespace(
-            version="gemini",
-            provider="gemini",
-            model="gemini-embedding-001",
-            api_key="gk",
-            base_url="",
-            dimensions=128,
-            use_fp16=False,
-            device="api",
-            multimodal=False,
-        ),
-        "openai": types.SimpleNamespace(
-            version="openai",
-            provider="openai",
-            model="text-embedding-3-small",
-            api_key="ok",
-            base_url="",
-            dimensions=256,
-            use_fp16=False,
-            device="api",
-            multimodal=False,
-        ),
-    }
-    settings = types.SimpleNamespace(
-        resolved_embedding_active_version="bge",
-        resolved_embedding_version_order=["bge", "gemini", "openai"],
-        resolve_embedding_backend=lambda version=None: backends[(version or "bge")],
+    settings = BrainSettings(
+        embedding_active_version="bge",
+        embedding_version_order="bge,gemini,openai",
     )
+    monkeypatch.setattr("config.get_settings", lambda: settings)
 
-    module, _ = _load_embedder(monkeypatch, backends["bge"], settings=settings)
     fake_db_mod = types.ModuleType("infra.db")
+    # Only openai table exists
     fake_db_mod.vector_table_exists = (
         lambda table_name, project_id="default", embedding_version=None: embedding_version == "openai"
     )
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
 
-    def fake_get_embedder(version=None):
-        if version == "bge":
-            raise RuntimeError("bge unavailable")
-        return types.SimpleNamespace(
-            encode=lambda texts, input_type="document": [[1.1, 1.2]]
-        )
+    class FakeEmbedder:
+        def encode_with_metadata(self, texts, input_type="document", acceptable_identities=None, forced_identity=None):
+            assert input_type == "query"
+            # gemini was skipped because no table exists; only bge (active) and openai remain
+            assert acceptable_identities == ["bge", "openai"]
+            return (
+                [[0.8] * 1536],
+                {
+                    "identity": "openai:text-embedding-3-small:1536:float32:l2:query:default",
+                    "provider": "openai",
+                    "model": "text-embedding-3-small",
+                    "dimensions": 1536,
+                },
+                [
+                    {"provider": "bge", "status": "error", "reason": "unavailable"},
+                    {"provider": "openai", "status": "selected"},
+                ],
+            )
 
-    monkeypatch.setattr(module, "get_embedder", fake_get_embedder)
+    monkeypatch.setattr("memory.embedder.get_embedder", lambda version=None: FakeEmbedder())
 
-    route = module.encode_query_with_fallback(
-        "hello",
-        project_id="proj-1",
-        table_names=("knowledge",),
-    )
-
+    route = encode_query_with_fallback("查詢文字", project_id="test-proj")
     assert route.version == "openai"
-    assert route.attempted_versions == [
-        {"version": "bge", "status": "error", "reason": "RuntimeError"},
-        {"version": "gemini", "status": "skipped", "reason": "missing_tables"},
-        {"version": "openai", "status": "selected"},
-    ]
+    assert len(route.vector) == 1536

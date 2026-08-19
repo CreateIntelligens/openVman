@@ -23,13 +23,85 @@ def list_workspace_documents(project_id: str = "default"):
     return _list_workspace_documents(project_id)
 
 
-def build_readiness_payload() -> dict[str, object]:
-    """Readiness check — DB ping plus background warmup completion.
+def check_embedding_service_readiness(cfg: Any = None) -> tuple[bool, dict[str, Any]]:
+    """Probe the standalone embedding service /health/ready endpoint."""
+    import httpx
 
-    背景預熱（embedder 載入 + knowledge/memories 檢索路徑暖機）完成前回報
-    not_ready，讓 readiness probe / 反向代理擋下流量，避免第一個檢索請求
-    承擔冷啟成本。
-    """
+    if cfg is None:
+        cfg = get_settings()
+
+    active_version = cfg.resolved_embedding_active_version
+    if active_version != "bge":
+        return True, {"status": "skipped", "version": active_version}
+
+    url = f"{cfg.resolved_embedding_service_url.rstrip('/')}/health/ready"
+    headers = {}
+    if cfg.embedding_service_token:
+        headers["Authorization"] = f"Bearer {cfg.embedding_service_token}"
+
+    route_type = "external" if cfg.is_embedding_service_external else "local"
+
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            resp = client.get(url, headers=headers)
+        if resp.status_code != 200:
+            return False, {
+                "status": "not_ready",
+                "route": route_type,
+                "url": cfg.resolved_embedding_service_url,
+                "error": f"HTTP {resp.status_code}: {resp.text[:200]}",
+                "hint": "Ensure COMPOSE_PROFILES includes 'embedding' or set EMBEDDING_SERVICE_URL"
+                if route_type == "local"
+                else "",
+            }
+        data = resp.json()
+        model = data.get("model")
+        dimension = data.get("dimension")
+        if (
+            cfg.embedding_expected_model
+            and model != cfg.embedding_expected_model
+        ):
+            return False, {
+                "status": "incompatible",
+                "route": route_type,
+                "url": cfg.resolved_embedding_service_url,
+                "error": f"Model mismatch: expected {cfg.embedding_expected_model}, got {model}",
+                "model": model,
+                "dimension": dimension,
+            }
+        if (
+            cfg.embedding_expected_dimension
+            and dimension != cfg.embedding_expected_dimension
+        ):
+            return False, {
+                "status": "incompatible",
+                "route": route_type,
+                "url": cfg.resolved_embedding_service_url,
+                "error": f"Dimension mismatch: expected {cfg.embedding_expected_dimension}, got {dimension}",
+                "model": model,
+                "dimension": dimension,
+            }
+        return True, {
+            "status": "ready",
+            "route": route_type,
+            "url": cfg.resolved_embedding_service_url,
+            "model": model,
+            "dimension": dimension,
+        }
+    except Exception as exc:
+        return False, {
+            "status": "unreachable",
+            "route": route_type,
+            "url": cfg.resolved_embedding_service_url,
+            "error": str(exc),
+            "hint": "Ensure COMPOSE_PROFILES includes 'embedding' or set EMBEDDING_SERVICE_URL"
+            if route_type == "local"
+            else "",
+        }
+
+
+def build_readiness_payload() -> dict[str, object]:
+    """Readiness check — DB ping plus background warmup and remote embedding readiness."""
     from warmup_state import is_warmup_done
 
     try:
@@ -39,7 +111,20 @@ def build_readiness_payload() -> dict[str, object]:
 
     if not is_warmup_done():
         return {"status": "not_ready", "db": "ok", "warmup": "pending"}
-    return {"status": "ready", "db": "ok", "warmup": "done"}
+
+    emb_ok, emb_info = check_embedding_service_readiness()
+    if not emb_ok:
+        return {
+            "status": "not_ready",
+            "db": "ok",
+            "warmup": "done",
+            "embedding": emb_info.get("status", "not_ready"),
+            "embedding_error": emb_info.get("error", ""),
+            "embedding_route": emb_info.get("route", ""),
+            "embedding_hint": emb_info.get("hint", ""),
+        }
+
+    return {"status": "ready", "db": "ok", "warmup": "done", "embedding": "ready"}
 
 
 def list_personas(project_id: str = "default"):
@@ -114,6 +199,8 @@ def build_health_payload(project_id: str = "default") -> dict[str, object]:
             "version": getattr(embedding_backend, "version", ""),
             "provider": getattr(embedding_backend, "provider", ""),
             "model": getattr(embedding_backend, "model", ""),
+            "route": "external" if getattr(cfg, "is_embedding_service_external", False) else "local",
+            "service_url": getattr(cfg, "resolved_embedding_service_url", "http://embedding:8009"),
         },
         "session_runtime": {
             "status": "disabled",

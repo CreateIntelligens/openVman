@@ -147,11 +147,16 @@ def resolve_vector_table_name(
     logical_name = table_name.strip()
     if logical_name not in TABLE_SEED_TEXTS:
         raise ValueError(f"未知的向量資料表: {table_name}")
-    version = (
+    raw_version = (
         (embedding_version or "").strip().lower()
         or get_settings().resolved_embedding_active_version
     )
-    if version == "bge":
+    if ":" in raw_version:
+        version = raw_version.split(":")[0].strip().lower()
+    else:
+        version = raw_version
+
+    if version in ("bge", "default"):
         return logical_name
     return f"{logical_name}__{version}"
 

@@ -143,6 +143,11 @@ def test_readiness_pending_until_warmup_done(monkeypatch):
         "get_db",
         lambda project_id="default": type("_DB", (), {"table_names": lambda self: []})(),
     )
+    monkeypatch.setattr(
+        health_payload,
+        "check_embedding_service_readiness",
+        lambda: (True, {"status": "ready"}),
+    )
 
     warmup_state.reset_warmup_state()
     pending = health_payload.build_readiness_payload()

@@ -64,6 +64,9 @@ class TTSRouterConfig(BaseSettings):
     # --- Gemini TTS Console ---
     tts_gemini_url: str = Field(default="", validation_alias="TTS_GEMINI_URL")
 
+    # --- TTS Text Normalization / 轉譯 API ---
+    normalize_api_url: str = Field(default="", validation_alias="NORMALIZE_API_URL")
+
     # --- Edge-TTS (in-process) ---
     edge_tts_enabled: bool = Field(default=True, validation_alias="TTS_EDGE_ENABLED")
     edge_tts_voice: str = Field(

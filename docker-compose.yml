@@ -23,6 +23,8 @@ services:
     environment:
       - HOME=/home/appuser
       - OPF_MOE_TRITON=false
+      - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://embedding:8009}
+      - EMBEDDING_SERVICE_TOKEN=${GATEWAY_INTERNAL_TOKEN:-}
     healthcheck:
       test:
         - CMD
@@ -33,6 +35,44 @@ services:
       timeout: 5s
       retries: 30
       start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  embedding:
+    <<: *shared
+    profiles: ["embedding"]
+    build:
+      context: ./brain/embedding
+      dockerfile: Dockerfile
+    volumes:
+      - ./brain/embedding:/app
+      - hf-cache:/home/appuser/.cache/huggingface
+    environment:
+      - HF_HOME=/home/appuser/.cache/huggingface
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
+      - EMBEDDING_MODEL_REVISION=${EMBEDDING_MODEL_REVISION:-default}
+      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cuda}
+      - EMBEDDING_USE_FP16=${EMBEDDING_USE_FP16:-true}
+      - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-32}
+      - EMBEDDING_MAX_LENGTH=${EMBEDDING_MAX_LENGTH:-8192}
+      - EMBEDDING_MAX_CONCURRENCY=${EMBEDDING_MAX_CONCURRENCY:-1}
+      - EMBEDDING_COOLDOWN_SECONDS=${EMBEDDING_COOLDOWN_SECONDS:-60.0}
+      - EMBEDDING_BEARER_TOKEN=${GATEWAY_INTERNAL_TOKEN:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+      - EMBEDDING_PROVIDER_FALLBACKS=${EMBEDDING_PROVIDER_FALLBACKS:-bge,gemini,openai,voyage}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('EMBEDDING_BEARER_TOKEN',''); req=urllib.request.Request('http://localhost:8009/health/ready', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
     deploy:
       resources:
         reservations:
@@ -63,7 +103,7 @@ services:
       - ./backend/index-tts-vllm:/app
       - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request, json, sys; res=json.loads(urllib.request.urlopen('http://localhost:8011/health').read()); sys.exit(0 if res.get('status') == 'healthy' else 1)"]
+      test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('INTERNAL_API_TOKEN',''); req=urllib.request.Request('http://localhost:8011/health/ready', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 30
@@ -214,7 +254,7 @@ services:
       - ./.env
     environment:
       - REDIS_URL=redis://redis:6379
-      - TTS_INDEXTTS_URL=${TTS_INDEXTTS_URL:-http://index-tts-vllm:8011}
+      - TTS_INDEXTTS_URL=${TTS_INDEXTTS_URL:-}
       - AVATAR_ASSETS_DIR=/data/avatar
       - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
       - AVATAR_MASCOTS_DIR=/data/mascots

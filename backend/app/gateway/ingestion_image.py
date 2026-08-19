@@ -28,18 +28,18 @@ def _read_image_base64(file_path: str) -> tuple[str, str]:
     return b64, mime or "image/jpeg"
 
 
-async def _describe_with_vision(file_path: str, trace_id: str) -> str:
+async def _describe_with_vision(file_path: str, trace_id: str, cfg: Any = None) -> str:
     """Call Vision LLM API for image description."""
-    cfg = get_tts_config()
+    from app.gateway.vlm_client import get_vlm_client, resolve_vlm_route
+
+    route = resolve_vlm_route(cfg)
+    client = get_vlm_client(cfg)
+    if client is None:
+        return ""
+
     b64_data, mime_type = _read_image_base64(file_path)
-
-    client_kwargs: dict = {"api_key": cfg.vision_llm_api_key}
-    if cfg.vision_llm_base_url:
-        client_kwargs["base_url"] = cfg.vision_llm_base_url
-
-    client = AsyncOpenAI(**client_kwargs)
     response = await client.chat.completions.create(
-        model=cfg.vision_llm_model,
+        model=route.model,
         messages=[
             {
                 "role": "user",
@@ -80,7 +80,7 @@ async def describe(file_path: str, trace_id: str) -> IngestionResult:
     # Try Vision LLM first if API key is configured
     if cfg.vision_llm_api_key:
         try:
-            content = await _describe_with_vision(file_path, trace_id)
+            content = await _describe_with_vision(file_path, trace_id, cfg)
             logger.info("vision_llm_ok trace_id=%s chars=%d", trace_id, len(content))
             return IngestionResult(content_type="image_description", content=content)
         except Exception as exc:

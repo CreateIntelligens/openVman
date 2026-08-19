@@ -9,7 +9,8 @@ import pytest
 API_ROOT = Path(__file__).resolve().parents[2]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
-GENERATED_PYTHON_ROOT = Path(__file__).resolve().parents[4] / "contracts" / "generated" / "python"
+parents = Path(__file__).resolve().parents
+GENERATED_PYTHON_ROOT = parents[4] / "contracts" / "generated" / "python" if len(parents) > 4 else API_ROOT / "contracts" / "generated" / "python"
 if str(GENERATED_PYTHON_ROOT) not in sys.path:
     sys.path.insert(0, str(GENERATED_PYTHON_ROOT))
 PROTOCOL_EVENTS_MODULE = "protocol.protocol_events"

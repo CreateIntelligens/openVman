@@ -248,35 +248,21 @@ class CameraLivePlugin:
         )
 
     def _get_vision_client(self) -> Any:
-        """Return a pooled AsyncOpenAI client, rebuilt only when credentials change.
-
-        Called once per frame on the hot path; constructing a new client each
-        time would force a fresh connection pool + TLS handshake to the VLM.
-        """
-        from openai import AsyncOpenAI
-
-        cfg = get_tts_config()
-        if not cfg.vision_llm_api_key:
-            return None
-
-        key = (cfg.vision_llm_api_key, cfg.vision_llm_base_url or "")
-        if self._vision_client is None or self._vision_client_key != key:
-            client_kwargs: dict[str, Any] = {"api_key": cfg.vision_llm_api_key}
-            if cfg.vision_llm_base_url:
-                client_kwargs["base_url"] = cfg.vision_llm_base_url
-            self._vision_client = AsyncOpenAI(**client_kwargs)
-            self._vision_client_key = key
-        return self._vision_client
+        """Return a pooled AsyncOpenAI client, rebuilt only when credentials change."""
+        from app.gateway.vlm_client import get_vlm_client
+        return get_vlm_client()
 
     async def _complete_vision(self, prompt: str, b64_data: str, mime_type: str) -> str:
         """Single Vision LLM completion for a text prompt + one image."""
+        from app.gateway.vlm_client import resolve_vlm_route
+
         client = self._get_vision_client()
         if client is None:
             return "（Vision LLM 未設定）"
 
-        cfg = get_tts_config()
+        route = resolve_vlm_route()
         response = await client.chat.completions.create(
-            model=cfg.vision_llm_model,
+            model=route.model,
             messages=[
                 {
                     "role": "user",

@@ -58,8 +58,10 @@ class TestDescribeWithVision:
 
         with (
             patch("app.gateway.ingestion_image.get_tts_config", return_value=_vision_cfg()),
-            patch("app.gateway.ingestion_image.AsyncOpenAI", return_value=mock_client),
+            patch("app.gateway.vlm_client.AsyncOpenAI", return_value=mock_client),
         ):
+            from app.gateway.vlm_client import _client_cache
+            _client_cache.clear()
             result = await describe(_fake_image, "trace-1")
 
         assert result.content_type == "image_description"
@@ -71,8 +73,10 @@ class TestDescribeWithVision:
 
         with (
             patch("app.gateway.ingestion_image.get_tts_config", return_value=_vision_cfg(base_url="https://custom.api.com/v1")),
-            patch("app.gateway.ingestion_image.AsyncOpenAI", return_value=mock_client) as mock_cls,
+            patch("app.gateway.vlm_client.AsyncOpenAI", return_value=mock_client) as mock_cls,
         ):
+            from app.gateway.vlm_client import _client_cache
+            _client_cache.clear()
             result = await describe(_fake_image, "trace-2")
 
         mock_cls.assert_called_once_with(

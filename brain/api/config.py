@@ -1,8 +1,7 @@
-"""大腦層集中設定 — 從 .env 讀取所有環境變數"""
-
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_INTERNAL_PORT = 8100
@@ -72,6 +71,12 @@ class BrainSettings(BaseSettings):
     embedding_model: str = "BAAI/bge-m3"
     embedding_use_fp16: bool = True
     embedding_device: str = "cuda"
+    embedding_service_url: str = ""
+    embedding_service_token: str = ""
+    embedding_service_timeout: float = 30.0
+    embedding_service_chunk_size: int = 32
+    embedding_expected_model: str = "BAAI/bge-m3"
+    embedding_expected_dimension: int = 1024
     embedding_gemini_model: str = "gemini-embedding-001"
     embedding_gemini_dimensions: int = 0
     embedding_openai_model: str = "text-embedding-3-small"
@@ -197,6 +202,16 @@ class BrainSettings(BaseSettings):
                 ordered.append(version)
         return ordered
 
+    @property
+    def resolved_embedding_service_url(self) -> str:
+        if self.embedding_service_url.strip():
+            return self.embedding_service_url.strip()
+        return "http://embedding:8009"
+
+    @property
+    def is_embedding_service_external(self) -> bool:
+        return bool(self.embedding_service_url.strip())
+
     @cached_property
     def resolved_privacy_filter_block_categories(self) -> list[str]:
         return [
@@ -291,45 +306,39 @@ class BrainSettings(BaseSettings):
             if channel.strip()
         ]
 
-    # Lookup for API-based embedding providers: version -> (model_attr, key_attr, base_url, dims_attr)
-    _API_EMBEDDING_PROVIDERS: dict[str, tuple[str, str, str, str]] = {
-        "gemini": ("embedding_gemini_model", "gemini_api_key", "https://generativelanguage.googleapis.com/v1beta", "embedding_gemini_dimensions"),
-        "openai": ("embedding_openai_model", "openai_api_key", "", "embedding_openai_dimensions"),
-        "voyage": ("embedding_voyage_model", "voyage_api_key", "https://api.voyageai.com/v1", "embedding_voyage_dimensions"),
-    }
-
     def resolve_embedding_backend(
         self,
         version: str | None = None,
     ) -> EmbeddingBackend:
         resolved_version = self._normalize_embedding_version(
-            version or self.embedding_active_version)
-        if resolved_version == "bge":
-            return EmbeddingBackend(
-                version="bge",
-                provider="bge",
-                model=self.embedding_model,
-                api_key="",
-                base_url="",
-                dimensions=None,
-                use_fp16=self.embedding_use_fp16,
-                device=self.embedding_device,
-                multimodal=False,
-            )
-        spec = self._API_EMBEDDING_PROVIDERS.get(resolved_version)
-        if spec is None:
-            raise ValueError(f"embedding version 不支援: {resolved_version}")
-        model_attr, key_attr, base_url, dims_attr = spec
+            version or self.embedding_active_version
+        )
+        if resolved_version == "gemini":
+            model = self.embedding_gemini_model
+            dimensions = self.embedding_gemini_dimensions or 768
+            api_key = self.gemini_api_key or self.embedding_service_token
+        elif resolved_version == "openai":
+            model = self.embedding_openai_model
+            dimensions = self.embedding_openai_dimensions or 1536
+            api_key = self.openai_api_key or self.embedding_service_token
+        elif resolved_version == "voyage":
+            model = self.embedding_voyage_model
+            dimensions = self.embedding_voyage_dimensions or 1024
+            api_key = self.voyage_api_key or self.embedding_service_token
+        else:
+            model = self.embedding_expected_model or self.embedding_model
+            dimensions = self.embedding_expected_dimension or 1024
+            api_key = self.embedding_service_token
+
         return EmbeddingBackend(
             version=resolved_version,
             provider=resolved_version,
-            model=getattr(self, model_attr),
-            api_key=getattr(self, key_attr),
-            base_url=base_url,
-            dimensions=self._normalize_embedding_dimensions(
-                getattr(self, dims_attr)),
-            use_fp16=False,
-            device="api",
+            model=model,
+            api_key=api_key,
+            base_url=self.resolved_embedding_service_url,
+            dimensions=dimensions,
+            use_fp16=self.embedding_use_fp16,
+            device="remote_http",
             multimodal=False,
         )
 

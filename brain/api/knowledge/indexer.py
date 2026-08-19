@@ -973,10 +973,19 @@ def _build_knowledge_records(chunk_specs: list[ChunkSpec]) -> list[dict[str, Any
         return []
 
     texts = [chunk.embed_text or chunk.text for chunk in chunk_specs]
-    vectors = get_embedder().encode(texts)
+    embedder = get_embedder()
+    try:
+        vectors, spec, _ = embedder.encode_with_metadata(texts, input_type="document")
+    except (AttributeError, TypeError, ValueError):
+        vectors = embedder.encode(texts)
+        spec = {}
+
     records: list[dict[str, Any]] = []
 
     for chunk, vector in zip(chunk_specs, vectors):
+        metadata = dict(chunk.metadata)
+        if spec and spec.get("identity"):
+            metadata["embedding_identity"] = spec["identity"]
         records.append(
             {
                 "text": chunk.text,
@@ -985,7 +994,7 @@ def _build_knowledge_records(chunk_specs: list[ChunkSpec]) -> list[dict[str, Any
                 "date": date.today().isoformat(),
                 "path": str(chunk.metadata.get("path", "")),
                 "chunk_id": str(chunk.metadata.get("chunk_id", "")),
-                "metadata": json.dumps(chunk.metadata, ensure_ascii=False),
+                "metadata": json.dumps(metadata, ensure_ascii=False),
             }
         )
 

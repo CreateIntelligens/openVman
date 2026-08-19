@@ -60,7 +60,7 @@ from app.routes import mascots as mascot_routes
 from app.routes import public_characters as public_characters_routes
 from app.service import TTSRouterService
 from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
-from app.tts_text_cleaner import clean_for_tts
+from app.tts_text import clean_for_tts, prepare_tts_text_async
 from app.utils.upload import (
     UploadTooLargeError,
     cleanup_temp_path,
@@ -406,7 +406,7 @@ class SpeechRequest(BaseModel):
 async def create_speech(body: SpeechRequest) -> Response:
     cfg = get_tts_config()
     svc = _get_service()
-    cleaned_text = clean_for_tts(body.input)
+    cleaned_text = (await prepare_tts_text_async(body.input)) or ""
     request = SynthesizeRequest(text=cleaned_text, voice_hint=body.voice)
     cache_key: str | None = None
 
@@ -498,7 +498,7 @@ async def _proxy_indextts_stream(
 @app.post("/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
 async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
     cfg = get_tts_config()
-    cleaned = clean_for_tts(body.text.strip())
+    cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
 

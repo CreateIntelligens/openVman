@@ -129,6 +129,26 @@ def wav_to_bytes(wav_data, sampling_rate):
 async def health_check():
     return JSONResponse(status_code=200, content={"status": "healthy", "timestamp": time.time()})
 
+@app.get("/health/ready")
+async def health_ready(request: Request):
+    global tts
+    token = os.getenv("INTERNAL_API_TOKEN", "").strip()
+    if token:
+        auth = request.headers.get("Authorization", "")
+        if not auth or auth != f"Bearer {token}":
+            return JSONResponse(status_code=401, content={"status": "unauthorized", "error": "Invalid or missing token"})
+    if tts is None:
+        return JSONResponse(status_code=503, content={"status": "not_ready", "error": "Model not initialized"})
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ready",
+            "model": MODEL,
+            "revision": "1.0.0",
+            "device": "cuda" if torch.cuda.is_available() else "cpu",
+        },
+    )
+
 @app.post("/tts_url")
 async def tts_api_url(request: Request):
     try:

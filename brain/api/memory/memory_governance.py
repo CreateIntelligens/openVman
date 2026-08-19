@@ -356,23 +356,33 @@ def _build_summary_records(summaries: list[DailyMemorySummary]) -> list[dict[str
     if not summaries:
         return []
 
-    vectors = get_embedder().encode([s.summary_text for s in summaries])
+    embedder = get_embedder()
+    texts = [s.summary_text for s in summaries]
+    try:
+        vectors, spec, _ = embedder.encode_with_metadata(texts, input_type="document")
+    except (AttributeError, TypeError, ValueError):
+        vectors = embedder.encode(texts)
+        spec = {}
+
     records: list[dict[str, Any]] = []
     for summary, vector in zip(summaries, vectors):
         importance = score_importance(summary.summary_text)
+        meta = {
+            "kind": "daily_summary",
+            "persona_id": summary.persona_id,
+            "day": summary.day,
+            "fingerprint": summary.fingerprint,
+            "importance": importance.score,
+            "importance_level": importance.level,
+        }
+        if spec and spec.get("identity"):
+            meta["embedding_identity"] = spec["identity"]
         records.append({
             "text": summary.summary_text,
             "vector": normalize_vector(vector),
             "source": "memory_summary",
             "date": summary.day,
-            "metadata": json.dumps({
-                "kind": "daily_summary",
-                "persona_id": summary.persona_id,
-                "day": summary.day,
-                "fingerprint": summary.fingerprint,
-                "importance": importance.score,
-                "importance_level": importance.level,
-            }, ensure_ascii=False),
+            "metadata": json.dumps(meta, ensure_ascii=False),
         })
     return records
 
