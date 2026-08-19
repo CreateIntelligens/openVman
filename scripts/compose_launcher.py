@@ -79,7 +79,11 @@ def resolve_routing(env: dict[str, str]) -> ResolvedRouting:
             warnings.append("Both VISION_LLM_BASE_URL and 'vlm' profile are configured; external URL takes precedence.")
     elif "vlm" in explicit_profiles:
         injected_env["VISION_LLM_BASE_URL"] = "http://vlm:8000/v1"
-        injected_env["VISION_LLM_API_KEY"] = env.get("VISION_LLM_API_KEY") or "local-vlm"
+        injected_env["VISION_LLM_API_KEY"] = (
+            env.get("GATEWAY_INTERNAL_TOKEN")
+            or env.get("VISION_LLM_API_KEY")
+            or ""
+        )
         injected_env["VISION_LLM_MODEL"] = env.get("VISION_LLM_MODEL") or "openvman-vlm"
         vlm_mode = "Local (profile: vlm)"
     else:

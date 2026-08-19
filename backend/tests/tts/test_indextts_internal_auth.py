@@ -64,3 +64,91 @@ def test_protected_routes_fail_closed_without_configured_secret(monkeypatch) -> 
     assert response.json() == {
         "detail": "internal API token is not configured",
     }
+
+
+def test_readiness_uses_internal_header_and_requires_successful_warmup(monkeypatch) -> None:
+    monkeypatch.setenv("INTERNAL_API_TOKEN", "test-internal-token")
+    module = _load_api_server(monkeypatch)
+    module.tts = object()
+    module.tts_ready = False
+    module.tts_readiness_error = "synthesis_warmup_failed"
+    client = TestClient(module.app)
+
+    assert client.get("/health/ready").status_code == 403
+    assert client.get(
+        "/health/ready",
+        headers={"Authorization": "Bearer test-internal-token"},
+    ).status_code == 403
+
+    response = client.get(
+        "/health/ready",
+        headers={"X-Internal-Token": "test-internal-token"},
+    )
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "not_ready",
+        "error": "synthesis_warmup_failed",
+    }
+
+
+def test_readiness_succeeds_only_after_synthesis_warmup(monkeypatch) -> None:
+    monkeypatch.setenv("INTERNAL_API_TOKEN", "test-internal-token")
+    module = _load_api_server(monkeypatch)
+
+    class FakeIndexTTS:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def registry_speaker(self, *_args):
+            pass
+
+        async def infer_with_ref_audio_embed(self, *_args):
+            return 24000, b"warmup"
+
+    module.IndexTTS = FakeIndexTTS
+    module.args = types.SimpleNamespace(
+        model_dir=str(Path(module.__file__).parent / "assets" / "checkpoints"),
+        gpu_memory_utilization=0.1,
+    )
+
+    with TestClient(module.app) as client:
+        response = client.get(
+            "/health/ready",
+            headers={"X-Internal-Token": "test-internal-token"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+
+
+def test_failed_synthesis_warmup_keeps_readiness_unavailable(monkeypatch) -> None:
+    monkeypatch.setenv("INTERNAL_API_TOKEN", "test-internal-token")
+    module = _load_api_server(monkeypatch)
+
+    class FailingIndexTTS:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def registry_speaker(self, *_args):
+            pass
+
+        async def infer_with_ref_audio_embed(self, *_args):
+            raise RuntimeError("warmup failed")
+
+    module.IndexTTS = FailingIndexTTS
+    module.args = types.SimpleNamespace(
+        model_dir=str(Path(module.__file__).parent / "assets" / "checkpoints"),
+        gpu_memory_utilization=0.1,
+    )
+
+    with TestClient(module.app) as client:
+        response = client.get(
+            "/health/ready",
+            headers={"X-Internal-Token": "test-internal-token"},
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "status": "not_ready",
+        "error": "synthesis_warmup_failed",
+    }

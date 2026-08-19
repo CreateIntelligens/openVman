@@ -77,12 +77,15 @@ async def probe_indextts_health(
     if not tts_url:
         return {"status": "disabled", "route": "disabled"}
 
-    is_local = "index-tts-vllm:8011" in tts_url or "localhost:8011" in tts_url or "127.0.0.1:8011" in tts_url
+    is_local = any(
+        host in tts_url
+        for host in ("index-tts-vllm:8011", "localhost:8011", "127.0.0.1:8011")
+    )
     route = "local" if is_local else "external"
 
     headers = {}
     if getattr(cfg, "gateway_internal_token", None):
-        headers["Authorization"] = f"Bearer {cfg.gateway_internal_token}"
+        headers["X-Internal-Token"] = cfg.gateway_internal_token
 
     ready_url = f"{tts_url.rstrip('/')}/health/ready"
     res = await _probe_service(client, "index-tts", ready_url, headers=headers)

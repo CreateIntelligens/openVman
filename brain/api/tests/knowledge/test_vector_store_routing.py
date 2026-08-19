@@ -13,9 +13,30 @@ if str(API_ROOT) not in sys.path:
 
 
 def _load_db(monkeypatch, *, active_version: str):
+    bge_identity = "bge:BAAI/bge-m3:1024:float32:l2:document:rev-one"
+    gemini_identity = (
+        "gemini:gemini-embedding-001:768:float32:l2:document:provider-managed"
+    )
+
+    def identity_with_semantics(identity, semantics):
+        parts = identity.split(":")
+        parts[5] = semantics
+        return ":".join(parts)
+
     fake_config_mod = types.ModuleType("config")
     fake_config_mod.get_settings = lambda: types.SimpleNamespace(
         resolved_embedding_active_version=active_version,
+        resolved_embedding_write_identity=(
+            bge_identity if active_version == "bge" else gemini_identity
+        ),
+        resolved_embedding_identity_aliases={
+            "bge": bge_identity,
+            "gemini": gemini_identity,
+        },
+        resolved_embedding_compatible_legacy_identities={
+            "bge:BAAI/bge-m3:1024:float32:l2:document:default"
+        },
+        _identity_with_semantics=identity_with_semantics,
     )
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)
 
@@ -39,3 +60,32 @@ class TestVectorTableNaming:
 
         assert db.resolve_vector_table_name("knowledge") == "knowledge__gemini"
         assert db.resolve_vector_table_name("memories") == "memories__gemini"
+
+    def test_known_query_identity_routes_to_its_document_table(self, monkeypatch):
+        db = _load_db(monkeypatch, active_version="bge")
+        query_identity = (
+            "bge:BAAI/bge-m3:1024:float32:l2:query:rev-one"
+        )
+
+        assert db.resolve_vector_table_name("knowledge", query_identity) == "knowledge"
+
+    def test_unknown_revision_gets_an_isolated_table(self, monkeypatch):
+        db = _load_db(monkeypatch, active_version="bge")
+        new_identity = (
+            "bge:BAAI/bge-m3:1024:float32:l2:document:rev-two"
+        )
+
+        table_name = db.resolve_vector_table_name("knowledge", new_identity)
+        assert table_name.startswith("knowledge__emb_")
+        assert table_name != "knowledge"
+
+    def test_parity_verified_legacy_identity_keeps_the_legacy_table(self, monkeypatch):
+        db = _load_db(monkeypatch, active_version="bge")
+        legacy_identity = (
+            "bge:BAAI/bge-m3:1024:float32:l2:document:default"
+        )
+
+        assert db.resolve_vector_table_name(
+            "knowledge",
+            legacy_identity,
+        ) == "knowledge"

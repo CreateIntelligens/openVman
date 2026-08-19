@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
-import re
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
+import re
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
@@ -58,10 +58,30 @@ def resolve_embedding_index_state_path(
 ) -> Path:
     """Return the per-project knowledge index state path for an embedding version."""
     ctx = resolve_project_context(project_id)
-    version = (embedding_version or get_settings().resolved_embedding_active_version).strip().lower()
-    if version == "bge":
+    cfg = get_settings()
+    version = (
+        embedding_version
+        or getattr(cfg, "resolved_embedding_write_identity", "")
+        or cfg.resolved_embedding_active_version
+    ).strip()
+    aliases = getattr(cfg, "resolved_embedding_identity_aliases", {})
+    compatible_legacy = getattr(
+        cfg,
+        "resolved_embedding_compatible_legacy_identities",
+        set(),
+    )
+    canonical = aliases.get(version.lower(), version)
+    for alias, identity in aliases.items():
+        if canonical == identity:
+            if alias == "bge":
+                return ctx.index_state_path
+            return ctx.project_root / f"knowledge_index_state__{alias}.json"
+    if canonical in compatible_legacy or version.lower() == "bge":
         return ctx.index_state_path
-    return ctx.project_root / f"knowledge_index_state__{version}.json"
+    if ":" not in canonical:
+        return ctx.project_root / f"knowledge_index_state__{version.lower()}.json"
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+    return ctx.project_root / f"knowledge_index_state__emb_{digest}.json"
 
 
 # ---------------------------------------------------------------------------

@@ -68,6 +68,7 @@ class BgeLocalProvider:
         self._init_lock = asyncio.Lock()
         self._model: Any = None
         self._is_ready = False
+        self._warmup_complete = False
 
     @property
     def is_configured(self) -> bool:
@@ -114,12 +115,22 @@ class BgeLocalProvider:
                     self.use_fp16,
                 )
                 from FlagEmbedding import BGEM3FlagModel
+                from huggingface_hub import snapshot_download
 
-                return BGEM3FlagModel(
-                    self.model_name,
-                    use_fp16=self.use_fp16,
-                    device=self.device,
-                )
+                kwargs: dict[str, Any] = {
+                    "use_fp16": self.use_fp16,
+                    "device": self.device,
+                }
+                model_source = self.model_name
+                if (
+                    self.model_revision not in {"", "default"}
+                    and not os.path.isdir(self.model_name)
+                ):
+                    model_source = snapshot_download(
+                        repo_id=self.model_name,
+                        revision=self.model_revision,
+                    )
+                return BGEM3FlagModel(model_source, **kwargs)
 
             self._model = await loop.run_in_executor(None, _load)
             self._is_ready = True
@@ -134,6 +145,8 @@ class BgeLocalProvider:
             return False
 
     async def warmup(self) -> None:
+        if self._warmup_complete:
+            return
         model = await self._get_or_load_model()
         loop = asyncio.get_running_loop()
 
@@ -147,6 +160,7 @@ class BgeLocalProvider:
 
         async with self._semaphore:
             await loop.run_in_executor(None, _warm)
+        self._warmup_complete = True
 
     async def encode(
         self,
@@ -188,6 +202,7 @@ class BgeLocalProvider:
         async with self._init_lock:
             self._model = None
             self._is_ready = False
+            self._warmup_complete = False
         logger.info("BGE local provider shut down cleanly.")
 
 
@@ -197,17 +212,20 @@ class GeminiApiProvider:
     def __init__(
         self,
         api_key: str,
-        model: str = "text-embedding-004",
+        model: str = "gemini-embedding-001",
         dimensions: int = 768,
+        model_revision: str = "provider-managed",
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
         timeout: float = 30.0,
     ) -> None:
         self.api_key = (api_key or "").strip()
         self.model = model.strip()
         self.dimensions = dimensions
+        self.model_revision = model_revision
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self._is_ready = False
 
     @property
     def is_configured(self) -> bool:
@@ -221,7 +239,7 @@ class GeminiApiProvider:
             dtype="float32",
             normalization="l2",
             input_semantics=input_semantics,
-            model_revision="default",
+            model_revision=self.model_revision,
         )
         return EmbeddingSpec(
             identity=identity,
@@ -232,7 +250,7 @@ class GeminiApiProvider:
             normalized=True,
             normalization="l2",
             input_semantics=input_semantics,
-            model_revision="default",
+            model_revision=self.model_revision,
             service_revision="1.0.0",
         )
 
@@ -242,11 +260,13 @@ class GeminiApiProvider:
         return self._client
 
     async def is_ready(self) -> bool:
-        return self.is_configured
+        return self.is_configured and self._is_ready
 
     async def warmup(self) -> None:
         if not self.is_configured:
             raise RuntimeError("Gemini API key is not configured")
+        if not self._is_ready:
+            await self.encode(["embedding readiness probe"], input_type="document")
 
     async def encode(
         self,
@@ -288,11 +308,19 @@ class GeminiApiProvider:
                 raise RuntimeError(
                     f"Gemini returned {len(vectors)} vectors for {len(texts)} texts"
                 )
+            self._is_ready = True
             return _l2_normalize(vectors)
         except Exception as exc:
+            self._is_ready = False
             sanitized_url = _sanitize_url(url)
-            logger.error("Gemini embedding call to %s failed: %s", sanitized_url, exc)
-            raise RuntimeError(f"Gemini embedding failed: {exc}") from None
+            logger.error(
+                "Gemini embedding call to %s failed (%s)",
+                sanitized_url,
+                type(exc).__name__,
+            )
+            raise RuntimeError(
+                f"Gemini embedding failed ({type(exc).__name__})"
+            ) from None
 
     async def shutdown(self) -> None:
         if self._client and not self._client.is_closed:
@@ -307,15 +335,18 @@ class OpenAiApiProvider:
         api_key: str,
         model: str = "text-embedding-3-small",
         dimensions: int = 1536,
+        model_revision: str = "provider-managed",
         base_url: str = "https://api.openai.com/v1",
         timeout: float = 30.0,
     ) -> None:
         self.api_key = (api_key or "").strip()
         self.model = model.strip()
         self.dimensions = dimensions
+        self.model_revision = model_revision
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self._is_ready = False
 
     @property
     def is_configured(self) -> bool:
@@ -329,7 +360,7 @@ class OpenAiApiProvider:
             dtype="float32",
             normalization="l2",
             input_semantics=input_semantics,
-            model_revision="default",
+            model_revision=self.model_revision,
         )
         return EmbeddingSpec(
             identity=identity,
@@ -340,7 +371,7 @@ class OpenAiApiProvider:
             normalized=True,
             normalization="l2",
             input_semantics=input_semantics,
-            model_revision="default",
+            model_revision=self.model_revision,
             service_revision="1.0.0",
         )
 
@@ -350,11 +381,13 @@ class OpenAiApiProvider:
         return self._client
 
     async def is_ready(self) -> bool:
-        return self.is_configured
+        return self.is_configured and self._is_ready
 
     async def warmup(self) -> None:
         if not self.is_configured:
             raise RuntimeError("OpenAI API key is not configured")
+        if not self._is_ready:
+            await self.encode(["embedding readiness probe"], input_type="document")
 
     async def encode(
         self,
@@ -389,11 +422,19 @@ class OpenAiApiProvider:
                 raise RuntimeError(
                     f"OpenAI returned {len(vectors)} vectors for {len(texts)} texts"
                 )
+            self._is_ready = True
             return _l2_normalize(vectors)
         except Exception as exc:
+            self._is_ready = False
             sanitized_url = _sanitize_url(url)
-            logger.error("OpenAI embedding call to %s failed: %s", sanitized_url, exc)
-            raise RuntimeError(f"OpenAI embedding failed: {exc}") from None
+            logger.error(
+                "OpenAI embedding call to %s failed (%s)",
+                sanitized_url,
+                type(exc).__name__,
+            )
+            raise RuntimeError(
+                f"OpenAI embedding failed ({type(exc).__name__})"
+            ) from None
 
     async def shutdown(self) -> None:
         if self._client and not self._client.is_closed:
@@ -408,15 +449,18 @@ class VoyageApiProvider:
         api_key: str,
         model: str = "voyage-3-large",
         dimensions: int = 1024,
+        model_revision: str = "provider-managed",
         base_url: str = "https://api.voyageai.com/v1",
         timeout: float = 30.0,
     ) -> None:
         self.api_key = (api_key or "").strip()
         self.model = model.strip()
         self.dimensions = dimensions
+        self.model_revision = model_revision
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self._is_ready = False
 
     @property
     def is_configured(self) -> bool:
@@ -430,7 +474,7 @@ class VoyageApiProvider:
             dtype="float32",
             normalization="l2",
             input_semantics=input_semantics,
-            model_revision="default",
+            model_revision=self.model_revision,
         )
         return EmbeddingSpec(
             identity=identity,
@@ -441,7 +485,7 @@ class VoyageApiProvider:
             normalized=True,
             normalization="l2",
             input_semantics=input_semantics,
-            model_revision="default",
+            model_revision=self.model_revision,
             service_revision="1.0.0",
         )
 
@@ -451,11 +495,13 @@ class VoyageApiProvider:
         return self._client
 
     async def is_ready(self) -> bool:
-        return self.is_configured
+        return self.is_configured and self._is_ready
 
     async def warmup(self) -> None:
         if not self.is_configured:
             raise RuntimeError("Voyage API key is not configured")
+        if not self._is_ready:
+            await self.encode(["embedding readiness probe"], input_type="document")
 
     async def encode(
         self,
@@ -490,11 +536,19 @@ class VoyageApiProvider:
                 raise RuntimeError(
                     f"Voyage returned {len(vectors)} vectors for {len(texts)} texts"
                 )
+            self._is_ready = True
             return _l2_normalize(vectors)
         except Exception as exc:
+            self._is_ready = False
             sanitized_url = _sanitize_url(url)
-            logger.error("Voyage embedding call to %s failed: %s", sanitized_url, exc)
-            raise RuntimeError(f"Voyage embedding failed: {exc}") from None
+            logger.error(
+                "Voyage embedding call to %s failed (%s)",
+                sanitized_url,
+                type(exc).__name__,
+            )
+            raise RuntimeError(
+                f"Voyage embedding failed ({type(exc).__name__})"
+            ) from None
 
     async def shutdown(self) -> None:
         if self._client and not self._client.is_closed:
@@ -520,6 +574,7 @@ class ProviderRegistry:
         self.cooldown_seconds = cooldown_seconds
         self.fallback_order = list(fallback_order or ["bge", "gemini", "openai", "voyage"])
         self._providers: dict[str, _ProviderState] = {}
+        self._readiness_lock = asyncio.Lock()
 
     def register(self, name: str, provider: Any) -> None:
         self._providers[name.strip().lower()] = _ProviderState(
@@ -563,6 +618,11 @@ class ProviderRegistry:
         state.last_failure_time = time.time()
 
     async def inspect_readiness(self) -> dict[str, Any]:
+        """Serialize expensive warmups and return provider readiness."""
+        async with self._readiness_lock:
+            return await self._inspect_readiness_unlocked()
+
+    async def _inspect_readiness_unlocked(self) -> dict[str, Any]:
         """Inspect all registered providers and determine overall status."""
         configured_providers = self.get_configured_providers()
         if not configured_providers:
@@ -578,10 +638,20 @@ class ProviderRegistry:
         preferred_name = self.fallback_order[0] if self.fallback_order else "bge"
 
         for name, provider in configured_providers.items():
+            state = self._providers[name]
+            if self._is_in_cooldown(state, time.time()):
+                provider_statuses[name] = {
+                    "status": "cooldown",
+                    "spec": provider.spec().to_dict()
+                    if hasattr(provider, "spec")
+                    else {},
+                }
+                continue
             try:
                 await provider.warmup()
                 is_ready = await provider.is_ready()
                 if is_ready:
+                    self._record_success(state)
                     has_ready = True
                     if name == preferred_name:
                         preferred_ready = True
@@ -590,9 +660,10 @@ class ProviderRegistry:
                     "spec": provider.spec().to_dict() if hasattr(provider, "spec") else {},
                 }
             except Exception as exc:
+                self._record_failure(state)
                 provider_statuses[name] = {
                     "status": "error",
-                    "error": str(exc),
+                    "error_type": type(exc).__name__,
                     "spec": provider.spec().to_dict() if hasattr(provider, "spec") else {},
                 }
 
@@ -632,20 +703,15 @@ class ProviderRegistry:
             provider = state.instance
             spec = provider.spec(input_semantics=input_type)
 
-            # If a specific identity was requested, must match identity, provider alias, or model name
+            # A lease is an exact vector identity, never a provider/model alias.
             if requested_identity:
                 req = requested_identity.strip()
-                if req not in (spec.identity, name, spec.provider, spec.model):
+                if req != spec.identity:
                     continue
 
-            # If caller gave acceptable identities, match by identity, provider alias, or model name
+            # Query fallback is constrained to exact identities backed by indexes.
             if acceptable_set is not None:
-                if not (
-                    spec.identity in acceptable_set
-                    or name in acceptable_set
-                    or spec.provider in acceptable_set
-                    or spec.model in acceptable_set
-                ):
+                if spec.identity not in acceptable_set:
                     continue
 
             candidate_names.append(name)
@@ -695,9 +761,9 @@ class ProviderRegistry:
                     "model": spec.model,
                     "identity": spec.identity,
                     "status": "error",
-                    "error": str(exc),
+                    "error_type": type(exc).__name__,
                 })
-                errors.append(f"{name}: {exc}")
+                errors.append(f"{name}: {type(exc).__name__}")
 
         raise RuntimeError(
             f"No acceptable embedding provider succeeded for batch (attempted {len(attempts)} providers). Errors: {'; '.join(errors)}"

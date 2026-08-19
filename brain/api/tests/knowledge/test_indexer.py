@@ -39,6 +39,12 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         return vectors
 
     fake_embedder.encode.side_effect = _fake_encode
+    write_identity = "bge:BAAI/bge-m3:1024:float32:l2:document:test"
+    fake_embedder.encode_with_metadata.side_effect = lambda texts, **kwargs: (
+        fake_embedder.encode(texts),
+        {"identity": write_identity, "dimensions": 128},
+        [],
+    )
     fake_embedder_mod.get_embedder = lambda: fake_embedder
 
     # Stub infra.db
@@ -50,7 +56,9 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_db_mod.normalize_vector = lambda v: v
     fake_db_mod.parse_record_metadata = lambda r: json.loads(r.get("metadata", "{}"))
     fake_db_mod.ensure_fts_index = lambda table_name, project_id="default": None
-    fake_db_mod.resolve_vector_table_name = lambda table_name: table_name
+    fake_db_mod.resolve_vector_table_name = (
+        lambda table_name, embedding_version=None: table_name
+    )
 
     # Stub workspace
     workspace_root = tmp_path / "workspace"
@@ -81,6 +89,7 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_config.chunk_char_limit = 500
     fake_config.chunk_overlap_ratio = 0.15
     fake_config.chunk_semantic_threshold = 0.65
+    fake_config.resolved_embedding_write_identity = write_identity
     fake_settings_mod = types.ModuleType("config")
     fake_settings_mod.get_settings = lambda: fake_config
 
@@ -766,4 +775,3 @@ def test_build_knowledge_records_encodes_embed_text(monkeypatch, tmp_path):
     assert encoded[0] == ["主題：t\n問題：q", "plain chunk"]
     assert records[0]["text"] == "full QA payload"
     assert records[1]["text"] == "plain chunk"
-

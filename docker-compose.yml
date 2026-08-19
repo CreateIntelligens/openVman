@@ -24,7 +24,13 @@ services:
       - HOME=/home/appuser
       - OPF_MOE_TRITON=false
       - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://embedding:8009}
-      - EMBEDDING_SERVICE_TOKEN=${GATEWAY_INTERNAL_TOKEN:-}
+      - EMBEDDING_SERVICE_TOKEN=${EMBEDDING_SERVICE_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}
+      - EMBEDDING_EXPECTED_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
+      - EMBEDDING_EXPECTED_DIMENSION=${EMBEDDING_EXPECTED_DIMENSION:-1024}
+      - EMBEDDING_EXPECTED_REVISION=${EMBEDDING_MODEL_REVISION:-5617a9f61b028005a4858fdac845db406aefb181}
+      - EMBEDDING_WRITE_IDENTITY=${EMBEDDING_WRITE_IDENTITY:-}
+      - EMBEDDING_IDENTITY_ALIASES=${EMBEDDING_IDENTITY_ALIASES:-}
+      - EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES=${EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES:-}
     healthcheck:
       test:
         - CMD
@@ -55,17 +61,27 @@ services:
     environment:
       - HF_HOME=/home/appuser/.cache/huggingface
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
-      - EMBEDDING_MODEL_REVISION=${EMBEDDING_MODEL_REVISION:-default}
+      - EMBEDDING_MODEL_REVISION=${EMBEDDING_MODEL_REVISION:-5617a9f61b028005a4858fdac845db406aefb181}
       - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cuda}
       - EMBEDDING_USE_FP16=${EMBEDDING_USE_FP16:-true}
       - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-32}
       - EMBEDDING_MAX_LENGTH=${EMBEDDING_MAX_LENGTH:-8192}
       - EMBEDDING_MAX_CONCURRENCY=${EMBEDDING_MAX_CONCURRENCY:-1}
       - EMBEDDING_COOLDOWN_SECONDS=${EMBEDDING_COOLDOWN_SECONDS:-60.0}
-      - EMBEDDING_BEARER_TOKEN=${GATEWAY_INTERNAL_TOKEN:-}
+      - EMBEDDING_BEARER_TOKEN=${EMBEDDING_SERVICE_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+      - EMBEDDING_GEMINI_MODEL=${EMBEDDING_GEMINI_MODEL:-gemini-embedding-001}
+      - EMBEDDING_GEMINI_DIMENSIONS=${EMBEDDING_GEMINI_DIMENSIONS:-768}
+      - EMBEDDING_GEMINI_BASE_URL=${EMBEDDING_GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
+      - EMBEDDING_OPENAI_MODEL=${EMBEDDING_OPENAI_MODEL:-text-embedding-3-small}
+      - EMBEDDING_OPENAI_DIMENSIONS=${EMBEDDING_OPENAI_DIMENSIONS:-1536}
+      - EMBEDDING_OPENAI_BASE_URL=${EMBEDDING_OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - EMBEDDING_VOYAGE_MODEL=${EMBEDDING_VOYAGE_MODEL:-voyage-3-large}
+      - EMBEDDING_VOYAGE_DIMENSIONS=${EMBEDDING_VOYAGE_DIMENSIONS:-1024}
+      - EMBEDDING_VOYAGE_BASE_URL=${EMBEDDING_VOYAGE_BASE_URL:-https://api.voyageai.com/v1}
+      - EMBEDDING_PROVIDER_TIMEOUT=${EMBEDDING_PROVIDER_TIMEOUT:-30.0}
       - EMBEDDING_PROVIDER_FALLBACKS=${EMBEDDING_PROVIDER_FALLBACKS:-bge,gemini,openai,voyage}
     healthcheck:
       test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('EMBEDDING_BEARER_TOKEN',''); req=urllib.request.Request('http://localhost:8009/health/ready', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
@@ -103,7 +119,7 @@ services:
       - ./backend/index-tts-vllm:/app
       - ./backend/app/assets/tts_references:/app/assets/tts_references:ro
     healthcheck:
-      test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('INTERNAL_API_TOKEN',''); req=urllib.request.Request('http://localhost:8011/health/ready', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
+      test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('INTERNAL_API_TOKEN',''); req=urllib.request.Request('http://localhost:8011/health/ready', headers={'X-Internal-Token': token} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 30
@@ -120,6 +136,20 @@ services:
     <<: *shared
     profiles: ["vlm"]
     image: vllm/vllm-openai:v0.24.0
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - HF_HOME=/root/.cache/huggingface
+      - VLLM_API_KEY=${GATEWAY_INTERNAL_TOKEN:-${VISION_LLM_API_KEY:-}}
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        if [ -z "$${VLLM_API_KEY:-}" ]; then
+          echo "VLLM_API_KEY is required for the local VLM service" >&2
+          exit 1
+        fi
+        exec vllm serve "$$@" --api-key "$${VLLM_API_KEY}"
+      - --
     command:
       - --model
       - ${VLM_MODEL:-Qwen/Qwen3-VL-4B-Instruct-FP8}
@@ -144,14 +174,11 @@ services:
       - '{"max_pixels":262144}'
       - --mm-processor-cache-gb
       - "0.5"
-    environment:
-      - HF_TOKEN=${HF_TOKEN:-}
-      - HF_HOME=/root/.cache/huggingface
     volumes:
       - hf-cache:/root/.cache/huggingface
     shm_size: 8g
     healthcheck:
-      test: ["CMD", "python3", "-c", "import socket, sys; socket.create_connection(('127.0.0.1', 8000), timeout=2).close(); sys.exit(0)"]
+      test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('VLLM_API_KEY',''); req=urllib.request.Request('http://127.0.0.1:8000/v1/models', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=5); sys.exit(0 if res.status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 30

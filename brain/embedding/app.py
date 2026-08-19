@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+import hmac
 import logging
 import os
 import time
@@ -34,7 +35,10 @@ SERVICE_REVISION = "1.0.0"
 
 # Local BGE Configuration
 DEFAULT_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
-MODEL_REVISION = os.getenv("EMBEDDING_MODEL_REVISION", "default")
+MODEL_REVISION = os.getenv(
+    "EMBEDDING_MODEL_REVISION",
+    "5617a9f61b028005a4858fdac845db406aefb181",
+)
 DEVICE = os.getenv("EMBEDDING_DEVICE", "cuda")
 USE_FP16 = os.getenv("EMBEDDING_USE_FP16", "true").lower() in ("true", "1", "yes")
 BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
@@ -44,13 +48,23 @@ COOLDOWN_SECONDS = float(os.getenv("EMBEDDING_COOLDOWN_SECONDS", "60.0"))
 
 # External Provider Configuration
 GEMINI_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
-GEMINI_MODEL = os.getenv("EMBEDDING_GEMINI_MODEL", "text-embedding-004")
+GEMINI_MODEL = os.getenv("EMBEDDING_GEMINI_MODEL", "gemini-embedding-001")
+GEMINI_DIMENSIONS = int(os.getenv("EMBEDDING_GEMINI_DIMENSIONS", "768"))
+GEMINI_BASE_URL = os.getenv(
+    "EMBEDDING_GEMINI_BASE_URL",
+    "https://generativelanguage.googleapis.com/v1beta",
+)
 
 OPENAI_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
 OPENAI_MODEL = os.getenv("EMBEDDING_OPENAI_MODEL", "text-embedding-3-small")
+OPENAI_DIMENSIONS = int(os.getenv("EMBEDDING_OPENAI_DIMENSIONS", "1536"))
+OPENAI_BASE_URL = os.getenv("EMBEDDING_OPENAI_BASE_URL", "https://api.openai.com/v1")
 
 VOYAGE_KEY = (os.getenv("VOYAGE_API_KEY") or "").strip()
 VOYAGE_MODEL = os.getenv("EMBEDDING_VOYAGE_MODEL", "voyage-3-large")
+VOYAGE_DIMENSIONS = int(os.getenv("EMBEDDING_VOYAGE_DIMENSIONS", "1024"))
+VOYAGE_BASE_URL = os.getenv("EMBEDDING_VOYAGE_BASE_URL", "https://api.voyageai.com/v1")
+PROVIDER_TIMEOUT = float(os.getenv("EMBEDDING_PROVIDER_TIMEOUT", "30.0"))
 
 raw_order = os.getenv("EMBEDDING_PROVIDER_FALLBACKS", "bge,gemini,openai,voyage")
 FALLBACK_ORDER = [p.strip().lower() for p in raw_order.split(",") if p.strip()]
@@ -79,11 +93,38 @@ def _get_registry() -> ProviderRegistry:
             ),
         )
         # Register Gemini
-        reg.register("gemini", GeminiApiProvider(api_key=GEMINI_KEY, model=GEMINI_MODEL))
+        reg.register(
+            "gemini",
+            GeminiApiProvider(
+                api_key=GEMINI_KEY,
+                model=GEMINI_MODEL,
+                dimensions=GEMINI_DIMENSIONS,
+                base_url=GEMINI_BASE_URL,
+                timeout=PROVIDER_TIMEOUT,
+            ),
+        )
         # Register OpenAI
-        reg.register("openai", OpenAiApiProvider(api_key=OPENAI_KEY, model=OPENAI_MODEL))
+        reg.register(
+            "openai",
+            OpenAiApiProvider(
+                api_key=OPENAI_KEY,
+                model=OPENAI_MODEL,
+                dimensions=OPENAI_DIMENSIONS,
+                base_url=OPENAI_BASE_URL,
+                timeout=PROVIDER_TIMEOUT,
+            ),
+        )
         # Register Voyage
-        reg.register("voyage", VoyageApiProvider(api_key=VOYAGE_KEY, model=VOYAGE_MODEL))
+        reg.register(
+            "voyage",
+            VoyageApiProvider(
+                api_key=VOYAGE_KEY,
+                model=VOYAGE_MODEL,
+                dimensions=VOYAGE_DIMENSIONS,
+                base_url=VOYAGE_BASE_URL,
+                timeout=PROVIDER_TIMEOUT,
+            ),
+        )
         _registry = reg
     return _registry
 
@@ -123,7 +164,11 @@ def verify_bearer_token(authorization: str | None = Header(None)) -> None:
             detail="Missing Authorization header",
         )
     parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer" or parts[1] != BEARER_TOKEN:
+    if (
+        len(parts) != 2
+        or parts[0].lower() != "bearer"
+        or not hmac.compare_digest(parts[1], BEARER_TOKEN)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Bearer token",
@@ -197,18 +242,21 @@ async def health_readiness(
             },
         )
 
-    # Pick preferred spec for top-level metadata
-    specs = reg.get_available_specs()
-    preferred_spec = specs[0] if specs else None
+    ready_specs = [
+        provider["spec"]
+        for provider in report.get("providers", {}).values()
+        if provider.get("status") == "ready" and provider.get("spec")
+    ]
+    preferred_spec = ready_specs[0] if ready_specs else {}
 
     return {
         "status": report["status"],
         "service": "embedding-service",
         "service_revision": SERVICE_REVISION,
-        "model": preferred_spec.model if preferred_spec else "",
-        "dimension": preferred_spec.dimensions if preferred_spec else 0,
-        "normalization": preferred_spec.normalization if preferred_spec else "l2",
-        "embedding_spec": preferred_spec.to_dict() if preferred_spec else {},
+        "model": preferred_spec.get("model", ""),
+        "dimension": preferred_spec.get("dimensions", 0),
+        "normalization": preferred_spec.get("normalization", "l2"),
+        "embedding_spec": preferred_spec,
         "available_providers": list(report.get("providers", {}).keys()),
         "providers_status": report.get("providers", {}),
     }

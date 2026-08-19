@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+from contextlib import asynccontextmanager
 import hmac
 import io
 import json
@@ -7,13 +8,13 @@ import logging
 import os
 import struct
 import time
-from contextlib import asynccontextmanager
 
-import soundfile as sf
-import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+import soundfile as sf
+import uvicorn
+
 from indextts.infer_vllm import IndexTTS
 
 
@@ -50,15 +51,21 @@ async def convert_audio_with_ffmpeg(input_data, target_sample_rate=16000):
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate(input=input_data)
-        if process.returncode != 0: return input_data 
+        if process.returncode != 0:
+            return input_data
         return stdout
-    except: return input_data
+    except Exception:
+        return input_data
 
 tts = None
+tts_ready = False
+tts_readiness_error = "model_not_initialized"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global tts
+    global tts, tts_ready, tts_readiness_error
+    tts_ready = False
+    tts_readiness_error = "model_loading"
     cfg_path = os.path.join(args.model_dir, "config.yaml")
     tts = IndexTTS(model_dir=args.model_dir, cfg_path=cfg_path, gpu_memory_utilization=args.gpu_memory_utilization)
     current_file_path = os.path.abspath(__file__)
@@ -75,11 +82,32 @@ async def lifespan(app: FastAPI):
         first_speaker = next(iter(speaker_dict), None)
         if first_speaker is not None:
             try:
-                await tts.infer_with_ref_audio_embed(first_speaker, "預熱")
+                warmup_result = await tts.infer_with_ref_audio_embed(
+                    first_speaker,
+                    "預熱",
+                )
+                if not isinstance(warmup_result, tuple) or len(warmup_result) != 2:
+                    raise RuntimeError("invalid warmup synthesis result")
+                sample_rate, wav = warmup_result
+                wav_size = getattr(wav, "size", None)
+                if sample_rate <= 0 or wav is None or wav_size == 0:
+                    raise RuntimeError("empty warmup synthesis result")
+                tts_ready = True
+                tts_readiness_error = ""
                 print(f"[warmup] TTS synthesis warmup done (speaker={first_speaker})")
             except Exception as ex:
-                print(f"[warmup] TTS warmup skipped: {ex}")
-    yield
+                tts_readiness_error = "synthesis_warmup_failed"
+                print(f"[warmup] TTS synthesis warmup failed ({type(ex).__name__})")
+        else:
+            tts_readiness_error = "no_warmup_speaker"
+    else:
+        tts_readiness_error = "speaker_registry_missing"
+    try:
+        yield
+    finally:
+        tts_ready = False
+        tts_readiness_error = "service_stopping"
+        tts = None
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -130,22 +158,23 @@ async def health_check():
     return JSONResponse(status_code=200, content={"status": "healthy", "timestamp": time.time()})
 
 @app.get("/health/ready")
-async def health_ready(request: Request):
-    global tts
-    token = os.getenv("INTERNAL_API_TOKEN", "").strip()
-    if token:
-        auth = request.headers.get("Authorization", "")
-        if not auth or auth != f"Bearer {token}":
-            return JSONResponse(status_code=401, content={"status": "unauthorized", "error": "Invalid or missing token"})
-    if tts is None:
-        return JSONResponse(status_code=503, content={"status": "not_ready", "error": "Model not initialized"})
+async def health_ready():
+    global tts, tts_ready, tts_readiness_error
+    if tts is None or not tts_ready:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "error": tts_readiness_error,
+            },
+        )
     return JSONResponse(
         status_code=200,
         content={
             "status": "ready",
-            "model": MODEL,
-            "revision": "1.0.0",
-            "device": "cuda" if torch.cuda.is_available() else "cpu",
+            "model": os.getenv("MODEL", "IndexTeam/IndexTTS-1.5"),
+            "revision": os.getenv("MODEL_REVISION", "unknown"),
+            "device": "cuda",
         },
     )
 

@@ -20,12 +20,15 @@ def test_vlm_compose_defaults_match_qwen3_fp8_runtime():
     assert "- \"512\"" in compose
 
 
-def test_vlm_healthcheck_does_not_emit_http_access_logs():
+def test_vlm_healthcheck_uses_authenticated_models_endpoint():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
     assert "- --disable-log-requests" not in compose
-    assert "/v1/models" not in compose
-    assert "socket.create_connection" in compose
+    assert 'exec vllm serve "$$@" --api-key "$${VLLM_API_KEY}"' in compose
+    assert "VLLM_API_KEY=${GATEWAY_INTERNAL_TOKEN:-${VISION_LLM_API_KEY:-}}" in compose
+    assert "VLLM_API_KEY is required for the local VLM service" in compose
+    assert "http://127.0.0.1:8000/v1/models" in compose
+    assert "Authorization" in compose
 
 
 def test_vlm_env_example_matches_qwen3_fp8_runtime():

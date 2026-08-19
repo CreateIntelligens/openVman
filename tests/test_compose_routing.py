@@ -60,6 +60,17 @@ def test_routing_profile_injects_consumer_urls():
     assert routing.injected_env.get("TTS_INDEXTTS_URL") == "http://index-tts-vllm:8011"
 
 
+def test_local_vlm_uses_gateway_token_as_api_key():
+    routing = resolve_routing(
+        {
+            "COMPOSE_PROFILES": "vlm",
+            "GATEWAY_INTERNAL_TOKEN": "shared-gateway-token",
+        },
+    )
+
+    assert routing.injected_env["VISION_LLM_API_KEY"] == "shared-gateway-token"
+
+
 def test_sanitize_url_strips_query_and_credentials():
     url_with_secret = "http://user:secret123@shared-gpu:8009/embed?token=my-secret-token"
     sanitized = sanitize_url(url_with_secret)

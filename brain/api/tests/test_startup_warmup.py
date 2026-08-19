@@ -75,6 +75,22 @@ async def test_warmup_resources_marks_warmup_done(monkeypatch):
     assert warmup_state.is_warmup_done() is True
 
 
+@pytest.mark.asyncio
+async def test_warmup_failure_still_releases_readiness(monkeypatch):
+    main = _load_main()
+    monkeypatch.setattr(main, "_warmup_project_ids", lambda: ["default"])
+    monkeypatch.setattr(main, "get_embedder", lambda: object())
+    monkeypatch.setattr(
+        main,
+        "ensure_workspace_scaffold",
+        lambda _project_id: (_ for _ in ()).throw(RuntimeError("broken")),
+    )
+
+    assert warmup_state.is_warmup_done() is False
+    await main.warmup_resources()
+    assert warmup_state.is_warmup_done() is True
+
+
 def test_warmup_retrieval_path_warms_knowledge_and_memories(monkeypatch):
     main = _load_main()
     searched_tables: list[str] = []

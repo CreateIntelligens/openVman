@@ -65,7 +65,23 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
     summaries = _build_daily_summaries(project_id)
     _write_summary_document(summaries, project_id)
 
-    existing_records = get_memories_table(project_id).to_arrow().to_pylist()
+    write_identity = get_settings().resolved_embedding_write_identity
+    existing_records = get_memories_table(
+        project_id,
+        write_identity,
+    ).to_arrow().to_pylist()
+    compatible_legacy = (
+        get_settings().resolved_embedding_compatible_legacy_identities
+    )
+    _assert_memory_records_identity(
+        existing_records,
+        write_identity,
+        compatible_legacy,
+    )
+    existing_records = _normalize_memory_record_identities(
+        existing_records,
+        write_identity,
+    )
     deduped = _dedupe_memory_records(existing_records)
     deduped = _semantic_dedupe_records(deduped)
     non_summary = [
@@ -79,15 +95,26 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
         curated_records = [
             {
                 "text": "系統初始化記錄",
-                "vector": normalize_vector(get_embedder().encode(["系統初始化記錄"])[0]),
+                "vector": normalize_vector(
+                    get_embedder().encode(
+                        ["系統初始化記錄"],
+                        forced_identity=write_identity,
+                    )[0]
+                ),
                 "source": "system",
                 "date": date.today().isoformat(),
-                "metadata": json.dumps({"placeholder": True}, ensure_ascii=False),
+                "metadata": json.dumps(
+                    {
+                        "placeholder": True,
+                        "embedding_identity": write_identity,
+                    },
+                    ensure_ascii=False,
+                ),
             }
         ]
 
     get_db(project_id).create_table(
-        resolve_vector_table_name("memories"),
+        resolve_vector_table_name("memories", write_identity),
         data=curated_records,
         mode="overwrite",
     )
@@ -97,6 +124,42 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
         "memory_records": len(curated_records),
         "transcripts_archived": archived_count,
     }
+
+
+def _assert_memory_records_identity(
+    records: list[dict[str, Any]],
+    expected_identity: str,
+    compatible_legacy: set[str],
+) -> None:
+    for record in records:
+        identity = str(
+            parse_record_metadata(record).get("embedding_identity", "")
+        ).strip()
+        if (
+            identity
+            and identity != expected_identity
+            and identity not in compatible_legacy
+        ):
+            raise RuntimeError(
+                "Memory table contains an incompatible embedding identity"
+            )
+
+
+def _normalize_memory_record_identities(
+    records: list[dict[str, Any]],
+    identity: str,
+) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for record in records:
+        metadata = parse_record_metadata(record)
+        metadata["embedding_identity"] = identity
+        normalized.append(
+            {
+                **record,
+                "metadata": json.dumps(metadata, ensure_ascii=False),
+            }
+        )
+    return normalized
 
 
 _SUMMARY_SECTION_HEADER = "# 記憶摘要"
@@ -357,10 +420,17 @@ def _build_summary_records(summaries: list[DailyMemorySummary]) -> list[dict[str
         return []
 
     embedder = get_embedder()
+    expected_identity = get_settings().resolved_embedding_write_identity
     texts = [s.summary_text for s in summaries]
-    try:
-        vectors, spec, _ = embedder.encode_with_metadata(texts, input_type="document")
-    except (AttributeError, TypeError, ValueError):
+    if hasattr(embedder, "encode_with_metadata"):
+        vectors, spec, _ = embedder.encode_with_metadata(
+            texts,
+            input_type="document",
+            forced_identity=expected_identity,
+        )
+        if spec.get("identity") != expected_identity:
+            raise RuntimeError("Gateway returned an identity outside the write lease")
+    else:
         vectors = embedder.encode(texts)
         spec = {}
 

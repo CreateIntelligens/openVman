@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from datetime import date
+import hashlib
+import json
 from threading import Lock
 from typing import TYPE_CHECKING, Any
 
@@ -66,12 +67,20 @@ def _build_seed_record(
     text: str,
     embedding_version: str | None = None,
 ) -> dict[str, Any]:
+    cfg = get_settings()
+    value = embedding_version or cfg.resolved_embedding_active_version
+    resolver = getattr(cfg, "resolve_embedding_identity", None)
+    identity = (
+        resolver(value, input_semantics="document")
+        if callable(resolver)
+        else value
+    )
     return {
         "text": text,
         "vector": encode_text(text, embedding_version),
         "source": "system",
         "date": date.today().isoformat(),
-        "metadata": "{}",
+        "metadata": json.dumps({"embedding_identity": identity}),
     }
 
 
@@ -147,18 +156,47 @@ def resolve_vector_table_name(
     logical_name = table_name.strip()
     if logical_name not in TABLE_SEED_TEXTS:
         raise ValueError(f"未知的向量資料表: {table_name}")
+    cfg = get_settings()
     raw_version = (
-        (embedding_version or "").strip().lower()
-        or get_settings().resolved_embedding_active_version
+        (embedding_version or "").strip()
+        or getattr(cfg, "resolved_embedding_write_identity", "")
+        or cfg.resolved_embedding_active_version
     )
-    if ":" in raw_version:
-        version = raw_version.split(":")[0].strip().lower()
-    else:
-        version = raw_version
+    version = raw_version.lower()
+    if version == "default":
+        version = "bge"
 
-    if version in ("bge", "default"):
+    aliases = getattr(cfg, "resolved_embedding_identity_aliases", {})
+    compatible_legacy = getattr(
+        cfg,
+        "resolved_embedding_compatible_legacy_identities",
+        set(),
+    )
+    if version in aliases:
+        canonical = aliases[version]
+    elif ":" in raw_version:
+        canonical = raw_version
+    else:
+        canonical = aliases.get(version, version)
+
+    for alias, document_identity in aliases.items():
+        identities = {document_identity}
+        identity_with_semantics = getattr(cfg, "_identity_with_semantics", None)
+        if identity_with_semantics:
+            identities.add(identity_with_semantics(document_identity, "query"))
+            identities.add(identity_with_semantics(document_identity, "symmetric"))
+        if canonical in identities:
+            if alias == "bge":
+                return logical_name
+            return f"{logical_name}__{alias}"
+
+    if canonical in compatible_legacy or version == "bge":
         return logical_name
-    return f"{logical_name}__{version}"
+
+    if ":" not in canonical:
+        return f"{logical_name}__{version}"
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+    return f"{logical_name}__emb_{digest}"
 
 
 def vector_table_exists(
@@ -174,8 +212,10 @@ def _table_cache_key(
     project_id: str,
     embedding_version: str | None = None,
 ) -> str:
+    cfg = get_settings()
     version = (
-        (embedding_version or "").strip().lower()
-        or get_settings().resolved_embedding_active_version
+        (embedding_version or "").strip()
+        or getattr(cfg, "resolved_embedding_write_identity", "")
+        or cfg.resolved_embedding_active_version
     )
     return f"{project_id}:{version}"

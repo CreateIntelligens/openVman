@@ -130,19 +130,21 @@ def test_encode_query_with_fallback_passes_acceptable_identities_and_selects_pro
     monkeypatch.setattr("config.get_settings", lambda: settings)
 
     fake_db_mod = types.ModuleType("infra.db")
+    bge_identity, gemini_identity, _ = settings.resolved_embedding_query_identities
     fake_db_mod.vector_table_exists = (
-        lambda table_name, project_id="default", embedding_version=None: embedding_version in ("bge", "gemini")
+        lambda table_name, project_id="default", embedding_version=None: embedding_version
+        in (bge_identity, gemini_identity)
     )
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
 
     class FakeEmbedder:
         def encode_with_metadata(self, texts, input_type="document", acceptable_identities=None, forced_identity=None):
             assert input_type == "query"
-            assert acceptable_identities == ["bge", "gemini"]
+            assert acceptable_identities == [bge_identity, gemini_identity]
             return (
                 [[0.4] * 768],
                 {
-                    "identity": "gemini:text-embedding-004:768:float32:l2:query:default",
+                    "identity": gemini_identity,
                     "provider": "gemini",
                     "model": "text-embedding-004",
                     "dimensions": 768,
@@ -156,7 +158,7 @@ def test_encode_query_with_fallback_passes_acceptable_identities_and_selects_pro
     monkeypatch.setattr("memory.embedder.get_embedder", lambda version=None: FakeEmbedder())
 
     route = encode_query_with_fallback("什麼是 ESG？", project_id="test-proj")
-    assert route.version == "gemini"
+    assert route.version == gemini_identity
     assert len(route.vector) == 768
     assert len(route.attempted_versions) == 2
     assert route.attempted_versions[1]["status"] == "selected"
@@ -171,20 +173,21 @@ def test_encode_query_with_fallback_skips_versions_without_tables(monkeypatch):
 
     fake_db_mod = types.ModuleType("infra.db")
     # Only openai table exists
+    _, _, openai_identity = settings.resolved_embedding_query_identities
     fake_db_mod.vector_table_exists = (
-        lambda table_name, project_id="default", embedding_version=None: embedding_version == "openai"
+        lambda table_name, project_id="default", embedding_version=None: embedding_version
+        == openai_identity
     )
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
 
     class FakeEmbedder:
         def encode_with_metadata(self, texts, input_type="document", acceptable_identities=None, forced_identity=None):
             assert input_type == "query"
-            # gemini was skipped because no table exists; only bge (active) and openai remain
-            assert acceptable_identities == ["bge", "openai"]
+            assert acceptable_identities == [openai_identity]
             return (
                 [[0.8] * 1536],
                 {
-                    "identity": "openai:text-embedding-3-small:1536:float32:l2:query:default",
+                    "identity": openai_identity,
                     "provider": "openai",
                     "model": "text-embedding-3-small",
                     "dimensions": 1536,
@@ -198,5 +201,5 @@ def test_encode_query_with_fallback_skips_versions_without_tables(monkeypatch):
     monkeypatch.setattr("memory.embedder.get_embedder", lambda version=None: FakeEmbedder())
 
     route = encode_query_with_fallback("查詢文字", project_id="test-proj")
-    assert route.version == "openai"
+    assert route.version == openai_identity
     assert len(route.vector) == 1536

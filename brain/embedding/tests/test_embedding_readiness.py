@@ -54,6 +54,7 @@ class MockHealthyProvider:
 class MockFailingWarmupProvider:
     def __init__(self, spec: EmbeddingSpec) -> None:
         self._spec = spec
+        self.warmup_calls = 0
 
     @property
     def is_configured(self) -> bool:
@@ -66,6 +67,7 @@ class MockFailingWarmupProvider:
         return False
 
     async def warmup(self) -> None:
+        self.warmup_calls += 1
         raise RuntimeError("CUDA out of memory during warmup encode")
 
     async def encode(self, texts: list[str], *, input_type: str = "document") -> list[list[float]]:
@@ -114,7 +116,34 @@ def test_health_ready_failure_on_warmup_error(monkeypatch):
     client = TestClient(embedding_app.app)
     response = client.get("/health/ready")
     assert response.status_code == 503
-    assert "CUDA out of memory" in str(response.json()["detail"])
+    detail = response.json()["detail"]
+    assert detail["providers"]["bge"]["error_type"] == "RuntimeError"
+    assert "CUDA out of memory" not in str(detail)
+
+
+@pytest.mark.asyncio
+async def test_readiness_failure_uses_cooldown_without_repeating_warmup():
+    reg = ProviderRegistry(cooldown_seconds=60.0)
+    spec = EmbeddingSpec(
+        identity=make_canonical_identity(
+            "openai",
+            "text-embedding-3-small",
+            1536,
+            input_semantics="document",
+        ),
+        provider="openai",
+        model="text-embedding-3-small",
+        dimensions=1536,
+    )
+    provider = MockFailingWarmupProvider(spec)
+    reg.register("openai", provider)
+
+    first = await reg.inspect_readiness()
+    second = await reg.inspect_readiness()
+
+    assert first["providers"]["openai"]["status"] == "error"
+    assert second["providers"]["openai"]["status"] == "cooldown"
+    assert provider.warmup_calls == 1
 
 
 def test_bearer_token_enforcement(monkeypatch):

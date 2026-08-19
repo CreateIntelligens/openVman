@@ -52,14 +52,14 @@
 
 - [x] 7.1 Document a stable private Docker-network topology that lets one GPU stack serve openVman worktrees without publishing embedding, VLM, or IndexTTS host ports (mark Draft until verified).
 - [x] 7.2 Add authenticated nginx routes for edge proxying GPU services where needed.
-- [x] 7.3 Verify the extended `/embed` contract against the current JTAI client fixtures and document environment variables for JTAI.
+- [ ] 7.3 Verify the extended `/embed` contract against the current JTAI client fixtures and document environment variables for JTAI. (Deferred until the user adds the JTAI side.)
 - [x] 7.4 Document ownership, startup, shutdown, and failure-isolation rules for the shared GPU stack.
 
 ## 8. Migration and Verification
 
 - [x] 8.1 Compare local HTTP vectors with in-process implementation on the fixed corpus and confirm identity, dimension, normalization, and cosine-similarity tolerances before switching routing.
 - [x] 8.2 Run Brain embedding/retrieval/memory/index tests and Backend camera/vision/TTS tests in local-profile, external-URL, mixed, degraded-provider, and disabled-optional-service modes.
-- [x] 8.3 Build heavy GPU images sequentially, start services only after each build completes, and verify embedding, VLM, and enabled IndexTTS ready health through real inference paths.
-- [x] 8.4 Verify one shared GPU stack serves two worktree consumers while `nvidia-smi` shows only one BGE model allocation and no consumer `api` process owns BGE weights.
-- [x] 8.5 Verify knowledge search, memory search, index rebuild, image ingestion, and live camera behavior through nginx without adding public service-specific ports.
-- [x] 8.6 Remove Brain's in-process embedding providers and stale documentation only after parity tests pass, then run strict OpenSpec validation, `git diff --check`, focused tests, and production builds.
+- [ ] 8.3 Build heavy GPU images sequentially, start services only after each build completes, and verify embedding, VLM, and enabled IndexTTS ready health through real inference paths. (Embedding and VLM live inference verified; IndexTTS is disabled and was not started.)
+- [ ] 8.4 Verify one shared GPU stack serves two worktree consumers while `nvidia-smi` shows only one BGE model allocation and no consumer `api` process owns BGE weights. (Deferred with JTAI integration.)
+- [ ] 8.5 Verify knowledge search, memory search, index rebuild, image ingestion, and live camera behavior through nginx without adding public service-specific ports. (GPU edge routes verified; complete application-flow acceptance remains.)
+- [ ] 8.6 Remove Brain's in-process embedding providers and stale documentation only after parity tests pass, then run strict OpenSpec validation, `git diff --check`, focused tests, and production builds. (Code removal and tests passed; production builds were intentionally not run in this pass.)

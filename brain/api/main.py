@@ -155,16 +155,23 @@ def _warmup_retrieval_path(project_id: str = "default") -> None:
 async def warmup_resources() -> None:
     """背景預熱重資源，避免第一個請求承擔初始化成本。"""
     logger.info("背景預熱開始...")
-    project_ids = _warmup_project_ids()
-    await asyncio.to_thread(get_embedder)
-    for project_id in project_ids:
-        ensure_workspace_scaffold(project_id)
-        await asyncio.to_thread(ensure_tables, project_id)
-        # _warmup_retrieval_path 內部已逐表吞掉預熱失敗、不會 raise。
-        await asyncio.to_thread(_warmup_retrieval_path, project_id)
-    await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
-    mark_warmup_done()
-    logger.info("背景預熱完成")
+    try:
+        project_ids = _warmup_project_ids()
+        await asyncio.to_thread(get_embedder)
+        for project_id in project_ids:
+            ensure_workspace_scaffold(project_id)
+            await asyncio.to_thread(ensure_tables, project_id)
+            # _warmup_retrieval_path 內部已逐表吞掉預熱失敗、不會 raise。
+            await asyncio.to_thread(_warmup_retrieval_path, project_id)
+        await asyncio.to_thread(maybe_run_memory_maintenance, True, "default")
+    except Exception as exc:
+        logger.warning(
+            "背景預熱未完整執行（不阻斷服務 readiness）: %s",
+            type(exc).__name__,
+        )
+    finally:
+        mark_warmup_done()
+        logger.info("背景預熱完成")
 
 
 async def load_privacy_filter_if_enabled() -> None:

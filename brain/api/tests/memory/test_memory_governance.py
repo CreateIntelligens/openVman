@@ -40,6 +40,14 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_embedder_mod = types.ModuleType("memory.embedder")
     fake_embedder = MagicMock()
     fake_embedder.encode.return_value = [[0.1] * 128]
+    fake_embedder.encode_with_metadata.side_effect = lambda texts, **kwargs: (
+        [[0.1] * 128 for _ in texts],
+        {
+            "identity": "bge:BAAI/bge-m3:1024:float32:l2:document:test",
+            "dimensions": 128,
+        },
+        [],
+    )
     fake_embedder_mod.get_embedder = lambda: fake_embedder
     monkeypatch.setitem(sys.modules, "memory.embedder", fake_embedder_mod)
 
@@ -50,12 +58,16 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_table.to_arrow.return_value.to_pylist.return_value = []
     fake_db.create_table = MagicMock()
     fake_db_mod.get_db = lambda project_id="default": fake_db
-    fake_db_mod.get_memories_table = lambda project_id="default": fake_table
+    fake_db_mod.get_memories_table = (
+        lambda project_id="default", embedding_version=None: fake_table
+    )
     fake_db_mod.get_knowledge_table = lambda project_id="default": MagicMock()
     fake_db_mod.normalize_vector = lambda v: v
     fake_db_mod.parse_record_metadata = lambda r: json.loads(r.get("metadata", "{}"))
     fake_db_mod.ensure_fts_index = lambda table_name, project_id="default": None
-    fake_db_mod.resolve_vector_table_name = lambda table_name: table_name
+    fake_db_mod.resolve_vector_table_name = (
+        lambda table_name, embedding_version=None: table_name
+    )
     monkeypatch.setitem(sys.modules, "infra.db", fake_db_mod)
 
     # Stub workspace
@@ -85,6 +97,12 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_cfg.memory_maintenance_interval_seconds = 0
     fake_cfg.memory_merge_similarity_threshold = 0.92
     fake_cfg.transcript_retention_days = 30
+    fake_cfg.resolved_embedding_write_identity = (
+        "bge:BAAI/bge-m3:1024:float32:l2:document:test"
+    )
+    fake_cfg.resolved_embedding_compatible_legacy_identities = {
+        "bge:BAAI/bge-m3:1024:float32:l2:document:default"
+    }
     fake_config_mod = types.ModuleType("config")
     fake_config_mod.get_settings = lambda: fake_cfg
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)

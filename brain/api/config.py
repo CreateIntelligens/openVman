@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import cached_property
+import json
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -77,6 +78,10 @@ class BrainSettings(BaseSettings):
     embedding_service_chunk_size: int = 32
     embedding_expected_model: str = "BAAI/bge-m3"
     embedding_expected_dimension: int = 1024
+    embedding_expected_revision: str = "5617a9f61b028005a4858fdac845db406aefb181"
+    embedding_write_identity: str = ""
+    embedding_identity_aliases: str = ""
+    embedding_compatible_legacy_identities: str = ""
     embedding_gemini_model: str = "gemini-embedding-001"
     embedding_gemini_dimensions: int = 0
     embedding_openai_model: str = "text-embedding-3-small"
@@ -203,6 +208,123 @@ class BrainSettings(BaseSettings):
         return ordered
 
     @property
+    def resolved_embedding_identity_aliases(self) -> dict[str, str]:
+        """Return explicit legacy alias to document-identity mappings."""
+        aliases = {
+            "bge": self._embedding_identity(
+                "bge",
+                self.embedding_expected_model or self.embedding_model,
+                self.embedding_expected_dimension or 1024,
+                "document",
+                self.embedding_expected_revision,
+            ),
+            "gemini": self._embedding_identity(
+                "gemini",
+                self.embedding_gemini_model,
+                self.embedding_gemini_dimensions or 768,
+                "document",
+                "provider-managed",
+            ),
+            "openai": self._embedding_identity(
+                "openai",
+                self.embedding_openai_model,
+                self.embedding_openai_dimensions or 1536,
+                "document",
+                "provider-managed",
+            ),
+            "voyage": self._embedding_identity(
+                "voyage",
+                self.embedding_voyage_model,
+                self.embedding_voyage_dimensions or 1024,
+                "document",
+                "provider-managed",
+            ),
+        }
+        raw = self.embedding_identity_aliases.strip()
+        if not raw:
+            return aliases
+        try:
+            overrides = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError("EMBEDDING_IDENTITY_ALIASES 必須是 JSON object") from exc
+        if not isinstance(overrides, dict):
+            raise ValueError("EMBEDDING_IDENTITY_ALIASES 必須是 JSON object")
+        for alias, identity in overrides.items():
+            normalized_alias = self._normalize_embedding_version(str(alias))
+            normalized_identity = str(identity).strip()
+            self._validate_embedding_identity(normalized_identity)
+            aliases[normalized_alias] = normalized_identity
+        return aliases
+
+    @property
+    def resolved_embedding_write_identity(self) -> str:
+        identity = self.embedding_write_identity.strip()
+        if identity:
+            self._validate_embedding_identity(identity)
+            return identity
+        return self.resolved_embedding_identity_aliases[
+            self.resolved_embedding_active_version
+        ]
+
+    @property
+    def resolved_embedding_compatible_legacy_identities(self) -> set[str]:
+        """Return identities proven equivalent to the pinned write identity."""
+        identities: set[str] = set()
+        if (
+            self.embedding_expected_model == "BAAI/bge-m3"
+            and self.embedding_expected_dimension == 1024
+            and self.embedding_expected_revision
+            == "5617a9f61b028005a4858fdac845db406aefb181"
+        ):
+            identities.add(
+                self._embedding_identity(
+                    "bge",
+                    "BAAI/bge-m3",
+                    1024,
+                    "document",
+                    "default",
+                )
+            )
+        raw = self.embedding_compatible_legacy_identities.strip()
+        if not raw:
+            return identities
+        try:
+            configured = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES 必須是 JSON array"
+            ) from exc
+        if not isinstance(configured, list):
+            raise ValueError(
+                "EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES 必須是 JSON array"
+            )
+        for identity in configured:
+            normalized = str(identity).strip()
+            self._validate_embedding_identity(normalized)
+            identities.add(normalized)
+        return identities
+
+    @property
+    def resolved_embedding_query_identities(self) -> list[str]:
+        aliases = self.resolved_embedding_identity_aliases
+        return [
+            self._identity_with_semantics(aliases[version], "query")
+            for version in self.resolved_embedding_version_order
+        ]
+
+    def resolve_embedding_identity(
+        self,
+        value: str,
+        *,
+        input_semantics: str = "document",
+    ) -> str:
+        normalized = value.strip()
+        if normalized.lower() in self.resolved_embedding_identity_aliases:
+            normalized = self.resolved_embedding_identity_aliases[normalized.lower()]
+        self._validate_embedding_identity(normalized)
+        return self._identity_with_semantics(normalized, input_semantics)
+
+    @property
     def resolved_embedding_service_url(self) -> str:
         if self.embedding_service_url.strip():
             return self.embedding_service_url.strip()
@@ -313,28 +435,37 @@ class BrainSettings(BaseSettings):
         resolved_version = self._normalize_embedding_version(
             version or self.embedding_active_version
         )
-        if resolved_version == "gemini":
-            model = self.embedding_gemini_model
-            dimensions = self.embedding_gemini_dimensions or 768
-            api_key = self.gemini_api_key or self.embedding_service_token
-        elif resolved_version == "openai":
-            model = self.embedding_openai_model
-            dimensions = self.embedding_openai_dimensions or 1536
-            api_key = self.openai_api_key or self.embedding_service_token
-        elif resolved_version == "voyage":
-            model = self.embedding_voyage_model
-            dimensions = self.embedding_voyage_dimensions or 1024
-            api_key = self.voyage_api_key or self.embedding_service_token
-        else:
-            model = self.embedding_expected_model or self.embedding_model
-            dimensions = self.embedding_expected_dimension or 1024
-            api_key = self.embedding_service_token
+        provider_models = {
+            "gemini": (
+                self.embedding_gemini_model,
+                self.embedding_gemini_dimensions or 768,
+            ),
+            "openai": (
+                self.embedding_openai_model,
+                self.embedding_openai_dimensions or 1536,
+            ),
+            "voyage": (
+                self.embedding_voyage_model,
+                self.embedding_voyage_dimensions or 1024,
+            ),
+            "bge": (
+                self.embedding_expected_model or self.embedding_model,
+                self.embedding_expected_dimension or 1024,
+            ),
+        }
+        model, dimensions = provider_models.get(
+            resolved_version,
+            (
+                self.embedding_expected_model or self.embedding_model,
+                self.embedding_expected_dimension or 1024,
+            ),
+        )
 
         return EmbeddingBackend(
             version=resolved_version,
             provider=resolved_version,
             model=model,
-            api_key=api_key,
+            api_key=self.embedding_service_token,
             base_url=self.resolved_embedding_service_url,
             dimensions=dimensions,
             use_fp16=self.embedding_use_fp16,
@@ -350,6 +481,40 @@ class BrainSettings(BaseSettings):
         if normalized in {"bge", "gemini", "openai", "voyage"}:
             return normalized
         raise ValueError(f"embedding version 不支援: {value}")
+
+    @staticmethod
+    def _embedding_identity(
+        provider: str,
+        model: str,
+        dimensions: int,
+        semantics: str,
+        revision: str,
+    ) -> str:
+        return (
+            f"{provider}:{model}:{dimensions}:float32:l2:"
+            f"{semantics}:{revision}"
+        )
+
+    @staticmethod
+    def _validate_embedding_identity(identity: str) -> None:
+        parts = identity.split(":")
+        if len(parts) != 7 or not all(parts):
+            raise ValueError(f"embedding identity 格式不合法: {identity!r}")
+        try:
+            dimensions = int(parts[2])
+        except ValueError as exc:
+            raise ValueError(f"embedding identity 維度不合法: {identity!r}") from exc
+        if dimensions <= 0:
+            raise ValueError(f"embedding identity 維度不合法: {identity!r}")
+
+    @classmethod
+    def _identity_with_semantics(cls, identity: str, semantics: str) -> str:
+        cls._validate_embedding_identity(identity)
+        if semantics not in {"document", "query", "symmetric"}:
+            raise ValueError(f"embedding input semantics 不支援: {semantics}")
+        parts = identity.split(":")
+        parts[5] = semantics
+        return ":".join(parts)
 
 
 _settings: BrainSettings | None = None

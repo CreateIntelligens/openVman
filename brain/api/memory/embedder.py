@@ -101,10 +101,13 @@ def encode_query_with_fallback(
     candidate_versions: list[str] = []
     attempted_versions: list[dict[str, Any]] = []
 
-    for version in cfg.resolved_embedding_version_order:
-        if version != active_version and not _version_has_queryable_tables(
+    for version, identity in zip(
+        cfg.resolved_embedding_version_order,
+        cfg.resolved_embedding_query_identities,
+    ):
+        if not _version_has_queryable_tables(
             project_id,
-            version,
+            identity,
             table_names,
         ):
             attempted_versions.append(
@@ -115,7 +118,7 @@ def encode_query_with_fallback(
                 }
             )
             continue
-        candidate_versions.append(version)
+        candidate_versions.append(identity)
 
     if not candidate_versions:
         raise RuntimeError("沒有可用的 embedding version 可供查詢")
@@ -128,10 +131,11 @@ def encode_query_with_fallback(
                 input_type="query",
                 acceptable_identities=candidate_versions,
             )
-            # Map selected model / provider back to version
-            selected_provider = spec.get("provider", "bge") if spec else "bge"
+            selected_identity = spec.get("identity", "") if spec else ""
+            if selected_identity not in candidate_versions:
+                raise RuntimeError("Gateway returned an unrequested embedding identity")
             return QueryEmbeddingRoute(
-                version=selected_provider,
+                version=selected_identity,
                 vector=vectors[0],
                 attempted_versions=attempts,
                 embedding_spec=spec,
@@ -144,7 +148,11 @@ def encode_query_with_fallback(
     # Fallback path for mock embedders
     for version in candidate_versions:
         try:
-            vector = get_embedder(version).encode([query], input_type="query")[0]
+            vector = get_embedder().encode(
+                [query],
+                input_type="query",
+                forced_identity=version,
+            )[0]
             attempted_versions.append({"version": version, "status": "selected"})
             return QueryEmbeddingRoute(
                 version=version,
@@ -242,6 +250,7 @@ class GatewayRemoteTextEmbedder:
         all_attempts: list[dict[str, Any]] = []
 
         active_identity = forced_identity
+        leased_identity = forced_identity
 
         for i in range(0, len(texts), self.chunk_size):
             chunk = texts[i : i + self.chunk_size]
@@ -271,6 +280,16 @@ class GatewayRemoteTextEmbedder:
                     f"Gateway returned {len(chunk_vectors)} vectors for {len(chunk)} inputs"
                 )
 
+            returned_identity = str(chunk_spec.get("identity", ""))
+            if leased_identity and returned_identity != leased_identity:
+                raise RuntimeError("Gateway returned an unrequested embedding identity")
+            if (
+                not active_identity
+                and acceptable_identities
+                and returned_identity not in acceptable_identities
+            ):
+                raise RuntimeError("Gateway returned an unrequested embedding identity")
+
             # Validate vector dimensions
             expected_dim = chunk_spec.get("dimensions") or self.expected_dimension
             for vec in chunk_vectors:
@@ -284,12 +303,19 @@ class GatewayRemoteTextEmbedder:
                 locked_spec = chunk_spec
                 active_identity = chunk_spec.get("identity")
             else:
-                mismatch_fields = []
-                for field in ("identity", "model", "dimensions", "dtype", "normalization", "input_semantics", "model_revision"):
-                    if locked_spec.get(field) != chunk_spec.get(field):
-                        mismatch_fields.append(
-                            f"{field}: initial={locked_spec.get(field)!r} vs chunk_{i}={chunk_spec.get(field)!r}"
-                        )
+                mismatch_fields = [
+                    f"{field}: initial={locked_spec.get(field)!r} vs chunk_{i}={chunk_spec.get(field)!r}"
+                    for field in (
+                        "identity",
+                        "model",
+                        "dimensions",
+                        "dtype",
+                        "normalization",
+                        "input_semantics",
+                        "model_revision",
+                    )
+                    if locked_spec.get(field) != chunk_spec.get(field)
+                ]
                 if mismatch_fields:
                     msg = f"Embedding specification drift across chunks in single batch: {'; '.join(mismatch_fields)}"
                     logger.error(msg)
@@ -309,4 +335,16 @@ class GatewayRemoteTextEmbedder:
 
 def encode_text(text: str, *, embedding_version: str | None = None) -> list[float]:
     """Encode a single string into a vector."""
-    return get_embedder(embedding_version).encode([text])[0]
+    cfg = get_settings()
+    value = embedding_version or cfg.resolved_embedding_active_version
+    resolver = getattr(cfg, "resolve_embedding_identity", None)
+    identity = (
+        resolver(value, input_semantics="document")
+        if callable(resolver)
+        else value
+    )
+    return get_embedder().encode(
+        [text],
+        input_type="document",
+        forced_identity=identity if ":" in identity else None,
+    )[0]

@@ -78,4 +78,29 @@ describe("nginx default config", () => {
     expect(charactersLocation).toContain('Access-Control-Allow-Origin "*"');
     expect(charactersLocation).toContain('Cache-Control "public, max-age=300"');
   });
+
+  it.each(["embedding", "vlm"])(
+    "protects the %s GPU edge route with upstream bearer auth and limits",
+    (service) => {
+      const location = source.match(
+        new RegExp(`location ~ \\^/api/gpu/${service}/\\(\\.\\*\\)\\$ \\{([\\s\\S]*?)\\n    \\}`),
+      )?.[1];
+
+      expect(location).toContain("proxy_set_header Authorization $http_authorization;");
+      expect(location).toContain("limit_req zone=gpu_inference_rate burst=4 nodelay;");
+      expect(location).toContain("limit_req_status 429;");
+      expect(location).toContain("limit_conn gpu_inference_conn 2;");
+      expect(location).toContain("limit_conn_status 429;");
+      expect(location).toContain("client_body_timeout 15s;");
+    },
+  );
+
+  it("defines bounded shared GPU inference rate and connection zones", () => {
+    expect(source).toContain(
+      "limit_req_zone $binary_remote_addr zone=gpu_inference_rate:10m rate=2r/s;",
+    );
+    expect(source).toContain(
+      "limit_conn_zone $binary_remote_addr zone=gpu_inference_conn:10m;",
+    );
+  });
 });

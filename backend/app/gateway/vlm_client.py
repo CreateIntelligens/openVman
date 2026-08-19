@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
+import logging
 from threading import Lock
 from typing import Any
 from urllib.parse import urlparse, urlunparse
@@ -49,14 +49,20 @@ def resolve_vlm_route(cfg: Any = None) -> VLMRoute:
 
     raw_base_url = (cfg.vision_llm_base_url or "").strip()
     raw_api_key = (cfg.vision_llm_api_key or "").strip()
+    raw_internal_key = (getattr(cfg, "gateway_internal_token", "") or "").strip()
     raw_model = (cfg.vision_llm_model or "").strip()
 
     if raw_base_url:
-        is_local_container = "vlm:8000" in raw_base_url or "localhost:8000" in raw_base_url or "127.0.0.1:8000" in raw_base_url
+        is_local_container = any(
+            host in raw_base_url
+            for host in ("vlm:8000", "localhost:8000", "127.0.0.1:8000")
+        )
         return VLMRoute(
             route="local" if is_local_container else "external",
             base_url=raw_base_url.rstrip("/"),
-            api_key=raw_api_key or ("local-vlm" if is_local_container else ""),
+            api_key=(raw_internal_key or raw_api_key)
+            if is_local_container
+            else raw_api_key,
             model=raw_model or ("openvman-vlm" if is_local_container else "gpt-4o"),
             is_enabled=True,
         )
@@ -66,7 +72,7 @@ def resolve_vlm_route(cfg: Any = None) -> VLMRoute:
         return VLMRoute(
             route="local",
             base_url="http://vlm:8000/v1",
-            api_key=raw_api_key or "local-vlm",
+            api_key=raw_internal_key or raw_api_key,
             model=raw_model or "openvman-vlm",
             is_enabled=True,
         )

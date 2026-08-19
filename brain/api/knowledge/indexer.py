@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import csv
+from dataclasses import dataclass
+from datetime import date
 import hashlib
 import json
 import math
-import re
-from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
+import re
 from typing import Any
 
 from config import get_settings
-
 from infra.db import (
     ensure_fts_index,
     get_db,
@@ -26,7 +25,11 @@ from infra.db import (
 from infra.pipeline import CheckpointStore, PipelineConfig, run_pipeline
 from infra.project_context import resolve_embedding_index_state_path
 from knowledge.qa_csv import extract_image_id
-from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold, iter_indexable_documents
+from knowledge.workspace import (
+    ALLOWED_CODE_SUFFIXES,
+    ensure_workspace_scaffold,
+    iter_indexable_documents,
+)
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
 
@@ -213,8 +216,12 @@ class _IndexSink:
         self._store.commit(updates)
 
 
-def _knowledge_table_name() -> str:
-    return resolve_vector_table_name("knowledge")
+def _write_identity() -> str:
+    return get_settings().resolved_embedding_write_identity
+
+
+def _knowledge_table_name(identity: str | None = None) -> str:
+    return resolve_vector_table_name("knowledge", identity or _write_identity())
 
 
 def _knowledge_table_exists(project_id: str) -> bool:
@@ -243,7 +250,8 @@ def _ensure_knowledge_table(
             table = _open_knowledge_table(project_id)
         return table, True
     _ensure_knowledge_table_schema(project_id)
-    return _open_knowledge_table(project_id), False
+    table = _open_knowledge_table(project_id)
+    return table, False
 
 
 def _ensure_knowledge_table_schema(project_id: str) -> None:
@@ -974,11 +982,23 @@ def _build_knowledge_records(chunk_specs: list[ChunkSpec]) -> list[dict[str, Any
 
     texts = [chunk.embed_text or chunk.text for chunk in chunk_specs]
     embedder = get_embedder()
-    try:
-        vectors, spec, _ = embedder.encode_with_metadata(texts, input_type="document")
-    except (AttributeError, TypeError, ValueError):
+    expected_identity = _write_identity()
+    if hasattr(embedder, "encode_with_metadata"):
+        vectors, spec, _ = embedder.encode_with_metadata(
+            texts,
+            input_type="document",
+            forced_identity=expected_identity,
+        )
+        if spec.get("identity") != expected_identity:
+            raise RuntimeError("Gateway returned an identity outside the write lease")
+    else:
         vectors = embedder.encode(texts)
         spec = {}
+
+    if len(vectors) != len(chunk_specs):
+        raise RuntimeError(
+            f"Gateway returned {len(vectors)} vectors for {len(chunk_specs)} chunks"
+        )
 
     records: list[dict[str, Any]] = []
 
@@ -1005,7 +1025,12 @@ def _build_placeholder_records() -> list[dict[str, Any]]:
     return [
         {
             "text": "知識庫目前沒有內容。",
-            "vector": normalize_vector(get_embedder().encode(["知識庫目前沒有內容。"])[0]),
+            "vector": normalize_vector(
+                get_embedder().encode(
+                    ["知識庫目前沒有內容。"],
+                    forced_identity=_write_identity(),
+                )[0]
+            ),
             "source": "system",
             "date": date.today().isoformat(),
             "path": "",
@@ -1075,9 +1100,13 @@ def _collect_reusable_records(
     current_fingerprints: dict[str, str],
 ) -> list[dict[str, Any]]:
     reusable: list[dict[str, Any]] = []
+    expected_identity = _write_identity()
     for record in records:
         metadata = parse_record_metadata(record)
         if metadata.get("placeholder"):
+            continue
+        identity = str(metadata.get("embedding_identity", "")).strip()
+        if identity and identity != expected_identity:
             continue
         path = str(metadata.get("path", "")).strip()
         fingerprint = str(metadata.get("fingerprint", "")).strip()
