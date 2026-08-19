@@ -105,6 +105,9 @@ _HOP_BY_HOP = frozenset({
     "te",
     "trailers",
 })
+# 這幾個 header 由本層的 ASGI server 自行產生；把上游那份一併轉發會讓
+# 回應出現重複的 date/server，nginx 會警告並丟棄後者。
+_SERVER_GENERATED_HEADERS = frozenset({"date", "server"})
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 _OPENVMAN_HEADER_PREFIX = "x-openvman-"
 _USER_ID_HEADER = "X-OpenVMan-User-ID"
@@ -133,6 +136,7 @@ def _filter_headers(headers: httpx.Headers | dict | Any) -> dict[str, str]:
         k: v
         for k, v in headers.items()
         if k.lower() not in _HOP_BY_HOP
+        and k.lower() not in _SERVER_GENERATED_HEADERS
     }
 
 
