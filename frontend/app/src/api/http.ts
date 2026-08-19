@@ -32,13 +32,33 @@ const AUTH_WHITELIST = [
   "/api/auth/temporary-login",
 ]
 
-function isAuthEndpoint(input: RequestInfo | URL): boolean {
-  const url = typeof input === "string"
+// 單一資產沒被授權（403）只代表這個檔案不能用，不代表整個帳號沒權限。
+// 讓它觸發全域 forbidden 會把整頁換成「權限不足」，人物就再也不會出現。
+const ASSET_PATH_PREFIXES = [
+  "/assets/",
+  "/mascots/",
+  "/backgrounds/",
+]
+
+function requestPath(input: RequestInfo | URL): string {
+  return typeof input === "string"
     ? input
     : input instanceof URL
       ? input.pathname
       : input.url
+}
+
+function isAuthEndpoint(input: RequestInfo | URL): boolean {
+  const url = requestPath(input)
   return AUTH_WHITELIST.some((path) => url.includes(path))
+}
+
+function isAssetRequest(input: RequestInfo | URL): boolean {
+  const url = requestPath(input)
+  const path = url.startsWith("http")
+    ? new URL(url).pathname
+    : url
+  return ASSET_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))
 }
 
 export async function apiFetch(
@@ -48,7 +68,7 @@ export async function apiFetch(
   const response = await fetch(input, { ...init, credentials: "include" })
   if (!isAuthEndpoint(input)) {
     if (response.status === 401) unauthorizedHandler?.()
-    if (response.status === 403) forbiddenHandler?.()
+    if (response.status === 403 && !isAssetRequest(input)) forbiddenHandler?.()
   }
   return response
 }

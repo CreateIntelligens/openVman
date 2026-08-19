@@ -43,7 +43,7 @@
               :background-fit="settings.backgroundFit"
             />
             <iframe
-              v-if="settings.renderMode === '3d'"
+              v-if="settings.renderMode === '3d' && stageAvatarWidgetSrc"
               ref="stageAvatarFrameRef"
               class="stage-avatar-frame"
               :src="stageAvatarWidgetSrc"
@@ -175,7 +175,6 @@ import { useTypewriter } from "./composables/useTypewriter";
 import { useWebcamCapture } from "./composables/useWebcamCapture";
 import {
   buildMascotWidgetSrc,
-  FALLBACK_MASCOT_CATALOG,
   toMascotOption,
   type MascotApiRecord,
   type MascotOption,
@@ -190,9 +189,6 @@ import {
 
 const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
 const HOST_MESSAGE_NAMESPACE = "avatar-widget-host";
-const fallbackVrmAvatarOptions = FALLBACK_MASCOT_CATALOG
-  .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
-
 const isStarted = ref(false);
 const rendererBootstrapState = ref<"loading" | "ready" | "error">("loading");
 const asrError = ref("");
@@ -255,7 +251,9 @@ function onAudioQueueEmpty(): void {
 }
 
 const settings = useSettingsStore();
-const vrmAvatarOptions = ref<MascotOption[]>(fallbackVrmAvatarOptions);
+// 初始為空：清單一律以後端回傳為準。用寫死的 catalog 當初始值會在
+// fetchVrmAvatars() 回來前就去抓未授權的 VRM，換來一個 403。
+const vrmAvatarOptions = ref<MascotOption[]>([]);
 const selectedVrmAvatar = computed(() =>
   resolveVrmAvatarOption(settings.vrmAvatarId, vrmAvatarOptions.value),
 );
@@ -265,9 +263,11 @@ const vrmCharacterOptions = computed(() =>
     label: mascot.label,
   })),
 );
-const stageAvatarWidgetSrc = computed(() =>
-  `${buildMascotWidgetSrc(selectedVrmAvatar.value)}&chrome=stage`,
-);
+const stageAvatarWidgetSrc = computed(() => {
+  const mascot = selectedVrmAvatar.value;
+  if (!mascot) return "";
+  return `${buildMascotWidgetSrc(mascot)}&chrome=stage`;
+});
 const stageBackgroundClass = computed(() =>
   isUploadedAvatarBackgroundId(settings.backgroundId)
     ? "stage-background--custom"
@@ -361,10 +361,10 @@ function pickProviderVoice(provider: TtsProvider | undefined): string {
 function resolveVrmAvatarOption(
   vrmId: string | null | undefined,
   catalog: readonly MascotOption[],
-): MascotOption {
+): MascotOption | null {
   return catalog.find((mascot) => mascot.id === vrmId)
     ?? catalog[0]
-    ?? fallbackVrmAvatarOptions[0];
+    ?? null;
 }
 
 async function fetchVrmAvatars(): Promise<void> {
@@ -781,7 +781,7 @@ function handleRenderModeChange(mode: '2d' | '3d'): void {
 }
 
 function handleVrmAvatarChange(vrmId: string): void {
-  settings.vrmAvatarId = resolveVrmAvatarOption(vrmId, vrmAvatarOptions.value).id;
+  settings.vrmAvatarId = resolveVrmAvatarOption(vrmId, vrmAvatarOptions.value)?.id ?? "";
 }
 
 function handleBackgroundChange(
