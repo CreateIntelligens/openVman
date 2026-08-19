@@ -443,11 +443,19 @@ class UserRepository:
             ).fetchone()
         return _user_from_row(row) if row is not None else None
 
-    def list(self) -> list[UserRecord]:
+    def list(
+        self,
+        *,
+        account_type: AccountType | None = None,
+    ) -> list[UserRecord]:
+        query = "SELECT * FROM users"
+        params: list[object] = []
+        if account_type is not None:
+            query += " WHERE account_type = ?"
+            params.append(account_type.value)
+        query += " ORDER BY username_normalized, id"
         with self.database.transaction() as connection:
-            rows = connection.execute(
-                "SELECT * FROM users ORDER BY username_normalized, id"
-            ).fetchall()
+            rows = connection.execute(query, tuple(params)).fetchall()
         return [_user_from_row(row) for row in rows]
 
     def has_admin(self) -> bool:

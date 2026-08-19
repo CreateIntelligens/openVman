@@ -43,11 +43,11 @@ from .runtime import AuthRuntime, get_auth_runtime
 _SESSION_COOKIE_NAME = "openvman_session"
 _INVALID_CREDENTIALS = "Invalid credentials"
 _DUMMY_PASSWORD_HASH = "$2b$12$RHUg9KKg90SMUGjfwS3QxeboW/TeCDDpAZQBOcOOnOfYB64TsIfGO"
-_TEMPORARY_PASSWORD_PATTERN = re.compile(r"\A([A-Za-z0-9]{4})[A-Za-z0-9]{8}\Z")
+_TEMPORARY_PASSWORD_PATTERN = re.compile(r"\A[A-Za-z0-9]{12}\Z")
 _TEMPORARY_DURATION_SECONDS = 72 * 60 * 60
 _TEMPORARY_PASSWORD_ALPHABET = string.ascii_letters + string.digits
 _TEMPORARY_PASSWORD_LENGTH = 12
-_TEMPORARY_LOCATOR_LENGTH = 4
+_TEMPORARY_LOCATOR_LENGTH = 12
 
 auth_router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 users_router = APIRouter(prefix="/api/users", tags=["Accounts"])
@@ -369,7 +369,7 @@ def temporary_login(
 ) -> LoginResponse:
     match = _TEMPORARY_PASSWORD_PATTERN.fullmatch(body.password)
     located = (
-        runtime.temporary_accounts.get_credential_by_locator(match.group(1))
+        runtime.temporary_accounts.get_credential_by_locator(match.group(0))
         if match is not None
         else None
     )
@@ -625,7 +625,8 @@ def list_accounts(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> list[AdminAccountProfile]:
     return [
-        AdminAccountProfile.from_record(user, runtime) for user in runtime.users.list()
+        AdminAccountProfile.from_record(user, runtime)
+        for user in runtime.users.list(account_type=AccountType.FORMAL)
     ]
 
 

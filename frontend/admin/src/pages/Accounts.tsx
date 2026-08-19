@@ -149,6 +149,7 @@ export default function Accounts() {
       </nav>
 
       {creationMode === "formal" && (
+        <>
         <section className="card mb-6 overflow-hidden">
           <header className="border-b border-border px-5 py-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -239,141 +240,139 @@ export default function Accounts() {
             </div>
           </form>
         </section>
+
+        <section className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <h2 className="text-base font-semibold">正式帳號列表</h2>
+            <button className="btn btn-ghost" type="button" onClick={() => void reload()} disabled={loading}>
+              重新整理
+            </button>
+          </div>
+          {loading ? (
+            <div className="p-8 text-center text-sm text-content-muted" role="status">載入帳號中…</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {accounts.map((account) => {
+                const isSelf = account.id === currentAccount?.id;
+                const resourceCount = ownedResourceCount(account);
+                const grantCount = grantedResourceCount(account);
+                const canEditAccess = account.role === "user"
+                  && (account.kind ?? account.account_type ?? "formal") === "formal";
+                const editingAccess = editingAccountId === account.id;
+                return (
+                  <article key={account.id} className="px-5 py-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{account.username}</span>
+                          <span className="chip">{account.role}</span>
+                          {canEditAccess && (
+                            <span className="chip">
+                              {grantCount > 0
+                                ? `已授權 ${grantCount} 項`
+                                : "尚未授權"}
+                            </span>
+                          )}
+                          {isSelf && (
+                            <span className="chip border-primary/30 text-primary">
+                              目前帳號
+                            </span>
+                          )}
+                          {account.disabled && (
+                            <span className="chip border-danger/30 text-danger">
+                              已停用
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-content-subtle">
+                          建立於 {new Date(account.created_at).toLocaleString("zh-TW")}
+                          {resourceCount > 0
+                            ? ` · 私有資源 ${resourceCount} 項`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {canEditAccess && (
+                          <button
+                            className={editingAccess
+                              ? "btn btn-primary"
+                              : "btn btn-ghost"}
+                            type="button"
+                            aria-expanded={editingAccess}
+                            onClick={() => setEditingAccountId(
+                              editingAccess ? null : account.id,
+                            )}
+                          >
+                            資源權限
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          disabled={isSelf}
+                          onClick={() => void runAction(
+                            () => setAccountDisabled(account.id, !account.disabled),
+                            account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
+                          )}
+                        >
+                          {account.disabled ? "啟用" : "停用"}
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={() => void runAction(
+                            () => revokeAccountSessions(account.id),
+                            "撤銷登入階段失敗",
+                          )}
+                        >
+                          登出所有裝置
+                        </button>
+                        <button
+                          className="btn btn-danger"
+                          type="button"
+                          disabled={isSelf || !account.disabled || resourceCount > 0}
+                          title={resourceCount > 0
+                            ? "請先移除或轉移帳號擁有的私有資源"
+                            : undefined}
+                          onClick={() => {
+                            if (!window.confirm(
+                              `確定刪除帳號「${account.username}」？`,
+                            )) return;
+                            void runAction(
+                              () => deleteAccount(account.id),
+                              "刪除帳號失敗",
+                            );
+                          }}
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </div>
+                    {editingAccess && (
+                      <FormalAccountAccessPanel
+                        account={account}
+                        onCancel={() => setEditingAccountId(null)}
+                        onSaved={(updated) => {
+                          setAccounts((current) => current.map((item) => (
+                            item.id === updated.id ? updated : item
+                          )));
+                          setEditingAccountId(null);
+                        }}
+                      />
+                    )}
+                  </article>
+                );
+              })}
+              {accounts.length === 0 && (
+                <div className="p-8 text-center text-sm text-content-muted">尚無正式帳號資料</div>
+              )}
+            </div>
+          )}
+        </section>
+        </>
       )}
 
       {creationMode === "temporary" && <TemporaryBatchPanel />}
-
-      <section className="card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-base font-semibold">帳號列表</h2>
-          <button className="btn btn-ghost" type="button" onClick={() => void reload()} disabled={loading}>
-            重新整理
-          </button>
-        </div>
-        {loading ? (
-          <div className="p-8 text-center text-sm text-content-muted" role="status">載入帳號中…</div>
-        ) : (
-          <div className="divide-y divide-border">
-            {accounts.map((account) => {
-              const isSelf = account.id === currentAccount?.id;
-              const resourceCount = ownedResourceCount(account);
-              const grantCount = grantedResourceCount(account);
-              const canEditAccess = account.role === "user"
-                && (account.kind ?? account.account_type ?? "formal") === "formal";
-              const editingAccess = editingAccountId === account.id;
-              return (
-                <article key={account.id} className="px-5 py-4">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{account.username}</span>
-                        <span className="chip">{account.role}</span>
-                        {account.kind === "temporary" && (
-                          <span className="chip">臨時</span>
-                        )}
-                        {canEditAccess && (
-                          <span className="chip">
-                            {grantCount > 0
-                              ? `已授權 ${grantCount} 項`
-                              : "尚未授權"}
-                          </span>
-                        )}
-                        {isSelf && (
-                          <span className="chip border-primary/30 text-primary">
-                            目前帳號
-                          </span>
-                        )}
-                        {account.disabled && (
-                          <span className="chip border-danger/30 text-danger">
-                            已停用
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-xs text-content-subtle">
-                        建立於 {new Date(account.created_at).toLocaleString("zh-TW")}
-                        {resourceCount > 0
-                          ? ` · 私有資源 ${resourceCount} 項`
-                          : ""}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {canEditAccess && (
-                        <button
-                          className={editingAccess
-                            ? "btn btn-primary"
-                            : "btn btn-ghost"}
-                          type="button"
-                          aria-expanded={editingAccess}
-                          onClick={() => setEditingAccountId(
-                            editingAccess ? null : account.id,
-                          )}
-                        >
-                          資源權限
-                        </button>
-                      )}
-                      <button
-                        className="btn btn-ghost"
-                        type="button"
-                        disabled={isSelf}
-                        onClick={() => void runAction(
-                          () => setAccountDisabled(account.id, !account.disabled),
-                          account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
-                        )}
-                      >
-                        {account.disabled ? "啟用" : "停用"}
-                      </button>
-                      <button
-                        className="btn btn-ghost"
-                        type="button"
-                        onClick={() => void runAction(
-                          () => revokeAccountSessions(account.id),
-                          "撤銷登入階段失敗",
-                        )}
-                      >
-                        登出所有裝置
-                      </button>
-                      <button
-                        className="btn btn-danger"
-                        type="button"
-                        disabled={isSelf || !account.disabled || resourceCount > 0}
-                        title={resourceCount > 0
-                          ? "請先移除或轉移帳號擁有的私有資源"
-                          : undefined}
-                        onClick={() => {
-                          if (!window.confirm(
-                            `確定刪除帳號「${account.username}」？`,
-                          )) return;
-                          void runAction(
-                            () => deleteAccount(account.id),
-                            "刪除帳號失敗",
-                          );
-                        }}
-                      >
-                        刪除
-                      </button>
-                    </div>
-                  </div>
-                  {editingAccess && (
-                    <FormalAccountAccessPanel
-                      account={account}
-                      onCancel={() => setEditingAccountId(null)}
-                      onSaved={(updated) => {
-                        setAccounts((current) => current.map((item) => (
-                          item.id === updated.id ? updated : item
-                        )));
-                        setEditingAccountId(null);
-                      }}
-                    />
-                  )}
-                </article>
-              );
-            })}
-            {accounts.length === 0 && (
-              <div className="p-8 text-center text-sm text-content-muted">尚無帳號資料</div>
-            )}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

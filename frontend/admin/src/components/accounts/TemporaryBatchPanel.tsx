@@ -169,9 +169,6 @@ export default function TemporaryBatchPanel() {
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <h3 id="temporary-result-title" className="font-semibold">本次臨時密碼</h3>
-              <p className="mt-1 text-sm font-medium text-warn">
-                明碼只顯示這一次，離開或重新整理後無法再次查詢。
-              </p>
             </div>
             <button
               className="btn btn-ghost self-start"
@@ -205,7 +202,6 @@ export default function TemporaryBatchPanel() {
       <section className="border-t border-border" aria-labelledby="temporary-history-title">
         <div className="px-5 py-4">
           <h3 id="temporary-history-title" className="font-semibold">批次紀錄</h3>
-          <p className="mt-1 text-xs text-content-muted">歷史紀錄只保留狀態與到期資訊，不保存也不回傳密碼明碼。</p>
         </div>
         <div className="divide-y divide-border border-t border-border">
           {batches.map((batch) => {
@@ -215,13 +211,15 @@ export default function TemporaryBatchPanel() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-center">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <code className="truncate font-mono text-sm">{batch.batch_id}</code>
+                      <span className="font-semibold text-sm">建立於 {dateLabel(batch.created_at)}</span>
                       <span className="chip">{batchStateLabel(batch)}</span>
                       <span className="text-xs text-content-subtle">{batch.account_count ?? 5} 組</span>
                     </div>
-                    <p className="mt-1 text-xs text-content-muted">
-                      建立 {dateLabel(batch.created_at)} · 到期 {dateLabel(batch.expires_at)}
-                    </p>
+                    {batch.expires_at && (
+                      <p className="mt-1 text-xs text-content-muted">
+                        到期 {dateLabel(batch.expires_at)}
+                      </p>
+                    )}
                   </div>
                   <button
                     className="btn btn-danger self-start md:self-auto"
@@ -237,10 +235,10 @@ export default function TemporaryBatchPanel() {
                 </div>
                 {batch.accounts && batch.accounts.length > 0 && (
                   <div className="mt-3 grid gap-x-5 gap-y-2 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {batch.accounts.map((account, index) => (
+                    {batch.accounts.map((account) => (
                       <div key={account.user_id} className="flex min-w-0 items-center justify-between gap-3 text-xs">
                         <span className="min-w-0">
-                          <span className="block truncate text-content-muted">第 {index + 1} 組</span>
+                          <code className="block truncate font-mono text-content-muted">{account.username}</code>
                           <span className="block text-content-subtle">{remainingLabel(account.remaining_seconds)}</span>
                         </span>
                         <span className="chip shrink-0">{stateLabel(account.state)}</span>

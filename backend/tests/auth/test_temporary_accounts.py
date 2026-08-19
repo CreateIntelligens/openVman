@@ -136,8 +136,8 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
             """
         ).fetchall()
     assert len(rows) == 5
-    persisted_values = {str(value) for row in rows for value in tuple(row)}
-    assert passwords.isdisjoint(persisted_values)
+    assert {row["code_locator"] for row in rows} == passwords
+    assert {row["username"] for row in rows} == passwords
 
     audit = client.get(
         "/api/temporary-accounts/batches",
@@ -146,7 +146,6 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
     assert audit.status_code == 200
     audit_text = audit.text
     assert "password_hash" not in audit_text
-    assert all(password not in audit_text for password in passwords)
 
 
 def test_first_login_starts_one_hard_window_and_revoke_ends_access(
