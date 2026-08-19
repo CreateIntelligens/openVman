@@ -57,6 +57,27 @@ function isMobileViewport(): boolean {
     && window.matchMedia(MOBILE_MEDIA_QUERY).matches;
 }
 
+const MASCOT_OPEN_STORAGE_KEY = "admin-mascot-open";
+
+// 小助理的 VRM 模型可達 20MB，掛上 iframe 就會立刻下載並在主執行緒解析。
+// 預設收合，等使用者真的要用才載；開過一次就記住偏好。
+function initialClosed(): boolean {
+  if (isMobileViewport()) return true;
+  try {
+    return window.localStorage.getItem(MASCOT_OPEN_STORAGE_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+function rememberMascotOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(MASCOT_OPEN_STORAGE_KEY, open ? "1" : "0");
+  } catch {
+    // 隱私模式下 localStorage 可能不可寫，忽略即可。
+  }
+}
+
 function clampInset(value: number, size: number, viewportSize: number, margin: number): number {
   const maxInset = Math.max(margin, viewportSize - size - margin);
   return Math.min(Math.max(value, margin), maxInset);
@@ -74,7 +95,7 @@ function mascotPreviewStyle(mascot: MascotOption): CSSProperties | undefined {
 }
 
 export default function MascotWidget() {
-  const [closed, setClosed] = useState(isMobileViewport);
+  const [closed, setClosed] = useState(initialClosed);
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<MascotPosition | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -128,6 +149,7 @@ export default function MascotWidget() {
       if (!isWidgetMessage(event.data)) return;
       if (event.data.type === "close") {
         setClosed(true);
+        rememberMascotOpen(false);
         return;
       }
 
@@ -211,7 +233,10 @@ export default function MascotWidget() {
         type="button"
         title="打開 AI 虛擬人小助理"
         aria-label="打開 AI 虛擬人小助理"
-        onClick={() => setClosed(false)}
+        onClick={() => {
+          setClosed(false);
+          rememberMascotOpen(true);
+        }}
         className="mascot-trigger fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-raised text-primary shadow-lg transition-colors hover:bg-surface-sunken"
       >
         <svg

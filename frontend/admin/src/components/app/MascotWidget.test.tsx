@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MascotProvider } from "../../context/MascotContext";
@@ -15,6 +15,8 @@ describe("MascotWidget", () => {
 
   it("loads the selected mascot iframe source from localStorage", () => {
     window.localStorage.setItem("avatar.mascot_id", "qqman");
+    // VRM 最大可到 20MB，widget 預設收合；展開過才會掛 iframe。
+    window.localStorage.setItem("admin-mascot-open", "1");
 
     render(
       <MascotProvider>
@@ -27,6 +29,32 @@ describe("MascotWidget", () => {
 
     expect(src).toContain("engine=3d");
     expect(decodeURIComponent(src)).toContain("/mascots/qqman/model.vrm");
+  });
+
+  it("starts collapsed by default so the VRM is not downloaded eagerly", () => {
+    render(
+      <MascotProvider>
+        <MascotWidget />
+      </MascotProvider>,
+    );
+
+    expect(screen.queryByTitle("AI 虛擬人小助理")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "打開 AI 虛擬人小助理" }),
+    ).not.toBeNull();
+  });
+
+  it("mounts the iframe and remembers the choice once opened", () => {
+    render(
+      <MascotProvider>
+        <MascotWidget />
+      </MascotProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打開 AI 虛擬人小助理" }));
+
+    expect(screen.getByTitle("AI 虛擬人小助理")).not.toBeNull();
+    expect(window.localStorage.getItem("admin-mascot-open")).toBe("1");
   });
 
   it("starts collapsed on compact viewports", () => {
