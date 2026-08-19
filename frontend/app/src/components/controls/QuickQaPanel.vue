@@ -122,17 +122,27 @@ const currentNode = computed(() => {
 });
 
 const currentSubNodes = computed(() => {
-  if (!currentNode.value) return nodes.value;
+  if (!currentNode.value) {
+    return nodes.value.filter(n => n.children && n.children.length > 0);
+  }
   return currentNode.value.children ?? [];
 });
 
 const currentQuestions = computed(() => {
-  if (!currentNode.value) return [];
+  if (!currentNode.value) {
+    return nodes.value.flatMap(node =>
+      (node.children && node.children.length > 0)
+        ? []
+        : (node.qa_entries ?? []).filter(entry => !entry.hidden)
+    );
+  }
   return (currentNode.value.qa_entries ?? []).filter(entry => !entry.hidden);
 });
 
 const currentTitle = computed(() => {
-  if (!currentNode.value) return "分類選單";
+  if (!currentNode.value) {
+    return "快速問題";
+  }
   return currentNode.value.label || currentNode.value.node_id;
 });
 

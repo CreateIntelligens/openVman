@@ -137,20 +137,23 @@ onUnmounted(() => {
 
 .session-toolbar {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
+  top: 1.5rem;
+  left: 1.5rem;
   z-index: var(--ov-z-sticky);
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  max-width: 45%;
-  padding: 0.45rem 0.65rem 0.45rem 0.85rem;
+  max-width: min(32rem, 90vw);
+  padding: 0.35rem 0.65rem 0.35rem 0.85rem;
   border: var(--hairline) solid var(--line);
   border-radius: 999rem;
-  background: var(--bg-soft);
+  background: color-mix(in srgb, var(--bg-soft) 88%, transparent);
+  backdrop-filter: blur(0.75rem);
+  -webkit-backdrop-filter: blur(0.75rem);
   color: var(--text);
   font-family: var(--ov-font-ui);
   font-size: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .session-toolbar span {
@@ -164,6 +167,17 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.45rem;
   font-variant-numeric: tabular-nums;
+}
+
+.temporary-session strong {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999rem;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.72rem;
 }
 
 .temporary-session span + span::before {
