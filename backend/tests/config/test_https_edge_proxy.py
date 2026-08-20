@@ -45,3 +45,20 @@ def test_admin_dev_nginx_does_not_load_production_static_config():
     assert "./frontend/admin/nginx:/etc/nginx/http.d" not in compose
     assert "./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro" in compose
     assert "COPY nginx/ /etc/nginx/http.d/" not in dockerfile
+
+
+def test_native_public_proxy_supports_openvman_root_relative_routes():
+    config = (ROOT / "infra" / "nginx" / "native" / "146-openvman.conf").read_text(encoding="utf-8")
+
+    assert "location /openvman/" in config
+    for route in ("admin", "api", "ws", "v1", "tts", "js", "wasm"):
+        assert route in config
+    assert "proxy_pass https://127.0.0.1:8787" in config
+
+
+def test_vite_hmr_uses_native_https_port():
+    app_vite = (ROOT / "frontend" / "app" / "vite.config.ts").read_text(encoding="utf-8")
+    admin_vite = (ROOT / "frontend" / "admin" / "vite.config.ts").read_text(encoding="utf-8")
+
+    assert "clientPort: 443" in app_vite
+    assert "clientPort: 443" in admin_vite
