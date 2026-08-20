@@ -63,5 +63,7 @@ def test_vite_hmr_uses_native_https_port():
     app_vite = (ROOT / "frontend" / "app" / "vite.config.ts").read_text(encoding="utf-8")
     admin_vite = (ROOT / "frontend" / "admin" / "vite.config.ts").read_text(encoding="utf-8")
 
-    assert "clientPort: 443" in app_vite
-    assert "clientPort: 443" in admin_vite
+    # 兩邊都用 PUBLIC_HTTPS_PORT，預設落在 native nginx 的 443。
+    for config in (app_vite, admin_vite):
+        assert "PUBLIC_HTTPS_PORT ?? 443" in config
+        assert "clientPort: publicPort" in config
