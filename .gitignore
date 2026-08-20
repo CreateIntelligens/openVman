@@ -77,3 +77,6 @@ frontend/admin/public/models/
 
 # Git worktrees
 .worktree/
+
+# 由 scripts/render-native-nginx.sh 產生，內容依機器而異
+infra/nginx/native/openvman.conf

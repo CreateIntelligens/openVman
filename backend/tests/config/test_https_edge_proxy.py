@@ -67,3 +67,39 @@ def test_vite_hmr_uses_native_https_port():
     for config in (app_vite, admin_vite):
         assert "PUBLIC_HTTPS_PORT ?? 443" in config
         assert "clientPort: publicPort" in config
+
+
+def test_native_vhost_matches_its_template():
+    """The deployed vhost must stay renderable from the template.
+
+    146-openvman.conf is what currently runs; the template is what a new
+    machine renders. If they drift, a fresh deploy silently loses whatever
+    was hand-edited into the live file.
+    """
+    template = (
+        ROOT / "infra" / "nginx" / "native" / "openvman.conf.template"
+    ).read_text(encoding="utf-8")
+    current = (
+        ROOT / "infra" / "nginx" / "native" / "146-openvman.conf"
+    ).read_text(encoding="utf-8")
+
+    rendered = template
+    for placeholder, value in (
+        ("${PUBLIC_DOMAIN}", "146.5gao.ai"),
+        (
+            "${LETSENCRYPT_DIR}",
+            "/home/human/openVman/infra/nginx/certs/letsencrypt",
+        ),
+        ("${EDGE_UPSTREAM}", "127.0.0.1:8787"),
+        ("${ACME_WEBROOT}", "/usr/share/nginx/html"),
+    ):
+        rendered = rendered.replace(placeholder, value)
+
+    # 範本開頭多一段說明用的註解，比對時逐行去掉。
+    lines = rendered.splitlines()
+    while lines and (lines[0].startswith("#") or not lines[0].strip()):
+        lines.pop(0)
+    body = "\n".join(lines)
+
+    assert "${" not in body, "template still has unsubstituted placeholders"
+    assert body.strip() == current.strip()
