@@ -96,6 +96,14 @@ async def _fetch_gemini_voices(base_url: str) -> list[str]:
     return await _fetch_provider_voices(base_url, "/api/voices", "gemini")
 
 
+# 與 frontend/app/src/types/avatarBackground.ts 的 AVATAR_BACKGROUND_IDS 對應，
+# label 沿用前台選單（SettingsModal）的中文名稱。
+_BUILTIN_AVATAR_BACKGROUNDS = (
+    ("dark", "深色"),
+    ("clinic", "診間"),
+    ("studio", "棚拍"),
+)
+
 _EDGE_TTS_VOICE_LABELS = {
     "zh-TW-HsiaoChenNeural": "曉臻 (Edge-TTS)",
     "zh-TW-YunJheNeural": "雲哲 (Edge-TTS)",
@@ -196,6 +204,18 @@ async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:
                 )
     except Exception as exc:
         logger.warning("failed to sync backgrounds: %s", exc)
+
+    # 前端內建的純 CSS 背景（AvatarCanvas 直接渲染，沒有實體檔案），
+    # 仍要註冊成資源，否則管理端的權限選單看不到、也就無法指定成預設。
+    for bid, blabel in _BUILTIN_AVATAR_BACKGROUNDS:
+        try:
+            runtime.resources.upsert_system_resource(
+                resource_type=ResourceType.AVATAR_BACKGROUND,
+                resource_id=bid,
+                metadata={"label": blabel, "builtin": True},
+            )
+        except Exception as exc:
+            logger.warning("failed to register builtin background %s: %s", bid, exc)
 
 
 def _extract_voice_names(payload: object) -> list[str]:

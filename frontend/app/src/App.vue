@@ -955,21 +955,32 @@ function pickInitialCharacter(): string {
   settings.characterId = selected;
   if (selected && selected !== preferred) {
     addSelectionNotice(`預設人物 ${preferred} 未獲授權，已改用 ${selected}。`);
-  } else if (!selected) {
+  } else if (!selected && vrmAvatarOptions.value.length === 0) {
+    // 只授權 VRM 的帳號沒有 2D 角色是正常的，不該當成沒有人物。
     addSelectionNotice("目前帳號沒有可使用的虛擬人物。");
   }
   return selected;
 }
 
-async function bootstrapRenderer(): Promise<void> {
+async function bootstrapRenderer(vrmReady?: Promise<unknown>): Promise<void> {
   rendererBootstrapState.value = "loading";
   try {
     await Promise.all([
       wasm.initWasm(),
       avatarCatalog.load(),
+      // 需要知道有沒有 VRM 才能判斷「沒有 2D 角色」是否為錯誤。
+      vrmReady ?? Promise.resolve(),
     ]);
     const characterId = pickInitialCharacter();
-    if (!characterId) throw new Error("帳號沒有可使用的虛擬人物");
+    if (!characterId) {
+      // 帳號可能只被授權 VRM。這種情況切到 3D 舞台，而不是視為載入失敗。
+      if (vrmAvatarOptions.value.length > 0) {
+        settings.renderMode = "3d";
+        rendererBootstrapState.value = "ready";
+        return;
+      }
+      throw new Error("帳號沒有可使用的虛擬人物");
+    }
     await wasm.loadCharacter(characterId);
     rendererBootstrapState.value = "ready";
   } catch (error) {
@@ -1018,12 +1029,13 @@ function handleKeydown(event: KeyboardEvent): void {
 onMounted(() => {
   window.addEventListener("keydown", handleKeydown, true);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
+  const vrmReady = fetchVrmAvatars();
   void Promise.allSettled([
-    fetchVrmAvatars(),
+    vrmReady,
     fetchTtsProviders(),
     fetchBackgrounds(),
     fetchInitialProjectData(),
-    bootstrapRenderer(),
+    bootstrapRenderer(vrmReady),
   ]);
 });
 

@@ -10,10 +10,12 @@ import pytest
 from app.auth.database import AuthDatabase
 from app.auth.models import AccountRole, ResourceType, ResourceVisibility
 from app.auth.repositories import (
+    InvalidResourceGrantError,
     ResourceConflictError,
     ResourceRepository,
     UserRepository,
     UsernameConflictError,
+    _normalize_account_access,
 )
 
 
@@ -153,3 +155,40 @@ def test_resource_identity_conflict_is_deterministic(repositories):
 
     with pytest.raises(ResourceConflictError, match="resource already registered"):
         resources.register(**registration)
+
+
+def _access(*, character: str = "", mascot: str = ""):
+    """Build a minimal grant/defaults pair with the required project+voice."""
+    grants = [
+        (ResourceType.PROJECT, "default"),
+        (ResourceType.CUSTOM_VOICE, "hayley"),
+    ]
+    if character:
+        grants.append((ResourceType.AVATAR_CHARACTER, character))
+    if mascot:
+        grants.append((ResourceType.AVATAR_MASCOT, mascot))
+    return grants, ("default", character, "indextts", "hayley", mascot, "")
+
+
+@pytest.mark.parametrize(
+    ("character", "mascot"),
+    [("0713", ""), ("", "qqman"), ("0713", "qqman")],
+)
+def test_stage_avatar_accepts_character_or_vrm(character: str, mascot: str):
+    grants, defaults = _access(character=character, mascot=mascot)
+
+    normalized_grants, normalized_defaults = _normalize_account_access(
+        grants,
+        defaults,
+    )
+
+    assert normalized_defaults[1] == character
+    assert normalized_defaults[4] == mascot
+    assert len(normalized_grants) == len(grants)
+
+
+def test_stage_avatar_requires_at_least_one_of_character_or_vrm():
+    grants, defaults = _access()
+
+    with pytest.raises(InvalidResourceGrantError, match="character or VRM"):
+        _normalize_account_access(grants, defaults)

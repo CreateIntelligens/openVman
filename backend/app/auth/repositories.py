@@ -199,16 +199,24 @@ def _normalize_account_access(
     grant_types = {item[0] for item in normalized_grants}
     required_types = {
         ResourceType.PROJECT,
-        ResourceType.AVATAR_CHARACTER,
         ResourceType.CUSTOM_VOICE,
     }
     if not required_types.issubset(grant_types):
         raise InvalidResourceGrantError(
-            "project, avatar character, and voice grants are required"
+            "project and voice grants are required"
+        )
+    # 舞台人物可以是 openVman 2D 角色或 VRM，管理端也是併成同一張清單，
+    # 所以只要求兩者至少擇一，不強制一定要有 2D 角色。
+    if not grant_types & {
+        ResourceType.AVATAR_CHARACTER,
+        ResourceType.AVATAR_MASCOT,
+    }:
+        raise InvalidResourceGrantError(
+            "at least one avatar character or VRM grant is required"
         )
 
     normalized_defaults = tuple(value.strip() for value in defaults)
-    if len(normalized_defaults) < 4 or not all(normalized_defaults[:4]):
+    if len(normalized_defaults) < 4:
         raise InvalidResourceGrantError("all required account defaults are required")
     project_id = normalized_defaults[0]
     character_id = normalized_defaults[1]
@@ -217,11 +225,20 @@ def _normalize_account_access(
     mascot_id = normalized_defaults[4] if len(normalized_defaults) > 4 else ""
     background_id = normalized_defaults[5] if len(normalized_defaults) > 5 else ""
 
+    if not all((project_id, voice_provider, voice_id)):
+        raise InvalidResourceGrantError("all required account defaults are required")
+    # 預設登入人物同樣可以是 2D 角色或 VRM，兩者至少要指定一個。
+    if not character_id and not mascot_id:
+        raise InvalidResourceGrantError(
+            "a default avatar character or VRM is required"
+        )
+
     default_resources = {
         (ResourceType.PROJECT, project_id),
-        (ResourceType.AVATAR_CHARACTER, character_id),
         (ResourceType.CUSTOM_VOICE, voice_id),
     }
+    if character_id:
+        default_resources.add((ResourceType.AVATAR_CHARACTER, character_id))
     if mascot_id:
         default_resources.add((ResourceType.AVATAR_MASCOT, mascot_id))
     if background_id:
