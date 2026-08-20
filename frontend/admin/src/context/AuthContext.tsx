@@ -18,6 +18,7 @@ import {
   setForbiddenHandler,
   setUnauthorizedHandler,
 } from "../api/common";
+import { publicAdminPath } from "../components/app/navigation";
 
 interface AuthContextValue {
   account: AccountProfile | null;
@@ -43,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccount(null);
     setForbidden(false);
     setLoading(false);
-    if (window.location.pathname !== "/admin/login") {
-      replacePath("/admin/login");
+    if (window.location.pathname !== publicAdminPath("/admin/login")) {
+      replacePath(publicAdminPath("/admin/login"));
     }
   }, []);
 
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const profile = await loginRequest(username, password);
     setAccount(profile);
     setForbidden(false);
-    replacePath("/admin/chat");
+    replacePath(publicAdminPath("/admin/chat"));
   }, []);
 
   const logout = useCallback(async () => {
@@ -88,8 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearForbidden = useCallback(() => {
     setForbidden(false);
-    if (window.location.pathname !== "/admin/chat") {
-      replacePath("/admin/chat");
+    if (window.location.pathname !== publicAdminPath("/admin/chat")) {
+      replacePath(publicAdminPath("/admin/chat"));
       window.dispatchEvent(new PopStateEvent("popstate"));
     }
   }, []);

@@ -178,7 +178,7 @@ test("auth API uses cookie endpoints without storing the returned JWT", () => {
   assert.match(authApi, /"\/api\/auth\/me"/);
   assert.doesNotMatch(`${authApi}\n${authStore}`, /localStorage|sessionStorage/);
   assert.match(authStore, /function expireSession\(\)/);
-  assert.match(authStore, /replacePath\("\/login"\)/);
+  assert.match(authStore, /publicAppPath\("\/login"\)/);
 });
 
 test("temporary login accepts only a password and exposes the expiry notice", () => {

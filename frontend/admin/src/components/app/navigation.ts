@@ -79,6 +79,16 @@ export interface AdminRoute {
   subView?: string;
 }
 
+const PUBLIC_OPENVMAN_PREFIX = "/openvman";
+
+export function publicAdminPath(path: string): string {
+  const pathname = typeof window === "undefined" ? "" : window.location.pathname;
+  const prefix = pathname === PUBLIC_OPENVMAN_PREFIX || pathname.startsWith(`${PUBLIC_OPENVMAN_PREFIX}/`)
+    ? PUBLIC_OPENVMAN_PREFIX
+    : "";
+  return `${prefix}${path}`;
+}
+
 export function isTab(value: string | null): value is Tab {
   return value !== null && allTabs.some((tab) => tab.key === value);
 }
@@ -91,7 +101,10 @@ export function parseAdminRoute(
   pathname: string,
   search = "",
 ): AdminRoute | null {
-  const match = pathname.match(/^\/admin\/?([^/]*)\/?$/);
+  const normalizedPath = pathname.startsWith(`${PUBLIC_OPENVMAN_PREFIX}/`)
+    ? pathname.slice(PUBLIC_OPENVMAN_PREFIX.length)
+    : pathname;
+  const match = normalizedPath.match(/^\/admin\/?([^/]*)\/?$/);
   if (!match?.[1]) {
     return null;
   }
@@ -119,5 +132,5 @@ export function buildAdminPath(
   }
 
   const query = params.toString();
-  return `/admin/${tabPathSegments[tab]}${query ? `?${query}` : ""}`;
+  return publicAdminPath(`/admin/${tabPathSegments[tab]}${query ? `?${query}` : ""}`);
 }

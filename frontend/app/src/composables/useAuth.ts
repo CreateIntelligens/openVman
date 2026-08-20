@@ -17,6 +17,16 @@ const loading = ref(true)
 const forbidden = ref(false)
 let handlersInstalled = false
 
+const PUBLIC_OPENVMAN_PREFIX = "/openvman"
+
+function publicAppPath(path: string): string {
+  const pathname = window.location.pathname
+  const prefix = pathname === PUBLIC_OPENVMAN_PREFIX || pathname.startsWith(`${PUBLIC_OPENVMAN_PREFIX}/`)
+    ? PUBLIC_OPENVMAN_PREFIX
+    : ""
+  return `${prefix}${path}`
+}
+
 function replacePath(path: string): void {
   window.history.replaceState(null, "", path)
 }
@@ -25,7 +35,7 @@ function expireSession(): void {
   account.value = null
   forbidden.value = false
   loading.value = false
-  if (window.location.pathname !== "/login") replacePath("/login")
+  if (window.location.pathname !== publicAppPath("/login")) replacePath(publicAppPath("/login"))
 }
 
 function installHandlers(): void {
@@ -43,7 +53,7 @@ async function bootstrap(): Promise<void> {
   try {
     account.value = await getCurrentAccount()
     forbidden.value = false
-    if (window.location.pathname === "/login") replacePath("/")
+    if (window.location.pathname === publicAppPath("/login")) replacePath(publicAppPath("/"))
   } catch {
     expireSession()
   } finally {
@@ -54,7 +64,7 @@ async function bootstrap(): Promise<void> {
 function completeLogin(profile: AccountProfile): void {
   account.value = profile
   forbidden.value = false
-  replacePath("/")
+  replacePath(publicAppPath("/"))
 }
 
 async function login(username: string, password: string): Promise<void> {

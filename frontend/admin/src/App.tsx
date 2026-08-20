@@ -20,6 +20,7 @@ import {
   isTab,
   pageComponents,
   parseAdminRoute,
+  publicAdminPath,
   type AdminRoute,
   type Tab,
 } from "./components/app/navigation";
@@ -262,8 +263,8 @@ function AuthGate() {
   const { account, loading, forbidden } = useAuth();
 
   useEffect(() => {
-    if (!loading && account && window.location.pathname === "/admin/login") {
-      window.history.replaceState(null, "", "/admin/chat");
+    if (!loading && account && window.location.pathname === publicAdminPath("/admin/login")) {
+      window.history.replaceState(null, "", publicAdminPath("/admin/chat"));
     }
   }, [account, loading]);
 

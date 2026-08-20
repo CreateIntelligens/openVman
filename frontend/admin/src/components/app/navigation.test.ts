@@ -17,4 +17,11 @@ describe("admin navigation routes", () => {
   it("rejects unknown paths", () => {
     expect(parseAdminRoute("/admin/not-a-page")).toBeNull();
   });
+
+  it("round-trips the public openvman virtual path", () => {
+    window.history.replaceState(null, "", "/openvman/admin/chat");
+
+    expect(parseAdminRoute(window.location.pathname)).toEqual({ tab: "Chat" });
+    expect(buildAdminPath("Chat")).toBe("/openvman/admin/chat");
+  });
 });
