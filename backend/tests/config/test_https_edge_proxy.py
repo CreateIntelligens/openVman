@@ -51,6 +51,8 @@ def test_native_public_proxy_supports_openvman_root_relative_routes():
     config = (ROOT / "infra" / "nginx" / "native" / "146-openvman.conf").read_text(encoding="utf-8")
 
     assert "location /openvman/" in config
+    assert "location ^~ /admin/" in config
+    assert "location = /admin/login" in config
     for route in ("admin", "api", "ws", "v1", "tts", "js", "wasm"):
         assert route in config
     assert "proxy_pass https://127.0.0.1:8787" in config
