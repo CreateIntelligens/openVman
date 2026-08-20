@@ -53,8 +53,9 @@ def test_native_public_proxy_supports_openvman_root_relative_routes():
     assert "location /openvman/" in config
     assert "location ^~ /admin/" in config
     assert "location = /admin/login" in config
-    for route in ("admin", "api", "ws", "v1", "tts", "js", "wasm"):
+    for route in ("admin", "api", "ws", "v1", "tts", "js", "wasm", "grafana", "vendor"):
         assert route in config
+    assert "location = /widget.html" in config
     assert "proxy_pass https://127.0.0.1:8787" in config
 
 
