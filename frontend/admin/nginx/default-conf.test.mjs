@@ -33,8 +33,9 @@ describe("nginx default config", () => {
       /location = \/openvman-avatar-sdk\.js \{[\s\S]*Access-Control-Allow-Origin "\*"/,
     );
     expect(source).toMatch(
-      /location = \/openvman-avatar-sdk\.js \{[\s\S]*proxy_pass \$avatar_sdk\/openvman-avatar-sdk\.js/,
+      /location = \/openvman-avatar-sdk\.js \{[\s\S]*alias \/usr\/share\/nginx\/html\/openvman-avatar-sdk\.js/,
     );
+    expect(source).not.toContain("avatar-sdk:80");
     expect(source).toMatch(
       /location = \/sdk\/runtime\/OpenVmanAvatarRuntime\.wasm \{[\s\S]*application\/wasm/,
     );

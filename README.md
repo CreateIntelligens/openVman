@@ -55,6 +55,40 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 
 `backend/app/config.py`、`brain/api/config.py` 兩者的 pydantic-settings 仍各自帶有一個相對路徑的 `env_file=` 備援設定，但在 Docker 部署下不會用到（容器只掛載服務子目錄，該路徑在容器內不存在）——實際生效值一律來自 compose 注入的環境變數。
 
+### 對外 HTTPS：主機 nginx（compose 之外）
+
+`docker compose up` 只會起到 **Docker 邊緣 nginx**（`8786` HTTP / `8787` HTTPS，自簽憑證）。對外的正式 HTTPS 由**主機自己的 nginx** 終止，再轉進來：
+
+```
+瀏覽器 ──HTTPS 443──> 主機 nginx（Let's Encrypt）
+                        └──HTTPS 8787──> Docker nginx（自簽）
+                             └──> avatar / admin / backend
+```
+
+**這層不能塞進 compose**，原因是主機 nginx 佔用 80/443 且由其他服務共用；容器要接管得用 `network_mode: host` 並停掉主機 nginx，會影響同機的其他站台。憑證申請也需要 80 埠做 ACME 驗證，同樣會撞。
+
+因此每台機器要手動做一次（步驟見 `infra/nginx/native/README.md`）：
+
+```bash
+# 1. 產生 vhost（PUBLIC_DOMAIN 必填，其餘有預設值）
+PUBLIC_DOMAIN=example.com ./scripts/render-native-nginx.sh
+
+# 2. 申請憑證（certbot 跑在容器裡，不需安裝在主機）
+docker run --rm \
+  -v /usr/share/nginx/html:/var/www/certbot \
+  -v "$PWD/infra/nginx/certs/letsencrypt:/etc/letsencrypt" \
+  certbot/certbot certonly --webroot --webroot-path /var/www/certbot -d example.com
+
+# 3. 安裝並套用
+sudo cp infra/nginx/native/openvman.conf /etc/nginx/conf.d/
+sudo nginx -t && sudo systemctl reload nginx
+
+# 4. 排自動續期
+crontab -e   # 17 4 * * * /path/to/repo/scripts/renew-letsencrypt.sh >>/var/log/openvman-certbot-renew.log 2>&1
+```
+
+只想在內網測試、不需要正式憑證的話跳過這段即可，直接連 `https://<host>:8787`（自簽，瀏覽器會跳警告）。`HTTPS_PORT=8787` 始終是 Docker edge 的 host port；前端 HMR 會依瀏覽器目前連入的 origin，自動使用主機 nginx 的 443 或區網直連的 8787，不需要另一個 port 環境變數。
+
 ### AI Coding 餵檔策略
 
 | 撰寫目標 | 餵入哪些文件 |

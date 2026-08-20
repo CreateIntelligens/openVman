@@ -24,8 +24,9 @@
 - [x] 4.1 更新 nginx 測試，保留 SDK／runtime／角色資源 CORS 並阻止舊 Embed HTTP／WS API fallback
 - [x] 4.2 在 edge nginx 服務 `/openvman-avatar-sdk.js` 與 branded runtime alias，不新增 host port
 - [x] 4.3 為 SDK 所需靜態資源設定精準 CORS、cache 與 MIME type
-- [x] 4.4 以 multi-stage `avatar-sdk` service 提供 build 產物，移除 embed-loader／iframe dist 掛載
+- [x] 4.4 由 multi-stage `admin` image 建置並直接提供 SDK 產物，不新增 SDK 專用容器
 - [x] 4.5 新增無 Key `GET /characters`、完整素材過濾及 nginx CORS／短快取測試
+- [x] 4.6 保留 `HTTPS_PORT` 獨立映射 Docker edge，並讓 HMR 依瀏覽器 origin 與可代理路徑同時支援正式 443 與區網直連 port
 
 ## 5. 移除 iframe 與 Embed backend 公開接入
 

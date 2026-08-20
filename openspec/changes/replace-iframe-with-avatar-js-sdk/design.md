@@ -27,7 +27,9 @@
 
 ### D1：純 TypeScript IIFE SDK，不使用 Vue 或 iframe
 
-新增 `frontend/avatar-sdk/`，Vite 建置成單一 `openvman-avatar-sdk.js`，在 `window.OpenVmanAvatar` 暴露 `init()` 與 `listCharacters()`。SDK 直接建立 light-DOM root 與 canvas；不將 Vue runtime 或既有完整 avatar app 打包給客戶。部署以 multi-stage `avatar-sdk` service 建置與提供靜態產物，再由既有 edge nginx proxy，不新增 host port。
+新增 `frontend/avatar-sdk/`，Vite 建置成單一 `openvman-avatar-sdk.js`，在 `window.OpenVmanAvatar` 暴露 `init()` 與 `listCharacters()`。SDK 直接建立 light-DOM root 與 canvas；不將 Vue runtime 或既有完整 avatar app 打包給客戶。部署由 multi-stage `admin` image 一併建置 SDK，並由同一 nginx 直接提供靜態產物；不新增 SDK 專用容器或 host port。
+
+Compose 的 `HTTPS_PORT` 只管理 Docker edge 在 host 的 HTTPS 映射（預設 8787）；公開 443 屬於主機 nginx 的獨立入口。Vite HMR 不固定 `clientPort`，改由瀏覽器實際載入的 origin 推導 port，使兩個入口可同時使用；app HMR 使用兩層 nginx 都會代理的 `/@vite/hmr` WebSocket 路徑，避免公開根路徑的導向。
 
 替代方案 Web Component + iframe 已封存，原因是無法突破矩形視覺邊界。Shadow DOM 直接渲染亦否決，因 vendor runtime 使用 `document.getElementById()`，看不到 shadow tree。
 

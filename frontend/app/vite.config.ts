@@ -4,7 +4,6 @@ import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vite";
 import checker from "vite-plugin-checker";
 
-const publicPort = Number(process.env.PUBLIC_HTTPS_PORT ?? 443);
 const rootDir = __dirname;
 
 export default defineConfig({
@@ -22,13 +21,11 @@ export default defineConfig({
     port: 80,
     strictPort: true,
     allowedHosts: true,
-    // Page is served over HTTPS via the nginx edge proxy, so HMR must use wss
-    // or the browser blocks it as mixed content. clientPort is the public
-    // Native nginx terminates HTTPS on the standard public port, since that is
-    // the origin the browser actually loaded.
+    // HMR 固定使用 wss 以避免 HTTPS 頁面的 mixed content。不設
+    // clientPort，讓 Vite 從瀏覽器實際載入的 origin 推導 443 或 8787。
     hmr: {
       protocol: "wss",
-      clientPort: publicPort,
+      path: "/@vite/hmr",
     },
     proxy: {
       "/ws": {

@@ -162,7 +162,7 @@ SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'un
 
 ### SDK 或 runtime 404
 
-確認 script 使用完整 openVman URL，並確認 `avatar-sdk` service 正常運行。
+確認 script 使用完整 openVman URL，並確認 `admin` service 已建置最新 SDK 且正常運行。
 
 ### 有角色但沒有聲音
 

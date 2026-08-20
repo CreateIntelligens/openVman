@@ -202,13 +202,6 @@ services:
       - avatar-node-modules:/app/node_modules
       - ./contracts:/contracts:ro
 
-  avatar-sdk:
-    <<: *shared
-    init: true
-    build:
-      context: ./frontend/avatar-sdk
-      dockerfile: Dockerfile
-
   admin:
     <<: *shared
     init: true
@@ -229,7 +222,6 @@ services:
       - api
       - backend
       - avatar
-      - avatar-sdk
 
   redis:
     <<: *shared

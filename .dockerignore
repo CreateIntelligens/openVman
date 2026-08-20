@@ -14,6 +14,7 @@
 # … then re-include only what the admin/avatar builds need.
 !frontend/admin
 !frontend/app
+!frontend/avatar-sdk
 !contracts
 
 # Prune heavy/generated/unreadable subpaths even within the allowed dirs.
@@ -22,6 +23,8 @@ frontend/admin/dist
 frontend/admin/dist-verify
 frontend/app/node_modules
 frontend/app/dist
+frontend/avatar-sdk/node_modules
+frontend/avatar-sdk/dist
 **/.git
 **/__pycache__
 **/*.pyc

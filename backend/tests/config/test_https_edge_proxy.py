@@ -59,14 +59,21 @@ def test_native_public_proxy_supports_openvman_root_relative_routes():
     assert "proxy_pass https://127.0.0.1:8787" in config
 
 
-def test_vite_hmr_uses_native_https_port():
+def test_vite_hmr_follows_the_browser_https_origin():
     app_vite = (ROOT / "frontend" / "app" / "vite.config.ts").read_text(encoding="utf-8")
     admin_vite = (ROOT / "frontend" / "admin" / "vite.config.ts").read_text(encoding="utf-8")
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
-    # 兩邊都用 PUBLIC_HTTPS_PORT，預設落在 native nginx 的 443。
+    # 不固定 clientPort，讓同一份設定同時支援主機 nginx 443
+    # 與區網直連 Docker edge 8787。
     for config in (app_vite, admin_vite):
-        assert "PUBLIC_HTTPS_PORT ?? 443" in config
-        assert "clientPort: publicPort" in config
+        assert 'protocol: "wss"' in config
+        assert "clientPort:" not in config
+        assert "process.env.PUBLIC_HTTPS_PORT" not in config
+    assert 'path: "/@vite/hmr"' in app_vite
+    assert "PUBLIC_HTTPS_PORT" not in compose
+    assert "PUBLIC_HTTPS_PORT" not in env_example
 
 
 def test_native_vhost_matches_its_template():
