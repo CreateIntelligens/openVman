@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   CAMERA_PREVIEW_SCALE: "avatar.camera_preview_scale",
   RENDER_MODE: "avatar.render_mode",
   VRM_AVATAR_ID: "avatar.vrm_avatar_id",
+  LOGIN_MODE: "avatar.login_mode",
 } as const
 
 export function readPref(key: string, fallback: string): string {

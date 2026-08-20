@@ -2,9 +2,11 @@
 import { ref } from "vue"
 
 import { useAuth } from "../../composables/useAuth"
+import { readPref, writePref, STORAGE_KEYS } from "../../utils/storageUtils"
 
 const auth = useAuth()
-const mode = ref<"formal" | "temporary">("formal")
+const savedMode = readPref(STORAGE_KEYS.LOGIN_MODE, "temporary")
+const mode = ref<"formal" | "temporary">(savedMode === "formal" ? "formal" : "temporary")
 const username = ref("")
 const password = ref("")
 const submitting = ref(false)
@@ -20,8 +22,10 @@ async function submit(): Promise<void> {
   error.value = ""
   try {
     if (mode.value === "temporary") {
+      writePref(STORAGE_KEYS.LOGIN_MODE, "temporary")
       await auth.loginTemporary(password.value)
     } else {
+      writePref(STORAGE_KEYS.LOGIN_MODE, "formal")
       await auth.login(username.value.trim(), password.value)
     }
   } catch (reason) {
@@ -40,6 +44,7 @@ async function submit(): Promise<void> {
 
 function selectMode(nextMode: "formal" | "temporary"): void {
   mode.value = nextMode
+  writePref(STORAGE_KEYS.LOGIN_MODE, nextMode)
   password.value = ""
   error.value = ""
 }
@@ -120,6 +125,7 @@ function selectMode(nextMode: "formal" | "temporary"): void {
               :type="mode === 'formal' ? 'password' : 'text'"
               :autocomplete="mode === 'formal' ? 'current-password' : 'one-time-code'"
               :disabled="submitting"
+              :autofocus="mode === 'temporary'"
             />
           </label>
           <button class="submit-button" type="submit" :disabled="submitting">
