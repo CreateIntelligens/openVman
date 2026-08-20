@@ -31,6 +31,8 @@
 
 Compose 的 `HTTPS_PORT` 只管理 Docker edge 在 host 的 HTTPS 映射（預設 8787）；公開 443 屬於主機 nginx 的獨立入口。Vite HMR 不固定 `clientPort`，改由瀏覽器實際載入的 origin 推導 port，使兩個入口可同時使用；app HMR 使用兩層 nginx 都會代理的 `/@vite/hmr` WebSocket 路徑，避免公開根路徑的導向。
 
+新主機的公開 HTTPS 初始化由單一 `setup-public-https.sh` 串接 vhost render、HTTP-only ACME bootstrap、Docker certbot、完整 vhost 安裝／reload 與冪等 crontab 更新；後續自動續期仍由 `renew-letsencrypt.sh` 負責。
+
 替代方案 Web Component + iframe 已封存，原因是無法突破矩形視覺邊界。Shadow DOM 直接渲染亦否決，因 vendor runtime 使用 `document.getElementById()`，看不到 shadow tree。
 
 ### D2：每個 page lifetime 單 instance，destroy 後不可重新初始化

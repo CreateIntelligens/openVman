@@ -22,46 +22,46 @@ That layer is not managed by compose, so it has to be set up once per machine.
 
 ## Deploying to a new host
 
-1. **Render the vhost.** `PUBLIC_DOMAIN` is required; the rest default to the
-   values this repo uses.
+Start the Compose stack from the profiles and service URLs configured in
+`.env`, then run the one-time setup as the deployment user. The setup uses
+`sudo` only for the host nginx files and reload; certbot itself runs in Docker.
 
-   ```sh
-   PUBLIC_DOMAIN=example.com ./scripts/render-native-nginx.sh
-   ```
+```sh
+docker compose up -d
 
-   | Variable | Default |
-   | --- | --- |
-   | `PUBLIC_DOMAIN` | *(required)* |
-   | `LETSENCRYPT_DIR` | `<repo>/infra/nginx/certs/letsencrypt` |
-   | `EDGE_UPSTREAM` | `127.0.0.1:8787` |
-   | `ACME_WEBROOT` | `/usr/share/nginx/html` |
+./scripts/setup-public-https.sh
+```
 
-2. **Issue the certificate.** certbot runs as a container rather than a host
-   package, so the cert directory is bind-mounted at the standard
-   `/etc/letsencrypt` path inside it. Serve the ACME challenge from
-   `ACME_WEBROOT` first — the vhost's `/.well-known/acme-challenge/` location
-   already points there.
+Set `PUBLIC_DOMAIN` and `LETSENCRYPT_EMAIL` in the repository root `.env`
+before running setup. Explicit shell environment values override `.env` when a
+one-off value is needed.
 
-   ```sh
-   docker run --rm \
-     -v /usr/share/nginx/html:/var/www/certbot \
-     -v "$PWD/infra/nginx/certs/letsencrypt:/etc/letsencrypt" \
-     certbot/certbot certonly --webroot --webroot-path /var/www/certbot \
-     -d example.com
-   ```
+The script performs the whole initial flow:
 
-3. **Install and reload.**
+1. Render the repository's nginx template.
+2. Install a temporary HTTP-only ACME vhost when the certificate is absent.
+3. Issue the initial certificate with the pinned certbot container.
+4. Install the full HTTPS vhost and reload host nginx.
+5. Install or replace one marked renewal block in the current user's crontab.
 
-   ```sh
-   sudo cp infra/nginx/native/openvman.conf /etc/nginx/conf.d/
-   sudo nginx -t && sudo systemctl reload nginx
-   ```
+It is safe to rerun: an existing certificate is not reissued, the vhost is
+validated before reload, and the cron block is replaced rather than appended.
+Use `--dry-run` to print the planned operations without changing nginx,
+certificates, or crontab.
 
-4. **Schedule renewal.** See `infra/nginx/certs/README.md`.
+| Variable | Default |
+| --- | --- |
+| `PUBLIC_DOMAIN` | `.env` *(required)* |
+| `LETSENCRYPT_EMAIL` | `.env` *(required)* |
+| `LETSENCRYPT_DIR` | `<repo>/infra/nginx/certs/letsencrypt` |
+| `EDGE_UPSTREAM` | `127.0.0.1:8787` |
+| `ACME_WEBROOT` | `/usr/share/nginx/html` |
+| `NGINX_CONFIG_PATH` | `/etc/nginx/conf.d/openvman.conf` |
+| `LETSENCRYPT_CRON_SCHEDULE` | `17 4 * * *` |
+| `LETSENCRYPT_RENEW_LOG` | `<repo>/backend/logs/letsencrypt-renew.log` |
 
-   ```
-   17 4 * * * /path/to/repo/scripts/renew-letsencrypt.sh >>/var/log/openvman-certbot-renew.log 2>&1
-   ```
+DNS must already point at this host, inbound port 80 must reach host nginx, and
+the deployment user must have Docker and crontab access.
 
 ## Why `/openvman/` is not configurable
 

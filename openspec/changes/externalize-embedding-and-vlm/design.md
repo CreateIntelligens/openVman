@@ -4,7 +4,7 @@ The `api` service currently imports `BGEM3FlagModel`, loads `BAAI/bge-m3` into i
 
 JTAI already runs BGE-M3 as a standalone FastAPI service. Its client contract is `POST /embed` with `texts` and `input_type`, returning `vectors`. The contract is small and useful, but it does not identify the effective model, prove model readiness, execute remote-provider fallback, or prevent a client from pairing unknown vectors with an incompatible index.
 
-Static Compose interpolation can choose a default URL, but Compose cannot conditionally activate a profile based on whether another variable is empty. The design must keep direct `docker compose` behavior explicit while optionally providing a thin launcher for automatic required-service fallback.
+Static Compose interpolation can choose a default URL, but Compose cannot conditionally activate a profile based on whether another variable is empty. The design therefore keeps `docker compose` behavior explicit: `.env` must include `embedding` whenever no external embedding URL is configured.
 
 ## Goals / Non-Goals
 
@@ -35,7 +35,7 @@ Static Compose interpolation can choose a default URL, but Compose cannot condit
 `EMBEDDING_SERVICE_URL` is the canonical gateway endpoint. Inside Compose it resolves as follows:
 
 1. A non-empty value supplied by `.env` is used unchanged.
-2. Otherwise the `api` container receives `http://embedding:8009` and the launcher treats the local `embedding` profile as required.
+2. Otherwise the `api` container receives `http://embedding:8009` and `.env` must select the local `embedding` profile.
 
 Brain will use one pooled gateway adapter for BGE, Gemini, OpenAI, and Voyage. Provider keys, base URLs, retry limits, and provider fallback order move into the embedding container. Brain retains only data-aware policy: which embedding identities have queryable tables and which identity an indexing operation is allowed to create or update.
 
@@ -85,7 +85,7 @@ The canonical runtime variables are:
 - `VISION_LLM_BASE_URL`, `VISION_LLM_MODEL`, and `VISION_LLM_API_KEY` for VLM.
 - `TTS_INDEXTTS_URL` and `GATEWAY_INTERNAL_TOKEN` for IndexTTS.
 
-Explicit URLs always win for the consumer route. Local profile routes use `http://embedding:8009`, `http://vlm:8000/v1`, and `http://index-tts-vllm:8011`. Local VLM receives a non-secret placeholder key; authenticated external services require explicit credentials.
+Explicit URLs always win for the consumer route. Local profile routes use `http://embedding:8009`, `http://vlm:8000/v1`, and `http://index-tts-vllm:8011`. Local VLM and its Backend consumer share `GATEWAY_INTERNAL_TOKEN`; authenticated external services can supply `VISION_LLM_API_KEY` explicitly.
 
 VLM and IndexTTS remain optional. A non-empty external URL enables that route without requiring a local profile. Selecting `vlm` or `indextts` in `COMPOSE_PROFILES` enables the corresponding local route. If neither URL nor profile is present, the feature/provider remains disabled. In particular, IndexTTS does not start or become an attempted local route by default, so Backend continues through its configured TTS fallback chain.
 
@@ -101,12 +101,12 @@ The local services use profiles:
 
 Examples:
 
-- Current local vision development: `COMPOSE_PROFILES=vlm`; the launcher adds required `embedding`, starts local VLM, and leaves IndexTTS disabled.
+- Current local vision development: `COMPOSE_PROFILES=embedding,vlm` starts the required embedding gateway and local VLM while leaving IndexTTS disabled.
 - Fully local GPU mode: `COMPOSE_PROFILES=embedding,vlm,indextts` with no external service URLs.
 - Shared GPU stack: all three service URLs point to the shared deployment and no local GPU profile is needed in consumer worktrees.
 - Mixed: external embedding with local `vlm`, and IndexTTS omitted or external.
 
-Direct `docker compose` does not pretend to infer profiles: callers must include `embedding` when no external embedding URL is configured. A thin launcher reads `.env`, adds only the required `embedding` profile when its URL is absent, recognizes optional VLM/IndexTTS from explicit URLs or profiles, and prints the resolved mode before invoking Compose. It never overrides an explicit URL or silently enables an optional service.
+`docker compose` does not infer profiles: callers include `embedding` when no external embedding URL is configured and explicitly select optional local VLM/IndexTTS profiles. Consumer URLs and credentials are resolved by Compose interpolation, so the deployment has one standard startup interface.
 
 ### 7. Cross-worktree access does not add service-specific host ports
 
@@ -131,7 +131,7 @@ Liveness remains lightweight so a transient model failure can be distinguished f
 - **The shared gateway becomes a common dependency** → Use readiness, bounded timeouts, actionable errors, and independent restart policies; do not silently allocate another model.
 - **Fallback could silently corrupt retrieval** → Return the exact embedding specification, allow only caller-approved identities, use one identity per batch, and fail closed before touching an incompatible table.
 - **Provider fallback moves credentials into a shared service** → Keep secrets only in the provider deployment, redact configuration/telemetry, and authenticate all non-private routes.
-- **Profiles and URLs can be configured inconsistently** → Print resolved routing at startup, warn about redundant local profiles, add Compose configuration tests, and document direct Compose versus launcher behavior.
+- **Profiles and URLs can be configured inconsistently** → Keep the required local profile in `.env.example`, add direct Compose configuration tests, and document external-URL precedence.
 - **Public inference routes increase attack surface** → Prefer a private shared network; require authentication and nginx rate/body limits for edge exposure.
 - **JTAI and openVman currently use different BGE wrapper classes** → Freeze a deterministic compatibility corpus and compare vector dimension and cosine similarity before switching JTAI to the shared gateway.
 - **A shared GPU can still be oversubscribed by VLM, embedding, and TTS together** → Keep per-service GPU memory controls, leave IndexTTS off by default, and document supported profile combinations; do not start multiple heavy builds concurrently.
@@ -142,7 +142,7 @@ Liveness remains lightweight so a transient model failure can be distinguished f
 2. Freeze the current provider identities and compare local BGE vectors against the existing in-process implementation on a fixed corpus.
 3. Add Brain's pooled gateway adapter and identity validation behind configuration while retaining the current path for controlled parity testing.
 4. Move provider fallback and credentials into the gateway; have Brain send acceptable table-backed identities and consume returned specifications.
-5. Add the `embedding` profile, URL defaults, optional-service rules, VLM/IndexTTS routing parity, and Compose launcher tests.
+5. Add the `embedding` profile, URL defaults, optional-service rules, VLM/IndexTTS routing parity, and direct Compose configuration tests.
 6. Verify knowledge search, memory search, index rebuild, VLM camera flow, IndexTTS synthesis/fallback, GPU allocation, and service health in local, external, and mixed modes.
 7. Remove Brain's in-process BGE and direct external embedding adapters only after parity and index-isolation tests pass.
 8. Document a shared GPU deployment for worktrees and JTAI, including private-network and nginx-authenticated examples.

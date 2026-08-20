@@ -278,6 +278,7 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - TTS_INDEXTTS_URL=${TTS_INDEXTTS_URL:-}
+      - VISION_LLM_API_KEY=${VISION_LLM_API_KEY:-${GATEWAY_INTERNAL_TOKEN:-}}
       - AVATAR_ASSETS_DIR=/data/avatar
       - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
       - AVATAR_MASCOTS_DIR=/data/mascots

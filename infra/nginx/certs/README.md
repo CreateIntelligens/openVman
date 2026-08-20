@@ -21,9 +21,14 @@ standard `/etc/letsencrypt` path inside that container, so the renewal config
 stays portable while the host nginx reads the same files through their real
 path.
 
-Renew with `scripts/renew-letsencrypt.sh` (add `--dry-run` to rehearse without
-touching the live certificate). Schedule it from cron:
+`scripts/setup-public-https.sh` installs the renewal cron automatically during
+the initial public HTTPS setup. The marked cron block is replaced on rerun, so
+it does not create duplicate jobs. Its default log is
+`backend/logs/letsencrypt-renew.log`.
+
+To renew manually, run `scripts/renew-letsencrypt.sh` (add `--dry-run` to
+rehearse without touching the live certificate). The default cron schedule is:
 
 ```
-17 4 * * * /path/to/repo/scripts/renew-letsencrypt.sh >>/var/log/openvman-certbot-renew.log 2>&1
+17 4 * * * <repo>/scripts/renew-letsencrypt.sh
 ```

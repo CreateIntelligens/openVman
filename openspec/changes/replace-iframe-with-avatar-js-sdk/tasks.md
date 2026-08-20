@@ -27,6 +27,7 @@
 - [x] 4.4 由 multi-stage `admin` image 建置並直接提供 SDK 產物，不新增 SDK 專用容器
 - [x] 4.5 新增無 Key `GET /characters`、完整素材過濾及 nginx CORS／短快取測試
 - [x] 4.6 保留 `HTTPS_PORT` 獨立映射 Docker edge，並讓 HMR 依瀏覽器 origin 與可代理路徑同時支援正式 443 與區網直連 port
+- [x] 4.7 新增冪等的公開 HTTPS 初始化腳本，一次完成 certbot、主機 nginx 與 renew crontab
 
 ## 5. 移除 iframe 與 Embed backend 公開接入
 

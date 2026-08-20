@@ -30,24 +30,24 @@ The Compose configuration SHALL provide `embedding`, `vlm`, and `indextts` profi
 - **WHEN** `TTS_INDEXTTS_URL` is empty and `COMPOSE_PROFILES` does not include `indextts`
 - **THEN** the IndexTTS container does not start and Backend does not attempt the internal IndexTTS URL
 
-### Requirement: Automatic launcher preserves explicit optional-service selection
-If the project provides an automatic Compose launcher, it SHALL add the required local embedding profile only when its URL is unset, SHALL recognize optional VLM and IndexTTS from explicit URLs or profiles, and SHALL print the resolved routing before invoking `docker compose`.
+### Requirement: Direct Compose startup uses explicit routing configuration
+The project SHALL use standard `docker compose` startup without a custom launcher. `.env` SHALL explicitly select required local profiles or configure external service URLs, and Compose interpolation SHALL provide matching consumer routes and credentials.
 
-#### Scenario: Launcher fills required local embedding
-- **WHEN** `EMBEDDING_SERVICE_URL` is unset and the `embedding` profile is absent
-- **THEN** the launcher adds `embedding` and reports the local gateway selection
+#### Scenario: Direct Compose starts required local embedding
+- **WHEN** `EMBEDDING_SERVICE_URL` is unset and `COMPOSE_PROFILES` includes `embedding`
+- **THEN** `docker compose up -d` starts the gateway and Brain uses `http://embedding:8009`
 
-#### Scenario: Launcher sees an external URL
+#### Scenario: Direct Compose sees an external URL
 - **WHEN** any service URL is explicitly configured
-- **THEN** the launcher preserves that URL and does not require that service's local profile
+- **THEN** the consumer preserves that URL and does not require that service's local profile
 
-#### Scenario: Launcher sees no optional-service opt-in
+#### Scenario: Direct Compose sees no optional-service opt-in
 - **WHEN** neither URL nor profile selects VLM or IndexTTS
-- **THEN** the launcher leaves that optional service disabled
+- **THEN** Compose leaves that optional service disabled
 
 #### Scenario: Explicit local profile and external URL coexist
 - **WHEN** a service has both an explicit external URL and an explicitly listed local profile
-- **THEN** the consumer uses the external URL while the launcher preserves the user's profile and reports a redundant-local-service warning
+- **THEN** the consumer uses the external URL while Compose preserves the explicitly requested local service
 
 ### Requirement: GPU consumers expose routing health
 Brain and Backend health payloads SHALL identify whether embedding, VLM, and IndexTTS routes are disabled, local, external, degraded, incompatible, or unreachable as applicable and SHALL not expose credentials.

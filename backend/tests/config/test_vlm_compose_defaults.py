@@ -30,6 +30,7 @@ def test_vlm_healthcheck_uses_authenticated_models_endpoint():
     assert "- --disable-log-requests" not in compose
     assert 'exec vllm serve "$$@" --api-key "$${VLLM_API_KEY}"' in compose
     assert "VLLM_API_KEY=${GATEWAY_INTERNAL_TOKEN:-${VISION_LLM_API_KEY:-}}" in compose
+    assert "VISION_LLM_API_KEY=${VISION_LLM_API_KEY:-${GATEWAY_INTERNAL_TOKEN:-}}" in compose
     assert "VLLM_API_KEY is required for the local VLM service" in compose
     assert "http://127.0.0.1:8000/v1/models" in compose
     assert "Authorization" in compose

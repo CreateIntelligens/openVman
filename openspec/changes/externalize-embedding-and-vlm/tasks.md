@@ -26,13 +26,13 @@
 - [x] 3.6 Update Brain warmup/readiness to call remote model-ready health and fail closed when no acceptable identity is ready or returned metadata is incompatible.
 - [x] 3.7 Add unit tests for external URL precedence, internal default routing, gateway outage, provider fallback metadata, missing-table candidate exclusion, mixed-model batch rejection, write isolation, missing local profile hints, and no in-process provider construction.
 
-## 4. Compose Profiles and Automatic Launcher
+## 4. Compose Profiles and Direct Startup
 
 - [x] 4.1 Add the `embedding` service/profile, GPU reservation, cache volume, ready healthcheck, restart policy, and internal-only networking to `docker-compose.yml`.
 - [x] 4.2 Resolve explicit embedding/VLM/IndexTTS URLs before internal profile URLs; remove the unconditional internal IndexTTS URL that currently makes an unselected profile appear enabled.
-- [x] 4.3 Update Compose launcher: when local profiles (vlm, indextts) are selected and URLs not set, inject corresponding consumer environment variables (`VISION_LLM_BASE_URL`, `TTS_INDEXTTS_URL`, etc.).
-- [x] 4.4 Add launcher and `docker compose config` tests for fully local, fully external, mixed, explicitly profiled, disabled optional services, redundant URL/profile, and missing-required-service configurations.
-- [x] 4.5 Update `.env.example` to document `COMPOSE_PROFILES=embedding,vlm,indextts`, launcher behavior, URL-based shared-service mode, and default-disabled IndexTTS behavior.
+- [x] 4.3 Resolve local VLM consumer credentials from `GATEWAY_INTERNAL_TOKEN` while preserving explicit external `VISION_LLM_API_KEY` values.
+- [x] 4.4 Add direct `docker compose config` tests for fully local and fully external GPU routing without a custom launcher.
+- [x] 4.5 Update `.env.example` to document explicit `COMPOSE_PROFILES=embedding,vlm,indextts`, URL-based shared-service mode, and default-disabled IndexTTS behavior.
 
 ## 5. VLM Routing Parity
 

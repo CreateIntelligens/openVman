@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -110,3 +112,46 @@ def test_native_vhost_matches_its_template():
 
     assert "${" not in body, "template still has unsubstituted placeholders"
     assert body.strip() == current.strip()
+
+
+def test_public_https_setup_wraps_initial_certificate_nginx_and_cron(tmp_path):
+    script = ROOT / "scripts" / "setup-public-https.sh"
+    renew_script = ROOT / "scripts" / "renew-letsencrypt.sh"
+    source = script.read_text(encoding="utf-8")
+    assert os.access(script, os.X_OK)
+    assert os.access(renew_script, os.X_OK)
+    env = os.environ.copy()
+    env.pop("PUBLIC_DOMAIN", None)
+    env.pop("LETSENCRYPT_EMAIL", None)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "PUBLIC_DOMAIN=avatar.example.com\n"
+        "LETSENCRYPT_EMAIL=ops@example.com\n",
+        encoding="utf-8",
+    )
+    env["OPENVMAN_ENV_FILE"] = str(env_file)
+
+    result = subprocess.run(
+        [str(script), "--dry-run"],
+        cwd=ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "render nginx vhost" in result.stdout
+    assert "issue initial Let's Encrypt certificate" in result.stdout
+    assert "install and reload host nginx" in result.stdout
+    assert "install idempotent renewal cron" in result.stdout
+    assert "render-native-nginx.sh" in source
+    assert "certbot" in source and "certonly" in source
+    assert "nginx" in source and "systemctl" in source
+    assert "crontab" in source and "renew-letsencrypt.sh" in source
+    assert "cron_begin=" in source and "cron_end=" in source
+    assert 'run_root test -s "$FULLCHAIN"' in source
+    assert "prepare_nginx_rollback" in source and "nginx_backup" in source
+    assert source.index("prepare_nginx_rollback\nrun_root install") < source.index(
+        'run_root install -m 0644 "$RENDERED_CONFIG"',
+    )
+    assert "existing jobs were not changed" in source
