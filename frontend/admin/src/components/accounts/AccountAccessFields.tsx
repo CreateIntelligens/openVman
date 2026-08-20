@@ -12,7 +12,8 @@ const PREFERRED_PROJECT = "proj-b85afb8bb6";
 const PREFERRED_CHARACTER = "0713";
 const PREFERRED_VOICE = "hayley";
 const PREFERRED_MASCOT = "qqman";
-const PREFERRED_BACKGROUND = "8881";
+// 前台預設就是內建的深色舞台（avatarBackground.ts 的 fallback）。
+const PREFERRED_BACKGROUND = "dark";
 
 type GrantType = keyof AccountResourceGrants;
 
@@ -73,10 +74,13 @@ function initialSelection(
   current: string[] | undefined,
   options: AccountAccessOption[],
   preferred: string,
+  /** 選填的資源不預先勾選，讓管理者自己決定要不要給。 */
+  optional = false,
 ): string[] {
   const available = new Set(options.map((option) => option.id));
   const selected = (current ?? []).filter((id) => available.has(id));
   if (selected.length > 0) return selected;
+  if (optional) return [];
   const fallback = available.has(preferred) ? preferred : options[0]?.id;
   return fallback ? [fallback] : [];
 }
@@ -108,7 +112,9 @@ function accessFromOptions(
     current?.grants.avatar_mascots,
     options.avatar_mascots ?? [],
     PREFERRED_MASCOT,
+    true,
   );
+  // 背景預設給深色（前台的 fallback 也是它），VRM 才是完全選填。
   const backgrounds = initialSelection(
     current?.grants.avatar_backgrounds,
     options.avatar_backgrounds ?? [],
@@ -261,22 +267,31 @@ export function useAccountAccessForm(
     });
   }
 
-  const hasMascots = (options?.avatar_mascots?.length ?? 0) === 0
-    || ((access.grants.avatar_mascots?.length ?? 0) > 0 && Boolean(access.defaults.mascot_id));
-  const hasBackgrounds = (options?.avatar_backgrounds?.length ?? 0) === 0
-    || ((access.grants.avatar_backgrounds?.length ?? 0) > 0 && Boolean(access.defaults.background_id));
+  // 舞台人物可以是 openVman 2D 角色或 VRM，兩者擇一即可（與後端
+  // _normalize_account_access 的規則一致）。VRM 與背景本身都是選填，
+  // 但一旦選了就必須指定預設值，否則後端會擋下整批。
+  const hasStageAvatar = (
+    access.grants.avatar_characters.length > 0
+    || (access.grants.avatar_mascots?.length ?? 0) > 0
+  ) && Boolean(access.defaults.character_id || access.defaults.mascot_id);
+  const mascotDefaultOk = (access.grants.avatar_mascots?.length ?? 0) === 0
+    || Boolean(access.defaults.mascot_id);
+  const characterDefaultOk = access.grants.avatar_characters.length === 0
+    || Boolean(access.defaults.character_id);
+  const backgroundDefaultOk = (access.grants.avatar_backgrounds?.length ?? 0) === 0
+    || Boolean(access.defaults.background_id);
 
   const complete = Boolean(
     options
       && access.grants.projects.length > 0
-      && access.grants.avatar_characters.length > 0
       && access.grants.custom_voices.length > 0
       && access.defaults.project_id
-      && access.defaults.character_id
       && access.defaults.voice_provider
       && access.defaults.voice_id
-      && hasMascots
-      && hasBackgrounds,
+      && hasStageAvatar
+      && characterDefaultOk
+      && mascotDefaultOk
+      && backgroundDefaultOk,
   );
 
   return {
