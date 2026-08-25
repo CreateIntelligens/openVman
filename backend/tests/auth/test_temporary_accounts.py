@@ -31,6 +31,7 @@ from app.auth.runtime import AuthRuntime, build_auth_runtime, get_auth_runtime
 from app.config import TTSRouterConfig
 
 _ADMIN_PASSWORD = "admin-password"
+_ROOT_PASSWORD = "root-password"
 
 
 @pytest.fixture()
@@ -86,6 +87,15 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {login.json()['token']}"}
 
 
+def _root_headers(client: TestClient) -> dict[str, str]:
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "ai360", "password": _ROOT_PASSWORD},
+    )
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['token']}"}
+
+
 def _batch_body() -> dict[str, object]:
     return {
         "grants": {
@@ -123,7 +133,7 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
     assert len(credentials) == 5
     assert len({item["password"] for item in credentials}) == 5
     assert all(
-        len(item["password"]) == 12 and item["password"].isascii()
+        len(item["password"]) == 20 and item["password"].isascii()
         and item["password"].isalnum()
         for item in credentials
     )
@@ -140,8 +150,10 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
             """
         ).fetchall()
     assert len(rows) == 5
-    assert {row["code_locator"] for row in rows} == passwords
-    assert {row["username"] for row in rows} == passwords
+    locators = {password[:12] for password in passwords}
+    assert {row["code_locator"] for row in rows} == locators
+    assert all(row["username"] not in passwords for row in rows)
+    assert all(row["username"] not in locators for row in rows)
 
     audit = client.get(
         "/api/temporary-accounts/batches",
@@ -150,6 +162,88 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
     assert audit.status_code == 200
     audit_text = audit.text
     assert "password_hash" not in audit_text
+    assert all(password not in audit_text for password in passwords)
+    assert all(locator not in audit_text for locator in locators)
+
+
+@pytest.mark.parametrize("actor_role", [AccountRole.ROOT, AccountRole.ADMIN])
+def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
+    client: TestClient,
+    runtime: AuthRuntime,
+    actor_role: AccountRole,
+):
+    actor = _bootstrap(runtime) if actor_role is AccountRole.ADMIN else None
+    if actor_role is AccountRole.ROOT:
+        actor = runtime.users.create_root(
+            username="ai360",
+            password_hash=hash_password(_ROOT_PASSWORD),
+        )
+        for resource_type, resource_id in (
+            (ResourceType.PROJECT, "proj-b85afb8bb6"),
+            (ResourceType.PROJECT, "esg-7dea843a0d"),
+            (ResourceType.AVATAR_CHARACTER, "0713"),
+            (ResourceType.CUSTOM_VOICE, "hayley"),
+        ):
+            runtime.resources.register(
+                resource_type=resource_type,
+                resource_id=resource_id,
+                owner_user_id=None,
+                visibility=ResourceVisibility.SYSTEM_PUBLIC,
+            )
+    headers = (
+        _root_headers(client)
+        if actor_role is AccountRole.ROOT
+        else _admin_headers(client)
+    )
+    created_response = client.post(
+        "/api/temporary-accounts/batches",
+        headers=headers,
+        json=_batch_body(),
+    )
+    assert created_response.status_code == 201
+    created = created_response.json()
+    plaintext_credentials = {
+        item["password"] for item in created["credentials"]
+    }
+    with runtime.database.transaction() as connection:
+        persisted_locators = {
+            row["code_locator"]
+            for row in connection.execute(
+                """
+                SELECT code_locator FROM temporary_credentials
+                WHERE batch_id = ?
+                """,
+                (created["batch_id"],),
+            ).fetchall()
+        }
+
+    listed = client.get("/api/temporary-accounts/batches", headers=headers)
+    assert listed.status_code == 200
+    listed_text = listed.text
+    assert "password" not in listed_text.casefold()
+    assert "hash" not in listed_text.casefold()
+    assert all(secret not in listed_text for secret in plaintext_credentials)
+    assert all(locator not in listed_text for locator in persisted_locators)
+
+    revoked = client.post(
+        f"/api/temporary-accounts/batches/{created['batch_id']}/revoke",
+        headers=headers,
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["state"] == "revoked"
+    assert "password" not in revoked.text.casefold()
+    assert all(secret not in revoked.text for secret in plaintext_credentials)
+    assert all(locator not in revoked.text for locator in persisted_locators)
+
+    events = runtime.auth_audit.list()
+    assert [event.action for event in events[-2:]] == [
+        "temporary_batch_created",
+        "temporary_batch_revoked",
+    ]
+    assert all(event.actor_user_id == actor.id for event in events[-2:])
+    audit_text = " ".join(event.metadata_json for event in events)
+    assert all(secret not in audit_text for secret in plaintext_credentials)
+    assert all(locator not in audit_text for locator in persisted_locators)
 
 
 def test_first_login_starts_one_hard_window_and_revoke_ends_access(
@@ -251,6 +345,89 @@ def test_expired_temporary_credential_is_revalidated_on_every_request(
         ).status_code
         == 401
     )
+
+
+def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
+    client: TestClient,
+    runtime: AuthRuntime,
+):
+    admin = _bootstrap(runtime)
+    legacy_password = "LegacyPwd001"  # gitleaks:allow
+    credentials = [
+        TemporaryCredentialCreate(
+            locator=(legacy_password if index == 0 else f"OtherPwd{index:04d}"),
+            password_hash=(
+                hash_password(legacy_password) if index == 0 else "unused-hash"
+            ),
+        )
+        for index in range(5)
+    ]
+    batch = runtime.temporary_accounts.create_batch(
+        created_by=admin.id,
+        credentials=credentials,
+        grants=[
+            (ResourceType.PROJECT, "proj-b85afb8bb6"),
+            (ResourceType.AVATAR_CHARACTER, "0713"),
+            (ResourceType.CUSTOM_VOICE, "hayley"),
+        ],
+        defaults=("proj-b85afb8bb6", "0713", "indextts", "hayley"),
+        duration_seconds=72 * 60 * 60,
+    )
+    with runtime.database.transaction(write=True) as connection:
+        connection.execute(
+            """
+            UPDATE users
+            SET username = (
+                    SELECT code_locator FROM temporary_credentials
+                    WHERE temporary_credentials.user_id = users.id
+                ),
+                -- 真實寫入會小寫化，模擬舊資料時必須跟著小寫，
+                -- 否則遷移條件在測試裡會意外成立。
+                username_normalized = (
+                    SELECT lower(code_locator) FROM temporary_credentials
+                    WHERE temporary_credentials.user_id = users.id
+                )
+            WHERE id IN (
+                SELECT user_id FROM temporary_credentials WHERE batch_id = ?
+            )
+            """,
+            (batch.batch.id,),
+        )
+        connection.execute("DELETE FROM schema_migrations WHERE version >= 5")
+
+    runtime.database.initialize()
+
+    with runtime.database.transaction() as connection:
+        rows = connection.execute(
+            """
+            SELECT users.username, users.username_normalized,
+                   temporary_credentials.code_locator
+            FROM temporary_credentials
+            INNER JOIN users ON users.id = temporary_credentials.user_id
+            WHERE temporary_credentials.batch_id = ?
+            ORDER BY users.id
+            """,
+            (batch.batch.id,),
+        ).fetchall()
+        versions = connection.execute(
+            "SELECT version FROM schema_migrations ORDER BY version"
+        ).fetchall()
+        violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+
+    assert all(row["username"].startswith("tmp-") for row in rows)
+    assert all(row["username"] != row["code_locator"] for row in rows)
+    assert all(row["username_normalized"] != row["code_locator"] for row in rows)
+    # 測試刻意移除舊的遷移紀錄再重跑，所以只會補回 v6。
+    assert [row["version"] for row in versions] == [1, 2, 3, 4, 6]
+    assert violations == []
+
+    login = client.post(
+        "/api/auth/temporary-login",
+        json={"password": legacy_password},
+    )
+    assert login.status_code == 200
+    assert login.json()["account"]["username"].startswith("tmp-")
+    assert legacy_password not in login.text
 
 
 def test_concurrent_activation_keeps_the_first_expiry(runtime: AuthRuntime):

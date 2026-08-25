@@ -41,7 +41,10 @@ def test_migration_is_idempotent_and_enables_sqlite_safety_pragmas(tmp_path: Pat
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()[0]
         busy_timeout = connection.execute("PRAGMA busy_timeout").fetchone()[0]
 
-    assert [row["version"] for row in migrations] == [1, 2, 3]
+    applied = [row["version"] for row in migrations]
+    # 只驗證遷移不重複、且按序套用；確切版本號會隨新遷移增加。
+    assert applied == sorted(set(applied))
+    assert applied[:4] == [1, 2, 3, 4]
     assert journal_mode == "wal"
     assert foreign_keys == 1
     assert busy_timeout == 5000
@@ -62,7 +65,10 @@ def test_temporary_migration_recovers_when_column_already_exists(tmp_path: Path)
         columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(users)")
         }
-    assert [row["version"] for row in migrations] == [1, 2, 3]
+    applied = [row["version"] for row in migrations]
+    # 只驗證遷移不重複、且按序套用；確切版本號會隨新遷移增加。
+    assert applied == sorted(set(applied))
+    assert applied[:4] == [1, 2, 3, 4]
     assert "account_type" in columns
 
 
@@ -101,13 +107,15 @@ def test_concurrent_reads_and_writes_complete_without_lock_errors(repositories):
 
 def test_disabled_token_version_and_ownership_counts_persist(repositories):
     database, users, resources = repositories
+    # 撤銷工作階段需要一個具權限的 actor，政策檢查與 audit 才會執行。
+    root = users.create_root(username="ai360", password_hash="hash")
     user = users.create(
         username="owner",
         password_hash="hash",
         role=AccountRole.USER,
     )
-    users.set_disabled(user.id, True)
-    users.revoke_sessions(user.id)
+    users.set_disabled_guarded(actor_id=root.id, user_id=user.id, disabled=True)
+    users.revoke_sessions(user.id, actor_id=root.id)
     resources.register(
         resource_type=ResourceType.PROJECT,
         resource_id="project-a",
@@ -127,7 +135,8 @@ def test_disabled_token_version_and_ownership_counts_persist(repositories):
 
     assert reloaded is not None
     assert reloaded.disabled is True
-    assert reloaded.token_version == 1
+    # 停用本身就會撤銷工作階段，再加上明確的 revoke_sessions 共兩次遞增。
+    assert reloaded.token_version == 2
     assert reloaded_resources.count_private_by_owner(user.id) == {
         "custom_voice": 1,
         "project": 1,
