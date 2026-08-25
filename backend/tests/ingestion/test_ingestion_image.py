@@ -66,6 +66,7 @@ class TestDescribeWithVision:
 
         assert result.content_type == "image_description"
         assert result.content == "這是一張測試圖片"
+        assert mock_client.chat.completions.create.call_args.kwargs["max_tokens"] == 256
 
     @pytest.mark.asyncio
     async def test_vision_llm_with_base_url(self, _fake_image):

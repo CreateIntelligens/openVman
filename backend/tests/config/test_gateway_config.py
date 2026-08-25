@@ -10,7 +10,8 @@ def test_gateway_defaults():
     """Gateway config fields have correct defaults."""
     from app.config import TTSRouterConfig
 
-    cfg = TTSRouterConfig()
+    with patch.dict(os.environ, {}, clear=True):
+        cfg = TTSRouterConfig(_env_file=None)
     assert cfg.gateway_temp_dir == "/tmp/vman-gateway"
     assert cfg.gateway_temp_ttl_min == 30
     assert cfg.gateway_temp_dir_max_mb == 2048
@@ -45,7 +46,7 @@ def test_gateway_env_override():
     with patch.dict(os.environ, env, clear=False):
         from app.config import TTSRouterConfig
 
-        cfg = TTSRouterConfig()
+        cfg = TTSRouterConfig(_env_file=None)
         assert cfg.gateway_temp_dir == "/custom/path"
         assert cfg.gateway_temp_ttl_min == 60
         assert cfg.gateway_temp_dir_max_mb == 512
@@ -60,5 +61,5 @@ def test_custom_media_supported_types():
     with patch.dict(os.environ, env, clear=False):
         from app.config import TTSRouterConfig
 
-        cfg = TTSRouterConfig()
+        cfg = TTSRouterConfig(_env_file=None)
         assert cfg.supported_mime_types == frozenset({"image/jpeg", "application/pdf"})

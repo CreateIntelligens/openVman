@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import CurrentAccount, get_current_account
-from app.auth.models import AccountRole, AccountType, ResourceRecord, ResourceType
+from app.auth.models import (
+    AccountType,
+    ResourceRecord,
+    ResourceType,
+    is_at_least_admin,
+)
 from app.auth.resources import (
     ResourceNotFoundError,
     list_accessible_resources,
@@ -279,7 +284,7 @@ def resolve_tts_voice(
 
     is_unrestricted_admin = (
         current.user.account_type is AccountType.FORMAL
-        and current.user.role is AccountRole.ADMIN
+        and is_at_least_admin(current.user.role)
     )
     if not is_unrestricted_admin:
         defaults = runtime.account_access.get_defaults(current.user.id)
@@ -401,7 +406,7 @@ async def get_tts_providers(
 ) -> JSONResponse:
     if not (
         current.user.account_type is AccountType.FORMAL
-        and current.user.role is AccountRole.ADMIN
+        and is_at_least_admin(current.user.role)
     ):
         return JSONResponse(content=_scoped_tts_providers(current, runtime))
 

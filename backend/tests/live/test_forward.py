@@ -13,6 +13,7 @@ def _mock_cfg() -> MagicMock:
     cfg = MagicMock()
     cfg.brain_url = "http://brain:8100"
     cfg.backend_port = 8200
+    cfg.gateway_forward_url = ""
     cfg.gateway_internal_token = "test-token"
     return cfg
 
@@ -52,6 +53,28 @@ class TestForwardToBrain:
         assert call_args[1]["json"]["project_id"] == "store-a"
         assert call_args[1]["json"]["persona_id"] == "clerk"
         assert call_args[1]["headers"]["X-Internal-Token"] == "test-token"
+
+    @pytest.mark.asyncio
+    async def test_configured_forward_url_supports_standalone_worker(self):
+        cfg = _mock_cfg()
+        cfg.gateway_forward_url = "http://backend:8200/"
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=_ok_response())
+
+        with (
+            patch("app.gateway.forward.get_tts_config", return_value=cfg),
+            patch("app.gateway.forward._http.get", return_value=mock_client),
+        ):
+            ok = await forward_to_brain(
+                trace_id="worker",
+                session_id="standalone",
+                enriched_context=[],
+            )
+
+        assert ok is True
+        assert mock_client.post.call_args.args[0] == (
+            "http://backend:8200/internal/enrich"
+        )
 
     @pytest.mark.asyncio
     async def test_forward_error_does_not_raise(self):

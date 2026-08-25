@@ -86,6 +86,21 @@ def test_jwt_round_trip_contains_the_required_contract(tmp_path: Path):
     assert claims.expires_at > claims.issued_at
 
 
+def test_jwt_round_trip_preserves_root_claim(tmp_path: Path):
+    database = AuthDatabase(tmp_path / "root-accounts.db")
+    database.initialize()
+    root = UserRepository(database).create_root(
+        username="ai360",
+        password_hash="unused",
+    )
+
+    claims = _tokens().decode(_tokens().issue(root))
+
+    assert claims.subject == root.id
+    assert claims.role is AccountRole.ROOT
+    assert claims.token_version == root.token_version
+
+
 def test_jwt_rejects_expiry_wrong_audience_and_malformed_tokens(tmp_path: Path):
     user = _user(tmp_path)
     service = _tokens(lifetime_seconds=60)

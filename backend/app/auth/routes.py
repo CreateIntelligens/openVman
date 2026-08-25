@@ -12,7 +12,7 @@ from math import ceil
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from .dependencies import CurrentAccount, get_current_account, require_admin
+from .dependencies import CurrentAccount, get_current_account, require_admin, require_root
 from .models import (
     AccountDefaultsRecord,
     AccountRole,
@@ -24,6 +24,7 @@ from .models import (
     UserRecord,
 )
 from .passwords import PasswordValidationError, hash_password, verify_password
+from .policy import AccountPolicyError
 from .repositories import (
     AccountEnabledError,
     InvalidResourceGrantError,
@@ -43,10 +44,13 @@ from .runtime import AuthRuntime, get_auth_runtime
 _SESSION_COOKIE_NAME = "openvman_session"
 _INVALID_CREDENTIALS = "Invalid credentials"
 _DUMMY_PASSWORD_HASH = "$2b$12$RHUg9KKg90SMUGjfwS3QxeboW/TeCDDpAZQBOcOOnOfYB64TsIfGO"
-_TEMPORARY_PASSWORD_PATTERN = re.compile(r"\A[A-Za-z0-9]{12}\Z")
+_TEMPORARY_PASSWORD_PATTERN = re.compile(
+    r"\A(?:(?P<locator>[A-Za-z0-9]{12})[A-Za-z0-9]{8}"
+    r"|(?P<legacy_locator>[A-Za-z0-9]{12}))\Z"
+)
 _TEMPORARY_DURATION_SECONDS = 72 * 60 * 60
 _TEMPORARY_PASSWORD_ALPHABET = string.ascii_letters + string.digits
-_TEMPORARY_PASSWORD_LENGTH = 12
+_TEMPORARY_PASSWORD_LENGTH = 20
 _TEMPORARY_LOCATOR_LENGTH = 12
 
 auth_router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -236,6 +240,11 @@ class TemporaryLoginRequest(_StrictModel):
     password: str
 
 
+class ChangeOwnPasswordRequest(_StrictModel):
+    current_password: str
+    new_password: str
+
+
 class LoginResponse(_StrictModel):
     account: AccountProfile
     token: str
@@ -264,6 +273,15 @@ class CreateAccountRequest(_StrictModel):
     password: str
     role: AccountRole = AccountRole.USER
     access: UpdateAccountAccessRequest | None = None
+
+
+class ChangeAccountRoleRequest(_StrictModel):
+    role: AccountRole
+    access: UpdateAccountAccessRequest | None = None
+
+
+class ResetAccountPasswordRequest(_StrictModel):
+    password: str
 
 
 class AccountAccessOption(_StrictModel):
@@ -391,7 +409,9 @@ def temporary_login(
 ) -> LoginResponse:
     match = _TEMPORARY_PASSWORD_PATTERN.fullmatch(body.password)
     located = (
-        runtime.temporary_accounts.get_credential_by_locator(match.group(0))
+        runtime.temporary_accounts.get_credential_by_locator(
+            match.group("locator") or match.group("legacy_locator")
+        )
         if match is not None
         else None
     )
@@ -454,6 +474,32 @@ def me(
         current.user,
         runtime=runtime,
         credential=current.temporary_credential,
+    )
+
+
+@auth_router.post("/password", response_model=LoginResponse)
+def change_own_password(
+    body: ChangeOwnPasswordRequest,
+    response: Response,
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> LoginResponse:
+    if not verify_password(body.current_password, current.user.password_hash):
+        raise HTTPException(status_code=403, detail="Current password is incorrect")
+    try:
+        user = runtime.users.change_own_password(
+            user_id=current.user.id,
+            password_hash=hash_password(body.new_password),
+        )
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    token = runtime.tokens.issue(user)
+    _set_session_cookie(response, token, runtime)
+    return LoginResponse(
+        account=AccountProfile.from_record(user, runtime=runtime),
+        token=token,
     )
 
 
@@ -582,6 +628,8 @@ def create_temporary_batch(
             defaults=_defaults_tuple(body.defaults),
             duration_seconds=_TEMPORARY_DURATION_SECONDS,
         )
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (InvalidResourceGrantError, UserNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -622,11 +670,14 @@ def list_temporary_batches(
 )
 def revoke_temporary_batch(
     batch_id: str,
-    _admin: CurrentAccount = Depends(require_admin),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> TemporaryBatchAudit:
     try:
-        batch = runtime.temporary_accounts.revoke_batch(batch_id)
+        batch = runtime.temporary_accounts.revoke_batch(
+            batch_id,
+            actor_id=admin.user.id,
+        )
     except TemporaryCredentialNotFoundError as exc:
         raise HTTPException(
             status_code=404, detail="Temporary batch not found"
@@ -725,6 +776,8 @@ def update_account_access(
             status_code=404,
             detail="Account not found",
         ) from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except InvalidResourceGrantError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -755,6 +808,8 @@ def create_account(
             grants=_resource_grants(access.grants) if access is not None else None,
             defaults=_defaults_tuple(access.defaults) if access is not None else None,
         )
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (InvalidResourceGrantError, PasswordValidationError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except UsernameConflictError as exc:
@@ -777,6 +832,8 @@ def set_account_disabled(
         )
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (LastAdminError, SelfProtectionError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return AdminAccountProfile.from_record(user, runtime)
@@ -785,13 +842,18 @@ def set_account_disabled(
 @users_router.post("/{user_id}/revoke", response_model=AdminAccountProfile)
 def revoke_account_sessions(
     user_id: str,
-    _admin: CurrentAccount = Depends(require_admin),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> AdminAccountProfile:
     try:
-        user = runtime.users.revoke_sessions(user_id)
+        user = runtime.users.revoke_sessions(
+            user_id,
+            actor_id=admin.user.id,
+        )
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return AdminAccountProfile.from_record(user, runtime)
 
 
@@ -805,6 +867,8 @@ def delete_account(
         runtime.users.delete_guarded(actor_id=admin.user.id, user_id=user_id)
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except OwnedResourcesError as exc:
         raise HTTPException(
             status_code=409,
@@ -816,3 +880,53 @@ def delete_account(
     except (AccountEnabledError, LastAdminError, SelfProtectionError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@users_router.patch("/{user_id}/role", response_model=AdminAccountProfile)
+def change_account_role(
+    user_id: str,
+    body: ChangeAccountRoleRequest,
+    root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AdminAccountProfile:
+    access = body.access
+    try:
+        user = runtime.users.change_role(
+            actor_id=root.user.id,
+            user_id=user_id,
+            role=body.role,
+            grants=_resource_grants(access.grants) if access is not None else None,
+            defaults=_defaults_tuple(access.defaults) if access is not None else None,
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except InvalidResourceGrantError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return AdminAccountProfile.from_record(user, runtime)
+
+
+@users_router.post(
+    "/{user_id}/password-reset",
+    response_model=AdminAccountProfile,
+)
+def reset_account_password(
+    user_id: str,
+    body: ResetAccountPasswordRequest,
+    root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AdminAccountProfile:
+    try:
+        user = runtime.users.reset_password(
+            actor_id=root.user.id,
+            user_id=user_id,
+            password_hash=hash_password(body.password),
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return AdminAccountProfile.from_record(user, runtime)

@@ -8,8 +8,10 @@ nginx and is not part of the SDK's public contract.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth.models import ResourceType, ResourceVisibility
+from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.avatar.store import AvatarStore
 from app.config import get_tts_config
 
@@ -33,5 +35,20 @@ def reset_store() -> None:
 
 
 @router.get("/characters", summary="列出可供 Avatar SDK 使用的角色")
-async def list_public_characters() -> dict:
-    return {"characters": get_store().list_public_characters()}
+async def list_public_characters(
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> dict:
+    public_ids = {
+        resource.resource_id
+        for resource in runtime.resources.list_by_type(
+            ResourceType.AVATAR_CHARACTER
+        )
+        if resource.visibility is ResourceVisibility.SYSTEM_PUBLIC
+    }
+    return {
+        "characters": [
+            character
+            for character in get_store().list_public_characters()
+            if character["char_id"] in public_ids
+        ]
+    }

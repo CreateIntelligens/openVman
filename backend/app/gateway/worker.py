@@ -15,7 +15,11 @@ from app.gateway.job_status import set_job_status
 from app.gateway.plugins.api_tool import ApiToolPlugin
 from app.gateway.plugins.camera_live import CameraLivePlugin
 from app.gateway.plugins.web_crawler import WebCrawlerPlugin
-from app.gateway.queue import push_to_dlq
+from app.gateway.queue import (
+    GATEWAY_QUEUE_NAME,
+    get_arq_redis_settings,
+    push_to_dlq,
+)
 
 logger = logging.getLogger("gateway.worker")
 
@@ -184,5 +188,6 @@ class WorkerSettings:
     """Arq worker settings — used when running arq as a standalone worker."""
 
     functions = [process_media, process_camera, process_api_tool, process_web_crawler]
-    queue_name = "vman:gateway"
+    redis_settings = get_arq_redis_settings()
+    queue_name = GATEWAY_QUEUE_NAME
     max_jobs = 10

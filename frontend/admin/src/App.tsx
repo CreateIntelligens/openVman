@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 
+import { isAtLeastAdmin } from "./api/auth";
 import AppSidebar from "./components/app/AppSidebar";
 import {
   AuthLoadingState,
@@ -66,7 +67,7 @@ function AppContent() {
     buildAdminPath(route.tab, projectId, route.subView),
   );
   const ActiveComponent = pageComponents[route.tab];
-  const isAdmin = account?.role === "admin";
+  const isAdmin = account ? isAtLeastAdmin(account.role) : false;
 
   const applyRoute = useCallback(
     (

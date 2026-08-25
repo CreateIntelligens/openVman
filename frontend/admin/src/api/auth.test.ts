@@ -4,7 +4,11 @@ import {
   createAccount,
   createTemporaryBatch,
   fetchAccountAccessOptions,
+  isAtLeastAdmin,
+  listAccounts,
   login,
+  resetAccountPassword,
+  updateAccountRole,
   updateAccountAccess,
 } from "./auth";
 import {
@@ -34,12 +38,91 @@ describe("cookie auth API", () => {
     const account = await login("alice", "correct horse battery staple");
 
     expect(account.username).toBe("alice");
+    expect(Object.prototype.hasOwnProperty.call(account, "token")).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/auth/login",
       expect.objectContaining({ credentials: "include" }),
     );
     expect(JSON.stringify(window.localStorage)).not.toContain("secret-jwt");
     expect(window.localStorage.length).toBe(0);
+  });
+
+  it("treats ROOT and admin as administrator-level roles", () => {
+    expect(isAtLeastAdmin("root")).toBe(true);
+    expect(isAtLeastAdmin("admin")).toBe(true);
+    expect(isAtLeastAdmin("user")).toBe(false);
+  });
+
+  it("keeps secret fields out of formal account responses", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([{
+        id: "root-1",
+        username: "ai360",
+        role: "root",
+        disabled: false,
+        created_at: "2026-08-24T00:00:00Z",
+        password: "plaintext-must-not-survive",
+        password_hash: "bcrypt-must-not-survive",
+        defaults: {
+          project_id: "project-a",
+          character_id: "character-a",
+          voice_provider: "indextts",
+          voice_id: "voice-a",
+          password_hash: "nested-hash-must-not-survive",
+        },
+      }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    ));
+
+    const accounts = await listAccounts();
+
+    expect(accounts[0].role).toBe("root");
+    expect(
+      Object.prototype.hasOwnProperty.call(accounts[0], "password"),
+    ).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(accounts[0], "password_hash"),
+    ).toBe(false);
+    expect(JSON.stringify(accounts)).not.toContain("must-not-survive");
+  });
+
+  it("uses the ROOT role-change and password-reset endpoints", async () => {
+    const response = {
+      id: "user-a",
+      username: "alice",
+      role: "admin",
+      disabled: false,
+      created_at: "2026-08-24T00:00:00Z",
+    };
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateAccountRole("user-a", { role: "admin" });
+    await resetAccountPassword("user-a", "new-password-123");
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/users/user-a/role",
+      expect.objectContaining({ method: "PATCH", credentials: "include" }),
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      role: "admin",
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/users/user-a/password-reset",
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+      password: "new-password-123",
+    });
   });
 
   it("centralizes expired-session handling", async () => {

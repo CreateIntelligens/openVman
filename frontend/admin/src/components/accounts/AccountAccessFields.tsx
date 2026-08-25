@@ -147,14 +147,20 @@ function accessFromOptions(
 export function useAccountAccessForm(
   cacheKey: string,
   initialAccess?: AccountAccessInput,
+  /** 呼叫端還不需要授權欄位時跳過抓取（例如提升為管理員不會用到）。 */
+  enabled = true,
 ) {
   const [options, setOptions] = useState<AccountAccessOptions | null>(null);
   const [access, setAccess] = useState<AccountAccessInput>(EMPTY_ACCESS);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     let active = true;
     setLoading(true);
     setError(null);
@@ -176,7 +182,7 @@ export function useAccountAccessForm(
     return () => {
       active = false;
     };
-  }, [cacheKey, revision]);
+  }, [cacheKey, revision, enabled]);
 
   const reload = useCallback(() => setRevision((current) => current + 1), []);
 

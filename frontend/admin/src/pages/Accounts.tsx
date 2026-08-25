@@ -7,11 +7,13 @@ import {
   revokeAccountSessions,
   setAccountDisabled,
   type Account,
-  type AccountRole,
+  type AssignableAccountRole,
 } from "../api/auth";
 import AccountAccessFields, {
   useAccountAccessForm,
 } from "../components/accounts/AccountAccessFields";
+import AccountPasswordResetDialog from "../components/accounts/AccountPasswordResetDialog";
+import AccountRoleDialog from "../components/accounts/AccountRoleDialog";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
@@ -37,14 +39,21 @@ function grantedResourceCount(account: Account): number {
 
 export default function Accounts() {
   const { account: currentAccount } = useAuth();
+  const isRoot = currentAccount?.role === "root";
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<AccountRole>("user");
+  const [role, setRole] = useState<AssignableAccountRole>("user");
   const [creationMode, setCreationMode] = useState<"formal" | "temporary">(
     "formal",
   );
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [roleChangeAccount, setRoleChangeAccount] = useState<Account | null>(
+    null,
+  );
+  const [passwordResetAccount, setPasswordResetAccount] = useState<Account | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +111,12 @@ export default function Accounts() {
     } catch (nextError) {
       setError(errorMessage(nextError, fallback));
     }
+  }
+
+  function replaceAccount(updated: Account) {
+    setAccounts((current) => current.map((account) => (
+      account.id === updated.id ? updated : account
+    )));
   }
 
   return (
@@ -193,11 +208,13 @@ export default function Accounts() {
                 <select
                   className="input mt-2"
                   value={role}
-                  onChange={(event) => setRole(event.target.value as AccountRole)}
+                  onChange={(event) => setRole(
+                    event.target.value as AssignableAccountRole,
+                  )}
                   disabled={submitting}
                 >
                   <option value="user">一般使用者</option>
-                  <option value="admin">管理員</option>
+                  {isRoot && <option value="admin">管理員</option>}
                 </select>
               </label>
             </div>
@@ -254,10 +271,17 @@ export default function Accounts() {
             <div className="divide-y divide-border">
               {accounts.map((account) => {
                 const isSelf = account.id === currentAccount?.id;
+                const isFormal = (
+                  account.kind ?? account.account_type ?? "formal"
+                ) === "formal";
+                const canManage = !isSelf && isFormal && (
+                  isRoot
+                    ? account.role !== "root"
+                    : account.role === "user"
+                );
                 const resourceCount = ownedResourceCount(account);
                 const grantCount = grantedResourceCount(account);
-                const canEditAccess = account.role === "user"
-                  && (account.kind ?? account.account_type ?? "formal") === "formal";
+                const canEditAccess = canManage && account.role === "user";
                 const editingAccess = editingAccountId === account.id;
                 return (
                   <article key={account.id} className="px-5 py-4">
@@ -265,7 +289,9 @@ export default function Accounts() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{account.username}</span>
-                          <span className="chip">{account.role}</span>
+                          <span className="chip">
+                            {account.role === "root" ? "ROOT" : account.role}
+                          </span>
                           {canEditAccess && (
                             <span className="chip">
                               {grantCount > 0
@@ -306,46 +332,69 @@ export default function Accounts() {
                             資源權限
                           </button>
                         )}
-                        <button
-                          className="btn btn-ghost"
-                          type="button"
-                          disabled={isSelf}
-                          onClick={() => void runAction(
-                            () => setAccountDisabled(account.id, !account.disabled),
-                            account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
-                          )}
-                        >
-                          {account.disabled ? "啟用" : "停用"}
-                        </button>
-                        <button
-                          className="btn btn-ghost"
-                          type="button"
-                          onClick={() => void runAction(
-                            () => revokeAccountSessions(account.id),
-                            "撤銷登入階段失敗",
-                          )}
-                        >
-                          登出所有裝置
-                        </button>
-                        <button
-                          className="btn btn-danger"
-                          type="button"
-                          disabled={isSelf || !account.disabled || resourceCount > 0}
-                          title={resourceCount > 0
-                            ? "請先移除或轉移帳號擁有的私有資源"
-                            : undefined}
-                          onClick={() => {
-                            if (!window.confirm(
-                              `確定刪除帳號「${account.username}」？`,
-                            )) return;
-                            void runAction(
-                              () => deleteAccount(account.id),
-                              "刪除帳號失敗",
-                            );
-                          }}
-                        >
-                          刪除
-                        </button>
+                        {isRoot && canManage && (
+                          <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => setRoleChangeAccount(account)}
+                          >
+                            變更角色
+                          </button>
+                        )}
+                        {isRoot && canManage && (
+                          <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => setPasswordResetAccount(account)}
+                          >
+                            重設密碼
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => void runAction(
+                              () => setAccountDisabled(account.id, !account.disabled),
+                              account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
+                            )}
+                          >
+                            {account.disabled ? "啟用" : "停用"}
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => void runAction(
+                              () => revokeAccountSessions(account.id),
+                              "撤銷登入階段失敗",
+                            )}
+                          >
+                            登出所有裝置
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            className="btn btn-danger"
+                            type="button"
+                            disabled={!account.disabled || resourceCount > 0}
+                            title={resourceCount > 0
+                              ? "請先移除或轉移帳號擁有的私有資源"
+                              : undefined}
+                            onClick={() => {
+                              if (!window.confirm(
+                                `確定刪除帳號「${account.username}」？`,
+                              )) return;
+                              void runAction(
+                                () => deleteAccount(account.id),
+                                "刪除帳號失敗",
+                              );
+                            }}
+                          >
+                            刪除
+                          </button>
+                        )}
                       </div>
                     </div>
                     {editingAccess && (
@@ -373,6 +422,28 @@ export default function Accounts() {
       )}
 
       {creationMode === "temporary" && <TemporaryBatchPanel />}
+
+      {roleChangeAccount && (
+        <AccountRoleDialog
+          account={roleChangeAccount}
+          onClose={() => setRoleChangeAccount(null)}
+          onSaved={(updated) => {
+            replaceAccount(updated);
+            setRoleChangeAccount(null);
+          }}
+        />
+      )}
+
+      {passwordResetAccount && (
+        <AccountPasswordResetDialog
+          account={passwordResetAccount}
+          onClose={() => setPasswordResetAccount(null)}
+          onSaved={(updated) => {
+            replaceAccount(updated);
+            setPasswordResetAccount(null);
+          }}
+        />
+      )}
     </div>
   );
 }

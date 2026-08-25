@@ -35,6 +35,7 @@ vi.mock("./api/auth", () => ({
   }),
   login: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
+  isAtLeastAdmin: (role: string) => role === "root" || role === "admin",
 }));
 
 vi.mock("./pages/Avatar", () => ({
@@ -175,6 +176,25 @@ describe("App tab mounting", () => {
 
     expect(await screen.findByText("權限不足")).toBeTruthy();
     expect(screen.queryByTestId("tab-accounts")).toBeNull();
+  });
+
+  it("grants ROOT the existing administrator navigation and account route", async () => {
+    window.history.replaceState(null, "", "/admin/accounts");
+    vi.mocked(getCurrentAccount).mockResolvedValue({
+      id: "root-1",
+      username: "ai360",
+      role: "root",
+      disabled: false,
+      created_at: "2026-08-24T00:00:00Z",
+    });
+
+    render(<App />);
+
+    expect(await screen.findByTestId("tab-accounts")).toBeTruthy();
+    expect(
+      screen.getAllByRole("button", { name: /Accounts/ }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("權限不足")).toBeNull();
   });
 
   it("keeps the mascot from covering account administration controls", async () => {

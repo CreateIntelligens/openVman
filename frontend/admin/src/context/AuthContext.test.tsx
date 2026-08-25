@@ -55,6 +55,19 @@ describe("AuthProvider", () => {
     expect(getCurrentAccount).toHaveBeenCalledOnce();
   });
 
+  it("restores a ROOT session without changing its role", async () => {
+    vi.mocked(getCurrentAccount).mockResolvedValue({
+      ...PROFILE,
+      id: "root-1",
+      username: "ai360",
+      role: "root",
+    });
+
+    render(<AuthProvider><Probe /></AuthProvider>);
+
+    expect(await screen.findByText("ai360")).toBeTruthy();
+  });
+
   it("clears the local account and routes to login on logout", async () => {
     render(<AuthProvider><Probe /></AuthProvider>);
     await screen.findByText("alice");

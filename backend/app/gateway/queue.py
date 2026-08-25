@@ -13,6 +13,7 @@ from app.config import get_tts_config
 from app.gateway.redis_pool import get_redis
 
 logger = logging.getLogger("gateway.queue")
+GATEWAY_QUEUE_NAME = "vman:gateway"
 
 try:
     from arq import create_pool
@@ -23,6 +24,13 @@ except ImportError:  # pragma: no cover
     _HAS_ARQ = False
 
 _arq_pool: ArqRedis | None = None  # type: ignore[name-defined]
+
+
+def get_arq_redis_settings() -> RedisSettings:  # type: ignore[name-defined]
+    """Return the Redis settings shared by ARQ producers and workers."""
+    if not _HAS_ARQ:
+        raise RuntimeError("arq is not installed")
+    return RedisSettings.from_dsn(get_tts_config().redis_url)
 
 
 @dataclass(frozen=True)
@@ -42,9 +50,11 @@ async def _get_arq_pool() -> ArqRedis | None:  # type: ignore[name-defined]
     if redis is None:
         return None
 
-    cfg = get_tts_config()
     try:
-        _arq_pool = await create_pool(RedisSettings.from_dsn(cfg.redis_url))
+        _arq_pool = await create_pool(
+            get_arq_redis_settings(),
+            default_queue_name=GATEWAY_QUEUE_NAME,
+        )
         return _arq_pool
     except Exception as exc:
         logger.warning("arq pool creation failed: %s", exc)

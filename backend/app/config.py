@@ -183,6 +183,10 @@ class TTSRouterConfig(BaseSettings):
 
     # --- Internal ---
     brain_url: str = "http://api:8100"
+    gateway_forward_url: str = Field(
+        default="",
+        validation_alias="GATEWAY_FORWARD_URL",
+    )
     gateway_internal_token: str = ""
 
     # --- Authentication ---

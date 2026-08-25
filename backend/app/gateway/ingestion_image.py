@@ -54,7 +54,7 @@ async def _describe_with_vision(file_path: str, trace_id: str, cfg: Any = None) 
                 ],
             }
         ],
-        max_tokens=1024,
+        max_tokens=256,
     )
     return response.choices[0].message.content or ""
 

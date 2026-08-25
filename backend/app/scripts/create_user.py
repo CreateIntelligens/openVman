@@ -1,4 +1,4 @@
-"""Create exactly the first administrator in the account database."""
+"""Create exactly the protected ai360 ROOT account."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sys
 
 import bcrypt
 
-from app.auth.models import AccountRole, UserRecord
+from app.auth.models import UserRecord
 from app.auth.passwords import hash_password
 from app.auth.repositories import AdminAlreadyExistsError
 from app.auth.runtime import AuthRuntime, get_auth_runtime
@@ -26,7 +26,7 @@ def bootstrap_admin(
         if username == password == "ai360"
         else hash_password(password)
     )
-    return runtime.users.create_first_admin(
+    return runtime.users.create_root(
         username=username,
         password_hash=password_hash,
     )
@@ -45,14 +45,13 @@ def _read_password(environment_name: str) -> str:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create the first openVman administrator",
+        description="Create the protected openVman ai360 ROOT",
     )
-    parser.add_argument("--username", required=True)
-    parser.add_argument("--role", choices=[AccountRole.ADMIN.value], default="admin")
+    parser.add_argument("--username", choices=["ai360"], default="ai360")
     parser.add_argument(
         "--password-env",
         default="BOOTSTRAP_ADMIN_PASSWORD",
-        help="environment variable containing the initial password",
+        help="environment variable containing the initial ROOT password",
     )
     return parser
 
@@ -69,7 +68,7 @@ def main() -> int:
         print(f"bootstrap failed: {exc}", file=sys.stderr)
         return 1
 
-    print(f"created administrator {user.username} ({user.id})")
+    print(f"created ROOT {user.username} ({user.id})")
     return 0
 
 

@@ -28,7 +28,10 @@ async def forward_to_brain(
     Fire-and-forget: only logs errors, never raises.
     """
     cfg = get_tts_config()
-    url = f"http://127.0.0.1:{cfg.backend_port}/internal/enrich"
+    forward_base_url = cfg.gateway_forward_url.rstrip("/") or (
+        f"http://127.0.0.1:{cfg.backend_port}"
+    )
+    url = f"{forward_base_url}/internal/enrich"
 
     payload = {
         "trace_id": trace_id,

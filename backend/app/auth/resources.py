@@ -5,11 +5,11 @@ from __future__ import annotations
 from enum import StrEnum
 
 from .models import (
-    AccountRole,
     AccountType,
     ResourceRecord,
     ResourceType,
     UserRecord,
+    is_at_least_admin,
 )
 from .repositories import ResourceRepository
 
@@ -43,7 +43,7 @@ def resolve_resource(
 
     if (
         account.account_type is AccountType.FORMAL
-        and account.role is AccountRole.ADMIN
+        and is_at_least_admin(account.role)
     ):
         return record
     if record.owner_user_id == account.id:
@@ -64,7 +64,7 @@ def list_accessible_resources(
     """List resources visible to an account using the same resolver rules."""
     if (
         account.account_type is AccountType.FORMAL
-        and account.role is AccountRole.ADMIN
+        and is_at_least_admin(account.role)
     ):
         return resources.list_by_type(resource_type)
     return resources.list_accessible(

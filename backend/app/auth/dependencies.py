@@ -10,7 +10,13 @@ from urllib.parse import urlsplit
 from fastapi import Depends, HTTPException, Request, WebSocket, status
 from starlette.requests import HTTPConnection
 
-from .models import AccountRole, AccountType, TemporaryCredentialRecord, UserRecord
+from .models import (
+    AccountRole,
+    AccountType,
+    TemporaryCredentialRecord,
+    UserRecord,
+    is_at_least_admin,
+)
 from .runtime import AuthRuntime, get_auth_runtime
 from .tokens import InvalidSessionTokenError
 
@@ -161,6 +167,14 @@ def get_current_account(
 def require_admin(
     current: CurrentAccount = Depends(get_current_account),
 ) -> CurrentAccount:
-    if current.user.role is not AccountRole.ADMIN:
+    if not is_at_least_admin(current.user.role):
         raise HTTPException(status_code=403, detail="Administrator access required")
+    return current
+
+
+def require_root(
+    current: CurrentAccount = Depends(get_current_account),
+) -> CurrentAccount:
+    if current.user.role is not AccountRole.ROOT:
+        raise HTTPException(status_code=403, detail="ROOT access required")
     return current

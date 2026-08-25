@@ -6,7 +6,8 @@ import {
   parseJson,
 } from "./common";
 
-export type AccountRole = "admin" | "user";
+export type AccountRole = "root" | "admin" | "user";
+export type AssignableAccountRole = Exclude<AccountRole, "root">;
 export type AccountKind = "formal" | "temporary";
 
 export interface AccountDefaults {
@@ -42,6 +43,61 @@ export interface Account extends AccountProfile {
 interface WrappedAccount {
   account?: AccountProfile;
   user?: AccountProfile;
+}
+
+export function isAtLeastAdmin(role: AccountRole): boolean {
+  return role === "root" || role === "admin";
+}
+
+function safeAccountProfile(account: AccountProfile): AccountProfile {
+  const defaults = account.defaults
+    ? {
+      project_id: account.defaults.project_id,
+      character_id: account.defaults.character_id,
+      voice_provider: account.defaults.voice_provider,
+      voice_id: account.defaults.voice_id,
+      mascot_id: account.defaults.mascot_id,
+      background_id: account.defaults.background_id,
+    }
+    : account.defaults;
+  return {
+    id: account.id,
+    username: account.username,
+    role: account.role,
+    kind: account.kind,
+    account_type: account.account_type,
+    disabled: account.disabled,
+    created_at: account.created_at,
+    expires_at: account.expires_at,
+    remaining_seconds: account.remaining_seconds,
+    defaults,
+  };
+}
+
+function safeAccount(account: Account): Account {
+  const grants = account.grants
+    ? {
+      projects: [...account.grants.projects],
+      avatar_characters: [...account.grants.avatar_characters],
+      custom_voices: [...account.grants.custom_voices],
+      avatar_mascots: account.grants.avatar_mascots
+        ? [...account.grants.avatar_mascots]
+        : undefined,
+      avatar_backgrounds: account.grants.avatar_backgrounds
+        ? [...account.grants.avatar_backgrounds]
+        : undefined,
+    }
+    : account.grants;
+  return {
+    ...safeAccountProfile(account),
+    created_by: account.created_by,
+    updated_at: account.updated_at,
+    token_version: account.token_version,
+    resource_counts: account.resource_counts
+      ? { ...account.resource_counts }
+      : account.resource_counts,
+    grants,
+  };
 }
 
 export interface LoginResponse extends WrappedAccount, Partial<AccountProfile> {
@@ -124,7 +180,7 @@ function accountFromResponse(payload: LoginResponse): AccountProfile {
   if (!account.id || !account.username || !account.role) {
     throw new Error("登入回應缺少帳號資料");
   }
-  return account as AccountProfile;
+  return safeAccountProfile(account as AccountProfile);
 }
 
 export async function login(
@@ -153,21 +209,24 @@ export async function listAccounts(): Promise<Account[]> {
   const payload = await fetchJson<Account[] | AccountListResponse>(
     apiUrl("/users"),
   );
-  if (Array.isArray(payload)) return payload;
-  return payload.accounts ?? payload.users ?? [];
+  const accounts = Array.isArray(payload)
+    ? payload
+    : payload.accounts ?? payload.users ?? [];
+  return accounts.map(safeAccount);
 }
 
 export async function createAccount(input: {
   username: string;
   password: string;
-  role: AccountRole;
+  role: AssignableAccountRole;
   access?: AccountAccessInput;
 }): Promise<Account> {
-  return fetchJson<Account>(apiUrl("/users"), {
+  const account = await fetchJson<Account>(apiUrl("/users"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+  return safeAccount(account);
 }
 
 export async function fetchAccountAccessOptions(): Promise<AccountAccessOptions> {
@@ -178,18 +237,22 @@ export async function updateAccountAccess(
   userId: string,
   input: AccountAccessInput,
 ): Promise<Account> {
-  return fetchJson<Account>(apiUrl(`${itemPath("/users", userId)}/access`), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+  const account = await fetchJson<Account>(
+    apiUrl(`${itemPath("/users", userId)}/access`),
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  return safeAccount(account);
 }
 
 export async function setAccountDisabled(
   userId: string,
   disabled: boolean,
 ): Promise<Account> {
-  return fetchJson<Account>(
+  const account = await fetchJson<Account>(
     apiUrl(`${itemPath("/users", userId)}/disabled`),
     {
       method: "PATCH",
@@ -197,6 +260,37 @@ export async function setAccountDisabled(
       body: JSON.stringify({ disabled }),
     },
   );
+  return safeAccount(account);
+}
+
+export async function updateAccountRole(
+  userId: string,
+  input: { role: AssignableAccountRole; access?: AccountAccessInput },
+): Promise<Account> {
+  const account = await fetchJson<Account>(
+    apiUrl(`${itemPath("/users", userId)}/role`),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+  return safeAccount(account);
+}
+
+export async function resetAccountPassword(
+  userId: string,
+  password: string,
+): Promise<Account> {
+  const account = await fetchJson<Account>(
+    apiUrl(`${itemPath("/users", userId)}/password-reset`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    },
+  );
+  return safeAccount(account);
 }
 
 export async function revokeAccountSessions(userId: string): Promise<void> {

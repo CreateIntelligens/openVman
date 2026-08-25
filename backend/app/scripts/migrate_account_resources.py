@@ -12,12 +12,12 @@ from typing import Any
 
 from app.auth.database import AuthDatabase
 from app.auth.models import (
-    AccountRole,
     AccountType,
     ResourceRecord,
     ResourceType,
     ResourceVisibility,
     UserRecord,
+    is_at_least_admin,
 )
 from app.auth.repositories import (
     ResourceConflictError,
@@ -430,7 +430,7 @@ def _select_bootstrap_admin(users: UserRepository) -> tuple[UserRecord, list[str
     candidates = [
         user
         for user in users.list()
-        if user.role is AccountRole.ADMIN
+        if is_at_least_admin(user.role)
         and user.account_type is AccountType.FORMAL
         and not user.disabled
         and user.created_by is None
@@ -548,7 +548,7 @@ def _formal_account_can_read(
     resource: ResourceRecord | ExpectedResource,
 ) -> bool:
     return (
-        user.role is AccountRole.ADMIN
+        is_at_least_admin(user.role)
         or resource.owner_user_id == user.id
         or resource.visibility is ResourceVisibility.SYSTEM_PUBLIC
     )

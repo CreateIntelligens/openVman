@@ -7,8 +7,25 @@ from enum import StrEnum
 
 
 class AccountRole(StrEnum):
+    ROOT = "root"
     ADMIN = "admin"
     USER = "user"
+
+
+_ACCOUNT_ROLE_RANK = {
+    AccountRole.USER: 0,
+    AccountRole.ADMIN: 1,
+    AccountRole.ROOT: 2,
+}
+
+
+def role_at_least(role: AccountRole, minimum: AccountRole) -> bool:
+    """Return whether a role satisfies a centralized hierarchy threshold."""
+    return _ACCOUNT_ROLE_RANK[role] >= _ACCOUNT_ROLE_RANK[minimum]
+
+
+def is_at_least_admin(role: AccountRole) -> bool:
+    return role_at_least(role, AccountRole.ADMIN)
 
 
 class AccountType(StrEnum):
@@ -90,3 +107,13 @@ class TemporaryBatchRecord:
     created_by: str | None
     created_at: str
     revoked_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class AuthAuditEventRecord:
+    id: str
+    action: str
+    actor_user_id: str | None
+    target_user_id: str | None
+    created_at: str
+    metadata_json: str

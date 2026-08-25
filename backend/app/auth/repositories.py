@@ -15,6 +15,7 @@ from .models import (
     AccountDefaultsRecord,
     AccountRole,
     AccountType,
+    AuthAuditEventRecord,
     ResourceGrantRecord,
     ResourceRecord,
     ResourceType,
@@ -22,6 +23,15 @@ from .models import (
     TemporaryBatchRecord,
     TemporaryCredentialRecord,
     UserRecord,
+    is_at_least_admin,
+)
+from .policy import (
+    AccountPolicyError,
+    ensure_account_manager,
+    ensure_can_change_role,
+    ensure_can_create_role,
+    ensure_can_manage_account,
+    ensure_can_reset_password,
 )
 
 
@@ -135,6 +145,31 @@ def _user_from_row(row: sqlite3.Row) -> UserRecord:
     )
 
 
+def _load_actor_and_target(
+    connection: sqlite3.Connection,
+    actor_id: str,
+    user_id: str,
+) -> tuple[UserRecord, UserRecord]:
+    """Fetch the acting and target accounts for a guarded mutation.
+
+    Every policy-gated repository method needs exactly this pair, so keeping
+    the fetch here means a new method cannot accidentally skip one of them.
+    """
+    actor = connection.execute(
+        "SELECT * FROM users WHERE id = ?",
+        (actor_id,),
+    ).fetchone()
+    if actor is None:
+        raise UserNotFoundError("actor account does not exist")
+    target = connection.execute(
+        "SELECT * FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if target is None:
+        raise UserNotFoundError("account does not exist")
+    return _user_from_row(actor), _user_from_row(target)
+
+
 def _temporary_credential_from_row(
     row: sqlite3.Row,
 ) -> TemporaryCredentialRecord:
@@ -179,6 +214,53 @@ def _resource_from_row(row: sqlite3.Row) -> ResourceRecord:
         visibility=ResourceVisibility(row["visibility"]),
         created_at=row["created_at"],
         metadata_json=row["metadata_json"],
+    )
+
+
+def _audit_from_row(row: sqlite3.Row) -> AuthAuditEventRecord:
+    return AuthAuditEventRecord(
+        id=row["id"],
+        action=row["action"],
+        actor_user_id=row["actor_user_id"],
+        target_user_id=row["target_user_id"],
+        created_at=row["created_at"],
+        metadata_json=row["metadata_json"],
+    )
+
+
+_AUDIT_SECRET_KEYS = frozenset(
+    {"credential", "hash", "jwt", "password", "secret", "token"}
+)
+
+
+def _append_auth_audit(
+    connection: sqlite3.Connection,
+    *,
+    action: str,
+    actor_user_id: str | None,
+    target_user_id: str | None,
+    metadata: dict[str, object] | None = None,
+    now: str | None = None,
+) -> None:
+    safe_metadata = metadata or {}
+    for key in safe_metadata:
+        normalized = key.casefold()
+        if any(secret in normalized for secret in _AUDIT_SECRET_KEYS):
+            raise ValueError("audit metadata must not contain secrets")
+    connection.execute(
+        """
+        INSERT INTO auth_audit_events(
+            id, action, actor_user_id, target_user_id, created_at, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            f"audit_{uuid4().hex}",
+            action,
+            actor_user_id,
+            target_user_id,
+            now or _now_iso(),
+            json.dumps(safe_metadata, separators=(",", ":"), sort_keys=True),
+        ),
     )
 
 
@@ -354,6 +436,8 @@ class UserRepository:
         grants: Iterable[tuple[ResourceType, str]] | None = None,
         defaults: tuple[str, str, str, str] | None = None,
     ) -> UserRecord:
+        if role is AccountRole.ROOT:
+            raise AccountPolicyError("ROOT accounts cannot be created")
         if (grants is None) != (defaults is None):
             raise InvalidResourceGrantError(
                 "account grants and defaults must be provided together"
@@ -363,7 +447,7 @@ class UserRepository:
             if grants is not None and defaults is not None
             else None
         )
-        if normalized_access is not None and role is AccountRole.ADMIN:
+        if normalized_access is not None and is_at_least_admin(role):
             raise InvalidResourceGrantError(
                 "administrator accounts already have unrestricted access"
             )
@@ -377,11 +461,12 @@ class UserRepository:
             with self.database.transaction(write=True) as connection:
                 if created_by is not None:
                     creator = connection.execute(
-                        "SELECT 1 FROM users WHERE id = ?",
+                        "SELECT * FROM users WHERE id = ?",
                         (created_by,),
                     ).fetchone()
                     if creator is None:
                         raise UserNotFoundError("creator account does not exist")
+                    ensure_can_create_role(_user_from_row(creator), role)
                 connection.execute(
                     """
                     INSERT INTO users(
@@ -413,6 +498,18 @@ class UserRepository:
                         now=now,
                         clear_existing=False,
                     )
+                if created_by is not None:
+                    _append_auth_audit(
+                        connection,
+                        action="account_created",
+                        actor_user_id=created_by,
+                        target_user_id=user_id,
+                        metadata={
+                            "account_type": account_type.value,
+                            "role": role.value,
+                        },
+                        now=now,
+                    )
         except sqlite3.IntegrityError as exc:
             if "username_normalized" in str(exc):
                 raise UsernameConflictError("username already exists") from exc
@@ -423,7 +520,7 @@ class UserRepository:
             raise RepositoryError("created account could not be reloaded")
         return user
 
-    def create_first_admin(
+    def create_root(
         self,
         *,
         username: str,
@@ -432,22 +529,29 @@ class UserRepository:
         user_id = f"usr_{uuid4().hex}"
         display_username = _display_username(username)
         normalized_username = normalize_username(username)
+        if normalized_username != "ai360":
+            raise ValueError("ROOT username must be ai360")
         now = _now_iso()
 
         try:
             with self.database.transaction(write=True) as connection:
                 existing = connection.execute(
-                    "SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"
+                    "SELECT id, username_normalized FROM users WHERE role = 'root' LIMIT 1"
                 ).fetchone()
                 if existing is not None:
-                    raise AdminAlreadyExistsError("an administrator already exists")
+                    raise AdminAlreadyExistsError("ROOT already exists")
+                conflicting = connection.execute(
+                    "SELECT 1 FROM users WHERE username_normalized = 'ai360'"
+                ).fetchone()
+                if conflicting is not None:
+                    raise UsernameConflictError("ai360 already exists")
                 connection.execute(
                     """
                     INSERT INTO users(
                         id, username, username_normalized, password_hash, role,
                         account_type, disabled, token_version, created_at,
                         updated_at, created_by
-                    ) VALUES (?, ?, ?, ?, 'admin', 'formal', 0, 0, ?, ?, NULL)
+                    ) VALUES (?, ?, ?, ?, 'root', 'formal', 0, 0, ?, ?, NULL)
                     """,
                     (
                         user_id,
@@ -465,7 +569,7 @@ class UserRepository:
 
         user = self.get_by_id(user_id)
         if user is None:
-            raise RepositoryError("created administrator could not be reloaded")
+            raise RepositoryError("created ROOT could not be reloaded")
         return user
 
     def get_by_id(self, user_id: str) -> UserRecord | None:
@@ -506,24 +610,9 @@ class UserRepository:
     def has_admin(self) -> bool:
         with self.database.transaction() as connection:
             row = connection.execute(
-                "SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"
+                "SELECT 1 FROM users WHERE role IN ('root', 'admin') LIMIT 1"
             ).fetchone()
         return row is not None
-
-    def set_disabled(self, user_id: str, disabled: bool) -> UserRecord:
-        with self.database.transaction(write=True) as connection:
-            updated = connection.execute(
-                """
-                UPDATE users SET disabled = ?, updated_at = ? WHERE id = ?
-                """,
-                (int(disabled), _now_iso(), user_id),
-            ).rowcount
-            if updated == 0:
-                raise UserNotFoundError("account does not exist")
-        user = self.get_by_id(user_id)
-        if user is None:
-            raise RepositoryError("updated account could not be reloaded")
-        return user
 
     def set_disabled_guarded(
         self,
@@ -533,50 +622,73 @@ class UserRepository:
         disabled: bool,
     ) -> UserRecord:
         with self.database.transaction(write=True) as connection:
-            row = connection.execute(
-                "SELECT * FROM users WHERE id = ?",
-                (user_id,),
-            ).fetchone()
-            if row is None:
-                raise UserNotFoundError("account does not exist")
+            actor, target = _load_actor_and_target(connection, actor_id, user_id)
+            ensure_can_manage_account(actor, target)
             if disabled and actor_id == user_id:
                 raise SelfProtectionError("administrator cannot disable itself")
             if (
                 disabled
-                and row["role"] == AccountRole.ADMIN.value
-                and not bool(row["disabled"])
+                and is_at_least_admin(target.role)
+                and not target.disabled
             ):
                 enabled_admins = connection.execute(
                     """
                     SELECT COUNT(*) FROM users
-                    WHERE role = 'admin' AND disabled = 0
+                    WHERE role IN ('root', 'admin') AND disabled = 0
                     """
                 ).fetchone()[0]
                 if enabled_admins <= 1:
                     raise LastAdminError(
                         "cannot disable the final enabled administrator"
                     )
-            connection.execute(
-                "UPDATE users SET disabled = ?, updated_at = ? WHERE id = ?",
-                (int(disabled), _now_iso(), user_id),
-            )
+            if target.disabled != disabled:
+                now = _now_iso()
+                connection.execute(
+                    """
+                    UPDATE users
+                    SET disabled = ?, token_version = token_version + 1,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (int(disabled), now, user_id),
+                )
+                _append_auth_audit(
+                    connection,
+                    action="account_enabled" if not disabled else "account_disabled",
+                    actor_user_id=actor_id,
+                    target_user_id=user_id,
+                    now=now,
+                )
         user = self.get_by_id(user_id)
         if user is None:
             raise RepositoryError("updated account could not be reloaded")
         return user
 
-    def revoke_sessions(self, user_id: str) -> UserRecord:
+    def revoke_sessions(
+        self,
+        user_id: str,
+        *,
+        actor_id: str,
+    ) -> UserRecord:
         with self.database.transaction(write=True) as connection:
-            updated = connection.execute(
+            actor, target = _load_actor_and_target(connection, actor_id, user_id)
+            ensure_can_manage_account(actor, target)
+            now = _now_iso()
+            connection.execute(
                 """
                 UPDATE users
                 SET token_version = token_version + 1, updated_at = ?
                 WHERE id = ?
                 """,
-                (_now_iso(), user_id),
-            ).rowcount
-            if updated == 0:
-                raise UserNotFoundError("account does not exist")
+                (now, user_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="account_sessions_revoked",
+                actor_user_id=actor_id,
+                target_user_id=user_id,
+                now=now,
+            )
         user = self.get_by_id(user_id)
         if user is None:
             raise RepositoryError("updated account could not be reloaded")
@@ -584,15 +696,11 @@ class UserRepository:
 
     def delete_guarded(self, *, actor_id: str, user_id: str) -> None:
         with self.database.transaction(write=True) as connection:
-            row = connection.execute(
-                "SELECT * FROM users WHERE id = ?",
-                (user_id,),
-            ).fetchone()
-            if row is None:
-                raise UserNotFoundError("account does not exist")
+            actor, target = _load_actor_and_target(connection, actor_id, user_id)
+            ensure_can_manage_account(actor, target)
             if actor_id == user_id:
                 raise SelfProtectionError("administrator cannot delete itself")
-            if not bool(row["disabled"]):
+            if not target.disabled:
                 raise AccountEnabledError("account must be disabled before deletion")
 
             count_rows = connection.execute(
@@ -612,7 +720,220 @@ class UserRepository:
             if counts:
                 raise OwnedResourcesError(counts)
 
+            now = _now_iso()
             connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            _append_auth_audit(
+                connection,
+                action="account_deleted",
+                actor_user_id=actor_id,
+                target_user_id=user_id,
+                metadata={"role": target.role.value},
+                now=now,
+            )
+
+    def change_role(
+        self,
+        *,
+        actor_id: str,
+        user_id: str,
+        role: AccountRole,
+        grants: Iterable[tuple[ResourceType, str]] | None = None,
+        defaults: tuple[str, ...] | None = None,
+    ) -> UserRecord:
+        if (grants is None) != (defaults is None):
+            raise InvalidResourceGrantError(
+                "account grants and defaults must be provided together"
+            )
+        normalized_access = (
+            _normalize_account_access(tuple(grants), defaults)
+            if grants is not None and defaults is not None
+            else None
+        )
+        with self.database.transaction(write=True) as connection:
+            actor, target = _load_actor_and_target(connection, actor_id, user_id)
+            ensure_can_change_role(actor, target, role)
+
+            if target.role is role:
+                return target
+            if role is AccountRole.USER and normalized_access is None:
+                raise InvalidResourceGrantError(
+                    "demoting an administrator requires grants and defaults"
+                )
+            if role is AccountRole.ADMIN and normalized_access is not None:
+                raise InvalidResourceGrantError(
+                    "administrator accounts already have unrestricted access"
+                )
+
+            now = _now_iso()
+            if role is AccountRole.USER:
+                normalized_grants, normalized_defaults = normalized_access
+                _persist_account_access(
+                    connection,
+                    user_id=user_id,
+                    granted_by=actor_id,
+                    normalized_grants=normalized_grants,
+                    normalized_defaults=normalized_defaults,
+                    now=now,
+                    clear_existing=True,
+                )
+            else:
+                connection.execute(
+                    "DELETE FROM resource_grants WHERE grantee_user_id = ?",
+                    (user_id,),
+                )
+                connection.execute(
+                    "DELETE FROM account_defaults WHERE user_id = ?",
+                    (user_id,),
+                )
+            connection.execute(
+                """
+                UPDATE users
+                SET role = ?, token_version = token_version + 1, updated_at = ?
+                WHERE id = ?
+                """,
+                (role.value, now, user_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="account_role_changed",
+                actor_user_id=actor_id,
+                target_user_id=user_id,
+                metadata={"from_role": target.role.value, "to_role": role.value},
+                now=now,
+            )
+
+        updated = self.get_by_id(user_id)
+        if updated is None:
+            raise RepositoryError("updated account could not be reloaded")
+        return updated
+
+    def reset_password(
+        self,
+        *,
+        actor_id: str,
+        user_id: str,
+        password_hash: str,
+    ) -> UserRecord:
+        with self.database.transaction(write=True) as connection:
+            actor, target = _load_actor_and_target(connection, actor_id, user_id)
+            ensure_can_reset_password(actor, target)
+
+            now = _now_iso()
+            connection.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, token_version = token_version + 1,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (password_hash, now, user_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="account_password_reset",
+                actor_user_id=actor_id,
+                target_user_id=user_id,
+                now=now,
+            )
+
+        updated = self.get_by_id(user_id)
+        if updated is None:
+            raise RepositoryError("updated account could not be reloaded")
+        return updated
+
+    def recover_root_password(self, *, password_hash: str) -> UserRecord:
+        """Replace the sole ROOT password for a container-local operator."""
+        with self.database.transaction(write=True) as connection:
+            roots = connection.execute(
+                "SELECT * FROM users WHERE role = 'root'"
+            ).fetchall()
+            if len(roots) != 1:
+                raise RepositoryError("exactly one ROOT account is required")
+            root = _user_from_row(roots[0])
+            if (
+                root.username_normalized != "ai360"
+                or root.account_type is not AccountType.FORMAL
+            ):
+                raise RepositoryError("ROOT identity is invalid")
+            now = _now_iso()
+            connection.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, token_version = token_version + 1,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (password_hash, now, root.id),
+            )
+            _append_auth_audit(
+                connection,
+                action="root_password_recovered",
+                actor_user_id=None,
+                target_user_id=root.id,
+                now=now,
+            )
+
+        updated = self.get_by_id(root.id)
+        if updated is None:
+            raise RepositoryError("recovered ROOT could not be reloaded")
+        return updated
+
+    def change_own_password(
+        self,
+        *,
+        user_id: str,
+        password_hash: str,
+    ) -> UserRecord:
+        with self.database.transaction(write=True) as connection:
+            user = connection.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+            if user is None:
+                raise UserNotFoundError("account does not exist")
+            if user["account_type"] != AccountType.FORMAL.value:
+                raise AccountPolicyError(
+                    "temporary account passwords cannot be changed"
+                )
+            now = _now_iso()
+            connection.execute(
+                """
+                UPDATE users
+                SET password_hash = ?, token_version = token_version + 1,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (password_hash, now, user_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="own_password_changed",
+                actor_user_id=user_id,
+                target_user_id=user_id,
+                now=now,
+            )
+
+        updated = self.get_by_id(user_id)
+        if updated is None:
+            raise RepositoryError("updated account could not be reloaded")
+        return updated
+
+
+class AuthAuditRepository:
+    """Read append-only authentication audit events for tests and operators."""
+
+    def __init__(self, database: AuthDatabase) -> None:
+        self.database = database
+
+    def list(self) -> tuple[AuthAuditEventRecord, ...]:
+        with self.database.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM auth_audit_events
+                ORDER BY created_at, id
+                """
+            ).fetchall()
+        return tuple(_audit_from_row(row) for row in rows)
 
 
 class ResourceRepository:
@@ -822,7 +1143,7 @@ class ResourceRepository:
 
 
 class AccountAccessRepository:
-    """Manage explicit read grants and defaults for any non-admin account."""
+    """Manage explicit read grants and defaults for any scoped account."""
 
     def __init__(self, database: AuthDatabase) -> None:
         self.database = database
@@ -842,32 +1163,24 @@ class AccountAccessRepository:
         now = _now_iso()
         with self.database.transaction(write=True) as connection:
             actor = connection.execute(
-                """
-                SELECT role, disabled, account_type FROM users WHERE id = ?
-                """,
+                "SELECT * FROM users WHERE id = ?",
                 (granted_by,),
             ).fetchone()
-            if (
-                actor is None
-                or actor["role"] != AccountRole.ADMIN.value
-                or bool(actor["disabled"])
-                or actor["account_type"] != AccountType.FORMAL.value
-            ):
-                raise UserNotFoundError(
-                    "enabled formal administrator required"
-                )
+            if actor is None:
+                raise UserNotFoundError("administrator account does not exist")
 
             target = connection.execute(
-                "SELECT role, account_type FROM users WHERE id = ?",
+                "SELECT * FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
             if target is None:
                 raise UserNotFoundError("account does not exist")
+            ensure_can_manage_account(_user_from_row(actor), _user_from_row(target))
             if target["account_type"] != AccountType.FORMAL.value:
                 raise InvalidResourceGrantError(
                     "temporary account grants are managed by their batch"
                 )
-            if target["role"] == AccountRole.ADMIN.value:
+            if is_at_least_admin(AccountRole(target["role"])):
                 raise InvalidResourceGrantError(
                     "administrator accounts already have unrestricted access"
                 )
@@ -880,6 +1193,13 @@ class AccountAccessRepository:
                 normalized_defaults=normalized_defaults,
                 now=now,
                 clear_existing=True,
+            )
+            _append_auth_audit(
+                connection,
+                action="account_access_updated",
+                actor_user_id=granted_by,
+                target_user_id=user_id,
+                now=now,
             )
 
         updated_defaults = self.get_defaults(user_id)
@@ -954,20 +1274,12 @@ class TemporaryAccountRepository:
         try:
             with self.database.transaction(write=True) as connection:
                 creator = connection.execute(
-                    """
-                    SELECT role, disabled, account_type FROM users WHERE id = ?
-                    """,
+                    "SELECT * FROM users WHERE id = ?",
                     (created_by,),
                 ).fetchone()
-                if (
-                    creator is None
-                    or creator["role"] != AccountRole.ADMIN.value
-                    or bool(creator["disabled"])
-                    or creator["account_type"] != AccountType.FORMAL.value
-                ):
-                    raise UserNotFoundError(
-                        "enabled formal administrator required"
-                    )
+                if creator is None:
+                    raise UserNotFoundError("administrator account does not exist")
+                ensure_account_manager(_user_from_row(creator))
 
                 for resource_type, resource_id in normalized_grants:
                     resource = connection.execute(
@@ -992,7 +1304,9 @@ class TemporaryAccountRepository:
                 )
                 for credential in credentials:
                     user_id = f"usr_{uuid4().hex}"
-                    username = credential.locator
+                    # Login lookup uses a hidden password prefix; the account name
+                    # must remain unrelated so later audit responses cannot reveal it.
+                    username = f"tmp-{uuid4().hex}"
                     connection.execute(
                         """
                         INSERT INTO users(
@@ -1034,6 +1348,14 @@ class TemporaryAccountRepository:
                         now=now,
                         clear_existing=False,
                     )
+                _append_auth_audit(
+                    connection,
+                    action="temporary_batch_created",
+                    actor_user_id=created_by,
+                    target_user_id=None,
+                    metadata={"account_count": len(credentials), "batch_id": batch_id},
+                    now=now,
+                )
         except sqlite3.IntegrityError as exc:
             raise RepositoryError("temporary batch could not be created") from exc
 
@@ -1215,9 +1537,21 @@ class TemporaryAccountRepository:
         batches = [self.get_batch(row["id"]) for row in rows]
         return [batch for batch in batches if batch is not None]
 
-    def revoke_batch(self, batch_id: str) -> TemporaryBatch:
+    def revoke_batch(
+        self,
+        batch_id: str,
+        *,
+        actor_id: str,
+    ) -> TemporaryBatch:
         now = _now_iso()
         with self.database.transaction(write=True) as connection:
+            actor = connection.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (actor_id,),
+            ).fetchone()
+            if actor is None:
+                raise UserNotFoundError("administrator account does not exist")
+            ensure_account_manager(_user_from_row(actor))
             exists = connection.execute(
                 "SELECT 1 FROM temporary_account_batches WHERE id = ?",
                 (batch_id,),
@@ -1231,6 +1565,14 @@ class TemporaryAccountRepository:
                 WHERE id = ?
                 """,
                 (now, batch_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="temporary_batch_revoked",
+                actor_user_id=actor_id,
+                target_user_id=None,
+                metadata={"batch_id": batch_id},
+                now=now,
             )
             connection.execute(
                 """

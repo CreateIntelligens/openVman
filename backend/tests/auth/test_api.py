@@ -451,7 +451,7 @@ def test_account_deletion_resource_counts_and_admin_self_protection(client, runt
         json={"disabled": True},
     )
     self_delete = client.delete(f"/api/users/{admin.id}", headers=headers)
-    assert self_disable.status_code == self_delete.status_code == 409
+    assert self_disable.status_code == self_delete.status_code == 403
 
     created = client.post(
         "/api/users",
