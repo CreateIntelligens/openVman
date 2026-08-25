@@ -18,9 +18,6 @@ class EmbeddingBackend:
     api_key: str
     base_url: str
     dimensions: int | None
-    use_fp16: bool
-    device: str
-    multimodal: bool
 
 
 class BrainSettings(BaseSettings):
@@ -69,9 +66,6 @@ class BrainSettings(BaseSettings):
     # === Embedding 設定 ===
     embedding_active_version: str = "bge"
     embedding_version_order: str = "bge,gemini,openai,voyage"
-    embedding_model: str = "BAAI/bge-m3"
-    embedding_use_fp16: bool = True
-    embedding_device: str = "cuda"
     embedding_service_url: str = ""
     embedding_service_token: str = ""
     embedding_service_timeout: float = 30.0
@@ -213,7 +207,7 @@ class BrainSettings(BaseSettings):
         aliases = {
             "bge": self._embedding_identity(
                 "bge",
-                self.embedding_expected_model or self.embedding_model,
+                self.embedding_expected_model,
                 self.embedding_expected_dimension or 1024,
                 "document",
                 self.embedding_expected_revision,
@@ -449,14 +443,14 @@ class BrainSettings(BaseSettings):
                 self.embedding_voyage_dimensions or 1024,
             ),
             "bge": (
-                self.embedding_expected_model or self.embedding_model,
+                self.embedding_expected_model,
                 self.embedding_expected_dimension or 1024,
             ),
         }
         model, dimensions = provider_models.get(
             resolved_version,
             (
-                self.embedding_expected_model or self.embedding_model,
+                self.embedding_expected_model,
                 self.embedding_expected_dimension or 1024,
             ),
         )
@@ -468,9 +462,6 @@ class BrainSettings(BaseSettings):
             api_key=self.embedding_service_token,
             base_url=self.resolved_embedding_service_url,
             dimensions=dimensions,
-            use_fp16=self.embedding_use_fp16,
-            device="remote_http",
-            multimodal=False,
         )
 
     def _normalize_embedding_dimensions(self, value: int) -> int | None:

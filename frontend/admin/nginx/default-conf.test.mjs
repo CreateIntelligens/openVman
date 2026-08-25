@@ -64,10 +64,14 @@ describe("nginx default config", () => {
     expect(embedSocket).toBeLessThan(generalSocket);
   });
 
-  it("allows cross-origin character resources for the direct SDK", () => {
+  it("proxies public and authorized character resources without unsafe shared caching", () => {
     const assetsLocation = source.match(/location \/assets\/ \{([\s\S]*?)\n    \}/)?.[1];
 
     expect(assetsLocation).toContain('Access-Control-Allow-Origin "*"');
+    expect(assetsLocation).toContain(
+      "proxy_set_header Authorization $http_authorization;",
+    );
+    expect(assetsLocation).not.toContain('Cache-Control "public');
   });
 
   it("proxies the public character list with CORS and short caching", () => {

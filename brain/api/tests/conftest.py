@@ -16,10 +16,9 @@ API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
-# Stub heavy native dependencies not available in test environment
-for _mod_name in ("lancedb", "sentence_transformers", "FlagEmbedding"):
-    if _mod_name not in sys.modules:
-        sys.modules[_mod_name] = MagicMock()
+# Stub LanceDB when its native runtime is unavailable in the test environment.
+if "lancedb" not in sys.modules:
+    sys.modules["lancedb"] = MagicMock()
 
 
 @pytest.fixture(autouse=True)

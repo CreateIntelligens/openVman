@@ -41,7 +41,6 @@ class TestEmbeddingSettings:
         assert backend.provider == "bge"
         assert backend.model == "BAAI/bge-m3"
         assert backend.api_key == cfg.embedding_service_token
-        assert backend.multimodal is False
 
     def test_active_version_is_prepended_once(self):
         cfg = BrainSettings(

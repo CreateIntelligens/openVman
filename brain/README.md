@@ -8,7 +8,7 @@
 - 有後端 API，支援同步生成、SSE 串流生成、知識重建索引、文件上傳/編輯/搬移
 - 有 workspace 檔案系統，承載 `SOUL`、`AGENTS`、`TOOLS`、`MEMORY`、每日對話日誌與 learnings
 - 有 LanceDB 向量資料庫，維護 `knowledge` 與 `memories` 兩張表
-- 支援 Gemini 作為 LLM，支援 CPU / GPU embedding
+- 支援 Gemini 作為 LLM，並透過獨立 embedding gateway 取得向量
 
 ## 1. 系統目標
 
@@ -31,7 +31,8 @@ browser
     -> api (FastAPI, internal :8100)
       -> workspace files (/data/workspace in container)
       -> LanceDB (/data/projects/default/lancedb in container)
-      -> embedding model
+      -> embedding gateway (internal :8009 or explicit external URL)
+        -> BGE-M3 / Gemini / OpenAI / Voyage providers
       -> Gemini / OpenAI-compatible LLM endpoint
 ```
 
@@ -46,7 +47,11 @@ browser
   - 目前是單頁 console，包含 `Chat / Health / Embed / Search / Memory / Workspace`
 - `api`
   - 真正的大腦服務
-  - 負責 embedding、檢索、記憶寫入、聊天生成、workspace 管理、索引重建
+  - 負責透過 HTTP 取得 embedding、檢索、記憶寫入、聊天生成、workspace 管理、索引重建
+  - 不載入 BGE 權重，也不直接建立 embedding provider client
+- `embedding`
+  - 獨立的 embedding gateway
+  - 負責 BGE-M3 推論、remote provider fallback、模型 readiness 與回傳 embedding identity
 - `workspace`
   - 可編輯知識來源與核心設定區
 - `lancedb`
@@ -57,6 +62,7 @@ browser
 ```text
 brain/
 ├── api/                      # FastAPI backend
+├── embedding/                # 獨立 embedding gateway
 ├── web/                      # Vite frontend console
 ├── nginx/                    # Reverse proxy
 ├── data/
@@ -81,6 +87,8 @@ brain/
 
 - `brain/api`
   - 後端主程式與業務邏輯
+- `brain/embedding`
+  - embedding gateway 與 BGE-M3 / remote provider adapters
 - `brain/web`
   - 前端 console
 - `brain/data/workspace`
@@ -148,17 +156,18 @@ FastAPI 入口。負責：
 
 - 啟動時建立 workspace scaffold
 - 初始化 LanceDB 連線
-- 背景 warmup embedding model 與資料表
+- 背景 warmup remote embedding gateway 與資料表
 - 暴露 REST / SSE endpoints
 
 ### `api/config.py`
 
-集中管理環境變數與 LLM/embedding 設定。包含：
+集中管理環境變數與 LLM/embedding gateway 設定。包含：
 
 - LLM provider
 - LLM model
 - API key
-- embedding model / device / fp16
+- embedding gateway URL / token / timeout
+- 預期 embedding specification、write identity 與 legacy identity mapping
 - LanceDB 路徑
 - 記憶與輸入長度限制
 
@@ -171,14 +180,15 @@ FastAPI 入口。負責：
 - `knowledge`
 - `memories`
 
-### `api/embedder.py`
+### `api/memory/embedder.py`
 
-負責 embedding model 載入與文字向量化。支援：
+負責呼叫 remote embedding gateway 並驗證向量契約。支援：
 
-- lazy load
-- 啟動後背景 warmup
-- lock 保護，避免重複初始化
-- CPU / GPU 模式切換
+- pooled HTTP client 與 bounded chunking
+- query/document input semantics
+- acceptable identity 與 write identity 約束
+- 跨 chunk identity/specification 一致性驗證
+- 啟動後背景 warmup remote gateway 與 LanceDB 查詢路徑
 
 ### `api/retrieval.py`
 
@@ -404,9 +414,10 @@ BRAIN_LLM_PROVIDER=gemini
 BRAIN_LLM_API_KEY=
 BRAIN_LLM_MODEL=gemini-3.1-flash-lite
 
-EMBEDDING_MODEL=BAAI/bge-m3
-EMBEDDING_USE_FP16=true
-EMBEDDING_DEVICE=cuda
+COMPOSE_PROFILES=embedding,vlm
+EMBEDDING_SERVICE_URL=
+EMBEDDING_SERVICE_TOKEN=
+EMBEDDING_EXPECTED_DIMENSION=1024
 LANCEDB_PATH=/data/projects/default/lancedb
 
 SHORT_TERM_MEMORY_ROUNDS=20
@@ -422,8 +433,9 @@ ENABLE_CONTENT_FILTER=true
 - 本機開發用 `.env`
 - repo 保留 `.env.example`
 - 真實 API key 不要放進版控
-- GPU 環境才開 `EMBEDDING_DEVICE=cuda`
-- CPU 模式下通常應搭配 `EMBEDDING_USE_FP16=false`
+- 未設定外部 `EMBEDDING_SERVICE_URL` 時，`COMPOSE_PROFILES` 必須包含 `embedding`
+- 外部 gateway 由 `EMBEDDING_SERVICE_URL` 選取，Brain 不需要啟用本機 embedding profile
+- `EMBEDDING_MODEL`、`EMBEDDING_DEVICE` 與 `EMBEDDING_USE_FP16` 屬於獨立 gateway，不是 Brain API 的 in-process model 設定
 - `.env.example` 是範本值，實際部署可依機器能力調整
 
 ## 11. 啟動方式
@@ -433,12 +445,16 @@ ENABLE_CONTENT_FILTER=true
 複製 `.env.example` 為 `.env`，填入至少：
 
 - `BRAIN_LLM_API_KEY`
-- 需要的 LLM / embedding 參數
+- 需要的 LLM 與 embedding gateway 路由參數
 
 ### 2. 啟動
 
+本機 embedding image 與 Brain API 都需要建置時，依序執行，避免同時進行重型 build：
+
 ```bash
-docker compose -f brain/docker-compose.yml up -d --build
+docker compose build embedding
+docker compose build api
+docker compose up -d
 ```
 
 ### 3. 檢查健康度
@@ -512,13 +528,15 @@ curl -s -X POST http://127.0.0.1:8787/brain/chat \
 
 ## 14. 目前限制與注意事項
 
-### 1. Warmup 狀態沒有完整外露
+### 1. Embedding gateway 是必要相依服務
 
-API 啟動後會背景預熱 embedding 與資料表，避免第一次真正使用時完全冷啟動，但目前 health 尚未完整區分：
+API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gateway 不可達、回傳未授權 identity 或向量規格不相容時，Brain 會 fail closed，不會在 API process 內重建 provider fallback 或載入 BGE。
 
-- `warming`
-- `ready`
-- `failed`
+可使用下列端點區分 process liveness 與 dependency readiness：
+
+- `GET /brain/health`
+- `GET /brain/health/ready`
+- `GET /brain/health/detailed`
 
 ### 2. Session store 目前是 process memory
 
@@ -548,7 +566,7 @@ API 啟動後會背景預熱 embedding 與資料表，避免第一次真正使�
 
 如果要把 `brain` 往更完整的產品推，下一批最值得做的是：
 
-1. health 增加 warmup / GPU readiness 狀態
+1. 強化 embedding gateway outage 與 identity mismatch 的操作告警
 2. learnings / errors 後台專用檢視與人工編修
 3. workspace 樹狀目錄、批次搬移與批次上傳
 4. session store 外部化

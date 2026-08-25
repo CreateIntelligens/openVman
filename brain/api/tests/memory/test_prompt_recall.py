@@ -10,16 +10,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # ---------------------------------------------------------------------------
-# Stub heavy imports before loading modules under test
+# Stub LanceDB before loading modules under test
 # ---------------------------------------------------------------------------
 
 API_ROOT = str(__import__("pathlib").Path(__file__).resolve().parents[2])
 if API_ROOT not in sys.path:
     sys.path.insert(0, API_ROOT)
 
-for _mod_name in ("lancedb", "sentence_transformers", "FlagEmbedding"):
-    if _mod_name not in sys.modules:
-        sys.modules[_mod_name] = MagicMock()
+if "lancedb" not in sys.modules:
+    sys.modules["lancedb"] = MagicMock()
 
 
 # ------------------------------------------------------------------

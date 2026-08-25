@@ -30,7 +30,7 @@ def client(monkeypatch, tmp_path):
     import routes.knowledge_qa
     monkeypatch.setattr(routes.knowledge_qa, "schedule_reindex", lambda project_id="default": None)
     
-    # Mock embedder to avoid real FlagEmbedding behavior and IndexError
+    # Keep route tests independent from the remote embedding gateway.
     class FakeEmbedder:
         def encode(self, texts, **kwargs):
             return [[0.1] * 1024 for _ in texts]

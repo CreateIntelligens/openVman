@@ -36,29 +36,48 @@ TTS_INDEXTTS_URL=http://index-tts-vllm:8011
 
 ## 3. Nginx 邊界轉發 (Edge Proxy Routing)
 
-若跨機器或跨主機無法直接加入 Docker 內部網路，可透過 Nginx 統一邊界 Port（8786 / 8787）路由，並啟用 Bearer Token 鑑權：
+若跨機器或跨主機無法直接加入 Docker 內部網路，可透過 Nginx 統一邊界 Port（8786 / 8787）路由。Nginx 保留 `Authorization` header 並施加 request body、rate、connection 與 timeout 限制；embedding gateway 本身會以 `EMBEDDING_SERVICE_TOKEN`（未設定時沿用 `GATEWAY_INTERNAL_TOKEN`）驗證 Bearer token。
 
 ```nginx
-location /api/gpu/embedding/ {
-    auth_request /auth/verify;
+location ~ ^/api/gpu/embedding/(.*)$ {
     client_max_body_size 10M;
-    proxy_pass http://embedding:8009/;
-    proxy_set_header Host $host;
+    proxy_set_header Authorization $http_authorization;
+    proxy_pass http://embedding:8009/$1$is_args$args;
 }
 ```
+
+對外 consumer 使用的 base URL 為 `https://<PUBLIC_DOMAIN>/api/gpu/embedding`，不要把 `/embed` 加在環境變數中。Docker edge 預設的 HTTP `8786` 會轉向 HTTPS `8787`；直接使用 `8787` 只適合 consumer 已信任該憑證的環境，生產環境應由正式憑證的 host nginx 對外提供 `443`。
 
 ---
 
 ## 4. JTAI 串接設定
 
-JTAI 系統可直接共用 openVman 的 embedding 服務：
+JTAI 的 `EMBEDDING_SERVICE_URL` 會優先於本地 Compose embedding service。指向 openVman edge 時，不啟用 JTAI 的 `embedding` profile：
 
 ```env
-# 在 JTAI 的 .env 中設定
-EMBEDDING_MODEL=BAAI/bge-m3
+# JTAI .env
+COMPOSE_PROFILES=
+EMBEDDING_SERVICE_URL=https://<PUBLIC_DOMAIN>/api/gpu/embedding
+EMBEDDING_SERVICE_TOKEN=<same-high-entropy-token-as-openvman>
+EMBEDDING_EXPECTED_MODEL=BAAI/bge-m3
+EMBEDDING_EXPECTED_DIMENSION=1024
+```
+
+同一個 private Docker network 內可改用下列 URL，其餘設定不變：
+
+```env
 EMBEDDING_SERVICE_URL=http://embedding:8009
 ```
-JTAI 發送 `POST /embed` (`{"texts": [...], "input_type": "document"}`)，openVman embedding 服務直接回傳相容之 `{"vectors": [...]}`。
+
+JTAI 發送 `POST /embed` (`{"texts": [...], "input_type": "document"}`)。`vectors` 保留原有 JTAI contract，openVman 另外回傳 additive metadata：
+
+- top-level `model`；
+- `embedding_spec.identity`、`provider`、`model`、`dimensions`、`dtype`；
+- `normalized`、`normalization`、`input_semantics`；
+- `model_revision` 與 `service_revision`；
+- 無機密資料的 `attempts`。
+
+JTAI client 會檢查回傳筆數、維度、model、L2 normalization 與 input semantics。一次 encode 若分成多個 HTTP chunk，第一個 response 的 canonical identity 會鎖定後續 chunk，避免同一批資料混用不同向量規格。舊版 `/embed` 只含 `vectors` 時仍可相容讀取，但無法提供 identity 鎖定與完整 spec 驗證，不應用於新的共用部署。
 
 ---
 

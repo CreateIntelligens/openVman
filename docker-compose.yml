@@ -3,6 +3,36 @@ x-shared: &shared
     - TZ=Asia/Taipei
   restart: unless-stopped
 
+x-backend-runtime: &backend-runtime
+  user: "${UID:-1000}:${GID:-1000}"
+  image: openvman-backend
+  volumes:
+    - ./backend/app:/app/app
+    - ./backend/data:/app/data
+    - ./backend/logs:/app/logs
+    - ./backend/tests:/app/tests
+    - ./backend/Dockerfile:/app/Dockerfile
+    - ./backend/requirements.txt:/app/requirements.txt
+    - ./backend/scripts:/app/scripts
+    - ./data:/data
+    - ./brain/data:/brain-data:ro
+    - ./backend/index-tts-vllm/assets:/indextts-assets:ro
+    - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
+    - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
+  env_file:
+    - ./.env
+  environment: &backend-environment
+    - TZ=Asia/Taipei
+    - REDIS_URL=redis://redis:6379
+    - GATEWAY_TEMP_DIR=/data/gateway-temp
+    - GATEWAY_FORWARD_URL=http://backend:8200
+    - MEDIA_PROCESSING_TIMEOUT_MS=${MEDIA_PROCESSING_TIMEOUT_MS:-60000}
+    - TTS_INDEXTTS_URL=${TTS_INDEXTTS_URL:-}
+    - VISION_LLM_API_KEY=${VISION_LLM_API_KEY:-${GATEWAY_INTERNAL_TOKEN:-}}
+    - AVATAR_ASSETS_DIR=/data/avatar
+    - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
+    - AVATAR_MASCOTS_DIR=/data/mascots
+
 services:
   api:
     <<: *shared
@@ -255,36 +285,24 @@ services:
       - prometheus
 
   backend:
-    <<: *shared
-    user: "${UID:-1000}:${GID:-1000}"
+    <<: [*shared, *backend-runtime]
+    environment: *backend-environment
     build:
       context: ./backend
       dockerfile: Dockerfile
-    volumes:
-      - ./backend/app:/app/app
-      - ./backend/data:/app/data
-      - ./backend/logs:/app/logs
-      - ./backend/tests:/app/tests
-      - ./backend/Dockerfile:/app/Dockerfile
-      - ./backend/requirements.txt:/app/requirements.txt
-      - ./backend/scripts:/app/scripts
-      - ./data:/data
-      - ./brain/data:/brain-data:ro
-      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
-      - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
-      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
-    env_file:
-      - ./.env
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - TTS_INDEXTTS_URL=${TTS_INDEXTTS_URL:-}
-      - VISION_LLM_API_KEY=${VISION_LLM_API_KEY:-${GATEWAY_INTERNAL_TOKEN:-}}
-      - AVATAR_ASSETS_DIR=/data/avatar
-      - AVATAR_BACKGROUNDS_DIR=/data/backgrounds
-      - AVATAR_MASCOTS_DIR=/data/mascots
     depends_on:
       api:
         condition: service_healthy
+
+  gateway-worker:
+    <<: [*shared, *backend-runtime]
+    environment: *backend-environment
+    entrypoint: ["arq", "app.gateway.worker.WorkerSettings"]
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
 volumes:
   hf-cache:

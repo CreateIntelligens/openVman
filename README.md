@@ -16,6 +16,7 @@
 | 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
 | 04 | [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md) | 網關 (外圍)：媒體處理 · 任務佇列 · 插件 (Camera/Web) · 臨時儲存 · 計費備援 | ✅ 已完成 |
 | 05 | [05_DOCLING_RUNBOOK.md](./docs/05_DOCLING_RUNBOOK.md) | 文件解析：pdf-inspector fast path · Docling 主轉換 · AnyDoc fallback · 驗證與修復 | ✅ 已完成 |
+| -- | [account-administration.md](./docs/account-administration.md) | 帳號管理：ROOT／admin／user 階層 · migration · 密碼 reset · 備份與 rollback | ✅ 已完成 |
 | -- | [avatar-embed/README.md](./docs/avatar-embed/README.md) | Avatar JavaScript SDK：直接 DOM · 外部音訊 · PCM 串流 · 公開錯誤碼 | ✅ 已完成 |
 | -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
 
@@ -28,16 +29,16 @@
 
 所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定，再執行 `./scripts/ensure-runtime-secrets.sh` 安全產生缺少的內部 token 與 session secret；不用分開維護多份。
 
-### 初始管理員
+### 初始 ROOT
 
-空白安裝的初始管理員固定為帳號 `ai360`、密碼 `ai360`。服務啟動後，在 Backend 容器執行一次：
+空白安裝的唯一 ROOT 固定為帳號 `ai360`。服務啟動後，在 Backend 容器執行一次：
 
 ```bash
 docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
   python -m app.scripts.create_user --username ai360
 ```
 
-若資料庫已存在管理員，指令會拒絕建立或覆蓋帳號。
+指令不接受其他 ROOT 名稱，也不會建立或取代第二個 ROOT。`ai360` 僅適合開發環境；正式部署必須在首次登入後立即更換密碼。既有兩層帳號資料庫會將原 `ai360` 原地升級為 ROOT，保留帳號 ID、密碼 hash、ownership 與 grants，但會撤銷 migration 前的 session。完整操作與 rollback 注意事項請見 [帳號管理手冊](./docs/account-administration.md)。
 
 ### 部署前置：資料目錄權限
 

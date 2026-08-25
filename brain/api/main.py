@@ -116,11 +116,11 @@ _WARMUP_TABLES = ("knowledge", "memories")
 
 
 def _warmup_retrieval_path(project_id: str = "default") -> None:
-    """真正跑一次 encode + search，預熱 CUDA kernel 與 LanceDB 查詢路徑。
+    """真正跑一次 remote encode + search，預熱 gateway 與 LanceDB 查詢路徑。
 
-    僅建立 embedder/table 物件並不會觸發第一次 forward pass 的 kernel 編譯
-    成本（實測冷啟 embed ~8s、search ~1.7s，熱啟後皆 <60ms）。這裡實際呼叫
-    一次檢索把整條 hot path 熱起來，避免第一個使用者請求承擔該成本。
+    僅建立 HTTP client/table 物件不會驗證 gateway inference 或 LanceDB 查詢。
+    這裡實際呼叫一次檢索，把完整 remote hot path 熱起來，避免第一個使用者
+    請求承擔連線與查詢冷啟成本。
 
     knowledge 與 memories 各自有獨立的 LanceDB 查詢路徑與 FTS 索引；search_memory
     走的是 memories 表，若只暖 knowledge，第一個「我是誰」這類記憶查詢仍會冷啟。
@@ -153,7 +153,7 @@ def _warmup_retrieval_path(project_id: str = "default") -> None:
 
 
 async def warmup_resources() -> None:
-    """背景預熱重資源，避免第一個請求承擔初始化成本。"""
+    """背景預熱 remote embedding 與資料路徑。"""
     logger.info("背景預熱開始...")
     try:
         project_ids = _warmup_project_ids()
@@ -216,7 +216,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await asyncio.to_thread(run_migration)
     await load_privacy_filter_if_enabled()
 
-    # 背景預熱重資源
+    # 背景預熱 remote embedding 與資料路徑
     app.state.warmup_task = asyncio.create_task(warmup_resources())
 
     # Start dreaming scheduler (opt-in)

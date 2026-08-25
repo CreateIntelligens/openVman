@@ -30,8 +30,6 @@ _fake_infra_db.resolve_vector_table_name = lambda name, ev=None: name  # type: i
 
 _STUBS = {
     "lancedb": MagicMock(),
-    "sentence_transformers": MagicMock(),
-    "FlagEmbedding": MagicMock(),
     "infra.db": _fake_infra_db,
     "memory.embedder": _fake_embedder,
     "memory.importance": _fake_importance,

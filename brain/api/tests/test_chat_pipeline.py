@@ -301,7 +301,7 @@ def test_build_chat_messages_includes_tool_instructions_for_tool_route(
 
 
 def _stub_memory_for_guardrails(monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
-    """Stub memory.memory so guardrails' lazy import works without FlagEmbedding."""
+    """Stub memory.memory so the test stays focused on guardrails."""
     from conftest import stub_chat_service_deps
 
     stub_chat_service_deps(monkeypatch)

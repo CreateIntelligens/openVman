@@ -33,7 +33,7 @@ def _make_tool(tool_registry, *, name: str = "test_tool", handler=None, paramete
 
 
 def _stub_heavy_modules(monkeypatch: pytest.MonkeyPatch):
-    """Stub out modules that need native libs (FlagEmbedding, etc.).
+    """Stub chat-service dependencies that are unrelated to these tests.
 
     Returns the freshly-loaded ``core.chat_service`` module so that tests
     get the correct ``ToolPhaseError`` class identity.
@@ -414,4 +414,3 @@ class TestGracefulDegradation:
         assert result.tool_steps == partial
         assert any(message.get("role") == "tool" for message in seen_messages)
         assert any("工具流程部分失敗" in str(message.get("content", "")) for message in seen_messages)
-
