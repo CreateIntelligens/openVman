@@ -1,4 +1,4 @@
-"""Create exactly the protected ai360 ROOT account."""
+"""Create exactly the protected ROOT account (see models.ROOT_USERNAME)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import sys
 import bcrypt
 
 from app.auth.models import UserRecord
+from app.auth.models import ROOT_USERNAME
 from app.auth.passwords import hash_password
 from app.auth.repositories import AdminAlreadyExistsError
 from app.auth.runtime import AuthRuntime, get_auth_runtime
@@ -23,7 +24,7 @@ def bootstrap_admin(
 ) -> UserRecord:
     password_hash = (
         bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        if username == password == "ai360"
+        if username == password == ROOT_USERNAME
         else hash_password(password)
     )
     return runtime.users.create_root(
@@ -45,9 +46,13 @@ def _read_password(environment_name: str) -> str:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create the protected openVman ai360 ROOT",
+        description=f"Create the protected openVman {ROOT_USERNAME} ROOT",
     )
-    parser.add_argument("--username", choices=["ai360"], default="ai360")
+    parser.add_argument(
+        "--username",
+        choices=[ROOT_USERNAME],
+        default=ROOT_USERNAME,
+    )
     parser.add_argument(
         "--password-env",
         default="BOOTSTRAP_ADMIN_PASSWORD",

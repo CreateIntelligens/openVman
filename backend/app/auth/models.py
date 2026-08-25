@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -18,6 +19,10 @@ _ACCOUNT_ROLE_RANK = {
     AccountRole.ROOT: 2,
 }
 
+# 唯一 ROOT 帳號的登入名稱。部署可用 AUTH_ROOT_USERNAME 覆寫；預設值是
+# 既有部署的名稱，所以不設環境變數時行為不變。
+ROOT_USERNAME = os.getenv("AUTH_ROOT_USERNAME", "ai360").strip().casefold() or "ai360"
+
 
 def role_at_least(role: AccountRole, minimum: AccountRole) -> bool:
     """Return whether a role satisfies a centralized hierarchy threshold."""
@@ -26,6 +31,13 @@ def role_at_least(role: AccountRole, minimum: AccountRole) -> bool:
 
 def is_at_least_admin(role: AccountRole) -> bool:
     return role_at_least(role, AccountRole.ADMIN)
+
+
+# 「admin 以上」的角色值，供 SQL 的 IN 子句使用。從階層推導而非寫死字面
+# 列表，新增角色時不會漏掉這裡。
+ADMIN_OR_ABOVE_VALUES = tuple(
+    role.value for role in AccountRole if is_at_least_admin(role)
+)
 
 
 class AccountType(StrEnum):

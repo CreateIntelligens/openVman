@@ -9,6 +9,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .models import ROOT_USERNAME
+
 _BUSY_TIMEOUT_MS = 5000
 
 _INITIAL_SCHEMA_STATEMENTS = (
@@ -337,19 +339,22 @@ class AuthDatabase:
         if len(roots) > 1 or (
             roots
             and (
-                roots[0]["username_normalized"] != "ai360"
+                roots[0]["username_normalized"] != ROOT_USERNAME
                 or roots[0]["account_type"] != "formal"
             )
         ):
             raise RuntimeError("conflicting ROOT account state")
 
-        ai360 = connection.execute(
-            "SELECT role, account_type FROM users WHERE username_normalized = 'ai360'"
+        root_named = connection.execute(
+            "SELECT role, account_type FROM users WHERE username_normalized = ?",
+            (ROOT_USERNAME,),
         ).fetchone()
-        if ai360 is not None and ai360["account_type"] != "formal":
-            raise RuntimeError("ai360 must be a formal account before ROOT migration")
-        if roots and ai360 is None:
-            raise RuntimeError("ROOT identity must be ai360")
+        if root_named is not None and root_named["account_type"] != "formal":
+            raise RuntimeError(
+                f"{ROOT_USERNAME} must be a formal account before ROOT migration"
+            )
+        if roots and root_named is None:
+            raise RuntimeError(f"ROOT identity must be {ROOT_USERNAME}")
 
         before_count = int(connection.execute("SELECT COUNT(*) FROM users").fetchone()[0])
         now = datetime.now(timezone.utc).isoformat()
@@ -367,8 +372,7 @@ class AuthDatabase:
                 updated_at TEXT NOT NULL,
                 created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
                 account_type TEXT NOT NULL DEFAULT 'formal'
-                    CHECK (account_type IN ('formal', 'temporary')),
-                CHECK (role != 'root' OR username_normalized = 'ai360')
+                    CHECK (account_type IN ('formal', 'temporary'))
             )
             """
         )
@@ -384,22 +388,22 @@ class AuthDatabase:
                 username,
                 username_normalized,
                 password_hash,
-                CASE WHEN username_normalized = 'ai360' THEN 'root' ELSE role END,
+                CASE WHEN username_normalized = ? THEN 'root' ELSE role END,
                 disabled,
                 token_version + CASE
-                    WHEN username_normalized = 'ai360' AND role != 'root' THEN 1
+                    WHEN username_normalized = ? AND role != 'root' THEN 1
                     ELSE 0
                 END,
                 created_at,
                 CASE
-                    WHEN username_normalized = 'ai360' AND role != 'root' THEN ?
+                    WHEN username_normalized = ? AND role != 'root' THEN ?
                     ELSE updated_at
                 END,
                 created_by,
                 account_type
             FROM users
             """,
-            (now,),
+            (ROOT_USERNAME, ROOT_USERNAME, ROOT_USERNAME, now),
         )
         connection.execute("DROP TABLE users")
         connection.execute("ALTER TABLE users_root_migration RENAME TO users")

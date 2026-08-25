@@ -12,6 +12,8 @@ from uuid import uuid4
 
 from .database import AuthDatabase
 from .models import (
+    ADMIN_OR_ABOVE_VALUES,
+    ROOT_USERNAME,
     AccountDefaultsRecord,
     AccountRole,
     AccountType,
@@ -143,6 +145,9 @@ def _user_from_row(row: sqlite3.Row) -> UserRecord:
         updated_at=row["updated_at"],
         created_by=row["created_by"],
     )
+
+
+_ADMIN_OR_ABOVE_PLACEHOLDERS = ", ".join("?" * len(ADMIN_OR_ABOVE_VALUES))
 
 
 def _load_actor_and_target(
@@ -529,8 +534,8 @@ class UserRepository:
         user_id = f"usr_{uuid4().hex}"
         display_username = _display_username(username)
         normalized_username = normalize_username(username)
-        if normalized_username != "ai360":
-            raise ValueError("ROOT username must be ai360")
+        if normalized_username != ROOT_USERNAME:
+            raise ValueError(f"ROOT username must be {ROOT_USERNAME}")
         now = _now_iso()
 
         try:
@@ -541,10 +546,11 @@ class UserRepository:
                 if existing is not None:
                     raise AdminAlreadyExistsError("ROOT already exists")
                 conflicting = connection.execute(
-                    "SELECT 1 FROM users WHERE username_normalized = 'ai360'"
+                    "SELECT 1 FROM users WHERE username_normalized = ?",
+                    (ROOT_USERNAME,),
                 ).fetchone()
                 if conflicting is not None:
-                    raise UsernameConflictError("ai360 already exists")
+                    raise UsernameConflictError(f"{ROOT_USERNAME} already exists")
                 connection.execute(
                     """
                     INSERT INTO users(
@@ -610,7 +616,9 @@ class UserRepository:
     def has_admin(self) -> bool:
         with self.database.transaction() as connection:
             row = connection.execute(
-                "SELECT 1 FROM users WHERE role IN ('root', 'admin') LIMIT 1"
+                "SELECT 1 FROM users "
+                f"WHERE role IN ({_ADMIN_OR_ABOVE_PLACEHOLDERS}) LIMIT 1",
+                ADMIN_OR_ABOVE_VALUES,
             ).fetchone()
         return row is not None
 
@@ -632,10 +640,10 @@ class UserRepository:
                 and not target.disabled
             ):
                 enabled_admins = connection.execute(
-                    """
-                    SELECT COUNT(*) FROM users
-                    WHERE role IN ('root', 'admin') AND disabled = 0
-                    """
+                    "SELECT COUNT(*) FROM users "
+                    f"WHERE role IN ({_ADMIN_OR_ABOVE_PLACEHOLDERS}) "
+                    "AND disabled = 0",
+                    ADMIN_OR_ABOVE_VALUES,
                 ).fetchone()[0]
                 if enabled_admins <= 1:
                     raise LastAdminError(
@@ -851,7 +859,7 @@ class UserRepository:
                 raise RepositoryError("exactly one ROOT account is required")
             root = _user_from_row(roots[0])
             if (
-                root.username_normalized != "ai360"
+                root.username_normalized != ROOT_USERNAME
                 or root.account_type is not AccountType.FORMAL
             ):
                 raise RepositoryError("ROOT identity is invalid")

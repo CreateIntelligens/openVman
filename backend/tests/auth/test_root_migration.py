@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -361,3 +365,51 @@ def test_root_migration_fails_closed_on_another_root(tmp_path: Path):
         ).fetchone()
     assert [row["id"] for row in roots] == ["usr_conflicting_root"]
     assert migration is None
+
+
+
+def test_root_username_is_configurable(tmp_path):
+    """ROOT 帳號名稱可依部署覆寫，不是烘在 schema 裡的租戶常數。
+
+    在子行程執行：ROOT_USERNAME 是模組層級常數，用 importlib.reload 改它
+    會污染同一個 session 的其他測試。
+    """
+    script = textwrap.dedent(
+        """
+        import sys
+
+        from app.auth.database import AuthDatabase
+        from app.auth.models import ROOT_USERNAME, AccountRole
+        from app.auth.repositories import UserRepository
+
+        assert ROOT_USERNAME == "superadmin", ROOT_USERNAME
+
+        database = AuthDatabase(sys.argv[1])
+        database.initialize()
+        users = UserRepository(database)
+
+        root = users.create_root(username="superadmin", password_hash="hash")
+        assert root.role is AccountRole.ROOT
+
+        try:
+            users.create_root(username="ai360", password_hash="hash")
+        except ValueError as exc:
+            assert "superadmin" in str(exc), str(exc)
+        else:
+            raise AssertionError("the previous ROOT name should be rejected")
+        """
+    )
+    environment = {
+        **os.environ,
+        "AUTH_ROOT_USERNAME": "superadmin",
+        "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
+    }
+
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(tmp_path / "accounts.db")],
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert result.returncode == 0, result.stderr
