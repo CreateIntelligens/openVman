@@ -32,7 +32,7 @@ async def _fetch_gateway_vectors(
         os.getenv("EMBEDDING_SERVICE_URL", "http://embedding:8009").rstrip("/"),
         "http://127.0.0.1:8009",
         "http://localhost:8009",
-        "http://127.0.0.1:8786/api/gpu/embedding",
+        "http://127.0.0.1:8786/api/embedding",
     ]
     token = os.getenv("EMBEDDING_BEARER_TOKEN") or os.getenv("GATEWAY_INTERNAL_TOKEN") or ""
     headers = {"Authorization": f"Bearer {token}"} if token else {}

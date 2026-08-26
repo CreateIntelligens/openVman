@@ -60,6 +60,6 @@
 - [x] 8.1 Compare local HTTP vectors with in-process implementation on the fixed corpus and confirm identity, dimension, normalization, and cosine-similarity tolerances before switching routing.
 - [x] 8.2 Run Brain embedding/retrieval/memory/index tests and Backend camera/vision/TTS tests in local-profile, external-URL, mixed, degraded-provider, and disabled-optional-service modes.
 - [x] 8.3 Build heavy GPU images sequentially, start services only after each build completes, and verify embedding, VLM, and enabled IndexTTS ready health through real inference paths.
-- [ ] 8.4 Verify one shared GPU stack serves two worktree consumers while `nvidia-smi` shows only one BGE model allocation and no consumer `api` process owns BGE weights. (The scoped openVman and `jtai-rag` consumers share one allocation; a separate live `/home/human/jtai` stack still owns a second BGE allocation.)
+- [x] 8.4 Verify one shared GPU stack serves two worktree consumers while `nvidia-smi` shows only one BGE model allocation and no consumer `api` process owns BGE weights. (Verified with openVman, root JTAI, and `jtai-rag` consumers sharing `openvman-embedding-1`; the former `jtai-embedding-1` is stopped.)
 - [x] 8.5 Verify knowledge search, memory search, index rebuild, image ingestion, and live camera behavior through nginx without adding public service-specific ports.
 - [x] 8.6 Remove Brain's in-process embedding providers and stale documentation only after parity tests pass, then run strict OpenSpec validation, `git diff --check`, focused tests, and production builds.
