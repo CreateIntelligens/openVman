@@ -84,11 +84,12 @@ describe("nginx default config", () => {
     expect(charactersLocation).toContain('Cache-Control "public, max-age=300"');
   });
 
+  // 兩個服務的路徑一致，都是 /api/<service>/。
   it.each(["embedding", "vlm"])(
-    "protects the %s GPU edge route with upstream bearer auth and limits",
+    "protects the %s inference edge route with upstream bearer auth and limits",
     (service) => {
       const location = source.match(
-        new RegExp(`location ~ \\^/api/gpu/${service}/\\(\\.\\*\\)\\$ \\{([\\s\\S]*?)\\n    \\}`),
+        new RegExp(`location ~ \\^/api/${service}/\\(\\.\\*\\)\\$ \\{([\\s\\S]*?)\\n    \\}`),
       )?.[1];
 
       expect(location).toContain("proxy_set_header Authorization $http_authorization;");
@@ -99,6 +100,25 @@ describe("nginx default config", () => {
       expect(location).toContain("client_body_timeout 15s;");
     },
   );
+
+  it("serves shared inference under /api without the gpu prefix", () => {
+    // 兩個推論服務都掛在 /api 下；/api/gpu/* 是已退役的舊前綴。
+    expect(source).toContain("location ~ ^/api/embedding/(.*)$");
+    expect(source).toContain("location ~ ^/api/vlm/(.*)$");
+    expect(source).not.toContain("/api/gpu/");
+  });
+
+  it("maps the embedding base URL onto the embed endpoint", () => {
+    // 精確比對必須排在前綴規則之前，consumer 才不用打 /api/embedding/embed。
+    const exact = source.indexOf("location = /api/embedding {");
+    const prefix = source.indexOf("location ~ ^/api/embedding/(.*)$");
+
+    expect(exact).not.toBe(-1);
+    expect(exact).toBeLessThan(prefix);
+    expect(
+      source.match(/location = \/api\/embedding \{([\s\S]*?)\n    \}/)?.[1],
+    ).toContain("http://embedding:8009/embed$is_args$args");
+  });
 
   it("defines bounded shared GPU inference rate and connection zones", () => {
     expect(source).toContain(

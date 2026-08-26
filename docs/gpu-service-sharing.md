@@ -39,14 +39,43 @@ TTS_INDEXTTS_URL=http://index-tts-vllm:8011
 若跨機器或跨主機無法直接加入 Docker 內部網路，可透過 Nginx 統一邊界 Port（8786 / 8787）路由。Nginx 保留 `Authorization` header 並施加 request body、rate、connection 與 timeout 限制；embedding gateway 本身會以 `EMBEDDING_SERVICE_TOKEN`（未設定時沿用 `GATEWAY_INTERNAL_TOKEN`）驗證 Bearer token。
 
 ```nginx
-location ~ ^/api/gpu/embedding/(.*)$ {
+# base URL 本身就是 embed 端點（精確比對優先於下方前綴）
+location = /api/embedding {
+    client_max_body_size 10M;
+    proxy_set_header Authorization $http_authorization;
+    proxy_pass http://embedding:8009/embed$is_args$args;
+}
+
+location ~ ^/api/embedding/(.*)$ {
     client_max_body_size 10M;
     proxy_set_header Authorization $http_authorization;
     proxy_pass http://embedding:8009/$1$is_args$args;
 }
 ```
 
-對外 consumer 使用的 base URL 為 `https://<PUBLIC_DOMAIN>/api/gpu/embedding`，不要把 `/embed` 加在環境變數中。Docker edge 預設的 HTTP `8786` 會轉向 HTTPS `8787`；直接使用 `8787` 只適合 consumer 已信任該憑證的環境，生產環境應由正式憑證的 host nginx 對外提供 `443`。
+對外 consumer 使用的 base URL 為 `https://<PUBLIC_DOMAIN>/api/embedding`，不要把 `/embed` 加在環境變數中。
+
+| 用途 | 端點 | 認證 |
+| --- | --- | --- |
+| 向量嵌入（jtai 格式） | `POST /api/embedding` | Bearer |
+| 向量嵌入（OpenAI 相容） | `POST /api/embedding/v1/embeddings` | Bearer |
+| 模型清單 | `GET /api/embedding/v1/models` | Bearer |
+| 存活檢查 | `GET /api/embedding/health` | 公開 |
+| 就緒檢查 | `GET /api/embedding/health/ready` | Bearer |
+
+`POST /api/embedding/embed` 仍可用，但 base URL 已直接對應同一個端點，新的串接不需要再疊 `/embed`。OpenAI 相容路徑讓 consumer 可以直接使用現成的 OpenAI client，只要把 base URL 設為 `https://<PUBLIC_DOMAIN>/api/embedding/v1`。
+
+視覺模型走同一組限制，路徑對稱：
+
+| 用途 | 端點 | 認證 |
+| --- | --- | --- |
+| 視覺推論（OpenAI 相容） | `POST /api/vlm/v1/chat/completions` | Bearer |
+| 模型清單 | `GET /api/vlm/v1/models` | Bearer |
+| 存活檢查 | `GET /api/vlm/health` | 公開 |
+
+兩個服務都掛在 `/api/<service>` 底下。早期的 `/api/gpu/*` 前綴已退役——推論服務不一定跑在 GPU 上，前綴描述的是部署細節而非介面。
+
+Docker edge 預設的 HTTP `8786` 會轉向 HTTPS `8787`；直接使用 `8787` 只適合 consumer 已信任該憑證的環境，生產環境應由正式憑證的 host nginx 對外提供 `443`。
 
 ---
 
@@ -57,7 +86,7 @@ JTAI 的 `EMBEDDING_SERVICE_URL` 會優先於本地 Compose embedding service。
 ```env
 # JTAI .env
 COMPOSE_PROFILES=
-EMBEDDING_SERVICE_URL=https://<PUBLIC_DOMAIN>/api/gpu/embedding
+EMBEDDING_SERVICE_URL=https://<PUBLIC_DOMAIN>/api/embedding
 EMBEDDING_SERVICE_TOKEN=<same-high-entropy-token-as-openvman>
 EMBEDDING_EXPECTED_MODEL=BAAI/bge-m3
 EMBEDDING_EXPECTED_DIMENSION=1024
