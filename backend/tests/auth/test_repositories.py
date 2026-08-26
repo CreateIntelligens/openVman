@@ -40,6 +40,9 @@ def test_migration_is_idempotent_and_enables_sqlite_safety_pragmas(tmp_path: Pat
         journal_mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()[0]
         busy_timeout = connection.execute("PRAGMA busy_timeout").fetchone()[0]
+        user_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(users)")
+        }
 
     applied = [row["version"] for row in migrations]
     # 只驗證遷移不重複、且按序套用；確切版本號會隨新遷移增加。
@@ -48,6 +51,14 @@ def test_migration_is_idempotent_and_enables_sqlite_safety_pragmas(tmp_path: Pat
     assert journal_mode == "wal"
     assert foreign_keys == 1
     assert busy_timeout == 5000
+    assert "admin_portal_access" in user_columns
+
+    user = UserRepository(database).create(
+        username="portal-default",
+        password_hash="hash",
+        role=AccountRole.USER,
+    )
+    assert user.admin_portal_access is False
 
 
 def test_temporary_migration_recovers_when_column_already_exists(tmp_path: Path):

@@ -26,7 +26,11 @@ export default function AccountRoleDialog({
   const accessForm = useAccountAccessForm(
     `role-change-${account.id}`,
     account.grants && account.defaults
-      ? { grants: account.grants, defaults: account.defaults }
+      ? {
+        grants: account.grants,
+        defaults: account.defaults,
+        admin_portal_access: account.admin_portal_access ?? false,
+      }
       : undefined,
     // 只有降級才會顯示授權欄位，提升為管理員時不必抓選項。
     demoting,

@@ -26,6 +26,7 @@ vi.mock("./api/metrics", () => ({
 }));
 
 vi.mock("./api/auth", () => ({
+  AdminPortalAccessError: class AdminPortalAccessError extends Error {},
   getCurrentAccount: vi.fn().mockResolvedValue({
     id: "admin-1",
     username: "admin",
@@ -35,6 +36,7 @@ vi.mock("./api/auth", () => ({
   }),
   login: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
+  temporaryLogin: vi.fn(),
   isAtLeastAdmin: (role: string) => role === "root" || role === "admin",
 }));
 
@@ -77,7 +79,11 @@ vi.mock("./pages/Workspace", () => ({
 
 import App from "./App";
 import { fetchProjects } from "./api";
-import { getCurrentAccount } from "./api/auth";
+import {
+  AdminPortalAccessError,
+  getCurrentAccount,
+  temporaryLogin,
+} from "./api/auth";
 import { allTabs } from "./components/app/navigation";
 
 describe("App tab mounting", () => {
@@ -91,6 +97,15 @@ describe("App tab mounting", () => {
       role: "admin",
       disabled: false,
       created_at: "2026-08-17T00:00:00Z",
+    });
+    vi.mocked(temporaryLogin).mockResolvedValue({
+      id: "temporary-1",
+      username: "臨時帳號",
+      role: "user",
+      kind: "temporary",
+      disabled: false,
+      created_at: "2026-08-26T00:00:00Z",
+      admin_portal_access: true,
     });
     vi.mocked(fetchProjects).mockResolvedValue({
       project_count: 1,
@@ -176,6 +191,43 @@ describe("App tab mounting", () => {
 
     expect(await screen.findByText("權限不足")).toBeTruthy();
     expect(screen.queryByTestId("tab-accounts")).toBeNull();
+  });
+
+  it("blocks Admin portal bootstrap without discarding the frontend session", async () => {
+    vi.mocked(getCurrentAccount).mockRejectedValue(
+      new AdminPortalAccessError("Admin portal access required"),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("無法進入管理後台")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "前往虛擬人前台" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/");
+  });
+
+  it("lets an authorized temporary account log in directly", async () => {
+    vi.mocked(getCurrentAccount).mockRejectedValue(new Error("not signed in"));
+    vi.mocked(temporaryLogin).mockResolvedValue({
+      id: "temporary-1",
+      username: "臨時帳號",
+      role: "user",
+      kind: "temporary",
+      disabled: false,
+      created_at: "2026-08-26T00:00:00Z",
+      admin_portal_access: true,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "臨時密碼" }));
+    fireEvent.change(screen.getByLabelText("臨時密碼"), {
+      target: { value: "temporary-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登入" }));
+
+    await waitFor(() => expect(temporaryLogin).toHaveBeenCalledWith(
+      "temporary-password",
+    ));
+    expect(await screen.findByTestId("tab-chat")).toBeTruthy();
   });
 
   it("grants ROOT the existing administrator navigation and account route", async () => {

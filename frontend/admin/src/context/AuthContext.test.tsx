@@ -2,15 +2,19 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../api/auth", () => ({
+  AdminPortalAccessError: class AdminPortalAccessError extends Error {},
   getCurrentAccount: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
+  temporaryLogin: vi.fn(),
 }));
 
 import {
+  AdminPortalAccessError,
   getCurrentAccount,
   login,
   logout,
+  temporaryLogin,
 } from "../api/auth";
 import { AuthProvider, useAuth } from "./AuthContext";
 
@@ -34,6 +38,12 @@ function Probe() {
         login
       </button>
       <button type="button" onClick={() => void auth.logout()}>logout</button>
+      <button
+        type="button"
+        onClick={() => void auth.loginTemporary("temporary-password").catch(() => undefined)}
+      >
+        temporary login
+      </button>
     </div>
   );
 }
@@ -45,6 +55,11 @@ describe("AuthProvider", () => {
     vi.mocked(getCurrentAccount).mockResolvedValue(PROFILE);
     vi.mocked(login).mockResolvedValue(PROFILE);
     vi.mocked(logout).mockResolvedValue(undefined);
+    vi.mocked(temporaryLogin).mockResolvedValue({
+      ...PROFILE,
+      kind: "temporary",
+      admin_portal_access: true,
+    });
   });
 
   it("restores the cookie session on mount", async () => {
@@ -89,5 +104,29 @@ describe("AuthProvider", () => {
     await waitFor(() => expect(login).toHaveBeenCalledOnce());
     expect(screen.getByText("guest")).toBeTruthy();
     expect(window.location.pathname).toBe("/admin/login");
+  });
+
+  it("keeps the normal frontend session when Admin portal bootstrap is denied", async () => {
+    vi.mocked(getCurrentAccount).mockRejectedValue(
+      new AdminPortalAccessError("Admin portal access required"),
+    );
+    render(<AuthProvider><Probe /></AuthProvider>);
+
+    expect(await screen.findByText("guest")).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/chat");
+  });
+
+  it("supports an authorized temporary Admin login", async () => {
+    vi.mocked(getCurrentAccount).mockRejectedValue(new Error("expired"));
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await screen.findByText("guest");
+
+    fireEvent.click(screen.getByRole("button", { name: "temporary login" }));
+
+    await waitFor(() => expect(temporaryLogin).toHaveBeenCalledWith(
+      "temporary-password",
+    ));
+    expect(await screen.findByText("alice")).toBeTruthy();
+    expect(window.location.pathname).toBe("/admin/chat");
   });
 });

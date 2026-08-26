@@ -30,6 +30,7 @@ export interface AccountProfile {
   expires_at?: string | null;
   remaining_seconds?: number | null;
   defaults?: AccountDefaults | null;
+  admin_portal_access?: boolean;
 }
 
 export interface Account extends AccountProfile {
@@ -49,17 +50,21 @@ export function isAtLeastAdmin(role: AccountRole): boolean {
   return role === "root" || role === "admin";
 }
 
+function safeAccountDefaults(
+  defaults?: AccountDefaults | null,
+): AccountDefaults | null | undefined {
+  if (!defaults) return defaults;
+  return {
+    project_id: defaults.project_id,
+    character_id: defaults.character_id,
+    voice_provider: defaults.voice_provider,
+    voice_id: defaults.voice_id,
+    mascot_id: defaults.mascot_id,
+    background_id: defaults.background_id,
+  };
+}
+
 function safeAccountProfile(account: AccountProfile): AccountProfile {
-  const defaults = account.defaults
-    ? {
-      project_id: account.defaults.project_id,
-      character_id: account.defaults.character_id,
-      voice_provider: account.defaults.voice_provider,
-      voice_id: account.defaults.voice_id,
-      mascot_id: account.defaults.mascot_id,
-      background_id: account.defaults.background_id,
-    }
-    : account.defaults;
   return {
     id: account.id,
     username: account.username,
@@ -70,7 +75,8 @@ function safeAccountProfile(account: AccountProfile): AccountProfile {
     created_at: account.created_at,
     expires_at: account.expires_at,
     remaining_seconds: account.remaining_seconds,
-    defaults,
+    defaults: safeAccountDefaults(account.defaults),
+    admin_portal_access: account.admin_portal_access,
   };
 }
 
@@ -134,6 +140,7 @@ export interface AccountAccessOptions {
 export interface AccountAccessInput {
   grants: AccountResourceGrants;
   defaults: AccountDefaults;
+  admin_portal_access: boolean;
 }
 
 export interface TemporaryCredential {
@@ -146,6 +153,7 @@ export interface TemporaryBatchResult {
   batch_id: string;
   credentials: TemporaryCredential[];
   created_at: string;
+  admin_portal_access: boolean;
 }
 
 export interface TemporaryBatchAudit {
@@ -159,6 +167,7 @@ export interface TemporaryBatchAudit {
   grants?: AccountResourceGrants;
   defaults?: AccountDefaults;
   accounts?: TemporaryAccountAudit[];
+  admin_portal_access?: boolean;
 }
 
 export interface TemporaryAccountAudit {
@@ -175,6 +184,8 @@ interface TemporaryBatchListResponse {
   batches?: TemporaryBatchAudit[];
 }
 
+export class AdminPortalAccessError extends Error {}
+
 function accountFromResponse(payload: LoginResponse): AccountProfile {
   const account = payload.account ?? payload.user ?? payload;
   if (!account.id || !account.username || !account.role) {
@@ -187,11 +198,23 @@ export async function login(
   username: string,
   password: string,
 ): Promise<AccountProfile> {
-  const payload = await fetchJson<LoginResponse>(apiUrl("/auth/login"), {
+  const payload = await fetchJson<LoginResponse>(apiUrl("/auth/admin-login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   });
+  return accountFromResponse(payload);
+}
+
+export async function temporaryLogin(password: string): Promise<AccountProfile> {
+  const payload = await fetchJson<LoginResponse>(
+    apiUrl("/auth/admin-temporary-login"),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    },
+  );
   return accountFromResponse(payload);
 }
 
@@ -201,7 +224,11 @@ export async function logout(): Promise<void> {
 }
 
 export async function getCurrentAccount(): Promise<AccountProfile> {
-  const payload = await fetchJson<LoginResponse>(apiUrl("/auth/me"));
+  const response = await apiFetch(apiUrl("/auth/admin-me"));
+  if (response.status === 403) {
+    throw new AdminPortalAccessError("此帳號沒有進入管理後台的權限");
+  }
+  const payload = await parseJson<LoginResponse>(response);
   return accountFromResponse(payload);
 }
 
@@ -333,5 +360,19 @@ export async function revokeTemporaryBatch(
   return fetchJson<TemporaryBatchAudit>(
     apiUrl(`${itemPath(TEMPORARY_BATCHES_PATH, batchId)}/revoke`),
     { method: "POST" },
+  );
+}
+
+export async function setTemporaryBatchAdminPortalAccess(
+  batchId: string,
+  enabled: boolean,
+): Promise<TemporaryBatchAudit> {
+  return fetchJson<TemporaryBatchAudit>(
+    apiUrl(`${itemPath(TEMPORARY_BATCHES_PATH, batchId)}/admin-portal-access`),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    },
   );
 }

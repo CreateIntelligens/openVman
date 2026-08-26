@@ -11,6 +11,7 @@ openVman 目前以呼叫端提供的 `project_id`、`persona_id`、角色與聲�
 - 將 project 與 persona 選擇改為「在登入者可存取集合中解析」，不再信任任意的 client-supplied ID；HTTP、SSE 與 WebSocket 使用相同授權規則。
 - 區分 system-public 與 account-private 資源：內建／既有公開 Avatar 與 provider voice 可維持共用唯讀，新的使用者上傳資產預設為私有；公開 Avatar SDK 只列出 system-public 角色。
 - 新增 Admin 與 Avatar 前端登入狀態、路由守衛、登出與 401 處理；JWT 不寫入 `localStorage`。
+- 新增獨立的 Admin portal 存取權限：ROOT／admin 固定可進後台，一般正式帳號與臨時帳號預設不可進，管理員可在帳號權限或臨時批次設定中明確開啟。
 - 登入後回傳並套用資源預設值；系統 fallback 為 `proj-b85afb8bb6`（創造智能醫院衛教助理）、`0713`（ESG-AIKKA雀斑）與 IndexTTS `hayley`。
 - ESG project `esg-7dea843a0d` 的 Quick QA／quick reply 內容納入知識庫授權與 migration，授權 ESG project 時一併授權其 quick reply，不建立旁路清單。
 - 新增既有資料 migration：現有 projects 指派給 bootstrap admin，既有公開角色／背景／吉祥物／IndexTTS voices 登記為 system-public，避免升級後遺失或意外跨帳號共享。

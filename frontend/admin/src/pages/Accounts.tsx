@@ -293,11 +293,18 @@ export default function Accounts() {
                             {account.role === "root" ? "ROOT" : account.role}
                           </span>
                           {canEditAccess && (
-                            <span className="chip">
-                              {grantCount > 0
-                                ? `已授權 ${grantCount} 項`
-                                : "尚未授權"}
-                            </span>
+                            <>
+                              <span className="chip">
+                                {grantCount > 0
+                                  ? `已授權 ${grantCount} 項`
+                                  : "尚未授權"}
+                              </span>
+                              <span className="chip">
+                                {account.admin_portal_access
+                                  ? "可進管理後台"
+                                  : "不可進管理後台"}
+                              </span>
+                            </>
                           )}
                           {isSelf && (
                             <span className="chip border-primary/30 text-primary">

@@ -12,7 +12,13 @@ from math import ceil
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from .dependencies import CurrentAccount, get_current_account, require_admin, require_root
+from .dependencies import (
+    CurrentAccount,
+    get_current_account,
+    require_admin,
+    require_admin_portal_access,
+    require_root,
+)
 from .models import (
     AccountDefaultsRecord,
     AccountRole,
@@ -22,6 +28,7 @@ from .models import (
     ResourceType,
     TemporaryCredentialRecord,
     UserRecord,
+    has_admin_portal_access,
 )
 from .passwords import PasswordValidationError, hash_password, verify_password
 from .policy import AccountPolicyError
@@ -165,6 +172,7 @@ class AccountProfile(_StrictModel):
     expires_at: str | None = None
     remaining_seconds: int | None = None
     defaults: AccountDefaultsProfile | None = None
+    admin_portal_access: bool
 
     @classmethod
     def from_record(
@@ -201,6 +209,7 @@ class AccountProfile(_StrictModel):
             created_by=user.created_by,
             expires_at=expires_at,
             remaining_seconds=remaining_seconds,
+            admin_portal_access=has_admin_portal_access(user),
             defaults=(
                 AccountDefaultsProfile.from_record(defaults)
                 if defaults is not None
@@ -261,11 +270,17 @@ class LogoutResponse(_StrictModel):
 class CreateTemporaryBatchRequest(_StrictModel):
     grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
+    admin_portal_access: bool = False
 
 
 class UpdateAccountAccessRequest(_StrictModel):
     grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
+    admin_portal_access: bool = False
+
+
+class SetAdminPortalAccessRequest(_StrictModel):
+    enabled: bool
 
 
 class CreateAccountRequest(_StrictModel):
@@ -308,6 +323,7 @@ class TemporaryBatchCreated(_StrictModel):
     batch_id: str
     credentials: list[TemporaryCredentialCreated]
     created_at: str
+    admin_portal_access: bool
 
 
 class ResourceGrantProfile(_StrictModel):
@@ -332,6 +348,7 @@ class TemporaryAccountAudit(_StrictModel):
     remaining_seconds: int | None
     grants: list[ResourceGrantProfile]
     defaults: AccountDefaultsProfile
+    admin_portal_access: bool
 
 
 class TemporaryBatchAudit(_StrictModel):
@@ -346,6 +363,7 @@ class TemporaryBatchAudit(_StrictModel):
     grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
     accounts: list[TemporaryAccountAudit]
+    admin_portal_access: bool
 
 
 def _set_session_cookie(
@@ -376,11 +394,12 @@ def _clear_session_cookie(response: Response, runtime: AuthRuntime) -> None:
     )
 
 
-@auth_router.post("/login", response_model=LoginResponse)
-def login(
+def _formal_login(
     body: LoginRequest,
     response: Response,
-    runtime: AuthRuntime = Depends(get_auth_runtime),
+    runtime: AuthRuntime,
+    *,
+    require_portal_access: bool,
 ) -> LoginResponse:
     user = runtime.users.get_by_username(body.username)
     password_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
@@ -392,6 +411,11 @@ def login(
         or not password_matches
     ):
         raise HTTPException(status_code=401, detail=_INVALID_CREDENTIALS)
+    if require_portal_access and not has_admin_portal_access(user):
+        raise HTTPException(
+            status_code=403,
+            detail="此帳號沒有進入管理後台的權限",
+        )
 
     token = runtime.tokens.issue(user)
     _set_session_cookie(response, token, runtime)
@@ -401,11 +425,40 @@ def login(
     )
 
 
-@auth_router.post("/temporary-login", response_model=LoginResponse)
-def temporary_login(
-    body: TemporaryLoginRequest,
+@auth_router.post("/login", response_model=LoginResponse)
+def login(
+    body: LoginRequest,
     response: Response,
     runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> LoginResponse:
+    return _formal_login(
+        body,
+        response,
+        runtime,
+        require_portal_access=False,
+    )
+
+
+@auth_router.post("/admin-login", response_model=LoginResponse)
+def admin_login(
+    body: LoginRequest,
+    response: Response,
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> LoginResponse:
+    return _formal_login(
+        body,
+        response,
+        runtime,
+        require_portal_access=True,
+    )
+
+
+def _temporary_login(
+    body: TemporaryLoginRequest,
+    response: Response,
+    runtime: AuthRuntime,
+    *,
+    require_portal_access: bool,
 ) -> LoginResponse:
     match = _TEMPORARY_PASSWORD_PATTERN.fullmatch(body.password)
     located = (
@@ -420,6 +473,11 @@ def temporary_login(
     password_matches = verify_password(body.password, password_hash)
     if user is None or not password_matches:
         raise HTTPException(status_code=401, detail=_INVALID_CREDENTIALS)
+    if require_portal_access and not has_admin_portal_access(user):
+        raise HTTPException(
+            status_code=403,
+            detail="此帳號沒有進入管理後台的權限",
+        )
 
     now = datetime.now(timezone.utc)
     try:
@@ -455,6 +513,34 @@ def temporary_login(
     )
 
 
+@auth_router.post("/temporary-login", response_model=LoginResponse)
+def temporary_login(
+    body: TemporaryLoginRequest,
+    response: Response,
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> LoginResponse:
+    return _temporary_login(
+        body,
+        response,
+        runtime,
+        require_portal_access=False,
+    )
+
+
+@auth_router.post("/admin-temporary-login", response_model=LoginResponse)
+def admin_temporary_login(
+    body: TemporaryLoginRequest,
+    response: Response,
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> LoginResponse:
+    return _temporary_login(
+        body,
+        response,
+        runtime,
+        require_portal_access=True,
+    )
+
+
 @auth_router.post("/logout", response_model=LogoutResponse)
 def logout(
     response: Response,
@@ -468,6 +554,18 @@ def logout(
 @auth_router.get("/me", response_model=AccountProfile)
 def me(
     current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AccountProfile:
+    return AccountProfile.from_record(
+        current.user,
+        runtime=runtime,
+        credential=current.temporary_credential,
+    )
+
+
+@auth_router.get("/admin-me", response_model=AccountProfile)
+def admin_me(
+    current: CurrentAccount = Depends(require_admin_portal_access),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> AccountProfile:
     return AccountProfile.from_record(
@@ -544,6 +642,7 @@ def _temporary_account_audit(
         remaining_seconds=remaining_seconds,
         grants=[ResourceGrantProfile.from_record(grant) for grant in account.grants],
         defaults=AccountDefaultsProfile.from_record(account.defaults),
+        admin_portal_access=account.user.admin_portal_access,
     )
 
 
@@ -587,6 +686,7 @@ def _temporary_batch_audit(
         grants=AccountResourceGrants.from_records(first_account.grants),
         defaults=AccountDefaultsProfile.from_record(first_account.defaults),
         accounts=accounts,
+        admin_portal_access=first_account.user.admin_portal_access,
     )
 
 
@@ -627,6 +727,7 @@ def create_temporary_batch(
             grants=_resource_grants(body.grants),
             defaults=_defaults_tuple(body.defaults),
             duration_seconds=_TEMPORARY_DURATION_SECONDS,
+            admin_portal_access=body.admin_portal_access,
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -646,6 +747,7 @@ def create_temporary_batch(
             for locator, password in generated
         ],
         created_at=batch.batch.created_at,
+        admin_portal_access=body.admin_portal_access,
     )
 
 
@@ -662,6 +764,30 @@ def list_temporary_batches(
         _temporary_batch_audit(batch, now=now)
         for batch in runtime.temporary_accounts.list_batches()
     ]
+
+
+@temporary_accounts_router.patch(
+    "/batches/{batch_id}/admin-portal-access",
+    response_model=TemporaryBatchAudit,
+)
+def set_temporary_batch_admin_portal_access(
+    batch_id: str,
+    body: SetAdminPortalAccessRequest,
+    admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> TemporaryBatchAudit:
+    try:
+        batch = runtime.temporary_accounts.set_admin_portal_access(
+            batch_id,
+            actor_id=admin.user.id,
+            enabled=body.enabled,
+        )
+    except TemporaryCredentialNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Temporary batch not found",
+        ) from exc
+    return _temporary_batch_audit(batch)
 
 
 @temporary_accounts_router.post(
@@ -770,6 +896,7 @@ def update_account_access(
             granted_by=admin.user.id,
             grants=_resource_grants(body.grants),
             defaults=_defaults_tuple(body.defaults),
+            admin_portal_access=body.admin_portal_access,
         )
     except UserNotFoundError as exc:
         raise HTTPException(
@@ -807,6 +934,7 @@ def create_account(
             created_by=admin.user.id,
             grants=_resource_grants(access.grants) if access is not None else None,
             defaults=_defaults_tuple(access.defaults) if access is not None else None,
+            admin_portal_access=bool(access and access.admin_portal_access),
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -897,6 +1025,7 @@ def change_account_role(
             role=body.role,
             grants=_resource_grants(access.grants) if access is not None else None,
             defaults=_defaults_tuple(access.defaults) if access is not None else None,
+            admin_portal_access=bool(access and access.admin_portal_access),
         )
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc

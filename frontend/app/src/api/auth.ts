@@ -1,6 +1,6 @@
 import { apiFetch, fetchJson, parseJson } from "./http"
 
-export type AccountRole = "admin" | "user"
+export type AccountRole = "root" | "admin" | "user"
 export type AccountKind = "formal" | "temporary"
 
 export interface AccountDefaults {
@@ -23,6 +23,7 @@ export interface AccountProfile {
   expires_at?: string | null
   remaining_seconds?: number | null
   defaults?: AccountDefaults | null
+  admin_portal_access?: boolean
 }
 
 interface AccountResponse extends Partial<AccountProfile> {

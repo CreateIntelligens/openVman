@@ -4,10 +4,13 @@ import {
   createAccount,
   createTemporaryBatch,
   fetchAccountAccessOptions,
+  getCurrentAccount,
   isAtLeastAdmin,
   listAccounts,
   login,
   resetAccountPassword,
+  setTemporaryBatchAdminPortalAccess,
+  temporaryLogin,
   updateAccountRole,
   updateAccountAccess,
 } from "./auth";
@@ -40,7 +43,7 @@ describe("cookie auth API", () => {
     expect(account.username).toBe("alice");
     expect(Object.prototype.hasOwnProperty.call(account, "token")).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/auth/login",
+      "/api/auth/admin-login",
       expect.objectContaining({ credentials: "include" }),
     );
     expect(JSON.stringify(window.localStorage)).not.toContain("secret-jwt");
@@ -51,6 +54,55 @@ describe("cookie auth API", () => {
     expect(isAtLeastAdmin("root")).toBe(true);
     expect(isAtLeastAdmin("admin")).toBe(true);
     expect(isAtLeastAdmin("user")).toBe(false);
+  });
+
+  it("uses Admin-specific session and temporary-login endpoints", async () => {
+    const account = {
+      id: "temporary-1",
+      username: "臨時帳號",
+      role: "user",
+      kind: "temporary",
+      disabled: false,
+      created_at: "2026-08-26T00:00:00Z",
+      admin_portal_access: true,
+    };
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+      new Response(JSON.stringify({
+        account,
+        token: "not-persisted",
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await temporaryLogin("temporary-password");
+    await getCurrentAccount();
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/auth/admin-temporary-login");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/auth/admin-me");
+  });
+
+  it("updates Admin portal access for an existing temporary batch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      batch_id: "batch-1",
+      created_at: "2026-08-26T00:00:00Z",
+      admin_portal_access: true,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await setTemporaryBatchAdminPortalAccess("batch-1", true);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/temporary-accounts/batches/batch-1/admin-portal-access",
+      expect.objectContaining({ method: "PATCH", credentials: "include" }),
+    );
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual({ enabled: true });
   });
 
   it("keeps secret fields out of formal account responses", async () => {
@@ -166,6 +218,7 @@ describe("cookie auth API", () => {
         voice_provider: "indextts",
         voice_id: "hayley",
       },
+      admin_portal_access: false,
     });
 
     expect(result.credentials).toHaveLength(5);
@@ -186,6 +239,7 @@ describe("cookie auth API", () => {
         voice_provider: "indextts",
         voice_id: "hayley",
       },
+      admin_portal_access: false,
     });
   });
 
@@ -202,6 +256,7 @@ describe("cookie auth API", () => {
         voice_provider: "indextts",
         voice_id: "voice-a",
       },
+      admin_portal_access: true,
     };
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       id: "user-a",
@@ -278,6 +333,7 @@ describe("cookie auth API", () => {
     await expect(updateAccountAccess("user-a", {
       grants: updated.grants,
       defaults: updated.defaults,
+      admin_portal_access: true,
     })).resolves.toEqual(updated);
 
     expect(fetchMock).toHaveBeenNthCalledWith(

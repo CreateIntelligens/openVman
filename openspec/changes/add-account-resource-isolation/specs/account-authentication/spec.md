@@ -88,3 +88,22 @@ The system SHALL return `expires_at` and a non-negative `remaining_seconds` in t
 - **WHEN** the frontend receives a successful temporary login response
 - **THEN** it displays the remaining duration and absolute expiry time
 - **THEN** it does not store the password or JWT in localStorage
+
+### Requirement: Admin portal access is explicitly authorized
+The system SHALL allow ROOT and administrator accounts to enter the Admin portal, SHALL require an explicit `admin_portal_access` capability for formal non-admin and temporary accounts, and SHALL default that capability to false for existing and newly created scoped accounts.
+
+#### Scenario: Scoped account has no Admin portal grant
+- **WHEN** a formal non-admin or temporary session without `admin_portal_access` calls the Admin session bootstrap endpoint
+- **THEN** the system returns 403 while leaving the session valid for the normal frontend
+
+#### Scenario: Unauthorized temporary password is submitted to Admin login
+- **WHEN** a valid unused temporary password without `admin_portal_access` is submitted to the Admin-specific temporary login endpoint
+- **THEN** the system returns 403 without starting its 72-hour first-use window
+
+#### Scenario: Scoped account receives an Admin portal grant
+- **WHEN** an administrator enables `admin_portal_access` for a formal account or temporary batch
+- **THEN** that account can bootstrap the Admin portal while retaining its existing resource scope
+
+#### Scenario: Admin portal grant changes
+- **WHEN** an administrator enables or disables `admin_portal_access`
+- **THEN** the affected account sessions are revoked so the next request must reauthenticate against the current permission

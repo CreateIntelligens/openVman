@@ -15,6 +15,7 @@ from .models import (
     AccountType,
     TemporaryCredentialRecord,
     UserRecord,
+    has_admin_portal_access,
     is_at_least_admin,
 )
 from .runtime import AuthRuntime, get_auth_runtime
@@ -169,6 +170,17 @@ def require_admin(
 ) -> CurrentAccount:
     if not is_at_least_admin(current.user.role):
         raise HTTPException(status_code=403, detail="Administrator access required")
+    return current
+
+
+def require_admin_portal_access(
+    current: CurrentAccount = Depends(get_current_account),
+) -> CurrentAccount:
+    if not has_admin_portal_access(current.user):
+        raise HTTPException(
+            status_code=403,
+            detail="此帳號沒有進入管理後台的權限",
+        )
     return current
 
 

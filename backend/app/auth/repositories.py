@@ -144,6 +144,7 @@ def _user_from_row(row: sqlite3.Row) -> UserRecord:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         created_by=row["created_by"],
+        admin_portal_access=bool(row["admin_portal_access"]),
     )
 
 
@@ -206,8 +207,8 @@ def _defaults_from_row(row: sqlite3.Row) -> AccountDefaultsRecord:
         character_id=row["character_id"],
         voice_provider=row["voice_provider"],
         voice_id=row["voice_id"],
-        mascot_id=row["mascot_id"] or "" if "mascot_id" in keys and row["mascot_id"] else "",
-        background_id=row["background_id"] or "" if "background_id" in keys and row["background_id"] else "",
+        mascot_id=(row["mascot_id"] or "") if "mascot_id" in keys else "",
+        background_id=(row["background_id"] or "") if "background_id" in keys else "",
     )
 
 
@@ -440,6 +441,7 @@ class UserRepository:
         account_type: AccountType = AccountType.FORMAL,
         grants: Iterable[tuple[ResourceType, str]] | None = None,
         defaults: tuple[str, str, str, str] | None = None,
+        admin_portal_access: bool = False,
     ) -> UserRecord:
         if role is AccountRole.ROOT:
             raise AccountPolicyError("ROOT accounts cannot be created")
@@ -477,8 +479,8 @@ class UserRepository:
                     INSERT INTO users(
                         id, username, username_normalized, password_hash, role,
                         account_type, disabled, token_version, created_at,
-                        updated_at, created_by
-                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)
+                        updated_at, created_by, admin_portal_access
+                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
@@ -490,6 +492,7 @@ class UserRepository:
                         now,
                         now,
                         created_by,
+                        int(admin_portal_access),
                     ),
                 )
                 if normalized_access is not None:
@@ -511,6 +514,7 @@ class UserRepository:
                         target_user_id=user_id,
                         metadata={
                             "account_type": account_type.value,
+                            "admin_portal_access": admin_portal_access,
                             "role": role.value,
                         },
                         now=now,
@@ -556,8 +560,8 @@ class UserRepository:
                     INSERT INTO users(
                         id, username, username_normalized, password_hash, role,
                         account_type, disabled, token_version, created_at,
-                        updated_at, created_by
-                    ) VALUES (?, ?, ?, ?, 'root', 'formal', 0, 0, ?, ?, NULL)
+                        updated_at, created_by, admin_portal_access
+                    ) VALUES (?, ?, ?, ?, 'root', 'formal', 0, 0, ?, ?, NULL, 0)
                     """,
                     (
                         user_id,
@@ -747,6 +751,7 @@ class UserRepository:
         role: AccountRole,
         grants: Iterable[tuple[ResourceType, str]] | None = None,
         defaults: tuple[str, ...] | None = None,
+        admin_portal_access: bool = False,
     ) -> UserRecord:
         if (grants is None) != (defaults is None):
             raise InvalidResourceGrantError(
@@ -796,17 +801,29 @@ class UserRepository:
             connection.execute(
                 """
                 UPDATE users
-                SET role = ?, token_version = token_version + 1, updated_at = ?
+                SET role = ?, admin_portal_access = ?,
+                    token_version = token_version + 1, updated_at = ?
                 WHERE id = ?
                 """,
-                (role.value, now, user_id),
+                (
+                    role.value,
+                    int(admin_portal_access) if role is AccountRole.USER else 0,
+                    now,
+                    user_id,
+                ),
             )
             _append_auth_audit(
                 connection,
                 action="account_role_changed",
                 actor_user_id=actor_id,
                 target_user_id=user_id,
-                metadata={"from_role": target.role.value, "to_role": role.value},
+                metadata={
+                    "admin_portal_access": (
+                        admin_portal_access if role is AccountRole.USER else True
+                    ),
+                    "from_role": target.role.value,
+                    "to_role": role.value,
+                },
                 now=now,
             )
 
@@ -1162,7 +1179,8 @@ class AccountAccessRepository:
         user_id: str,
         granted_by: str,
         grants: Iterable[tuple[ResourceType, str]],
-        defaults: tuple[str, str, str, str],
+        defaults: tuple[str, ...],
+        admin_portal_access: bool = False,
     ) -> tuple[tuple[ResourceGrantRecord, ...], AccountDefaultsRecord]:
         normalized_grants, normalized_defaults = _normalize_account_access(
             grants,
@@ -1202,11 +1220,28 @@ class AccountAccessRepository:
                 now=now,
                 clear_existing=True,
             )
+            connection.execute(
+                """
+                UPDATE users
+                SET admin_portal_access = ?,
+                    token_version = token_version + CASE
+                        WHEN admin_portal_access != ? THEN 1 ELSE 0 END,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    int(admin_portal_access),
+                    int(admin_portal_access),
+                    now,
+                    user_id,
+                ),
+            )
             _append_auth_audit(
                 connection,
                 action="account_access_updated",
                 actor_user_id=granted_by,
                 target_user_id=user_id,
+                metadata={"admin_portal_access": admin_portal_access},
                 now=now,
             )
 
@@ -1252,6 +1287,7 @@ class TemporaryAccountRepository:
         grants: Iterable[tuple[ResourceType, str]],
         defaults: tuple[str, str, str, str],
         duration_seconds: int,
+        admin_portal_access: bool = False,
     ) -> TemporaryBatch:
         if len(credentials) != 5:
             raise ValueError("a temporary batch must contain exactly five credentials")
@@ -1262,14 +1298,6 @@ class TemporaryAccountRepository:
             grants,
             defaults,
         )
-        (
-            project_id,
-            character_id,
-            voice_provider,
-            voice_id,
-            mascot_id,
-            background_id,
-        ) = normalized_defaults
 
         locators = [credential.locator for credential in credentials]
         if len(set(locators)) != len(credentials) or any(
@@ -1320,8 +1348,9 @@ class TemporaryAccountRepository:
                         INSERT INTO users(
                             id, username, username_normalized, password_hash,
                             role, account_type, disabled, token_version,
-                            created_at, updated_at, created_by
-                        ) VALUES (?, ?, ?, ?, 'user', 'temporary', 0, 0, ?, ?, ?)
+                            created_at, updated_at, created_by,
+                            admin_portal_access
+                        ) VALUES (?, ?, ?, ?, 'user', 'temporary', 0, 0, ?, ?, ?, ?)
                         """,
                         (
                             user_id,
@@ -1331,6 +1360,7 @@ class TemporaryAccountRepository:
                             now,
                             now,
                             created_by,
+                            int(admin_portal_access),
                         ),
                     )
                     connection.execute(
@@ -1361,7 +1391,11 @@ class TemporaryAccountRepository:
                     action="temporary_batch_created",
                     actor_user_id=created_by,
                     target_user_id=None,
-                    metadata={"account_count": len(credentials), "batch_id": batch_id},
+                    metadata={
+                        "account_count": len(credentials),
+                        "admin_portal_access": admin_portal_access,
+                        "batch_id": batch_id,
+                    },
                     now=now,
                 )
         except sqlite3.IntegrityError as exc:
@@ -1544,6 +1578,59 @@ class TemporaryAccountRepository:
             ).fetchall()
         batches = [self.get_batch(row["id"]) for row in rows]
         return [batch for batch in batches if batch is not None]
+
+    def set_admin_portal_access(
+        self,
+        batch_id: str,
+        *,
+        actor_id: str,
+        enabled: bool,
+    ) -> TemporaryBatch:
+        now = _now_iso()
+        with self.database.transaction(write=True) as connection:
+            actor = connection.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (actor_id,),
+            ).fetchone()
+            if actor is None:
+                raise UserNotFoundError("administrator account does not exist")
+            ensure_account_manager(_user_from_row(actor))
+            exists = connection.execute(
+                "SELECT 1 FROM temporary_account_batches WHERE id = ?",
+                (batch_id,),
+            ).fetchone()
+            if exists is None:
+                raise TemporaryCredentialNotFoundError(
+                    "temporary batch does not exist"
+                )
+            connection.execute(
+                """
+                UPDATE users
+                SET admin_portal_access = ?,
+                    token_version = token_version + CASE
+                        WHEN admin_portal_access != ? THEN 1 ELSE 0 END,
+                    updated_at = ?
+                WHERE id IN (
+                    SELECT user_id FROM temporary_credentials WHERE batch_id = ?
+                )
+                """,
+                (int(enabled), int(enabled), now, batch_id),
+            )
+            _append_auth_audit(
+                connection,
+                action="temporary_batch_admin_portal_access_updated",
+                actor_user_id=actor_id,
+                target_user_id=None,
+                metadata={
+                    "admin_portal_access": enabled,
+                    "batch_id": batch_id,
+                },
+                now=now,
+            )
+        batch = self.get_batch(batch_id)
+        if batch is None:
+            raise RepositoryError("updated temporary batch could not be reloaded")
+        return batch
 
     def revoke_batch(
         self,

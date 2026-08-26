@@ -88,3 +88,10 @@
 - [x] 11.3 Run Backend and Brain unit／integration suites, Admin and Avatar frontend tests／type-checks／production builds, SDK contract tests, and `git diff --check`.
 - [x] 11.4 Run migrations twice against a disposable copy of current data, verify unchanged counts and hashes on the second run, and confirm rollback preserves both legacy and new private files.
 - [x] 11.5 Verify formal-account grant replacement through API tests and a live create／login／list／cleanup smoke test.
+
+## 12. Explicit Admin portal access
+
+- [x] 12.1 Add a fail-closed `admin_portal_access` account field and migration, effective ROOT／admin access helper, Admin session bootstrap endpoint, and session revocation when the capability changes.
+- [x] 12.2 Extend formal account access updates and temporary batch create／update APIs with a default-false Admin portal capability plus audit-safe responses.
+- [x] 12.3 Add Admin frontend portal gating and permission controls for formal accounts and temporary batches without changing normal frontend login or scoped resource behavior.
+- [x] 12.4 Add Backend and Admin frontend regression tests, validate OpenSpec strictly, run focused type／test checks, and verify the final diff.

@@ -104,6 +104,7 @@ describe("Accounts", () => {
           mascot_id: "",
           background_id: "",
         },
+        admin_portal_access: false,
       },
     }));
     await waitFor(() => {
@@ -288,6 +289,7 @@ describe("Accounts", () => {
             mascot_id: "",
             background_id: "",
           },
+          admin_portal_access: false,
         },
       },
     ));

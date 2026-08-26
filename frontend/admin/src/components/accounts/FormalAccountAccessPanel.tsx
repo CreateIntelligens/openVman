@@ -26,7 +26,11 @@ export default function FormalAccountAccessPanel({
 }: FormalAccountAccessPanelProps) {
   const initialAccess: AccountAccessInput | undefined = (
     account.grants && account.defaults
-      ? { grants: account.grants, defaults: account.defaults }
+      ? {
+        grants: account.grants,
+        defaults: account.defaults,
+        admin_portal_access: account.admin_portal_access ?? false,
+      }
       : undefined
   );
   const accessForm = useAccountAccessForm(account.id, initialAccess);

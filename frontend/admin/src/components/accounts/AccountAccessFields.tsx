@@ -33,6 +33,7 @@ const EMPTY_ACCESS: AccountAccessInput = {
     mascot_id: "",
     background_id: "",
   },
+  admin_portal_access: false,
 };
 
 const GROUPS: Array<{
@@ -141,6 +142,7 @@ function accessFromOptions(
       mascot_id: initialDefault(current?.defaults.mascot_id, mascots),
       background_id: initialDefault(current?.defaults.background_id, backgrounds),
     },
+    admin_portal_access: current?.admin_portal_access ?? false,
   };
 }
 
@@ -185,6 +187,13 @@ export function useAccountAccessForm(
   }, [cacheKey, revision, enabled]);
 
   const reload = useCallback(() => setRevision((current) => current + 1), []);
+
+  function setAdminPortalAccess(enabled: boolean) {
+    setAccess((current) => ({
+      ...current,
+      admin_portal_access: enabled,
+    }));
+  }
 
   function setDefault(grantType: GrantType, value: string) {
     setAccess((current) => {
@@ -307,6 +316,7 @@ export function useAccountAccessForm(
     loading,
     options,
     reload,
+    setAdminPortalAccess,
     setDefault,
     toggle,
   };
@@ -338,10 +348,26 @@ export default function AccountAccessFields({
   form: AccountAccessForm;
 }) {
   return (
-    <div className="grid border-y border-border grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-0">
-      {GROUPS.map((group) => (
-        <AccessGroup key={group.grantType} form={form} {...group} />
-      ))}
+    <div className="border-y border-border">
+      <label className="flex cursor-pointer items-start gap-3 border-b border-border bg-surface-sunken px-5 py-4">
+        <input
+          className="mt-1 h-4 w-4 accent-primary"
+          type="checkbox"
+          checked={form.access.admin_portal_access}
+          onChange={(event) => form.setAdminPortalAccess(event.target.checked)}
+        />
+        <span>
+          <span className="block text-sm font-semibold">允許進入管理後台</span>
+          <span className="mt-1 block text-xs leading-5 text-content-muted">
+            預設不允許；開啟後仍只看得到下方授權的資源，並不會取得帳號管理權限。
+          </span>
+        </span>
+      </label>
+      <div className="grid grid-cols-1 gap-0 md:grid-cols-2 xl:grid-cols-3">
+        {GROUPS.map((group) => (
+          <AccessGroup key={group.grantType} form={form} {...group} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -394,7 +420,11 @@ function AccessGroup({
 
   // 聲音有數十個且分屬不同廠牌，先挑廠牌再挑聲音才選得動。
   const providers = Array.from(
-    new Set(options.map((option) => option.provider).filter((p): p is string => Boolean(p))),
+    new Set(
+      options
+        .map((option) => option.provider)
+        .filter((p): p is string => Boolean(p)),
+    ),
   ).sort();
   const useProviderFilter = providers.length > 1;
   const [activeProvider, setActiveProvider] = useState<string>("");

@@ -9,9 +9,11 @@ import {
 } from "react";
 
 import {
+  AdminPortalAccessError,
   getCurrentAccount,
   login as loginRequest,
   logout as logoutRequest,
+  temporaryLogin as temporaryLoginRequest,
   type AccountProfile,
 } from "../api/auth";
 import {
@@ -25,6 +27,7 @@ interface AuthContextValue {
   loading: boolean;
   forbidden: boolean;
   login: (username: string, password: string) => Promise<void>;
+  loginTemporary: (password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearForbidden: () => void;
 }
@@ -58,8 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((profile) => {
         if (active) setAccount(profile);
       })
-      .catch(() => {
-        if (active) expireSession();
+      .catch((reason) => {
+        if (!active) return;
+        if (reason instanceof AdminPortalAccessError) {
+          setAccount(null);
+          setForbidden(true);
+          return;
+        }
+        expireSession();
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -72,12 +81,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [expireSession]);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const profile = await loginRequest(username, password);
+  const handleAuthenticated = useCallback((profile: AccountProfile) => {
     setAccount(profile);
     setForbidden(false);
     replacePath(publicAdminPath("/admin/chat"));
   }, []);
+
+  const login = useCallback(async (username: string, password: string) => {
+    const profile = await loginRequest(username, password);
+    handleAuthenticated(profile);
+  }, [handleAuthenticated]);
+
+  const loginTemporary = useCallback(async (password: string) => {
+    const profile = await temporaryLoginRequest(password);
+    handleAuthenticated(profile);
+  }, [handleAuthenticated]);
 
   const logout = useCallback(async () => {
     try {
@@ -101,10 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       forbidden,
       login,
+      loginTemporary,
       logout,
       clearForbidden,
     }),
-    [account, clearForbidden, forbidden, loading, login, logout],
+    [account, clearForbidden, forbidden, loading, login, loginTemporary, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

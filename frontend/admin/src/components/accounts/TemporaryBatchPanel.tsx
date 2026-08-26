@@ -8,6 +8,7 @@ import {
   createTemporaryBatch,
   listTemporaryBatches,
   revokeTemporaryBatch,
+  setTemporaryBatchAdminPortalAccess,
   type TemporaryBatchAudit,
   type TemporaryBatchResult,
 } from "../../api/auth";
@@ -19,18 +20,23 @@ function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-function batchStateLabel(batch: TemporaryBatchAudit): string {
-  if (batch.revoked_at || batch.state === "revoked") return "已撤銷";
-  if (batch.state === "expired") return "已到期";
-  if (batch.first_used_at || batch.state === "active") return "使用中";
-  return "尚未啟用";
+function stateLabel(state?: string | null): string {
+  switch (state) {
+    case "active":
+      return "使用中";
+    case "expired":
+      return "已到期";
+    case "revoked":
+      return "已撤銷";
+    default:
+      return "尚未啟用";
+  }
 }
 
-function stateLabel(state: string): string {
-  if (state === "active") return "使用中";
-  if (state === "expired") return "已到期";
-  if (state === "revoked") return "已撤銷";
-  return "尚未啟用";
+function batchStateLabel(batch: TemporaryBatchAudit): string {
+  if (batch.revoked_at) return "已撤銷";
+  if (batch.state) return stateLabel(batch.state);
+  return batch.first_used_at ? "使用中" : "尚未啟用";
 }
 
 function dateLabel(value?: string | null): string {
@@ -50,6 +56,10 @@ function revokeButtonLabel(isRevoking: boolean, isRevoked: boolean): string {
   return "撤銷整批";
 }
 
+function portalAccessButtonLabel(isUpdating: boolean, hasAccess: boolean): string {
+  if (isUpdating) return "更新中…";
+  return hasAccess ? "關閉後台權限" : "開啟後台權限";
+}
 
 export default function TemporaryBatchPanel() {
   const accessForm = useAccountAccessForm("temporary-account-batch");
@@ -58,6 +68,7 @@ export default function TemporaryBatchPanel() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [updatingPortal, setUpdatingPortal] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -129,6 +140,24 @@ export default function TemporaryBatchPanel() {
       setError(messageFrom(reason, "撤銷批次失敗"));
     } finally {
       setRevoking(null);
+    }
+  }
+
+  async function updatePortalAccess(batch: TemporaryBatchAudit) {
+    setUpdatingPortal(batch.batch_id);
+    setError(null);
+    try {
+      const updated = await setTemporaryBatchAdminPortalAccess(
+        batch.batch_id,
+        !(batch.admin_portal_access ?? false),
+      );
+      setBatches((current) => current.map(
+        (item) => item.batch_id === batch.batch_id ? updated : item,
+      ));
+    } catch (reason) {
+      setError(messageFrom(reason, "更新管理後台權限失敗"));
+    } finally {
+      setUpdatingPortal(null);
     }
   }
 
@@ -213,6 +242,9 @@ export default function TemporaryBatchPanel() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-sm">建立於 {dateLabel(batch.created_at)}</span>
                       <span className="chip">{batchStateLabel(batch)}</span>
+                      <span className="chip">
+                        {batch.admin_portal_access ? "可進管理後台" : "不可進管理後台"}
+                      </span>
                       <span className="text-xs text-content-subtle">{batch.account_count ?? 5} 組</span>
                     </div>
                     {batch.expires_at && (
@@ -221,17 +253,30 @@ export default function TemporaryBatchPanel() {
                       </p>
                     )}
                   </div>
-                  <button
-                    className="btn btn-danger self-start md:self-auto"
-                    type="button"
-                    disabled={revoked || revoking === batch.batch_id}
-                    onClick={() => {
-                      if (!window.confirm("確定撤銷這一批臨時帳號的剩餘存取權？")) return;
-                      void revoke(batch.batch_id);
-                    }}
-                  >
-                    {revokeButtonLabel(revoking === batch.batch_id, revoked)}
-                  </button>
+                  <div className="flex flex-wrap gap-2 self-start md:self-auto">
+                    <button
+                      className="btn btn-ghost"
+                      type="button"
+                      disabled={revoked || updatingPortal === batch.batch_id}
+                      onClick={() => void updatePortalAccess(batch)}
+                    >
+                      {portalAccessButtonLabel(
+                        updatingPortal === batch.batch_id,
+                        batch.admin_portal_access ?? false,
+                      )}
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      type="button"
+                      disabled={revoked || revoking === batch.batch_id}
+                      onClick={() => {
+                        if (!window.confirm("確定撤銷這一批臨時帳號的剩餘存取權？")) return;
+                        void revoke(batch.batch_id);
+                      }}
+                    >
+                      {revokeButtonLabel(revoking === batch.batch_id, revoked)}
+                    </button>
+                  </div>
                 </div>
                 {batch.accounts && batch.accounts.length > 0 && (
                   <div className="mt-3 grid gap-x-5 gap-y-2 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">

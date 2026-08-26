@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.auth.middleware import FailClosedAuthMiddleware
+from app.auth.middleware import FailClosedAuthMiddleware, is_public_path
 from app.auth.models import ResourceType, ResourceVisibility
 from app.auth.resources import (
     ResourceNotFoundError,
@@ -97,6 +97,7 @@ def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
         "expires_at": None,
         "remaining_seconds": None,
         "defaults": None,
+        "admin_portal_access": True,
     }
     assert login["token"]
 
@@ -114,6 +115,98 @@ def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
     assert logout.status_code == 200
     assert logout.json() == {"ok": True}
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_admin_portal_access_defaults_denied_and_can_be_replaced(
+    client,
+    runtime,
+):
+    from app.auth.models import AccountRole
+    from app.auth.passwords import hash_password
+
+    admin = _bootstrap_admin(runtime)
+    user = runtime.users.create(
+        username="portal-user",
+        password_hash=hash_password(_USER_PASSWORD),
+        role=AccountRole.USER,
+    )
+    for resource_type, resource_id in (
+        (ResourceType.PROJECT, "portal-project"),
+        (ResourceType.AVATAR_CHARACTER, "portal-character"),
+        (ResourceType.CUSTOM_VOICE, "portal-voice"),
+    ):
+        runtime.resources.register(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            owner_user_id=admin.id if resource_type is ResourceType.PROJECT else None,
+            visibility=(
+                ResourceVisibility.PRIVATE
+                if resource_type is ResourceType.PROJECT
+                else ResourceVisibility.SYSTEM_PUBLIC
+            ),
+        )
+
+    generic_login = _login(client, user.username, _USER_PASSWORD)
+    generic_headers = {
+        "Authorization": f"Bearer {generic_login['token']}",
+    }
+    assert generic_login["account"]["admin_portal_access"] is False
+    assert client.post(
+        "/api/auth/admin-login",
+        json={"username": user.username, "password": _USER_PASSWORD},
+    ).status_code == 403
+    assert client.get("/api/auth/admin-me", headers=generic_headers).status_code == 403
+    assert client.get("/api/auth/me", headers=generic_headers).status_code == 200
+
+    admin_headers = {
+        "Authorization": f"Bearer {_login(client, admin.username, _ADMIN_PASSWORD)['token']}",
+    }
+    access = {
+        "grants": {
+            "projects": ["portal-project"],
+            "avatar_characters": ["portal-character"],
+            "custom_voices": ["portal-voice"],
+            "avatar_mascots": [],
+            "avatar_backgrounds": [],
+        },
+        "defaults": {
+            "project_id": "portal-project",
+            "character_id": "portal-character",
+            "voice_provider": "indextts",
+            "voice_id": "portal-voice",
+            "mascot_id": "",
+            "background_id": "",
+        },
+        "admin_portal_access": True,
+    }
+    granted = client.put(
+        f"/api/users/{user.id}/access",
+        headers=admin_headers,
+        json=access,
+    )
+    assert granted.status_code == 200
+    assert granted.json()["admin_portal_access"] is True
+    assert client.get("/api/auth/me", headers=generic_headers).status_code == 401
+
+    portal_login = client.post(
+        "/api/auth/admin-login",
+        json={"username": user.username, "password": _USER_PASSWORD},
+    )
+    assert portal_login.status_code == 200
+    portal_headers = {
+        "Authorization": f"Bearer {portal_login.json()['token']}",
+    }
+    assert client.get("/api/auth/admin-me", headers=portal_headers).status_code == 200
+
+    access["admin_portal_access"] = False
+    denied = client.put(
+        f"/api/users/{user.id}/access",
+        headers=admin_headers,
+        json=access,
+    )
+    assert denied.status_code == 200
+    assert denied.json()["admin_portal_access"] is False
+    assert client.get("/api/auth/me", headers=portal_headers).status_code == 401
 
 
 def test_production_login_cookie_has_required_flags(tmp_path: Path):
@@ -205,7 +298,7 @@ def test_admin_lifecycle_creator_revocation_and_immediate_disable(client, runtim
 
 
 def test_admin_creates_formal_account_with_access_atomically(client, runtime):
-    admin = _bootstrap_admin(runtime)
+    _bootstrap_admin(runtime)
     admin_headers = {
         "Authorization": f"Bearer {_login(client, 'admin', _ADMIN_PASSWORD)['token']}",
     }
@@ -238,6 +331,7 @@ def test_admin_creates_formal_account_with_access_atomically(client, runtime):
             "mascot_id": "",
             "background_id": "",
         },
+        "admin_portal_access": True,
     }
     created = client.post(
         "/api/users",
@@ -253,6 +347,7 @@ def test_admin_creates_formal_account_with_access_atomically(client, runtime):
     assert created.status_code == 201
     assert created.json()["grants"] == access["grants"]
     assert created.json()["defaults"] == access["defaults"]
+    assert created.json()["admin_portal_access"] is True
 
     invalid = client.post(
         "/api/users",
@@ -510,6 +605,9 @@ def test_fail_closed_middleware_ignores_query_tokens_and_enforces_csrf(runtime):
     app.add_middleware(FailClosedAuthMiddleware, runtime=runtime)
     isolated_client = TestClient(app)
 
+    assert is_public_path("/api/auth/admin-login") is True
+    assert is_public_path("/api/auth/admin-temporary-login") is True
+    assert is_public_path("/api/auth/admin-me") is False
     assert isolated_client.get("/healthz").status_code == 200
     assert isolated_client.get("/private").status_code == 401
     assert isolated_client.get(f"/private?token={token}").status_code == 401

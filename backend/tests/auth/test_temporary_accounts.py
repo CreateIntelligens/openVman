@@ -166,6 +166,80 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
     assert all(locator not in audit_text for locator in locators)
 
 
+def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
+    client: TestClient,
+    runtime: AuthRuntime,
+):
+    _bootstrap(runtime)
+    admin_headers = _admin_headers(client)
+    created = client.post(
+        "/api/temporary-accounts/batches",
+        headers=admin_headers,
+        json=_batch_body(),
+    ).json()
+    password = created["credentials"][0]["password"]
+
+    assert created["admin_portal_access"] is False
+    denied = client.post(
+        "/api/auth/admin-temporary-login",
+        json={"password": password},
+    )
+    assert denied.status_code == 403
+    with runtime.database.transaction() as connection:
+        first_used_at = connection.execute(
+            """
+            SELECT first_used_at FROM temporary_credentials
+            WHERE batch_id = ? ORDER BY user_id LIMIT 1
+            """,
+            (created["batch_id"],),
+        ).fetchone()["first_used_at"]
+    assert first_used_at is None
+
+    granted = client.patch(
+        f"/api/temporary-accounts/batches/{created['batch_id']}"
+        "/admin-portal-access",
+        headers=admin_headers,
+        json={"enabled": True},
+    )
+    assert granted.status_code == 200
+    assert granted.json()["admin_portal_access"] is True
+    assert all(
+        account["admin_portal_access"] is True
+        for account in granted.json()["accounts"]
+    )
+
+    portal_login = client.post(
+        "/api/auth/admin-temporary-login",
+        json={"password": password},
+    )
+    assert portal_login.status_code == 200
+    portal_headers = {
+        "Authorization": f"Bearer {portal_login.json()['token']}",
+    }
+    assert client.get("/api/auth/admin-me", headers=portal_headers).status_code == 200
+
+    revoked = client.patch(
+        f"/api/temporary-accounts/batches/{created['batch_id']}"
+        "/admin-portal-access",
+        headers=admin_headers,
+        json={"enabled": False},
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["admin_portal_access"] is False
+    assert client.get("/api/auth/me", headers=portal_headers).status_code == 401
+
+    normal_login = client.post(
+        "/api/auth/temporary-login",
+        json={"password": password},
+    )
+    assert normal_login.status_code == 200
+    normal_headers = {
+        "Authorization": f"Bearer {normal_login.json()['token']}",
+    }
+    assert client.get("/api/auth/me", headers=normal_headers).status_code == 200
+    assert client.get("/api/auth/admin-me", headers=normal_headers).status_code == 403
+
+
 @pytest.mark.parametrize("actor_role", [AccountRole.ROOT, AccountRole.ADMIN])
 def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
     client: TestClient,
@@ -417,8 +491,8 @@ def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
     assert all(row["username"].startswith("tmp-") for row in rows)
     assert all(row["username"] != row["code_locator"] for row in rows)
     assert all(row["username_normalized"] != row["code_locator"] for row in rows)
-    # 測試刻意移除舊的遷移紀錄再重跑，所以只會補回 v6。
-    assert [row["version"] for row in versions] == [1, 2, 3, 4, 6]
+    # 測試刻意移除舊的遷移紀錄再重跑，所以會補回 v6 與後續 migration。
+    assert [row["version"] for row in versions] == [1, 2, 3, 4, 6, 7]
     assert violations == []
 
     login = client.post(

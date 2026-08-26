@@ -9,6 +9,7 @@ import {
 import { isAtLeastAdmin } from "./api/auth";
 import AppSidebar from "./components/app/AppSidebar";
 import {
+  AdminPortalDeniedState,
   AuthLoadingState,
   ForbiddenState,
   LoginScreen,
@@ -270,6 +271,7 @@ function AuthGate() {
   }, [account, loading]);
 
   if (loading) return <AuthLoadingState />;
+  if (forbidden && !account) return <AdminPortalDeniedState />;
   if (!account) return <LoginScreen />;
   if (forbidden) {
     return (

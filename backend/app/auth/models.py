@@ -33,6 +33,11 @@ def is_at_least_admin(role: AccountRole) -> bool:
     return role_at_least(role, AccountRole.ADMIN)
 
 
+def has_admin_portal_access(user: UserRecord) -> bool:
+    """Return the effective Admin portal capability for an account."""
+    return is_at_least_admin(user.role) or user.admin_portal_access
+
+
 # 「admin 以上」的角色值，供 SQL 的 IN 子句使用。從階層推導而非寫死字面
 # 列表，新增角色時不會漏掉這裡。
 ADMIN_OR_ABOVE_VALUES = tuple(
@@ -71,6 +76,7 @@ class UserRecord:
     created_at: str
     updated_at: str
     created_by: str | None
+    admin_portal_access: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -129,6 +129,8 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
 }
 
 const AUTH_WHITELIST = [
+  "/api/auth/admin-login",
+  "/api/auth/admin-temporary-login",
   "/api/auth/login",
   "/api/auth/temporary-login",
 ];

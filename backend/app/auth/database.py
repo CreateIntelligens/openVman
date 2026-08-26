@@ -146,6 +146,8 @@ _ROOT_ACCOUNT_MIGRATION_NAME = "root_account_role_and_auth_audit"
 # locator，永遠不成立，於是被標記完成卻沒遷移到任何一列。改用 v6 重跑。
 _TEMPORARY_USERNAME_SCHEMA_VERSION = 6
 _TEMPORARY_USERNAME_MIGRATION_NAME = "redact_temporary_credential_locators_v2"
+_ADMIN_PORTAL_ACCESS_SCHEMA_VERSION = 7
+_ADMIN_PORTAL_ACCESS_MIGRATION_NAME = "add_admin_portal_access"
 
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
@@ -251,6 +253,42 @@ class AuthDatabase:
 
         self._migrate_root_account_schema()
         self._redact_temporary_usernames()
+        self._add_admin_portal_access()
+
+    def _add_admin_portal_access(self) -> None:
+        """Add the default-deny portal capability after rebuilding users."""
+        with self.transaction(write=True) as connection:
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_ADMIN_PORTAL_ACCESS_SCHEMA_VERSION,),
+            ).fetchone()
+            if applied is not None:
+                return
+            user_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "admin_portal_access" not in user_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN admin_portal_access INTEGER NOT NULL DEFAULT 0
+                    CHECK (admin_portal_access IN (0, 1))
+                    """
+                )
+            connection.execute(
+                """
+                INSERT INTO schema_migrations(version, details_json)
+                VALUES (?, ?)
+                """,
+                (
+                    _ADMIN_PORTAL_ACCESS_SCHEMA_VERSION,
+                    json.dumps(
+                        {"name": _ADMIN_PORTAL_ACCESS_MIGRATION_NAME},
+                        separators=(",", ":"),
+                    ),
+                ),
+            )
 
     def _redact_temporary_usernames(self) -> None:
         """Remove legacy credential locators from audit-visible usernames."""

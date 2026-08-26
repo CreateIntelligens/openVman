@@ -110,6 +110,8 @@ TTS cache key SHALL 包含 owner scope、provider 與 resolved voice resource ke
 
 Project、persona、character、background、mascot 與 voice selectors 只使用受保護 list API 回傳值；UI 仍傳 ID 做選擇，但 server ownership check 才是授權依據。
 
+Admin portal 存取是獨立於資源 grant 與帳號角色的 capability。ROOT／admin 永遠具有有效權限；一般正式帳號與臨時帳號以 `users.admin_portal_access` 保存，既有與新建資料預設為 false。Admin frontend 使用專用的 formal／temporary login endpoints，啟動時改呼叫 Backend 專用的 `/api/auth/admin-me`，由伺服器拒絕未授權 login 與 session；不能只靠隱藏導覽或 client-side role 判斷。Admin temporary login 會先檢查 capability 再啟動首次使用時限。管理員可在正式帳號權限編輯器與臨時批次建立／歷史紀錄中調整此值，變更時遞增受影響帳號的 `token_version`，讓已開啟的後台 session 立即失效。這項 capability 只控制 Admin portal 入口，不改變前台依資源 ownership／grant 執行的既有 API 能力。
+
 ### 8. Default selection 與 Quick Reply 都由授權集合解析
 
 未設定個人 defaults 時，Backend 建議 `project_id=proj-b85afb8bb6`、`character_id=0713`、`voice_provider=indextts`、`voice_id=hayley`。Admin 設定正式非管理員或建立臨時帳號時預先選取這三項；若管理員改選，則把選取集合中的明確 primary choice 寫入 `account_defaults`。前端不得因 localStorage 殘值越過 server list；default 不可存取時改用 server 回傳的第一個可用資源並提示使用者。
