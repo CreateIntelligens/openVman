@@ -25,6 +25,20 @@
 
 第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](./docs/avatar-embed/README.md)。
 
+### 共用推論服務端點
+
+其他 stack（JTAI、測試環境）可透過邊界 nginx 共用同一組模型權重，避免重複載入顯存。兩個服務都掛在 `/api/<service>` 底下，以 Bearer token 驗證並套用速率／連線限制：
+
+| 服務 | 端點 | 認證 |
+| --- | --- | --- |
+| Embedding（jtai 格式） | `POST /api/embedding` | Bearer |
+| Embedding（OpenAI 相容） | `POST /api/embedding/v1/embeddings` | Bearer |
+| VLM（OpenAI 相容） | `POST /api/vlm/v1/chat/completions` | Bearer |
+| 存活檢查 | `GET /api/{embedding,vlm}/health` | 公開 |
+| 就緒檢查 | `GET /api/embedding/health/ready` | Bearer |
+
+base URL 本身就是 embed 端點，不需要再疊 `/embed`。OpenAI 相容路徑可直接餵給現成的 OpenAI client（base URL 設為 `.../api/embedding/v1`）。完整拓撲與 JTAI 串接設定見 [GPU 服務共用指南](./docs/gpu-service-sharing.md)。
+
 ## 環境變數 (.env)
 
 所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定，再執行 `./scripts/ensure-runtime-secrets.sh` 安全產生缺少的內部 token 與 session secret；不用分開維護多份。
