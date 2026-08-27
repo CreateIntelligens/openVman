@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import {
   updateAccountRole,
   type Account,
+  type AssignableAccountRole,
 } from "../../api/auth";
 import { useModalDismiss } from "../useModalDismiss";
 import { errorMessage } from "../../utils/errorMessage";
@@ -16,13 +17,28 @@ interface AccountRoleDialogProps {
   onSaved: (account: Account) => void;
 }
 
+const ROLE_LABELS: Record<AssignableAccountRole, string> = {
+  admin: "管理員",
+  user: "一般使用者",
+};
+
+const ROLE_EFFECTS: Record<AssignableAccountRole, string> = {
+  admin: "可使用所有已登錄資源，並管理一般與臨時帳號；原有一般使用者授權將不再生效。",
+  user: "資源存取改為僅限下方所選的授權範圍。",
+};
+
 export default function AccountRoleDialog({
   account,
   onClose,
   onSaved,
 }: AccountRoleDialogProps) {
-  const nextRole = account.role === "admin" ? "user" : "admin";
+  // 可指派的角色由型別驅動，新增角色時選單自動跟上（ROOT 不可指派）。
+  const assignableRoles: AssignableAccountRole[] = ["admin", "user"];
+  const [nextRole, setNextRole] = useState<AssignableAccountRole>(
+    account.role === "admin" ? "user" : "admin",
+  );
   const demoting = nextRole === "user";
+  const unchanged = nextRole === account.role;
   const accessForm = useAccountAccessForm(
     `role-change-${account.id}`,
     account.grants && account.defaults
@@ -79,14 +95,39 @@ export default function AccountRoleDialog({
       >
         <header className="border-b border-border px-6 py-5">
           <h2 id="role-change-title" className="text-lg font-semibold">
-            {demoting ? "降級為一般使用者" : "提升為管理員"}
+            變更角色
           </h2>
           <p className="mt-2 text-sm leading-6 text-content-muted">
-            {demoting
-              ? `請先設定 ${account.username} 降級後可使用的完整資源。`
-              : `${account.username} 將可使用所有已登錄資源；原有一般使用者授權將不再生效。`}
+            {account.username} 目前是{ROLE_LABELS[account.role as AssignableAccountRole]
+              ?? account.role}。
           </p>
         </header>
+
+        <div className="border-b border-border px-6 py-5">
+          <label className="block text-sm font-medium">
+            變更為
+            <select
+              className="input mt-2"
+              value={nextRole}
+              onChange={(event) => setNextRole(
+                event.target.value as AssignableAccountRole,
+              )}
+              disabled={saving}
+            >
+              {assignableRoles.map((role) => (
+                <option key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                  {role === account.role ? "（目前角色）" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-2 text-sm leading-6 text-content-muted">
+            {unchanged
+              ? "與目前角色相同，請選擇其他角色。"
+              : ROLE_EFFECTS[nextRole]}
+          </p>
+        </div>
 
         <form onSubmit={submit}>
           {displayedError && (
@@ -118,6 +159,7 @@ export default function AccountRoleDialog({
               type="submit"
               disabled={
                 saving
+                || unchanged
                 || (demoting && (accessForm.loading || !accessForm.complete))
               }
             >

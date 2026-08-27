@@ -219,6 +219,34 @@ describe("Accounts", () => {
     ]);
   });
 
+  it("lets ROOT pick the target role and blocks a no-op change", async () => {
+    authState.account = {
+      id: "root-a",
+      username: "ai360",
+      role: "root",
+    };
+    const user = formalAccount("user-b", "viewer", "user");
+    vi.mocked(listAccounts).mockResolvedValue([user]);
+
+    render(<Accounts />);
+    clickRowButton(
+      (await screen.findByText("viewer")).closest("article"),
+      "變更角色",
+    );
+
+    const select = screen.getByLabelText(/變更為/) as HTMLSelectElement;
+    const submit = screen.getByRole("button", { name: "確認變更角色" });
+
+    // 預設跳到另一個角色，直接送出即可。
+    expect(select.value).toBe("admin");
+    expect(submit.hasAttribute("disabled")).toBe(false);
+
+    // 選回目前角色是空操作，要擋下來而不是送出去。
+    fireEvent.change(select, { target: { value: "user" } });
+    await waitFor(() => expect(submit.hasAttribute("disabled")).toBe(true));
+    expect(updateAccountRole).not.toHaveBeenCalled();
+  });
+
   it("recovers from a denied role change without optimistic state", async () => {
     authState.account = {
       id: "root-a",
