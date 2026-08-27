@@ -14,6 +14,7 @@
         :disabled="rendererDisabled"
         :error-message="rendererErrorMessage"
         :camera-active="webcam.active.value"
+        :camera-disabled="!visionAvailable"
         :immersive="immersive"
         :camera-preview-scale="settings.cameraPreviewScale"
         @open-settings="showSettings = true"
@@ -877,6 +878,21 @@ const webcam = useWebcamCapture({
   },
 });
 
+// VLM（視覺辨識）未啟用時攝影機只會白打 API，直接鎖住開鏡頭按鈕。
+// 查不到健康狀態時不鎖（fail-open），避免誤擋可用功能。
+const visionAvailable = ref(true);
+
+async function fetchVisionHealth(): Promise<void> {
+  try {
+    const res = await apiFetch("/api/vision/health");
+    if (!res.ok) return;
+    const data = (await res.json()) as { available?: boolean };
+    visionAvailable.value = data.available !== false;
+  } catch {
+    // 網路層失敗視同「無法判定」，維持 fail-open
+  }
+}
+
 async function handleToggleCamera(): Promise<void> {
   if (webcam.active.value) {
     void chat.resetVisualInput();
@@ -1035,6 +1051,7 @@ onMounted(() => {
     fetchTtsProviders(),
     fetchBackgrounds(),
     fetchInitialProjectData(),
+    fetchVisionHealth(),
     bootstrapRenderer(vrmReady),
   ]);
 });

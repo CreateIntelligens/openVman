@@ -10,8 +10,8 @@
         :class="{ 'camera-btn--active': cameraActive }"
         :disabled="disabled || cameraDisabled"
         @click="$emit('toggleCamera')"
-        :title="cameraActive ? '關閉攝影機' : '開啟攝影機'"
-        :aria-label="cameraActive ? '關閉攝影機' : '開啟攝影機'"
+        :title="cameraTitle"
+        :aria-label="cameraTitle"
       >
         <svg v-if="cameraActive" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M16 10v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h2"/>
@@ -88,6 +88,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+
 import type { AvatarState } from "../../composables/useAvatarChat";
 
 export interface PersonaSummary {
@@ -95,7 +97,7 @@ export interface PersonaSummary {
   label: string
 }
 
-defineProps<{
+const props = defineProps<{
   state: AvatarState
   disabled?: boolean
   errorMessage?: string | null
@@ -112,6 +114,11 @@ const emit = defineEmits<{
   toggleImmersive: []
   cameraPreviewScaleChange: [scale: number]
 }>()
+
+const cameraTitle = computed(() => {
+  if (props.cameraDisabled) return "攝影機功能未啟用（視覺辨識服務未開啟）"
+  return props.cameraActive ? "關閉攝影機" : "開啟攝影機"
+})
 
 function handleCameraPreviewScaleInput(event: Event): void {
   const target = event.target as HTMLInputElement | null

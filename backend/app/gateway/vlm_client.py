@@ -67,8 +67,10 @@ def resolve_vlm_route(cfg: Any = None) -> VLMRoute:
             is_enabled=True,
         )
 
-    # Local default when explicit model or key indicates local intent
-    if raw_api_key or raw_model == "openvman-vlm":
+    # Local default only on explicit model intent。compose 恆以
+    # GATEWAY_INTERNAL_TOKEN 填入 VISION_LLM_API_KEY，故 api key 存在
+    # 不代表要啟用 VLM——否則 VLM 永遠無法進入 disabled 狀態。
+    if raw_model == "openvman-vlm":
         return VLMRoute(
             route="local",
             base_url="http://vlm:8000/v1",

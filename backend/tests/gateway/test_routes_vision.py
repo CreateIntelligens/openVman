@@ -152,3 +152,36 @@ def test_vision_reset_clears_session_event_state(client):
     }
     cam.reset_session_events.assert_called_once_with("vision-text")
     cam.session_visual_state.assert_called_once_with("vision-text")
+
+
+def test_vision_health_ready(client):
+    probe = {"status": "ready", "route": "local", "model": "openvman-vlm", "url": "http://vlm:8000/v1"}
+    with patch(
+        "app.gateway.routes_vision.probe_vlm_health",
+        new_callable=AsyncMock,
+        return_value=probe,
+    ):
+        resp = client.get("/api/vision/health")
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "available": True,
+        "status": "ready",
+        "route": "local",
+        "model": "openvman-vlm",
+    }
+
+
+def test_vision_health_disabled(client):
+    probe = {"status": "disabled", "route": "disabled", "model": "openvman-vlm"}
+    with patch(
+        "app.gateway.routes_vision.probe_vlm_health",
+        new_callable=AsyncMock,
+        return_value=probe,
+    ):
+        resp = client.get("/api/vision/health")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["available"] is False
+    assert body["status"] == "disabled"

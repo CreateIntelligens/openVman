@@ -22,6 +22,13 @@ test("immersive camera mode exposes a camera size slider", () => {
   assert.match(source, /max="1\.35"/);
 });
 
+test("camera button explains itself when vision service is unavailable", () => {
+  assert.match(source, /cameraDisabled\?:\s*boolean/);
+  assert.match(source, /攝影機功能未啟用（視覺辨識服務未開啟）/);
+  assert.match(source, /:title="cameraTitle"/);
+  assert.match(source, /:aria-label="cameraTitle"/);
+});
+
 test("settings button can stay enabled while renderer actions are disabled", () => {
   assert.match(source, /settingsDisabled\?:\s*boolean/);
   assert.match(source, /class="settings-btn"[\s\S]*?:disabled="settingsDisabled"/);

@@ -19,6 +19,7 @@ from app.auth.resources import ResourceNotFoundError, resolve_resource
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.config import get_tts_config
 from app.gateway.plugins.camera_live import InvalidFrameError, decode_frame_base64
+from app.gateway.vlm_client import probe_vlm_health
 from app.gateway.worker import get_camera_plugin
 from app.http_client import SharedAsyncClient
 
@@ -90,6 +91,19 @@ async def vision_describe(
         current,
     )
     return {"reply": reply, "session_id": session_id, "visual_state": visual_state}
+
+
+@router.get("/api/vision/health", summary="視覺管道健康狀態")
+async def vision_health() -> dict[str, object]:
+    """回報 VLM 可用性，供前端決定是否開放攝影機 UI。"""
+    probe = await probe_vlm_health(client=_http.get(), cfg=get_tts_config())
+    status = str(probe.get("status", "unknown"))
+    return {
+        "available": status == "ready",
+        "status": status,
+        "route": probe.get("route", ""),
+        "model": probe.get("model", ""),
+    }
 
 
 @router.post("/api/vision/reset", summary="重置視覺事件狀態（text 模式）")

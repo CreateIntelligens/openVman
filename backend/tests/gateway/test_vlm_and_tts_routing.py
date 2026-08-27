@@ -55,6 +55,20 @@ def test_vlm_disabled_when_unconfigured():
     assert route.is_enabled is False
 
 
+def test_vlm_disabled_when_only_api_key_present():
+    # compose 恆以 GATEWAY_INTERNAL_TOKEN 填入 VISION_LLM_API_KEY，
+    # 單有 key 不得視為啟用意圖，否則 VLM 永遠關不掉。
+    cfg = TTSRouterConfig(
+        vision_llm_base_url="",
+        vision_llm_api_key="internal-token-fallback",
+        vision_llm_model="",
+        gateway_internal_token="internal-token-fallback",
+    )
+    route = resolve_vlm_route(cfg)
+    assert route.route == "disabled"
+    assert route.is_enabled is False
+
+
 @pytest.mark.asyncio
 async def test_vlm_health_probing_and_redaction(monkeypatch):
     secret_key = "sk-super-secret-key-999"
