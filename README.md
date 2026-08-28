@@ -95,7 +95,7 @@ docker compose \
   --profile watchtower up -d
 ```
 
-registry override 會移除開發用 source bind mount，讓 Watchtower 更新 Docker Hub image 後確實使用新版本。Watchtower 只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。若 Docker Hub repositories 設為 private，需在部署主機先執行 `docker login`，並讓 Watchtower 讀取主機 Docker credential config。
+registry override 會移除開發用 source bind mount，讓 Watchtower 更新 Docker Hub image 後確實使用新版本。Watchtower 使用 Docker API `1.44` 相容 Docker Engine 29，只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。若 Docker Hub repositories 設為 private，需在部署主機先執行 `docker login`，並讓 Watchtower 讀取主機 Docker credential config。
 
 ### 對外 HTTPS：主機 nginx（compose 之外）
 

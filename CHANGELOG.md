@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Watchtower Docker 29 Compatibility**: Configured the registry deployment to use Watchtower Docker API `1.44`, matching Docker Engine 29's minimum API requirement while retaining label-only updates.
 - **Docker Hub Multi-Architecture CI/CD**: Added `docker-publish.yml` using Node.js 24-compatible Docker actions, Buildx, and QEMU. Backend, Admin, and Avatar images publish `linux/amd64` + `linux/arm64`; CUDA/PyTorch Brain API and Embedding images publish `linux/amd64`. Added `docker-compose.registry.yml` for self-contained registry deployment and label-scoped Watchtower updates.
 - **GitHub Actions Node.js 24 Runtime**: Upgraded the protocol-contracts workflow to `actions/checkout@v6` and `actions/setup-python@v7` so action internals no longer target the deprecated Node.js 20 runtime.
 - **External Tool Feature Flags**: Added `URL2MD_SEARCH_ENABLED`, `URL2MD_READ_ENABLED`, and `WIKI_PUBLISH_ENABLED`, all defaulting to `true`; disabled tools are removed from HTTP tool registration and Gemini Live declarations after Brain restart.
