@@ -5,7 +5,9 @@ x-shared: &shared
 
 x-backend-runtime: &backend-runtime
   user: "${UID:-1000}:${GID:-1000}"
-  image: openvman-backend
+  image: "${DOCKERHUB_USERNAME:-local}/openvman-backend:${OPENVMAN_IMAGE_TAG:-latest}"
+  labels:
+    com.centurylinklabs.watchtower.enable: "true"
   volumes:
     - ./backend/app:/app/app
     - ./backend/data:/app/data
@@ -40,6 +42,9 @@ services:
     build:
       context: ./brain/api
       dockerfile: Dockerfile
+    image: "${DOCKERHUB_USERNAME:-local}/openvman-api:${OPENVMAN_IMAGE_TAG:-latest}"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     volumes:
       - ./brain/api:/app
       - ./brain/data:/data
@@ -85,6 +90,9 @@ services:
     build:
       context: ./brain/embedding
       dockerfile: Dockerfile
+    image: "${DOCKERHUB_USERNAME:-local}/openvman-embedding:${OPENVMAN_IMAGE_TAG:-latest}"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     volumes:
       - ./brain/embedding:/app
       - hf-cache:/home/appuser/.cache/huggingface
@@ -227,6 +235,9 @@ services:
     build:
       context: .
       dockerfile: frontend/app/Dockerfile
+    image: "${DOCKERHUB_USERNAME:-local}/openvman-avatar:${OPENVMAN_IMAGE_TAG:-latest}"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     volumes:
       - ./frontend/app:/app
       - avatar-node-modules:/app/node_modules
@@ -239,6 +250,9 @@ services:
       context: .
       dockerfile: frontend/admin/Dockerfile
       target: dev
+    image: "${DOCKERHUB_USERNAME:-local}/openvman-admin:${OPENVMAN_IMAGE_TAG:-latest}"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     ports:
       - "${PORT:-8786}:80"
       - "${HTTPS_PORT:-8787}:443"

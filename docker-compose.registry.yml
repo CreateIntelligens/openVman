@@ -1,0 +1,56 @@
+# Registry deployment override.
+#
+# Use with:
+#   DOCKERHUB_USERNAME=<user> docker compose \
+#     -f docker-compose.yml -f docker-compose.registry.yml \
+#     --profile watchtower up -d
+#
+# Local development bind mounts are removed so Watchtower image replacements
+# are not masked by stale host source files.
+
+services:
+  api:
+    volumes: !override
+      - ./brain/data:/data
+      - ./brain/skills:/skills:ro
+      - ./contracts:/contracts:ro
+      - hf-cache:/home/appuser/.cache/huggingface
+      - opf-cache:/home/appuser/.opf
+      - triton-cache:/home/appuser/.triton
+
+  embedding:
+    volumes: !override
+      - hf-cache:/home/appuser/.cache/huggingface
+
+  avatar:
+    volumes: !override []
+
+  admin:
+    volumes: !override
+      - ./infra/nginx/certs:/etc/nginx/certs
+
+  backend:
+    volumes: !override
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+      - ./data:/data
+      - ./brain/data:/brain-data:ro
+      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
+      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
+
+  gateway-worker:
+    volumes: !override
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+      - ./data:/data
+      - ./brain/data:/brain-data:ro
+      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
+      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    profiles: ["watchtower"]
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --label-enable --interval 300 --cleanup

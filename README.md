@@ -74,6 +74,29 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 
 `protocol-contracts` workflow 使用 `actions/checkout@v6` 與 `actions/setup-python@v7`，採用 Node.js 24-compatible action runtime。若改用 self-hosted runner，runner 需支援這些 action 的 Node.js 24 runtime。
 
+### Docker Hub CI/CD
+
+`.github/workflows/docker-publish.yml` 會在 `main` push 時登入 Docker Hub，使用 Buildx + QEMU 建立並推送以下 images：
+
+| Image | Platforms | 用途 |
+|---|---|---|
+| `openvman-backend` | `linux/amd64`, `linux/arm64` | Backend 與 Gateway Worker |
+| `openvman-admin` | `linux/amd64`, `linux/arm64` | Admin UI |
+| `openvman-avatar` | `linux/amd64`, `linux/arm64` | Avatar frontend |
+| `openvman-api` | `linux/amd64` | CUDA Brain API |
+| `openvman-embedding` | `linux/amd64` | CUDA/PyTorch Embedding |
+
+GitHub Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`。部署主機的 `.env` 也必須設定相同的 `DOCKERHUB_USERNAME`，再使用 registry override：
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.registry.yml \
+  --profile watchtower up -d
+```
+
+registry override 會移除開發用 source bind mount，讓 Watchtower 更新 Docker Hub image 後確實使用新版本。Watchtower 只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。若 Docker Hub repositories 設為 private，需在部署主機先執行 `docker login`，並讓 Watchtower 讀取主機 Docker credential config。
+
 ### 對外 HTTPS：主機 nginx（compose 之外）
 
 `docker compose up -d` 會依 `.env` 的 `COMPOSE_PROFILES` 與外部服務網址啟動包含 **Docker 邊緣 nginx** 的 Compose stack（`8786` HTTP / `8787` HTTPS，自簽憑證）。對外的正式 HTTPS 由**主機自己的 nginx** 終止，再轉進來：

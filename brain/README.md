@@ -388,6 +388,8 @@ user input
 
 目前 2md 與 Wiki 呼叫不攜帶專案側認證；Wiki 若是受保護頁面，需另行加入環境變數密鑰與 Authorization／password 設定。外部服務的 HTTP、格式或執行錯誤會包成 tool error，交由 agent loop 繼續處理；不得把密鑰放入 tool arguments 或 Markdown 內容。
 
+Docker registry deployment 使用根目錄的 `docker-compose.registry.yml`。Brain API 與 Embedding image 目前為 CUDA/PyTorch amd64 image；ARM64 部署可使用多平台的 Backend、Admin 與 Avatar image，但需要另外提供 ARM64 相容的 GPU inference service。
+
 ### Workspace Admin API
 
 - `GET /brain/knowledge/documents`
