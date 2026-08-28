@@ -23,7 +23,7 @@ function TreeActionButton({
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const variantClass = {
-    default: "hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200",
+    default: "hover:bg-surface-sunken hover:text-content ",
     primary: "hover:bg-primary/10 hover:text-primary",
     danger: "hover:bg-danger/10 hover:text-danger",
   }[variant];
@@ -33,7 +33,7 @@ function TreeActionButton({
       type="button"
       aria-label={title}
       title={title}
-      className={`rounded-md p-1 text-slate-400 transition-colors ${variantClass}`}
+      className={`rounded-md p-1 text-content-subtle transition-colors ${variantClass}`}
       onClick={(event) => {
         event.stopPropagation();
         onClick(event);
@@ -304,7 +304,7 @@ export default function TreeView({
             ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
             : isSelected
               ? "bg-primary/15 text-primary"
-              : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+              : "hover:bg-surface-sunken text-content-muted hover:text-content "
         } ${isDraggingThisNode ? "ring-1 ring-inset ring-primary/40" : ""}`}
         style={{ paddingLeft: `${depth * 0.875 + 0.5}rem` }}
         onClick={(event) => handleSelect(event.currentTarget)}
@@ -374,7 +374,7 @@ export default function TreeView({
         <div className="w-4 h-4 flex items-center justify-center shrink-0">
           {node.type === "folder" ? (
             <span
-              className={`material-symbols-outlined text-[1rem] text-slate-500 transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
+              className={`material-symbols-outlined text-[1rem] text-content-subtle transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
               onClick={(e) => { e.stopPropagation(); onToggle(node.path); }}
             >
               chevron_right
@@ -398,7 +398,7 @@ export default function TreeView({
             </span>
           ) : (
             <span className={`material-symbols-outlined text-[1.125rem] ${
-              node.name.endsWith(".md") ? "text-sky-400" : "text-slate-400"
+              node.name.endsWith(".md") ? "text-sky-400" : "text-content-subtle"
             }`}>
               {node.name.endsWith(".md") ? "markdown" : "description"}
             </span>
@@ -502,7 +502,7 @@ export default function TreeView({
           <button
             type="button"
             aria-label={`刪除資料夾 ${node.path}`}
-            className="ml-1 shrink-0 rounded-md p-1 text-slate-400 opacity-0 transition-colors hover:bg-red-500/10 hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
+            className="ml-1 shrink-0 rounded-md p-1 text-content-subtle opacity-0 transition-colors hover:bg-red-500/10 hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
             onClick={(event) => {
               event.stopPropagation();
               onDeleteFolder(node.path);

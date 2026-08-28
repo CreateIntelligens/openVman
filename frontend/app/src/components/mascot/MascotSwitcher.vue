@@ -108,9 +108,9 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
   padding: 0.35rem 0.65rem;
   border: var(--hairline) solid rgba(255, 255, 255, 0.3);
   border-radius: 0.5rem;
-  background: rgba(15, 23, 42, 0.64);
+  background: rgba(28, 26, 23, 0.64);
   color: #fff;
-  box-shadow: 0 0.5rem 1.5rem rgba(15, 23, 42, 0.22);
+  box-shadow: 0 0.5rem 1.5rem rgba(28, 26, 23, 0.22);
   backdrop-filter: blur(0.75rem);
   -webkit-backdrop-filter: blur(0.75rem);
   cursor: pointer;
@@ -118,7 +118,7 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
 
 .mascot-switcher__trigger:hover:not(:disabled),
 .mascot-switcher--open .mascot-switcher__trigger {
-  background: rgba(15, 23, 42, 0.78);
+  background: rgba(28, 26, 23, 0.78);
   border-color: rgba(255, 255, 255, 0.46);
 }
 
@@ -136,11 +136,11 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
 }
 
 .mascot-switcher__mark--2d {
-  background: #38bdf8;
+  background: var(--primary);
 }
 
 .mascot-switcher__mark--3d {
-  background: #34d399;
+  background: rgb(var(--ov-color-success));
 }
 
 .mascot-switcher__label {
@@ -160,7 +160,7 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
   border: var(--hairline) solid rgba(255, 255, 255, 0.3);
   border-radius: 0.5rem;
   background: rgba(248, 250, 252, 0.94);
-  box-shadow: 0 1rem 2rem rgba(15, 23, 42, 0.24);
+  box-shadow: 0 1rem 2rem rgba(28, 26, 23, 0.24);
   backdrop-filter: blur(0.75rem);
   -webkit-backdrop-filter: blur(0.75rem);
 }
@@ -175,21 +175,21 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
   border: var(--hairline) solid transparent;
   border-radius: 0.5rem;
   background: transparent;
-  color: #0f172a;
+  color: var(--text);
   cursor: pointer;
   text-align: left;
 }
 
 .mascot-switcher__option:hover,
 .mascot-switcher__option--active {
-  border-color: rgba(14, 165, 233, 0.34);
-  background: rgba(14, 165, 233, 0.1);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .mascot-switcher__preview {
   aspect-ratio: 1;
   border-radius: 0.5rem;
-  border: var(--hairline) solid rgba(15, 23, 42, 0.12);
+  border: var(--hairline) solid var(--line);
 }
 
 .mascot-switcher__preview--2d {
@@ -225,7 +225,7 @@ onUnmounted(() => window.removeEventListener("keydown", handleKeydown))
 
 .mascot-switcher__option-text small {
   margin-top: 0.15rem;
-  color: #64748b;
+  color: var(--text-soft);
   font-size: 0.68rem;
   font-weight: 700;
 }

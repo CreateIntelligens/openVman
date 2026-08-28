@@ -16,12 +16,12 @@ export default function MemoryMetaBadges({ metadata }: MemoryMetaBadgesProps) {
         </span>
       )}
       {meta.source_type && (
-        <span className="rounded bg-white dark:bg-slate-800 px-1.5 py-0.5 text-[0.625rem] font-medium text-slate-500 dark:text-slate-400">
+        <span className="rounded bg-surface-raised px-1.5 py-0.5 text-[0.625rem] font-medium text-content-muted">
           {meta.source_type}
         </span>
       )}
       {meta.turn && (
-        <span className="rounded bg-white dark:bg-slate-800 px-1.5 py-0.5 text-[0.625rem] font-medium text-slate-500 dark:text-slate-400">
+        <span className="rounded bg-surface-raised px-1.5 py-0.5 text-[0.625rem] font-medium text-content-muted">
           turn {meta.turn}
         </span>
       )}

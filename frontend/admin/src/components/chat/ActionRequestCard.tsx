@@ -92,7 +92,7 @@ export default function ActionRequestCard({
         <iframe
           src={projectUrl(request.endpoint)}
           title={request.label}
-          className="w-full border-0 bg-white dark:bg-slate-950/30"
+          className="w-full border-0 bg-surface-raised dark:bg-surface/30"
           style={{ height: "32.5rem" }}
         />
       </div>

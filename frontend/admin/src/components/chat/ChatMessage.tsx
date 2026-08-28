@@ -80,13 +80,13 @@ export default function ChatMessage({
   );
   const messageCardClassName = isUserMessage
     ? "ml-auto bg-primary text-white rounded-tr-sm"
-    : "bg-white dark:bg-slate-900/80 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800/80 rounded-tl-sm backdrop-blur-sm";
+    : "bg-surface-raised dark:bg-surface-sunken/80 text-content border border-border rounded-tl-sm backdrop-blur-sm";
   const messageMetaClassName = isUserMessage
     ? "text-primary-100 opacity-80"
-    : "text-slate-500";
+    : "text-content-subtle";
   const ttsButtonTitle = isPlaying ? "停止" : isPrefetching ? "語音準備中…" : "播放";
   const ttsButtonClassName = [
-    "text-slate-500 hover:text-slate-900 dark:hover:text-white",
+    "text-content-subtle hover:text-content ",
     isPlaying ? "!opacity-100 text-primary" : "",
     isPrefetching ? "animate-pulse text-primary/50" : "",
   ].filter(Boolean).join(" ");
@@ -113,7 +113,7 @@ export default function ChatMessage({
             <button
               type="button"
               onClick={() => navigator.clipboard.writeText(message.content)}
-              className="text-slate-500 hover:text-slate-900 dark:hover:text-white"
+              className="text-content-subtle hover:text-content "
               title="Copy"
             >
               <span className="material-symbols-outlined text-[0.875rem]">content_copy</span>
@@ -123,9 +123,9 @@ export default function ChatMessage({
       </div>
       {isEmptyAssistantDraft ? (
         <div className="flex items-center gap-1 py-1" aria-label="Brain 正在思考">
-          <span className="h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce [animation-delay:-0.3s]" />
-          <span className="h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce [animation-delay:-0.15s]" />
-          <span className="h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce" />
+          <span className="h-2 w-2 rounded-full bg-content-subtle animate-bounce [animation-delay:-0.3s]" />
+          <span className="h-2 w-2 rounded-full bg-content-subtle animate-bounce [animation-delay:-0.15s]" />
+          <span className="h-2 w-2 rounded-full bg-content-subtle animate-bounce" />
         </div>
       ) : shouldRenderMarkdown ? (
         <div className="text-[0.9375rem] leading-relaxed relative z-10">

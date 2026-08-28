@@ -47,9 +47,9 @@ function handleChange(event: Event): void {
   min-height: 2.75rem;
   padding: 0 2.5rem 0 0.875rem;
   background: var(--bg-soft, #fff);
-  border: 1px solid var(--line, #e2e8f0);
+  border: 1px solid var(--line, #e7e4de);
   border-radius: 0.5rem;
-  color: var(--text, #0f172a);
+  color: var(--text, #1c1a17);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -57,13 +57,13 @@ function handleChange(event: Event): void {
 }
 
 .custom-select:hover:not(:disabled) {
-  border-color: var(--primary, #0ea5e9);
+  border-color: var(--primary, #c96442);
   background: var(--bg-soft-hover, #f8fafc);
 }
 
 .custom-select:focus-visible {
-  border-color: var(--primary, #0ea5e9);
-  box-shadow: 0 0 0 0.1875rem rgba(14, 165, 233, 0.15);
+  border-color: var(--primary, #c96442);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
 .custom-select:disabled {

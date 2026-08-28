@@ -153,7 +153,7 @@ onUnmounted(() => {
   color: var(--text);
   font-family: var(--ov-font-ui);
   font-size: 0.75rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0.125rem 0.5rem rgba(28, 26, 23, 0.06);
 }
 
 .session-toolbar span {

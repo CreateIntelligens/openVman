@@ -28,7 +28,7 @@ export default function QaImagePreview({
       loading="lazy"
       decoding="async"
       onError={() => setVisible(false)}
-      className="max-h-48 w-auto max-w-full rounded-lg border border-slate-200 bg-white object-contain dark:border-slate-700"
+      className="max-h-48 w-auto max-w-full rounded-lg border border-border bg-white object-contain "
     />
   );
 }

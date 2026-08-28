@@ -20,7 +20,7 @@ export const SlashDropdown: React.FC<SlashDropdownProps> = ({ matches, selectedI
   if (matches.length === 0) return null;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-[15rem] overflow-y-auto">
+    <div className="absolute bottom-full left-0 right-0 mb-1 z-30 bg-surface-raised border border-border rounded-xl shadow-2xl overflow-hidden max-h-[15rem] overflow-y-auto">
       {matches.map((skill, i) => (
         <button
           key={skill.id}
@@ -30,8 +30,8 @@ export const SlashDropdown: React.FC<SlashDropdownProps> = ({ matches, selectedI
           }}
           className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
             i === selectedIndex
-              ? "bg-primary/20 text-slate-900 dark:text-white"
-              : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              ? "bg-primary/20 text-content "
+              : "text-content-muted hover:bg-surface-sunken"
           }`}
         >
           <span className="material-symbols-outlined text-primary text-lg">extension</span>
@@ -41,7 +41,7 @@ export const SlashDropdown: React.FC<SlashDropdownProps> = ({ matches, selectedI
               <span className="text-[0.6875rem] text-content-muted">{skill.name}</span>
               <ScopeBadge scope={skill.scope} />
             </div>
-            <div className="text-[0.6875rem] text-slate-500 truncate">
+            <div className="text-[0.6875rem] text-content-subtle truncate">
               {skill.description || skill.name}
             </div>
           </div>

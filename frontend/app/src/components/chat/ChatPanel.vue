@@ -281,8 +281,9 @@ useStickToBottom(messagesRef, contentRef)
 .chat-panel__header h3 {
   margin: 0;
   color: var(--text);
+  font-family: var(--ov-font-display);
   font-size: 1.125rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .chat-panel__counter {
@@ -550,7 +551,7 @@ useStickToBottom(messagesRef, contentRef)
 .chat-input-feedback {
   flex-basis: 100%;
   margin: 0 0 0 3rem;
-  color: #b91c1c;
+  color: rgb(var(--ov-color-danger));
   font-size: 0.8rem;
 }
 
@@ -578,7 +579,7 @@ useStickToBottom(messagesRef, contentRef)
 
 .chat-input-bar input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 var(--focus-ring-size) rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 0 var(--focus-ring-size) color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
 .chat-input-bar input:disabled {

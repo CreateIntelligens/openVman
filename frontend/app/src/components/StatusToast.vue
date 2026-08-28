@@ -113,7 +113,7 @@ defineExpose({ show, showCountdown, dismiss, clear })
   background: rgba(30, 30, 40, 0.92);
   border: var(--hairline) solid rgba(255,255,255,0.15);
   border-radius: 0.5rem;
-  color: #e0e0e0;
+  color: #e7e4de;
   font-size: 0.85rem;
   backdrop-filter: blur(0.375rem);
   pointer-events: all;
@@ -138,7 +138,7 @@ defineExpose({ show, showCountdown, dismiss, clear })
   min-height: 2.75rem;
   background: none;
   border: none;
-  color: #999;
+  color: #a9a298;
   cursor: pointer;
   font-size: 0.75rem;
   padding: 0;

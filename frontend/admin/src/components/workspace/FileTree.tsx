@@ -26,9 +26,9 @@ function sortNodes(nodes: FileNode[]): FileNode[] {
 const ICON_MAP: Record<string, { icon: string; color: string }> = {
        ".md": { icon: "markdown", color: "text-sky-600 dark:text-sky-400" },
        ".csv": { icon: "table_chart", color: "text-emerald-600 dark:text-emerald-400" },
-       ".txt": { icon: "description", color: "text-slate-500 dark:text-slate-400" },
+       ".txt": { icon: "description", color: "text-content-muted" },
 };
-const DEFAULT_ICON = { icon: "draft", color: "text-slate-400 dark:text-slate-500" };
+const DEFAULT_ICON = { icon: "draft", color: "text-content-subtle" };
 
 export default function FileTree({ documents, selectedPath, onSelect, searchQuery = "" }: FileTreeProps) {
        const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -111,13 +111,13 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                             <div key={node.path} className="w-full">
                                    <button
                                           onClick={() => toggleFolder(node.path)}
-                                          className="flex w-full items-center gap-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-md transition-colors text-left group"
+                                          className="flex w-full items-center gap-2 py-1.5 hover:bg-surface-sunken rounded-md transition-colors text-left group"
                                           style={{ paddingLeft: `${level * 1}rem` }}
                                    >
-                                          <span className="material-symbols-outlined text-[1rem] text-slate-400 dark:text-slate-500 shrink-0 group-hover:text-primary transition-colors">
+                                          <span className="material-symbols-outlined text-[1rem] text-content-subtle shrink-0 group-hover:text-primary transition-colors">
                                                  {isExpanded ? "folder_open" : "folder"}
                                           </span>
-                                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{node.name}</span>
+                                          <span className="text-sm font-medium text-content-muted truncate">{node.name}</span>
                                    </button>
 
                                    {isExpanded && (
@@ -139,7 +139,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                      <button
                             key={node.path}
                             onClick={() => onSelect(node.path)}
-                            className={`flex w-full items-center gap-2 py-1.5 pr-2 rounded-md transition-all text-left group ${isSelected ? "bg-primary/20 text-primary font-semibold" : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400"
+                            className={`flex w-full items-center gap-2 py-1.5 pr-2 rounded-md transition-all text-left group ${isSelected ? "bg-primary/20 text-primary font-semibold" : "hover:bg-surface-sunken text-content-muted"
                                    }`}
                             style={{ paddingLeft: `${level * 1}rem` }}
                      >
@@ -160,7 +160,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                                           </span>
                                    )}
                                    {!doc?.is_indexable && !doc?.is_core && (
-                                          <span className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                          <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wider text-content-subtle">
                                                  omit
                                           </span>
                                    )}
@@ -172,7 +172,7 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
        const rootChildren = sortNodes(Object.values(tree.children));
 
        if (documents.length === 0) {
-              return <div className="text-sm text-slate-500 p-4">No documents found.</div>;
+              return <div className="text-sm text-content-subtle p-4">No documents found.</div>;
        }
 
        return (

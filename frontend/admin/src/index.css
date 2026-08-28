@@ -5,55 +5,34 @@
 @tailwind utilities;
 
 /* ── Design Tokens ── */
-/* Warm Professional palette. Warm neutral base + deep teal accent. */
+/* 色彩單一來源在 contracts/frontend-theme.css（--ov-color-*，含 .dark 覆寫）。
+   這裡只做別名，讓 tailwind 的 rgb(var(--color-*)) 寫法沿用。 */
 
 :root {
-  /* Neutrals (warm gray / stone) — kept as hex for non-tailwind use */
-  --stone-50: #faf9f7;
-  --stone-100: #f4f2ee;
-  --stone-200: #e7e4de;
-  --stone-300: #d3cec5;
-  --stone-400: #a9a298;
-  --stone-500: #7a7469;
-  --stone-600: #56524a;
-  --stone-700: #3d3a34;
-  --stone-800: #28262220;
-  --stone-900: #1c1a17;
-  --stone-950: #151311;
+  --color-surface: var(--ov-color-surface);
+  --color-surface-sunken: var(--ov-color-surface-sunken);
+  --color-surface-raised: var(--ov-color-surface-raised);
+  --color-surface-overlay: var(--ov-color-surface-overlay);
 
-  /* Accent (deep teal) — kept as hex for non-tailwind use */
-  --teal-50: #effcf9;
-  --teal-100: #c7f5eb;
-  --teal-500: #0d9488;
-  --teal-600: #0b7a70;
-  --teal-700: #0a6159;
+  --color-border: var(--ov-color-border);
+  --color-border-strong: var(--ov-color-border-strong);
 
-  /* Semantic tokens — RGB channels (space-separated) so tailwind can apply <alpha-value>. */
-  /* Light */
-  --color-surface: 250 249 247;
-  --color-surface-sunken: 244 242 238;
-  --color-surface-raised: 255 255 255;
-  --color-surface-overlay: 255 255 255;
+  --color-content: var(--ov-color-content);
+  --color-content-muted: var(--ov-color-content-muted);
+  --color-content-subtle: var(--ov-color-content-subtle);
+  --color-content-inverse: var(--ov-color-content-inverse);
 
-  --color-border: 231 228 222;
-  --color-border-strong: 211 206 197;
+  --color-accent: var(--ov-color-accent);
+  --color-accent-50: var(--ov-color-accent-50);
+  --color-accent-100: var(--ov-color-accent-100);
+  --color-accent-500: var(--ov-color-accent-500);
+  --color-accent-600: var(--ov-color-accent-600);
+  --color-accent-700: var(--ov-color-accent-700);
 
-  --color-content: 28 26 23;
-  --color-content-muted: 86 82 74;
-  --color-content-subtle: 122 116 105;
-  --color-content-inverse: 250 249 247;
-
-  --color-accent: 13 148 136;
-  --color-accent-50: 239 252 249;
-  --color-accent-100: 199 245 235;
-  --color-accent-500: 13 148 136;
-  --color-accent-600: 11 122 112;
-  --color-accent-700: 10 97 89;
-
-  --color-success: 5 150 105;
-  --color-warn: 180 83 9;
-  --color-danger: 185 28 28;
-  --color-info: 29 78 216;
+  --color-success: var(--ov-color-success);
+  --color-warn: var(--ov-color-warn);
+  --color-danger: var(--ov-color-danger);
+  --color-info: var(--ov-color-info);
 
   /* Radius + layout tokens */
   --hairline: 0.0625rem;
@@ -63,33 +42,6 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
-}
-
-.dark {
-  --color-surface: 21 19 17;
-  --color-surface-sunken: 28 26 23;
-  --color-surface-raised: 36 33 29;
-  --color-surface-overlay: 45 42 37;
-
-  --color-border: 61 58 52;
-  --color-border-strong: 86 82 74;
-
-  --color-content: 244 242 238;
-  --color-content-muted: 169 162 152;
-  --color-content-subtle: 122 116 105;
-  --color-content-inverse: 21 19 17;
-
-  --color-accent: 20 184 166;
-  --color-accent-50: 10 97 89;
-  --color-accent-100: 11 122 112;
-  --color-accent-500: 20 184 166;
-  --color-accent-600: 45 212 191;
-  --color-accent-700: 94 234 212;
-
-  --color-success: 16 185 129;
-  --color-warn: 245 158 11;
-  --color-danger: 248 113 113;
-  --color-info: 96 165 250;
 }
 
 html {
@@ -218,8 +170,9 @@ body {
     border-bottom: var(--hairline) solid rgb(var(--color-border));
   }
   .page-title {
+    font-family: var(--ov-font-display);
     font-size: 1.5rem;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.2;
     color: rgb(var(--color-content));
   }

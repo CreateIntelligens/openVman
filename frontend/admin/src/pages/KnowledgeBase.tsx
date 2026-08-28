@@ -667,7 +667,7 @@ export default function KnowledgeBase() {
 
   return (
     <div
-      className="h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-background-dark"
+      className="h-full flex flex-col overflow-hidden bg-surface dark:bg-background-dark"
       onDragOver={(e) => e.preventDefault()}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -675,19 +675,19 @@ export default function KnowledgeBase() {
     >
       {dragOver && (
         <div className="fixed inset-4 z-50 rounded-2xl border-2 border-dashed border-primary bg-primary/10 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
+          <div className="bg-surface-raised px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3">
             <span className="material-symbols-outlined text-primary text-3xl">upload_file</span>
-            <span className="text-xl font-bold text-slate-900 dark:text-white">拖放檔案以上傳到 {currentDir}</span>
+            <span className="text-xl font-bold text-content ">拖放檔案以上傳到 {currentDir}</span>
           </div>
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-3 py-3 dark:border-slate-800/60 sm:px-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={openMobileTree}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-primary dark:hover:bg-slate-800 md:hidden"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-content-subtle hover:bg-surface-sunken hover:text-primary md:hidden"
             aria-label="開啟檔案樹"
             aria-controls="knowledge-tree-panel"
             aria-expanded={mobileTreeOpen}
@@ -697,15 +697,15 @@ export default function KnowledgeBase() {
             </span>
           </button>
           <span className="material-symbols-outlined text-primary text-[1.5rem]">school</span>
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">知識庫</h1>
-          <span className="hidden text-xs text-slate-500 lg:inline">{documents.length} 文件 · {indexedCount} 已索引</span>
-          <div className="ml-auto flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-800 dark:bg-slate-900/40 sm:ml-3">
+          <h1 className="text-lg font-bold text-content ">知識庫</h1>
+          <span className="hidden text-xs text-content-subtle lg:inline">{documents.length} 文件 · {indexedCount} 已索引</span>
+          <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface-sunken p-0.5 dark:bg-surface-sunken/40 sm:ml-3">
             <button
               onClick={() => setActiveTab("documents")}
               className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 activeTab === "documents"
-                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  ? "bg-surface-raised text-primary shadow-sm"
+                  : "text-content-subtle hover:text-content"
               }`}
             >
               文件
@@ -714,8 +714,8 @@ export default function KnowledgeBase() {
               onClick={() => setActiveTab("graph")}
               className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 activeTab === "graph"
-                  ? "bg-white dark:bg-slate-800 text-primary shadow-sm"
-                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                  ? "bg-surface-raised text-primary shadow-sm"
+                  : "text-content-subtle hover:text-content"
               }`}
             >
               圖譜
@@ -809,16 +809,16 @@ export default function KnowledgeBase() {
           aria-label="知識庫檔案樹"
           aria-modal={mobileTreeOpen ? "true" : undefined}
           role={mobileTreeOpen ? "dialog" : undefined}
-          className={`fixed inset-y-0 left-0 z-50 w-[min(18rem,85vw)] shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-slate-800/60 dark:bg-slate-950 md:relative md:z-auto md:flex md:w-64 md:bg-white md:dark:bg-slate-950/30 xl:w-72 ${
+          className={`fixed inset-y-0 left-0 z-50 w-[min(18rem,85vw)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface-raised md:relative md:z-auto md:flex md:w-64 md:bg-white md:dark:bg-surface/30 xl:w-72 ${
             mobileTreeOpen ? "flex" : "hidden"
           }`}
         >
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-800/40 flex items-center justify-between">
+          <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">檔案與快速問答</span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-content-subtle">檔案與快速問答</span>
               {qaTreeLoading && (
-                <span className="material-symbols-outlined animate-spin text-[1rem] text-slate-400">sync</span>
+                <span className="material-symbols-outlined animate-spin text-[1rem] text-content-subtle">sync</span>
               )}
             </div>
             <button
@@ -826,7 +826,7 @@ export default function KnowledgeBase() {
                 setShowNewFolder(true);
                 setNewFolderName("");
               }}
-              className="p-1 rounded-md text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors"
+              className="p-1 rounded-md text-content-subtle hover:text-primary hover:bg-primary/10 transition-colors"
               title="新增資料夾"
             >
               <span className="material-symbols-outlined text-[1rem]">create_new_folder</span>
@@ -834,7 +834,7 @@ export default function KnowledgeBase() {
             <button
               type="button"
               onClick={closeMobileTree}
-              className="flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-white md:hidden"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-content-subtle hover:bg-surface-sunken hover:text-content md:hidden"
               aria-label="關閉檔案樹"
             >
               <span className="material-symbols-outlined text-[1.125rem]">
@@ -843,31 +843,31 @@ export default function KnowledgeBase() {
             </button>
           </div>
 
-          <div className="border-b border-slate-200 dark:border-slate-800/40 px-3 py-2.5">
+          <div className="border-b border-border px-3 py-2.5">
             <div className="relative">
-              <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[1rem] text-slate-400 dark:text-slate-500">
+              <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[1rem] text-content-subtle">
                 search
               </span>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="搜尋檔案樹..."
-                className="w-full rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 py-1.5 pl-8 pr-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-colors focus:border-primary/50"
+                className="w-full rounded-md border border-border bg-surface dark:bg-surface-sunken/60 py-1.5 pl-8 pr-3 text-sm text-content placeholder:text-content-subtle outline-none transition-colors focus:border-primary/50"
               />
             </div>
             {hasActiveSearch && (
-              <p className="mt-2 text-xs text-slate-500">搜尋命中 {matchingDocumentCount} 筆</p>
+              <p className="mt-2 text-xs text-content-subtle">搜尋命中 {matchingDocumentCount} 筆</p>
             )}
           </div>
 
           {showNewFolder && (
-            <form onSubmit={handleCreateFolderSubmit} className="flex items-center gap-1 px-3 py-2 border-b border-slate-200 dark:border-slate-800/40 bg-primary/5">
+            <form onSubmit={handleCreateFolderSubmit} className="flex items-center gap-1 px-3 py-2 border-b border-border bg-primary/5">
               <input
                 autoFocus
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 placeholder="資料夾名稱"
-                className="bg-transparent text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none flex-1 min-w-0"
+                className="bg-transparent text-xs text-content placeholder:text-content-subtle outline-none flex-1 min-w-0"
                 onKeyDown={(e) => {
                   if (e.key === "Escape") {
                     cancelCreateFolder();
@@ -877,7 +877,7 @@ export default function KnowledgeBase() {
               <button type="submit" disabled={!newFolderName.trim()} className="p-0.5 text-primary disabled:opacity-30">
                 <span className="material-symbols-outlined text-[1rem]">check</span>
               </button>
-              <button type="button" onClick={cancelCreateFolder} className="p-0.5 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+              <button type="button" onClick={cancelCreateFolder} className="p-0.5 text-content-subtle hover:text-content">
                 <span className="material-symbols-outlined text-[1rem]">close</span>
               </button>
             </form>
@@ -892,11 +892,11 @@ export default function KnowledgeBase() {
 
           <div className="flex-1 overflow-y-auto overflow-x-hidden py-1">
             {loading && !documents.length ? (
-              <div className="flex items-center justify-center py-10 text-slate-500 text-xs">
+              <div className="flex items-center justify-center py-10 text-content-subtle text-xs">
                 <span className="material-symbols-outlined animate-spin mr-1 text-[1rem]">refresh</span> 載入中...
               </div>
             ) : showSearchEmptyState ? (
-              <div className="px-4 py-10 text-center text-xs text-slate-500">
+              <div className="px-4 py-10 text-center text-xs text-content-subtle">
                 <span className="material-symbols-outlined mb-2 text-[1.25rem]">search_off</span>
                 <p>沒有符合搜尋的檔案</p>
               </div>

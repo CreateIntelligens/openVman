@@ -31,6 +31,6 @@ test("camera button explains itself when vision service is unavailable", () => {
 
 test("settings button can stay enabled while renderer actions are disabled", () => {
   assert.match(source, /settingsDisabled\?:\s*boolean/);
-  assert.match(source, /class="settings-btn"[\s\S]*?:disabled="settingsDisabled"/);
+  assert.match(source, /class="control-btn settings-btn"[\s\S]*?:disabled="settingsDisabled"/);
   assert.match(source, /:disabled="disabled \|\| cameraDisabled"/);
 });

@@ -95,8 +95,8 @@ export default function MergedCsvPane({
 
   if (!nodeId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
-        <span className="material-symbols-outlined text-[3rem] mb-3 text-slate-300 dark:text-slate-600">
+      <div className="flex flex-col items-center justify-center h-full p-8 text-content-subtle bg-surface-raised dark:bg-surface-sunken/30 rounded-xl border border-dashed border-border">
+        <span className="material-symbols-outlined text-[3rem] mb-3 text-border-strong">
           drafts
         </span>
         <p className="text-sm font-medium">請從左側側邊欄選擇一個知識節點以檢視並編輯問答數據</p>
@@ -219,18 +219,18 @@ export default function MergedCsvPane({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4 gap-3 bg-slate-50/50 dark:bg-slate-950/20 shrink-0">
+    <div className="flex flex-col h-full bg-surface-raised border border-border rounded-xl overflow-hidden shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border px-6 py-4 gap-3 bg-surface/50 dark:bg-surface/20 shrink-0">
         <div>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[1.25rem] text-primary">view_list</span>
-            <span className="text-base font-bold text-slate-800 dark:text-slate-100">
+            <span className="text-base font-bold text-content">
               合併檢視編輯器
             </span>
           </div>
           {nodeLabel && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              目前節點：<span className="font-semibold text-slate-700 dark:text-slate-300">{nodeLabel}</span> ({nodeId})
+            <p className="text-xs text-content-muted mt-0.5">
+              目前節點：<span className="font-semibold text-content-muted">{nodeLabel}</span> ({nodeId})
             </p>
           )}
         </div>
@@ -245,7 +245,7 @@ export default function MergedCsvPane({
             type="button"
             onClick={() => setCleanupConfirmOpen(true)}
             disabled={cleaningImages}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 transition-colors hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-content-muted transition-colors hover:text-content hover:bg-surface-sunken disabled:opacity-50"
           >
             <span className={`material-symbols-outlined text-[1rem] ${cleaningImages ? "animate-spin" : ""}`}>
               {cleaningImages ? "sync" : "mop"}
@@ -282,14 +282,14 @@ export default function MergedCsvPane({
 
       <div className="flex-1 overflow-auto p-6 min-h-0">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-500 py-12">
+          <div className="flex flex-col items-center justify-center h-full text-content-subtle py-12">
             <span className="material-symbols-outlined animate-spin text-[2rem] mb-2 text-primary">
               sync
             </span>
             <p className="text-xs">正在載入合併問答數據...</p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500 py-12 space-y-2">
+          <div className="flex flex-col items-center justify-center h-full text-content-subtle py-12 space-y-2">
             <span className="material-symbols-outlined text-[2.5rem]">
               table_rows
             </span>
@@ -301,12 +301,12 @@ export default function MergedCsvPane({
             {rows.map((row, idx) => (
               <article
                 key={row._localId}
-                className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900 ${row.hidden ? "opacity-60" : ""}`}
+                className={`rounded-xl border border-border bg-surface-raised p-4 shadow-sm transition-colors ${row.hidden ? "opacity-60" : ""}`}
               >
                 <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-500">問答 {idx + 1}</p>
-                    <p className="break-all text-xs text-slate-400" title={row.source_file}>
+                    <p className="text-xs font-semibold text-content-subtle">問答 {idx + 1}</p>
+                    <p className="break-all text-xs text-content-subtle" title={row.source_file}>
                       來源：{row.source_file}
                     </p>
                   </div>
@@ -314,7 +314,7 @@ export default function MergedCsvPane({
                     <button
                       type="button"
                       onClick={() => handleCellChange(idx, "hidden", !row.hidden)}
-                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ${row.hidden ? "bg-slate-100 text-slate-500 dark:bg-slate-800" : "bg-success/10 text-success"}`}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ${row.hidden ? "bg-surface-sunken text-content-subtle " : "bg-success/10 text-success"}`}
                       title={row.hidden ? "目前已隱藏，點擊以顯示" : "目前顯示中，點擊以隱藏"}
                     >
                       <span className="material-symbols-outlined text-base">{row.hidden ? "visibility_off" : "visibility"}</span>
@@ -323,7 +323,7 @@ export default function MergedCsvPane({
                     <button
                       type="button"
                       onClick={() => handleRemoveRow(idx)}
-                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-400 transition-colors hover:bg-danger/10 hover:text-danger"
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-content-subtle transition-colors hover:bg-danger/10 hover:text-danger"
                       title="刪除此行"
                     >
                       <span className="material-symbols-outlined text-base">delete</span>
@@ -333,31 +333,31 @@ export default function MergedCsvPane({
                 </header>
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <label className="space-y-1.5 text-xs font-semibold text-slate-500">
+                  <label className="space-y-1.5 text-xs font-semibold text-content-subtle">
                     <span>問題</span>
                     <textarea
                       value={row.q}
                       onChange={(e) => handleCellChange(idx, "q", e.target.value)}
                       placeholder="請輸入問題"
                       rows={3}
-                      className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-normal leading-relaxed text-slate-800 outline-none transition-colors focus:border-primary focus:bg-white dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-950/70"
+                      className="w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm font-normal leading-relaxed text-content outline-none transition-colors focus:border-primary focus:bg-white dark:bg-surface/40 dark:focus:bg-surface/70"
                     />
                   </label>
-                  <label className="space-y-1.5 text-xs font-semibold text-slate-500">
+                  <label className="space-y-1.5 text-xs font-semibold text-content-subtle">
                     <span>答案</span>
                     <textarea
                       value={row.a}
                       onChange={(e) => handleCellChange(idx, "a", e.target.value)}
                       placeholder="請輸入答案"
                       rows={5}
-                      className="w-full resize-y rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-normal leading-relaxed text-slate-800 outline-none transition-colors focus:border-primary focus:bg-white dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-200 dark:focus:bg-slate-950/70"
+                      className="w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm font-normal leading-relaxed text-content outline-none transition-colors focus:border-primary focus:bg-white dark:bg-surface/40 dark:focus:bg-surface/70"
                     />
                   </label>
                 </div>
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   <div className="space-y-2">
-                    <span className="text-xs font-semibold text-slate-500">圖片</span>
+                    <span className="text-xs font-semibold text-content-subtle">圖片</span>
                     <QaImagePreview
                       imageId={row.img || ""}
                       alt={`${row.q || `問答 ${idx + 1}`}的參考圖片`}
@@ -368,7 +368,7 @@ export default function MergedCsvPane({
                         value={row.img || ""}
                         onChange={(e) => handleCellChange(idx, "img", e.target.value)}
                         placeholder="圖片 ID"
-                        className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-xs text-slate-700 outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300"
+                        className="min-w-0 flex-1 rounded-lg border border-border bg-surface p-2.5 font-mono text-xs text-content-muted outline-none focus:border-primary dark:bg-surface/40 "
                       />
                       <button
                         type="button"
@@ -388,14 +388,14 @@ export default function MergedCsvPane({
                       </button>
                     </div>
                   </div>
-                  <label className="space-y-2 text-xs font-semibold text-slate-500">
+                  <label className="space-y-2 text-xs font-semibold text-content-subtle">
                     <span>外部連結</span>
                     <input
                       type="text"
                       value={row.url || ""}
                       onChange={(e) => handleCellChange(idx, "url", e.target.value)}
                       placeholder="外部連結"
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs font-normal text-slate-700 outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300"
+                      className="w-full rounded-lg border border-border bg-surface p-2.5 text-xs font-normal text-content-muted outline-none focus:border-primary dark:bg-surface/40 "
                     />
                   </label>
                 </div>
@@ -405,7 +405,7 @@ export default function MergedCsvPane({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 px-6 py-4 bg-slate-50/50 dark:bg-slate-950/20 shrink-0">
+      <div className="flex items-center justify-between border-t border-border px-6 py-4 bg-surface/50 dark:bg-surface/20 shrink-0">
         <button
           type="button"
           onClick={handleAddRow}
@@ -421,7 +421,7 @@ export default function MergedCsvPane({
             type="button"
             onClick={handleCancel}
             disabled={loading || saving || !isDirty}
-            className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition-colors disabled:opacity-45"
+            className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-content-muted hover:text-content dark:hover:bg-surface-overlay transition-colors disabled:opacity-45"
           >
             取消
           </button>

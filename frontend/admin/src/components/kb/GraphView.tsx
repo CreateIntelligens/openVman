@@ -96,7 +96,7 @@ export default function GraphView(): ReactNode {
   const statusBadge = useMemo(() => {
     const state = displayStatus?.state ?? "absent";
     const styles: Record<string, string> = {
-      absent: "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200",
+      absent: "bg-border text-content-muted ",
       building: "bg-amber-100 text-amber-800 dark:bg-amber-800/30 dark:text-amber-300",
       ready: "bg-emerald-100 text-emerald-800 dark:bg-emerald-800/30 dark:text-emerald-300",
       failed: "bg-rose-100 text-rose-800 dark:bg-rose-800/30 dark:text-rose-300",
@@ -118,13 +118,13 @@ export default function GraphView(): ReactNode {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 flex items-center justify-between shrink-0">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-primary text-[1.25rem]">hub</span>
-          <span className="text-sm font-bold text-slate-900 dark:text-white">知識圖譜</span>
+          <span className="text-sm font-bold text-content ">知識圖譜</span>
           {statusBadge}
           {displayStatus?.finished_at && (
-            <span className="text-[0.6875rem] text-slate-500">
+            <span className="text-[0.6875rem] text-content-subtle">
               最後建置：{new Date(displayStatus.finished_at).toLocaleString()}
             </span>
           )}
@@ -148,14 +148,14 @@ export default function GraphView(): ReactNode {
       )}
 
       {displayStatus?.state === "ready" && summary && (
-        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800/60 grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
+        <div className="px-4 py-3 border-b border-border grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
           <StatCard label="Nodes" value={summary.nodes} />
           <StatCard label="Edges" value={summary.edges} />
           <StatCard label="Communities" value={summary.communities} />
           <StatCard label="Bridges" value={summary.surprising_bridges} />
           {summary.god_nodes.length > 0 && (
             <div className="col-span-2 md:col-span-4">
-              <div className="text-[0.625rem] uppercase tracking-widest text-slate-500 mb-1">Hubs</div>
+              <div className="text-[0.625rem] uppercase tracking-widest text-content-subtle mb-1">Hubs</div>
               <div className="flex flex-wrap gap-1.5">
                 {summary.god_nodes.slice(0, 10).map((n, i) => (
                   <span
@@ -171,7 +171,7 @@ export default function GraphView(): ReactNode {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-hidden bg-white dark:bg-slate-950/30">
+      <div className="flex-1 min-h-0 overflow-hidden bg-surface-raised dark:bg-surface/30">
         <GraphContent loadState={loadState} status={displayStatus} htmlKey={htmlKey} />
       </div>
     </div>
@@ -217,9 +217,9 @@ interface StatCardProps {
 
 function StatCard({ label, value }: StatCardProps): ReactNode {
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-slate-800/60 bg-slate-50 dark:bg-slate-900/40 px-3 py-2">
-      <div className="text-[0.625rem] uppercase tracking-widest text-slate-500">{label}</div>
-      <div className="text-lg font-bold text-slate-900 dark:text-white">{value.toLocaleString()}</div>
+    <div className="rounded-lg border border-border bg-surface dark:bg-surface-sunken/40 px-3 py-2">
+      <div className="text-[0.625rem] uppercase tracking-widest text-content-subtle">{label}</div>
+      <div className="text-lg font-bold text-content ">{value.toLocaleString()}</div>
     </div>
   );
 }
@@ -232,7 +232,7 @@ interface EmptyStateProps {
 
 function EmptyState({ icon, text, spin = false }: EmptyStateProps): ReactNode {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2">
+    <div className="h-full flex flex-col items-center justify-center text-content-subtle gap-2">
       <span className={`material-symbols-outlined text-[2rem] ${spin ? "animate-spin" : ""}`}>{icon}</span>
       <span className="text-sm">{text}</span>
     </div>

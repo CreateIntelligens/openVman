@@ -54,7 +54,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary/40 text-slate-500 hover:text-primary rounded-xl transition-colors w-full justify-center"
+        className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-border-strong hover:border-primary/40 text-content-subtle hover:text-primary rounded-xl transition-colors w-full justify-center"
       >
         <span className="material-symbols-outlined text-lg">add</span>
         <span className="text-sm font-bold">建立技能</span>
@@ -63,15 +63,15 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
   }
 
   return (
-    <div className="bg-slate-100 dark:bg-slate-900/40 border border-primary/10 rounded-xl p-5 space-y-4">
+    <div className="bg-surface-sunken dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">新增技能</h4>
+        <h4 className="text-sm font-bold text-content">新增技能</h4>
         <button
           onClick={() => {
             reset();
             setOpen(false);
           }}
-          className="text-slate-500 hover:text-slate-900 dark:hover:text-white"
+          className="text-content-subtle hover:text-content "
         >
           <span className="material-symbols-outlined text-lg">close</span>
         </button>
@@ -80,7 +80,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
       {error && <StatusAlert type="error" message={error} />}
 
       <div>
-        <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">範圍</label>
+        <label className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1">範圍</label>
         <div className="flex gap-2">
           {([
             { value: "project", label: `專案（${projectId}）` },
@@ -93,7 +93,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
               className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border transition-colors ${
                 scope === option.value
                   ? "bg-primary/10 border-primary/40 text-primary"
-                  : "bg-white dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                  : "bg-surface-raised dark:bg-surface-overlay/60 border-border text-content-muted"
               }`}
             >
               {option.label}
@@ -103,15 +103,15 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
       </div>
 
       <div>
-        <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">名稱</label>
+        <label className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1">名稱</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="我的技能"
-          className="w-full px-3 py-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-primary/40"
+          className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-overlay/60 border border-border rounded-lg text-sm text-content placeholder-content-subtle outline-none focus:border-primary/40"
         />
         {name.trim() && (
-          <p className="text-[0.625rem] text-slate-500 mt-1 font-mono">
+          <p className="text-[0.625rem] text-content-subtle mt-1 font-mono">
             ID: {derivedId}
             {!idOverride && (
               <button onClick={() => setIdOverride(derivedId)} className="ml-2 text-primary hover:underline">
@@ -124,23 +124,23 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
 
       {idOverride !== "" && (
         <div>
-          <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">技能 ID</label>
+          <label className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1">技能 ID</label>
           <input
             value={idOverride}
             onChange={(e) => setIdOverride(e.target.value)}
             placeholder="my_skill"
-            className="w-full px-3 py-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-primary/40"
+            className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-overlay/60 border border-border rounded-lg text-sm text-content placeholder-content-subtle outline-none focus:border-primary/40"
           />
         </div>
       )}
 
       <div>
-        <label className="block text-[0.625rem] font-bold text-slate-500 uppercase tracking-widest mb-1">說明</label>
+        <label className="block text-[0.625rem] font-bold text-content-subtle uppercase tracking-widest mb-1">說明</label>
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="選填說明..."
-          className="w-full px-3 py-2 bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-primary/40"
+          className="w-full px-3 py-2 bg-surface-raised dark:bg-surface-overlay/60 border border-border rounded-lg text-sm text-content placeholder-content-subtle outline-none focus:border-primary/40"
         />
       </div>
 

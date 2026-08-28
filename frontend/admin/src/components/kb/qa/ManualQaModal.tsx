@@ -138,17 +138,17 @@ export default function ManualQaModal({
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
     >
-      <div className="w-full max-w-3xl max-h-[85%] flex flex-col rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 shadow-2xl outline-none transition-all">
+      <div className="w-full max-w-3xl max-h-[85%] flex flex-col rounded-2xl border border-border bg-surface-raised p-6 shadow-2xl outline-none transition-all">
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">手動輸入問答</h3>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              節點：<span className="font-semibold text-slate-700 dark:text-slate-300">{node.label}</span>（{nodeId}）
+            <h3 className="text-lg font-bold text-content ">手動輸入問答</h3>
+            <p className="mt-1 text-xs text-content-muted">
+              節點：<span className="font-semibold text-content-muted">{node.label}</span>（{nodeId}）
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-md text-content-subtle hover:text-content hover:bg-surface-sunken transition-colors"
             title="關閉"
           >
             <span className="material-symbols-outlined text-[1.25rem]">close</span>
@@ -162,30 +162,30 @@ export default function ManualQaModal({
           </div>
         )}
 
-        <p className="mt-3 shrink-0 text-[0.7rem] text-slate-400 dark:text-slate-500">{VISIBILITY_HINT}</p>
+        <p className="mt-3 shrink-0 text-[0.7rem] text-content-subtle">{VISIBILITY_HINT}</p>
 
         <div className="mt-3 flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
           {rows.map((row, index) => (
             <div
               key={index}
-              className="rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-2 bg-slate-50/50 dark:bg-slate-950/20"
+              className="rounded-xl border border-border p-4 space-y-2 bg-surface/50 dark:bg-surface/20"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">第 {index + 1} 題</span>
+                <span className="text-xs font-bold text-content-muted">第 {index + 1} 題</span>
                 <div className="flex items-center gap-2">
-                  <label className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 cursor-pointer select-none">
+                  <label className="inline-flex items-center gap-1.5 text-xs text-content-muted cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={row.visible}
                       onChange={(e) => updateRow(index, { visible: e.target.checked })}
-                      className="rounded border-slate-300 dark:border-slate-700"
+                      className="rounded border-border-strong"
                     />
                     顯示為預設問題
                   </label>
                   <button
                     type="button"
                     onClick={() => removeRow(index)}
-                    className="inline-flex items-center justify-center p-1 rounded text-slate-400 hover:text-danger hover:bg-danger/10 transition-colors"
+                    className="inline-flex items-center justify-center p-1 rounded text-content-subtle hover:text-danger hover:bg-danger/10 transition-colors"
                     title="移除此題"
                   >
                     <span className="material-symbols-outlined text-[1.125rem]">delete</span>
@@ -198,14 +198,14 @@ export default function ManualQaModal({
                 onChange={(e) => updateRow(index, { q: e.target.value })}
                 placeholder="問題（必填）"
                 rows={2}
-                className="w-full resize-none rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-xs leading-relaxed text-slate-800 dark:text-slate-200 outline-none focus:border-primary transition-colors"
+                className="w-full resize-none rounded-lg border border-border bg-surface-raised p-2 text-xs leading-relaxed text-content outline-none focus:border-primary transition-colors"
               />
               <textarea
                 value={row.a}
                 onChange={(e) => updateRow(index, { a: e.target.value })}
                 placeholder="答案"
                 rows={3}
-                className="w-full resize-none rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-xs leading-relaxed text-slate-800 dark:text-slate-200 outline-none focus:border-primary transition-colors"
+                className="w-full resize-none rounded-lg border border-border bg-surface-raised p-2 text-xs leading-relaxed text-content outline-none focus:border-primary transition-colors"
               />
 
               <div className="flex flex-col sm:flex-row gap-2">
@@ -216,13 +216,13 @@ export default function ManualQaModal({
                     onChange={(e) => updateRow(index, { img: e.target.value, pendingImageFile: null })}
                     placeholder="圖片 ID（可上傳）"
                     readOnly={row.pendingImageFile !== null}
-                    className="w-full min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-xs font-mono text-slate-700 dark:text-slate-300 outline-none focus:border-primary transition-colors"
+                    className="w-full min-w-0 rounded-lg border border-border bg-surface-raised p-2 text-xs font-mono text-content-muted outline-none focus:border-primary transition-colors"
                   />
                   {row.pendingImageFile && (
                     <button
                       type="button"
                       onClick={() => updateRow(index, { pendingImageFile: null })}
-                      className="shrink-0 inline-flex items-center justify-center p-1 rounded text-slate-400 hover:text-danger hover:bg-danger/10 transition-colors"
+                      className="shrink-0 inline-flex items-center justify-center p-1 rounded text-content-subtle hover:text-danger hover:bg-danger/10 transition-colors"
                       title="清除待上傳圖片"
                     >
                       <span className="material-symbols-outlined text-[1.125rem]">close</span>
@@ -232,7 +232,7 @@ export default function ManualQaModal({
                     type="button"
                     onClick={() => handlePickImage(index)}
                     disabled={submitting}
-                    className="shrink-0 inline-flex items-center justify-center p-1 rounded text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+                    className="shrink-0 inline-flex items-center justify-center p-1 rounded text-content-subtle hover:text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
                     title="選擇圖片（送出時上傳）"
                   >
                     <span className="material-symbols-outlined text-[1.125rem]">add_photo_alternate</span>
@@ -243,7 +243,7 @@ export default function ManualQaModal({
                   value={row.url}
                   onChange={(e) => updateRow(index, { url: e.target.value })}
                   placeholder="外部連結 URL"
-                  className="flex-1 min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2 text-xs text-slate-700 dark:text-slate-300 outline-none focus:border-primary transition-colors"
+                  className="flex-1 min-w-0 rounded-lg border border-border bg-surface-raised p-2 text-xs text-content-muted outline-none focus:border-primary transition-colors"
                 />
               </div>
             </div>
@@ -252,7 +252,7 @@ export default function ManualQaModal({
           <button
             type="button"
             onClick={() => setRows((prev) => [...prev, createEmptyRow()])}
-            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 px-4 py-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:border-primary hover:text-primary transition-colors"
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border-strong px-4 py-2.5 text-xs font-semibold text-content-muted hover:border-primary hover:text-primary transition-colors"
           >
             <span className="material-symbols-outlined text-[1.1rem]">add</span>
             新增一題
@@ -260,12 +260,12 @@ export default function ManualQaModal({
         </div>
 
         <div className="mt-5 shrink-0 flex items-center justify-between">
-          <span className="text-xs text-slate-400 dark:text-slate-500">{validRows.length} 題有效</span>
+          <span className="text-xs text-content-subtle">{validRows.length} 題有效</span>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
               disabled={submitting}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm text-slate-500 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-45"
+              className="rounded-lg border border-border px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken hover:text-content transition-colors disabled:opacity-45"
             >
               取消
             </button>

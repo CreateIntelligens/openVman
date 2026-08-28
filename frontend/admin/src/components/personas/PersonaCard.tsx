@@ -19,13 +19,13 @@ export default function PersonaCard({
     <div
       className={`rounded-md p-2.5 text-left transition-colors cursor-pointer border ${
         selected
-          ? "bg-slate-100 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 shadow-sm"
-          : "bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/30"
+          ? "bg-surface-sunken dark:bg-surface-overlay/60 border-border shadow-sm"
+          : "bg-transparent border-transparent hover:bg-surface-sunken "
       }`}
       onClick={() => onSelect(persona)}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={`font-semibold truncate text-sm ${selected ? "text-primary" : "text-slate-700 dark:text-slate-300"}`}>
+        <span className={`font-semibold truncate text-sm ${selected ? "text-primary" : "text-content-muted"}`}>
           {persona.label || persona.persona_id}
         </span>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -38,7 +38,7 @@ export default function PersonaCard({
       </div>
 
       <div className="mt-1.5 flex items-center justify-between">
-        <span className="text-[0.625rem] font-mono text-slate-500 truncate">{persona.persona_id}</span>
+        <span className="text-[0.625rem] font-mono text-content-subtle truncate">{persona.persona_id}</span>
         {selected && !persona.is_default && (
           <button
             onClick={(event) => {

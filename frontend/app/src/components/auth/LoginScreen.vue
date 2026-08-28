@@ -138,7 +138,7 @@ function selectMode(nextMode: "formal" | "temporary"): void {
 </template>
 
 <style scoped>
-/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 · macrostructure: Workbench · genre: modern-minimal · theme: existing warm-neutral teal · slop: pass */
+/* Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 · macrostructure: Workbench · genre: modern-minimal · theme: shared warm-neutral terracotta tokens · slop: pass */
 .login-page {
   min-height: 100dvh;
   display: grid;
@@ -198,9 +198,10 @@ function selectMode(nextMode: "formal" | "temporary"): void {
 
 h1 {
   margin: 0;
+  font-family: var(--ov-font-display);
   font-size: clamp(2.25rem, 5vw, 4.25rem);
-  line-height: 1.08;
-  letter-spacing: -0.035em;
+  line-height: 1.16;
+  letter-spacing: -0.015em;
   overflow-wrap: anywhere;
 }
 

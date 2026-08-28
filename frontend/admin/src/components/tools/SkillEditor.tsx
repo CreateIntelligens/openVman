@@ -58,8 +58,8 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
   };
 
   return (
-    <div className="bg-slate-50 dark:bg-slate-900/60 border border-primary/10 rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800">
+    <div className="bg-surface dark:bg-surface-sunken/60 border border-primary/10 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-primary">edit_note</span>
           <span className="font-bold text-sm">編輯：{skillId}</span>
@@ -80,7 +80,7 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
           </button>
           <button
             onClick={onClose}
-            className="flex items-center gap-1 px-3 py-1.5 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-600 rounded-lg text-xs transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 border border-border text-content-muted hover:text-content hover:border-border-strong rounded-lg text-xs transition-colors"
           >
             <span className="material-symbols-outlined text-sm">close</span>
             關閉
@@ -94,15 +94,15 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
         </div>
       )}
 
-      <div className="flex border-b border-slate-200 dark:border-slate-800">
+      <div className="flex border-b border-border">
         {SKILL_EDITOR_TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`px-5 py-2.5 text-xs font-bold transition-colors ${
               activeTab === tab
-                ? "text-primary border-b-2 border-primary bg-slate-200/50 dark:bg-slate-800/30"
-                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                ? "text-primary border-b-2 border-primary bg-border/50 dark:bg-surface-overlay/30"
+                : "text-content-subtle hover:text-content"
             }`}
           >
             {tab}
@@ -111,13 +111,13 @@ export default function SkillEditor({ skillId, scope, projectId, onClose, onSave
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-slate-500 text-sm">載入檔案中...</div>
+        <div className="flex items-center justify-center py-16 text-content-subtle text-sm">載入檔案中...</div>
       ) : (
         <textarea
           value={files[activeTab] ?? ""}
           onChange={(e) => handleChange(e.target.value)}
           spellCheck={false}
-          className="w-full h-[25rem] p-5 bg-transparent text-slate-800 dark:text-slate-200 text-xs leading-5 font-mono resize-y outline-none border-none"
+          className="w-full h-[25rem] p-5 bg-transparent text-content text-xs leading-5 font-mono resize-y outline-none border-none"
           style={{ tabSize: 2 }}
         />
       )}

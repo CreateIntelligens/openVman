@@ -37,9 +37,9 @@ export default function Select({
       return "bg-primary/15 text-primary font-semibold";
     }
     if (index === focusedIndex) {
-      return "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100";
+      return "bg-surface-sunken text-content";
     }
-    return "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60";
+    return "text-content-muted hover:bg-surface-sunken ";
   };
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
@@ -146,10 +146,10 @@ export default function Select({
         onClick={() => (open ? setOpen(false) : openDropdown())}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        className="w-full flex items-center justify-between gap-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-between gap-2 bg-surface-raised text-content border border-border rounded-lg px-3 py-2 text-sm font-medium cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="truncate">{displayLabel}</span>
-        <span className={`material-symbols-outlined text-[1rem] text-slate-400 transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""}`}>
+        <span className={`material-symbols-outlined text-[1rem] text-content-subtle transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""}`}>
           expand_more
         </span>
       </button>
@@ -160,7 +160,7 @@ export default function Select({
           ref={listRef}
           role="listbox"
           aria-label={ariaLabel ?? title ?? placeholder ?? "選擇選項"}
-          className={`absolute z-50 w-full min-w-[7.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl dark:shadow-[0_0.5rem_1.875rem_rgba(0,0,0,0.5)] overflow-y-auto max-h-[12.5rem] py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
+          className={`absolute z-50 w-full min-w-[7.5rem] bg-surface-raised border border-border rounded-xl shadow-xl dark:shadow-[0_0.5rem_1.875rem_rgba(0,0,0,0.5)] overflow-y-auto max-h-[12.5rem] py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
           {options.map((option, i) => (
             <div

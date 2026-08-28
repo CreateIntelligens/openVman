@@ -87,20 +87,20 @@ export default function Search() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="sticky top-0 z-10 px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-primary/10">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">知識庫搜尋</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+      <header className="sticky top-0 z-10 px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-border dark:border-primary/10">
+        <h2 className="text-2xl font-bold text-content ">知識庫搜尋</h2>
+        <p className="text-sm text-content-muted">
           顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。
         </p>
       </header>
 
       <div className="p-8 max-w-5xl space-y-8">
         {/* Search Bar */}
-        <div className="bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 p-1.5 rounded-2xl flex flex-col md:flex-row items-stretch gap-2 shadow-xl shadow-slate-200/50 dark:shadow-primary/5">
+        <div className="bg-surface-raised dark:bg-surface-overlay/40 border border-border p-1.5 rounded-2xl flex flex-col md:flex-row items-stretch gap-2 shadow-xl shadow-border/50 dark:shadow-primary/5">
           <div className="flex-1 relative flex items-center">
-            <span className="material-symbols-outlined absolute left-4 text-slate-400">search</span>
+            <span className="material-symbols-outlined absolute left-4 text-content-subtle">search</span>
             <input
-              className="w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-lg"
+              className="w-full pl-12 pr-4 py-4 bg-transparent border-none focus:ring-0 text-content placeholder:text-content-subtle text-lg"
               placeholder="描述你要搜尋的內容..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -111,7 +111,7 @@ export default function Search() {
               }}
             />
           </div>
-          <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
+          <div className="h-auto w-px bg-border hidden md:block mx-2 my-2" />
           <div className="flex items-center px-4">
             <Select
               value={table}
@@ -123,9 +123,9 @@ export default function Search() {
               className="text-sm min-w-[6.25rem]"
             />
           </div>
-          <div className="h-auto w-px bg-slate-200 dark:bg-slate-700 hidden md:block mx-2 my-2" />
+          <div className="h-auto w-px bg-border hidden md:block mx-2 my-2" />
           <div className="flex items-center gap-2 px-4">
-            <label className="text-xs text-slate-400 dark:text-slate-500 font-bold whitespace-nowrap">Top K</label>
+            <label className="text-xs text-content-subtle font-bold whitespace-nowrap">Top K</label>
             <Select
               value={String(topK)}
               onChange={(v) => setTopK(Number(v))}
@@ -147,12 +147,12 @@ export default function Search() {
         {/* Results */}
         {response && !response.error && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2 text-content ">
                 <span className="material-symbols-outlined text-primary">analytics</span>
                 搜尋結果
               </h3>
-              <span className="text-sm text-slate-400 dark:text-slate-500">
+              <span className="text-sm text-content-subtle">
                 找到 {response.results.length} 筆結果
               </span>
             </div>
@@ -169,14 +169,14 @@ export default function Search() {
                 return (
                   <div
                     key={i}
-                    className="bg-white dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl hover:border-primary/50 transition-all group shadow-sm"
+                    className="bg-surface-raised dark:bg-surface-overlay/30 border border-border p-6 rounded-2xl hover:border-primary/50 transition-all group shadow-sm"
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-1 rounded bg-primary/10 text-primary text-[0.625rem] font-bold uppercase tracking-wider">
                           RAG chunk
                         </span>
-                        <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 text-[0.625rem] font-bold uppercase tracking-wider">
+                        <span className="px-2 py-1 rounded bg-surface-sunken dark:bg-surface-overlay text-content-muted text-[0.625rem] font-bold uppercase tracking-wider">
                           {response.table}
                         </span>
                         {exactMatch && (
@@ -185,13 +185,13 @@ export default function Search() {
                           </span>
                         )}
                         {response.table === "memories" && <PersonaBadge metadata={metadata} />}
-                        <span className="text-xs text-slate-500">來源：{item.source}</span>
+                        <span className="text-xs text-content-subtle">來源：{item.source}</span>
                       </div>
                       <div className="text-right min-w-[7.5rem]">
-                        <p className="text-[0.625rem] text-slate-500 uppercase font-bold tracking-tighter mb-1">相關度</p>
+                        <p className="text-[0.625rem] text-content-subtle uppercase font-bold tracking-tighter mb-1">相關度</p>
                         {similarity != null ? (
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 h-2 rounded-full bg-slate-700 overflow-hidden">
+                            <div className="flex-1 h-2 rounded-full bg-border overflow-hidden">
                               <div
                                 className="h-full rounded-full bg-primary transition-all"
                                 style={{ width: `${similarity}%` }}
@@ -202,22 +202,22 @@ export default function Search() {
                             </span>
                           </div>
                         ) : (
-                          <span className="text-sm font-mono text-slate-500">—</span>
+                          <span className="text-sm font-mono text-content-subtle">—</span>
                         )}
                       </div>
                     </div>
-                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-4">{item.text}</p>
+                    <p className="text-content-muted leading-relaxed mb-4">{item.text}</p>
                     {(resultTitle || resultPath || headings.length > 0 || chunkId) && (
-                      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-content-muted">
                         {resultTitle && (
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">{resultTitle}</span>
+                          <span className="font-semibold text-content">{resultTitle}</span>
                         )}
                         {headings.length > 0 && <span>{headings.join(" / ")}</span>}
                         {resultPath && <span className="font-mono">{resultPath}</span>}
-                        {chunkId && <span className="font-mono text-slate-400">{chunkId}</span>}
+                        {chunkId && <span className="font-mono text-content-subtle">{chunkId}</span>}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-xs pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                    <div className="flex items-center gap-2 text-content-subtle text-xs pt-4 border-t border-border ">
                       <span className="material-symbols-outlined text-sm">calendar_today</span>
                       <span>{item.date}</span>
                     </div>
@@ -226,7 +226,7 @@ export default function Search() {
               })}
 
               {response.results.length === 0 && (
-                <p className="text-slate-500 text-center py-8">沒有找到結果。</p>
+                <p className="text-content-subtle text-center py-8">沒有找到結果。</p>
               )}
             </div>
           </div>

@@ -1,6 +1,10 @@
-/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · macrostructure: paired operational shells · genre: modern-minimal · tone: technical/utilitarian · anchor hue: blue */
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · macrostructure: paired operational shells · genre: modern-minimal · tone: technical/utilitarian · anchor hue: terracotta */
+/* 前後台共用的設計 tokens。色彩一律存 RGB channel（空白分隔），
+   消費端以 rgb(var(--ov-color-x)) 或 rgb(var(--ov-color-x) / alpha) 取用，
+   tailwind 端也能套 <alpha-value>。深色以 .dark class 切換（admin 使用；app 目前僅淺色）。 */
 :root {
   --ov-font-ui: "Noto Sans TC", "IBM Plex Sans", "Segoe UI", sans-serif;
+  --ov-font-display: "Noto Serif TC", "Noto Sans TC", serif;
   --ov-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --ov-touch-target: 2.75rem;
@@ -14,10 +18,33 @@
   --ov-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ov-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
-  --ov-color-success: 16 185 129;
-  --ov-color-warn: 245 158 11;
-  --ov-color-danger: 248 113 113;
-  --ov-color-info: 96 165 250;
+  /* 暖色中性階（stone） */
+  --ov-color-surface: 250 249 247;
+  --ov-color-surface-sunken: 244 242 238;
+  --ov-color-surface-raised: 255 255 255;
+  --ov-color-surface-overlay: 255 255 255;
+
+  --ov-color-border: 231 228 222;
+  --ov-color-border-strong: 211 206 197;
+
+  --ov-color-content: 28 26 23;
+  --ov-color-content-muted: 86 82 74;
+  --ov-color-content-subtle: 122 116 105;
+  --ov-color-content-inverse: 250 249 247;
+
+  /* Accent（陶土橘 #C96442） */
+  --ov-color-accent: 201 100 66;
+  --ov-color-accent-50: 250 241 236;
+  --ov-color-accent-100: 246 231 222;
+  --ov-color-accent-500: 201 100 66;
+  --ov-color-accent-600: 169 79 47;
+  --ov-color-accent-700: 138 63 36;
+
+  /* 語意狀態（淺色底用深階，深色以 .dark 覆寫） */
+  --ov-color-success: 5 150 105;
+  --ov-color-warn: 180 83 9;
+  --ov-color-danger: 185 28 28;
+  --ov-color-info: 29 78 216;
 
   --ov-z-base: 1;
   --ov-z-raised: 10;
@@ -26,6 +53,33 @@
   --ov-z-modal: 400;
   --ov-z-toast: 500;
   --ov-z-tooltip: 600;
+}
+
+.dark {
+  --ov-color-surface: 21 19 17;
+  --ov-color-surface-sunken: 28 26 23;
+  --ov-color-surface-raised: 36 33 29;
+  --ov-color-surface-overlay: 45 42 37;
+
+  --ov-color-border: 61 58 52;
+  --ov-color-border-strong: 86 82 74;
+
+  --ov-color-content: 244 242 238;
+  --ov-color-content-muted: 169 162 152;
+  --ov-color-content-subtle: 122 116 105;
+  --ov-color-content-inverse: 21 19 17;
+
+  --ov-color-accent: 224 122 82;
+  --ov-color-accent-50: 138 63 36;
+  --ov-color-accent-100: 169 79 47;
+  --ov-color-accent-500: 224 122 82;
+  --ov-color-accent-600: 235 148 114;
+  --ov-color-accent-700: 243 178 152;
+
+  --ov-color-success: 16 185 129;
+  --ov-color-warn: 245 158 11;
+  --ov-color-danger: 248 113 113;
+  --ov-color-info: 96 165 250;
 }
 
 @media (prefers-reduced-motion: reduce) {

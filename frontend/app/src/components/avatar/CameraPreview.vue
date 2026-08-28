@@ -99,15 +99,15 @@ watch(
 }
 
 .camera-preview__signal--green {
-  --camera-signal-color: #22c55e;
+  --camera-signal-color: rgb(var(--ov-color-success));
 }
 
 .camera-preview__signal--yellow {
-  --camera-signal-color: #f59e0b;
+  --camera-signal-color: rgb(var(--ov-color-warn));
 }
 
 .camera-preview__signal--red {
-  --camera-signal-color: #ef4444;
+  --camera-signal-color: rgb(var(--ov-color-danger));
 }
 
 @keyframes camera-preview-pulse {

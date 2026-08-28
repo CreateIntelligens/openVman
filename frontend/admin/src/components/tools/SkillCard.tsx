@@ -18,7 +18,7 @@ export default function SkillCard({
   onDelete,
 }: SkillCardProps) {
   return (
-    <div className="bg-slate-100 dark:bg-slate-900/40 border border-primary/10 rounded-xl p-5 transition-transform hover:scale-[1.02]">
+    <div className="bg-surface-sunken dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-5 transition-transform hover:scale-[1.02]">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -32,7 +32,7 @@ export default function SkillCard({
                   className={`text-[0.5625rem] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                     skill.scope === "project"
                       ? "bg-primary/15 text-primary border border-primary/30"
-                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                      : "bg-border text-content-muted"
                   }`}
                   title={skill.scope === "project" ? `專案：${skill.project_id}` : "共用範圍"}
                 >
@@ -40,7 +40,7 @@ export default function SkillCard({
                 </span>
               )}
             </div>
-            <p className="text-[0.625rem] text-slate-500 font-mono">{skill.id} v{skill.version}</p>
+            <p className="text-[0.625rem] text-content-subtle font-mono">{skill.id} v{skill.version}</p>
           </div>
         </div>
 
@@ -49,7 +49,7 @@ export default function SkillCard({
           disabled={isToggling}
           title={skill.enabled ? "停用技能" : "啟用技能"}
           className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-            skill.enabled ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+            skill.enabled ? "bg-emerald-500" : "bg-border-strong"
           }`}
         >
           <span
@@ -60,7 +60,7 @@ export default function SkillCard({
         </button>
       </div>
 
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">{skill.description}</p>
+      <p className="text-xs text-content-muted mb-3 line-clamp-2">{skill.description}</p>
 
       {skill.warnings?.length > 0 && (
         <div className="mb-3 space-y-1">
@@ -74,10 +74,10 @@ export default function SkillCard({
       )}
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[0.6875rem] text-slate-500">
+        <div className="flex items-center gap-2 text-[0.6875rem] text-content-subtle">
           <span className="material-symbols-outlined text-[0.875rem]">handyman</span>
           {skill.tools.length}個工具
-          <span className="text-slate-300 dark:text-slate-700 mx-1">|</span>
+          <span className="text-border-strong mx-1">|</span>
           <span className="truncate font-mono max-w-[7.5rem]" title={skill.tools.join(", ")}>
             {skill.tools.join(", ")}
           </span>
@@ -89,7 +89,7 @@ export default function SkillCard({
             className={`flex items-center gap-1 px-2 py-1 text-[0.6875rem] border rounded-lg transition-colors ${
               isEditing
                 ? "text-primary border-primary/30 bg-primary/10"
-                : "text-slate-500 dark:text-slate-400 hover:text-primary border-slate-200 dark:border-slate-700 hover:border-primary/30"
+                : "text-content-muted hover:text-primary border-border hover:border-primary/30"
             }`}
           >
             <span className="material-symbols-outlined text-[0.875rem]">edit</span>
@@ -97,7 +97,7 @@ export default function SkillCard({
           </button>
           <button
             onClick={() => onDelete(skill)}
-            className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-slate-500 dark:text-slate-400 hover:text-red-400 border border-slate-200 dark:border-slate-700 hover:border-red-500/30 rounded-lg transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-[0.6875rem] text-content-muted hover:text-red-400 border border-border hover:border-red-500/30 rounded-lg transition-colors"
             title="刪除"
           >
             <span className="material-symbols-outlined text-[0.875rem]">delete</span>

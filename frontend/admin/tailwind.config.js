@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        slate: {
+        stone: {
           50: "#faf9f7",
           100: "#f4f2ee",
           200: "#e7e4de",
@@ -49,7 +49,7 @@ export default {
         "background-dark": "rgb(var(--color-surface) / <alpha-value>)",
       },
       fontFamily: {
-        display: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Noto Serif TC", "Noto Sans TC", "serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       fontSize: {

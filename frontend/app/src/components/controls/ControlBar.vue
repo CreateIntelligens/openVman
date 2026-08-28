@@ -6,8 +6,8 @@
 
     <div class="control-bar__right">
       <button
-        class="camera-btn"
-        :class="{ 'camera-btn--active': cameraActive }"
+        class="control-btn"
+        :class="{ 'control-btn--active': cameraActive }"
         :disabled="disabled || cameraDisabled"
         @click="$emit('toggleCamera')"
         :title="cameraTitle"
@@ -45,7 +45,7 @@
       </label>
 
       <button
-        class="settings-btn"
+        class="control-btn settings-btn"
         :disabled="settingsDisabled"
         aria-label="系統設定"
         title="系統設定"
@@ -59,8 +59,8 @@
       </button>
 
       <button
-        class="immersive-btn"
-        :class="{ 'immersive-btn--active': immersive }"
+        class="control-btn"
+        :class="{ 'control-btn--active': immersive }"
         @click="$emit('toggleImmersive')"
         :title="immersive ? '結束全螢幕' : '全螢幕'"
         :aria-label="immersive ? '結束全螢幕' : '全螢幕'"
@@ -136,7 +136,7 @@ function handleCameraPreviewScaleInput(event: Event): void {
   border-radius: 0.75rem;
   border: 1px solid var(--line);
   background: var(--bg-soft);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(28, 26, 23, 0.06);
   padding: 1rem 1.25rem;
 }
 
@@ -148,8 +148,9 @@ function handleCameraPreviewScaleInput(event: Event): void {
 .control-bar h2 {
   margin: 0;
   color: var(--text);
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-family: var(--ov-font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -164,7 +165,7 @@ function handleCameraPreviewScaleInput(event: Event): void {
   min-width: 0;
 }
 
-.camera-btn {
+.control-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -180,22 +181,22 @@ function handleCameraPreviewScaleInput(event: Event): void {
   white-space: nowrap;
   min-height: 2.75rem;
 }
-.camera-btn:hover:not(:disabled) {
+.control-btn:hover:not(:disabled) {
   background: var(--bg-soft);
   border-color: var(--primary);
   color: var(--primary);
 }
-.camera-btn--active {
+.control-btn--active {
   background: var(--primary);
   border-color: var(--primary);
   color: #fff;
 }
-.camera-btn--active:hover:not(:disabled) {
+.control-btn--active:hover:not(:disabled) {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
   color: #fff;
 }
-.camera-btn:disabled {
+.control-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -206,7 +207,7 @@ function handleCameraPreviewScaleInput(event: Event): void {
   gap: 0.5rem;
   min-width: 9rem;
   padding: 0.35rem 0.7rem;
-  border: var(--hairline) solid rgba(15, 23, 42, 0.12);
+  border: var(--hairline) solid var(--line);
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.45);
   color: var(--text-soft);
@@ -220,72 +221,14 @@ function handleCameraPreviewScaleInput(event: Event): void {
   accent-color: var(--primary);
 }
 
-.settings-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: var(--bg);
-  color: var(--text-soft);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-  min-height: 2.75rem;
-}
-.settings-btn:hover:not(:disabled) {
-  background: var(--bg-soft);
-  border-color: var(--primary);
-  color: var(--primary);
-}
-.settings-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.immersive-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: var(--bg);
-  color: var(--text-soft);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-  min-height: 2.75rem;
-}
-.immersive-btn:hover {
-  background: var(--bg-soft);
-  border-color: var(--primary);
-  color: var(--primary);
-}
-.immersive-btn--active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-.immersive-btn--active:hover {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
-  color: #fff;
-}
-
 .error-banner {
   width: 100%;
   margin: 0;
   border-radius: 0.5rem;
   padding: 0.6rem 0.875rem;
-  background: #fef2f2;
-  border: 1px solid #fee2e2;
-  color: #b91c1c;
+  background: color-mix(in srgb, rgb(var(--ov-color-danger)) 7%, var(--bg-soft));
+  border: 1px solid color-mix(in srgb, rgb(var(--ov-color-danger)) 18%, var(--line));
+  color: rgb(var(--ov-color-danger));
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -305,9 +248,7 @@ function handleCameraPreviewScaleInput(event: Event): void {
     gap: 0.5rem;
   }
 
-  .camera-btn,
-  .settings-btn,
-  .immersive-btn {
+  .control-btn {
     min-width: 2.75rem;
     padding-inline: 0.75rem;
   }

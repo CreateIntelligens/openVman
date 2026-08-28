@@ -60,7 +60,7 @@ function SidebarNodeItem({
   const hasChildren = children.length > 0;
   const isExpanded = search ? true : expandedNodeIds.has(node.node_id);
   let itemStateClass =
-    "hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white";
+    "hover:bg-surface-sunken text-content-muted hover:text-content ";
 
   if (isDragOver) {
     itemStateClass = "bg-info/10 dark:bg-info/20 border-info/50";
@@ -147,7 +147,7 @@ function SidebarNodeItem({
         onDrop={handleDrop}
       >
         <span
-          className="material-symbols-outlined text-[1.25rem] text-slate-400 dark:text-slate-500 cursor-grab active:cursor-grabbing mr-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="material-symbols-outlined text-[1.25rem] text-content-subtle cursor-grab active:cursor-grabbing mr-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           title="拖曳以排序"
         >
           drag_indicator
@@ -156,14 +156,14 @@ function SidebarNodeItem({
         <div className="w-5 h-5 flex items-center justify-center shrink-0 mr-1" onClick={handleToggle}>
           {hasChildren ? (
             <span
-              className={`material-symbols-outlined text-[1.125rem] text-slate-500 transition-transform duration-150 hover:text-slate-700 dark:hover:text-slate-300 ${
+              className={`material-symbols-outlined text-[1.125rem] text-content-subtle transition-transform duration-150 hover:text-content ${
                 isExpanded ? "rotate-90" : ""
               }`}
             >
               chevron_right
             </span>
           ) : (
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+            <div className="w-1.5 h-1.5 rounded-full bg-border-strong" />
           )}
         </div>
 
@@ -178,7 +178,7 @@ function SidebarNodeItem({
         <div className="flex items-center gap-1.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           <button
             onClick={handleToggleVisibility}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-border text-content-muted hover:text-content "
             title={node.hidden ? "顯示節點" : "隱藏節點"}
           >
             <span className="material-symbols-outlined text-[1.05rem]">
@@ -188,7 +188,7 @@ function SidebarNodeItem({
 
           <button
             onClick={handleAddChild}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-border text-content-muted hover:text-content "
             title="新增子節點"
           >
             <span className="material-symbols-outlined text-[1.05rem]">add</span>
@@ -196,7 +196,7 @@ function SidebarNodeItem({
 
           <button
             onClick={handleEditLabel}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-border text-content-muted hover:text-content "
             title="修改名稱"
           >
             <span className="material-symbols-outlined text-[1.05rem]">edit</span>
@@ -204,7 +204,7 @@ function SidebarNodeItem({
 
           <button
             onClick={handleDeleteClick}
-            className="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-border text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
             title="刪除節點"
           >
             <span className="material-symbols-outlined text-[1.05rem]">delete</span>
@@ -365,19 +365,19 @@ export default function ExplorerSidebar({
   }, [nodesTree, search]);
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 w-full">
+    <div className="flex flex-col h-full bg-surface-raised border-r border-border w-full">
       {error && (
         <div className="px-4 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs border-b border-red-100 dark:border-red-900/30 flex items-center gap-1.5 shrink-0">
           <span className="material-symbols-outlined text-[1rem]">error</span>
           <span className="truncate flex-1">{error}</span>
         </div>
       )}
-      <div className="p-4 flex flex-col gap-2 shrink-0 border-b border-slate-200 dark:border-slate-800">
+      <div className="p-4 flex flex-col gap-2 shrink-0 border-b border-border">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">問答知識節點</h3>
+            <h3 className="text-sm font-semibold text-content truncate">問答知識節點</h3>
             {loading && (
-              <span className="material-symbols-outlined text-[1rem] text-slate-400 dark:text-slate-500 animate-spin shrink-0">
+              <span className="material-symbols-outlined text-[1rem] text-content-subtle animate-spin shrink-0">
                 sync
               </span>
             )}
@@ -400,21 +400,21 @@ export default function ExplorerSidebar({
             placeholder="搜尋節點名稱或 ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+            className="w-full text-xs pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-content placeholder-content-subtle focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
           />
-          <span className="material-symbols-outlined text-[1rem] absolute left-2.5 top-1.5 text-slate-400 dark:text-slate-500">
+          <span className="material-symbols-outlined text-[1rem] absolute left-2.5 top-1.5 text-content-subtle">
             search
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-[0.7rem] text-slate-500 dark:text-slate-400 mt-1">
-          <button onClick={handleExpandAll} className="hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+        <div className="flex items-center gap-2 text-[0.7rem] text-content-muted mt-1">
+          <button onClick={handleExpandAll} className="hover:text-content transition-colors">
             展開全部
           </button>
           <span>|</span>
           <button
             onClick={handleCollapseAll}
-            className="hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className="hover:text-content transition-colors"
           >
             收合全部
           </button>
@@ -423,12 +423,12 @@ export default function ExplorerSidebar({
 
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {loading && filteredTree.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-slate-500 text-xs">
+          <div className="flex flex-col items-center justify-center py-12 text-content-subtle text-xs">
             <span className="material-symbols-outlined animate-spin mb-2 text-primary text-[1.5rem]">sync</span>
             載入中...
           </div>
         ) : filteredTree.length === 0 ? (
-          <div className="text-center py-8 text-xs text-slate-400 dark:text-slate-500">
+          <div className="text-center py-8 text-xs text-content-subtle">
             {search ? "找不到相符的節點" : "尚無任何知識節點，請點擊上方按鈕建立"}
           </div>
         ) : (

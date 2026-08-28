@@ -66,7 +66,7 @@ function RefBadge({ item, index }: { item: ToolResultItem; index: number }) {
           "px-2 py-0.5 rounded text-[0.6875rem] border transition-colors",
           open
             ? "border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-            : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400",
+            : "border-border bg-surface-sunken text-content-muted hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400",
         ].join(" ")}
       >
         <span className="opacity-50 font-mono">[{index + 1}]</span>
@@ -79,8 +79,8 @@ function RefBadge({ item, index }: { item: ToolResultItem; index: number }) {
       </button>
 
       {open && item.text && (
-        <div className="ml-2 pl-2 border-l border-slate-200 dark:border-slate-700">
-          <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">
+        <div className="ml-2 pl-2 border-l border-border">
+          <p className="text-[0.6875rem] text-content-muted leading-relaxed whitespace-pre-wrap">
             {item.text}
           </p>
         </div>
@@ -114,7 +114,7 @@ export default function MessageMeta({
   if (!hasTools && extraCitations.length === 0 && !hasTiming) return null;
 
   return (
-    <div className="mt-2 text-xs text-slate-400 dark:text-slate-500 space-y-1.5">
+    <div className="mt-2 text-xs text-content-subtle space-y-1.5">
 
       {/* Single summary row */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -126,7 +126,7 @@ export default function MessageMeta({
               "inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[0.6875rem] transition-colors",
               refsOpen
                 ? "border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                : "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400",
+                : "border-border bg-surface-sunken hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400",
             ].join(" ")}
           >
             <span className="material-symbols-outlined text-[0.6875rem]">library_books</span>
@@ -167,7 +167,7 @@ export default function MessageMeta({
       {extraCitations.length > 0 && (
         <div className="flex flex-wrap gap-1 pl-0.5">
           {extraCitations.map((r, i) => (
-            <span key={i} className="inline-flex items-center px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[0.6875rem] text-slate-500 dark:text-slate-400 max-w-[12.5rem] truncate">
+            <span key={i} className="inline-flex items-center px-2 py-0.5 rounded border border-border bg-surface-sunken text-[0.6875rem] text-content-muted max-w-[12.5rem] truncate">
               {r.source ?? r.text?.slice(0, 40) ?? "—"}
             </span>
           ))}

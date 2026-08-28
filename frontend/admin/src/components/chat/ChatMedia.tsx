@@ -52,7 +52,7 @@ export default function ChatMedia({
         <img
           src={imageSrc}
           alt={primaryCitation?.title || "回覆參考圖片"}
-          className="max-h-[55dvh] w-auto max-w-full rounded-xl border border-slate-200 object-contain dark:border-slate-700"
+          className="max-h-[55dvh] w-auto max-w-full rounded-xl border border-border object-contain "
           loading="lazy"
           decoding="async"
           onError={() => setShowImage(false)}

@@ -53,13 +53,13 @@ const emit = defineEmits<{
   backdrop-filter: blur(0.25rem);
 }
 .error-overlay__card {
-  background: #1a1a2e;
+  background: #1c1a17;
   border: var(--hairline) solid rgba(255,255,255,0.1);
   border-radius: 1rem;
   padding: 2.5rem 3rem;
   text-align: center;
   width: min(23.75rem, calc(100% - 2rem));
-  color: #e0e0e0;
+  color: #e7e4de;
   overflow-wrap: anywhere;
 }
 .error-overlay__icon {
@@ -76,13 +76,13 @@ const emit = defineEmits<{
 }
 .error-overlay__msg {
   font-size: 0.9rem;
-  color: #b0b0c0;
+  color: #a9a298;
   margin-bottom: 1.5rem;
   line-height: 1.5;
 }
 .error-overlay__btn {
   min-height: 2.75rem;
-  background: #4a90e2;
+  background: rgb(var(--ov-color-accent));
   color: #fff;
   border: none;
   padding: 0.6rem 2rem;
@@ -91,5 +91,5 @@ const emit = defineEmits<{
   font-size: 0.9rem;
   transition: background 0.2s;
 }
-.error-overlay__btn:hover { background: #357abd; }
+.error-overlay__btn:hover { background: rgb(var(--ov-color-accent-600)); }
 </style>

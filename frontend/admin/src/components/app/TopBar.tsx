@@ -56,7 +56,7 @@ export default function TopBar({
       <button
         onClick={onOpenMobileNav}
         className="flex h-9 w-9 items-center justify-center rounded-md text-content-muted hover:bg-surface-sunken hover:text-content md:hidden"
-        aria-label="Open navigation"
+        aria-label="開啟導覽"
       >
         <span className="material-symbols-outlined text-[1.25rem]">menu</span>
       </button>
@@ -82,7 +82,7 @@ export default function TopBar({
       </div>
 
       <span className="hidden text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-content-subtle md:inline">
-        Project
+        專案
       </span>
 
       <div ref={wrapRef} className="relative ml-auto md:ml-0 md:mr-auto">
@@ -110,7 +110,7 @@ export default function TopBar({
             className="absolute right-0 top-[calc(100%+0.375rem)] z-50 min-w-[14rem] overflow-hidden rounded-lg border border-border-strong bg-surface-overlay shadow-lg md:left-0 md:right-auto"
           >
             <div className="border-b border-border px-3 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-content-subtle">
-              Switch project
+              切換專案
             </div>
             <div className="max-h-[16rem] overflow-y-auto py-1">
               {projects.length === 0 && (
@@ -178,7 +178,7 @@ export default function TopBar({
 
       <button
         onClick={onToggleTheme}
-        title={theme === "dark" ? "Light mode" : "Dark mode"}
+        title={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
         aria-label={theme === "dark" ? "切換至淺色模式" : "切換至深色模式"}
         className="flex h-9 w-9 items-center justify-center rounded-md text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
       >

@@ -128,18 +128,18 @@ export default function Memory() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">記憶管理</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-content-muted">
               瀏覽、新增並管理精選記憶紀錄。
             </p>
           </div>
-          <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="flex rounded-lg border border-border overflow-hidden">
             {(["browse", "add"] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab
                     ? "bg-primary text-white"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    : "text-content-muted hover:text-content "
                   }`}
               >
                 {tab === "browse" ? "瀏覽" : "新增"}
@@ -170,12 +170,12 @@ export default function Memory() {
 
             <div className="space-y-3">
               {loadingMemories && !memories.length && (
-                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-border bg-surface dark:bg-surface/40 p-8 text-center text-sm text-content-subtle">
                   載入記憶中...
                 </div>
               )}
               {!loadingMemories && !filteredMemories.length && (
-                <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-8 text-center text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-content-subtle">
                   {searchTerm ? "沒有符合搜尋條件的記憶。" : "尚無記憶。請切換至「新增」標籤頁建立。"}
                 </div>
               )}

@@ -646,7 +646,7 @@ function handleDialogClick(event: MouseEvent): void {
 }
 .btn-apply:hover { background: var(--primary-hover); }
 .btn-apply--dirty {
-  box-shadow: 0 0 0 0.1875rem rgba(14, 165, 233, 0.25);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--primary) 25%, transparent);
 }
 .btn-apply:disabled {
   cursor: not-allowed;
@@ -717,15 +717,15 @@ function handleDialogClick(event: MouseEvent): void {
 
 .background-option--active {
   border-color: var(--primary);
-  background: rgba(14, 165, 233, 0.08);
-  box-shadow: 0 0 0 0.1875rem rgba(14, 165, 233, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .background-option__swatch {
   width: 2rem;
   aspect-ratio: 1;
   flex: none;
-  border: 0.0625rem solid rgba(15, 23, 42, 0.12);
+  border: 0.0625rem solid var(--line);
   border-radius: 0.375rem;
   background-position: center;
   background-size: cover;
@@ -786,7 +786,7 @@ function handleDialogClick(event: MouseEvent): void {
 
 .background-url-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 0.1875rem rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 .background-url-input:disabled,
@@ -822,8 +822,8 @@ function handleDialogClick(event: MouseEvent): void {
 
 .background-fit-option--active {
   border-color: var(--primary);
-  background: rgba(14, 165, 233, 0.08);
-  box-shadow: 0 0 0 0.1875rem rgba(14, 165, 233, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .background-fit-option__text {
@@ -901,7 +901,7 @@ function handleDialogClick(event: MouseEvent): void {
 
 .mode-option--active {
   border-color: var(--primary);
-  background: rgba(14, 165, 233, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .mode-option__icon {

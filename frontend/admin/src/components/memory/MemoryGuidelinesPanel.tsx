@@ -1,11 +1,11 @@
 export default function MemoryGuidelinesPanel() {
   return (
-    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-      <h3 className="text-slate-900 dark:text-white font-bold mb-4 flex items-center gap-2">
+    <div className="bg-surface dark:bg-surface-overlay/50 rounded-xl p-6 border border-border">
+      <h3 className="text-content font-bold mb-4 flex items-center gap-2">
         <span className="material-symbols-outlined text-primary">info</span>
         記憶指南
       </h3>
-      <ul className="space-y-4 text-sm text-slate-500 dark:text-slate-400">
+      <ul className="space-y-4 text-sm text-content-muted">
         <li className="flex gap-3">
           <span className="material-symbols-outlined text-xs text-primary mt-1">circle</span>
           <span>使用清晰、客觀的語句，避免模糊不清。</span>

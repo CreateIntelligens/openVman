@@ -17,7 +17,7 @@ export const AsrButton: React.FC<AsrButtonProps> = ({
 
   const getButtonStyles = () => {
     if (!listening) {
-      return "w-10 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700";
+      return "w-10 border border-border bg-surface-raised text-content-muted hover:text-content hover:bg-surface-sunken";
     }
     return speaking
       ? "bg-red-500 text-white hover:bg-red-600 px-3 gap-1.5"

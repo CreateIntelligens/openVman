@@ -47,8 +47,8 @@ const emit = defineEmits<{
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 50%;
-  border: var(--hairline, 0.0625rem) solid var(--line, #e2e8f0);
-  background: var(--bg-soft, #fff);
+  border: var(--hairline, 0.0625rem) solid var(--line, #e7e4de);
+  background: var(--bg-soft, #ffffff);
   cursor: pointer;
   position: relative;
   color: var(--text-soft);

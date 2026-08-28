@@ -60,28 +60,26 @@ const hiddenSnapshotFrameStyle: CSSProperties = {
 };
 
 const inputClassName = [
-  "flex-1 min-w-0 rounded border border-slate-200 dark:border-slate-700",
-  "bg-slate-50 dark:bg-slate-900 px-3 py-1.5 text-sm",
-  "text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-blue-500",
+  "flex-1 min-w-0 rounded border border-border",
+  "bg-surface px-3 py-1.5 text-sm",
+  "text-content outline-none focus:ring-2 focus:ring-primary",
 ].join(" ");
 const formPanelClassName = [
-  "flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4",
-  "dark:border-slate-800/60 dark:bg-slate-950/30",
+  "flex flex-col gap-3 rounded-lg border border-border bg-surface-raised p-4",
 ].join(" ");
 const assetCardClassName = [
-  "flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white",
-  "dark:border-slate-800/60 dark:bg-slate-950/30",
+  "flex flex-col overflow-hidden rounded-lg border border-border bg-surface-raised",
 ].join(" ");
-const mediaPreviewClassName = "aspect-video w-full bg-slate-100 dark:bg-slate-900";
+const mediaPreviewClassName = "aspect-video w-full bg-surface-sunken";
 const cardBodyClassName = "flex flex-1 flex-col gap-1 p-3";
 const cardActionsClassName = "flex gap-2 px-3 pb-3";
 const primaryActionClassName = [
-  "flex-1 rounded bg-blue-600 py-1 text-xs text-white transition-colors",
-  "hover:bg-blue-700",
+  "flex-1 rounded bg-primary py-1 text-xs text-content-inverse transition-colors",
+  "hover:bg-primary-600",
 ].join(" ");
 const secondaryActionClassName = [
-  "flex-1 rounded border border-slate-200 py-1 text-xs text-slate-600 transition-colors",
-  "hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800",
+  "flex-1 rounded border border-border py-1 text-xs text-content-muted transition-colors",
+  "hover:bg-surface-sunken",
 ].join(" ");
 const dangerActionClassName = [
   "flex-1 rounded border border-red-200 py-1 text-xs text-red-600 transition-colors",
@@ -92,12 +90,11 @@ const filePickerBaseClassName = [
   "text-xs transition-all",
 ].join(" ");
 const filePickerSelectedClassName = [
-  "border-blue-500 bg-blue-50/30 text-blue-600",
-  "dark:bg-blue-950/20 dark:text-blue-400",
+  "border-primary bg-primary-50/30 text-primary-600 dark:text-primary",
 ].join(" ");
 const filePickerEmptyClassName = [
-  "border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100",
-  "dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800",
+  "border-border-strong bg-surface text-content-muted hover:bg-surface-sunken",
+  "dark:bg-surface-sunken",
 ].join(" ");
 const MASCOT_FALLBACK_BACKGROUNDS: Record<AvatarMascot["engine"], string> = {
   "2d": [
@@ -125,8 +122,8 @@ function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {
   return [
     "px-3 py-1.5 text-sm font-medium transition-all duration-200 rounded-md",
     tab === activeTab
-      ? "bg-white text-slate-800 shadow-sm border border-slate-200/60 dark:border-slate-800/60 dark:bg-slate-900 dark:text-slate-100"
-      : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-900/50",
+      ? "bg-surface-raised text-content shadow-sm border border-border/60 "
+      : "text-content-muted hover:text-content hover:bg-surface-sunken dark:hover:bg-surface-sunken/50",
   ].join(" ");
 }
 
@@ -575,18 +572,18 @@ export default function Avatar() {
   return (
     <div
       data-testid="avatar-page"
-      className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto bg-slate-50 p-6 dark:bg-background-dark"
+      className="flex h-full min-h-0 flex-col gap-6 overflow-y-auto bg-surface p-6 dark:bg-background-dark"
     >
       <div className="flex items-center gap-2">
-        <span className="material-symbols-outlined text-slate-500 dark:text-slate-400">face</span>
-        <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-200">
+        <span className="material-symbols-outlined text-content-muted">face</span>
+        <h1 className="text-xl font-semibold text-content">
           Avatar Characters
         </h1>
       </div>
 
       {status && <StatusAlert type={status.type} message={status.message} />}
 
-      <div className="flex w-fit rounded-lg bg-slate-100 p-1 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/30">
+      <div className="flex w-fit rounded-lg bg-surface-sunken p-1 dark:bg-surface/40 border border-border/50 ">
         <button
           type="button"
           onClick={() => handleTabChange("characters")}
@@ -613,7 +610,7 @@ export default function Avatar() {
       {activeTab === "characters" && (
         <>
           <div className={formPanelClassName}>
-            <p className="flex items-center gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
               <span className="material-symbols-outlined text-base">upload</span>
               Upload new character
             </p>
@@ -635,7 +632,7 @@ export default function Avatar() {
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Video (.webm):</span>
+                <span className="text-xs font-medium text-content-muted">Video (.webm):</span>
                 <label className={filePickerClassName(selectedVideoName)}>
                   <span className="material-symbols-outlined text-sm">movie</span>
                   <span className="max-w-[12rem] truncate">{selectedVideoName || "Select WebM"}</span>
@@ -651,7 +648,7 @@ export default function Avatar() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Data (.gz):</span>
+                <span className="text-xs font-medium text-content-muted">Data (.gz):</span>
                 <label className={filePickerClassName(selectedDataName)}>
                   <span
                     aria-hidden="true"
@@ -674,7 +671,7 @@ export default function Avatar() {
               <button
                 onClick={handleUpload}
                 disabled={uploading}
-                className="ml-auto rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+                className="ml-auto rounded-md bg-primary px-4 py-1.5 text-sm text-content-inverse font-medium transition-colors hover:bg-primary-600 disabled:opacity-50 shadow-sm"
               >
                 {uploading ? "Uploading…" : "Upload"}
               </button>
@@ -682,11 +679,11 @@ export default function Avatar() {
           </div>
 
           {loading && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+            <p className="text-sm text-content-muted">Loading…</p>
           )}
 
           {!loading && characters.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-12 text-slate-400 dark:text-slate-600">
+            <div className="flex flex-col items-center gap-2 py-12 text-content-subtle ">
               <span className="material-symbols-outlined text-4xl">face</span>
               <p className="text-sm">No characters yet</p>
             </div>
@@ -707,13 +704,13 @@ export default function Avatar() {
                     />
                   </div>
                   <div className={cardBodyClassName}>
-                    <p className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    <p className="font-mono text-sm font-semibold text-content">
                       {character.char_id}
                     </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                    <p className="text-sm text-content-muted">
                       {character.label}
                     </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                    <p className="text-xs text-content-subtle">
                       {formatSize(character.size_bytes)}
                     </p>
                   </div>
@@ -748,7 +745,7 @@ export default function Avatar() {
       {activeTab === "backgrounds" && (
         <>
           <div className={formPanelClassName}>
-            <p className="flex items-center gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
               <span className="material-symbols-outlined text-base">image</span>
               Upload background
             </p>
@@ -770,7 +767,7 @@ export default function Avatar() {
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Image (.png, .jpg, .webp):</span>
+                <span className="text-xs font-medium text-content-muted">Image (.png, .jpg, .webp):</span>
                 <label className={filePickerClassName(selectedImageName)}>
                   <span className="material-symbols-outlined text-sm">image</span>
                   <span className="max-w-[15rem] truncate">{selectedImageName || "Select background image"}</span>
@@ -788,7 +785,7 @@ export default function Avatar() {
               <button
                 onClick={handleBackgroundUpload}
                 disabled={backgroundUploading}
-                className="ml-auto rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+                className="ml-auto rounded-md bg-primary px-4 py-1.5 text-sm text-content-inverse font-medium transition-colors hover:bg-primary-600 disabled:opacity-50 shadow-sm"
               >
                 {backgroundUploading ? "Uploading…" : "Upload background"}
               </button>
@@ -796,11 +793,11 @@ export default function Avatar() {
           </div>
 
           {backgroundsLoading && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+            <p className="text-sm text-content-muted">Loading…</p>
           )}
 
           {!backgroundsLoading && backgrounds.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-12 text-slate-400 dark:text-slate-600">
+            <div className="flex flex-col items-center gap-2 py-12 text-content-subtle ">
               <span className="material-symbols-outlined text-4xl">image</span>
               <p className="text-sm">No backgrounds yet</p>
             </div>
@@ -818,13 +815,13 @@ export default function Avatar() {
                     />
                   </div>
                   <div className={cardBodyClassName}>
-                    <p className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-200">
+                    <p className="font-mono text-sm font-semibold text-content">
                       {background.background_id}
                     </p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                    <p className="text-sm text-content-muted">
                       {background.label}
                     </p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                    <p className="text-xs text-content-subtle">
                       {background.mime_type} · {formatSize(background.size_bytes)}
                     </p>
                   </div>
@@ -859,7 +856,7 @@ export default function Avatar() {
       {activeTab === "mascots" && (
         <>
           <div className={formPanelClassName}>
-            <p className="flex items-center gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
               <span className="material-symbols-outlined text-base">view_in_ar</span>
               Upload mascot
             </p>
@@ -881,7 +878,7 @@ export default function Avatar() {
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Model (.vrm):</span>
+                <span className="text-xs font-medium text-content-muted">Model (.vrm):</span>
                 <label className={filePickerClassName(selectedMascotModelName)}>
                   <span className="material-symbols-outlined text-sm">deployed_code</span>
                   <span className="max-w-[15rem] truncate">{selectedMascotModelName || "Select VRM"}</span>
@@ -897,7 +894,7 @@ export default function Avatar() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Thumbnail (Image):</span>
+                <span className="text-xs font-medium text-content-muted">Thumbnail (Image):</span>
                 <label className={filePickerClassName(selectedMascotThumbnailName)}>
                   <span className="material-symbols-outlined text-sm">image</span>
                   <span className="max-w-[15rem] truncate">{selectedMascotThumbnailName || "Select Image"}</span>
@@ -915,7 +912,7 @@ export default function Avatar() {
               <button
                 onClick={handleMascotUpload}
                 disabled={mascotUploading}
-                className="ml-auto rounded-md bg-blue-600 px-4 py-1.5 text-sm text-white font-medium transition-colors hover:bg-blue-700 disabled:opacity-50 shadow-sm"
+                className="ml-auto rounded-md bg-primary px-4 py-1.5 text-sm text-content-inverse font-medium transition-colors hover:bg-primary-600 disabled:opacity-50 shadow-sm"
               >
                 {mascotUploading ? "Uploading…" : "Upload mascot"}
               </button>
@@ -923,11 +920,11 @@ export default function Avatar() {
           </div>
 
           {mascotsLoading && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
+            <p className="text-sm text-content-muted">Loading…</p>
           )}
 
           {!mascotsLoading && mascots.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-12 text-slate-400 dark:text-slate-600">
+            <div className="flex flex-col items-center gap-2 py-12 text-content-subtle ">
               <span className="material-symbols-outlined text-4xl">view_in_ar</span>
               <p className="text-sm">No mascots yet</p>
             </div>
@@ -940,7 +937,7 @@ export default function Avatar() {
                 return (
                   <div key={mascot.mascot_id} className={assetCardClassName}>
                     <div
-                      className="flex aspect-video items-center justify-center bg-slate-100 dark:bg-slate-900 overflow-hidden relative"
+                      className="flex aspect-video items-center justify-center bg-surface-sunken overflow-hidden relative"
                       style={mascotPreviewStyle(mascot)}
                     >
                       {mascot.thumbnail_url ? (
@@ -959,13 +956,13 @@ export default function Avatar() {
                       )}
                     </div>
                     <div className={cardBodyClassName}>
-                      <p className="font-mono text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="font-mono text-sm font-semibold text-content">
                         {mascot.mascot_id}
                       </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                      <p className="text-sm text-content-muted">
                         {mascot.label}
                       </p>
-                      <p className="text-xs uppercase text-slate-400 dark:text-slate-500">
+                      <p className="text-xs uppercase text-content-subtle">
                         {mascot.builtin ? "built-in" : `${mascot.engine} · ${formatSize(mascot.size_bytes)}`}
                       </p>
                     </div>

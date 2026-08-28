@@ -383,7 +383,7 @@ onMounted(() => {
 }
 
 .error-state {
-  color: #ef4444;
+  color: rgb(var(--ov-color-danger));
 }
 
 .retry-btn {
@@ -472,7 +472,7 @@ onMounted(() => {
 }
 
 .app-shell.immersive .quick-qa-panel {
-  background: rgba(15, 23, 42, 0.72);
+  background: rgba(28, 26, 23, 0.72);
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 0.9375rem 2.5rem rgba(0, 0, 0, 0.4);
 }

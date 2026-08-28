@@ -96,7 +96,7 @@ describe("FileView", () => {
 
     const question = screen.getByPlaceholderText("請輸入問題");
 
-    expect(question.className).toContain("dark:focus:bg-slate-950/70");
+    expect(question.className).toContain("dark:focus:bg-surface/70");
     expect(question.className).not.toContain("dark:focus:bg-slate-850");
   });
 

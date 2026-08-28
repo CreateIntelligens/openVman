@@ -106,26 +106,26 @@ export default function VisibilityOrderModal({
       {...dismiss}
     >
       <div
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col mx-4"
+        className="bg-surface-raised border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[1.5rem]">
               sort
             </span>
             <div>
-              <span className="text-base font-semibold text-slate-900 dark:text-white">
+              <span className="text-base font-semibold text-content ">
                 批次調整可見性與順序
               </span>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-content-muted mt-0.5">
                 於父節點：{parentNode ? parentNode.label : "根節點目錄"}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-content-muted hover:text-content hover:bg-surface-sunken transition-colors"
           >
             <span className="material-symbols-outlined text-[1.25rem]">close</span>
           </button>
@@ -139,14 +139,14 @@ export default function VisibilityOrderModal({
           )}
 
           {localNodes.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 dark:text-slate-500">
+            <div className="text-center py-12 text-content-subtle">
               該層級下尚無任何子節點。
             </div>
           ) : (
-            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+            <div className="border border-border rounded-xl overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  <tr className="bg-surface dark:bg-surface/50 border-b border-border text-xs font-semibold text-content-muted">
                     <th className="py-3 px-4 text-center whitespace-nowrap">原始順序</th>
                     <th className="py-3 px-4 whitespace-nowrap">識別 ID</th>
                     <th className="py-3 px-4 whitespace-nowrap">節點名稱</th>
@@ -154,13 +154,13 @@ export default function VisibilityOrderModal({
                     <th className="py-3 px-4 text-center whitespace-nowrap">順序調整</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
+                <tbody className="divide-y divide-border text-sm">
                   {localNodes.map((node, idx) => (
                     <tr
                       key={node.node_id}
-                      className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 text-slate-700 dark:text-slate-300 transition-colors"
+                      className="hover:bg-surface-sunken/50 text-content-muted transition-colors"
                     >
-                      <td className="py-3.5 px-4 text-center text-xs font-mono text-slate-400">
+                      <td className="py-3.5 px-4 text-center text-xs font-mono text-content-subtle">
                         {idx + 1}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-xs">
@@ -175,7 +175,7 @@ export default function VisibilityOrderModal({
                             onClick={() => handleToggleHidden(idx)}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
                               node.hidden
-                                ? "bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400"
+                                ? "bg-surface-sunken hover:bg-border text-content-muted "
                                 : "bg-success/10 text-success hover:bg-success/20 dark:bg-success/20 dark:text-success"
                             }`}
                           >
@@ -191,7 +191,7 @@ export default function VisibilityOrderModal({
                           <button
                             onClick={() => handleMoveUp(idx)}
                             disabled={idx === 0}
-                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg hover:bg-surface-sunken text-content-muted hover:text-content disabled:opacity-30 disabled:pointer-events-none transition-colors"
                             title="上移"
                           >
                             <span className="material-symbols-outlined text-[1.25rem]">
@@ -201,7 +201,7 @@ export default function VisibilityOrderModal({
                           <button
                             onClick={() => handleMoveDown(idx)}
                             disabled={idx === localNodes.length - 1}
-                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg hover:bg-surface-sunken text-content-muted hover:text-content disabled:opacity-30 disabled:pointer-events-none transition-colors"
                             title="下移"
                           >
                             <span className="material-symbols-outlined text-[1.25rem]">
@@ -218,10 +218,10 @@ export default function VisibilityOrderModal({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3 shrink-0">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="px-4 py-2 rounded-xl text-sm font-medium text-content-muted hover:text-content hover:bg-surface-sunken transition-colors"
             disabled={saving}
           >
             取消

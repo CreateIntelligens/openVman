@@ -65,7 +65,7 @@ export default function AppSidebar({
         <div className="shrink-0 border-t border-border p-2">
           <button
             onClick={onTogglePin}
-            title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
+            title={isPinned ? "取消固定側邊欄" : "固定側邊欄"}
             aria-label={isPinned ? "取消固定側邊欄" : "固定側邊欄"}
             className={`flex h-9 w-full items-center gap-2 rounded-md px-3 text-sm text-content-muted transition-colors hover:bg-surface hover:text-content ${
               isExpanded ? "justify-start" : "justify-center"
@@ -83,7 +83,7 @@ export default function AppSidebar({
                 isExpanded ? "opacity-100 max-w-full" : "opacity-0 max-w-0 overflow-hidden"
               }`}
             >
-              {isPinned ? "Unpin" : "Pin"}
+              {isPinned ? "取消固定" : "固定側邊欄"}
             </span>
           </button>
         </div>

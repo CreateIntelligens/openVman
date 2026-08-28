@@ -1066,17 +1066,18 @@ onUnmounted(() => {
 @import "@contracts/frontend-theme.css";
 
 :root {
-  --bg: #f8fafc;
-  --bg-soft: #ffffff;
-  --text: #0f172a;
-  --text-soft: #64748b;
-  --line: #e2e8f0;
-  --primary: #0ea5e9;
-  --primary-hover: #0284c7;
+  /* 色彩單一來源:contracts/frontend-theme.css 的 --ov-color-*。 */
+  --bg: rgb(var(--ov-color-surface));
+  --bg-soft: rgb(var(--ov-color-surface-raised));
+  --text: rgb(var(--ov-color-content));
+  --text-soft: rgb(var(--ov-color-content-muted));
+  --line: rgb(var(--ov-color-border));
+  --primary: rgb(var(--ov-color-accent));
+  --primary-hover: rgb(var(--ov-color-accent-600));
   --hairline: 0.0625rem;
   --focus-ring-size: var(--ov-focus-ring-width);
   --radius-pill: 999rem;
-  --surface-shadow: 0 0.25rem 0.375rem -0.0625rem rgba(0, 0, 0, 0.05);
+  --surface-shadow: 0 0.25rem 0.375rem -0.0625rem rgba(28, 26, 23, 0.05);
 }
 
 *,
@@ -1306,7 +1307,7 @@ body {
 }
 
 .app-shell.immersive .chat-area :deep(.chat-msg) {
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(28, 26, 23, 0.55);
   backdrop-filter: blur(0.5rem);
   -webkit-backdrop-filter: blur(0.5rem);
   color: #fff;
@@ -1314,7 +1315,7 @@ body {
 }
 
 .app-shell.immersive .chat-area :deep(.chat-msg.user) {
-  background: rgba(14, 165, 233, 0.75);
+  background: color-mix(in srgb, var(--primary) 78%, transparent);
 }
 
 .app-shell.immersive .chat-area :deep(.chat-role),
@@ -1323,7 +1324,7 @@ body {
 }
 
 .app-shell.immersive .chat-area :deep(.chat-input-bar input) {
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(28, 26, 23, 0.55);
   backdrop-filter: blur(0.5rem);
   -webkit-backdrop-filter: blur(0.5rem);
   color: #fff;
@@ -1446,14 +1447,14 @@ body {
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, #a7f3d0 0%, #0d9488 100%);
+  background: var(--primary);
   border: 0.09375rem solid rgba(255, 255, 255, 0.6);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 0.25rem 0.875rem rgba(13, 148, 136, 0.35);
+  box-shadow: 0 0.25rem 0.875rem color-mix(in srgb, var(--primary) 35%, transparent);
   transition:
     background var(--ov-dur-short) var(--ov-ease-out),
     border-color var(--ov-dur-short) var(--ov-ease-out),
@@ -1470,9 +1471,9 @@ body {
 }
 
 .quick-qa-toggle-btn--active {
-  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  background: var(--primary-hover);
   border-color: #ffffff;
-  box-shadow: 0 0.25rem 1rem rgba(5, 150, 105, 0.45);
+  box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--primary-hover) 45%, transparent);
 }
 
 .toggle-btn-content {
@@ -1505,7 +1506,7 @@ body {
 }
 
 .app-shell.immersive .quick-qa-toggle-btn:hover {
-  background: rgba(15, 23, 42, 0.8);
+  background: rgba(28, 26, 23, 0.8);
   color: #fff;
   border-color: var(--primary);
 }
