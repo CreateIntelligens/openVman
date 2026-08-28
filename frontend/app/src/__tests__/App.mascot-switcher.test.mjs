@@ -18,7 +18,8 @@ test("VRM mode renders the selected avatar widget inside the main stage", () => 
   assert.match(source, /class="stage-avatar-frame"/);
   assert.match(source, /ref="stageAvatarFrameRef"/);
   assert.match(source, /:src="stageAvatarWidgetSrc"/);
-  assert.match(source, /buildMascotWidgetSrc\(selectedVrmAvatar\.value\)/);
+  assert.match(source, /const mascot = selectedVrmAvatar\.value/);
+  assert.match(source, /buildMascotWidgetSrc\(mascot\)/);
   assert.match(source, /:vrm-characters="vrmCharacterOptions"/);
   assert.match(source, /@vrm-character-change="handleVrmAvatarChange"/);
   assert.doesNotMatch(source, /THREE_D_AVATAR_OPTION/);

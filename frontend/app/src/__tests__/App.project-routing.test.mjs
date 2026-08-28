@@ -52,6 +52,7 @@ test("avatar stage background is wired through settings", () => {
 
 test("avatar frontend loads uploaded backgrounds for settings", () => {
   assert.match(source, /apiFetch\("\/api\/backgrounds"\)/);
-  assert.match(source, /backgrounds\.value = data\.backgrounds \?\? \[\]/);
+  assert.match(source, /const items = data\.backgrounds \?\? \[\]/);
+  assert.match(source, /backgrounds\.value = items/);
   assert.match(source, /void fetchBackgrounds\(\)/);
 });
