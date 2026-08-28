@@ -152,7 +152,18 @@ class BrainSettings(BaseSettings):
 
     # === Web Search ===
     gateway_base_url: str = "http://backend:8200"
+    url2md_primary_url: str = "https://2md.aiurl.tw"
+    url2md_fallback_urls: str = "https://2md.glsoft.ai,https://create360.ai"
+    url2md_search_enabled: bool = True
+    url2md_read_enabled: bool = True
     web_search_max_chars: int = 3000
+    web_search_max_results: int = 8
+
+    # === David888 Wiki ===
+    wiki_api_base_url: str = "https://wiki.david888.com/api"
+    wiki_publish_enabled: bool = True
+    wiki_publish_max_chars: int = 100000
+    wiki_publish_timeout_seconds: float = 30.0
 
     # === 備用 Provider Keys ===
     gemini_api_key: str = ""

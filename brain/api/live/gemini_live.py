@@ -348,9 +348,18 @@ class GeminiLiveSession:
             "search_memory": lambda: self._search("memories", args),
             "get_chat_history": lambda: asyncio.to_thread(self._get_chat_history, args),
             "save_memory": lambda: asyncio.to_thread(self._save_memory, args),
+            "search_web": lambda: asyncio.to_thread(self._search_web, args),
+            "read_web_page": lambda: asyncio.to_thread(self._read_web_page, args),
+            "publish_wiki": lambda: asyncio.to_thread(self._publish_wiki, args),
         }
 
         try:
+            if name == "search_web" and not getattr(self.config, "url2md_search_enabled", True):
+                raise ValueError("search_web 已停用")
+            if name == "read_web_page" and not getattr(self.config, "url2md_read_enabled", True):
+                raise ValueError("read_web_page 已停用")
+            if name == "publish_wiki" and not getattr(self.config, "wiki_publish_enabled", True):
+                raise ValueError("publish_wiki 已停用")
             handler = tool_map.get(name)
             if not handler:
                 raise ValueError(f"Unsupported Gemini Live tool: {name}")
@@ -405,6 +414,24 @@ class GeminiLiveSession:
         messages = list_session_messages(session_id, project_id=self.project_id)
         recent = messages[-max_messages:]
         return {"session_id": session_id, "messages": recent}
+
+    @staticmethod
+    def _search_web(args: dict[str, Any]) -> dict[str, Any]:
+        from tools.builtin.web_tools import _search_web
+
+        return _search_web(args)
+
+    @staticmethod
+    def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
+        from tools.builtin.web_tools import _read_web_page
+
+        return _read_web_page(args)
+
+    @staticmethod
+    def _publish_wiki(args: dict[str, Any]) -> dict[str, Any]:
+        from tools.builtin.wiki_tools import _publish_wiki
+
+        return _publish_wiki(args)
 
     async def _search(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(self._search_sync, table, args)

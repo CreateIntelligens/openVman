@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
+COPY app /app/app
 
 COPY docker /app/docker
 

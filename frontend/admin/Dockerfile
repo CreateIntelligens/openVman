@@ -33,8 +33,11 @@ RUN apk add --no-cache tzdata nginx openssl supervisor \
 COPY frontend/admin/nginx/http.d/ /etc/nginx/http.d/
 COPY frontend/admin/docker/ensure-https-cert.sh /usr/local/bin/ensure-https-cert
 COPY frontend/admin/supervisord.conf /etc/supervisord.conf
+COPY contracts /contracts
+COPY frontend/admin/ ./
 COPY --from=avatar-sdk-builder /sdk/dist/openvman-avatar-sdk.js /usr/share/nginx/html/openvman-avatar-sdk.js
-RUN chmod +x /usr/local/bin/ensure-https-cert
+RUN chmod +x /usr/local/bin/ensure-https-cert \
+    && chown -R node:node /app
 
 EXPOSE 80 443 5173
 
