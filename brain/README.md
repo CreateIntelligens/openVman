@@ -9,6 +9,8 @@
 - 有 workspace 檔案系統，承載 `SOUL`、`AGENTS`、`TOOLS`、`MEMORY`、每日對話日誌與 learnings
 - 有 LanceDB 向量資料庫，維護 `knowledge` 與 `memories` 兩張表
 - 支援 Gemini 作為 LLM，並透過獨立 embedding gateway 取得向量
+- 支援 2md 即時網路搜尋與 URL／文件讀取，服務順序為 `2md.aiurl.tw` → `2md.glsoft.ai` → `create360.ai`
+- 支援 David888 Wiki 長篇報告發布；回應只保留公開 `shareUrl`
 
 ## 1. 系統目標
 
@@ -358,6 +360,33 @@ user input
   - 取得完整回答（含 tool call 執行結果）
 - `GET /brain/chat/history`
   - 讀取當前 session history
+
+### 即時外部工具
+
+- `search_web(query, top_k?)`
+  - 透過 2md 執行即時公開網路搜尋
+- `read_web_page(url)`
+  - 透過 2md 讀取網頁、PDF 或其他支援文件並轉成 Markdown
+- `publish_wiki(path, markdown, append?, public?, share?, theme?)`
+  - 發布長篇報告至 David888 Wiki；成功後只回傳公開 `shareUrl`
+
+三個外部工具預設啟用，也可透過根目錄 `.env` 個別停用；停用後不會註冊給 HTTP Chat 或宣告給 Gemini Live：
+
+- `URL2MD_SEARCH_ENABLED=true|false`
+- `URL2MD_READ_ENABLED=true|false`
+- `WIKI_PUBLISH_ENABLED=true|false`
+
+修改開關後需重啟 Brain container／服務才會重新載入設定。
+
+2md 的 fallback 順序固定為：
+
+1. `https://2md.aiurl.tw`
+2. `https://2md.glsoft.ai`
+3. `https://create360.ai`
+
+這些工具同時提供給一般 HTTP Chat 與 Gemini Live。Weather 不另設即時 API；天氣查詢走 `search_web`。
+
+目前 2md 與 Wiki 呼叫不攜帶專案側認證；Wiki 若是受保護頁面，需另行加入環境變數密鑰與 Authorization／password 設定。外部服務的 HTTP、格式或執行錯誤會包成 tool error，交由 agent loop 繼續處理；不得把密鑰放入 tool arguments 或 Markdown 內容。
 
 ### Workspace Admin API
 

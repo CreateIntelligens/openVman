@@ -69,6 +69,36 @@ def test_registry_build_openai_tools_format(monkeypatch: pytest.MonkeyPatch):
     ]
 
 
+def test_external_tools_are_enabled_by_default(monkeypatch: pytest.MonkeyPatch):
+    import tools.builtin as builtin
+
+    settings = SimpleNamespace(
+        url2md_search_enabled=True,
+        url2md_read_enabled=True,
+        wiki_publish_enabled=True,
+    )
+    monkeypatch.setattr(builtin, "get_settings", lambda: settings)
+
+    names = {tool.name for tool in builtin.list_builtin_tools()}
+
+    assert {"search_web", "read_web_page", "publish_wiki"} <= names
+
+
+def test_external_tools_can_be_disabled(monkeypatch: pytest.MonkeyPatch):
+    import tools.builtin as builtin
+
+    settings = SimpleNamespace(
+        url2md_search_enabled=False,
+        url2md_read_enabled=False,
+        wiki_publish_enabled=False,
+    )
+    monkeypatch.setattr(builtin, "get_settings", lambda: settings)
+
+    names = {tool.name for tool in builtin.list_builtin_tools()}
+
+    assert {"search_web", "read_web_page", "publish_wiki"}.isdisjoint(names)
+
+
 def test_get_tool_registry_syncs_skill_tools_after_invalidation(monkeypatch: pytest.MonkeyPatch):
     tool_registry, _ = load_tool_modules(monkeypatch)
     import tools.skill_manager as skill_manager_module

@@ -448,6 +448,55 @@ async def test_gemini_live_session_search_tool_runs_in_thread(monkeypatch):
     assert payload["results"][0]["matched_queries"] == ["退款政策"]
 
 
+def test_gemini_live_declarations_include_2md_and_wiki_tools():
+    module, _ = _load_module()
+
+    declarations = module.build_gemini_tool_declarations()
+
+    assert {item["name"] for item in declarations} >= {
+        "search_web",
+        "read_web_page",
+        "publish_wiki",
+    }
+
+
+def test_gemini_live_declarations_respect_external_tool_flags():
+    module, fake_config = _load_module()
+    fake_config.url2md_search_enabled = False
+    fake_config.url2md_read_enabled = False
+    fake_config.wiki_publish_enabled = False
+
+    declarations = module.build_gemini_tool_declarations()
+    names = {item["name"] for item in declarations}
+
+    assert {"search_web", "read_web_page", "publish_wiki"}.isdisjoint(names)
+
+
+@pytest.mark.asyncio
+async def test_gemini_live_session_dispatches_2md_and_wiki_tools(monkeypatch):
+    module, _ = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-1",
+        client_id="client-1",
+    )
+
+    monkeypatch.setattr(session, "_search_web", lambda args: {"results": []})
+    monkeypatch.setattr(session, "_read_web_page", lambda args: {"content": "page"})
+    monkeypatch.setattr(session, "_publish_wiki", lambda args: {"shareUrl": "https://wiki/share/1"})
+
+    search_response = await session._execute_function_call({"id": "1", "name": "search_web", "args": {"query": "x"}})
+    read_response = await session._execute_function_call(
+        {"id": "2", "name": "read_web_page", "args": {"url": "https://example.com"}}
+    )
+    wiki_response = await session._execute_function_call(
+        {"id": "3", "name": "publish_wiki", "args": {"path": "r", "markdown": "# r"}}
+    )
+
+    assert search_response["response"] == {"results": []}
+    assert read_response["response"] == {"content": "page"}
+    assert wiki_response["response"] == {"shareUrl": "https://wiki/share/1"}
+
+
 @pytest.mark.asyncio
 async def test_gemini_live_session_listener_cleanup_preserves_newer_transport():
     module, fake_config = _load_module()

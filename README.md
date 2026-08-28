@@ -70,6 +70,10 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 
 `backend/app/config.py`、`brain/api/config.py` 兩者的 pydantic-settings 仍各自帶有一個相對路徑的 `env_file=` 備援設定，但在 Docker 部署下不會用到（容器只掛載服務子目錄，該路徑在容器內不存在）——實際生效值一律來自 compose 注入的環境變數。
 
+### GitHub Actions
+
+`protocol-contracts` workflow 使用 `actions/checkout@v6` 與 `actions/setup-python@v7`，採用 Node.js 24-compatible action runtime。若改用 self-hosted runner，runner 需支援這些 action 的 Node.js 24 runtime。
+
 ### 對外 HTTPS：主機 nginx（compose 之外）
 
 `docker compose up -d` 會依 `.env` 的 `COMPOSE_PROFILES` 與外部服務網址啟動包含 **Docker 邊緣 nginx** 的 Compose stack（`8786` HTTP / `8787` HTTPS，自簽憑證）。對外的正式 HTTPS 由**主機自己的 nginx** 終止，再轉進來：
@@ -281,11 +285,13 @@ docker compose up -d
 | 後端 | IndexTTS (vLLM) zh-TW | 以台灣口音為預設、低延遲串流；支援品牌聲線與客製化發音，並具備 GCP / AWS / Edge-TTS fallback |
 | 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
 | 網關 | **BullMQ + Redis 佇列** | 非同步處理多模態素材 (影像/語音) 的 CPU 密集型預處理管線 |
-| 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、Web Crawler 爬蟲等前置工具能力 |
+| 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、文件處理與 Web Crawler 等前置工具能力 |
 | 網關 | **pdf-inspector + Docling + AnyDoc** | PDF 安全 fast path、Office 文件主轉換與 Rust-backed fallback；Brain 只索引 canonical Markdown |
 | 大腦 | **LanceDB** (嵌入式向量 DB) | 無服務端、低延遲、本地部署 |
 | 大腦 | **BAAI/bge-m3** (本地 Embedding) | 1024 維、多語言、Dense+Sparse 混合檢索 |
 | 大腦 | Markdown 檔案系統 | 人類可讀、Git 可追蹤的知識庫 |
+| 大腦 | **2md Web Tools** | 以 `2md.aiurl.tw` 為主力、`2md.glsoft.ai` 與 `create360.ai` 為 fallback，提供即時搜尋與 URL / 文件轉 Markdown |
+| 大腦 | **David888 Wiki Publisher** | 由 `publish_wiki` 發布長篇 Markdown，回傳公開 `shareUrl`，不暴露內部編輯 URL |
 | 通訊 | WebSocket + JSON (Base64 音頻) | 全雙工、即時推流 |
 
 ---
@@ -322,6 +328,9 @@ docker compose up -d
 - ✅ **Knowledge Graph (graphify)**：內建 graphify 技能與 graph HTTP endpoints，Admin 知識庫新增 Graph 視覺化分頁
 - ✅ **Unified Admin Navigation**：以 NavigationContext 集中管理路由/分頁狀態，整合 AppSidebar、ChatSidebar 與各頁面；設計 token 改以 RGB channel 暴露，完整支援 Tailwind opacity modifier
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
+- ✅ **2md 即時網路工具**：`search_web(query)` 搜尋公開網路，`read_web_page(url)` 讀取網頁、PDF 與支援文件；依主力／兩級 fallback 自動降級
+- ✅ **David888 Wiki 分享**：長篇報告可透過 `publish_wiki` 發布，完成後只回傳公開 `shareUrl`
+- ✅ **外部工具開關**：`URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`WIKI_PUBLISH_ENABLED` 預設為 `true`，可個別停用並在重啟後套用
 - ✅ **動態 Gemini 模型探索與容錯鏈 (Dynamic Fallback Chain)**：支援透過 Gemini SDK 自動探索所有可用生成模型並進行 Pro -> Flash -> Flash-Lite 語意化排序，具備 10 分鐘快取與靜態安全網降級機制
 - ✅ 完整的錯誤處理、斷線重連、優雅關機機制
 - ✅ Token 預算管理 + 安全防護 (Guardrails)
