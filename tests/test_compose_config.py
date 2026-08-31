@@ -11,11 +11,18 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def compose_config(overrides: dict[str, str]) -> dict:
+def compose_config(
+    overrides: dict[str, str],
+    compose_files: tuple[str, ...] = (),
+) -> dict:
     env = os.environ.copy()
     env.update(overrides)
+    command = ["docker", "compose"]
+    for compose_file in compose_files:
+        command.extend(["-f", compose_file])
+    command.extend(["config", "--format", "json"])
     result = subprocess.run(
-        ["docker", "compose", "config", "--format", "json"],
+        command,
         cwd=ROOT,
         env=env,
         check=True,
@@ -23,6 +30,80 @@ def compose_config(overrides: dict[str, str]) -> dict:
         text=True,
     )
     return json.loads(result.stdout)
+
+
+def volume_targets(service: dict) -> set[str]:
+    return {volume["target"] for volume in service.get("volumes") or []}
+
+
+def test_default_compose_uses_public_images_and_starts_watchtower():
+    config = compose_config(
+        {
+            "COMPOSE_PROFILES": "",
+            "DOCKERHUB_USERNAME": "",
+            "ENV": "prod",
+        },
+    )
+    services = config["services"]
+
+    assert services["backend"]["image"] == (
+        "tbdavid2019/openvman-backend:latest"
+    )
+    assert "watchtower" in services
+    assert services["watchtower"]["command"] == [
+        "--api-version",
+        "1.44",
+        "--label-enable",
+        "--interval",
+        "300",
+        "--cleanup",
+    ]
+    assert "/app/app" not in volume_targets(services["backend"])
+    assert "/app" not in volume_targets(services["api"])
+    assert "/app" not in volume_targets(services["avatar"])
+    assert "/app" not in volume_targets(services["admin"])
+
+
+def test_dev_compose_restores_worktree_mounts_and_disables_watchtower():
+    config = compose_config(
+        {
+            "COMPOSE_PROFILES": "embedding",
+            "DOCKERHUB_USERNAME": "",
+            "ENV": "prod",
+            "PORT": "18786",
+            "HTTPS_PORT": "18787",
+        },
+        ("docker-compose.yml", "docker-compose.dev.yml"),
+    )
+    services = config["services"]
+
+    assert "watchtower" not in services
+    assert services["backend"]["environment"]["ENV"] == "dev"
+    assert services["api"]["environment"]["ENV"] == "dev"
+    assert services["gateway-worker"]["environment"]["ENV"] == "dev"
+    assert "/app/app" in volume_targets(services["backend"])
+    assert "/app" in volume_targets(services["api"])
+    assert "/app" in volume_targets(services["avatar"])
+    assert "/app/node_modules" in volume_targets(services["avatar"])
+    assert "/app" in volume_targets(services["admin"])
+    assert "/app/node_modules" in volume_targets(services["admin"])
+    assert "/etc/nginx/http.d" in volume_targets(services["admin"])
+    published_ports = {
+        port["target"]: port["published"]
+        for port in services["admin"]["ports"]
+    }
+    assert published_ports == {80: "18786", 443: "18787"}
+    for service_name in (
+        "admin",
+        "api",
+        "avatar",
+        "backend",
+        "embedding",
+        "gateway-worker",
+    ):
+        assert services[service_name]["labels"][
+            "com.centurylinklabs.watchtower.enable"
+        ] == "false"
 
 
 def test_direct_compose_routes_local_gpu_services():

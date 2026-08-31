@@ -86,16 +86,26 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 | `openvman-api` | `linux/amd64` | CUDA Brain API |
 | `openvman-embedding` | `linux/amd64` | CUDA/PyTorch Embedding |
 
-GitHub Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`。部署主機的 `.env` 也必須設定相同的 `DOCKERHUB_USERNAME`，再使用 registry override：
+GitHub Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`。正式部署預設只使用 `docker-compose.yml`；它同時保留 `image` 與 `build`，因此 Compose 會先拉取 `.env` 指定的 `tbdavid2019/openvman-*` image，遠端不存在時才從 Dockerfile build：
 
 ```bash
-docker compose \
-  -f docker-compose.yml \
-  -f docker-compose.registry.yml \
-  --profile watchtower up -d
+docker compose up -d --remove-orphans
 ```
 
-registry override 會移除開發用 source bind mount，讓 Watchtower 更新 Docker Hub image 後確實使用新版本。Watchtower 使用 Docker API `1.44` 相容 Docker Engine 29，只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。若 Docker Hub repositories 設為 private，需在部署主機先執行 `docker login`，並讓 Watchtower 讀取主機 Docker credential config。
+正式設定不掛載 frontend、backend 或 Brain API 原始碼，因此 image 內容不會被 host 上的舊檔案遮蔽。Watchtower 也由同一份 Compose 預設啟動，使用 Docker API `1.44` 相容 Docker Engine 29，只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。目前 `tbdavid2019/openvman-*` repositories 都是 public，新主機不需要 `docker login`。Watchtower 只更新既有 image；服務增刪或 ports、volumes、environment 等 Compose 架構變更仍需先更新 repository，再執行 `docker compose up -d --remove-orphans`。
+
+### Worktree 開發與 HMR
+
+開發時從 worktree 根目錄疊加 `docker-compose.dev.yml`。這份 override 會恢復 frontend、backend 與 Brain 原始碼 bind mounts、保留 frontend node_modules volumes、強制 Python runtime 使用 `ENV=dev`，並將 dev containers 的 Watchtower label 設為 `false`，避免同一台主機的正式 Watchtower 把本機開發 image 換回 Docker Hub 版本。將 worktree 自己的 git-ignored `.env` 設為：
+
+```env
+COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+COMPOSE_PROJECT_NAME=openvman-feature-x
+PORT=18786
+HTTPS_PORT=18787
+```
+
+之後與正式部署一樣只需執行 `docker compose up -d`；Compose 會依 worktree 的 `.env` 自動合併兩份檔案。每個 worktree 應使用不重複的 `COMPOSE_PROJECT_NAME`、`PORT` 與 `HTTPS_PORT`，以隔離 containers、networks、named volumes 與 host ports。React/Vue Vite HMR 會從瀏覽器實際連入的 HTTPS origin 推導 WebSocket port，因此請直接開啟 `https://<host>:<該 worktree 的 HTTPS_PORT>`。一般 source 修改不需要 `--build`；只有 Dockerfile 或 dependency lockfile 改變時才逐一 build 對應服務，避免平行重型 build。
 
 ### 對外 HTTPS：主機 nginx（compose 之外）
 
@@ -113,7 +123,7 @@ registry override 會移除開發用 source bind mount，讓 Watchtower 更新 D
 
 ```bash
 # 每次啟動／更新 Compose stack
-docker compose up -d
+docker compose up -d --remove-orphans
 
 # 每台主機首次建立公開 HTTPS；讀取 .env 的網域與信箱
 ./scripts/setup-public-https.sh
@@ -121,7 +131,7 @@ docker compose up -d
 
 先在 `.env` 設定 `PUBLIC_DOMAIN` 與 `LETSENCRYPT_EMAIL`。這支腳本會產生 vhost、以 Docker certbot 申請首張憑證、安裝並 reload 主機 nginx，再建立每日自動執行 `renew-letsencrypt.sh` 的 crontab。重複執行會略過已存在的憑證並更新同一段 cron，不會重複追加；若臨時用命令列傳入同名環境變數，命令列值優先。
 
-只想在內網測試、不需要正式憑證的話跳過這段即可，直接連 `https://<host>:8787`（自簽，瀏覽器會跳警告）。`HTTPS_PORT=8787` 始終是 Docker edge 的 host port；前端 HMR 會依瀏覽器目前連入的 origin，自動使用主機 nginx 的 443 或區網直連的 8787，不需要另一個 port 環境變數。
+只想在內網測試、不需要正式憑證的話跳過這段即可，直接連 `https://<host>:8787`（自簽，瀏覽器會跳警告）。正式部署的 `HTTPS_PORT=8787` 是 Docker edge 的 host port；worktree dev 可改用其他 port，Vite HMR 會依瀏覽器目前連入的 origin 自動使用對應 port，不需要另一個 HMR port 變數。
 
 ### AI Coding 餵檔策略
 

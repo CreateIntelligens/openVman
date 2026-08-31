@@ -18,9 +18,15 @@ def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_backend_env_example_uses_dev_mode():
+def test_backend_env_example_uses_production_mode_by_default():
     env_example = _read_text(REPO_ROOT / ".env.example")
-    assert "ENV=dev" in env_example
+    dev_compose = _read_text(REPO_ROOT / "docker-compose.dev.yml")
+
+    assert "ENV=prod" in env_example
+    assert "COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml" in (
+        env_example
+    )
+    assert "ENV=dev" in dev_compose
 
 
 def test_root_compose_has_separate_redis_service():

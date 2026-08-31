@@ -42,10 +42,14 @@ def test_admin_dev_image_prepares_self_signed_cert_before_nginx_starts():
 
 def test_admin_dev_nginx_does_not_load_production_static_config():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-    dockerfile = (ROOT / "frontend" / "admin" / "Dockerfile").read_text(encoding="utf-8")
+    dev_compose = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")
+    dockerfile = (
+        ROOT / "frontend" / "admin" / "Dockerfile"
+    ).read_text(encoding="utf-8")
 
     assert "./frontend/admin/nginx:/etc/nginx/http.d" not in compose
-    assert "./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro" in compose
+    assert "./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro" not in compose
+    assert "./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro" in dev_compose
     assert "COPY nginx/ /etc/nginx/http.d/" not in dockerfile
 
 

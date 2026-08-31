@@ -1,3 +1,5 @@
+# Production-first stack. Use docker-compose.dev.yml as an override when a
+# worktree needs source bind mounts and frontend HMR.
 x-shared: &shared
   environment: &tz
     - TZ=Asia/Taipei
@@ -5,21 +7,15 @@ x-shared: &shared
 
 x-backend-runtime: &backend-runtime
   user: "${UID:-1000}:${GID:-1000}"
-  image: "${DOCKERHUB_USERNAME:-local}/openvman-backend:${OPENVMAN_IMAGE_TAG:-latest}"
+  image: "${DOCKERHUB_USERNAME:-tbdavid2019}/openvman-backend:${OPENVMAN_IMAGE_TAG:-latest}"
   labels:
     com.centurylinklabs.watchtower.enable: "true"
   volumes:
-    - ./backend/app:/app/app
     - ./backend/data:/app/data
     - ./backend/logs:/app/logs
-    - ./backend/tests:/app/tests
-    - ./backend/Dockerfile:/app/Dockerfile
-    - ./backend/requirements.txt:/app/requirements.txt
-    - ./backend/scripts:/app/scripts
     - ./data:/data
     - ./brain/data:/brain-data:ro
     - ./backend/index-tts-vllm/assets:/indextts-assets:ro
-    - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
     - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
   env_file:
     - ./.env
@@ -42,13 +38,12 @@ services:
     build:
       context: ./brain/api
       dockerfile: Dockerfile
-    image: "${DOCKERHUB_USERNAME:-local}/openvman-api:${OPENVMAN_IMAGE_TAG:-latest}"
+    image: "${DOCKERHUB_USERNAME:-tbdavid2019}/openvman-api:${OPENVMAN_IMAGE_TAG:-latest}"
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     volumes:
-      - ./brain/api:/app
       - ./brain/data:/data
-      - ./brain/skills:/skills
+      - ./brain/skills:/skills:ro
       - ./contracts:/contracts:ro
       - hf-cache:/home/appuser/.cache/huggingface
       - opf-cache:/home/appuser/.opf
@@ -90,11 +85,10 @@ services:
     build:
       context: ./brain/embedding
       dockerfile: Dockerfile
-    image: "${DOCKERHUB_USERNAME:-local}/openvman-embedding:${OPENVMAN_IMAGE_TAG:-latest}"
+    image: "${DOCKERHUB_USERNAME:-tbdavid2019}/openvman-embedding:${OPENVMAN_IMAGE_TAG:-latest}"
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     volumes:
-      - ./brain/embedding:/app
       - hf-cache:/home/appuser/.cache/huggingface
     environment:
       - HF_HOME=/home/appuser/.cache/huggingface
@@ -235,13 +229,9 @@ services:
     build:
       context: .
       dockerfile: frontend/app/Dockerfile
-    image: "${DOCKERHUB_USERNAME:-local}/openvman-avatar:${OPENVMAN_IMAGE_TAG:-latest}"
+    image: "${DOCKERHUB_USERNAME:-tbdavid2019}/openvman-avatar:${OPENVMAN_IMAGE_TAG:-latest}"
     labels:
       com.centurylinklabs.watchtower.enable: "true"
-    volumes:
-      - ./frontend/app:/app
-      - avatar-node-modules:/app/node_modules
-      - ./contracts:/contracts:ro
 
   admin:
     <<: *shared
@@ -250,18 +240,14 @@ services:
       context: .
       dockerfile: frontend/admin/Dockerfile
       target: dev
-    image: "${DOCKERHUB_USERNAME:-local}/openvman-admin:${OPENVMAN_IMAGE_TAG:-latest}"
+    image: "${DOCKERHUB_USERNAME:-tbdavid2019}/openvman-admin:${OPENVMAN_IMAGE_TAG:-latest}"
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     ports:
       - "${PORT:-8786}:80"
       - "${HTTPS_PORT:-8787}:443"
     volumes:
-      - ./frontend/admin:/app
-      - admin-node-modules:/app/node_modules
-      - ./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro
       - ./infra/nginx/certs:/etc/nginx/certs
-      - ./contracts:/contracts:ro
     depends_on:
       - api
       - backend
@@ -317,6 +303,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+
+  watchtower:
+    <<: *shared
+    image: containrrr/watchtower:1.7.1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --api-version 1.44 --label-enable --interval 300 --cleanup
 
 volumes:
   hf-cache:

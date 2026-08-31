@@ -388,7 +388,7 @@ user input
 
 目前 2md 與 Wiki 呼叫不攜帶專案側認證；Wiki 若是受保護頁面，需另行加入環境變數密鑰與 Authorization／password 設定。外部服務的 HTTP、格式或執行錯誤會包成 tool error，交由 agent loop 繼續處理；不得把密鑰放入 tool arguments 或 Markdown 內容。
 
-Docker registry deployment 使用根目錄的 `docker-compose.registry.yml`。Brain API 與 Embedding image 目前為 CUDA/PyTorch amd64 image；ARM64 部署可使用多平台的 Backend、Admin 與 Avatar image，但需要另外提供 ARM64 相容的 GPU inference service。
+正式 Docker 部署直接使用根目錄的 `docker-compose.yml`；它預設從公開的 `tbdavid2019/openvman-*` repositories 拉取 image，並啟動 Watchtower。Worktree 開發則疊加 `docker-compose.dev.yml`，恢復 Brain API source mount 與 `ENV=dev`，同時停用 dev container 的 Watchtower 更新。Brain API 與 Embedding image 目前為 CUDA/PyTorch amd64 image；ARM64 部署可使用多平台的 Backend、Admin 與 Avatar image，但需要另外提供 ARM64 相容的 GPU inference service。
 
 ### Workspace Admin API
 
@@ -409,18 +409,20 @@ Docker registry deployment 使用根目錄的 `docker-compose.registry.yml`。Br
 
 目前設計是：
 
-- 對外入口只用一個 `PORT`
-- API 容器內部 port 固定 `8100`
-- nginx public port 預設 `8787`
+- Docker edge 的 HTTP host port 使用 `PORT`，預設 `8786`
+- Docker edge 的 HTTPS host port 使用 `HTTPS_PORT`，預設 `8787`
+- Brain API 容器內部 port 固定 `8100`，不直接暴露到 host
 
 ### Port 邏輯
 
 - `.env`
-  - `PORT=8787`
-- `nginx`
-  - listen `8787`
-- `docker-compose`
-  - host `${PORT}:8787`
+  - `PORT=8786`
+  - `HTTPS_PORT=8787`
+- Docker edge nginx
+  - container `80` / `443`
+- `docker-compose.yml`
+  - host `${PORT}:80`
+  - host `${HTTPS_PORT}:443`
 - `api`
   - internal `8100`
 - `nginx upstream`
@@ -428,18 +430,19 @@ Docker registry deployment 使用根目錄的 `docker-compose.registry.yml`。Br
 
 也就是說：
 
-- 外部世界只看到一個入口 port
+- 外部正式流量由 host nginx 的 `443` 轉送到 Docker edge `8787`
 - 內部 API port 是實作細節，不開放配置
 
 ## 10. 環境變數
 
-參考 `brain/.env.example`。
+參考根目錄 `.env.example`。正式部署預設 `ENV=prod`；疊加 `docker-compose.dev.yml` 時，Brain API、Backend 與 Gateway Worker 會強制使用 `ENV=dev`。
 
 ### 主要變數
 
 ```env
-ENV=dev
-PORT=8787
+ENV=prod
+PORT=8786
+HTTPS_PORT=8787
 
 BRAIN_LLM_PROVIDER=gemini
 BRAIN_LLM_API_KEY=

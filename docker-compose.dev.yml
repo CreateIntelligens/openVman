@@ -1,0 +1,91 @@
+# Worktree development override.
+#
+# In the worktree's untracked .env, set:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
+# Then use the normal command:
+#   docker compose up -d
+#
+# Each worktree should use a distinct PORT/HTTPS_PORT in its untracked .env.
+# Compose derives an isolated project name from the worktree directory name;
+# COMPOSE_PROJECT_NAME can override it when a stable explicit name is useful.
+
+services:
+  api:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    environment:
+      - ENV=dev
+    volumes: !override
+      - ./brain/api:/app
+      - ./brain/data:/data
+      - ./brain/skills:/skills
+      - ./contracts:/contracts:ro
+      - hf-cache:/home/appuser/.cache/huggingface
+      - opf-cache:/home/appuser/.opf
+      - triton-cache:/home/appuser/.triton
+
+  embedding:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    volumes: !override
+      - ./brain/embedding:/app
+      - hf-cache:/home/appuser/.cache/huggingface
+
+  avatar:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    volumes: !override
+      - ./frontend/app:/app
+      - avatar-node-modules:/app/node_modules
+      - ./contracts:/contracts:ro
+
+  admin:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    volumes: !override
+      - ./frontend/admin:/app
+      - admin-node-modules:/app/node_modules
+      - ./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro
+      - ./infra/nginx/certs:/etc/nginx/certs
+      - ./contracts:/contracts:ro
+
+  backend:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    environment:
+      - ENV=dev
+    volumes: !override
+      - ./backend/app:/app/app
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+      - ./backend/tests:/app/tests
+      - ./backend/Dockerfile:/app/Dockerfile
+      - ./backend/requirements.txt:/app/requirements.txt
+      - ./backend/scripts:/app/scripts
+      - ./data:/data
+      - ./brain/data:/brain-data:ro
+      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
+      - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
+      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
+
+  gateway-worker:
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    environment:
+      - ENV=dev
+    volumes: !override
+      - ./backend/app:/app/app
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+      - ./backend/tests:/app/tests
+      - ./backend/Dockerfile:/app/Dockerfile
+      - ./backend/requirements.txt:/app/requirements.txt
+      - ./backend/scripts:/app/scripts
+      - ./data:/data
+      - ./brain/data:/brain-data:ro
+      - ./backend/index-tts-vllm/assets:/indextts-assets:ro
+      - ./backend/index-tts-vllm:/app/index-tts-vllm:ro
+      - ./backend/app/assets/tts_references:/indextts-assets/tts_references:ro
+
+  watchtower:
+    profiles: ["production"]

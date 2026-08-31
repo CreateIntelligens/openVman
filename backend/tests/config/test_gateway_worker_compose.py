@@ -23,7 +23,10 @@ def test_compose_runs_gateway_worker_from_the_backend_image():
     backend = compose["services"]["backend"]
     worker = compose["services"]["gateway-worker"]
 
-    assert backend["image"] == worker["image"] == "openvman-backend"
+    assert backend["image"] == worker["image"] == (
+        "${DOCKERHUB_USERNAME:-tbdavid2019}/"
+        "openvman-backend:${OPENVMAN_IMAGE_TAG:-latest}"
+    )
     assert worker["entrypoint"] == [
         "arq",
         "app.gateway.worker.WorkerSettings",
