@@ -31,6 +31,7 @@ RUN apk add --no-cache tzdata nginx openssl supervisor \
     && chown node:node /app /app/node_modules
 
 COPY frontend/admin/nginx/http.d/ /etc/nginx/http.d/
+COPY frontend/admin/nginx/development.conf /etc/nginx/admin-routes.conf
 COPY frontend/admin/docker/ensure-https-cert.sh /usr/local/bin/ensure-https-cert
 COPY frontend/admin/supervisord.conf /etc/supervisord.conf
 COPY contracts /contracts
@@ -53,10 +54,16 @@ RUN pnpm build
 FROM nginx:1.27-alpine AS runner
 
 ENV TZ=Asia/Taipei
-RUN apk add --no-cache tzdata
+RUN apk add --no-cache openssl tzdata
 
-COPY frontend/admin/nginx/production.conf /etc/nginx/conf.d/default.conf
+COPY frontend/admin/nginx/http.d/ /etc/nginx/http.d/
+COPY frontend/admin/nginx/http.d/default.conf /etc/nginx/conf.d/default.conf
+COPY frontend/admin/nginx/production.conf /etc/nginx/admin-routes.conf
+COPY frontend/admin/docker/ensure-https-cert.sh /usr/local/bin/ensure-https-cert
 COPY --from=builder /app/dist /usr/share/nginx/html/admin
 COPY --from=avatar-sdk-builder /sdk/dist/openvman-avatar-sdk.js /usr/share/nginx/html/openvman-avatar-sdk.js
+RUN chmod +x /usr/local/bin/ensure-https-cert
 
-EXPOSE 80
+EXPOSE 80 443
+
+CMD ["/bin/sh", "-c", "ensure-https-cert && exec nginx -g 'daemon off;'"]

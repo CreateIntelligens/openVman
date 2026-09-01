@@ -28,29 +28,51 @@ def test_admin_nginx_listens_on_https_with_project_cert_paths():
     assert "ssl_certificate_key /etc/nginx/certs/openvman.key;" in config
 
 
-def test_admin_dev_image_prepares_self_signed_cert_before_nginx_starts():
+def test_admin_images_prepare_self_signed_cert_before_nginx_starts():
     dockerfile = (ROOT / "frontend" / "admin" / "Dockerfile").read_text(encoding="utf-8")
     supervisord = (ROOT / "frontend" / "admin" / "supervisord.conf").read_text(encoding="utf-8")
     cert_script = (ROOT / "frontend" / "admin" / "docker" / "ensure-https-cert.sh").read_text(encoding="utf-8")
 
     assert "openssl" in dockerfile
     assert "EXPOSE 80 443 5173" in dockerfile
+    assert "EXPOSE 80 443" in dockerfile
     assert "ensure-https-cert" in supervisord
+    assert "ensure-https-cert && exec nginx" in dockerfile
     assert "OPENVMAN_TLS_CERT_OWNER" in cert_script
     assert 'chown "$cert_owner"' in cert_script
 
 
-def test_admin_dev_nginx_does_not_load_production_static_config():
+def test_admin_build_targets_select_dev_or_production_routes():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     dev_compose = (ROOT / "docker-compose.dev.yml").read_text(encoding="utf-8")
+    workflow = (
+        ROOT / ".github" / "workflows" / "docker-publish.yml"
+    ).read_text(encoding="utf-8")
     dockerfile = (
         ROOT / "frontend" / "admin" / "Dockerfile"
+    ).read_text(encoding="utf-8")
+    edge_config = (
+        ROOT / "frontend" / "admin" / "nginx" / "http.d" / "default.conf"
+    ).read_text(encoding="utf-8")
+    dev_routes = (
+        ROOT / "frontend" / "admin" / "nginx" / "development.conf"
+    ).read_text(encoding="utf-8")
+    prod_routes = (
+        ROOT / "frontend" / "admin" / "nginx" / "production.conf"
     ).read_text(encoding="utf-8")
 
     assert "./frontend/admin/nginx:/etc/nginx/http.d" not in compose
     assert "./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro" not in compose
     assert "./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro" in dev_compose
     assert "COPY nginx/ /etc/nginx/http.d/" not in dockerfile
+    assert "target: runner" in compose
+    assert "target: dev" in dev_compose
+    assert "image: !reset null" in dev_compose
+    assert "target: runner" in workflow
+    assert "include /etc/nginx/admin-routes.conf;" in edge_config
+    assert "proxy_pass http://localhost:5173;" in dev_routes
+    assert "alias /usr/share/nginx/html/admin/;" in prod_routes
+    assert "/@vite/client" not in prod_routes
 
 
 def test_native_public_proxy_supports_openvman_root_relative_routes():

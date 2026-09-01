@@ -92,11 +92,11 @@ GitHub Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN
 docker compose up -d --remove-orphans
 ```
 
-正式設定不掛載 frontend、backend 或 Brain API 原始碼，因此 image 內容不會被 host 上的舊檔案遮蔽。Watchtower 也由同一份 Compose 預設啟動，使用 Docker API `1.44` 相容 Docker Engine 29，只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。目前 `tbdavid2019/openvman-*` repositories 都是 public，新主機不需要 `docker login`。Watchtower 只更新既有 image；服務增刪或 ports、volumes、environment 等 Compose 架構變更仍需先更新 repository，再執行 `docker compose up -d --remove-orphans`。
+正式設定不掛載 frontend、backend 或 Brain API 原始碼，因此 image 內容不會被 host 上的舊檔案遮蔽。Admin image 使用 `runner` stage，由同一個 HTTPS nginx edge 直接提供預先編譯的靜態 bundle，不會啟動 Vite 或 React Refresh。Watchtower 也由同一份 Compose 預設啟動，使用 Docker API `1.44` 相容 Docker Engine 29，只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。目前 `tbdavid2019/openvman-*` repositories 都是 public，新主機不需要 `docker login`。Watchtower 只更新既有 image；服務增刪或 ports、volumes、environment 等 Compose 架構變更仍需先更新 repository，再執行 `docker compose up -d --remove-orphans`。
 
 ### Worktree 開發與 HMR
 
-開發時從 worktree 根目錄疊加 `docker-compose.dev.yml`。這份 override 會恢復 frontend、backend 與 Brain 原始碼 bind mounts、保留 frontend node_modules volumes、強制 Python runtime 使用 `ENV=dev`，並將 dev containers 的 Watchtower label 設為 `false`，避免同一台主機的正式 Watchtower 把本機開發 image 換回 Docker Hub 版本。將 worktree 自己的 git-ignored `.env` 設為：
+開發時從 worktree 根目錄疊加 `docker-compose.dev.yml`。這份 override 會恢復 frontend、backend 與 Brain 原始碼 bind mounts、保留 frontend node_modules volumes、將 Admin build target 改回 `dev` 並移除正式 registry image 名稱、強制 Python runtime 使用 `ENV=dev`，同時把 dev containers 的 Watchtower label 設為 `false`，避免同一台主機的正式 Watchtower 把本機開發 image 換回 Docker Hub 版本。將 worktree 自己的 git-ignored `.env` 設為：
 
 ```env
 COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml

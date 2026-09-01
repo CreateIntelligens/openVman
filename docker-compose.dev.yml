@@ -40,6 +40,9 @@ services:
       - ./contracts:/contracts:ro
 
   admin:
+    build:
+      target: dev
+    image: !reset null
     labels:
       com.centurylinklabs.watchtower.enable: "false"
     volumes: !override

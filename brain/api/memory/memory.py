@@ -163,21 +163,24 @@ def list_memories(
 ) -> dict[str, Any]:
     """List memories with pagination, excluding vectors."""
     table = get_memories_table(project_id)
-    df = table.to_pandas()
-    if df.empty:
+    records = table.to_arrow().to_pylist()
+    if not records:
         return {"memories": [], "total": 0, "page": page, "page_size": page_size}
-    if "vector" in df.columns:
-        df = df.drop(columns=["vector"])
-    if "date" in df.columns:
-        df = df.sort_values(by="date", ascending=False, na_position="last")
-    df = df.reset_index(drop=True)
-    total = len(df)
+
+    records = [
+        {key: value for key, value in record.items() if key != "vector"}
+        for record in records
+    ]
+    dated_records = [record for record in records if record.get("date") is not None]
+    undated_records = [record for record in records if record.get("date") is None]
+    dated_records.sort(key=lambda record: str(record["date"]), reverse=True)
+    records = dated_records + undated_records
+
+    total = len(records)
     start = (page - 1) * page_size
     end = start + page_size
-    page_df = df.iloc[start:end]
-    records = page_df.to_dict(orient="records")
     return {
-        "memories": records,
+        "memories": records[start:end],
         "total": total,
         "page": page,
         "page_size": page_size,

@@ -25,7 +25,7 @@ jobs:
           - image: admin
             context: .
             file: ./frontend/admin/Dockerfile
-            target: dev
+            target: runner
             platforms: linux/amd64,linux/arm64
           - image: avatar
             context: .

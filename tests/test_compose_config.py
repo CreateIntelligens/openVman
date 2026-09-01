@@ -49,6 +49,10 @@ def test_default_compose_uses_public_images_and_starts_watchtower():
     assert services["backend"]["image"] == (
         "tbdavid2019/openvman-backend:latest"
     )
+    assert services["admin"]["image"] == (
+        "tbdavid2019/openvman-admin:latest"
+    )
+    assert services["admin"]["build"]["target"] == "runner"
     assert "watchtower" in services
     assert services["watchtower"]["command"] == [
         "--api-version",
@@ -78,6 +82,8 @@ def test_dev_compose_restores_worktree_mounts_and_disables_watchtower():
     services = config["services"]
 
     assert "watchtower" not in services
+    assert services["admin"].get("image") is None
+    assert services["admin"]["build"]["target"] == "dev"
     assert services["backend"]["environment"]["ENV"] == "dev"
     assert services["api"]["environment"]["ENV"] == "dev"
     assert services["gateway-worker"]["environment"]["ENV"] == "dev"

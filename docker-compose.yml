@@ -239,7 +239,7 @@ services:
     build:
       context: .
       dockerfile: frontend/admin/Dockerfile
-      target: dev
+      target: runner
     image: "${DOCKERHUB_USERNAME:-tbdavid2019}/openvman-admin:${OPENVMAN_IMAGE_TAG:-latest}"
     labels:
       com.centurylinklabs.watchtower.enable: "true"
