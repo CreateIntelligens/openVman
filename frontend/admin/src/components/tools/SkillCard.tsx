@@ -29,7 +29,7 @@ export default function SkillCard({
               <p className="font-bold text-sm">{skill.name}</p>
               {skill.scope && (
                 <span
-                  className={`text-[0.5625rem] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                  className={`text-[0.625rem] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
                     skill.scope === "project"
                       ? "bg-primary/15 text-primary border border-primary/30"
                       : "bg-border text-content-muted"

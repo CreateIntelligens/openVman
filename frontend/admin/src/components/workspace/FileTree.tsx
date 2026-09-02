@@ -155,12 +155,12 @@ export default function FileTree({ documents, selectedPath, onSelect, searchQuer
                             {/* Badges / Labels */}
                             <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                    {doc?.is_core && (
-                                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wider text-amber-500">
+                                          <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-amber-500">
                                                  core
                                           </span>
                                    )}
                                    {!doc?.is_indexable && !doc?.is_core && (
-                                          <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wider text-content-subtle">
+                                          <span className="rounded bg-surface-sunken px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-content-subtle">
                                                  omit
                                           </span>
                                    )}

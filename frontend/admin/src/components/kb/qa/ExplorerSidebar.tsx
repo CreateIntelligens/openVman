@@ -407,7 +407,7 @@ export default function ExplorerSidebar({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-[0.7rem] text-content-muted mt-1">
+        <div className="flex items-center gap-2 text-xs text-content-muted mt-1">
           <button onClick={handleExpandAll} className="hover:text-content transition-colors">
             展開全部
           </button>

@@ -162,7 +162,7 @@ export default function ManualQaModal({
           </div>
         )}
 
-        <p className="mt-3 shrink-0 text-[0.7rem] text-content-subtle">{VISIBILITY_HINT}</p>
+        <p className="mt-3 shrink-0 text-xs text-content-subtle">{VISIBILITY_HINT}</p>
 
         <div className="mt-3 flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
           {rows.map((row, index) => (

@@ -286,7 +286,7 @@ export default function MascotWidget() {
               selectedMascot.engine === "3d" ? "bg-success" : "bg-info"
             }`}
           />
-          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.82rem] font-bold">
+          <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] font-bold">
             {selectedMascot.label || "小助理"}
           </span>
         </button>

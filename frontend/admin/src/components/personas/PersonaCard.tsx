@@ -30,7 +30,7 @@ export default function PersonaCard({
         </span>
         <div className="flex items-center gap-1.5 shrink-0">
           {persona.is_default && (
-            <span className="rounded flex items-center bg-amber-500/10 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-widest text-amber-500">
+            <span className="rounded flex items-center bg-amber-500/10 px-1.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-widest text-amber-500">
               預設
             </span>
           )}

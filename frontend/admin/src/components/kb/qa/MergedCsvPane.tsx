@@ -237,7 +237,7 @@ export default function MergedCsvPane({
 
         <div className="flex items-center gap-2 self-start sm:self-center">
           {isDirty && (
-            <span className="px-2 py-0.5 text-[0.7rem] font-bold text-warn bg-warn/10 border border-warn/25 rounded-md animate-pulse">
+            <span className="px-2 py-0.5 text-xs font-bold text-warn bg-warn/10 border border-warn/25 rounded-md animate-pulse">
               有未儲存變更
             </span>
           )}
