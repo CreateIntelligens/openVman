@@ -17,6 +17,8 @@ import {
 
 type MascotDriver = {
   driveMouth: (volume: number) => void;
+  // 影片型小助理靠真正的 PCM（16kHz mono int16）算嘴型；VRM/Live2D 忽略此訊息
+  pushPcm: (chunk: ArrayBuffer) => void;
   stopMouth: () => void;
 };
 
@@ -30,6 +32,7 @@ interface MascotContextType extends MascotDriver {
 
 const noop: MascotContextType = {
   driveMouth: () => {},
+  pushPcm: () => {},
   stopMouth: () => {},
   mascotOptions: [...FALLBACK_MASCOT_CATALOG],
   selectedMascotId: DEFAULT_MASCOT_ID,
@@ -42,15 +45,33 @@ const noop: MascotContextType = {
 
 const MascotContext = createContext<MascotContextType>(noop);
 
-export function MascotProvider({ children }: { children: ReactNode }) {
+export function MascotProvider({
+  children,
+  initialOptions,
+}: {
+  children: ReactNode;
+  initialOptions?: MascotOption[];
+}) {
   const driverRef = useRef<MascotDriver | null>(null);
-  const [mascotOptions, setMascotOptionsState] = useState<MascotOption[]>([
-    ...FALLBACK_MASCOT_CATALOG,
-  ]);
-  const [selectedMascotId, setSelectedMascotIdState] = useState(readStoredMascotId);
+  const [mascotOptions, setMascotOptionsState] = useState<MascotOption[]>(
+    () => (
+      initialOptions?.length
+        ? [...initialOptions]
+        : [...FALLBACK_MASCOT_CATALOG]
+    ),
+  );
+  const [selectedMascotId, setSelectedMascotIdState] = useState(
+    () => readStoredMascotId(
+      initialOptions?.length ? initialOptions : FALLBACK_MASCOT_CATALOG,
+    ),
+  );
 
   const driveMouth = useCallback((volume: number) => {
     driverRef.current?.driveMouth(volume);
+  }, []);
+
+  const pushPcm = useCallback((chunk: ArrayBuffer) => {
+    driverRef.current?.pushPcm(chunk);
   }, []);
 
   const stopMouth = useCallback(() => {
@@ -72,6 +93,7 @@ export function MascotProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       driveMouth,
+      pushPcm,
       stopMouth,
       mascotOptions,
       selectedMascotId,
@@ -81,6 +103,7 @@ export function MascotProvider({ children }: { children: ReactNode }) {
     }),
     [
       driveMouth,
+      pushPcm,
       stopMouth,
       mascotOptions,
       selectedMascotId,

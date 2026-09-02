@@ -1,4 +1,4 @@
-export type MascotEngine = "2d" | "3d"
+export type MascotEngine = "2d" | "3d" | "video"
 export type MascotFit = "half" | "full"
 
 export interface MascotOption {
@@ -7,6 +7,7 @@ export interface MascotOption {
   engine: MascotEngine
   modelUrl?: string
   vrmUrl?: string
+  characterId?: string
   fit?: MascotFit
 }
 
@@ -16,6 +17,7 @@ export interface MascotApiRecord {
   engine: MascotEngine
   model_url: string
   vrm_url: string
+  character_id?: string
   fit: "" | MascotFit
 }
 
@@ -53,6 +55,7 @@ export function toMascotOption(record: MascotApiRecord): MascotOption {
     engine: record.engine,
     modelUrl: record.model_url || undefined,
     vrmUrl: record.vrm_url || undefined,
+    characterId: record.character_id || undefined,
     fit: record.fit || undefined,
   }
 }
@@ -73,7 +76,10 @@ export function buildMascotWidgetSrc(
 ): string {
   const params = new URLSearchParams()
 
-  if (mascot.engine === "3d") {
+  if (mascot.engine === "video") {
+    if (mascot.characterId) params.set("character", mascot.characterId)
+    params.set("engine", "video")
+  } else if (mascot.engine === "3d") {
     if (mascot.vrmUrl) params.set("vrm", mascot.vrmUrl)
     params.set("engine", "3d")
   } else {

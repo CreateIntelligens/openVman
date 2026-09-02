@@ -13,6 +13,7 @@
                font-family:"Noto Sans TC", system-ui, sans-serif; -webkit-font-smoothing:antialiased; }
   #stage { position:absolute; inset:0; }
   .avatar-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .avatar-video-stage { position:absolute; inset:0; }
 
   /* ===== 底部控制 dock（毛玻璃）===== */
   #control-bar {
@@ -131,12 +132,21 @@
   let VRM_URL = CFG.get('vrm') || (/\.vrm($|\?)/i.test(MODEL_URL) ? MODEL_URL : ''); // let：拖放自己的 VRM 時可換
   const VRM_TARGET_HEIGHT = readNumberParam('vrmTargetHeight', 1.68, 0.8, 2.4);
   const VRM_FIT_PADDING = readNumberParam('vrmFitPadding', 1.18, 1.05, 1.6);
+  // 影片皮（matex）：指定 avatar 角色 id，透過 OpenVman Avatar SDK 載入 WASM 嘴型 runtime
+  const CHARACTER_ID = CFG.get('character') || '';
   const ENGINE  = VRM_URL ? '3d' : '2d';
   // 切換用：embedder 兩個皮都給(data-model + data-vrm) → 長出 2D/3D 切換鈕。
-  // 預設引擎：data-engine 優先；否則有明確 2D 皮就 2D、只有 3D 就 3D。
+  // 預設引擎：data-engine 優先；否則有明確 2D 皮就 2D、只有 3D 就 3D、只有影片角色就 video。
   const has2D = !!CFG.get('model');
   const has3D = !!VRM_URL;
-  const startMode = CFG.get('engine') || (has2D ? '2d' : (has3D ? '3d' : '2d'));
+  function resolveStartMode() {
+    const configuredMode = CFG.get('engine');
+    if (configuredMode) return configuredMode;
+    if (has2D) return '2d';
+    if (has3D) return '3d';
+    return CHARACTER_ID ? 'video' : '2d';
+  }
+  const startMode = resolveStartMode();
 
   // ===== 模組層狀態 =====
   let model = null, app = null;
@@ -186,7 +196,14 @@
     const d = e.data || {};
     if (d.ns !== 'avatar-widget-host') return;
     if (d.type === 'mouth') driveMouth(d.volume);
-    if (d.type === 'mouth-stop') stopMouth();
+    if (d.type === 'mouth-stop') {
+      stopMouth();
+      if (_videoDriver) _videoDriver.interrupt();
+    }
+    // 影片皮需要真正的 PCM（16kHz mono int16）才能算嘴型，不能只靠音量
+    if (d.type === 'pcm' && d.buffer instanceof ArrayBuffer && _videoDriver) {
+      _videoDriver.pushPcm(d.buffer);
+    }
     if (d.type === 'gesture' && typeof d.name === 'string') gesture3D && gesture3D(d.name);
     // 注意：不接受用 postMessage 遠端啟動麥克風（listen），避免惡意父頁偷開麥；麥克風只由使用者點擊觸發
   });
@@ -227,13 +244,20 @@
     return c;
   }
   var _renderer = null, _engineMode = null, _switching = false; // var 不用 let：setEngine 在宣告前就被呼叫(TDZ)
+  async function bootEngine(mode) {
+    if (mode === '3d') return bootVRM();
+    if (mode === 'video') return bootVideo();
+    return bootAvatar();
+  }
   async function setEngine(mode) {
     if (_switching || mode === _engineMode) return;
     _switching = true;
     if (_renderer) { try { _renderer.dispose(); } catch (e) {} _renderer = null; }
     _engineMode = mode;
     const eb = document.getElementById('btn-engine'); if (eb) eb.textContent = (mode === '3d') ? '3D' : '2D';
-    try { _renderer = (mode === '3d') ? await bootVRM() : await bootAvatar(); } catch (e) { console.error(e); }
+    try {
+      _renderer = await bootEngine(mode);
+    } catch (e) { console.error(e); }
     _switching = false;
   }
   function initEngines() {
@@ -261,6 +285,72 @@
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (f) loadVRMFile(f);
   });
+
+  // ===== 影片皮：matex 角色（OpenVman Avatar SDK + WASM 嘴型 runtime）=====
+  // 音訊一律由父頁播放；這裡以 silent 輸出只驅動嘴型，避免同一段語音出聲兩次。
+  var _videoDriver = null;   // { pushPcm(ArrayBuffer), interrupt() }，bootVideo 設定、dispose 清掉
+  function loadAvatarSdk() {
+    if (window.OpenVmanAvatar) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = location.origin + '/openvman-avatar-sdk.js';
+      s.onload = res; s.onerror = () => rej(new Error('無法載入 Avatar SDK'));
+      document.head.appendChild(s);
+    });
+  }
+  async function bootVideo() {
+    try {
+      if (!CHARACTER_ID) throw new Error('video 引擎需要 character 參數');
+      const stage = document.getElementById('stage');
+      stage.querySelectorAll('canvas.avatar-canvas, .avatar-video-stage').forEach((old) => old.remove());
+      const host = document.createElement('div');
+      host.className = 'avatar-video-stage';
+      stage.insertBefore(host, stage.firstChild);
+      await loadAvatarSdk();
+      const inst = await window.OpenVmanAvatar.init({
+        container: host,
+        characterId: CHARACTER_ID,
+        assetsBaseUrl: '/assets/',
+        audioOutput: 'silent',
+      });
+      let alive = true;
+      _videoDriver = {
+        pushPcm(buffer) {
+          if (!alive || buffer.byteLength < 2) return;
+          inst.pushPcm(new Int16Array(buffer, 0, Math.floor(buffer.byteLength / 2)))
+            .catch((e) => console.warn('PCM 推送失敗：', e && e.message));
+        },
+        interrupt() {
+          if (alive) inst.interrupt();
+        },
+      };
+      inst.on('error', (e) => postToParent('error', { message: e.message }));
+      postToParent('ready');
+      setTimeout(() => {
+        if (!alive) return;
+        try {
+          const c = host.querySelector('#canvas_video');
+          if (c) postToParent('screenshot', { dataUrl: c.toDataURL('image/png') });
+        } catch (e) { console.warn('自動擷取影片頭像失敗：', e); }
+      }, 2500);
+      return {
+        dispose() {
+          alive = false;
+          _videoDriver = null;
+          try { inst.destroy(); } catch (e) {}
+          host.remove();
+        },
+      };
+    } catch (err) {
+      console.error(err);
+      const w = document.getElementById('direct-warn');
+      if (w) {
+        w.textContent = '影片角色啟動失敗：' + (err && err.message || err);
+        w.style.display = 'flex';
+      }
+      postToParent('error', { message: err && err.message || String(err) });
+    }
+  }
 
   // ===== 3D 皮：VRM（three + three-vrm，ESM 動態 import）=====
   async function bootVRM() {

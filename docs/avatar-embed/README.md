@@ -50,6 +50,7 @@ const avatar = await OpenVmanAvatar.init({
   height: "min(72dvh, 42rem)",
   zIndex: 1000,
   container: document.querySelector("#avatar-stage"),
+  audioOutput: "speaker",
 });
 ```
 
@@ -62,6 +63,7 @@ const avatar = await OpenVmanAvatar.init({
 | `zIndex` | 否 | `2147483000` | 覆寫 root 的 stacking order。 |
 | `container` | 否 | `document.body` | 指定時改為填滿該容器，不使用 viewport 懸浮位置。 |
 | `assetsBaseUrl` | 否 | SDK origin 的 `/assets` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
+| `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。 |
 
 同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`destroy()` 後必須重新載入頁面才能再次初始化。
 
@@ -101,6 +103,8 @@ for await (const chunk of pcmStream) {
 ```
 
 每個 chunk 必須是 16 kHz、單聲道、signed 16-bit PCM samples。若網路 payload 是 bytes，宿主應先處理 byte order 與 alignment，再建立 `Int16Array`。
+
+如果宿主已播放相同音訊，初始化時請設定 `audioOutput: "silent"`。SDK 仍會排程 PCM 並驅動嘴型，但不會將訊號送至喇叭，可避免重複出聲。
 
 ### `avatar.interrupt()`
 

@@ -24,6 +24,7 @@ from app.auth.models import ResourceType
 from app.auth.resources import list_accessible_resources
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.avatar.mascot_store import (
+    VIDEO_ENGINE,
     MascotExists,
     MascotNotFound,
     MascotStore,
@@ -34,7 +35,9 @@ from app.avatar.mascot_validation import (
     normalize_mascot_id,
     validate_vrm_bytes,
 )
+from app.avatar.validation import InvalidCharId, normalize_char_id
 from app.config import get_tts_config
+from app.routes.avatar import get_store as get_character_store
 
 logger = logging.getLogger("backend.mascots")
 router = APIRouter()
@@ -59,6 +62,12 @@ class UpdateLabelRequest(BaseModel):
     label: str = Field(..., min_length=1)
 
 
+class CreateVideoMascotRequest(BaseModel):
+    mascot_id: str = Field(..., min_length=1)
+    label: str = ""
+    character_id: str = Field(..., min_length=1)
+
+
 def _normalize_mascot_id_or_400(mascot_id: str) -> str:
     try:
         return normalize_mascot_id(mascot_id)
@@ -79,11 +88,25 @@ async def list_mascots(
             ResourceType.AVATAR_MASCOT,
         )
     }
+    # 影片型小助理的影片與嘴型資料由 /assets/{char_id} 依角色授權提供；
+    # 看不到角色的帳號連小助理也不列出，避免選了卻載不出來。
+    accessible_character_ids = {
+        resource.resource_id
+        for resource in list_accessible_resources(
+            runtime.resources,
+            current.user,
+            ResourceType.AVATAR_CHARACTER,
+        )
+    }
     return {
         "mascots": [
             mascot
             for mascot in get_store().list_mascots()
             if mascot.get("mascot_id") in accessible_ids
+            and (
+                mascot.get("engine") != VIDEO_ENGINE
+                or mascot.get("character_id") in accessible_character_ids
+            )
         ]
     }
 
@@ -125,6 +148,47 @@ async def create_mascot(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except MascotExists as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"status": "ok", "mascot": mascot}
+
+
+@router.post("/api/avatar/mascots/from-character", summary="以影片型 Avatar 角色建立小助理")
+async def create_video_mascot(
+    payload: CreateVideoMascotRequest,
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> dict[str, Any]:
+    mid = _normalize_mascot_id_or_400(payload.mascot_id)
+    try:
+        cid = normalize_char_id(payload.character_id)
+    except InvalidCharId as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    characters = {
+        character["char_id"]: character
+        for character in get_character_store().list_characters()
+    }
+    character = characters.get(cid)
+    if character is None:
+        raise HTTPException(status_code=404, detail=f"角色不存在：{cid}")
+    if not (character.get("has_video") and character.get("has_data")):
+        raise HTTPException(status_code=400, detail="角色缺少影片或嘴型資料，無法作為小助理")
+
+    label = payload.label.strip() or str(character.get("label") or cid)
+    try:
+        mascot = get_store().create_video_mascot(
+            mascot_id=mid,
+            label=label,
+            character_id=cid,
+        )
+    except MascotExists as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    try:
+        runtime.resources.upsert_system_resource(
+            resource_type=ResourceType.AVATAR_MASCOT,
+            resource_id=mid,
+            metadata={"label": label, "character_id": cid},
+        )
+    except Exception as exc:
+        logger.warning("failed to upsert mascot resource %s: %s", mid, exc)
     return {"status": "ok", "mascot": mascot}
 
 

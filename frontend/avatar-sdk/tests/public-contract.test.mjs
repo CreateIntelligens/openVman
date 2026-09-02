@@ -547,3 +547,15 @@ test("listCharacters reports a named error when the request fails", async () => 
     (error) => error.code === "RESOURCE_LOAD_FAILED",
   );
 });
+
+test("supports a silent audio output for host-driven playback", async () => {
+  const typesSource = await readFile(new URL("../src/types.ts", import.meta.url), "utf8");
+  const audioSource = await readFile(new URL("../src/audio.ts", import.meta.url), "utf8");
+  const mainSource = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+
+  assert.match(typesSource, /audioOutput\?: OpenVmanAvatarAudioOutput/);
+  assert.match(typesSource, /"speaker" \| "silent"/);
+  assert.match(audioSource, /createGain\(\)/);
+  assert.match(audioSource, /gain\.value = 0/);
+  assert.match(mainSource, /audioOutput: options\.audioOutput \?\? "speaker"/);
+});

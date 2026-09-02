@@ -42,6 +42,7 @@ function containerId(container?: HTMLElement): string {
 function signature(options: OpenVmanAvatarOptions): string {
   return JSON.stringify({
     assetsBaseUrl: options.assetsBaseUrl,
+    audioOutput: options.audioOutput ?? "speaker",
     characterId: options.characterId,
     container: containerId(options.container),
     height: options.height,
@@ -150,12 +151,16 @@ async function createInstance(
   ): void => {
     for (const handler of handlers.get(type) ?? []) handler(event);
   };
-  const audio = new AvatarAudio(runtime, (speaking) => {
-    emit("speaking", {
-      state: speaking ? "start" : "stop",
-      type: "speaking",
-    });
-  });
+  const audio = new AvatarAudio(
+    runtime,
+    (speaking) => {
+      emit("speaking", {
+        state: speaking ? "start" : "stop",
+        type: "speaking",
+      });
+    },
+    options.audioOutput ?? "speaker",
+  );
 
   const runAudio = async (operation: () => Promise<void>): Promise<void> => {
     try {

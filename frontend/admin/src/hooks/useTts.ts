@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTtsProviders, synthesizeSpeech, type TtsProvider } from "../api";
 import { useMascot } from "../context/MascotContext";
+import { resolveMascotOption } from "../data/mascotCatalog";
+import { blobToPcm16Chunks } from "../utils/liveAudioUtils";
 
 type WebAudioWindow = Window & typeof globalThis & {
        webkitAudioContext?: typeof AudioContext;
@@ -25,6 +27,10 @@ function rmsVolume(data: Uint8Array): number {
        }
        return Math.min(1, Math.sqrt(sum / data.length) * 3.4);
 }
+
+// 影片型小助理的 WASM runtime 吃 16kHz mono int16；4096 samples 一包與 Avatar SDK 一致。
+const MASCOT_PCM_SAMPLE_RATE = 16000;
+const MASCOT_PCM_CHUNK_BYTES = 4096 * 2;
 
 const TTS_PROVIDER_STORAGE_KEY = "brain-tts-provider";
 const TTS_VOICE_STORAGE_KEY = "brain-tts-voice";
@@ -85,7 +91,10 @@ export function useTts() {
        const mascotAudioCtxRef = useRef<AudioContext | null>(null);
        const mascotAudioGraphRef = useRef<MascotAudioGraph | null>(null);
        const mascotRafRef = useRef<number | null>(null);
-       const { driveMouth, stopMouth } = useMascot();
+       const { driveMouth, pushPcm, stopMouth, mascotOptions, selectedMascotId } = useMascot();
+       const mascotEngine = resolveMascotOption(selectedMascotId, mascotOptions).engine;
+       const mascotEngineRef = useRef(mascotEngine);
+       mascotEngineRef.current = mascotEngine;
 
        const ttsProviderRef = useRef(ttsProvider);
        ttsProviderRef.current = ttsProvider;
@@ -165,7 +174,32 @@ export function useTts() {
               }
        }, [driveMouth, stopMascotAnalyser]);
 
-       const playAudioBuffer = useCallback((buffer: ArrayBuffer, fallback?: string) => {
+       // 只有影片型小助理需要 PCM；解碼在 play() 之前完成，讓嘴型與聲音同時起跑。
+       const decodeMascotPcm = useCallback(async (buffer: ArrayBuffer): Promise<ArrayBuffer[]> => {
+              if (mascotEngineRef.current !== "video") {
+                     return [];
+              }
+              if (!mascotAudioCtxRef.current) {
+                     const ctx = createAudioContext();
+                     if (!ctx) {
+                            return [];
+                     }
+                     mascotAudioCtxRef.current = ctx;
+              }
+              try {
+                     return await blobToPcm16Chunks(
+                            new Blob([buffer]),
+                            mascotAudioCtxRef.current,
+                            MASCOT_PCM_SAMPLE_RATE,
+                            MASCOT_PCM_CHUNK_BYTES,
+                     );
+              } catch (reason) {
+                     console.warn("Failed to decode TTS audio for mascot lip sync:", reason);
+                     return [];
+              }
+       }, []);
+
+       const playAudioBuffer = useCallback(async (buffer: ArrayBuffer, fallback?: string) => {
               if (fallback) {
                      setTtsFallbackToast(fallback);
                      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -185,10 +219,19 @@ export function useTts() {
               };
 
               audio.onended = cleanup;
+              const pcmChunks = await decodeMascotPcm(buffer);
+              if (audioRef.current !== audio) {
+                     // 解碼期間被 stopAudio 取消
+                     URL.revokeObjectURL(url);
+                     return;
+              }
               audio.play()
-                     .then(() => driveMascotFromAudio(audio))
+                     .then(() => {
+                            driveMascotFromAudio(audio);
+                            for (const chunk of pcmChunks) pushPcm(chunk);
+                     })
                      .catch(cleanup);
-       }, [driveMascotFromAudio, stopMascotAnalyser]);
+       }, [decodeMascotPcm, driveMascotFromAudio, pushPcm, stopMascotAnalyser]);
 
        const prefetchTts = useCallback(async (text: string) => {
               ttsPrefetchAbortRef.current?.abort();
@@ -231,7 +274,7 @@ export function useTts() {
               const cached = ttsCacheRef.current.get(key);
               if (cached) {
                      setTtsCacheEntry(ttsCacheRef.current, key, cached);
-                     playAudioBuffer(cached.audio, cached.fallback);
+                     await playAudioBuffer(cached.audio, cached.fallback);
                      return;
               }
 
@@ -243,7 +286,7 @@ export function useTts() {
                             signal: controller.signal,
                      });
                      setTtsCacheEntry(ttsCacheRef.current, key, { audio, fallback });
-                     playAudioBuffer(audio, fallback);
+                     await playAudioBuffer(audio, fallback);
               } catch (reason) {
                      if (!controller.signal.aborted) {
                             console.error("TTS playback failed:", reason);

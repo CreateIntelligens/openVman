@@ -1,7 +1,7 @@
 # openVman — 虛擬人系統架構總覽 (Architecture Index)
 
 > **版本**：v0.10.1
-> **最後更新**：2026-08-17
+> **最後更新**：2026-09-02
 > **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
 
 ---
@@ -24,6 +24,8 @@
 ## 對外接入
 
 第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](./docs/avatar-embed/README.md)。
+
+Admin 也可將已上傳且素材完整的影片角色登記為右下角小助理。這類小助理同時檢查 mascot 與 avatar character 授權；宿主播放 TTS 時，會以 PCM 另行驅動嘴型，避免重複出聲。
 
 ### 共用推論服務端點
 

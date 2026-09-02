@@ -24,6 +24,15 @@ const MASCOT_FALLBACK_BACKGROUNDS: Record<MascotOption["engine"], string> = {
     "radial-gradient(circle at 50% 35%, #ecfccb 0 20%, transparent 21%)",
     "conic-gradient(from 160deg, #34d399, #22c55e, #0f766e, #34d399)",
   ].join(", "),
+  video: [
+    "radial-gradient(circle at 50% 36%, #fde68a 0 20%, transparent 21%)",
+    "linear-gradient(160deg, #fff7ed, #fed7aa)",
+  ].join(", "),
+};
+const MASCOT_ENGINE_DOT: Record<MascotOption["engine"], string> = {
+  "2d": "bg-info",
+  "3d": "bg-success",
+  video: "bg-primary",
 };
 
 interface MascotPosition {
@@ -96,6 +105,8 @@ function mascotPreviewStyle(mascot: MascotOption): CSSProperties | undefined {
 
 export default function MascotWidget() {
   const [closed, setClosed] = useState(initialClosed);
+  // 開過一次就讓 iframe 留在 DOM 裡只隱藏；卸載會讓重開時重新下載模型與 three.js。
+  const [mounted, setMounted] = useState(() => !initialClosed());
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<MascotPosition | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -136,6 +147,14 @@ export default function MascotWidget() {
     registerDriver({
       driveMouth: (volume: number) => {
         postToWidget({ type: "mouth", volume });
+      },
+      pushPcm: (chunk: ArrayBuffer) => {
+        // 用 transfer 交出 buffer，避免每個音訊片段都複製一份
+        frameRef.current?.contentWindow?.postMessage(
+          { ns: HOST_MESSAGE_NAMESPACE, type: "pcm", buffer: chunk },
+          window.location.origin,
+          [chunk],
+        );
       },
       stopMouth: () => {
         postToWidget({ type: "mouth-stop" });
@@ -227,33 +246,36 @@ export default function MascotWidget() {
     };
   }, [handleDragMove, handleDragEnd]);
 
-  if (closed) {
-    return (
-      <button
-        type="button"
-        title="打開 AI 虛擬人小助理"
-        aria-label="打開 AI 虛擬人小助理"
-        onClick={() => {
-          setClosed(false);
-          rememberMascotOpen(true);
-        }}
-        className="mascot-trigger fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-raised text-primary shadow-lg transition-colors hover:bg-surface-sunken"
+  const trigger = (
+    <button
+      type="button"
+      title="打開 AI 虛擬人小助理"
+      aria-label="打開 AI 虛擬人小助理"
+      onClick={() => {
+        setClosed(false);
+        setMounted(true);
+        rememberMascotOpen(true);
+      }}
+      className="mascot-trigger fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-raised text-primary shadow-lg transition-colors hover:bg-surface-sunken"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-6 w-6"
+        aria-hidden="true"
       >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-6 w-6"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
-        </svg>
-      </button>
-    );
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4.5 21a7.5 7.5 0 0 1 15 0" />
+      </svg>
+    </button>
+  );
+
+  if (closed && !mounted) {
+    return trigger;
   }
 
   const style: CSSProperties = position
@@ -261,11 +283,14 @@ export default function MascotWidget() {
     : { right: `${MASCOT_DEFAULT_MARGIN_REM}rem`, bottom: `${MASCOT_DEFAULT_MARGIN_REM}rem` };
 
   return (
-    <div
-      ref={widgetRef}
-      className="mascot-widget fixed h-[min(30rem,70dvh)] w-[min(21.25rem,90vw)] overflow-hidden rounded-2xl shadow-lg group"
-      style={style}
-    >
+    <>
+      {closed && trigger}
+      <div
+        ref={widgetRef}
+        hidden={closed}
+        className="mascot-widget fixed h-[min(30rem,70dvh)] w-[min(21.25rem,90vw)] overflow-hidden rounded-2xl shadow-lg group"
+        style={style}
+      >
       <div
         className={`absolute inset-x-0 top-0 z-[1] h-6 ${
           dragging ? "cursor-grabbing" : "cursor-grab"
@@ -283,7 +308,7 @@ export default function MascotWidget() {
         >
           <span
             className={`w-3 h-3 flex-none rounded-full shadow-[0_0_0_0.1875rem_rgba(255,255,255,0.14)] ${
-              selectedMascot.engine === "3d" ? "bg-success" : "bg-info"
+              MASCOT_ENGINE_DOT[selectedMascot.engine]
             }`}
           />
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] font-bold">
@@ -345,6 +370,7 @@ export default function MascotWidget() {
         allow="microphone; autoplay"
         className={`h-full w-full border-0 ${dragging ? "pointer-events-none" : ""}`}
       />
-    </div>
+      </div>
+    </>
   );
 }

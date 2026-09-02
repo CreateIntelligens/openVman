@@ -136,3 +136,110 @@ def test_delete_builtin_404(client):
     response = client.delete("/api/avatar/mascots/qqman")
 
     assert response.status_code == 404
+
+
+class _FakeCharacterStore:
+    def __init__(self, characters):
+        self._characters = characters
+
+    def list_characters(self):
+        return list(self._characters)
+
+
+@pytest.fixture
+def character_store(monkeypatch):
+    store = _FakeCharacterStore(
+        [
+            {
+                "char_id": "000",
+                "label": "預設角色",
+                "has_video": True,
+                "has_data": True,
+            },
+            {
+                "char_id": "broken",
+                "label": "缺資料",
+                "has_video": True,
+                "has_data": False,
+            },
+        ]
+    )
+    monkeypatch.setattr(mascot_routes, "get_character_store", lambda: store)
+    return store
+
+
+def test_create_video_mascot_from_character(client, character_store):
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
+    # 列表同時要求角色授權，測試先把角色資源登記為系統資源
+    get_auth_runtime().resources.upsert_system_resource(
+        resource_type=ResourceType.AVATAR_CHARACTER,
+        resource_id="000",
+        metadata={"label": "預設角色"},
+    )
+    response = client.post(
+        "/api/avatar/mascots/from-character",
+        json={"mascot_id": "matex-000", "label": "", "character_id": "000"},
+    )
+
+    assert response.status_code == 200
+    mascot = response.json()["mascot"]
+    assert mascot["engine"] == "video"
+    assert mascot["character_id"] == "000"
+    # 未填 label 時沿用角色名稱
+    assert mascot["label"] == "預設角色"
+
+    mascots = client.get("/api/avatar/mascots").json()["mascots"]
+    assert mascots[-1]["mascot_id"] == "matex-000"
+
+
+def test_create_video_mascot_unknown_character(client, character_store):
+    response = client.post(
+        "/api/avatar/mascots/from-character",
+        json={"mascot_id": "matex-x", "character_id": "nope"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_create_video_mascot_incomplete_character(client, character_store):
+    response = client.post(
+        "/api/avatar/mascots/from-character",
+        json={"mascot_id": "matex-broken", "character_id": "broken"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_create_video_mascot_duplicate(client, character_store):
+    _upload(client)
+
+    response = client.post(
+        "/api/avatar/mascots/from-character",
+        json={"mascot_id": "custom", "character_id": "000"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_video_mascot_hidden_without_character_access(client, character_store):
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
+    client.post(
+        "/api/avatar/mascots/from-character",
+        json={"mascot_id": "matex-000", "character_id": "000"},
+    )
+    runtime = get_auth_runtime()
+    # 角色資源尚未登記時，即使小助理資源存在也不該列出
+    mascots = client.get("/api/avatar/mascots").json()["mascots"]
+    assert all(m["mascot_id"] != "matex-000" for m in mascots)
+
+    runtime.resources.upsert_system_resource(
+        resource_type=ResourceType.AVATAR_CHARACTER,
+        resource_id="000",
+        metadata={"label": "預設角色"},
+    )
+    mascots = client.get("/api/avatar/mascots").json()["mascots"]
+    assert any(m["mascot_id"] == "matex-000" for m in mascots)

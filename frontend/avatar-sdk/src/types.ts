@@ -4,8 +4,12 @@ export type OpenVmanAvatarEventType =
   | "ready"
   | "speaking";
 
+export type OpenVmanAvatarAudioOutput = "speaker" | "silent";
+
 export interface OpenVmanAvatarOptions {
   assetsBaseUrl?: string;
+  // 宿主自行播放音訊時，可用 silent 只驅動嘴型。
+  audioOutput?: OpenVmanAvatarAudioOutput;
   characterId?: string;
   container?: HTMLElement;
   height?: string;

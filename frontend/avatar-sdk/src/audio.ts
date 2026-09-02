@@ -1,5 +1,6 @@
 import { OpenVmanAvatarError } from "./errors";
 import type { AvatarRuntime } from "./runtime";
+import type { OpenVmanAvatarAudioOutput } from "./types";
 
 const PCM_SAMPLE_RATE = 16000;
 const PCM_CHUNK_SAMPLES = 4096;
@@ -7,6 +8,7 @@ const PCM_CHUNK_SAMPLES = 4096;
 export class AvatarAudio {
   private context: AudioContext | null = null;
   private destroyed = false;
+  private outputNode: AudioNode | null = null;
   private nextStartTime = 0;
   private playbackGeneration = 0;
   private settlePlayback: (() => void) | null = null;
@@ -16,6 +18,7 @@ export class AvatarAudio {
   constructor(
     private readonly runtime: AvatarRuntime,
     private readonly onSpeakingChange: (speaking: boolean) => void,
+    private readonly audioOutput: OpenVmanAvatarAudioOutput = "speaker",
   ) {}
 
   async prepare(): Promise<void> {
@@ -89,7 +92,7 @@ export class AvatarAudio {
     const playbackSource = context.createBufferSource();
     this.sources.add(playbackSource);
     playbackSource.buffer = buffer;
-    playbackSource.connect(context.destination);
+    playbackSource.connect(this.ensureOutputNode(context));
     let listener: (() => void) | null = null;
     const finish = () => {
       this.sources.delete(playbackSource);
@@ -135,6 +138,22 @@ export class AvatarAudio {
     this.interrupt();
     void this.context?.close();
     this.context = null;
+    this.outputNode = null;
+  }
+
+  // silent 模式仍讓 source 跑完整個排程（onended 才會觸發 speaking 結束），
+  // 只是經過 gain=0 不出聲；嘴型由 runtime 依 pushAudio 的節奏驅動。
+  private ensureOutputNode(context: AudioContext): AudioNode {
+    if (this.outputNode) return this.outputNode;
+    if (this.audioOutput === "silent") {
+      const mute = context.createGain();
+      mute.gain.value = 0;
+      mute.connect(context.destination);
+      this.outputNode = mute;
+    } else {
+      this.outputNode = context.destination;
+    }
+    return this.outputNode;
   }
 
   private ensureContext(): AudioContext {

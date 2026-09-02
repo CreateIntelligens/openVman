@@ -1,4 +1,4 @@
-export type MascotEngine = "2d" | "3d";
+export type MascotEngine = "2d" | "3d" | "video";
 export type MascotFit = "half" | "full";
 
 export interface MascotOption {
@@ -7,6 +7,8 @@ export interface MascotOption {
   engine: MascotEngine;
   modelUrl?: string;
   vrmUrl?: string;
+  // video 引擎：對應 avatar 角色 id，由 widget 透過 Avatar SDK 載入
+  characterId?: string;
   thumbnailUrl?: string;
   fit?: MascotFit;
   builtin?: boolean;
@@ -18,6 +20,7 @@ export interface MascotApiRecord {
   engine: MascotEngine;
   model_url: string;
   vrm_url: string;
+  character_id?: string;
   thumbnail_url?: string;
   fit: "" | MascotFit;
   builtin: boolean;
@@ -61,6 +64,7 @@ export function toMascotOption(record: MascotApiRecord): MascotOption {
     engine: record.engine,
     modelUrl: record.model_url || undefined,
     vrmUrl: record.vrm_url || undefined,
+    characterId: record.character_id || undefined,
     thumbnailUrl: record.thumbnail_url || undefined,
     fit: record.fit || undefined,
     builtin: record.builtin,
@@ -83,7 +87,10 @@ export function buildMascotWidgetSrc(
 ): string {
   const params = new URLSearchParams();
 
-  if (mascot.engine === "3d") {
+  if (mascot.engine === "video") {
+    if (mascot.characterId) params.set("character", mascot.characterId);
+    params.set("engine", "video");
+  } else if (mascot.engine === "3d") {
     if (mascot.vrmUrl) params.set("vrm", mascot.vrmUrl);
     params.set("engine", "3d");
   } else {

@@ -4,6 +4,7 @@ import {
   AvatarBackground,
   AvatarCharacter,
   AvatarMascot,
+  createAvatarMascotFromCharacter,
   deleteAvatarBackground,
   deleteAvatarCharacter,
   deleteAvatarMascot,
@@ -106,6 +107,15 @@ const MASCOT_FALLBACK_BACKGROUNDS: Record<AvatarMascot["engine"], string> = {
     "radial-gradient(circle at 50% 35%, #ecfccb 0 20%, transparent 21%)",
     "conic-gradient(from 160deg, #34d399, #22c55e, #0f766e, #34d399)",
   ].join(", "),
+  video: [
+    "radial-gradient(circle at 50% 36%, #fde68a 0 20%, transparent 21%)",
+    "linear-gradient(160deg, #fff7ed, #fed7aa)",
+  ].join(", "),
+};
+const MASCOT_ENGINE_ICON: Record<AvatarMascot["engine"], string> = {
+  "2d": "face",
+  "3d": "view_in_ar",
+  video: "videocam",
 };
 
 function errorMessage(error: unknown): string {
@@ -116,6 +126,14 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatMascotMetadata(mascot: AvatarMascot): string {
+  if (mascot.builtin) return "built-in";
+  if (mascot.engine === "video") {
+    return `video · ${mascot.character_id ?? ""}`;
+  }
+  return `${mascot.engine} · ${formatSize(mascot.size_bytes)}`;
 }
 
 function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {
@@ -206,6 +224,10 @@ export default function Avatar() {
   const [mascotUploading, setMascotUploading] = useState(false);
   const mascotModelRef = useRef<HTMLInputElement>(null);
   const mascotThumbnailRef = useRef<HTMLInputElement>(null);
+  const [videoMascotCharacterId, setVideoMascotCharacterId] = useState("");
+  const [videoMascotId, setVideoMascotId] = useState("");
+  const [videoMascotLabel, setVideoMascotLabel] = useState("");
+  const [videoMascotCreating, setVideoMascotCreating] = useState(false);
 
   const [snapshotQueue, setSnapshotQueue] = useState<string[]>([]);
   const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(null);
@@ -457,6 +479,36 @@ export default function Avatar() {
       setStatus({ type: "error", message: errorMessage(err) });
     } finally {
       setMascotUploading(false);
+    }
+  }
+
+  async function handleVideoMascotCreate(): Promise<void> {
+    const characterId = videoMascotCharacterId.trim();
+    const mascotId = videoMascotId.trim();
+    if (!characterId || !mascotId) {
+      setStatus({
+        type: "error",
+        message: "Select a video character and enter a mascot ID",
+      });
+      return;
+    }
+    setVideoMascotCreating(true);
+    setStatus(null);
+    try {
+      await createAvatarMascotFromCharacter({
+        mascotId,
+        label: videoMascotLabel.trim(),
+        characterId,
+      });
+      setVideoMascotCharacterId("");
+      setVideoMascotId("");
+      setVideoMascotLabel("");
+      setStatus({ type: "success", message: "Video mascot created" });
+      await loadMascots();
+    } catch (err) {
+      setStatus({ type: "error", message: errorMessage(err) });
+    } finally {
+      setVideoMascotCreating(false);
     }
   }
 
@@ -917,6 +969,51 @@ export default function Avatar() {
             </div>
           </div>
 
+          <div className={formPanelClassName}>
+            <p className="flex items-center gap-1 text-sm font-medium text-content-muted">
+              <span className="material-symbols-outlined text-base">videocam</span>
+              Use a video character as mascot
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={videoMascotCharacterId}
+                onChange={(e) => setVideoMascotCharacterId(e.target.value)}
+                aria-label="Video character"
+                className={inputClassName}
+              >
+                <option value="">Select video character</option>
+                {characters
+                  .filter((character) => character.has_video && character.has_data)
+                  .map((character) => (
+                    <option key={character.char_id} value={character.char_id}>
+                      {character.label} ({character.char_id})
+                    </option>
+                  ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Video mascot ID"
+                value={videoMascotId}
+                onChange={(e) => setVideoMascotId(e.target.value)}
+                className={inputClassName}
+              />
+              <input
+                type="text"
+                placeholder="Display name (optional)"
+                value={videoMascotLabel}
+                onChange={(e) => setVideoMascotLabel(e.target.value)}
+                className={inputClassName}
+              />
+              <button
+                onClick={handleVideoMascotCreate}
+                disabled={videoMascotCreating}
+                className="ml-auto rounded-md bg-primary px-4 py-1.5 text-sm text-content-inverse font-medium transition-colors hover:bg-primary-600 disabled:opacity-50 shadow-sm"
+              >
+                {videoMascotCreating ? "Creating…" : "Create mascot"}
+              </button>
+            </div>
+          </div>
+
           {mascotsLoading && (
             <p className="text-sm text-content-muted">Loading…</p>
           )}
@@ -949,7 +1046,7 @@ export default function Avatar() {
                           aria-hidden="true"
                           className="material-symbols-outlined text-4xl text-white drop-shadow-md"
                         >
-                          {mascot.engine === "3d" ? "view_in_ar" : "face"}
+                          {MASCOT_ENGINE_ICON[mascot.engine]}
                         </span>
                       )}
                     </div>
@@ -961,7 +1058,7 @@ export default function Avatar() {
                         {mascot.label}
                       </p>
                       <p className="text-xs uppercase text-content-subtle">
-                        {mascot.builtin ? "built-in" : `${mascot.engine} · ${formatSize(mascot.size_bytes)}`}
+                        {formatMascotMetadata(mascot)}
                       </p>
                     </div>
                     <div className={cardActionsClassName}>

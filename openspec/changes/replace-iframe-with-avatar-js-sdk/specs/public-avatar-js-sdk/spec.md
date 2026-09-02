@@ -74,6 +74,11 @@ Instance SHALL 提供 `playAudio(source)` 與 `interrupt()`。`playAudio()` SHAL
 - **WHEN** 虛擬人播放中呼叫 `avatar.interrupt()`
 - **THEN** 目前音訊立即停止且 runtime speaking state 被清除
 
+#### Scenario: 宿主自行播放音訊
+- **WHEN** 呼叫端以 `audioOutput: "silent"` 初始化後呼叫 `playAudio()` 或 `pushPcm()`
+- **THEN** SDK 依音訊時間軸驅動嘴型與 speaking 事件
+- **AND** SDK 不將訊號輸出至喇叭
+
 ### Requirement: 宿主 PCM 串流 API
 Instance SHALL 提供 `pushPcm(chunk)`，接受 16 kHz、mono、16-bit signed PCM `Int16Array`。連續 chunks SHALL 依序無縫播放並依相同順序推送至 avatar runtime；SDK SHALL NOT 將 chunks 上傳至任何 backend。
 

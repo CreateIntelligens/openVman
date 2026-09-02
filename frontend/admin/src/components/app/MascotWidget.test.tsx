@@ -78,4 +78,43 @@ describe("MascotWidget", () => {
       screen.queryByTitle("AI 虛擬人小助理"),
     ).toBeNull();
   });
+
+  it("keeps the iframe mounted but hidden after closing so reopening is instant", () => {
+    window.localStorage.setItem("admin-mascot-open", "1");
+
+    render(
+      <MascotProvider>
+        <MascotWidget />
+      </MascotProvider>,
+    );
+
+    const frame = screen.getByTitle("AI 虛擬人小助理");
+    // 關閉鍵在 widget iframe 內，透過 postMessage 通知宿主
+    fireEvent(window, new MessageEvent("message", {
+      data: { ns: "avatar-widget", type: "close" },
+    }));
+
+    expect(screen.getByTitle("AI 虛擬人小助理")).toBe(frame);
+    expect(frame.closest(".mascot-widget")?.hasAttribute("hidden")).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "打開 AI 虛擬人小助理" }),
+    ).not.toBeNull();
+  });
+
+  it("builds a video mascot source from the character id", () => {
+    window.localStorage.setItem("admin-mascot-open", "1");
+    window.localStorage.setItem("avatar.mascot_id", "matex-000");
+
+    render(
+      <MascotProvider initialOptions={[
+        { id: "matex-000", label: "Matex", engine: "video", characterId: "000" },
+      ]}>
+        <MascotWidget />
+      </MascotProvider>,
+    );
+
+    const src = screen.getByTitle("AI 虛擬人小助理").getAttribute("src") ?? "";
+    expect(src).toContain("engine=video");
+    expect(src).toContain("character=000");
+  });
 });

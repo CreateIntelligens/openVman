@@ -1,4 +1,7 @@
-"""Filesystem-backed store for right-corner mascot VRM assets."""
+"""Filesystem-backed store for right-corner mascot assets.
+
+Mascots can use an uploaded VRM or reference an existing video character.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +19,8 @@ from app.avatar.mascot_validation import extract_vrm_thumbnail, normalize_mascot
 MODEL_FILENAME = "model.vrm"
 THUMBNAIL_FILENAME = "thumbnail.png"
 META_FILENAME = "meta.json"
+# 影片型小助理沒有模型檔，只在 meta.json 記錄引擎與對應的 avatar 角色 id。
+VIDEO_ENGINE = "video"
 logger = logging.getLogger("backend.mascots")
 
 BUILTIN_MASCOTS: tuple[dict[str, Any], ...] = (
@@ -25,6 +30,7 @@ BUILTIN_MASCOTS: tuple[dict[str, Any], ...] = (
         "engine": "2d",
         "model_url": "https://cdn.jsdelivr.net/gh/guansss/pixi-live2d-display/test/assets/haru/haru_greeter_t03.model3.json",
         "vrm_url": "",
+        "character_id": "",
         "thumbnail_url": "",
         "fit": "half",
         "builtin": True,
@@ -37,6 +43,7 @@ BUILTIN_MASCOTS: tuple[dict[str, Any], ...] = (
         "engine": "3d",
         "model_url": "",
         "vrm_url": "/mascots/qqman/model.vrm",
+        "character_id": "",
         "thumbnail_url": "",
         "fit": "",
         "builtin": True,
@@ -49,6 +56,7 @@ BUILTIN_MASCOTS: tuple[dict[str, Any], ...] = (
         "engine": "3d",
         "model_url": "",
         "vrm_url": "https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm",
+        "character_id": "",
         "thumbnail_url": "",
         "fit": "",
         "builtin": True,
@@ -139,6 +147,43 @@ class MascotStore:
             raise
         return self._summary(target)
 
+    def create_video_mascot(
+        self,
+        *,
+        mascot_id: str,
+        label: str,
+        character_id: str,
+    ) -> dict[str, Any]:
+        """Register an existing video avatar character as a mascot.
+
+        The character assets stay in the avatar store; the mascot directory only
+        carries meta.json so listing, renaming, and thumbnails work the same way
+        as uploaded VRM mascots.
+        """
+        mid = normalize_mascot_id(mascot_id)
+        target = self._dir(mid)
+        if mid in _BUILTIN_IDS or target.exists():
+            raise MascotExists(f"吉祥物已存在：{mid}")
+
+        tmp = Path(tempfile.mkdtemp(dir=self._base, prefix=f".{mid}.tmp."))
+        try:
+            now = _now()
+            self._write_meta(
+                tmp,
+                {
+                    "label": label.strip() or mid,
+                    "engine": VIDEO_ENGINE,
+                    "character_id": character_id,
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+            os.rename(tmp, target)
+        except Exception:
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise
+        return self._summary(target)
+
     def delete_mascot(self, mascot_id: str) -> None:
         mid = normalize_mascot_id(mascot_id)
         path = self._dir(mid)
@@ -181,13 +226,23 @@ class MascotStore:
 
         self._ensure_thumbnail(path, model, thumb)
 
+        is_video = meta.get("engine") == VIDEO_ENGINE
         return {
             "mascot_id": path.name,
             "label": meta.get("label", path.name),
-            "engine": "3d",
+            "engine": VIDEO_ENGINE if is_video else "3d",
             "model_url": "",
-            "vrm_url": f"{self._url_prefix}/{path.name}/{MODEL_FILENAME}",
-            "thumbnail_url": f"{self._url_prefix}/{path.name}/{THUMBNAIL_FILENAME}" if thumb.exists() else "",
+            "vrm_url": (
+                ""
+                if is_video
+                else f"{self._url_prefix}/{path.name}/{MODEL_FILENAME}"
+            ),
+            "character_id": str(meta.get("character_id", "")) if is_video else "",
+            "thumbnail_url": (
+                f"{self._url_prefix}/{path.name}/{THUMBNAIL_FILENAME}"
+                if thumb.exists()
+                else ""
+            ),
             "fit": "",
             "builtin": False,
             "size_bytes": model.stat().st_size if model.exists() else 0,

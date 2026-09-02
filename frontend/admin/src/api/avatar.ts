@@ -46,9 +46,10 @@ export interface AvatarBackgroundMutationResponse {
 export interface AvatarMascot {
   mascot_id: string;
   label: string;
-  engine: "2d" | "3d";
+  engine: "2d" | "3d" | "video";
   model_url: string;
   vrm_url: string;
+  character_id?: string;
   thumbnail_url?: string;
   fit: "" | "half" | "full";
   builtin: boolean;
@@ -195,6 +196,29 @@ export async function uploadAvatarMascot(
     method: "POST",
     body: form,
   });
+}
+
+export interface CreateVideoMascotArgs {
+  mascotId: string;
+  label: string;
+  characterId: string;
+}
+
+export async function createAvatarMascotFromCharacter(
+  args: CreateVideoMascotArgs,
+): Promise<AvatarMascotMutationResponse> {
+  return fetchJson<AvatarMascotMutationResponse>(
+    apiUrl(`${AVATAR_MASCOTS_PATH}/from-character`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mascot_id: args.mascotId,
+        label: args.label,
+        character_id: args.characterId,
+      }),
+    },
+  );
 }
 
 export async function deleteAvatarMascot(

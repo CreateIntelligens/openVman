@@ -78,3 +78,40 @@ def test_delete_uploaded_mascot(store):
 def test_delete_builtin_raises(store):
     with pytest.raises(MascotNotFound):
         store.delete_mascot("qqman")
+
+
+def test_create_video_mascot_from_character(store):
+    mascot = store.create_video_mascot(
+        mascot_id="matex-000",
+        label="影片小助理",
+        character_id="000",
+    )
+
+    assert mascot["mascot_id"] == "matex-000"
+    assert mascot["engine"] == "video"
+    assert mascot["character_id"] == "000"
+    assert mascot["vrm_url"] == ""
+    assert mascot["builtin"] is False
+    assert mascot["size_bytes"] == 0
+
+    listed = store.list_mascots()[-1]
+    assert listed["engine"] == "video"
+    assert listed["character_id"] == "000"
+
+
+def test_video_mascot_rename_and_delete(store):
+    store.create_video_mascot(mascot_id="matex-000", label="影片", character_id="000")
+
+    renamed = store.update_label("matex-000", "改名")
+    assert renamed["label"] == "改名"
+    assert renamed["engine"] == "video"
+
+    store.delete_mascot("matex-000")
+    assert all(m["mascot_id"] != "matex-000" for m in store.list_mascots())
+
+
+def test_video_mascot_id_conflicts_with_vrm_mascot(store):
+    _make_mascot(store)
+
+    with pytest.raises(MascotExists):
+        store.create_video_mascot(mascot_id="custom", label="x", character_id="000")
