@@ -46,7 +46,7 @@ function SkillSection({
 }: SkillSectionProps) {
   return (
     <section>
-      <h3 className="text-sm font-bold uppercase tracking-widest text-content-subtle px-1 mb-4 flex items-center gap-2">
+      <h3 className="section-title px-1 mb-4 flex items-center gap-2">
         <span className="material-symbols-outlined text-base">{icon}</span>
         {title}
         <span className="text-xs font-mono text-content-subtle">({skills.length})</span>
@@ -177,7 +177,7 @@ export default function Tools() {
     <div className="page-scroll">
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
         <div>
-          <h2 className="page-title">工具與技能</h2>
+          <h1 className="page-title">工具與技能</h1>
           <p className="page-subtitle">
             管理技能插件及查看已註冊工具
           </p>
@@ -242,7 +242,7 @@ export default function Tools() {
         )}
 
         <section>
-          <h3 className="text-sm font-bold uppercase tracking-widest text-content-subtle px-1 mb-4 flex items-center gap-2">
+          <h3 className="section-title px-1 mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-base">settings</span>
             內建工具
             <span className="text-xs font-mono text-content-subtle">({tools.length})</span>
@@ -253,7 +253,7 @@ export default function Tools() {
 
         {skillTools.length > 0 && (
           <section>
-            <h3 className="text-sm font-bold uppercase tracking-widest text-content-subtle px-1 mb-4 flex items-center gap-2">
+            <h3 className="section-title px-1 mb-4 flex items-center gap-2">
               <span className="material-symbols-outlined text-base">extension</span>
               技能工具
               <span className="text-xs font-mono text-content-subtle">({skillTools.length})</span>

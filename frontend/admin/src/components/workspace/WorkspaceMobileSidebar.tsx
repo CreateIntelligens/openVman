@@ -36,7 +36,7 @@ export default function WorkspaceMobileSidebar({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-5 border-b border-border flex items-center justify-between shrink-0 bg-surface dark:bg-surface-sunken/20">
-          <h2 className="text-sm font-bold tracking-widest uppercase text-content-muted">Workspace</h2>
+          <h2 className="section-title">工作區</h2>
           <button
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded text-content-muted hover:bg-surface-sunken hover:text-content transition-colors"

@@ -28,7 +28,7 @@ export default function Projects() {
     <div className="page-scroll">
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10 transition-colors">
         <div>
-          <h2 className="page-title">Projects</h2>
+          <h1 className="page-title">專案管理</h1>
           <p className="page-subtitle">
             管理多專案隔離，每個專案有獨立的 knowledge、persona、memory 空間。
           </p>
@@ -46,7 +46,7 @@ export default function Projects() {
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-content-subtle">
               New Project
             </p>
-            <h3 className="mt-2 text-lg font-bold text-content ">建立新專案</h3>
+            <h3 className="card-title mt-2">建立新專案</h3>
             <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
               <div className="flex-1">
                 <label className="mb-1 block text-xs text-content-muted">專案名稱</label>
@@ -90,7 +90,7 @@ export default function Projects() {
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-content-subtle">
                 All Projects
               </p>
-              <h3 className="mt-2 text-lg font-bold text-content ">專案列表</h3>
+              <h3 className="card-title mt-2">專案列表</h3>
             </div>
             <button
               onClick={() => void loadProjects()}
@@ -109,7 +109,7 @@ export default function Projects() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h4 className="text-base font-bold text-content truncate">
+                    <h4 className="card-title truncate">
                       {project.label}
                     </h4>
                     <p className="mt-1 text-xs text-content-subtle font-mono">

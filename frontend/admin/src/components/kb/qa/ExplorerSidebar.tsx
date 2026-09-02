@@ -375,7 +375,7 @@ export default function ExplorerSidebar({
       <div className="p-4 flex flex-col gap-2 shrink-0 border-b border-border">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <h3 className="text-sm font-semibold text-content truncate">問答知識節點</h3>
+            <h3 className="card-title truncate">問答知識節點</h3>
             {loading && (
               <span className="material-symbols-outlined text-[1rem] text-content-subtle animate-spin shrink-0">
                 sync

@@ -140,7 +140,7 @@ describe("App tab mounting", () => {
     render(<App />);
 
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
-    fireEvent.click(screen.getAllByRole("button", { name: /Chat/ })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /對話$/ })[0]);
 
     expect(await screen.findByTestId("tab-chat")).toBeTruthy();
     expect(window.location.pathname).toBe("/admin/chat");
@@ -244,7 +244,7 @@ describe("App tab mounting", () => {
 
     expect(await screen.findByTestId("tab-accounts")).toBeTruthy();
     expect(
-      screen.getAllByRole("button", { name: /Accounts/ }).length,
+      screen.getAllByRole("button", { name: /帳號管理/ }).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText("權限不足")).toBeNull();
   });

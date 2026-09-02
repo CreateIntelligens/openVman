@@ -9,7 +9,7 @@ interface MaintenancePanelProps {
 export default function MaintenancePanel({ maintaining, result, onRun }: MaintenancePanelProps) {
   return (
     <div className="bg-surface dark:bg-surface-overlay/50 rounded-xl p-6 border border-border">
-      <h3 className="text-content font-bold mb-2 flex items-center gap-2">
+      <h3 className="card-title mb-2 flex items-center gap-2">
         <span className="material-symbols-outlined text-primary">build</span>
         記憶維護
       </h3>

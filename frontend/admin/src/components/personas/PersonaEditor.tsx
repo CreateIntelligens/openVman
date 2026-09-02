@@ -48,7 +48,7 @@ export default function PersonaEditor({
               <span className="material-symbols-outlined text-[1.25rem]">psychology</span>
             </div>
             <div>
-              <h3 className="text-[1.25rem] font-semibold text-content leading-tight tracking-tight mb-0.5">
+              <h3 className="card-title leading-tight tracking-tight mb-0.5">
                 {title}
               </h3>
               <div className="flex items-center gap-2">

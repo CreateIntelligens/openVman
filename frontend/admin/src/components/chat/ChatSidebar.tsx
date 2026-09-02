@@ -54,7 +54,7 @@ export default function ChatSidebar({
         className="absolute left-0 top-0 flex h-full w-[20rem] flex-col border-r border-border shadow-lg"
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-          <h2 className="text-sm font-semibold text-content">對話</h2>
+          <h2 className="card-title">對話</h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => {

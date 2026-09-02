@@ -127,7 +127,7 @@ export default function Memory() {
       <header className="sticky top-0 z-10 px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="page-title">記憶管理</h2>
+            <h1 className="page-title">記憶管理</h1>
             <p className="page-subtitle">
               瀏覽、新增並管理精選記憶紀錄。
             </p>

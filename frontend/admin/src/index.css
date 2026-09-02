@@ -181,6 +181,18 @@ body {
     font-size: 0.875rem;
     color: rgb(var(--color-content-muted));
   }
+  .section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgb(var(--color-content-subtle));
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: rgb(var(--color-content));
+  }
 }
 
 .page-scroll::-webkit-scrollbar {

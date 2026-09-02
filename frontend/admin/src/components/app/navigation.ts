@@ -5,25 +5,25 @@ import {
 } from "react";
 
 export const workspaceTabs = [
-  { key: "Chat", label: "Chat", icon: "chat" },
-  { key: "Sessions", label: "Sessions", icon: "forum" },
-  { key: "Search", label: "Search", icon: "search" },
-  { key: "Workspace", label: "Workspace", icon: "folder_managed" },
+  { key: "Chat", label: "對話", icon: "chat" },
+  { key: "Sessions", label: "對話紀錄", icon: "forum" },
+  { key: "Search", label: "知識庫搜尋", icon: "search" },
+  { key: "Workspace", label: "工作區", icon: "folder_managed" },
 ] as const;
 
 export const knowledgeTabs = [
-  { key: "KnowledgeBase", label: "Knowledge", icon: "school" },
-  { key: "Memory", label: "Memory", icon: "memory" },
-  { key: "Personas", label: "Personas", icon: "groups" },
+  { key: "KnowledgeBase", label: "知識庫", icon: "school" },
+  { key: "Memory", label: "記憶管理", icon: "memory" },
+  { key: "Personas", label: "角色管理", icon: "groups" },
   { key: "Avatar", label: "Avatar", icon: "face" },
-  { key: "Tools", label: "Tools", icon: "build" },
+  { key: "Tools", label: "工具與技能", icon: "build" },
 ] as const;
 
 export const systemTabs = [
-  { key: "Projects", label: "Projects", icon: "folder_copy" },
-  { key: "Accounts", label: "Accounts", icon: "manage_accounts" },
-  { key: "Health", label: "Health", icon: "health_metrics" },
-  { key: "Monitoring", label: "Monitoring", icon: "monitoring" },
+  { key: "Projects", label: "專案管理", icon: "folder_copy" },
+  { key: "Accounts", label: "帳號管理", icon: "manage_accounts" },
+  { key: "Health", label: "系統健康", icon: "health_metrics" },
+  { key: "Monitoring", label: "系統監控", icon: "monitoring" },
 ] as const;
 
 export const tabGroups = [

@@ -141,7 +141,7 @@ export default function ManualQaModal({
       <div className="w-full max-w-3xl max-h-[85%] flex flex-col rounded-2xl border border-border bg-surface-raised p-6 shadow-2xl outline-none transition-all">
         <div className="flex items-start justify-between gap-3 shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-content ">手動輸入問答</h3>
+            <h3 className="card-title">手動輸入問答</h3>
             <p className="mt-1 text-xs text-content-muted">
               節點：<span className="font-semibold text-content-muted">{node.label}</span>（{nodeId}）
             </p>

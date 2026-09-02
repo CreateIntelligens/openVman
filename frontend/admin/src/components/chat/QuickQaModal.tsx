@@ -74,7 +74,7 @@ export default function QuickQaModal({ open, onClose, onSelectQuestion }: QuickQ
             ) : (
               <span className="material-symbols-outlined text-primary text-[1.25rem]">help_center</span>
             )}
-            <h3 className="text-base font-semibold text-content">{currentTitle}</h3>
+            <h3 className="card-title">{currentTitle}</h3>
           </div>
           <button
             type="button"

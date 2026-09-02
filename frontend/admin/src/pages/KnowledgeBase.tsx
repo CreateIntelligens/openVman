@@ -697,7 +697,7 @@ export default function KnowledgeBase() {
             </span>
           </button>
           <span className="material-symbols-outlined text-primary text-[1.5rem]">school</span>
-          <h1 className="text-lg font-bold text-content ">知識庫</h1>
+          <h1 className="page-title">知識庫</h1>
           <span className="hidden text-xs text-content-subtle lg:inline">{documents.length} 文件 · {indexedCount} 已索引</span>
           <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-surface-sunken p-0.5 dark:bg-surface-sunken/40 sm:ml-3">
             <button

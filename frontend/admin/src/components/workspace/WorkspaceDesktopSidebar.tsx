@@ -36,7 +36,7 @@ export default function WorkspaceDesktopSidebar({
   return (
     <aside className="w-[17.5rem] lg:w-[20rem] flex-shrink-0 border-r border-border bg-surface-raised dark:bg-surface/30 hidden md:flex flex-col">
       <div className="px-5 py-5 border-b border-border flex items-center justify-between shrink-0 bg-surface dark:bg-surface-sunken/20">
-        <h2 className="text-sm font-bold tracking-widest uppercase text-content-muted">Workspace</h2>
+        <h1 className="page-title">工作區</h1>
         <div className="flex items-center gap-1">
           <button
             onClick={onRefresh}

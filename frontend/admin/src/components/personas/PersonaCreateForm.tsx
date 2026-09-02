@@ -28,7 +28,7 @@ export default function PersonaCreateForm({
 }: PersonaCreateFormProps) {
   return (
     <div className="rounded-md border border-border bg-surface dark:bg-surface-sunken/20 p-4 space-y-4">
-      <h3 className="text-[0.75rem] font-semibold text-content-muted flex items-center gap-1.5">新增角色</h3>
+      <h3 className="section-title flex items-center gap-1.5">新增角色</h3>
       <div className="space-y-3">
         <input
           value={newPersonaId}

@@ -88,7 +88,7 @@ export default function Search() {
     <div className="page-scroll">
       {/* Header */}
       <header className="sticky top-0 z-10 px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10">
-        <h2 className="page-title">知識庫搜尋</h2>
+        <h1 className="page-title">知識庫搜尋</h1>
         <p className="page-subtitle">
           顯示 RAG 實際會參考的 chunk，並保留完全命中的文字線索。
         </p>
@@ -148,7 +148,7 @@ export default function Search() {
         {response && !response.error && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-border pb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2 text-content ">
+              <h3 className="card-title flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">analytics</span>
                 搜尋結果
               </h3>

@@ -94,7 +94,7 @@ export default function AccountRoleDialog({
         aria-labelledby="role-change-title"
       >
         <header className="border-b border-border px-6 py-5">
-          <h2 id="role-change-title" className="text-lg font-semibold">
+          <h2 id="role-change-title" className="card-title">
             變更角色
           </h2>
           <p className="mt-2 text-sm leading-6 text-content-muted">

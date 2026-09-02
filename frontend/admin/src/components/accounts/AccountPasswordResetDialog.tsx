@@ -64,7 +64,7 @@ export default function AccountPasswordResetDialog({
         aria-modal="true"
         aria-labelledby="password-reset-title"
       >
-        <h2 id="password-reset-title" className="text-lg font-semibold">
+        <h2 id="password-reset-title" className="card-title">
           重設 {account.username} 的密碼
         </h2>
         <p className="mt-2 text-sm leading-6 text-content-muted">

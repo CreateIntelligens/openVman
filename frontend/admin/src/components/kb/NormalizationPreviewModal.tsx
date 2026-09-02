@@ -28,7 +28,7 @@ export default function NormalizationPreviewModal({
       <div className="flex max-h-[86dvh] w-[min(64rem,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-2xl ">
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 ">
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-content ">整理預覽</h3>
+            <h3 className="card-title">整理預覽</h3>
             <p className="mt-1 truncate text-xs text-content-muted">{path}</p>
           </div>
           <button

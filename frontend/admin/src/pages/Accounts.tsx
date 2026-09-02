@@ -168,7 +168,7 @@ export default function Accounts() {
         <section className="card mb-6 overflow-hidden">
           <header className="border-b border-border px-5 py-4">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold">新增正式帳號</h2>
+              <h2 className="card-title">新增正式帳號</h2>
               <span className="chip">1 帳號資料</span>
               <span className="chip">2 資源權限</span>
             </div>
@@ -222,7 +222,7 @@ export default function Accounts() {
             {role === "user" ? (
               <section className="border-t border-border" aria-labelledby="new-account-access-title">
                 <div className="px-5 py-4">
-                  <h3 id="new-account-access-title" className="font-semibold">資源權限</h3>
+                  <h3 id="new-account-access-title" className="card-title">資源權限</h3>
                   <p className="mt-1 text-xs text-content-muted">
                     每一類至少選一項；預設值只能從已授權的項目中指定。
                   </p>
@@ -260,7 +260,7 @@ export default function Accounts() {
 
         <section className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="text-base font-semibold">正式帳號列表</h2>
+            <h2 className="card-title">正式帳號列表</h2>
             <button className="btn btn-ghost" type="button" onClick={() => void reload()} disabled={loading}>
               重新整理
             </button>

@@ -65,7 +65,7 @@ export default function PromptModal({
         onSubmit={handleSubmit}
         className="w-full max-w-md rounded-2xl border border-border bg-surface-raised p-6 shadow-2xl outline-none transition-all"
       >
-        <h3 className="text-lg font-bold text-content ">{title}</h3>
+        <h3 className="card-title">{title}</h3>
         <div className="mt-4 space-y-4">
           {fields.map((field, index) => (
             <div key={field.key} className="space-y-1">

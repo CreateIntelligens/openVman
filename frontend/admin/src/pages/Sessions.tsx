@@ -83,7 +83,7 @@ export default function Sessions() {
     <div className="page-scroll">
       <header className="sticky top-0 z-10 flex items-start justify-between gap-4 px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-border dark:border-primary/10">
         <div className="min-w-0">
-          <h2 className="page-title">對話紀錄</h2>
+          <h1 className="page-title">對話紀錄</h1>
           <p className="page-subtitle">
             瀏覽、篩選並匯出歷史對話。時間區間可精確到秒。
           </p>

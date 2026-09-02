@@ -253,10 +253,10 @@ export default function Personas() {
                             {/* Sidebar Header */}
                             <div className="px-5 py-5 border-b border-border flex items-center justify-between shrink-0 bg-surface dark:bg-surface-sunken/20">
                                    <div className="flex items-center gap-2.5">
-                                          <div className="w-6 h-6 rounded flex items-center justify-center bg-surface-sunken text-content-muted">
-                                                 <span className="material-symbols-outlined text-[0.875rem]">groups_2</span>
+                                          <div className="w-8 h-8 rounded flex items-center justify-center bg-surface-sunken text-content-muted">
+                                                 <span className="material-symbols-outlined text-[1.25rem]">groups_2</span>
                                           </div>
-                                          <h2 className="text-[0.8125rem] font-semibold tracking-wide text-content">角色管理</h2>
+                                          <h1 className="page-title">角色管理</h1>
                                    </div>
                                    <button
                                           onClick={() => loadPersonas(selectedPersona?.persona_id)}

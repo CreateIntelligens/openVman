@@ -1,7 +1,7 @@
 export default function MemoryGuidelinesPanel() {
   return (
     <div className="bg-surface dark:bg-surface-overlay/50 rounded-xl p-6 border border-border">
-      <h3 className="text-content font-bold mb-4 flex items-center gap-2">
+      <h3 className="card-title mb-4 flex items-center gap-2">
         <span className="material-symbols-outlined text-primary">info</span>
         記憶指南
       </h3>

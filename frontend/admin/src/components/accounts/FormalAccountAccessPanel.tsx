@@ -63,7 +63,7 @@ export default function FormalAccountAccessPanel({
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold">可用資源</h3>
+          <h3 className="card-title">可用資源</h3>
           <p className="mt-1 text-xs text-content-muted">
             此帳號只能讀取勾選項目與自己建立的私有資源；儲存後立即生效。
           </p>

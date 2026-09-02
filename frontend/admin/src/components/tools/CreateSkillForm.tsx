@@ -65,7 +65,7 @@ export default function CreateSkillForm({ onCreated }: CreateSkillFormProps) {
   return (
     <div className="bg-surface-sunken dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-bold text-content">新增技能</h4>
+        <h4 className="card-title">新增技能</h4>
         <button
           onClick={() => {
             reset();

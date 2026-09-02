@@ -76,7 +76,7 @@ export default function ConfirmModal({
       }}
       className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-border bg-surface-overlay p-6 text-content shadow-2xl"
     >
-      <h2 id={titleId} className="text-lg font-semibold">
+      <h2 id={titleId} className="card-title">
         {title}
       </h2>
       <p

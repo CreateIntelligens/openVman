@@ -19,7 +19,7 @@ export default function Health() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
         <div>
-          <h2 className="page-title">System Health</h2>
+          <h1 className="page-title">系統健康</h1>
           <p className="page-subtitle">Real-time status of your brain infrastructure</p>
         </div>
         <div className="flex items-center gap-4">
@@ -109,13 +109,13 @@ export default function Health() {
         {/* Metrics */}
         {metrics && (metrics.counter_count > 0 || metrics.timing_count > 0) && (
           <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-content-subtle px-1">
+            <h3 className="section-title px-1">
               Runtime Metrics
             </h3>
 
             {metrics.counter_count > 0 && (
               <div className="bg-surface-raised dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-6">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-content-muted mb-4">Counters</h4>
+                <h4 className="section-title mb-4">Counters</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Object.entries(metrics.counters)
                     .sort(([, a], [, b]) => b - a)
@@ -131,7 +131,7 @@ export default function Health() {
 
             {metrics.timing_count > 0 && (
               <div className="bg-surface-raised dark:bg-surface-sunken/40 border border-primary/10 rounded-xl p-6">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-content-muted mb-4">Timings</h4>
+                <h4 className="section-title mb-4">Timings</h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -214,7 +214,7 @@ function InfoCard({ icon, label, value, detail, status = "ok" }: {
           {badgeConfig.text}
         </span>
       </div>
-      <h4 className="text-content-muted text-xs font-bold uppercase tracking-widest mb-1">{label}</h4>
+      <h4 className="section-title mb-1">{label}</h4>
       <p className="text-xl font-bold truncate" title={value}>{value}</p>
       {detail && <p className="mt-2 text-[0.625rem] text-content-subtle truncate" title={detail}>{detail}</p>}
     </div>

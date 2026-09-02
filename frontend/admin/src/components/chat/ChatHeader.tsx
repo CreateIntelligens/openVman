@@ -28,7 +28,7 @@ export default function ChatHeader({
       </button>
 
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-sm font-semibold text-content">{conversationTitle}</h2>
+        <h2 className="card-title truncate">{conversationTitle}</h2>
         <p className="truncate text-xs text-content-subtle">{conversationStatus}</p>
       </div>
 

@@ -261,6 +261,8 @@ export default function Chat() {
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-surface">
+      {/* 視覺上以動態對話標題（ChatHeader）取代固定頁名，此標題僅供 a11y 使用 */}
+      <h1 className="page-title sr-only">對話</h1>
       <ChatSidebar
         open={sessionsOpen}
         onClose={() => setSessionsOpen(false)}
@@ -356,7 +358,7 @@ export default function Chat() {
                   <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/15 text-primary">
                     <span className="material-symbols-outlined text-[1.75rem]">psychology</span>
                   </div>
-                  <h1 className="mb-2 text-2xl font-semibold text-content">今天我能幫你什麼？</h1>
+                  <h2 className="mb-2 text-2xl font-semibold text-content">今天我能幫你什麼？</h2>
                   <p className="text-sm leading-relaxed text-content-muted">
                     我是你的智慧助手,基於{" "}
                     <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.8125rem] text-content">

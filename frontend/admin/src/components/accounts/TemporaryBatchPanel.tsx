@@ -166,7 +166,7 @@ export default function TemporaryBatchPanel() {
       <header className="flex flex-col gap-3 border-b border-border px-5 py-4 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold">臨時帳號批次</h2>
+            <h2 className="card-title">臨時帳號批次</h2>
             <span className="chip">每批固定 5 組</span>
           </div>
           <p className="mt-1 text-sm text-content-muted">
@@ -197,7 +197,7 @@ export default function TemporaryBatchPanel() {
         <section className="border-t border-border px-5 py-5" aria-labelledby="temporary-result-title">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h3 id="temporary-result-title" className="font-semibold">本次臨時密碼</h3>
+              <h3 id="temporary-result-title" className="card-title">本次臨時密碼</h3>
             </div>
             <button
               className="btn btn-ghost self-start"
@@ -230,7 +230,7 @@ export default function TemporaryBatchPanel() {
 
       <section className="border-t border-border" aria-labelledby="temporary-history-title">
         <div className="px-5 py-4">
-          <h3 id="temporary-history-title" className="font-semibold">批次紀錄</h3>
+          <h3 id="temporary-history-title" className="card-title">批次紀錄</h3>
         </div>
         <div className="divide-y divide-border border-t border-border">
           {batches.map((batch) => {
