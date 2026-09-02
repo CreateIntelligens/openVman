@@ -12,12 +12,13 @@ from time import monotonic
 
 import anydoc
 import httpx
-from fastapi import FastAPI, File, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.auth.middleware import FailClosedAuthMiddleware
+from app.auth.dependencies import CurrentAccount, get_current_account
 from app.auth.routes import auth_router, temporary_accounts_router, users_router
 from app.auth.runtime import get_auth_runtime
 from app.brain_proxy import _http as _brain_proxy_http
@@ -358,21 +359,32 @@ class SpeechRequest(BaseModel):
     speed: float = 1.0
 
 @app.post("/v1/audio/speech", tags=["TTS"], summary="文字轉語音")
-async def create_speech(body: SpeechRequest) -> Response:
+async def create_speech(
+    body: SpeechRequest,
+    current: CurrentAccount = Depends(get_current_account),
+) -> Response:
     cfg = get_tts_config()
+    authorized = admin_routes.resolve_tts_voice(
+        current,
+        get_auth_runtime(),
+        requested_provider=body.provider,
+        requested_voice=body.voice,
+    )
+    provider = authorized.provider if authorized else body.provider
+    voice = authorized.runtime_key if authorized else body.voice
     svc = _get_service()
     cleaned_text = (await prepare_tts_text_async(body.input)) or ""
-    request = SynthesizeRequest(text=cleaned_text, voice_hint=body.voice)
+    request = SynthesizeRequest(text=cleaned_text, voice_hint=voice)
     cache_key: str | None = None
 
     if cfg.tts_cache_enabled:
-        cache_key = make_cache_key(cleaned_text, body.voice, body.provider)
+        cache_key = make_cache_key(cleaned_text, voice, provider)
         cached = await cache_get(cache_key)
         if cached is not None:
             return _cached_speech_response(cached)
 
     try:
-        output = svc.synthesize(request, provider=body.provider)
+        output = svc.synthesize(request, provider=provider)
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 
@@ -451,23 +463,33 @@ async def _proxy_indextts_stream(
 
 
 @app.post("/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
-async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
+async def tts_stream_endpoint(
+    body: TtsStreamRequest,
+    current: CurrentAccount = Depends(get_current_account),
+) -> Response:
     cfg = get_tts_config()
+    authorized = admin_routes.resolve_tts_voice(
+        current,
+        get_auth_runtime(),
+        requested_provider=body.provider,
+        requested_voice=body.voice or body.character,
+    )
+    provider = authorized.provider if authorized else body.provider
+    character = authorized.runtime_key if authorized else (body.character or cfg.tts_indextts_default_character)
+    voice = authorized.runtime_key if authorized else body.voice
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
 
-    character = body.character or cfg.tts_indextts_default_character
-
     # Gemini TTS Console 支援 stream=true，邊生成邊吐 raw PCM（24000Hz），
     # 避免等整段合成完的高延遲。content-type 帶 rate 讓前端知道要重採樣。
-    if body.provider == "gemini-tts":
+    if provider == "gemini-tts":
         svc = _get_service()
         gemini = svc.gemini_adapter
         if gemini.enabled:
             try:
                 stream = await gemini.open_stream(
-                    SynthesizeRequest(text=cleaned, voice_hint=body.voice)
+                    SynthesizeRequest(text=cleaned, voice_hint=voice)
                 )
             except GeminiTTSHTTPError as exc:
                 return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
@@ -493,14 +515,15 @@ async def tts_stream_endpoint(body: TtsStreamRequest) -> Response:
     # 讓 Edge 用自身預設 voice（與 service.py fallback 的 replace(voice_hint="")一致）。
     edge = svc.edge_adapter
     if edge.enabled:
-        stream = edge.synthesize_stream(
-            SynthesizeRequest(text=cleaned, voice_hint="")
-        )
+        stream = edge.synthesize_stream(SynthesizeRequest(text=cleaned, voice_hint=voice))
         return StreamingResponse(stream, media_type="audio/mpeg")
 
     # Fallback (buffered): 其餘 provider 仍走 service chain 一次性回傳。
     try:
-        output = svc.synthesize(SynthesizeRequest(text=cleaned, voice_hint=character))
+        output = svc.synthesize(
+            SynthesizeRequest(text=cleaned, voice_hint=voice or character),
+            provider=provider,
+        )
     except RuntimeError as exc:
         return JSONResponse(status_code=502, content={"error": str(exc)})
 

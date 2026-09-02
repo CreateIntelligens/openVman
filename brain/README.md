@@ -12,6 +12,14 @@
 - 支援 2md 即時網路搜尋與 URL／文件讀取，服務順序為 `2md.aiurl.tw` → `2md.glsoft.ai` → `create360.ai`
 - 支援 David888 Wiki 長篇報告發布；回應只保留公開 `shareUrl`
 
+## Security boundaries
+
+- Brain 的 project data 路由由 Backend 先做 project resource authorization；dreaming、session export/delete、memory mutation 等寫入性操作需要更高權限。
+- `search_knowledge`、`search_memory` 與其他工具的回傳值一律視為不可信資料，不能授權另一個工具執行；`save_memory` 需要目前使用者明確要求記憶。
+- `main.py` 是 operator-managed skill source，不能透過技能檔案 API 上傳或替換。生產環境的 shared/project skill source 應維持唯讀並走 code review。
+- `read_web_page` 只接受可解析到公開網路位址的 HTTP(S) URL；private、loopback、link-local、reserved、multicast、unspecified 位址會被拒絕。
+- Embedding gateway 沒有設定 Bearer token 時會 fail closed；瀏覽器 CORS 必須由 `EMBEDDING_ALLOWED_ORIGINS` 明確列出 origin。
+
 ## 1. 系統目標
 
 `brain` 的角色不是單純聊天 API，而是：

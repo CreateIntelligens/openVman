@@ -87,9 +87,9 @@ def test_health_ready_metadata(monkeypatch):
     )
     reg.register("bge", MockHealthyProvider(spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
-    monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "")
+    monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "embedding-test-token")
 
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     response = client.get("/health/ready")
     assert response.status_code == 200
     data = response.json()
@@ -111,9 +111,9 @@ def test_health_ready_failure_on_warmup_error(monkeypatch):
     )
     reg.register("bge", MockFailingWarmupProvider(spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
-    monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "")
+    monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "embedding-test-token")
 
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     response = client.get("/health/ready")
     assert response.status_code == 503
     detail = response.json()["detail"]
@@ -184,6 +184,14 @@ def test_bearer_token_enforcement(monkeypatch):
     )
     assert res_valid_auth.status_code == 200
     assert len(res_valid_auth.json()["vectors"]) == 1
+
+
+def test_missing_bearer_configuration_fails_closed(monkeypatch):
+    monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "")
+    client = TestClient(embedding_app.app)
+    response = client.post("/embed", json={"texts": ["hello"]})
+    assert response.status_code == 503
+    assert "not configured" in response.json()["detail"]
 
 
 def test_bearer_token_ready_endpoint(monkeypatch):

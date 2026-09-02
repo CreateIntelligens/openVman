@@ -47,7 +47,7 @@ def runtime(tmp_path: Path) -> AuthRuntime:
         TTSRouterConfig(
             _env_file=None,
             env="dev",
-            session_jwt_secret="test-only-session-secret",
+        session_jwt_secret="test-only-session-secret-for-tests-32",
             auth_database_path=str(tmp_path / "accounts.db"),
         )
     )

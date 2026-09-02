@@ -1,16 +1,28 @@
+import re
 from typing import Any
-from tools.context import active_persona_id, active_project_id
+from tools.context import active_persona_id, active_project_id, active_user_message
 from .knowledge_tools import _search_tool
+
+_EXPLICIT_MEMORY_REQUEST = re.compile(
+    r"(?:記住|記得|記錄|紀錄|保存|保留|remember|memorize|save\s+this)",
+    re.IGNORECASE,
+)
 
 
 
 def _save_memory(args: dict[str, Any]) -> dict[str, Any]:
-    from memory.embedder import encode_text
-    from memory.memory import add_memory as store_memory
-
     content = str(args.get("content", "")).strip()
     if not content:
         raise ValueError("content 不可為空")
+    # A model must not be able to persist instructions merely because they
+    # appeared in retrieved knowledge or another tool result.  Only an
+    # explicit request in the current user turn authorizes this write.
+    if not _EXPLICIT_MEMORY_REQUEST.search(active_user_message.get()):
+        raise ValueError("只有使用者明確要求記憶時才能寫入長期記憶")
+    if len(content) > 2000:
+        raise ValueError("content 過長")
+    from memory.embedder import encode_text
+    from memory.memory import add_memory as store_memory
     vector = encode_text(content)
     store_memory(
         text=content,

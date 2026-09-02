@@ -74,18 +74,18 @@ def mock_registry(monkeypatch):
     )
     reg.register("bge", MockProvider(bge_spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
-    monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "")
+    monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "embedding-test-token")
 
 
 def test_health_liveness():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "embedding-service"}
 
 
 def test_v1_models_endpoint():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     response = client.get("/v1/models")
     assert response.status_code == 200
     data = response.json()
@@ -98,7 +98,7 @@ def test_v1_models_endpoint():
 
 
 def test_jtai_embed_endpoint():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     payload = {
         "texts": ["第一段文字測試", "第二段文字測試", "第三段文字測試"],
         "input_type": "document",
@@ -121,7 +121,7 @@ def test_jtai_embed_endpoint():
 
 
 def test_jtai_embed_empty_batch():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     response = client.post("/embed", json={"texts": [], "input_type": "query"})
     assert response.status_code == 200
     data = response.json()
@@ -131,19 +131,19 @@ def test_jtai_embed_empty_batch():
 
 
 def test_jtai_embed_empty_batch_invalid_identity():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     response = client.post("/embed", json={"texts": [], "identity": "invalid:identity:999"})
     assert response.status_code == 400
 
 
 def test_jtai_embed_invalid_payload():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     response = client.post("/embed", json={"input_type": "query"})
     assert response.status_code == 422
 
 
 def test_openai_embeddings_single_string():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     payload = {
         "input": "測試單一字串嵌入",
         "model": EXPECTED_BGE_MODEL,
@@ -161,7 +161,7 @@ def test_openai_embeddings_single_string():
 
 
 def test_openai_embeddings_rejects_unsupported_model():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     payload = {
         "input": "測試不支援的模型",
         "model": "not-the-served-model",
@@ -172,7 +172,7 @@ def test_openai_embeddings_rejects_unsupported_model():
 
 
 def test_openai_embeddings_batch_order_preservation():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     inputs = ["文字 A", "文字 B", "文字 C", "文字 D"]
     payload = {"input": inputs}
     response = client.post("/v1/embeddings", json=payload)
@@ -185,7 +185,7 @@ def test_openai_embeddings_batch_order_preservation():
 
 
 def test_max_request_texts_limit():
-    client = TestClient(embedding_app.app)
+    client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     oversized = [f"text_{i}" for i in range(embedding_app.MAX_REQUEST_TEXTS + 1)]
     response = client.post("/embed", json={"texts": oversized})
     assert response.status_code == 413

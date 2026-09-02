@@ -7,6 +7,7 @@ ENV_FILE=".env"
 REQUIRED_SECRETS=(
   "GATEWAY_INTERNAL_TOKEN"
   "SESSION_JWT_SECRET"
+  "GRAFANA_PASSWORD"
 )
 
 if ! command -v openssl >/dev/null 2>&1; then

@@ -118,6 +118,7 @@ _END_USER_AUTH_HEADERS = frozenset({"authorization", "cookie"})
 _PROJECT_SCOPED_PREFIXES = (
     "chat",
     "embed",
+    "health",
     "identity",
     "knowledge",
     "memories",
@@ -126,6 +127,7 @@ _PROJECT_SCOPED_PREFIXES = (
     "sessions",
     "skills",
     "tools",
+    "dreaming",
 )
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -197,10 +199,16 @@ def _requires_project_context(path: str) -> bool:
 
 def _project_access(path: str, method: str) -> ResourceAccess:
     normalized = path.strip("/")
+    if normalized == "sessions/export":
+        return ResourceAccess.EDIT
     if method.upper() in _SAFE_METHODS:
         return ResourceAccess.READ
     project_area = normalized.partition("/")[0]
-    if project_area in {"knowledge", "personas", "skills", "tools"}:
+    if project_area in {"knowledge", "personas", "skills", "tools", "dreaming"}:
+        return ResourceAccess.EDIT
+    if project_area == "sessions":
+        return ResourceAccess.EDIT
+    if project_area == "memories":
         return ResourceAccess.EDIT
     if normalized == "memories/maintain":
         return ResourceAccess.EDIT

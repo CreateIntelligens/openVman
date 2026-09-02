@@ -188,6 +188,10 @@ def test_project_content_writes_require_edit_access() -> None:
     assert _project_access("skills/example", "DELETE") is ResourceAccess.EDIT
     assert _project_access("tools/example", "PATCH") is ResourceAccess.EDIT
     assert _project_access("memories/maintain", "POST") is ResourceAccess.EDIT
+    assert _project_access("dreaming/run", "POST") is ResourceAccess.EDIT
+    assert _project_access("sessions/export", "GET") is ResourceAccess.EDIT
+    assert _project_access("sessions/export", "POST") is ResourceAccess.EDIT
+    assert _project_access("sessions/s1", "DELETE") is ResourceAccess.EDIT
     assert _project_access("knowledge/document", "GET") is ResourceAccess.READ
 
 

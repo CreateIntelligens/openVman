@@ -202,6 +202,7 @@ function GraphContent({ loadState, status, htmlKey }: GraphContentProps): ReactN
           key={htmlKey}
           src={graphHtmlUrl()}
           title="knowledge-graph"
+          sandbox="allow-scripts"
           className="w-full h-full border-0"
         />
       );

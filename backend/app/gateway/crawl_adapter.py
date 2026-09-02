@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import re
+import socket
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -16,6 +18,35 @@ from app.http_client import SharedAsyncClient
 logger = logging.getLogger("gateway.crawl_adapter")
 
 _MAX_FETCH_RETRIES = 3
+
+
+def _validate_public_target(hostname: str) -> None:
+    """Reject targets that resolve to local, private, or otherwise special IPs."""
+    try:
+        addresses = {
+            info[4][0]
+            for info in socket.getaddrinfo(
+                hostname, None, type=socket.SOCK_STREAM
+            )
+        }
+    except socket.gaierror as exc:
+        raise ValueError("無法解析該網址的網域") from exc
+    if not addresses:
+        raise ValueError("無法解析該網址的網域")
+    for address in addresses:
+        try:
+            parsed_address = ipaddress.ip_address(address)
+        except ValueError as exc:
+            raise ValueError("網址解析結果無效") from exc
+        if (
+            parsed_address.is_private
+            or parsed_address.is_loopback
+            or parsed_address.is_link_local
+            or parsed_address.is_reserved
+            or parsed_address.is_multicast
+            or parsed_address.is_unspecified
+        ):
+            raise ValueError("不允許擷取內部或特殊網路位址")
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,14 +259,20 @@ async def fetch_page(url: str) -> CrawlResult:
     cfg = get_tts_config()
 
     # 驗證 URL
-    parsed = urlparse(url)
+    try:
+        parsed = urlparse(url)
+    except ValueError as exc:
+        raise ValueError(f"無效的網址：{url}") from exc
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
         raise ValueError(f"無效的網址：{url}")
+    if parsed.username or parsed.password:
+        raise ValueError("不允許帶有帳號密碼的網址")
 
     # Domain blocking（複用現有設定）
     domain = parsed.hostname.lower()
     if domain in cfg.blocked_domain_set:
         raise ValueError(f"該網域已被封鎖：{domain}")
+    _validate_public_target(domain)
 
     # 組裝 provider URL
     provider_url = cfg.crawler_provider_url.rstrip("/")

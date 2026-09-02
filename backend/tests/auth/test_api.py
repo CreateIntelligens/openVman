@@ -28,7 +28,7 @@ def runtime(tmp_path: Path) -> AuthRuntime:
     config = TTSRouterConfig(
         _env_file=None,
         env="dev",
-        session_jwt_secret="test-only-session-secret",
+        session_jwt_secret="test-only-session-secret-for-tests-32",
         auth_database_path=str(tmp_path / "accounts.db"),
     )
     return build_auth_runtime(config)
@@ -213,7 +213,7 @@ def test_production_login_cookie_has_required_flags(tmp_path: Path):
     config = TTSRouterConfig(
         _env_file=None,
         env="prod",
-        session_jwt_secret="test-only-session-secret",
+        session_jwt_secret="test-only-session-secret-for-tests-32",
         auth_database_path=str(tmp_path / "accounts.db"),
     )
     runtime = build_auth_runtime(config)

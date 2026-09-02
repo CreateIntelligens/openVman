@@ -388,6 +388,11 @@ class SkillManager:
         for fname, content in files.items():
             if fname not in ALLOWED_SKILL_FILES:
                 raise ValueError(f"Cannot update file: {fname}")
+            if fname == "main.py":
+                # Skills are imported into the Brain process.  Allowing a
+                # project user to replace Python source is equivalent to
+                # granting arbitrary code execution in that process.
+                raise ValueError("main.py is operator-managed and cannot be updated via the API")
             (skill_dir / fname).write_text(content, encoding="utf-8")
 
         return self._reload_single(

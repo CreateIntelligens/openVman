@@ -147,8 +147,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv("EMBEDDING_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -157,7 +161,10 @@ app.add_middleware(
 # --- Authentication Dependency ---
 def verify_bearer_token(authorization: str | None = Header(None)) -> None:
     if not BEARER_TOKEN:
-        return
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Embedding service authentication is not configured",
+        )
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

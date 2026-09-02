@@ -43,6 +43,7 @@ from knowledge.qa_nodes import (
 )
 
 from routes.knowledge import schedule_reindex
+from config import get_settings
 from safety.internal_auth import require_internal_token
 
 logger = logging.getLogger(__name__)
@@ -485,7 +486,10 @@ async def upload_image_route(
     file: UploadFile = File(...),
     project_id: str = "default",
 ) -> dict[str, str]:
-    file_bytes = await file.read()
+    max_bytes = get_settings().qa_image_max_bytes
+    file_bytes = await file.read(max_bytes + 1)
+    if len(file_bytes) > max_bytes:
+        raise HTTPException(status_code=413, detail="Image file is too large")
 
     ext = Path(file.filename).suffix.lower()
     if ext not in _ALLOWED_QA_IMAGE_SUFFIXES:

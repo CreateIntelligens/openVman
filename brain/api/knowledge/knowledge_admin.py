@@ -337,7 +337,7 @@ def create_workspace_directory(relative_path: str, project_id: str = "default") 
     if rel.is_absolute():
         raise ValueError("path 必須是相對路徑")
     target = (root / rel).resolve()
-    if not str(target).startswith(str(root)):
+    if not target.is_relative_to(root):
         raise ValueError("path 不可超出 workspace")
     target.mkdir(parents=True, exist_ok=True)
     return {"status": "ok", "path": cleaned}
@@ -354,7 +354,7 @@ def delete_workspace_directory(relative_path: str, project_id: str = "default") 
     if rel.is_absolute():
         raise ValueError("path 必須是相對路徑")
     target = (root / rel).resolve()
-    if not str(target).startswith(str(root)):
+    if not target.is_relative_to(root):
         raise ValueError("path 不可超出 workspace")
     if not target.is_dir():
         raise FileNotFoundError("找不到指定目錄")
@@ -632,4 +632,3 @@ def commit_raw_documents(
         _report("committed")
 
     return {"committed": committed, "skipped": skipped}
-

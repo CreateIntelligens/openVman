@@ -1,7 +1,6 @@
 export type VoiceSource = "gemini" | "custom";
 
 export const DEFAULT_VOICE_SOURCE: VoiceSource = "gemini";
-export const ADMIN_AUTH_TOKEN = "openvman-admin";
 
 type ClientInitPayload = {
   event: "client_init";
@@ -50,7 +49,10 @@ export function buildClientInitPayload({
     event: "client_init",
     client_id: clientId,
     protocol_version: "1.0.0",
-    auth_token: ADMIN_AUTH_TOKEN,
+    // WebSocket authentication is performed by the HttpOnly session cookie
+    // or Bearer token during upgrade.  Keep the legacy protocol field as a
+    // per-connection nonce; it is not an authorization credential.
+    auth_token: globalThis.crypto.randomUUID(),
     capabilities,
     timestamp,
   };

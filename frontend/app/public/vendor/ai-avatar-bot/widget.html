@@ -156,9 +156,11 @@
   }
 
   // ===== 跟父頁溝通 =====
-  // 父頁 origin（用 referrer 推；推不到才退回 '*'）——postMessage 盡量指定目標而非對全網廣播
-  const PARENT_ORIGIN = (function () { try { return new URL(document.referrer).origin; } catch (e) { return '*'; } })();
+  // 父頁 origin 只能由 referrer 確認；未知時禁止跨來源訊息，避免廣播
+  // 給任意嵌入頁。
+  const PARENT_ORIGIN = (function () { try { return new URL(document.referrer).origin; } catch (e) { return ''; } })();
   function postToParent(type, payload) {
+    if (!PARENT_ORIGIN) return;
     try { window.parent.postMessage(Object.assign({ ns: 'avatar-widget', type }, payload || {}), PARENT_ORIGIN); } catch (e) {}
   }
 
@@ -180,6 +182,7 @@
   }
 
   window.addEventListener('message', (e) => {
+    if (!PARENT_ORIGIN || e.origin !== PARENT_ORIGIN || e.source !== window.parent) return;
     const d = e.data || {};
     if (d.ns !== 'avatar-widget-host') return;
     if (d.type === 'mouth') driveMouth(d.volume);

@@ -174,6 +174,7 @@ class BrainSettings(BaseSettings):
     # === 安全設定 ===
     gateway_internal_token: str = ""
     max_input_length: int = 500
+    qa_image_max_bytes: int = 10 * 1024 * 1024
     enable_content_filter: bool = True
     request_rate_limit_per_minute: int = 90
     block_prompt_injection: bool = True

@@ -14,8 +14,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app.auth.dependencies import CurrentAccount, get_current_account
-from app.auth.models import ResourceType
+from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
+from app.auth.models import ResourceType, is_at_least_admin
 from app.auth.resources import ResourceAccess, ResourceNotFoundError, resolve_resource
 from app.auth.runtime import AuthRuntime, get_auth_runtime
 from app.brain_proxy import _http as _brain_http
@@ -227,6 +227,7 @@ def _error_response(status_code: int, error: str, **extra: Any) -> JSONResponse:
 async def upload(
     file: UploadFile = File(...),
     session_id: str = Query(...),
+    current: CurrentAccount = Depends(get_current_account),
 ) -> JSONResponse:
     cfg = get_tts_config()
     storage = get_temp_storage()
@@ -259,6 +260,7 @@ async def upload(
         "mime_type": mime_type,
         "session_id": session_id,
         "trace_id": trace_id,
+        "owner_user_id": current.user.id,
     }
 
     await set_job_status(
@@ -266,6 +268,7 @@ async def upload(
         "accepted",
         session_id=session_id,
         trace_id=trace_id,
+        owner_user_id=current.user.id,
     )
 
     result = await enqueue_job("process_media", job_data, job_id=job_id, sync_fallback=_process_media_sync)
@@ -289,9 +292,20 @@ async def upload(
     summary="取得上傳進度",
     description="查詢上傳或非同步處理任務的狀態。\n\n**所需欄位**：\n- `job_id` (Path, str): 處理任務的 ID",
 )
-async def get_job(job_id: str) -> JSONResponse:
+async def get_job(
+    job_id: str,
+    current: CurrentAccount = Depends(get_current_account),
+) -> JSONResponse:
     payload = await get_job_status(job_id)
     if payload is None:
+        return JSONResponse(status_code=404, content={"error": "job_not_found"})
+
+    # Job IDs are opaque but status records may contain paths, session IDs,
+    # and processing errors.  Only the submitting account (or an admin) may
+    # read one.  Existing records without an owner are intentionally hidden
+    # from regular accounts.
+    owner_user_id = payload.get("owner_user_id")
+    if not is_at_least_admin(current.user.role) and owner_user_id != current.user.id:
         return JSONResponse(status_code=404, content={"error": "job_not_found"})
 
     return JSONResponse(content=payload)
@@ -304,7 +318,10 @@ async def get_job(job_id: str) -> JSONResponse:
     summary="取得死信佇列",
     description="讀取因為錯誤而未被處理的任務清單 (DLQ)。\n\n**所需欄位**：\n- `limit` (Query, int, 預設 20): 最多顯示的數量限制",
 )
-async def get_dlq(limit: int = Query(default=20, ge=1, le=100)) -> JSONResponse:
+async def get_dlq(
+    limit: int = Query(default=20, ge=1, le=100),
+    _current: CurrentAccount = Depends(require_admin),
+) -> JSONResponse:
     """Return dead-letter queue entries from Redis."""
     redis = await get_redis()
     if redis is None:

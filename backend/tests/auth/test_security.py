@@ -35,7 +35,7 @@ def _user(tmp_path: Path):
 
 def _tokens(**overrides) -> SessionTokenService:
     settings = {
-        "secret": "test-only-secret",
+        "secret": "test-only-secret-for-jwt-tests-32",
         "issuer": "openvman",
         "audience": "openvman-web",
         "lifetime_seconds": 3600,

@@ -192,9 +192,15 @@ def delete_memory(
     text: str = "",
 ) -> bool:
     """Delete a memory record by exact text match."""
+    # LanceDB's delete predicate is an SQL expression.  It has no parameter
+    # binding API, so reject expression syntax at the boundary instead of
+    # interpolating attacker-controlled text into a predicate.  Apostrophes
+    # and operators can be stored in memories; deletion of those records must
+    # use the administrative data path rather than this legacy text endpoint.
+    if not text or any(char in text for char in "'\"\\;=<>`()"):
+        raise ValueError("memory text contains unsupported filter syntax")
     table = get_memories_table(project_id)
-    escaped = text.replace("'", "''")
-    table.delete(f"text = '{escaped}'")
+    table.delete(f"text = '{text}'")
     return True
 
 

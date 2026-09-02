@@ -190,6 +190,18 @@ async def test_fetch_page_rejects_invalid_url():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1/admin",
+    "http://169.254.169.254/latest/meta-data",
+    "http://localhost/admin",
+])
+async def test_fetch_page_rejects_private_targets(url):
+    with patch("app.gateway.crawl_adapter.get_tts_config", return_value=_crawler_cfg()):
+        with pytest.raises(ValueError, match="內部|特殊"):
+            await fetch_page(url)
+
+
+@pytest.mark.asyncio
 async def test_fetch_page_rejects_blocked_domain():
     cfg = _crawler_cfg(blocked=frozenset({"evil.com"}))
     with patch("app.gateway.crawl_adapter.get_tts_config", return_value=cfg):

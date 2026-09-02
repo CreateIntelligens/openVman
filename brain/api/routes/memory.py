@@ -64,6 +64,8 @@ async def delete_memory(payload: AddMemoryRequest):
         raise HTTPException(status_code=400, detail="text 不可為空")
     try:
         remove_memory(project_id=payload.project_id, text=payload.text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         log_exception("delete_memory_error", exc)
         raise HTTPException(status_code=500, detail="刪除記憶失敗") from exc

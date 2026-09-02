@@ -70,13 +70,17 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     if table_name == "knowledge":
         related = _expand_via_graph(merged, project_id, primary_vector)
 
+    # Preserve the result shape for clients while making the trust boundary
+    # explicit to the model and to telemetry consumers.
+    marked_results = [{**record, "trust_boundary": "untrusted_reference_data"} for record in merged]
+    marked_related = [{**record, "trust_boundary": "untrusted_reference_data"} for record in related]
     return {
         "table": table_name,
         "queries": queries,
         "embedding_versions": sorted(list(embedding_versions)),
-        "results": merged,
-        "related": related,
-        "citations": build_citations(merged + related),
+        "results": marked_results,
+        "related": marked_related,
+        "citations": build_citations(marked_results + marked_related),
     }
 
 

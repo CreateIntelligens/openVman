@@ -10,6 +10,7 @@ import jwt
 from .models import AccountRole, AccountType, UserRecord
 
 _ALGORITHM = "HS256"
+_MIN_SECRET_BYTES = 32
 _REQUIRED_CLAIMS = ("sub", "role", "kind", "ver", "iat", "exp", "iss", "aud")
 
 
@@ -40,8 +41,10 @@ class SessionTokenService:
         audience: str,
         lifetime_seconds: int,
     ) -> None:
-        if not secret:
-            raise AuthConfigurationError("SESSION_JWT_SECRET is required")
+        if len(secret.encode("utf-8")) < _MIN_SECRET_BYTES:
+            raise AuthConfigurationError(
+                "SESSION_JWT_SECRET must contain at least 32 bytes"
+            )
         self._secret = secret
         self._issuer = issuer
         self._audience = audience

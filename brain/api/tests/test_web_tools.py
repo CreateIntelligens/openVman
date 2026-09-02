@@ -98,3 +98,5 @@ def test_web_tools_reject_invalid_url_and_empty_query(monkeypatch: pytest.Monkey
         web_tools._search_web({"query": "  "})
     with pytest.raises(ValueError, match="無效的網址"):
         web_tools._read_web_page({"url": "file:///tmp/secret"})
+    with pytest.raises(ValueError, match="內部|特殊"):
+        web_tools._read_web_page({"url": "http://127.0.0.1:8200/metrics"})

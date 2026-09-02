@@ -4,6 +4,7 @@ from pathlib import Path
 
 from tools.skill import SkillRef
 from tools.skill_manager import SkillManager
+import pytest
 
 
 def _write_skill(skill_dir: Path, skill_id: str) -> None:
@@ -71,3 +72,19 @@ def test_reload_project_skills_replaces_previous_project_scope(tmp_path: Path) -
     beta_skill = manager.get_skill(SkillRef(skill_id="beta", scope="project", project_id="proj-b"))
     assert beta_skill is not None
     assert beta_skill.scope == "project"
+
+
+def test_api_skill_updates_cannot_replace_python_source(tmp_path: Path) -> None:
+    shared_dir = tmp_path / "shared"
+    project_root = tmp_path / "projects"
+    _write_skill(project_root / "proj-a" / "skills" / "demo", "demo")
+
+    manager = SkillManager(str(shared_dir), project_root=str(project_root))
+    manager.reload_project_skills("proj-a")
+
+    with pytest.raises(ValueError, match="operator-managed"):
+        manager.update_skill_files(
+            SkillRef(skill_id="demo", scope="project", project_id="proj-a"),
+            {"main.py": "raise RuntimeError('pwned')"},
+            registry=type("Registry", (), {})(),
+        )

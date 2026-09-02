@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-os.environ.setdefault("SESSION_JWT_SECRET", "test-session-jwt-secret-for-backend-unit-tests")
+os.environ.setdefault("SESSION_JWT_SECRET", "test-session-jwt-secret-for-backend-unit-tests-32")
 os.environ.setdefault("AUTH_COOKIE_SECURE", "false")
 
 # Repo-structure tests read docker-compose.yml / Dockerfile / .env.example from
@@ -49,7 +49,7 @@ def _clear_auth_and_config_caches(tmp_path_factory):
     with patch.dict(
         os.environ,
         {
-            "SESSION_JWT_SECRET": "test-session-jwt-secret-for-backend-unit-tests",
+            "SESSION_JWT_SECRET": "test-session-jwt-secret-for-backend-unit-tests-32",
             "AUTH_DATABASE_PATH": test_db,
             "AUTH_COOKIE_SECURE": "false",
         },
