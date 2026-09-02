@@ -22,17 +22,19 @@ from app.providers.error_mapping import (
     classify_gcp_error,
     classify_gemini_error,
     classify_indextts_error,
+    classify_voxcpm_error,
 )
 from app.providers.gcp_adapter import GCPTTSAdapter
 from app.providers.gemini_tts_adapter import GeminiTTSAdapter
 from app.providers.indextts_adapter import IndexTTSAdapter
+from app.providers.voxcpm_adapter import VoxCPMAdapter
 
 
 @dataclass(frozen=True, slots=True)
 class RouteTarget:
     """A single hop in the TTS fallback chain."""
 
-    target: str  # e.g. "indextts", "aws-polly", "gcp-tts", "edge-tts"
+    target: str
     adapter: ProviderAdapter
     error_classifier: Callable[[Exception], str]
 
@@ -47,11 +49,12 @@ class SynthesisOutput:
 
 
 class TTSRouterService:
-    """Execute a bounded fallback chain: IndexTTS -> GCP -> AWS -> Edge-TTS."""
+    """Execute the bounded fallback chain across configured TTS providers."""
 
     def __init__(self, config: TTSRouterConfig | None = None) -> None:
         self._config = config or get_tts_config()
         self._indextts = IndexTTSAdapter(self._config)
+        self._voxcpm = VoxCPMAdapter(self._config)
         self._gemini = GeminiTTSAdapter(self._config)
         self._aws = AWSPollyAdapter(self._config)
         self._gcp = GCPTTSAdapter(self._config)
@@ -66,6 +69,11 @@ class TTSRouterService:
     def gemini_adapter(self) -> GeminiTTSAdapter:
         """Gemini TTS adapter, exposed for the streaming fallback path."""
         return self._gemini
+
+    @property
+    def voxcpm_adapter(self) -> VoxCPMAdapter:
+        """VoxCPM adapter, exposed for the /tts/stream targeted path."""
+        return self._voxcpm
 
     def build_chain(self) -> list[RouteTarget]:
         """Build the ordered fallback chain based on config."""
@@ -210,6 +218,7 @@ class TTSRouterService:
     ) -> tuple[tuple[str, ProviderAdapter, Callable[[Exception], str]], ...]:
         return (
             ("indextts", self._indextts, classify_indextts_error),
+            ("voxcpm", self._voxcpm, classify_voxcpm_error),
             ("gemini-tts", self._gemini, classify_gemini_error),
             ("gcp-tts", self._gcp, classify_gcp_error),
             ("aws-polly", self._aws, classify_aws_error),

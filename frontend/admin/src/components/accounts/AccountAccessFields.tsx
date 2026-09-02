@@ -374,6 +374,7 @@ export default function AccountAccessFields({
 
 const PROVIDER_LABELS: Record<string, string> = {
   indextts: "IndexTTS",
+  voxcpm: "VoxCPM",
   "gemini-tts": "Gemini TTS",
   "edge-tts": "Edge TTS",
   gcp: "GCP TTS",

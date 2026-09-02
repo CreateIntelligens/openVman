@@ -27,6 +27,7 @@ from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
 from app.providers.gemini_tts_adapter import GEMINI_DEFAULT_VOICE, GEMINI_PROVIDER_NAME
+from app.providers.voxcpm_adapter import VOXCPM_DEFAULT_VOICE, VOXCPM_PROVIDER_NAME
 
 logger = logging.getLogger("backend")
 router = APIRouter()
@@ -42,6 +43,7 @@ _PROVIDER_NAMES = {
     "gcp-tts": "GCP TTS",
     GEMINI_PROVIDER_NAME: "Gemini TTS",
     "indextts": "IndexTTS",
+    VOXCPM_PROVIDER_NAME: "VoxCPM",
 }
 
 
@@ -99,6 +101,42 @@ async def _fetch_indextts_voices(base_url: str, internal_token: str) -> list[str
 
 async def _fetch_gemini_voices(base_url: str) -> list[str]:
     return await _fetch_provider_voices(base_url, "/api/voices", "gemini")
+
+
+async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
+    """回傳 VoxCPM360 的 ``(voice_id, label)`` 清單。
+
+    castvoice 的 /voices 用 ``voice_id``＋中文 ``label``，與其他 provider 的
+    ``name`` 欄位不同，故不走 _extract_voice_names；label 留下來給 admin 選單。
+    """
+    voices_url = f"{base_url.rstrip('/')}/api/v1/tts/voices"
+    try:
+        response = await _health_http.get().get(
+            voices_url,
+            timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except Exception as exc:
+        logger.warning("failed to fetch voxcpm voices from %s: %s", voices_url, exc)
+        return []
+
+    voice_entries = payload.get("voices") if isinstance(payload, dict) else None
+    if not isinstance(voice_entries, list):
+        return []
+
+    voices: list[tuple[str, str]] = []
+    for entry in voice_entries:
+        if not isinstance(entry, dict):
+            continue
+        voice_id = entry.get("voice_id")
+        if not isinstance(voice_id, str) or not voice_id:
+            continue
+        label = entry.get("label")
+        display_label = label if isinstance(label, str) and label else voice_id
+        voices.append((voice_id, display_label))
+    return voices
 
 
 # 與 frontend/app/src/types/avatarBackground.ts 的 AVATAR_BACKGROUND_IDS 對應，
@@ -161,6 +199,17 @@ async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:
                 )
         except Exception as exc:
             logger.warning("failed to sync gemini voices: %s", exc)
+
+    if cfg.tts_voxcpm_url:
+        try:
+            for voice_id, label in await _fetch_voxcpm_voices(cfg.tts_voxcpm_url):
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.CUSTOM_VOICE,
+                    resource_id=voice_id,
+                    metadata={"provider": VOXCPM_PROVIDER_NAME, "label": label},
+                )
+        except Exception as exc:
+            logger.warning("failed to sync voxcpm voices: %s", exc)
 
     if cfg.tts_gcp_enabled and cfg.tts_gcp_voice_name:
         try:
@@ -431,6 +480,21 @@ async def get_tts_providers(
                     fetched_voices,
                     cfg.tts_indextts_default_character,
                 ),
+            })
+
+    if cfg.tts_voxcpm_url:
+        # 同 IndexTTS：抓不到 voices 就不列，避免選單出現會 502 的 provider。
+        voxcpm_voices = [
+            voice_id
+            for voice_id, _label in await _fetch_voxcpm_voices(cfg.tts_voxcpm_url)
+        ]
+        if voxcpm_voices:
+            default_voice = cfg.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
+            providers.append({
+                "id": VOXCPM_PROVIDER_NAME,
+                "name": "VoxCPM",
+                "default_voice": default_voice,
+                "voices": _prepend_default_voice(voxcpm_voices, default_voice),
             })
 
     if cfg.tts_gcp_enabled:

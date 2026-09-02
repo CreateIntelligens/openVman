@@ -19,7 +19,7 @@
 ### 2. 關鍵時序圖 (Sequence Diagrams)
 
 #### 2.1 即時對話流 (Conversational Flow)
-展示即時語音閉環。Backend 透過 `LiveVoicePipeline` 呼叫 Brain REST API 取得完整回覆，切句後依序送 TTS 合成（`TTSRouterService`：IndexTTS → GCP → AWS → Edge-TTS）。
+展示即時語音閉環。Backend 透過 `LiveVoicePipeline` 呼叫 Brain REST API 取得完整回覆，切句後依序送 TTS 合成（`TTSRouterService`：IndexTTS → VoxCPM → Gemini → GCP → AWS → Edge-TTS）。
 
 ```mermaid
 sequenceDiagram

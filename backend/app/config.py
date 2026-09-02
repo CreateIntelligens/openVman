@@ -64,6 +64,17 @@ class TTSRouterConfig(BaseSettings):
     # --- Gemini TTS Console ---
     tts_gemini_url: str = Field(default="", validation_alias="TTS_GEMINI_URL")
 
+    # --- VoxCPM360 (CastAgent-compatible /api/v1/tts/*) ---
+    tts_voxcpm_url: str = Field(default="", validation_alias="TTS_VOXCPM_URL")
+    tts_voxcpm_api_key: str = Field(
+        default="",
+        validation_alias="TTS_VOXCPM_API_KEY",
+    )
+    tts_voxcpm_default_voice: str = Field(
+        default="",
+        validation_alias="TTS_VOXCPM_DEFAULT_VOICE",
+    )
+
     # --- TTS Text Normalization / 轉譯 API ---
     normalize_api_url: str = Field(default="", validation_alias="NORMALIZE_API_URL")
 

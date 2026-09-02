@@ -10,7 +10,7 @@ from urllib.parse import urlparse, urlunparse
 
 import httpx
 
-from app.config import get_tts_config
+from app.config import TTSRouterConfig, get_tts_config
 from app.gateway.temp_storage import QuotaStatus
 
 logger = logging.getLogger("backend")
@@ -111,6 +111,37 @@ async def probe_indextts_health(
     }
 
 
+async def probe_voxcpm_health(
+    client: httpx.AsyncClient,
+    cfg: TTSRouterConfig | None = None,
+) -> dict[str, Any]:
+    if cfg is None:
+        cfg = get_tts_config()
+
+    tts_url = (cfg.tts_voxcpm_url or "").strip()
+    if not tts_url:
+        return {"status": "disabled"}
+
+    sanitized_url = _sanitize_url(tts_url)
+    response = await _probe_service(
+        client,
+        "voxcpm",
+        f"{tts_url.rstrip('/')}/api/v1/tts/health",
+    )
+    status = response.get("status", "unknown")
+
+    # castvoice health 回 {"status": "ok"}，對齊本服務的 ready/unreachable 語彙。
+    if status in {"ok", "ready", "healthy"}:
+        return {"status": "ready", "url": sanitized_url}
+    if status == "unreachable":
+        return {
+            "status": "unreachable",
+            "error": response.get("error", "unreachable"),
+            "url": sanitized_url,
+        }
+    return {"status": status, "url": sanitized_url}
+
+
 async def _probe_downstream_services(
     client: httpx.AsyncClient,
 ) -> dict[str, dict[str, Any]]:
@@ -138,6 +169,8 @@ async def _probe_downstream_services(
 
     indextts_probe = await probe_indextts_health(client, cfg)
     probes["index-tts"] = indextts_probe
+
+    probes["voxcpm"] = await probe_voxcpm_health(client, cfg)
 
     return probes
 

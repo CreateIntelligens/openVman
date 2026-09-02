@@ -18,6 +18,7 @@ def _make_config(
     gcp_enabled: bool = True,
     edge_enabled: bool = False,
     gemini_url: str = "",
+    voxcpm_url: str = "",
 ) -> TTSRouterConfig:
     return TTSRouterConfig(
         _env_file=None,
@@ -38,6 +39,7 @@ def _make_config(
         tts_gcp_sample_rate=24000,
         edge_tts_enabled=edge_enabled,
         tts_gemini_url=gemini_url,
+        tts_voxcpm_url=voxcpm_url,
     )
 
 
@@ -186,3 +188,43 @@ class TestRouterFallback:
         assert len(success_keys) == 2
         aws_success = [k for k in success_keys if "aws" in k]
         assert len(aws_success) == 2
+
+
+class TestVoxCPMRoute:
+    def setup_method(self):
+        reset_metrics()
+
+    def test_voxcpm_absent_from_chain_when_unconfigured(self):
+        svc = TTSRouterService(_make_config())
+        assert "voxcpm" not in [t.target for t in svc.build_chain()]
+
+    def test_voxcpm_sits_between_indextts_and_gcp(self):
+        svc = TTSRouterService(_make_config(voxcpm_url="http://voxcpm:8800"))
+        targets = [t.target for t in svc.build_chain()]
+        assert targets == ["indextts", "voxcpm", "gcp-tts", "aws-polly"]
+
+    def test_indextts_fails_falls_back_to_voxcpm(self):
+        svc = TTSRouterService(_make_config(voxcpm_url="http://voxcpm:8800"))
+        svc._indextts.synthesize = MagicMock(side_effect=RuntimeError("index down"))  # type: ignore[method-assign]
+        svc._voxcpm.synthesize = MagicMock(return_value=_ok_result("voxcpm"))  # type: ignore[method-assign]
+        svc._gcp.synthesize = MagicMock(return_value=_ok_result("gcp"))  # type: ignore[method-assign]
+
+        result = svc.synthesize(SynthesizeRequest(text="hello"))
+        assert result.result.provider == "voxcpm"
+        svc._gcp.synthesize.assert_not_called()
+
+    def test_targeted_voxcpm_uses_voice_hint(self):
+        svc = TTSRouterService(_make_config(voxcpm_url="http://voxcpm:8800"))
+        svc._indextts.synthesize = MagicMock(return_value=_ok_result("index"))  # type: ignore[method-assign]
+        svc._voxcpm.synthesize = MagicMock(return_value=_ok_result("voxcpm"))  # type: ignore[method-assign]
+
+        request = SynthesizeRequest(
+            text="hello",
+            voice_hint="voxcpm2-cosy-teen-female-01",
+        )
+        result = svc.synthesize(request, provider="voxcpm")
+
+        assert result.result.provider == "voxcpm"
+        assert result.fallback is False
+        svc._voxcpm.synthesize.assert_called_once_with(request)
+        svc._indextts.synthesize.assert_not_called()

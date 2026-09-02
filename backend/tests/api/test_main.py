@@ -346,6 +346,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
         tts_gemini_url="",
+        tts_voxcpm_url="",
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
     ))
@@ -390,6 +391,7 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
         tts_gemini_url="",
+        tts_voxcpm_url="",
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
     ))
@@ -427,6 +429,7 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
         tts_gcp_enabled=False,
         tts_aws_enabled=False,
         tts_gemini_url="http://nurse.5gao.ai:8206",
+        tts_voxcpm_url="",
         edge_tts_enabled=False,
     ))
 
@@ -837,3 +840,56 @@ def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(mon
     assert [event["event"] for event in FakeRelay.instances[0].sent_events] == ["user_speak"]
     assert FakeRelay.instances[0].sent_events[0]["text"] == "走新路"
     assert FakePipeline.instances == []
+
+
+def test_tts_providers_includes_voxcpm_when_configured(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "model_version": "voxcpm360-castvoice-test",
+                "voices": [
+                    {"voice_id": "barbet-hung-yi-lee", "label": "李宏毅老師"},
+                    {
+                        "voice_id": "voxcpm2-cosy-young-female-01",
+                        "label": "青年女聲 01",
+                    },
+                ],
+            }
+
+    class FakeClient:
+        async def get(self, url: str, timeout=None, follow_redirects=None):
+            assert url == "http://10.9.0.37:8800/api/v1/tts/voices"
+            return FakeResponse()
+
+    async def _fake_close() -> None:
+        return None
+
+    module.admin_routes._health_http = types.SimpleNamespace(
+        get=lambda: FakeClient(),
+        close=_fake_close,
+    )
+    monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
+        document_max_upload_bytes=1024,
+        tts_indextts_url="",
+        tts_gcp_enabled=False,
+        tts_aws_enabled=False,
+        tts_gemini_url="",
+        tts_voxcpm_url="http://10.9.0.37:8800",
+        tts_voxcpm_default_voice="",
+        edge_tts_enabled=False,
+    ))
+
+    assert _get_tts_provider_payload(module) == [
+        {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
+        {
+            "id": "voxcpm",
+            "name": "VoxCPM",
+            "default_voice": "voxcpm2-cosy-young-female-01",
+            "voices": ["barbet-hung-yi-lee", "voxcpm2-cosy-young-female-01"],
+        },
+    ]

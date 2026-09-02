@@ -66,16 +66,6 @@ const messageEnvelope = {
 
 每一段生成的文字，必須產生「音頻 (Audio Buffer)」。嘴型由前端 DINet AI 根據音訊即時生成，無需後端提供 viseme 資料。
 
-**推薦方案 A：自建 `VibeVoice`-style zh-TW TTS（主方案）**
-這裡的前提不是「能說中文」而已，而是**要穩定輸出台灣口音、可客製化聲線、可控停頓與語氣**。因此正式方案應以自建的 `VibeVoice` (0.5B/1.5B) 類型 TTS 為核心：
-
-* 以公司自己的 speaker index / voice profile 管理角色聲線。
-* 支援 zh-TW 發音詞典、數字/專有名詞讀法覆寫。
-
-* 呼叫 API 傳入短句文字。
-* 收集回傳的 Audio Buffer。
-* 每個 persona 至少準備主 speaker profile 與備援 profile。
-
 **備援方案 B：AWS Polly / GCP TTS**
 
 公司現況沒有 Azure，因此雲端備援應落在 **AWS** 或 **GCP**：
@@ -119,7 +109,13 @@ async function synthesizeWithFallback(text, session) {
   throw new Error("All TTS targets failed");
 }
 ```
-> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 串流走 `POST /tts/stream`。
+> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /tts/stream`，VoxCPM 則由同一路徑回傳完整 MP3。
+
+#### 6.1 VoxCPM360 外部節點
+
+Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/tts/health` 探測狀態、`GET /api/v1/tts/voices` 同步可用聲線，並以 `POST /api/v1/tts/synthesize` 傳送 `text`、`voice_id` 與固定的 `format: "mp3"`。成功時上游回傳 `audio/mpeg`，並可用 `X-Request-ID` 標示請求。
+
+連線由 `TTS_VOXCPM_URL` 啟用；若上游設定 `TTS_API_KEY`，Backend 必須以 `TTS_VOXCPM_API_KEY` 傳送 Bearer token。`TTS_VOXCPM_DEFAULT_VOICE` 可覆寫預設聲線。金鑰不得放入 URL 或健康狀態回應；Backend 將 `400/422`、`401/403`、`429` 與 `5xx` 分別歸類為請求、驗證、限流與 provider 不可用，供有界 fallback 與監控使用。
 
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
@@ -172,6 +168,9 @@ LLM_STREAM=true              # 必須為 true
 # === TTS 設定 ===
 TTS_INDEXTTS_URL=http://index-tts-vllm:8011
 TTS_INDEXTTS_DEFAULT_CHARACTER=hayley
+TTS_VOXCPM_URL=http://voxcpm-gateway:8800
+TTS_VOXCPM_API_KEY=***
+TTS_VOXCPM_DEFAULT_VOICE=voxcpm2-cosy-young-female-01
 TTS_AWS_ACCESS_KEY_ID=***
 TTS_AWS_SECRET_ACCESS_KEY=***
 TTS_AWS_REGION=ap-northeast-1

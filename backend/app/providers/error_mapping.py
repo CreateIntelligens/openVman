@@ -141,3 +141,23 @@ def classify_gemini_error(exc: Exception) -> str:
     from app.providers.gemini_tts_adapter import GeminiTTSHTTPError
 
     return _classify_http_provider_error(exc, GeminiTTSHTTPError)
+
+
+def classify_voxcpm_error(exc: Exception) -> str:
+    """Classify an error from the VoxCPM360 gateway.
+
+    castvoice 端點的錯誤碼比一般 HTTP provider 細：400 是參數／語音不存在，
+    401 是 Bearer token 錯誤，429 是 GPU 佇列已滿（帶 Retry-After）。
+    """
+    from app.providers.voxcpm_adapter import VoxCPMHTTPError
+
+    if isinstance(exc, VoxCPMHTTPError):
+        if exc.status_code in (401, 403):
+            return REASON_AUTH_ERROR
+        if exc.status_code == 429:
+            return REASON_RATE_LIMITED
+        if exc.status_code in (400, 422):
+            return REASON_BAD_REQUEST
+        if exc.status_code >= 500:
+            return REASON_PROVIDER_UNAVAILABLE
+    return _classify_network_error(exc) or REASON_UNKNOWN
