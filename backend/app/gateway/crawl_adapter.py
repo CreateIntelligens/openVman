@@ -18,6 +18,7 @@ from app.http_client import SharedAsyncClient
 logger = logging.getLogger("gateway.crawl_adapter")
 
 _MAX_FETCH_RETRIES = 3
+_DNS_LOOKUP_TIMEOUT_SECONDS = 5
 
 
 def _validate_public_target(hostname: str) -> None:
@@ -272,8 +273,14 @@ async def fetch_page(url: str) -> CrawlResult:
     domain = parsed.hostname.lower()
     if domain in cfg.blocked_domain_set:
         raise ValueError(f"該網域已被封鎖：{domain}")
-    # getaddrinfo 是同步阻塞呼叫，慢 DNS 不該卡住整個事件迴圈
-    await asyncio.to_thread(_validate_public_target, domain)
+    # getaddrinfo 是同步阻塞呼叫，慢 DNS 不該卡住整個事件迴圈，也不該無限等
+    try:
+        await asyncio.wait_for(
+            asyncio.to_thread(_validate_public_target, domain),
+            timeout=_DNS_LOOKUP_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise ValueError("網域解析逾時") from exc
 
     # 組裝 provider URL
     provider_url = cfg.crawler_provider_url.rstrip("/")

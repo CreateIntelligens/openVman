@@ -210,6 +210,22 @@ async def test_fetch_page_rejects_blocked_domain():
 
 
 @pytest.mark.asyncio
+async def test_fetch_page_rejects_dns_lookup_timeout():
+    with (
+        patch(
+            "app.gateway.crawl_adapter.get_tts_config",
+            return_value=_crawler_cfg(),
+        ),
+        patch(
+            "app.gateway.crawl_adapter.asyncio.to_thread",
+            new=AsyncMock(side_effect=TimeoutError),
+        ),
+    ):
+        with pytest.raises(ValueError, match="網域解析逾時"):
+            await fetch_page("https://example.com")
+
+
+@pytest.mark.asyncio
 async def test_fetch_page_empty_response_raises():
     mock_client = AsyncMock()
     mock_client.get = AsyncMock(return_value=_mock_response(text=""))

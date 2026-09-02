@@ -88,3 +88,4 @@ Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-878
 1. **路徑穿越**：所有路徑操作需驗證 `session_id` 是否含有 `../`。
 2. **自動清理**：每 5 分鐘執行一次 Cron 任務，標記超過 `TTL` 分鐘的暫存檔為過期並刪除。
 3. **磁碟保護**：所有上傳操作前必須檢查磁碟配額，避免耗盡主機空間。
+4. **爬蟲網路邊界**：Web Crawler 在對 provider 發送請求前必須拒絕 private、loopback 與 link-local 目標，並將 DNS 解析限制在 5 秒內。
