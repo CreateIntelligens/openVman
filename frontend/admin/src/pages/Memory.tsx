@@ -124,11 +124,11 @@ export default function Memory() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+      <header className="sticky top-0 z-10 px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold">記憶管理</h2>
-            <p className="text-sm text-content-muted">
+            <h2 className="page-title">記憶管理</h2>
+            <p className="page-subtitle">
               瀏覽、新增並管理精選記憶紀錄。
             </p>
           </div>

@@ -34,14 +34,14 @@ export default function PersonaCreateForm({
           value={newPersonaId}
           onChange={(event) => onNewPersonaIdChange(event.target.value)}
           placeholder="ID（例如 support）"
-          className="w-full rounded-md border border-border bg-surface-raised dark:bg-surface-sunken/50 px-3 py-2 text-[0.8125rem] text-content placeholder:text-content-subtle focus:border-primary/50 focus:outline-none transition-colors"
+          className="input dark:bg-surface-sunken/50 text-[0.8125rem] placeholder:text-content-subtle"
           title="唯一角色 ID（用於資料夾路徑）"
         />
         <input
           value={newPersonaLabel}
           onChange={(event) => onNewPersonaLabelChange(event.target.value)}
           placeholder="名稱（例如 Support Bot）"
-          className="w-full rounded-md border border-border bg-surface-raised dark:bg-surface-sunken/50 px-3 py-2 text-[0.8125rem] text-content placeholder:text-content-subtle focus:border-primary/50 focus:outline-none transition-colors"
+          className="input dark:bg-surface-sunken/50 text-[0.8125rem] placeholder:text-content-subtle"
           title="顯示名稱（僅套用於空白範本）"
         />
         <Select

@@ -287,6 +287,7 @@ ws.onclose = () => { reconnect(); };
 * **統一導覽 (`NavigationContext`)**：`AppSidebar`、`ChatSidebar`、各頁面共享單一導覽狀態，切換角色 (persona)、載入歷史 session、建立新對話都透過同一份 context 管理。
 * **對話紀錄匯出**：`ChatSidebar` 可將目前角色與篩選條件下的全部 session 匯出為 JSON，也可勾選多筆或下載單筆。匯出由 Backend 驗證專案讀取權限後交由 Brain 組裝，不從前端逐筆抓取歷史。
 * **設計 Token (RGB channels)**：`tailwind.config.js` 與 `index.css` 將語意色 (`primary`、`surface`、`danger` 等) 以 `R G B` 三通道形式暴露，讓 Tailwind 透明度修飾符 (`bg-primary/20` 等) 能夠正確運算。
+* **共用控制元件樣式**：Admin 頁面標題與副標題統一使用 `page-title`／`page-subtitle`，按鈕與輸入欄位優先使用 `btn`／`input`，並以 semantic color token 取代頁面專屬色碼。
 
 > **現況更新（2026-07-01）**：`/admin/chat` 的功能點（`SlashDropdown`、`useInputHistory`、`ActionRequestCard`、`NavigationContext`、`AppSidebar`、`ChatSidebar`）皆已實作且已接線，是本文件所有章節中與實作最貼近的一節。唯一落差：RGB channel 設計 token 只存在於 `frontend/admin`（有 `tailwind.config.js`）；`frontend/app`（虛擬人主前端）是純 CSS Vue app，沒有 Tailwind，兩個前端**不共用**設計系統，與規格暗示的統一 token 不符。
 

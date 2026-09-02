@@ -20,6 +20,7 @@
 - **Dynamic Model Fallback Testing**: Added comprehensive pytest coverage for dynamic discovery, sorting logic, graceful degradation on error, and fallback chain integration (`test_llm_fallback_chain.py`).
 
 ### Changed / Fixed
+- **Admin UI Consistency**: Standardized semantic colors, shared page headings, buttons, and inputs across the Admin portal without changing their behavior.
 - **Production Admin Runtime**: Changed the default Compose stack and Docker Hub workflow to build the Admin `runner` stage instead of the Vite development stage. The runner now retains the shared HTTPS nginx edge routes while serving the pre-built Admin bundle; the worktree override alone selects Vite/HMR.
 - **Memory Listing Runtime Dependency**: Replaced the Admin memory list's implicit pandas conversion with LanceDB's native Arrow records, preserving date ordering, pagination, and vector exclusion without requiring pandas in the production Brain API image.
 - **Single-File Default Deployment**: Removed the registry-only Compose override. A fresh host now uses `docker compose up -d --remove-orphans`, defaults to the public `tbdavid2019` namespace, and falls back to Dockerfile builds only when a published image is unavailable.

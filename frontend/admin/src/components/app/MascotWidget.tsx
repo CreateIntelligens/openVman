@@ -283,7 +283,7 @@ export default function MascotWidget() {
         >
           <span
             className={`w-3 h-3 flex-none rounded-full shadow-[0_0_0_0.1875rem_rgba(255,255,255,0.14)] ${
-              selectedMascot.engine === "3d" ? "bg-[#34d399]" : "bg-[#38bdf8]"
+              selectedMascot.engine === "3d" ? "bg-success" : "bg-info"
             }`}
           />
           <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[0.82rem] font-bold">
@@ -292,7 +292,7 @@ export default function MascotWidget() {
         </button>
 
         {switcherOpen && (
-          <div className="mt-2 grid gap-1.5 p-2 border border-white/30 rounded-lg bg-stone-50/95 dark:bg-stone-900/95 shadow-xl backdrop-blur-md max-h-[16rem] overflow-y-auto w-48">
+          <div className="mt-2 grid gap-1.5 p-2 border border-border rounded-lg bg-surface-overlay/95 shadow-xl backdrop-blur-md max-h-[16rem] overflow-y-auto w-48">
             {mascotOptions.map((opt) => {
               const isActive = opt.id === selectedMascotId;
               return (
@@ -303,12 +303,12 @@ export default function MascotWidget() {
                     setSelectedMascotId(opt.id);
                     setSwitcherOpen(false);
                   }}
-                  className={`grid grid-cols-[2.25rem_1fr] items-center gap-2.5 min-w-0 p-1.5 border border-transparent rounded-lg bg-transparent text-stone-800 dark:text-stone-200 cursor-pointer text-left transition-colors duration-150 hover:bg-primary/10 hover:border-primary/30 ${
+                  className={`grid grid-cols-[2.25rem_1fr] items-center gap-2.5 min-w-0 p-1.5 border border-transparent rounded-lg bg-transparent text-content cursor-pointer text-left transition-colors duration-150 hover:bg-primary/10 hover:border-primary/30 ${
                     isActive ? "bg-primary/10 border-primary/30 font-semibold" : ""
                   }`}
                 >
                   <span
-                    className="w-9 h-9 aspect-square rounded-lg border border-stone-900/12 dark:border-white/12 flex-shrink-0 overflow-hidden relative flex items-center justify-center"
+                    className="w-9 h-9 aspect-square rounded-lg border border-border flex-shrink-0 overflow-hidden relative flex items-center justify-center"
                     style={mascotPreviewStyle(opt)}
                   >
                     {opt.thumbnailUrl ? (
@@ -324,10 +324,10 @@ export default function MascotWidget() {
                     )}
                   </span>
                   <span className="flex min-w-0 flex-col leading-tight">
-                    <strong className="text-[0.86rem] font-bold text-stone-800 dark:text-stone-100 overflow-hidden text-ellipsis whitespace-nowrap">
+                    <strong className="text-sm font-bold text-content overflow-hidden text-ellipsis whitespace-nowrap">
                       {opt.label || opt.id}
                     </strong>
-                    <small className="mt-0.5 text-stone-500 dark:text-stone-400 text-[0.68rem] font-bold uppercase overflow-hidden text-ellipsis whitespace-nowrap">
+                    <small className="mt-0.5 text-content-subtle text-[0.6875rem] font-bold uppercase overflow-hidden text-ellipsis whitespace-nowrap">
                       {opt.engine}
                     </small>
                   </span>

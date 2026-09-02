@@ -93,7 +93,7 @@ export default function TopBar({
           aria-haspopup="listbox"
           aria-controls="project-switcher-list"
           aria-label={`目前專案：${displayLabel}`}
-          className="flex h-9 items-center gap-2 rounded-md border border-border bg-surface-raised px-3 text-sm font-medium text-content transition-colors hover:border-border-strong disabled:opacity-50"
+          className="btn btn-ghost h-9 bg-surface-raised px-3 hover:border-border-strong"
         >
           <span className="flex h-5 w-5 items-center justify-center rounded bg-primary/15 text-[0.6875rem] font-bold text-primary">
             {displayLabel.slice(0, 2).toUpperCase()}

@@ -53,6 +53,7 @@ node_modules/
 # IDE
 .vscode/
 .idea/
+.design/
 
 # Firebase
 firebase-debug.log

@@ -17,10 +17,10 @@ export default function Health() {
   return (
     <div className="page-scroll">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
         <div>
-          <h2 className="text-2xl font-bold">System Health</h2>
-          <p className="text-sm text-content-muted">Real-time status of your brain infrastructure</p>
+          <h2 className="page-title">System Health</h2>
+          <p className="page-subtitle">Real-time status of your brain infrastructure</p>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-xs text-content-subtle">auto-refresh in {countdown}s</span>

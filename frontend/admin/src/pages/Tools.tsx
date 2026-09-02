@@ -175,10 +175,10 @@ export default function Tools() {
 
   return (
     <div className="page-scroll">
-      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/10">
+      <header className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 bg-surface-raised/80 backdrop-blur-md border-b border-primary/10">
         <div>
-          <h2 className="text-2xl font-bold">工具與技能</h2>
-          <p className="text-sm text-content-muted">
+          <h2 className="page-title">工具與技能</h2>
+          <p className="page-subtitle">
             管理技能插件及查看已註冊工具
           </p>
         </div>

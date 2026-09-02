@@ -576,9 +576,7 @@ export default function Avatar() {
     >
       <div className="flex items-center gap-2">
         <span className="material-symbols-outlined text-content-muted">face</span>
-        <h1 className="text-xl font-semibold text-content">
-          Avatar Characters
-        </h1>
+        <h1 className="page-title">Avatar Characters</h1>
       </div>
 
       {status && <StatusAlert type={status.type} message={status.message} />}

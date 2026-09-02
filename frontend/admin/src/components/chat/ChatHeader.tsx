@@ -36,7 +36,7 @@ export default function ChatHeader({
         <button
           type="button"
           onClick={onOpenQuickQa}
-          className="flex items-center gap-1.5 rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs font-medium text-content transition-colors hover:border-primary/40 hover:bg-primary/5"
+          className="btn btn-ghost gap-1.5 bg-surface-raised px-2.5 py-1 text-xs hover:border-primary/40 hover:bg-primary/5"
           title="快速問答分類"
         >
           <span className="material-symbols-outlined text-primary text-[1.125rem]">quiz</span>
