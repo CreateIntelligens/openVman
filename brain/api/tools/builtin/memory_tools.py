@@ -1,6 +1,12 @@
 import re
 from typing import Any
-from tools.context import active_persona_id, active_project_id, active_user_message
+
+from tools.context import (
+    active_persona_id,
+    active_project_id,
+    active_user_message,
+)
+
 from .knowledge_tools import _search_tool
 
 _EXPLICIT_MEMORY_REQUEST = re.compile(

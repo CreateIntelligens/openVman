@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from config import get_settings
 from knowledge.doc_meta import upsert_document_meta
 from knowledge.knowledge_admin import (
     delete_workspace_document,
@@ -43,7 +44,6 @@ from knowledge.qa_nodes import (
 )
 
 from routes.knowledge import schedule_reindex
-from config import get_settings
 from safety.internal_auth import require_internal_token
 
 logger = logging.getLogger(__name__)

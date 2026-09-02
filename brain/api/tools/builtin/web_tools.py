@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 import ipaddress
+import logging
 import socket
 from typing import Any
 from urllib.parse import quote, urlparse

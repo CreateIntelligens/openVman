@@ -213,8 +213,6 @@ def _project_access(path: str, method: str) -> ResourceAccess:
         return ResourceAccess.EDIT
     if project_area == "memories":
         return ResourceAccess.EDIT
-    if normalized == "memories/maintain":
-        return ResourceAccess.EDIT
     return ResourceAccess.READ
 
 

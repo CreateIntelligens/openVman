@@ -17,8 +17,8 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from app.auth.middleware import FailClosedAuthMiddleware
 from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.middleware import FailClosedAuthMiddleware
 from app.auth.routes import auth_router, temporary_accounts_router, users_router
 from app.auth.runtime import get_auth_runtime
 from app.brain_proxy import _http as _brain_proxy_http
@@ -529,8 +529,8 @@ async def tts_stream_endpoint(
     svc = _get_service()
 
     # Fallback streaming: Edge-TTS 邊合成邊吐，避免等整句。
-    # 清掉 voice_hint：character 是 IndexTTS 的角色名，跨 provider 不通用，
-    # 讓 Edge 用自身預設 voice（與 service.py fallback 的 replace(voice_hint="")一致）。
+    # voice 已經過 resolve_tts_voice 授權；Edge adapter 會把非 Edge 格式的
+    # 名稱（例如 IndexTTS 角色名）退回自身預設 voice，這裡不需再清掉。
     edge = svc.edge_adapter
     if edge.enabled:
         stream = edge.synthesize_stream(SynthesizeRequest(text=cleaned, voice_hint=voice))

@@ -56,8 +56,12 @@ class TestDescribeWithVision:
     async def test_vision_llm_success(self, _fake_image):
         mock_client = _make_mock_openai_client("這是一張測試圖片")
 
+        # 沒有 base_url 且非本地模型時 VLM 路由視為 disabled，必須給外部 URL
         with (
-            patch("app.gateway.ingestion_image.get_tts_config", return_value=_vision_cfg()),
+            patch(
+                "app.gateway.ingestion_image.get_tts_config",
+                return_value=_vision_cfg(base_url="https://api.openai.com/v1"),
+            ),
             patch("app.gateway.vlm_client.AsyncOpenAI", return_value=mock_client),
         ):
             from app.gateway.vlm_client import _client_cache

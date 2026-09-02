@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tools.skill import SkillRef
 from tools.skill_manager import SkillManager
-import pytest
 
 
 def _write_skill(skill_dir: Path, skill_id: str) -> None:

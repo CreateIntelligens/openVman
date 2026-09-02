@@ -272,7 +272,8 @@ async def fetch_page(url: str) -> CrawlResult:
     domain = parsed.hostname.lower()
     if domain in cfg.blocked_domain_set:
         raise ValueError(f"該網域已被封鎖：{domain}")
-    _validate_public_target(domain)
+    # getaddrinfo 是同步阻塞呼叫，慢 DNS 不該卡住整個事件迴圈
+    await asyncio.to_thread(_validate_public_target, domain)
 
     # 組裝 provider URL
     provider_url = cfg.crawler_provider_url.rstrip("/")
