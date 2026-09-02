@@ -63,8 +63,6 @@ export default function Chat() {
     privacyWarningsVisible,
     sessions,
     loadingSessions,
-    exportingSessions,
-    selectedSessionIds,
     deleteSessionTarget,
     chatEndRef,
     starterPrompts,
@@ -80,9 +78,6 @@ export default function Chat() {
     playTts,
     loadSessions,
     loadSessionHistory,
-    toggleSessionSelection,
-    toggleAllSessions,
-    exportSessionHistory,
     submit,
     stopStreaming,
     resetConversation,
@@ -99,11 +94,7 @@ export default function Chat() {
     setMessages,
     searchQuery,
     setSearchQuery,
-    dateFrom,
-    setDateFrom,
-    dateTo,
-    setDateTo,
-    resetFilters,
+    resetSearch,
   } = useChatSession();
 
   const liveClientIdRef = useRef<string>("");
@@ -279,24 +270,15 @@ export default function Chat() {
         loadingPersonas={loadingPersonas}
         sessions={sessions}
         loadingSessions={loadingSessions}
-        exportingSessions={exportingSessions}
-        selectedSessionIds={selectedSessionIds}
         sessionId={sessionId}
         onPersonaChange={handlePersonaChange}
         onResetConversation={resetConversation}
         onLoadSessions={loadSessions}
         onLoadSessionHistory={loadSessionHistory}
-        onToggleSessionSelection={toggleSessionSelection}
-        onToggleAllSessions={toggleAllSessions}
-        onExportSessions={exportSessionHistory}
         onDeleteSession={setDeleteSessionTarget}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
-        dateFrom={dateFrom}
-        onDateFromChange={setDateFrom}
-        dateTo={dateTo}
-        onDateToChange={setDateTo}
-        onResetFilters={resetFilters}
+        onResetSearch={resetSearch}
       />
 
       <main className="relative flex min-w-0 flex-1 bg-surface">

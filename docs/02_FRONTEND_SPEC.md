@@ -285,7 +285,7 @@ ws.onclose = () => { reconnect(); };
 * **Action Request Card**：當 Brain 回傳 `action_request` 事件時，前端以 `ActionRequestCard` 呈現工具調用提案（名稱、參數、說明）；操作者可逐案核可/拒絕，核可後才真正執行工具。
 * **TTS / ASR 控制集中化**：TTS provider / voice、ASR 開關、Live 麥克風鍵皆整併至輸入列，降低視覺雜訊。TTS fallback 會以 toast 提示。
 * **統一導覽 (`NavigationContext`)**：`AppSidebar`、`ChatSidebar`、各頁面共享單一導覽狀態，切換角色 (persona)、載入歷史 session、建立新對話都透過同一份 context 管理。
-* **對話紀錄匯出**：`ChatSidebar` 可將目前角色與篩選條件下的全部 session 匯出為 JSON，也可勾選多筆或下載單筆。匯出由 Backend 驗證專案讀取權限後交由 Brain 組裝，不從前端逐筆抓取歷史。
+* **對話紀錄管理與匯出**：`Sessions` workspace 集中提供跨角色瀏覽、文字與秒級時間篩選、排序、批次選取、匯出及刪除。匯出由 Backend 驗證專案讀取權限後交由 Brain 組裝，不從前端逐筆抓取歷史；從紀錄列開啟 Chat 時，以一次性 URL deep link 還原角色與 session，消費後立即移除該參數。
 * **設計 Token (RGB channels)**：`tailwind.config.js` 與 `index.css` 將語意色 (`primary`、`surface`、`danger` 等) 以 `R G B` 三通道形式暴露，讓 Tailwind 透明度修飾符 (`bg-primary/20` 等) 能夠正確運算。
 * **共用控制元件樣式**：Admin 頁面標題與副標題統一使用 `page-title`／`page-subtitle`，按鈕與輸入欄位優先使用 `btn`／`input`，並以 semantic color token 取代頁面專屬色碼。
 

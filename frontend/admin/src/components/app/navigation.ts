@@ -6,6 +6,7 @@ import {
 
 export const workspaceTabs = [
   { key: "Chat", label: "Chat", icon: "chat" },
+  { key: "Sessions", label: "Sessions", icon: "forum" },
   { key: "Search", label: "Search", icon: "search" },
   { key: "Workspace", label: "Workspace", icon: "folder_managed" },
 ] as const;
@@ -42,6 +43,7 @@ export const pageComponents: Record<
   LazyExoticComponent<ComponentType>
 > = {
   Chat: lazy(() => import("../../pages/Chat")),
+  Sessions: lazy(() => import("../../pages/Sessions")),
   Search: lazy(() => import("../../pages/Search")),
   Workspace: lazy(() => import("../../pages/Workspace")),
   KnowledgeBase: lazy(() => import("../../pages/KnowledgeBase")),
@@ -57,6 +59,7 @@ export const pageComponents: Record<
 
 const tabPathSegments: Record<Tab, string> = {
   Chat: "chat",
+  Sessions: "sessions",
   Search: "search",
   Workspace: "workspace",
   KnowledgeBase: "knowledge",
@@ -77,6 +80,12 @@ const tabsByPathSegment = Object.fromEntries(
 export interface AdminRoute {
   tab: Tab;
   subView?: string;
+}
+
+/** Chat 頁深連結：從對話紀錄管理頁指定要開啟哪一筆對話。 */
+export interface ChatDeepLink {
+  sessionId: string;
+  personaId: string;
 }
 
 const PUBLIC_OPENVMAN_PREFIX = "/openvman";
@@ -122,6 +131,7 @@ export function buildAdminPath(
   tab: Tab,
   projectId = "default",
   subView?: string,
+  deepLink?: ChatDeepLink,
 ): string {
   const params = new URLSearchParams();
   if (projectId && projectId !== "default") {
@@ -130,7 +140,35 @@ export function buildAdminPath(
   if (subView) {
     params.set("view", subView);
   }
+  if (deepLink) {
+    params.set("session", deepLink.sessionId);
+    params.set("persona", deepLink.personaId);
+  }
 
   const query = params.toString();
   return publicAdminPath(`/admin/${tabPathSegments[tab]}${query ? `?${query}` : ""}`);
+}
+
+/**
+ * 讀取並清除網址上的對話深連結。
+ * 只在 Chat 頁掛載時消費一次，避免使用者切換對話後重新整理又跳回舊的那筆。
+ */
+export function consumeChatDeepLink(): ChatDeepLink | null {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session");
+  const personaId = params.get("persona");
+  if (!sessionId || !personaId) return null;
+
+  params.delete("session");
+  params.delete("persona");
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    `${window.location.pathname}${query ? `?${query}` : ""}`,
+  );
+
+  return { sessionId, personaId };
 }

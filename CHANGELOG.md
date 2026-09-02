@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Admin Session Management Page**: Added a dedicated Sessions workspace for cross-persona browsing, filtering, sorting, batch export, deletion, and one-click deep links back into Chat.
 - **Filtered Chat Session Export**: Added Admin JSON export for one, selected, or all filtered sessions, including the supported public message metadata while excluding internal-only fields.
 - **Scoped Portal Project Editing**: Allowed portal-enabled formal and temporary accounts to edit explicitly granted project content while reserving project creation, deletion, and global resource mutation for administrators.
 - **Watchtower Docker 29 Compatibility**: Configured the default deployment to use Watchtower Docker API `1.44`, matching Docker Engine 29's minimum API requirement while retaining label-only updates.

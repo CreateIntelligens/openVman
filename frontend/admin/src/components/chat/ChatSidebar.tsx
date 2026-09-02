@@ -1,20 +1,8 @@
 import { createPortal } from "react-dom";
 import type { PersonaSummary, SessionSummary } from "../../api";
 import Select from "../Select";
+import { buildAdminPath } from "../app/navigation";
 import { formatRelativeTime } from "./helpers";
-
-function getExportButtonLabel(
-  exporting: boolean,
-  selectedCount: number,
-): string {
-  if (exporting) {
-    return "匯出中…";
-  }
-  if (selectedCount > 0) {
-    return `匯出已選 (${selectedCount})`;
-  }
-  return "匯出篩選結果";
-}
 
 interface ChatSidebarProps {
   open: boolean;
@@ -25,24 +13,15 @@ interface ChatSidebarProps {
   loadingPersonas: boolean;
   sessions: SessionSummary[];
   loadingSessions: boolean;
-  exportingSessions: boolean;
-  selectedSessionIds: ReadonlySet<string>;
   sessionId: string;
   onPersonaChange: (id: string) => void;
   onResetConversation: () => void;
   onLoadSessions: () => void;
   onLoadSessionHistory: (id: string) => void;
-  onToggleSessionSelection: (id: string) => void;
-  onToggleAllSessions: () => void;
-  onExportSessions: (ids?: string[]) => void;
   onDeleteSession: (s: SessionSummary) => void;
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
-  dateFrom: string;
-  onDateFromChange: (value: string) => void;
-  dateTo: string;
-  onDateToChange: (value: string) => void;
-  onResetFilters: () => void;
+  onResetSearch: () => void;
 }
 
 export default function ChatSidebar({
@@ -54,24 +33,15 @@ export default function ChatSidebar({
   loadingPersonas,
   sessions,
   loadingSessions,
-  exportingSessions,
-  selectedSessionIds,
   sessionId,
   onPersonaChange,
   onResetConversation,
   onLoadSessions,
   onLoadSessionHistory,
-  onToggleSessionSelection,
-  onToggleAllSessions,
-  onExportSessions,
   onDeleteSession,
   searchQuery,
   onSearchQueryChange,
-  dateFrom,
-  onDateFromChange,
-  dateTo,
-  onDateToChange,
-  onResetFilters,
+  onResetSearch,
 }: ChatSidebarProps) {
   if (!open) return null;
 
@@ -163,75 +133,14 @@ export default function ChatSidebar({
                 )}
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-5 shrink-0 text-[0.625rem] text-content-subtle">
-                    起
-                  </span>
-                  <input
-                    type="datetime-local"
-                    step="1"
-                    value={dateFrom}
-                    onChange={(e) => onDateFromChange(e.target.value)}
-                    className="input min-w-0 flex-1 px-2 py-1 text-[0.6875rem]"
-                    title="起始時間"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-5 shrink-0 text-[0.625rem] text-content-subtle">
-                    迄
-                  </span>
-                  <input
-                    type="datetime-local"
-                    step="1"
-                    value={dateTo}
-                    onChange={(e) => onDateToChange(e.target.value)}
-                    className="input min-w-0 flex-1 px-2 py-1 text-[0.6875rem]"
-                    title="結束時間"
-                  />
-                </div>
-              </div>
-
-              {(searchQuery || dateFrom || dateTo) && (
+              {searchQuery && (
                 <button
-                  onClick={onResetFilters}
+                  onClick={onResetSearch}
                   className="flex w-full items-center justify-center gap-1 rounded border border-border bg-surface px-2 py-1 text-[0.6875rem] text-content-muted transition-colors hover:bg-surface-raised hover:text-content"
                 >
                   <span className="material-symbols-outlined text-[0.875rem]">filter_alt_off</span>
-                  清除篩選條件
+                  清除搜尋
                 </button>
-              )}
-
-              {sessions.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={onToggleAllSessions}
-                    disabled={loadingSessions || exportingSessions}
-                    className="shrink-0 text-[0.6875rem] text-content-muted transition-colors hover:text-content disabled:opacity-50"
-                  >
-                    {selectedSessionIds.size === sessions.length
-                      ? "取消全選"
-                      : "全選"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const selectedIds = [...selectedSessionIds];
-                      onExportSessions(selectedIds.length ? selectedIds : undefined);
-                    }}
-                    disabled={loadingSessions || exportingSessions}
-                    className="btn btn-ghost min-w-0 flex-1 gap-1 bg-surface-raised px-2 py-1.5 text-[0.6875rem] hover:border-border-strong"
-                  >
-                    <span className="material-symbols-outlined text-[0.875rem]">
-                      download
-                    </span>
-                    <span className="truncate">
-                      {getExportButtonLabel(
-                        exportingSessions,
-                        selectedSessionIds.size,
-                      )}
-                    </span>
-                  </button>
-                </div>
               )}
             </div>
 
@@ -241,7 +150,6 @@ export default function ChatSidebar({
               )}
               {sessions.map((s) => {
                 const isActive = s.session_id === sessionId;
-                const isSelected = selectedSessionIds.has(s.session_id);
                 return (
                   <div
                     key={s.session_id}
@@ -252,15 +160,6 @@ export default function ChatSidebar({
                         : "border-transparent hover:border-border hover:bg-surface"
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => onToggleSessionSelection(s.session_id)}
-                      onClick={(event) => event.stopPropagation()}
-                      disabled={exportingSessions}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                      aria-label={`選取對話 ${s.session_id.slice(0, 8)}`}
-                    />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex items-center justify-between gap-2">
                         <span
@@ -274,19 +173,6 @@ export default function ChatSidebar({
                           <span className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.625rem] text-content-subtle">
                             {s.message_count}
                           </span>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onExportSessions([s.session_id]);
-                            }}
-                            disabled={exportingSessions}
-                            className="flex h-6 w-6 items-center justify-center rounded text-content-subtle opacity-0 transition-all hover:bg-primary/10 hover:text-primary focus:opacity-100 disabled:cursor-not-allowed group-hover:opacity-100"
-                            title="匯出這筆對話"
-                          >
-                            <span className="material-symbols-outlined text-[0.875rem]">
-                              download
-                            </span>
-                          </button>
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
@@ -320,6 +206,14 @@ export default function ChatSidebar({
                 );
               })}
             </div>
+
+            <a
+              href={buildAdminPath("Sessions")}
+              className="mt-2 flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 py-2 text-[0.6875rem] text-content-muted transition-colors hover:bg-surface-raised hover:text-content"
+            >
+              <span className="material-symbols-outlined text-[0.875rem]">forum</span>
+              管理全部對話紀錄
+            </a>
           </div>
         </div>
       </aside>
