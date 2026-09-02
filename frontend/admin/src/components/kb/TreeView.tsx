@@ -11,6 +11,11 @@ import {
 } from "./helpers";
 import StatusDot from "./StatusDot";
 
+// QA 節點的操作按鈕以覆蓋方式掛在列尾：absolute 不佔文流，名稱才有完整寬度；
+// 用 opacity 而非 display 隱藏，鍵盤 Tab 仍能聚焦並讓按鈕群顯示。
+const QA_ACTIONS_OVERLAY_CLASS =
+  "absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-0.5 rounded-md bg-inherit pl-1 opacity-0 pointer-events-none transition-opacity focus-within:opacity-100 focus-within:pointer-events-auto group-hover:opacity-100 group-hover:pointer-events-auto";
+
 function TreeActionButton({
   title,
   icon,
@@ -299,7 +304,7 @@ export default function TreeView({
         aria-level={depth + 1}
         aria-label={node.name}
         tabIndex={isTreeTabStop ? 0 : -1}
-        className={`group flex cursor-pointer items-center px-2 py-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
+        className={`group relative flex cursor-pointer items-center px-2 py-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
           isDropTarget
             ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
             : isSelected
@@ -422,7 +427,7 @@ export default function TreeView({
         )}
 
         {isQaRoot && onCreateQaNode && (
-          <div className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <div className={QA_ACTIONS_OVERLAY_CLASS}>
             {onOrderQaNode && (
               <TreeActionButton
                 title="調整順序與可見性"
@@ -440,7 +445,7 @@ export default function TreeView({
         )}
 
         {isQaNode && qaNodeId && (
-          <div className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <div className={QA_ACTIONS_OVERLAY_CLASS}>
             {onToggleQaNodeHidden && (
               <TreeActionButton
                 title={node.qaHidden ? "顯示節點" : "隱藏節點"}
