@@ -2,7 +2,7 @@
 
 openVman Avatar SDK 會直接在宿主網站的 DOM 建立透明虛擬人，不使用 iframe，也不依賴 Vue、React 或宿主網站的 bundler。公開 global 為 `window.OpenVmanAvatar`。
 
-SDK 只提供角色渲染、音訊播放與嘴形同步，不開放 openVman 的 Brain、Chat、ASR 或 TTS。外部網站自行產生音訊後交給 SDK，因此初始化不需要 API Key，也不會呼叫 `/api/embed/*`。
+SDK 有兩種使用方式。預設是**播放模式**：只做角色渲染、音訊播放與嘴形同步，外部網站自行產生音訊後交給 SDK，初始化不需要任何金鑰。另一種是**對話模式**：初始化時提供 embed key（或在同源頁面沿用既有 session），即可用 `ask()` 讓 openVman 完成「回答 + 語音 + 嘴形」一整輪。未提供對話選項時，SDK 完全不會發出 chat 或 TTS 請求。
 
 ## 串接前準備
 
@@ -64,8 +64,87 @@ const avatar = await OpenVmanAvatar.init({
 | `container` | 否 | `document.body` | 指定時改為填滿該容器，不使用 viewport 懸浮位置。 |
 | `assetsBaseUrl` | 否 | SDK origin 的 `/static/characters` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
 | `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。 |
+| `embedKey` | 否 | 無 | 對話模式用的 embed key。設定後 `ask()` 會帶 `X-Embed-Key` 且不送 cookie；未設定則以同源 session cookie 呼叫。 |
+| `projectId` | 否 | 後端預設 | `ask()` 使用的專案 ID。使用 embed key 時必須與該金鑰綁定的專案一致，否則回 403。 |
+| `personaId` | 否 | 後端預設 | `ask()` 使用的人格 ID。 |
+| `tts` | 否 | 後端預設 | `{ provider, voice }`，指定 `ask()` 合成語音的 TTS 供應商與音色。 |
 
-同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`destroy()` 後必須重新載入頁面才能再次初始化。
+同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`embedKey`、`projectId`、`personaId` 與 `tts` 一併計入設定比對，因此只改對話選項再次 `init()` 同樣會被拒絕。`destroy()` 後必須重新載入頁面才能再次初始化。
+
+## 對話模式
+
+設定對話選項後，`await avatar.ask(text)` 會依序完成一整輪：送出 `POST /api/v1/chat`、派送 `reply` 事件、以回覆文字呼叫 `POST /v1/audio/speech`，再把合成音訊交給既有播放路徑驅動嘴型。Promise 會在語音播完（或被下一輪 `ask()` 中斷）後 resolve，回傳回覆文字；需要知道開口時機請監聽 `speaking` 事件。
+
+同一個 instance 的每次 `ask()` 都會沿用同一組 `session_id`，因此後端看得到完整上下文。新的 `ask()` 一定會先中止上一輪還在播的語音，不會兩段答案疊在一起。
+
+### 外部網站（embed key）
+
+embed key 是公開識別碼，不是密鑰，可以直接寫在前端。實際權限由後端的 origin allowlist、專案綁定、速率與每日配額決定，請在 Admin 的 Embed Keys 頁面建立並限定允許的 origin。
+
+```html
+<button id="ask" type="button">問一句</button>
+
+<script src="https://YOUR_OPENVMAN_HOST/static/sdk/openvman-avatar-sdk.js"></script>
+<script>
+  const avatarPromise = OpenVmanAvatar.init({
+    characterId: "000",
+    embedKey: "ovk_YOUR_EMBED_KEY",
+    projectId: "your-project",
+    personaId: "default",
+    tts: { provider: "voxcpm", voice: "zh-female" },
+  });
+
+  document.querySelector("#ask").addEventListener("click", async () => {
+    const avatar = await avatarPromise;
+    avatar.on("reply", ({ text }) => {
+      console.log("回覆：", text);
+    });
+
+    try {
+      await avatar.ask("請介紹一下你們的服務");
+    } catch (error) {
+      console.error(error.code, error.message);
+    }
+  });
+</script>
+```
+
+請求會帶 `X-Embed-Key` 且 `credentials: "omit"`，所以宿主網站的 cookie 不會外送。
+
+### 同源頁面（session）
+
+在已登入 openVman 的同源頁面省略 `embedKey` 即可，請求改以 `credentials: "include"` 送出，沿用既有 session cookie。
+
+```js
+const avatar = await OpenVmanAvatar.init({
+  characterId: "000",
+  projectId: "your-project",
+});
+
+const reply = await avatar.ask("今天有哪些待辦？");
+```
+
+### 對話事件與錯誤
+
+`ask()` 期間會派送 `reply`、`speaking` 與 `error` 事件；`error` 事件與 `ask()` reject 的錯誤內容相同，方便集中處理。
+
+```js
+avatar.on("reply", ({ text }) => renderBubble(text));
+avatar.on("error", ({ code, retryAfterSeconds }) => {
+  if (code === "RATE_LIMITED") {
+    showNotice(`請於 ${retryAfterSeconds ?? 60} 秒後再試。`);
+  }
+});
+```
+
+| 代碼 | 觸發情境 | 建議處理 |
+|---|---|---|
+| `UNAUTHORIZED` | HTTP 401 或 403：金鑰無效、已停用、origin 不在 allowlist，或 `projectId` 與金鑰綁定的專案不符。 | 停用對話 UI，不要重試。 |
+| `RATE_LIMITED` | HTTP 429：超過每分鐘速率或每日配額；有 `Retry-After` 時會帶 `retryAfterSeconds`。 | 依 `retryAfterSeconds` 退避後再試。 |
+| `CHAT_FAILED` | 其他對話失敗：網路錯誤、後端 5xx，或回應沒有 `reply`。 | 提示稍後再試。 |
+| `SPEECH_FAILED` | 語音合成失敗。此時 `reply` 事件已派送，宿主仍可只顯示文字。 | 降級為純文字回覆。 |
+
+若初始化時設定 `audioOutput: "silent"`，`ask()` 一樣會驅動嘴型並正常 resolve，只是 SDK 不出聲，適合宿主自行播放同一段語音的情境。
 
 ## JavaScript API
 
@@ -82,6 +161,10 @@ for (const { charId, label } of characters) {
   characterSelect.append(option);
 }
 ```
+
+### `await avatar.ask(text)`
+
+只在對話模式可用，完成一整輪對話並回傳回覆文字，詳見上方[對話模式](#對話模式)。
 
 ### `await avatar.playAudio(source)`
 
@@ -124,7 +207,8 @@ for await (const chunk of pcmStream) {
 |---|---|---|
 | `ready` | `{ type: "ready" }` | runtime 與角色已可用；在 init 完成後訂閱也會收到。 |
 | `speaking` | `{ type, state: "start" \| "stop" }` | 音訊播放狀態。 |
-| `error` | `{ type, code, message }` | 音訊、資源或 autoplay 錯誤。 |
+| `reply` | `{ type, text }` | 對話模式取得回覆文字，於語音合成前派送。 |
+| `error` | `{ type, code, message, retryAfterSeconds? }` | 音訊、資源、autoplay 或對話錯誤；`retryAfterSeconds` 只在 `RATE_LIMITED` 出現。 |
 | `destroyed` | `{ type: "destroyed" }` | instance 已清理。 |
 
 ## CSP
@@ -147,8 +231,10 @@ SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'un
 | `/api/v1/characters` | 可用角色清單（唯讀，無需驗證）。 |
 | `/static/characters/<characterId>/combined_data.json.gz` | 角色驅動資料。 |
 | `/static/characters/<characterId>/01.webm` | 透明角色影片。 |
+| `/api/v1/chat` | 對話模式的回答端點（需 embed key 或 session）。 |
+| `/v1/audio/speech` | 對話模式的語音合成端點（需 embed key 或 session）。 |
 
-`/api/embed/*`、`/ws/embed/*`、`/embed/avatar`、`/vman-embed.js` 與 `<vman-avatar>` 都不是支援的串接面，且已全數回 404。openVman 內部使用的 `/api/v1/*` 其餘端點不屬於 Avatar SDK 公開契約。
+`/api/embed/*`、`/ws/embed/*`、`/embed/avatar`、`/vman-embed.js` 與 `<vman-avatar>` 都不是支援的串接面，且已全數回 404。除上表列出者外，openVman 內部使用的 `/api/v1/*` 其餘端點不屬於 Avatar SDK 公開契約；embed key 也只能存取上表所列路徑。
 
 ## 錯誤碼
 
@@ -161,6 +247,10 @@ SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'un
 | `RESOURCE_LOAD_FAILED` | vendor JS、WASM 或角色資源載入失敗。 |
 | `AUDIO_PLAYBACK_FAILED` | 音訊讀取、解碼或播放失敗。 |
 | `AUTOPLAY_BLOCKED` | 瀏覽器要求先有 click／tap 等 user gesture。 |
+| `UNAUTHORIZED` | 對話請求回 401 或 403。 |
+| `RATE_LIMITED` | 對話請求回 429，可能帶 `retryAfterSeconds`。 |
+| `CHAT_FAILED` | 對話請求失敗或回應缺少 `reply`。 |
+| `SPEECH_FAILED` | 語音合成請求失敗。 |
 
 ## 排錯
 

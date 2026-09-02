@@ -12,7 +12,7 @@ The `openvman-avatar-sdk.js` bundle SHALL accept `embedKey`, `projectId`, `perso
 - **THEN** the second call is rejected with `INSTANCE_EXISTS` as for any other differing option
 
 ### Requirement: ask(text) runs a full turn
-An instance SHALL provide `ask(text): Promise<string>` that sends the text to `POST /api/v1/chat` with the instance's `project_id`, `persona_id`, and a per-instance `session_id`, emits a `reply` event with the answer text, requests `POST /v1/audio/speech` with the configured provider and voice, and plays the returned audio through the runtime. The promise SHALL resolve with the reply text after playback starts.
+An instance SHALL provide `ask(text): Promise<string>` that sends the text to `POST /api/v1/chat` with the instance's `project_id`, `persona_id`, and a per-instance `session_id`, emits a `reply` event with the answer text, requests `POST /v1/audio/speech` with the configured provider and voice, and plays the returned audio through the runtime. The promise SHALL resolve with the reply text once playback has finished or been interrupted; hosts that need the start of speech use the `speaking` event.
 
 #### Scenario: Keyed host
 - **WHEN** `init` received `embedKey` and the host calls `ask("你好")`

@@ -13,9 +13,15 @@
         place-items: center;
       }
 
-      button {
+      button,
+      input[type="text"] {
         font: inherit;
         padding: 0.75rem 1rem;
+      }
+
+      #reply {
+        margin: 0.75rem 0 0;
+        min-height: 1.5em;
       }
     </style>
   </head>
@@ -26,20 +32,38 @@
         <input id="audio-file" type="file" accept="audio/*" disabled>
       </label>
       <button id="stop" type="button" disabled>停止</button>
+
+      <p>
+        <input id="question" type="text" value="請介紹一下你們的服務" disabled>
+        <button id="ask" type="button" disabled>問一句</button>
+      </p>
+      <p id="reply"></p>
     </main>
 
     <script src="https://YOUR_OPENVMAN_HOST/static/sdk/openvman-avatar-sdk.js"></script>
     <script>
       const audioFile = document.querySelector("#audio-file");
       const stopButton = document.querySelector("#stop");
+      const question = document.querySelector("#question");
+      const askButton = document.querySelector("#ask");
+      const replyText = document.querySelector("#reply");
       let avatar;
 
       OpenVmanAvatar.init({
         characterId: "000",
+        // 對話模式：填入 Admin 建立的 embed key 與專案。
+        // 同源且已登入的頁面可省略 embedKey，改用既有 session。
+        embedKey: "ovk_YOUR_EMBED_KEY",
+        projectId: "your-project",
       }).then((instance) => {
         avatar = instance;
         audioFile.disabled = false;
         stopButton.disabled = false;
+        question.disabled = false;
+        askButton.disabled = false;
+        avatar.on("reply", ({ text }) => {
+          replyText.textContent = text;
+        });
         avatar.on("error", ({ code, message }) => {
           console.error(code, message);
         });
@@ -54,6 +78,23 @@
 
       stopButton.addEventListener("click", () => {
         avatar?.interrupt();
+      });
+
+      askButton.addEventListener("click", async () => {
+        const text = question.value.trim();
+        if (!avatar || !text) return;
+
+        askButton.disabled = true;
+        replyText.textContent = "思考中…";
+        try {
+          await avatar.ask(text);
+        } catch (error) {
+          replyText.textContent = error.code === "RATE_LIMITED"
+            ? `請於 ${error.retryAfterSeconds ?? 60} 秒後再試。`
+            : `對話失敗：${error.code}`;
+        } finally {
+          askButton.disabled = false;
+        }
       });
     </script>
   </body>

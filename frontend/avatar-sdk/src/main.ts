@@ -1,4 +1,5 @@
 import { AvatarAudio } from "./audio";
+import { AvatarConversation } from "./chat";
 import { createAvatarDom, removeAvatarDom } from "./dom";
 import { OpenVmanAvatarError } from "./errors";
 import { AvatarRuntime } from "./runtime";
@@ -45,8 +46,13 @@ function signature(options: OpenVmanAvatarOptions): string {
     audioOutput: options.audioOutput ?? "speaker",
     characterId: options.characterId,
     container: containerId(options.container),
+    embedKey: options.embedKey,
     height: options.height,
+    personaId: options.personaId,
     position: options.position,
+    projectId: options.projectId,
+    ttsProvider: options.tts?.provider,
+    ttsVoice: options.tts?.voice,
     width: options.width,
     zIndex: options.zIndex,
   });
@@ -181,7 +187,34 @@ async function createInstance(
     }
   };
 
+  const conversation = new AvatarConversation(resourceBaseUrl, options, {
+    interrupt: () => audio.interrupt(),
+    onReply: (text) => emit("reply", { text, type: "reply" }),
+    playAudio: (source) => audio.playAudio(source),
+  });
+
   const instance: OpenVmanAvatarInstance = {
+    async ask(text) {
+      try {
+        return await conversation.ask(text);
+      } catch (error) {
+        const publicError = error instanceof OpenVmanAvatarError
+          ? error
+          : new OpenVmanAvatarError(
+            "CHAT_FAILED",
+            error instanceof Error ? error.message : String(error),
+          );
+        emit("error", {
+          code: publicError.code,
+          message: publicError.message,
+          ...(publicError.retryAfterSeconds === undefined
+            ? {}
+            : { retryAfterSeconds: publicError.retryAfterSeconds }),
+          type: "error",
+        });
+        throw publicError;
+      }
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;

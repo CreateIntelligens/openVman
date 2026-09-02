@@ -35,10 +35,10 @@
 
 ## 6. SDK Conversation
 
-- [ ] 6.1 Add `embedKey`, `projectId`, `personaId`, and `tts` options to the SDK types and instance signature
-- [ ] 6.2 Implement a chat module with `ask(text)`, per-instance session id, `reply` event, credential mode selection, and the four named error codes
-- [ ] 6.3 Add contract tests for keyed, session, continuity, interrupt, silent, and error scenarios
-- [ ] 6.4 Document keyed and session usage with `ask()` in `docs/avatar-embed/README.md`
+- [x] 6.1 Add `embedKey`, `projectId`, `personaId`, and `tts` options to the SDK types and instance signature
+- [x] 6.2 Implement a chat module with `ask(text)`, per-instance session id, `reply` event, credential mode selection, and the four named error codes
+- [x] 6.3 Add contract tests for keyed, session, continuity, interrupt, silent, and error scenarios
+- [x] 6.4 Document keyed and session usage with `ask()` in `docs/avatar-embed/README.md`
 
 ## 7. Documentation and Verification
 
