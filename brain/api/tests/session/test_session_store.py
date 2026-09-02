@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -250,6 +250,29 @@ def test_list_sessions_filters_by_date_range(store: SessionStore):
 
     sessions_future = store.list_sessions("default", date_from="2099-01-01")
     assert sessions_future == []
+
+
+def test_list_sessions_filters_by_datetime_precision(store: SessionStore):
+    store.get_or_create_session("s1", "default")
+    store.append_message("s1", "default", "user", "hello")
+    now_local = datetime.now(ZoneInfo("Asia/Taipei"))
+
+    before = (now_local - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    after = (now_local + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    within = store.list_sessions("default", date_from=before, date_to=after)
+    assert [session["session_id"] for session in within] == ["s1"]
+
+    # 起始時間晚於建立時刻 1 分鐘，應被排除（純日期篩選抓不到這種差異）
+    excluded = store.list_sessions("default", date_from=after)
+    assert excluded == []
+
+    # 省略秒數時，結束邊界要補到 :59 才不會把同分鐘的紀錄切掉
+    minute_only = store.list_sessions(
+        "default",
+        date_to=now_local.strftime("%Y-%m-%dT%H:%M"),
+    )
+    assert [session["session_id"] for session in minute_only] == ["s1"]
 
 
 # ------------------------------------------------------------------

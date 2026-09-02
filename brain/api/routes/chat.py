@@ -18,8 +18,8 @@ from core.sse_events import (
     build_exception_protocol_error,
     build_protocol_error,
 )
+from protocol.history import serialize_history_messages
 from protocol.message_envelope import (
-    METADATA_ACTION_REQUESTS,
     METADATA_ORIGINAL_USER_MESSAGE,
     build_message_envelope,
     merge_metadata,
@@ -110,31 +110,5 @@ async def chat_history(session_id: str, project_id: str = "default", persona_id:
     from memory.memory import list_session_messages
 
     messages = list_session_messages(session_id=session_id, persona_id=persona_id, project_id=project_id)
-    history: list[dict[str, Any]] = []
-    for message in messages:
-        metadata = message.get("metadata") if isinstance(message, dict) else None
-        entry = {k: v for k, v in message.items() if k != "metadata"}
-        if isinstance(metadata, dict):
-            action_requests = metadata.get(METADATA_ACTION_REQUESTS)
-            if isinstance(action_requests, list) and action_requests:
-                entry[METADATA_ACTION_REQUESTS] = action_requests
-            tool_steps = metadata.get("tool_steps")
-            if isinstance(tool_steps, list) and tool_steps:
-                entry["tool_steps"] = tool_steps
-            rts = metadata.get("response_time_s")
-            if rts is not None:
-                entry["response_time_s"] = rts
-            pw = metadata.get("privacy_warning")
-            if isinstance(pw, dict) and pw:
-                entry["privacy_warning"] = pw
-            citations = metadata.get("citations")
-            if isinstance(citations, list) and citations:
-                entry["citations"] = citations
-            image_id = metadata.get("image_id")
-            if isinstance(image_id, str) and image_id:
-                entry["image_id"] = image_id
-            url = metadata.get("url")
-            if isinstance(url, str) and url:
-                entry["url"] = url
-        history.append(entry)
+    history = serialize_history_messages(messages)
     return {"session_id": session_id, "persona_id": persona_id, "history": history}

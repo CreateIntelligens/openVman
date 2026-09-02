@@ -63,6 +63,8 @@ export default function Chat() {
     privacyWarningsVisible,
     sessions,
     loadingSessions,
+    exportingSessions,
+    selectedSessionIds,
     deleteSessionTarget,
     chatEndRef,
     starterPrompts,
@@ -78,6 +80,9 @@ export default function Chat() {
     playTts,
     loadSessions,
     loadSessionHistory,
+    toggleSessionSelection,
+    toggleAllSessions,
+    exportSessionHistory,
     submit,
     stopStreaming,
     resetConversation,
@@ -274,11 +279,16 @@ export default function Chat() {
         loadingPersonas={loadingPersonas}
         sessions={sessions}
         loadingSessions={loadingSessions}
+        exportingSessions={exportingSessions}
+        selectedSessionIds={selectedSessionIds}
         sessionId={sessionId}
         onPersonaChange={handlePersonaChange}
         onResetConversation={resetConversation}
         onLoadSessions={loadSessions}
         onLoadSessionHistory={loadSessionHistory}
+        onToggleSessionSelection={toggleSessionSelection}
+        onToggleAllSessions={toggleAllSessions}
+        onExportSessions={exportSessionHistory}
         onDeleteSession={setDeleteSessionTarget}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}

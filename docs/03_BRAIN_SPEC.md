@@ -334,6 +334,10 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 * `MEMORY.md`、`memory/`、`.learnings/` 可以共享（全域知識）或獨立（角色專屬記憶），依業務需求設定。
 * LanceDB 檢索時，可透過 metadata 中的 `persona_id` 欄位進行過濾。
 
+#### 11.1 對話紀錄匯出
+
+`GET /brain/sessions/export` 依 `project_id`、`persona_id`、日期與關鍵字篩選 SQLite session，並可用逗號分隔的 `session_ids` 限定單筆或多筆。回應包含 session 摘要、依時間排序且移除內部 metadata 的訊息、匯出時間與總筆數。外部呼叫一律經 Backend `/api/sessions/export` 代理與專案讀取權限檢查。
+
 ### 12. 安全防護 (Guardrails)
 
 **10.1 輸入過濾 (Input Sanitization)**

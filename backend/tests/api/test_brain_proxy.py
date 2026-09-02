@@ -177,6 +177,7 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
     assert "/api/knowledge/upload" in paths
     assert "/api/knowledge/document/meta" in paths
     assert "/api/knowledge/note" in paths
+    assert "/api/sessions/export" in paths
 
 
 def test_project_content_writes_require_edit_access() -> None:

@@ -43,13 +43,24 @@ def _local_date_to_utc_iso(
     *,
     end_of_day: bool = False,
 ) -> str | None:
+    """把前端傳來的本地時間邊界轉成 UTC ISO 字串。
+
+    純日期 (YYYY-MM-DD) 會補成當天的起訖秒；帶時間的值則尊重使用者指定的
+    時分秒，只在省略秒數時補滿邊界，讓區間篩選可以精確到秒。
+    """
     if not date_str:
         return None
 
+    value = date_str.strip().replace("T", " ")
     boundary_time = "23:59:59" if end_of_day else "00:00:00"
+    if " " not in value:
+        value = f"{value} {boundary_time}"
+    elif value.count(":") == 1:
+        value = f"{value}:{'59' if end_of_day else '00'}"
+
     try:
         local_datetime = datetime.strptime(
-            f"{date_str} {boundary_time}",
+            value,
             "%Y-%m-%d %H:%M:%S",
         ).replace(tzinfo=ZoneInfo("Asia/Taipei"))
     except ValueError:
