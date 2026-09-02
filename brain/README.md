@@ -343,14 +343,23 @@ FastAPI 入口。負責：
 user input
   -> validate
   -> session append
-  -> embed query
-  -> search knowledge + memories
-  -> build prompt from workspace + retrieval context
-  -> call LLM
+  -> build prompt from workspace + persona + history
+  -> LLM call 1（強制 tool_choice=search_knowledge，帶完整 tool schema）
+  -> 執行 search_knowledge（AI 改寫的 queries + 原始使用者訊息一併檢索後合併去重）
+  -> LLM call 2（不帶 tools，只能就檢索結果作答；串流走這一回合）
   -> append assistant reply
   -> archive daily memory
   -> capture learnings / errors
 ```
+
+一般使用者回合固定是「先查、再答」兩次呼叫。行為由根目錄 `.env` 控制：
+
+- `CHAT_FORCE_KNOWLEDGE_SEARCH`（預設 `true`）：第一次呼叫強制走 `search_knowledge`。
+  只在該工具真的註冊給當前 persona/project 時生效；slash command 指定的工具永遠優先。
+- `CHAT_ANSWER_PASS_TEXT_ONLY`（預設 `true`）：作答回合不帶 tools，模型無法再開新工具輪。
+
+兩者都關閉即退回舊的 `tool_choice=auto` 多輪行為。若 provider 忽略強制設定直接回文字，
+該文字會被接受為答案並記一筆 warning，不會卡在迴圈裡。
 
 ## 8. API 一覽
 

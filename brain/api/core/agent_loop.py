@@ -51,11 +51,15 @@ class AgentLoopResult:
 
 
 def _build_turn_kwargs(
-    tools: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
     forced_tool_name: str | None,
     cfg: Any,
 ) -> dict[str, Any]:
-    """Build the shared kwargs for generate_chat_turn / stream_chat_turn calls."""
+    """Build the shared kwargs for generate_chat_turn / stream_chat_turn calls.
+
+    ``tools=None`` is the text-only answer pass: llm_client omits both ``tools``
+    and ``tool_choice``, so the provider cannot open another tool round.
+    """
     kwargs: dict[str, Any] = {"tools": tools, "privacy_source": "tool"}
     if forced_tool_name:
         kwargs["forced_tool_name"] = forced_tool_name
@@ -68,7 +72,7 @@ def _build_turn_kwargs(
 def _generate_turn(
     messages: list[dict[str, Any]],
     *,
-    tools: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
     forced_tool_name: str | None = None,
 ) -> LLMReply:
     return generate_chat_turn(messages, **_build_turn_kwargs(tools, forced_tool_name, get_settings()))
@@ -77,10 +81,13 @@ def _generate_turn(
 def _stream_turn(
     messages: list[dict[str, Any]],
     *,
-    tools: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
     forced_tool_name: str | None = None,
 ) -> LLMReply:
     return stream_chat_turn(messages, **_build_turn_kwargs(tools, forced_tool_name, get_settings()))
+
+
+KNOWLEDGE_SEARCH_TOOL = "search_knowledge"
 
 
 def run_agent_loop(
@@ -89,9 +96,16 @@ def run_agent_loop(
     project_id: str = "default",
     *,
     forced_tool_name: str | None = None,
+    allow_forced_knowledge_search: bool = False,
 ) -> AgentLoopResult:
     """Run a bounded think -> tool -> observe loop until the model returns text."""
-    working_messages, tool_steps, final_turn = _run_tool_phase(messages, persona_id, project_id, forced_tool_name=forced_tool_name)
+    working_messages, tool_steps, final_turn = _run_tool_phase(
+        messages,
+        persona_id,
+        project_id,
+        forced_tool_name=forced_tool_name,
+        allow_forced_knowledge_search=allow_forced_knowledge_search,
+    )
     if final_turn is None:
         raise ToolPhaseError(
             "工具調用超出最大輪次",
@@ -104,12 +118,34 @@ def run_agent_loop(
     return AgentLoopResult(reply=reply, tool_steps=tool_steps)
 
 
+def _resolve_forced_first_tool(
+    cfg: Any,
+    tools: list[dict[str, Any]],
+    forced_tool_name: str | None,
+    allow_forced_knowledge_search: bool,
+) -> str | None:
+    """Decide which tool (if any) the first LLM call must call.
+
+    A slash-command forced tool always wins. Otherwise, an ordinary user turn
+    is pinned to search_knowledge so the model cannot answer from memory —
+    but only when the tool is actually registered for this persona/project.
+    """
+    if forced_tool_name:
+        return forced_tool_name
+    if not (allow_forced_knowledge_search and cfg.chat_force_knowledge_search):
+        return None
+    if any(t.get("function", {}).get("name") == KNOWLEDGE_SEARCH_TOOL for t in tools):
+        return KNOWLEDGE_SEARCH_TOOL
+    return None
+
+
 def _run_tool_phase(
     messages: list[dict[str, Any]],
     persona_id: str,
     project_id: str = "default",
     *,
     forced_tool_name: str | None = None,
+    allow_forced_knowledge_search: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
     """Execute tool call rounds until the LLM returns a text turn or rounds are exhausted.
 
@@ -123,6 +159,10 @@ def _run_tool_phase(
     tools = registry.build_openai_tools()
     hallucination_pattern = _build_hallucination_pattern(tools)
     hallucination_retried = False
+    first_forced = _resolve_forced_first_tool(
+        cfg, tools, forced_tool_name, allow_forced_knowledge_search
+    )
+    text_only_answer_pass = bool(first_forced and cfg.chat_answer_pass_text_only)
 
     last_user_message = next(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
@@ -130,9 +170,18 @@ def _run_tool_phase(
     )
     with bind_tool_context(persona_id, project_id, user_message=last_user_message):
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
-            current_forced = forced_tool_name if iteration == 0 else None
-            turn_fn = _stream_turn if iteration == 0 else _generate_turn
-            turn = turn_fn(working_messages, tools=tools, forced_tool_name=current_forced)
+            current_forced = first_forced if iteration == 0 else None
+            # 作答回合起一律不帶 tools（含幻覺重試的後續回合），模型無法再開新的工具輪。
+            answer_pass = text_only_answer_pass and iteration >= 1
+            current_tools = None if answer_pass else tools
+            # stream_chat_turn 只是把 provider 串流即時消化成完整 LLMReply（沒有 token
+            # 外送給用戶端），所以串流純粹是 TTFB 最佳化：把它留給實際產生長文的作答回合，
+            # 強制搜尋那一回合只會吐 tool_call，不需要串流。
+            if text_only_answer_pass:
+                turn_fn = _stream_turn if answer_pass else _generate_turn
+            else:
+                turn_fn = _stream_turn if iteration == 0 else _generate_turn
+            turn = turn_fn(working_messages, tools=current_tools, forced_tool_name=current_forced)
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue
@@ -145,6 +194,12 @@ def _run_tool_phase(
                 hallucination_retried = True
                 working_messages.append({"role": "user", "content": _HALLUCINATED_TOOL_RETRY_MSG})
                 continue
+            if iteration == 0 and current_forced:
+                # 部分 provider 會忽略 tool_choice 直接回文字；接受它當答案，不要再繞圈。
+                logger.warning(
+                    "provider ignored forced tool_choice=%s and returned text — accepting as answer",
+                    current_forced,
+                )
             return working_messages, tool_steps, turn
 
     return working_messages, tool_steps, None

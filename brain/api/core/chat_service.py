@@ -373,6 +373,11 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             persona_id=context.persona_id,
             project_id=project_id,
             forced_tool_name=context.forced_tool_name,
+            # 只有一般使用者回合才強制先查知識庫：slash command 已指定工具，
+            # role=tool 的訊息雖然 path 也是 "tool" 但 skip_rag=True，都不該強制。
+            allow_forced_knowledge_search=(
+                not context.route.skip_rag and not context.forced_tool_name
+            ),
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)

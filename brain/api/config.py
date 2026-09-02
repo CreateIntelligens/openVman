@@ -151,6 +151,10 @@ class BrainSettings(BaseSettings):
     # e.g. "gemini-2.0-flash-lite" for faster forced tool calls
     forced_tool_model_override: str = ""
     forced_tool_max_tokens: int = 200
+    # 一般使用者回合的第一次 LLM 呼叫強制走 search_knowledge，避免模型憑記憶亂答。
+    chat_force_knowledge_search: bool = True
+    # 工具結果回填後的作答回合不帶 tools，模型無法再繼續開新的工具輪。
+    chat_answer_pass_text_only: bool = True
 
     # === Web Search ===
     gateway_base_url: str = "http://backend:8200"
