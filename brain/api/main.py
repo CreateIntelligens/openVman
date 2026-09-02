@@ -42,6 +42,9 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("brain")
+# httpx/httpcore 每個請求都印 INFO，readiness 探測 embedding 一分鐘數十行；只留警告以上
+for _noisy_logger in ("httpx", "httpcore"):
+    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
 
 _UVICORN_LOG_CONFIG = {
     "version": 1,

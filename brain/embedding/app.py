@@ -28,6 +28,25 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("embedding_service")
+for _noisy_logger in ("httpx", "httpcore"):
+    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
+
+_ACCESS_LOG_SILENT_PATHS = frozenset({"/health", "/health/ready"})
+
+
+class _SilentHealthAccessFilter(logging.Filter):
+    """Drop uvicorn access log lines for liveness/readiness polling."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn access log: args = (client, method, path, http_version, status)
+        if not isinstance(args, tuple) or len(args) < 5:
+            return True
+        path = str(args[2]).split("?")[0]
+        return not (args[4] == 200 and path in _ACCESS_LOG_SILENT_PATHS)
+
+
+logging.getLogger("uvicorn.access").addFilter(_SilentHealthAccessFilter())
 
 # --- Service Environment Configuration ---
 BEARER_TOKEN = (os.getenv("EMBEDDING_BEARER_TOKEN") or os.getenv("GATEWAY_INTERNAL_TOKEN") or "").strip()

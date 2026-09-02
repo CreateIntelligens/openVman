@@ -259,6 +259,8 @@ services:
   redis:
     <<: *shared
     image: redis:7-alpine
+    # RDB 每幾分鐘存檔都印五行，只留警告以上
+    command: ["redis-server", "--loglevel", "warning"]
     volumes:
       - redis-data:/data
 
@@ -273,6 +275,7 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=30d
+      - --log.level=warn
 
   grafana:
     <<: *shared

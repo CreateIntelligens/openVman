@@ -98,6 +98,11 @@ _UVICORN_LOG_CONFIG = {
     },
 }
 
+for _noisy_logger in ("httpx", "httpcore"):
+    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
+
+# 角色影片、VRM、背景圖由瀏覽器分段抓取，一次播放就是幾十行 200/206
+_ACCESS_LOG_SILENT_PREFIXES = ("/assets/", "/mascots/", "/backgrounds/")
 _ACCESS_LOG_SILENT_PATHS = frozenset({
     "/api/health",
     "/api/health/detailed",
@@ -135,10 +140,12 @@ class _SilentAccessPathsFilter(logging.Filter):
         path = str(args[2]).split("?")[0]
         status = args[4]
 
-        if status == 200:
+        if status in (200, 206):
             if path in _ACCESS_LOG_SILENT_PATHS:
                 return False
             if method == "GET" and path in _DASHBOARD_POLLING_PATHS:
+                return False
+            if method == "GET" and path.startswith(_ACCESS_LOG_SILENT_PREFIXES):
                 return False
 
         return True
