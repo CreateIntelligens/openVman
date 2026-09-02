@@ -18,6 +18,7 @@ _RESOURCE_NOT_FOUND = "Resource not found"
 
 class ResourceAccess(StrEnum):
     READ = "read"
+    EDIT = "edit"
     MUTATE = "mutate"
 
 
@@ -48,8 +49,13 @@ def resolve_resource(
         return record
     if record.owner_user_id == account.id:
         return record
+    grant_allows_access = access is ResourceAccess.READ or (
+        access is ResourceAccess.EDIT
+        and resource_type is ResourceType.PROJECT
+        and account.admin_portal_access
+    )
     if (
-        access is ResourceAccess.READ
+        grant_allows_access
         and resources.has_grant(account.id, resource_type, resource_id)
     ):
         return record

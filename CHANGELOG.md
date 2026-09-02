@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Scoped Portal Project Editing**: Allowed portal-enabled formal and temporary accounts to edit explicitly granted project content while reserving project creation, deletion, and global resource mutation for administrators.
 - **Watchtower Docker 29 Compatibility**: Configured the default deployment to use Watchtower Docker API `1.44`, matching Docker Engine 29's minimum API requirement while retaining label-only updates.
 - **Docker Hub Multi-Architecture CI/CD**: Added `docker-publish.yml` using Node.js 24-compatible Docker actions, Buildx, and QEMU. Backend, Admin, and Avatar images publish `linux/amd64` + `linux/arm64`; CUDA/PyTorch Brain API and Embedding images publish `linux/amd64`.
 - **Worktree HMR Compose Override**: Made `docker-compose.yml` the production-first, public-registry deployment with Watchtower enabled by default, and added `docker-compose.dev.yml` to restore source mounts, Python reload mode, frontend HMR volumes, and Watchtower isolation for Git worktrees.

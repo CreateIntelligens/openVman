@@ -59,7 +59,7 @@ def _trusted_brain_headers(
     }
 
 
-def _require_project_mutation(
+def _require_project_edit(
     runtime: AuthRuntime,
     current: CurrentAccount,
     project_id: str,
@@ -70,7 +70,7 @@ def _require_project_mutation(
             current.user,
             ResourceType.PROJECT,
             project_id,
-            access=ResourceAccess.MUTATE,
+            access=ResourceAccess.EDIT,
         )
     except ResourceNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Resource not found") from exc
@@ -434,7 +434,7 @@ async def upload_knowledge_documents(
 ) -> Response:
     cfg = get_tts_config()
     client = _brain_http.get()
-    _require_project_mutation(runtime, current, project_id)
+    _require_project_edit(runtime, current, project_id)
     trusted_headers = _trusted_brain_headers(
         current,
         project_id,
@@ -537,7 +537,7 @@ async def ingest_youtube_transcript(
     if not req.save_to_knowledge:
         return JSONResponse(content=result)
 
-    _require_project_mutation(runtime, current, req.project_id)
+    _require_project_edit(runtime, current, req.project_id)
 
     filename = f"{result['title']}.md"
     markdown_bytes = f"# {result['title']}\n\n{result['content']}".encode("utf-8")

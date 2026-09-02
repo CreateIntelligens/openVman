@@ -359,7 +359,7 @@ export default function AccountAccessFields({
         <span>
           <span className="block text-sm font-semibold">允許進入管理後台</span>
           <span className="mt-1 block text-xs leading-5 text-content-muted">
-            預設不允許；開啟後仍只看得到下方授權的資源，並不會取得帳號管理權限。
+            預設不允許；開啟後可檢視並編輯下方授權的專案，但不會取得帳號管理或專案建立／刪除權限。
           </span>
         </span>
       </label>

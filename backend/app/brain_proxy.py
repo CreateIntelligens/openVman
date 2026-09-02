@@ -198,12 +198,11 @@ def _project_access(path: str, method: str) -> ResourceAccess:
     normalized = path.strip("/")
     if method.upper() in _SAFE_METHODS:
         return ResourceAccess.READ
-    if normalized.startswith(("knowledge/", "personas/", "skills/", "tools/")):
-        return ResourceAccess.MUTATE
-    if normalized == "knowledge" or normalized in {"personas", "skills", "tools"}:
-        return ResourceAccess.MUTATE
+    project_area = normalized.partition("/")[0]
+    if project_area in {"knowledge", "personas", "skills", "tools"}:
+        return ResourceAccess.EDIT
     if normalized == "memories/maintain":
-        return ResourceAccess.MUTATE
+        return ResourceAccess.EDIT
     return ResourceAccess.READ
 
 

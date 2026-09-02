@@ -72,6 +72,10 @@ describe("Accounts", () => {
   it("selects access before creating a formal user", async () => {
     render(<Accounts />);
 
+    expect(
+      await screen.findByText(/可檢視並編輯下方授權的專案/),
+    ).toBeTruthy();
+
     fireEvent.change(screen.getByLabelText("帳號"), {
       target: { value: "alice" },
     });

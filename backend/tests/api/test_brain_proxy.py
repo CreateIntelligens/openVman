@@ -7,10 +7,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from app.auth.models import AccountRole
+from app.auth.dependencies import AuthTransport, CurrentAccount, get_current_account
+from app.auth.models import (
+    AccountRole,
+    AccountType,
+    ResourceType,
+    UserRecord,
+)
+from app.auth.resources import ResourceAccess
 
 
 def _mock_cfg():
@@ -49,6 +57,26 @@ def _make_response(
     response.aclose = AsyncMock(return_value=None)
     response.aiter_bytes = MagicMock()
     return response
+
+
+def _portal_current() -> CurrentAccount:
+    return CurrentAccount(
+        user=UserRecord(
+            id="portal-user",
+            username="portal-user",
+            username_normalized="portal-user",
+            password_hash="hash",
+            role=AccountRole.USER,
+            account_type=AccountType.FORMAL,
+            disabled=False,
+            token_version=0,
+            created_at="2026-09-01T00:00:00+00:00",
+            updated_at="2026-09-01T00:00:00+00:00",
+            created_by=None,
+            admin_portal_access=True,
+        ),
+        transport=AuthTransport.BEARER,
+    )
 
 
 @pytest.fixture()
@@ -149,6 +177,59 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
     assert "/api/knowledge/upload" in paths
     assert "/api/knowledge/document/meta" in paths
     assert "/api/knowledge/note" in paths
+
+
+def test_project_content_writes_require_edit_access() -> None:
+    from app.brain_proxy import _project_access
+
+    assert _project_access("knowledge/document", "PUT") is ResourceAccess.EDIT
+    assert _project_access("personas", "POST") is ResourceAccess.EDIT
+    assert _project_access("skills/example", "DELETE") is ResourceAccess.EDIT
+    assert _project_access("tools/example", "PATCH") is ResourceAccess.EDIT
+    assert _project_access("memories/maintain", "POST") is ResourceAccess.EDIT
+    assert _project_access("knowledge/document", "GET") is ResourceAccess.READ
+
+
+@pytest.mark.parametrize(
+    ("granted", "expected_status"),
+    [(True, 200), (False, 404)],
+)
+def test_portal_user_can_only_forward_granted_project_edits(
+    granted: bool,
+    expected_status: int,
+) -> None:
+    from app.brain_proxy import router
+
+    app = FastAPI()
+    app.include_router(router)
+    current = _portal_current()
+
+    def current_account(request: Request) -> CurrentAccount:
+        request.state.current_account = current
+        return current
+
+    app.dependency_overrides[get_current_account] = current_account
+    runtime = MagicMock()
+    runtime.resources.get.return_value = MagicMock(owner_user_id="admin-user")
+    runtime.resources.has_grant.return_value = granted
+    upstream = _make_response()
+    mock_client = MagicMock()
+    mock_client.build_request.return_value = "request"
+    mock_client.send = AsyncMock(return_value=upstream)
+
+    with (
+        patch("app.brain_proxy.get_auth_runtime", return_value=runtime),
+        patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
+        patch("app.brain_proxy._http.get", return_value=mock_client),
+        TestClient(app) as isolated_client,
+    ):
+        response = isolated_client.put(
+            "/api/knowledge/document?project_id=project-a",
+            json={"path": "knowledge/a.md", "content": "updated"},
+        )
+
+    assert response.status_code == expected_status
+    assert mock_client.send.await_count == (1 if granted else 0)
 
 
 def test_explicit_brain_routes_still_forward_options(client: TestClient):

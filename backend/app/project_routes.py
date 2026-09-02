@@ -11,8 +11,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.responses import Response
 
-from app.auth.dependencies import CurrentAccount, get_current_account
-from app.auth.models import AccountType, ResourceType, ResourceVisibility
+from app.auth.dependencies import CurrentAccount, get_current_account, require_admin
+from app.auth.models import ResourceType, ResourceVisibility
 from app.auth.repositories import ResourceConflictError
 from app.auth.resources import (
     ResourceAccess,
@@ -28,7 +28,6 @@ logger = logging.getLogger("backend.project_routes")
 router = APIRouter(tags=["Brain / Projects"])
 _PROJECT_PATH = "projects"
 _RESOURCE_NOT_FOUND_DETAIL = "Resource not found"
-_TEMPORARY_MUTATION_DETAIL = "Temporary accounts cannot manage projects"
 
 
 class _StrictModel(BaseModel):
@@ -55,14 +54,6 @@ def _resource_not_found() -> HTTPException:
         status_code=status.HTTP_404_NOT_FOUND,
         detail=_RESOURCE_NOT_FOUND_DETAIL,
     )
-
-
-def _reject_temporary_mutation(current: CurrentAccount) -> None:
-    if current.user.account_type is AccountType.TEMPORARY:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=_TEMPORARY_MUTATION_DETAIL,
-        )
 
 
 def _resolve_project(
@@ -193,10 +184,9 @@ async def list_projects(
 async def create_project(
     _body: ProjectCreateRequest,
     request: Request,
-    current: CurrentAccount = Depends(get_current_account),
+    current: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> Response:
-    _reject_temporary_mutation(current)
     response = await proxy_to_brain(
         request,
         _PROJECT_PATH,
@@ -250,10 +240,9 @@ async def create_project(
 async def delete_project(
     body: ProjectDeleteRequest,
     request: Request,
-    current: CurrentAccount = Depends(get_current_account),
+    current: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> Response:
-    _reject_temporary_mutation(current)
     _resolve_project(
         runtime,
         current,
