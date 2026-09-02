@@ -174,7 +174,7 @@ def test_convert_rejects_oversized_upload(monkeypatch):
     client, _ = _authenticated_client(module)
 
     response = client.post(
-        "/documents/convert",
+        "/api/v1/documents/convert",
         files={"file": ("note.txt", b"abcdef", "text/plain")},
     )
 
@@ -193,7 +193,7 @@ def test_convert_returns_upload_failed_code_when_conversion_crashes(monkeypatch)
     fake_anydoc.to_markdown = _raise_conversion_error
 
     response = client.post(
-        "/documents/convert",
+        "/api/v1/documents/convert",
         files={"file": ("data.csv", b"name\nhello\n", "text/csv")},
     )
 
@@ -208,11 +208,11 @@ def test_convert_uses_anydoc_for_each_upload(monkeypatch):
     client, _ = _authenticated_client(module)
 
     first = client.post(
-        "/documents/convert",
+        "/api/v1/documents/convert",
         files={"file": ("first.csv", b"name\nhello\n", "text/csv")},
     )
     second = client.post(
-        "/documents/convert",
+        "/api/v1/documents/convert",
         files={"file": ("second.csv", b"name\nworld\n", "text/csv")},
     )
 
@@ -228,7 +228,7 @@ def test_convert_preserves_plaintext_without_anydoc(monkeypatch):
     client, _ = _authenticated_client(module)
 
     response = client.post(
-        "/documents/convert",
+        "/api/v1/documents/convert",
         files={"file": ("note.txt", b"plain text", "text/plain")},
     )
 
@@ -279,7 +279,7 @@ def test_openapi_merges_brain_request_schema(monkeypatch):
     monkeypatch.setattr(module, "_fetch_brain_openapi", _fake_fetch)
     schema = asyncio.run(module._build_openapi_schema())
 
-    operation = schema["paths"]["/api/chat"]["post"]
+    operation = schema["paths"]["/api/v1/chat"]["post"]
     assert operation["requestBody"]["required"] is True
     assert operation["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ChatRequest"
@@ -290,7 +290,7 @@ def test_openapi_keeps_local_route_when_brain_remap_collides(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     local_schema = {
         "paths": {
-            "/api/knowledge/upload": {
+            "/api/v1/knowledge/upload": {
                 "post": {
                     "summary": "Backend knowledge upload",
                     "description": "AnyDoc fallback",
@@ -308,7 +308,7 @@ def test_openapi_keeps_local_route_when_brain_remap_collides(monkeypatch):
 
     schema = module._merge_brain_openapi(local_schema, brain_schema)
 
-    operation = schema["paths"]["/api/knowledge/upload"]["post"]
+    operation = schema["paths"]["/api/v1/knowledge/upload"]["post"]
     assert operation["summary"] == "Backend knowledge upload"
     assert operation["description"] == "AnyDoc fallback"
 
@@ -550,7 +550,7 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
     ))
 
     client, _ = _authenticated_client(module)
-    response = client.post("/tts/stream", json={"text": "你好", "character": "hayley"})
+    response = client.post("/api/v1/tts/stream", json={"text": "你好", "character": "hayley"})
 
     assert response.status_code == 200
     assert response.content == b"fallback-wav"
@@ -597,7 +597,7 @@ def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
     ))
 
     client, _ = _authenticated_client(module)
-    response = client.post("/tts/stream", json={"text": "你好", "character": "hayley"})
+    response = client.post("/api/v1/tts/stream", json={"text": "你好", "character": "hayley"})
 
     assert response.status_code == 200
     assert response.content == b"edge-1edge-2"
@@ -632,7 +632,7 @@ def test_websocket_routes_user_speak_to_brain_relay_when_relay_is_active(monkeyp
     ))
 
     client, _ = _authenticated_client(module)
-    with client.websocket_connect("/ws/client-1") as websocket:
+    with client.websocket_connect("/api/v1/ws/client-1") as websocket:
         websocket.send_text(json.dumps({"event": "client_init"}))
         ack = websocket.receive_json()
         assert ack["event"] == "server_init_ack"
@@ -665,7 +665,7 @@ def test_websocket_routes_audio_events_to_brain_live_relay(monkeypatch):
     ))
 
     client, _ = _authenticated_client(module)
-    with client.websocket_connect("/ws/client-2") as websocket:
+    with client.websocket_connect("/api/v1/ws/client-2") as websocket:
         websocket.send_text(json.dumps({"event": "client_init"}))
         ack = websocket.receive_json()
         assert ack["event"] == "server_init_ack"
@@ -701,7 +701,7 @@ def test_websocket_drops_audio_before_client_init_and_uses_initialized_voice_sou
     ))
 
     client, _ = _authenticated_client(module)
-    with client.websocket_connect("/ws/client-preinit") as websocket:
+    with client.websocket_connect("/api/v1/ws/client-preinit") as websocket:
         websocket.send_text(
             json.dumps(
                 {
@@ -830,7 +830,7 @@ def test_websocket_routes_user_speak_to_brain_relay_even_without_prior_audio(mon
     ))
 
     client, _ = _authenticated_client(module)
-    with client.websocket_connect("/ws/client-3") as websocket:
+    with client.websocket_connect("/api/v1/ws/client-3") as websocket:
         websocket.send_text(json.dumps({"event": "client_init"}))
         ack = websocket.receive_json()
         assert ack["event"] == "server_init_ack"
@@ -947,7 +947,7 @@ def _usage_request(query: str) -> Request:
     scope = {
         "type": "http",
         "method": "GET",
-        "path": "/v1/usage/summary",
+        "path": "/api/v1/usage/summary",
         "query_string": query.encode(),
         "headers": [],
     }

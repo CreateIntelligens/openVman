@@ -39,7 +39,7 @@ def client(tmp_path, monkeypatch):
 
 def _upload(client, char_id="008", label="角色八", video=b"\x1a\x45\xdf\xa3v", data=b"\x1f\x8bd"):
     return client.post(
-        "/api/avatar",
+        "/api/v1/avatar",
         data={"char_id": char_id, "label": label},
         files={
             "video": ("01.webm", io.BytesIO(video), "video/webm"),
@@ -49,21 +49,21 @@ def _upload(client, char_id="008", label="角色八", video=b"\x1a\x45\xdf\xa3v"
 
 
 def test_list_empty(client):
-    r = client.get("/api/avatar")
+    r = client.get("/api/v1/avatar")
     assert r.status_code == 200
     assert r.json() == {"characters": []}
 
 
 def test_upload_then_list(client):
     assert _upload(client).status_code == 200
-    chars = client.get("/api/avatar").json()["characters"]
+    chars = client.get("/api/v1/avatar").json()["characters"]
     assert len(chars) == 1
     assert chars[0]["char_id"] == "008"
 
 
 def test_upload_bad_extension(client):
     r = client.post(
-        "/api/avatar",
+        "/api/v1/avatar",
         data={"char_id": "008", "label": "x"},
         files={
             "video": ("01.mp4", io.BytesIO(b"\x1a\x45\xdf\xa3"), "video/mp4"),
@@ -75,7 +75,7 @@ def test_upload_bad_extension(client):
 
 def test_upload_bad_magic(client):
     r = client.post(
-        "/api/avatar",
+        "/api/v1/avatar",
         data={"char_id": "008", "label": "x"},
         files={
             "video": ("01.webm", io.BytesIO(b"NOTWEBM"), "video/webm"),
@@ -92,7 +92,7 @@ def test_upload_duplicate_conflict(client):
 
 def test_upload_invalid_char_id(client):
     r = client.post(
-        "/api/avatar",
+        "/api/v1/avatar",
         data={"char_id": "a/b", "label": "x"},
         files={
             "video": ("01.webm", io.BytesIO(b"\x1a\x45\xdf\xa3"), "video/webm"),
@@ -110,19 +110,19 @@ def test_delete(client):
     runtime = get_auth_runtime()
     assert runtime.resources.get(ResourceType.AVATAR_CHARACTER, "008") is not None
 
-    assert client.delete("/api/avatar/008").status_code == 200
-    assert client.get("/api/avatar").json()["characters"] == []
+    assert client.delete("/api/v1/avatar/008").status_code == 200
+    assert client.get("/api/v1/avatar").json()["characters"] == []
     assert runtime.resources.get(ResourceType.AVATAR_CHARACTER, "008") is None
 
 
 def test_delete_missing_404(client):
-    assert client.delete("/api/avatar/nope").status_code == 404
+    assert client.delete("/api/v1/avatar/nope").status_code == 404
 
 
 def test_delete_bound_conflict(client, monkeypatch):
     _upload(client)
     monkeypatch.setattr(avatar_routes, "_personas_bound_to", lambda char_id: ["doctor01"])
-    r = client.delete("/api/avatar/008")
+    r = client.delete("/api/v1/avatar/008")
     assert r.status_code == 409
     assert "doctor01" in r.json()["detail"]
 
@@ -132,9 +132,9 @@ def test_rename(client):
     from app.auth.runtime import get_auth_runtime
 
     _upload(client, char_id="008")
-    r = client.post("/api/avatar/008/rename", json={"new_char_id": "008b"})
+    r = client.post("/api/v1/avatar/008/rename", json={"new_char_id": "008b"})
     assert r.status_code == 200
-    ids = [c["char_id"] for c in client.get("/api/avatar").json()["characters"]]
+    ids = [c["char_id"] for c in client.get("/api/v1/avatar").json()["characters"]]
     assert ids == ["008b"]
     resources = get_auth_runtime().resources
     assert resources.get(ResourceType.AVATAR_CHARACTER, "008") is None
@@ -143,11 +143,11 @@ def test_rename(client):
 
 def test_update_label(client):
     _upload(client, char_id="008", label="角色八")
-    r = client.patch("/api/avatar/008", json={"label": "新的名字"})
+    r = client.patch("/api/v1/avatar/008", json={"label": "新的名字"})
     assert r.status_code == 200
     assert r.json()["character"]["char_id"] == "008"
     assert r.json()["character"]["label"] == "新的名字"
-    chars = client.get("/api/avatar").json()["characters"]
+    chars = client.get("/api/v1/avatar").json()["characters"]
     assert chars[0]["char_id"] == "008"
     assert chars[0]["label"] == "新的名字"
 
@@ -155,12 +155,12 @@ def test_update_label(client):
 def test_rename_conflict(client):
     _upload(client, char_id="008")
     _upload(client, char_id="009")
-    r = client.post("/api/avatar/008/rename", json={"new_char_id": "009"})
+    r = client.post("/api/v1/avatar/008/rename", json={"new_char_id": "009"})
     assert r.status_code == 409
 
 
 def test_rename_bound_conflict(client, monkeypatch):
     _upload(client, char_id="008")
     monkeypatch.setattr(avatar_routes, "_personas_bound_to", lambda char_id: ["doctor01"])
-    r = client.post("/api/avatar/008/rename", json={"new_char_id": "008b"})
+    r = client.post("/api/v1/avatar/008/rename", json={"new_char_id": "008b"})
     assert r.status_code == 409

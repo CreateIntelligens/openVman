@@ -22,7 +22,7 @@ const { DEFAULT_AVATAR_CATALOG_ENDPOINT, parseAvatarCatalog, fetchErrorMessage }
   await import(moduleUrl);
 
 test("the catalog defaults to the backend avatar endpoint", () => {
-  assert.equal(DEFAULT_AVATAR_CATALOG_ENDPOINT, "/api/avatar");
+  assert.equal(DEFAULT_AVATAR_CATALOG_ENDPOINT, "/api/v1/avatar");
 });
 
 test("parseAvatarCatalog extracts the characters array", () => {

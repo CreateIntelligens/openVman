@@ -75,7 +75,7 @@ def _normalize_mascot_id_or_400(mascot_id: str) -> str:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/api/avatar/mascots", summary="列出右下角小助理")
+@router.get("/api/v1/avatar/mascots", summary="列出右下角小助理")
 async def list_mascots(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
@@ -88,7 +88,7 @@ async def list_mascots(
             ResourceType.AVATAR_MASCOT,
         )
     }
-    # 影片型小助理的影片與嘴型資料由 /assets/{char_id} 依角色授權提供；
+    # 影片型小助理的影片與嘴型資料由 /static/characters/{char_id} 依角色授權提供；
     # 看不到角色的帳號連小助理也不列出，避免選了卻載不出來。
     accessible_character_ids = {
         resource.resource_id
@@ -111,7 +111,7 @@ async def list_mascots(
     }
 
 
-@router.post("/api/avatar/mascots", summary="上傳右下角小助理 VRM")
+@router.post("/api/v1/avatar/mascots", summary="上傳右下角小助理 VRM")
 async def create_mascot(
     mascot_id: str = Form(...),
     label: str = Form(""),
@@ -151,7 +151,7 @@ async def create_mascot(
     return {"status": "ok", "mascot": mascot}
 
 
-@router.post("/api/avatar/mascots/from-character", summary="以影片型 Avatar 角色建立小助理")
+@router.post("/api/v1/avatar/mascots/from-character", summary="以影片型 Avatar 角色建立小助理")
 async def create_video_mascot(
     payload: CreateVideoMascotRequest,
     _admin: CurrentAccount = Depends(require_admin),
@@ -192,7 +192,7 @@ async def create_video_mascot(
     return {"status": "ok", "mascot": mascot}
 
 
-@router.delete("/api/avatar/mascots/{mascot_id}", summary="刪除上傳的小助理")
+@router.delete("/api/v1/avatar/mascots/{mascot_id}", summary="刪除上傳的小助理")
 async def delete_mascot(
     mascot_id: str,
     _admin: CurrentAccount = Depends(require_admin),
@@ -210,7 +210,7 @@ async def delete_mascot(
     return {"status": "ok", "mascot_id": mid}
 
 
-@router.patch("/api/avatar/mascots/{mascot_id}", summary="更新小助理顯示名稱")
+@router.patch("/api/v1/avatar/mascots/{mascot_id}", summary="更新小助理顯示名稱")
 async def update_mascot_label(
     mascot_id: str,
     payload: UpdateLabelRequest,
@@ -236,7 +236,7 @@ async def update_mascot_label(
     return {"status": "ok", "mascot": mascot}
 
 
-@router.post("/api/avatar/mascots/{mascot_id}/thumbnail", summary="自動更新或上傳小助理縮圖")
+@router.post("/api/v1/avatar/mascots/{mascot_id}/thumbnail", summary="自動更新或上傳小助理縮圖")
 async def update_mascot_thumbnail(
     mascot_id: str,
     thumbnail: UploadFile = File(...),

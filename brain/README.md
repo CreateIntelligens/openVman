@@ -390,7 +390,7 @@ Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
   - 依帳號、專案、session、trace、類型與時間區間查詢事件
 
 這兩個 Brain endpoint 只接受 `X-Internal-Token`。瀏覽器與外部客戶端應改用
-Backend 的 `/v1/usage/summary` 與 `/v1/usage/events`；Backend 允許正式管理員
+Backend 的 `/api/v1/usage/summary` 與 `/api/v1/usage/events`；Backend 允許正式管理員
 查詢指定帳號，其餘帳號固定只能查詢自己的資料。
 
 ### 即時外部工具

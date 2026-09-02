@@ -2,10 +2,45 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- **Unified API Route Families**: The Backend HTTP and WebSocket surface collapses into three families — `/api/v1/*` for the application API, `/v1/audio/*` for OpenAI-compatible endpoints, and `/static/*` for served files. Only `/healthz`, `/metrics`, `/metrics/prometheus`, `/docs`, `/redoc`, and `/openapi.json` stay at the root. Every retired path returns **404** from the Backend and from both nginx configurations: there is no redirect, alias, rewrite, or transition period, and the `410` stubs for the iframe-era embed routes are deleted. Update every caller before deploying.
+
+  | Old | New |
+  |---|---|
+  | `/api/auth/*` | `/api/v1/auth/*` |
+  | `/api/users/*` | `/api/v1/users/*` |
+  | `/api/temporary-accounts/*` | `/api/v1/temporary-accounts/*` |
+  | `/api/projects*` | `/api/v1/projects*` |
+  | `/api/avatar*` | `/api/v1/avatar*` |
+  | `/api/backgrounds*` | `/api/v1/backgrounds*` |
+  | `/api/vision/*` | `/api/v1/vision/*` |
+  | `/api/knowledge/upload\|fetch\|youtube` | `/api/v1/knowledge/upload\|fetch\|youtube` |
+  | Brain proxy `/api/{path}` (chat, knowledge, sessions, memories, personas, search, health, identity, protocol, metrics, embed, dreaming, skills, tools) | `/api/v1/{path}` |
+  | `/characters` | `/api/v1/characters` |
+  | `/v1/tts/providers` | `/api/v1/tts/providers` |
+  | `/tts/stream` | `/api/v1/tts/stream` |
+  | `/v1/usage/events`, `/v1/usage/summary` | `/api/v1/usage/events`, `/api/v1/usage/summary` |
+  | `/uploads` | `/api/v1/uploads` |
+  | `/jobs/{id}` | `/api/v1/jobs/{id}` |
+  | `/admin/dlq` | `/api/v1/dlq` |
+  | `/documents/convert` | `/api/v1/documents/convert` |
+  | `/ws/{client_id}` | `/api/v1/ws/{client_id}` |
+  | `/internal/enrich` | `/api/v1/internal/enrich` (still internal-token only) |
+  | `/v1/audio/speech` | unchanged |
+  | `/assets/{id}/…` | `/static/characters/{id}/…` |
+  | `/mascots/{id}/…` | `/static/mascots/{id}/…` |
+  | `/backgrounds/{id}/…` | `/static/backgrounds/{id}/…` |
+  | `/openvman-avatar-sdk.js` | `/static/sdk/openvman-avatar-sdk.js` |
+  | `/sdk/runtime/*` | `/static/sdk/runtime/*` |
+  | `/healthz`, `/metrics`, `/metrics/prometheus`, `/docs`, `/redoc`, `/openapi.json` | unchanged |
+
+  Asset URLs returned by the mascot, background, and character APIs (`vrm_url`, `thumbnail_url`, `url`) now start with `/static/`. The Avatar SDK's documented script URL is `/static/sdk/openvman-avatar-sdk.js` and its default `assetsBaseUrl` is `/static/characters/`.
+
 ### Added
 - **Video Character Mascots**: Admins can register an existing video avatar character as the corner mascot. Mascot visibility follows both mascot and character grants, and host-played TTS is forwarded as 16 kHz mono PCM so the video runtime can lip-sync without duplicate audio output.
 - **First-Class NEN LLM Provider**: Added dedicated `NEN_API_KEY` and `NEN_BASE_URL` settings and explicit `nen:<model>` fallback hops. NEN continues to use the OpenAI-compatible transport while retaining its own provider identity in routing, health, metrics, and usage records, so it no longer occupies the shared primary-provider or OpenAI settings.
-- **Token Usage Ledger**: Brain now records every LLM call (input / output / cached / reasoning tokens, provider, model, latency) into an append-only SQLite ledger at `brain/data/usage.db`, attributed to the user, project, session and trace of the request via a context scope. Streaming calls request `stream_options.include_usage` (toggle `LLM_STREAM_INCLUDE_USAGE`). `/brain/chat` responses carry a per-turn `usage` summary, Brain exposes `/brain/usage/summary` and `/brain/usage/events`, and Backend fronts them at `/v1/usage/*` with non-admin accounts scoped to their own user id.
+- **Token Usage Ledger**: Brain now records every LLM call (input / output / cached / reasoning tokens, provider, model, latency) into an append-only SQLite ledger at `brain/data/usage.db`, attributed to the user, project, session and trace of the request via a context scope. Streaming calls request `stream_options.include_usage` (toggle `LLM_STREAM_INCLUDE_USAGE`). `/brain/chat` responses carry a per-turn `usage` summary, Brain exposes `/brain/usage/summary` and `/brain/usage/events`, and Backend fronts them at `/api/v1/usage/*` with non-admin accounts scoped to their own user id.
 - **VoxCPM Provider**: Added `VoxCPMAdapter` (`backend/app/providers/voxcpm_adapter.py`) calling the VoxCPM360 gateway's CastAgent-compatible `/api/v1/tts/synthesize`, wired into the fallback chain after IndexTTS, the Admin provider/voice registry, the backend health payload (`voxcpm`), and configured via `TTS_VOXCPM_URL` / `TTS_VOXCPM_API_KEY` / `TTS_VOXCPM_DEFAULT_VOICE`.
 - **Repository Security Audit Skill**: Added the versioned `.agents/skills/security-audit` methodology and lock record so future audits use the same reproducible checks. Local Claude/KiloCode symlink aliases remain ignored.
 - **Admin Session Management Page**: Added a dedicated Sessions workspace for cross-persona browsing, filtering, sorting, batch export, deletion, and one-click deep links back into Chat.

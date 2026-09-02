@@ -40,7 +40,7 @@ export class AvatarRuntime {
   }
 
   static async create(baseUrl: string): Promise<AvatarRuntime> {
-    await loadRuntimeScript(`${baseUrl}/sdk/runtime/OpenVmanAvatarRuntime.js`);
+    await loadRuntimeScript(`${baseUrl}/static/sdk/runtime/OpenVmanAvatarRuntime.js`);
     const idleLipSyncBypass = installIdleLipSyncBypass();
     if (!window.createQtAppInstance) {
       idleLipSyncBypass?.restore();
@@ -52,7 +52,7 @@ export class AvatarRuntime {
     try {
       const instance = await window.createQtAppInstance({
         locateFile: (path) => path.endsWith(".wasm")
-          ? `${baseUrl}/sdk/runtime/OpenVmanAvatarRuntime.wasm`
+          ? `${baseUrl}/static/sdk/runtime/OpenVmanAvatarRuntime.wasm`
           : path,
         onRuntimeInitialized() {},
       });

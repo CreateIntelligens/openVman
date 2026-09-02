@@ -43,5 +43,5 @@
 ## 7. Documentation and Verification
 
 - [x] 7.1 Add the full old-to-new path table and the embed-key feature to `CHANGELOG.md`; update `README.md`, `docs/04_GATEWAY_SPEC.md`, and `.env.example` if any setting is introduced
-- [ ] 7.2 Run Backend, Brain, Admin, App, SDK, and nginx test suites, `openspec validate`, and `git diff --check`
+- [x] 7.2 Run Backend, Brain, Admin, App, SDK, and nginx test suites, `openspec validate`, and `git diff --check`
 - [ ] 7.3 Rebuild the Admin image and verify a keyed conversation from a page on an allowlisted origin plus a 404 on one retired path per family

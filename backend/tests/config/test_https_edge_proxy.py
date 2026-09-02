@@ -81,10 +81,14 @@ def test_native_public_proxy_supports_openvman_root_relative_routes():
     assert "location /openvman/" in config
     assert "location ^~ /admin/" in config
     assert "location = /admin/login" in config
-    for route in ("admin", "api", "ws", "v1", "tts", "js", "wasm", "grafana", "vendor"):
+    for route in ("admin", "api", "v1", "static", "js", "wasm", "grafana", "vendor"):
         assert route in config
     assert "location = /widget.html" in config
     assert "proxy_pass https://127.0.0.1:8787" in config
+    # 退役前綴不得再有自己的 location —— WebSocket 已改走 /api/v1/ws/，
+    # SDK 與角色檔案改走 /static/。
+    assert "location = /openvman-avatar-sdk.js" not in config
+    assert "location = /characters" not in config
 
 
 def test_vite_hmr_follows_the_browser_https_origin():

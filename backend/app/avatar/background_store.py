@@ -33,7 +33,7 @@ def _now() -> str:
 
 
 class AvatarBackgroundStore:
-    def __init__(self, base_dir: str | Path, url_prefix: str = "/backgrounds") -> None:
+    def __init__(self, base_dir: str | Path, url_prefix: str = "/static/backgrounds") -> None:
         self._base = Path(base_dir)
         self._url_prefix = url_prefix.rstrip("/")
         self._base.mkdir(parents=True, exist_ok=True)

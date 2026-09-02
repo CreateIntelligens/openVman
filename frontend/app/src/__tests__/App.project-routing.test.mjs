@@ -14,9 +14,9 @@ test("settings modal receives project options and emits project changes", () => 
 });
 
 test("avatar frontend loads personas from the selected project", () => {
-  assert.match(source, /apiFetch\("\/api\/projects"\)/);
+  assert.match(source, /apiFetch\("\/api\/v1\/projects"\)/);
   assert.match(source, /project_id=\$\{encodeURIComponent\(targetProjectId\)\}/);
-  assert.doesNotMatch(source, /\/api\/personas\?project_id=default/);
+  assert.doesNotMatch(source, /\/api\/v1\/personas\?project_id=default/);
 });
 
 test("chat composable is configured with the selected project and persona before reconnect", () => {
@@ -51,7 +51,7 @@ test("avatar stage background is wired through settings", () => {
 });
 
 test("avatar frontend loads uploaded backgrounds for settings", () => {
-  assert.match(source, /apiFetch\("\/api\/backgrounds"\)/);
+  assert.match(source, /apiFetch\("\/api\/v1\/backgrounds"\)/);
   assert.match(source, /const items = data\.backgrounds \?\? \[\]/);
   assert.match(source, /backgrounds\.value = items/);
   assert.match(source, /void fetchBackgrounds\(\)/);

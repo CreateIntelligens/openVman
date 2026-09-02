@@ -45,7 +45,7 @@ test("qqman mascot points at the built-in VRM asset route", async () => {
   const { MASCOT_CATALOG } = await loadModule();
   const qqmanMascot = MASCOT_CATALOG.find((mascot) => mascot.id === "qqman");
 
-  assert.equal(qqmanMascot?.vrmUrl, "/mascots/qqman/model.vrm");
+  assert.equal(qqmanMascot?.vrmUrl, "/static/mascots/qqman/model.vrm");
   assert.notEqual(qqmanMascot?.vrmUrl, "/QQman_fll.vrm");
 });
 
@@ -93,13 +93,13 @@ test("mascot api records convert to switcher options", async () => {
     label: "自訂小助理",
     engine: "3d",
     model_url: "",
-    vrm_url: "/mascots/custom/model.vrm",
+    vrm_url: "/static/mascots/custom/model.vrm",
     fit: "",
   });
 
   assert.equal(option.id, "custom");
   assert.equal(option.label, "自訂小助理");
-  assert.equal(option.vrmUrl, "/mascots/custom/model.vrm");
+  assert.equal(option.vrmUrl, "/static/mascots/custom/model.vrm");
   assert.equal(resolveMascotOption("custom", [option]).id, "custom");
 });
 

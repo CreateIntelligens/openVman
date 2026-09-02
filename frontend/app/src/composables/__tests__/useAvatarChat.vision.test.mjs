@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
 
 test("exposes sendVisualInput and a default vision endpoint", () => {
-  assert.match(source, /export const DEFAULT_VISION_ENDPOINT = ['"]\/api\/vision\/describe['"]/);
+  assert.match(source, /export const DEFAULT_VISION_ENDPOINT = ['"]\/api\/v1\/vision\/describe['"]/);
   assert.match(source, /function sendVisualInput\(/);
   assert.match(source, /\bsendVisualInput,/);
 });
@@ -25,7 +25,7 @@ test("text mode posts the frame to the vision describe endpoint", () => {
 });
 
 test("visual input state can be reset in live and text modes", () => {
-  assert.match(source, /export const DEFAULT_VISION_RESET_ENDPOINT = ['"]\/api\/vision\/reset['"]/);
+  assert.match(source, /export const DEFAULT_VISION_RESET_ENDPOINT = ['"]\/api\/v1\/vision\/reset['"]/);
   assert.match(source, /function resetVisualInput\(\):\s*Promise<void>/);
   assert.match(source, /event:\s*['"]client_camera_reset['"]/);
   assert.match(source, /options\.visionResetEndpoint \?\? DEFAULT_VISION_RESET_ENDPOINT/);

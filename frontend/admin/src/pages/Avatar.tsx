@@ -153,7 +153,7 @@ function filePickerClassName(fileName: string): string {
 }
 
 function needsMascotSnapshot(mascot: AvatarMascot): boolean {
-  return !mascot.thumbnail_url || !mascot.thumbnail_url.includes("/mascots/");
+  return !mascot.thumbnail_url || !mascot.thumbnail_url.includes("/static/mascots/");
 }
 
 function mascotPreviewStyle(mascot: AvatarMascot): CSSProperties | undefined {
@@ -745,7 +745,7 @@ export default function Avatar() {
                 <div key={character.char_id} className={assetCardClassName}>
                   <div className={mediaPreviewClassName}>
                     <video
-                      src={`/assets/${character.char_id}/01.webm`}
+                      src={`/static/characters/${character.char_id}/01.webm`}
                       loop
                       muted
                       playsInline

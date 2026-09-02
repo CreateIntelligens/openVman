@@ -31,7 +31,7 @@ class InternalEnrichRequest(BaseModel):
     persona_id: str = "default"
 
 
-@router.post("/internal/enrich")
+@router.post("/api/v1/internal/enrich")
 async def internal_enrich(
     payload: InternalEnrichRequest,
     x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),

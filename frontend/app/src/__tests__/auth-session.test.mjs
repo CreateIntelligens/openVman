@@ -34,7 +34,7 @@ test("shared API client includes cookies and centralizes 401 handling", async ()
     setUnauthorizedHandler(() => {
       unauthorizedCalls += 1;
     });
-    await apiFetch("/api/projects");
+    await apiFetch("/api/v1/projects");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -173,9 +173,9 @@ test("auth API uses cookie endpoints without storing the returned JWT", () => {
   const authApi = read("api/auth.ts");
   const authStore = read("composables/useAuth.ts");
 
-  assert.match(authApi, /"\/api\/auth\/login"/);
-  assert.match(authApi, /"\/api\/auth\/logout"/);
-  assert.match(authApi, /"\/api\/auth\/me"/);
+  assert.match(authApi, /"\/api\/v1\/auth\/login"/);
+  assert.match(authApi, /"\/api\/v1\/auth\/logout"/);
+  assert.match(authApi, /"\/api\/v1\/auth\/me"/);
   assert.doesNotMatch(`${authApi}\n${authStore}`, /localStorage|sessionStorage/);
   assert.match(authStore, /function expireSession\(\)/);
   assert.match(authStore, /publicAppPath\("\/login"\)/);
@@ -187,7 +187,7 @@ test("temporary login accepts only a password and exposes the expiry notice", ()
   const loginScreen = read("components/auth/LoginScreen.vue");
   const root = read("Root.vue");
 
-  assert.match(authApi, /"\/api\/auth\/temporary-login"/);
+  assert.match(authApi, /"\/api\/v1\/auth\/temporary-login"/);
   assert.match(authApi, /JSON\.stringify\(\{ password \}\)/);
   assert.match(authStore, /loginTemporary/);
   assert.match(loginScreen, /正式帳號/);

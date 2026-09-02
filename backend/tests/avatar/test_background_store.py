@@ -32,7 +32,7 @@ def test_create_then_list(store):
     assert backgrounds == [created]
     assert created["background_id"] == "clinic"
     assert created["label"] == "診間背景"
-    assert created["url"] == "/backgrounds/clinic/image.png"
+    assert created["url"] == "/static/backgrounds/clinic/image.png"
     assert created["mime_type"] == "image/png"
     assert created["size_bytes"] > 0
     assert "updated_at" in created

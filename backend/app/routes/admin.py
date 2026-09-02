@@ -501,7 +501,7 @@ async def _forward_usage_query(
     return JSONResponse(status_code=response.status_code, content=content)
 
 
-@router.get("/v1/usage/summary", tags=["Usage"], summary="Token 用量彙總")
+@router.get("/api/v1/usage/summary", tags=["Usage"], summary="Token 用量彙總")
 async def get_usage_summary(
     request: Request,
     current: CurrentAccount = Depends(get_current_account),
@@ -509,7 +509,7 @@ async def get_usage_summary(
     return await _forward_usage_query(request, current, "summary")
 
 
-@router.get("/v1/usage/events", tags=["Usage"], summary="Token 用量事件明細")
+@router.get("/api/v1/usage/events", tags=["Usage"], summary="Token 用量事件明細")
 async def get_usage_events(
     request: Request,
     current: CurrentAccount = Depends(get_current_account),
@@ -527,7 +527,7 @@ async def metrics_prometheus():
     return build_prometheus_response()
 
 
-@router.get("/v1/tts/providers", tags=["TTS"], summary="取得 TTS Provider 清單")
+@router.get("/api/v1/tts/providers", tags=["TTS"], summary="取得 TTS Provider 清單")
 async def get_tts_providers(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),

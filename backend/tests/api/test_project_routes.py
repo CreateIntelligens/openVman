@@ -47,10 +47,10 @@ def test_portal_user_cannot_create_or_delete_projects() -> None:
         patch("app.project_routes.proxy_to_brain", new_callable=AsyncMock) as proxy,
         TestClient(app) as client,
     ):
-        create_response = client.post("/api/projects", json={"label": "New"})
+        create_response = client.post("/api/v1/projects", json={"label": "New"})
         delete_response = client.request(
             "DELETE",
-            "/api/projects",
+            "/api/v1/projects",
             json={"project_id": "project-a"},
         )
 

@@ -22,7 +22,7 @@ describe("postSearch", () => {
     await postSearch("PRP", "knowledge", 5);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/search",
+      "/api/v1/search",
       expect.objectContaining({
         body: JSON.stringify({
           query: "PRP",

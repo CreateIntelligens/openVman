@@ -28,7 +28,7 @@ describe("MascotWidget", () => {
     const src = frame.getAttribute("src") ?? "";
 
     expect(src).toContain("engine=3d");
-    expect(decodeURIComponent(src)).toContain("/mascots/qqman/model.vrm");
+    expect(decodeURIComponent(src)).toContain("/static/mascots/qqman/model.vrm");
   });
 
   it("starts collapsed by default so the VRM is not downloaded eagerly", () => {

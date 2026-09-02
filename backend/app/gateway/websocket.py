@@ -55,7 +55,7 @@ def _is_closed_websocket_runtime_error(exc: RuntimeError) -> bool:
     return any(closed_message in message for closed_message in CLOSED_WEBSOCKET_MESSAGES)
 
 
-@router.websocket("/ws/{client_id}")
+@router.websocket("/api/v1/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     try:
         current = authenticate_websocket(websocket, get_auth_runtime())

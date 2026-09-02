@@ -42,7 +42,7 @@ BUILTIN_MASCOTS: tuple[dict[str, Any], ...] = (
         "label": "Frieren",
         "engine": "3d",
         "model_url": "",
-        "vrm_url": "/mascots/qqman/model.vrm",
+        "vrm_url": "/static/mascots/qqman/model.vrm",
         "character_id": "",
         "thumbnail_url": "",
         "fit": "",
@@ -81,7 +81,7 @@ def _now() -> str:
 
 
 class MascotStore:
-    def __init__(self, base_dir: str | Path, url_prefix: str = "/mascots") -> None:
+    def __init__(self, base_dir: str | Path, url_prefix: str = "/static/mascots") -> None:
         self._base = Path(base_dir)
         self._url_prefix = url_prefix.rstrip("/")
         self._base.mkdir(parents=True, exist_ok=True)

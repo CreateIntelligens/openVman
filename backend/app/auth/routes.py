@@ -60,10 +60,10 @@ _TEMPORARY_PASSWORD_ALPHABET = string.ascii_letters + string.digits
 _TEMPORARY_PASSWORD_LENGTH = 20
 _TEMPORARY_LOCATOR_LENGTH = 12
 
-auth_router = APIRouter(prefix="/api/auth", tags=["Authentication"])
-users_router = APIRouter(prefix="/api/users", tags=["Accounts"])
+auth_router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
+users_router = APIRouter(prefix="/api/v1/users", tags=["Accounts"])
 temporary_accounts_router = APIRouter(
-    prefix="/api/temporary-accounts",
+    prefix="/api/v1/temporary-accounts",
     tags=["Temporary accounts"],
 )
 

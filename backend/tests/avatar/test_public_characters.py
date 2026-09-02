@@ -56,7 +56,7 @@ def _upload(
     data=b"\x1f\x8bd",
 ):
     return client.post(
-        "/api/avatar",
+        "/api/v1/avatar",
         data={"char_id": char_id, "label": label},
         files={
             "video": ("01.webm", io.BytesIO(video), "video/webm"),
@@ -66,7 +66,7 @@ def _upload(
 
 
 def test_list_empty(client):
-    response = client.get("/characters")
+    response = client.get("/api/v1/characters")
 
     assert response.status_code == 200
     assert response.json() == {"characters": []}
@@ -75,8 +75,8 @@ def test_list_empty(client):
 def test_list_only_returns_char_id_and_label(client):
     assert _upload(client).status_code == 200
 
-    response = client.get("/characters")
-    asset_response = client.get("/assets/008/01.webm")
+    response = client.get("/api/v1/characters")
+    asset_response = client.get("/static/characters/008/01.webm")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -97,7 +97,7 @@ def test_list_excludes_incomplete_characters(tmp_path, client):
         visibility=ResourceVisibility.SYSTEM_PUBLIC,
     )
 
-    response = client.get("/characters")
+    response = client.get("/api/v1/characters")
 
     assert response.json() == {"characters": []}
 
@@ -147,12 +147,12 @@ def test_private_character_is_not_public_but_owner_and_grantee_can_read(
             ),
         )
 
-    assert client.get("/characters").json() == {"characters": []}
-    assert client.get("/assets/private/01.webm").status_code == 404
+    assert client.get("/api/v1/characters").json() == {"characters": []}
+    assert client.get("/static/characters/private/01.webm").status_code == 404
 
     for account in (owner, grantee):
         response = client.get(
-            "/assets/private/01.webm",
+            "/static/characters/private/01.webm",
             headers={"Authorization": f"Bearer {runtime.tokens.issue(account)}"},
         )
         assert response.status_code == 200
@@ -168,26 +168,26 @@ def test_unregistered_character_is_not_listed_or_publicly_readable(client):
         data_bytes=b"unregistered-data",
     )
 
-    assert client.get("/characters").json() == {"characters": []}
-    assert client.get("/assets/unregistered/01.webm").status_code == 404
+    assert client.get("/api/v1/characters").json() == {"characters": []}
+    assert client.get("/static/characters/unregistered/01.webm").status_code == 404
 
     runtime = get_auth_runtime()
     admin = runtime.users.get_by_username("admin")
     assert admin is not None
     authenticated_response = client.get(
-        "/assets/unregistered/01.webm",
+        "/static/characters/unregistered/01.webm",
         headers={"Authorization": f"Bearer {runtime.tokens.issue(admin)}"},
     )
     assert authenticated_response.status_code == 404
 
 
 def test_character_asset_path_bypasses_middleware_for_route_level_policy():
-    assert is_public_path("/assets/008/01.webm") is True
+    assert is_public_path("/static/characters/008/01.webm") is True
 
 
 def test_list_excludes_in_progress_upload_tempdirs(tmp_path, client):
     (tmp_path / ".002.tmp.abc").mkdir()
 
-    response = client.get("/characters")
+    response = client.get("/api/v1/characters")
 
     assert response.json() == {"characters": []}

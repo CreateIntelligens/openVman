@@ -219,7 +219,7 @@ def _error_response(status_code: int, error: str, **extra: Any) -> JSONResponse:
 
 
 @router.post(
-    "/uploads",
+    "/api/v1/uploads",
     tags=["Uploads"],
     summary="上傳檔案",
     description="上傳圖文、語音等檔案至暫存區，並排入背景處理隊列。\n\n**所需欄位**：\n- `file` (Form, UploadFile): 欲上傳的檔案\n- `session_id` (Query, str): 指派歸屬的 Session ID",
@@ -281,13 +281,13 @@ async def upload(
             "mode": result.mode,
             "session_id": session_id,
             "trace_id": trace_id,
-            "status_url": f"/jobs/{result.job_id}",
+            "status_url": f"/api/v1/jobs/{result.job_id}",
         },
     )
 
 
 @router.get(
-    "/jobs/{job_id}",
+    "/api/v1/jobs/{job_id}",
     tags=["Uploads"],
     summary="取得上傳進度",
     description="查詢上傳或非同步處理任務的狀態。\n\n**所需欄位**：\n- `job_id` (Path, str): 處理任務的 ID",
@@ -313,7 +313,7 @@ async def get_job(
 
 
 @router.get(
-    "/admin/dlq",
+    "/api/v1/dlq",
     tags=["Admin"],
     summary="取得死信佇列",
     description="讀取因為錯誤而未被處理的任務清單 (DLQ)。\n\n**所需欄位**：\n- `limit` (Query, int, 預設 20): 最多顯示的數量限制",
@@ -436,7 +436,7 @@ async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
 
 
 @router.post(
-    "/api/knowledge/upload",
+    "/api/v1/knowledge/upload",
     tags=["Knowledge"],
     summary="上傳知識文件",
     description="上傳文件到知識庫。`.md`、`.txt`、`.csv` 直接轉發；PDF 先嘗試 pdf-inspector fast path，其他 PDF / Office 文件由 Docling 轉成 Markdown，失敗時回退 AnyDoc，再交由 Brain 存檔與重整索引。\n\n**所需欄位 (Form)**：\n- `files` (Form, list[UploadFile]): 要上傳的檔案\n- `target_dir` (Form, str, 預設 ''): 目標資料夾\n- `project_id` (Form, str, 預設 'default'): 專案 ID",
@@ -512,7 +512,7 @@ async def upload_knowledge_documents(
 
 
 @router.post(
-    "/api/knowledge/fetch",
+    "/api/v1/knowledge/fetch",
     tags=["Knowledge"],
     summary="即時抓取頁面內容",
     description="抓取網址頁面內容並回傳，不存入知識庫。本端點供給 AI Tool 當作即時爬蟲功能使用。支援一般網頁及 YouTube 連結（自動擷取字幕）。\n\n**所需欄位**：\n- `url` (Body, str): 要抓取的網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID",
@@ -536,7 +536,7 @@ async def fetch_web_content(req: CrawlIngestRequest) -> JSONResponse:
 
 
 @router.post(
-    "/api/knowledge/youtube",
+    "/api/v1/knowledge/youtube",
     tags=["Knowledge"],
     summary="擷取 YouTube 字幕",
     description="從 YouTube 影片擷取字幕文字，可選擇存入知識庫。\n\n**所需欄位**：\n- `url` (Body, str): YouTube 影片網址\n- `project_id` (Body, str, 預設 'default'): 專案 ID\n- `save_to_knowledge` (Body, bool, 預設 false): 是否存入知識庫\n- `target_dir` (Body, str, 預設 ''): 知識庫目標資料夾",

@@ -44,7 +44,7 @@ function accountFromResponse(payload: AccountResponse): AccountProfile {
 }
 
 export async function temporaryLogin(password: string): Promise<AccountProfile> {
-  const payload = await fetchJson<AccountResponse>("/api/auth/temporary-login", {
+  const payload = await fetchJson<AccountResponse>("/api/v1/auth/temporary-login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ password }),
@@ -56,7 +56,7 @@ export async function login(
   username: string,
   password: string,
 ): Promise<AccountProfile> {
-  const payload = await fetchJson<AccountResponse>("/api/auth/login", {
+  const payload = await fetchJson<AccountResponse>("/api/v1/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
@@ -66,11 +66,11 @@ export async function login(
 
 export async function getCurrentAccount(): Promise<AccountProfile> {
   return accountFromResponse(
-    await fetchJson<AccountResponse>("/api/auth/me"),
+    await fetchJson<AccountResponse>("/api/v1/auth/me"),
   )
 }
 
 export async function logout(): Promise<void> {
-  const response = await apiFetch("/api/auth/logout", { method: "POST" })
+  const response = await apiFetch("/api/v1/auth/logout", { method: "POST" })
   if (!response.ok) await parseJson<unknown>(response)
 }

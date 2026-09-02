@@ -7,9 +7,9 @@
  */
 
 /** Backend endpoint that lists available Avatar characters. */
-export const DEFAULT_AVATAR_CATALOG_ENDPOINT = '/api/avatar'
+export const DEFAULT_AVATAR_CATALOG_ENDPOINT = '/api/v1/avatar'
 
-/** One Avatar character as returned by `GET /api/avatar`. */
+/** One Avatar character as returned by `GET /api/v1/avatar`. */
 export interface AvatarCharacter {
        char_id: string
        label: string
@@ -39,7 +39,7 @@ function normalizeCharacter(raw: unknown): AvatarCharacter | null {
 }
 
 /**
- * Extract a clean list of characters from a `GET /api/avatar` body.
+ * Extract a clean list of characters from a `GET /api/v1/avatar` body.
  * Tolerates missing/garbage fields: malformed entries are dropped, and a
  * missing `characters` array yields `[]` rather than throwing.
  */

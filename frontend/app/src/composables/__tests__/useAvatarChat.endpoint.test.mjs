@@ -10,11 +10,11 @@ const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
 test("text-mode chat defaults to the backend Brain facade endpoint", () => {
   assert.match(
     source,
-    /export const DEFAULT_TEXT_CHAT_ENDPOINT = ['"]\/api\/chat['"]/,
+    /export const DEFAULT_TEXT_CHAT_ENDPOINT = ['"]\/api\/v1\/chat['"]/,
   );
   assert.match(
     source,
     /apiFetch\(options\.chatEndpoint \?\? DEFAULT_TEXT_CHAT_ENDPOINT,/,
   );
-  assert.doesNotMatch(source, /['"]\/api\/brain\/chat['"]/);
+  assert.doesNotMatch(source, /['"]\/api\/v1\/brain\/chat['"]/);
 });

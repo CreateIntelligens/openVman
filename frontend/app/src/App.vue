@@ -370,7 +370,7 @@ function resolveVrmAvatarOption(
 
 async function fetchVrmAvatars(): Promise<void> {
   try {
-    const res = await apiFetch("/api/avatar/mascots");
+    const res = await apiFetch("/api/v1/avatar/mascots");
     if (!res.ok) return;
     const data = (await res.json()) as VrmMascotsResponse;
     const items = (data.mascots ?? [])
@@ -415,7 +415,7 @@ async function fetchProjects(): Promise<void> {
   settings.projectId = "";
   chat.setProject("");
   try {
-    const res = await apiFetch("/api/projects");
+    const res = await apiFetch("/api/v1/projects");
     if (!res.ok) return;
     const data = await res.json();
     const items: ProjectSummary[] = (data.projects ?? []).map((p: ProjectSummary) => ({
@@ -465,7 +465,7 @@ async function fetchPersonas(
   personasLoading.value = true;
 
   try {
-    const res = await apiFetch(`/api/personas?project_id=${encodeURIComponent(targetProjectId)}`);
+    const res = await apiFetch(`/api/v1/personas?project_id=${encodeURIComponent(targetProjectId)}`);
     if (!res.ok || requestId !== personaRequestId) return;
     const data = await res.json();
     if (requestId !== personaRequestId) return;
@@ -491,7 +491,7 @@ async function fetchTtsProviders(): Promise<void> {
   settings.ttsProvider = "";
   settings.ttsVoice = "";
   try {
-    const res = await apiFetch("/v1/tts/providers");
+    const res = await apiFetch("/api/v1/tts/providers");
     if (!res.ok) return;
     const items = await res.json() as TtsProvider[];
     ttsProviders.value = items;
@@ -521,7 +521,7 @@ async function fetchTtsProviders(): Promise<void> {
 
 async function fetchBackgrounds(): Promise<void> {
   try {
-    const res = await apiFetch("/api/backgrounds");
+    const res = await apiFetch("/api/v1/backgrounds");
     if (!res.ok) return;
     const data = await res.json();
     const items = data.backgrounds ?? [];
@@ -884,7 +884,7 @@ const visionAvailable = ref(true);
 
 async function fetchVisionHealth(): Promise<void> {
   try {
-    const res = await apiFetch("/api/vision/health");
+    const res = await apiFetch("/api/v1/vision/health");
     if (!res.ok) return;
     const data = (await res.json()) as { available?: boolean };
     visionAvailable.value = data.available !== false;

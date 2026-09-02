@@ -93,7 +93,7 @@ def test_text_knowledge_upload_passthroughs_utf8_files_to_brain(client: TestClie
         ),
     ):
         response = client.post(
-            "/api/knowledge/upload",
+            "/api/v1/knowledge/upload",
             data={"target_dir": "knowledge/notes", "project_id": "default"},
             files={"files": ("example.md", BytesIO(b"# hello\n"), "text/markdown")},
         )
@@ -156,7 +156,7 @@ def test_pdf_knowledge_upload_converts_to_markdown_before_forwarding(client: Tes
         ),
     ):
         response = client.post(
-            "/api/knowledge/upload",
+            "/api/v1/knowledge/upload",
             data={"target_dir": "knowledge/ingested", "project_id": "default"},
             files={"files": ("report.pdf", BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
         )
@@ -221,7 +221,7 @@ def test_document_upload_normalizes_markdown_target_dir_under_knowledge(client: 
         ),
     ):
         response = client.post(
-            "/api/knowledge/upload",
+            "/api/v1/knowledge/upload",
             data={"target_dir": "custom", "project_id": "default"},
             files={"files": ("report.pdf", BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
         )
@@ -271,7 +271,7 @@ def test_pptx_knowledge_upload_converts_to_markdown_before_forwarding(client: Te
         ),
     ):
         response = client.post(
-            "/api/knowledge/upload",
+            "/api/v1/knowledge/upload",
             data={"target_dir": "knowledge/ingested", "project_id": "default"},
             files={
                 "files": (
@@ -324,7 +324,7 @@ def test_html_knowledge_upload_converts_to_markdown_before_forwarding(client: Te
         patch("app.gateway.routes._cleanup_temp_path", create=True),
     ):
         response = client.post(
-            "/api/knowledge/upload",
+            "/api/v1/knowledge/upload",
             data={"target_dir": "knowledge/ingested", "project_id": "default"},
             files={"files": ("page.html", BytesIO(b"<h1>hello</h1>"), "text/html")},
         )
@@ -339,9 +339,9 @@ def test_html_knowledge_upload_converts_to_markdown_before_forwarding(client: Te
 def test_knowledge_upload_is_not_documented_as_brain_proxy_mirror(client: TestClient):
     from app.brain_proxy import _BRAIN_ROUTE_DEFS
 
-    assert "/api/knowledge/upload" not in {route["path"] for route in _BRAIN_ROUTE_DEFS}
+    assert "/api/v1/knowledge/upload" not in {route["path"] for route in _BRAIN_ROUTE_DEFS}
 
     response = client.get("/openapi.json")
 
     assert response.status_code == 200
-    assert "/api/knowledge/upload" in response.json()["paths"]
+    assert "/api/v1/knowledge/upload" in response.json()["paths"]

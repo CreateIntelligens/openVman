@@ -28,16 +28,16 @@ export function setForbiddenHandler(
 }
 
 const AUTH_WHITELIST = [
-  "/api/auth/login",
-  "/api/auth/temporary-login",
+  "/api/v1/auth/login",
+  "/api/v1/auth/temporary-login",
 ]
 
 // 單一資產沒被授權（403）只代表這個檔案不能用，不代表整個帳號沒權限。
 // 讓它觸發全域 forbidden 會把整頁換成「權限不足」，人物就再也不會出現。
 const ASSET_PATH_PREFIXES = [
-  "/assets/",
-  "/mascots/",
-  "/backgrounds/",
+  "/static/characters/",
+  "/static/mascots/",
+  "/static/backgrounds/",
 ]
 
 function requestPath(input: RequestInfo | URL): string {

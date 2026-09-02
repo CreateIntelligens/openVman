@@ -80,7 +80,7 @@ def _bootstrap(runtime: AuthRuntime):
 
 def _admin_headers(client: TestClient) -> dict[str, str]:
     login = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": "admin", "password": _ADMIN_PASSWORD},
     )
     assert login.status_code == 200
@@ -89,7 +89,7 @@ def _admin_headers(client: TestClient) -> dict[str, str]:
 
 def _root_headers(client: TestClient) -> dict[str, str]:
     login = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": "ai360", "password": _ROOT_PASSWORD},
     )
     assert login.status_code == 200
@@ -122,7 +122,7 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
 ):
     _bootstrap(runtime)
     response = client.post(
-        "/api/temporary-accounts/batches",
+        "/api/v1/temporary-accounts/batches",
         headers=_admin_headers(client),
         json=_batch_body(),
     )
@@ -156,7 +156,7 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
     assert all(row["username"] not in locators for row in rows)
 
     audit = client.get(
-        "/api/temporary-accounts/batches",
+        "/api/v1/temporary-accounts/batches",
         headers=_admin_headers(client),
     )
     assert audit.status_code == 200
@@ -173,7 +173,7 @@ def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
     _bootstrap(runtime)
     admin_headers = _admin_headers(client)
     created = client.post(
-        "/api/temporary-accounts/batches",
+        "/api/v1/temporary-accounts/batches",
         headers=admin_headers,
         json=_batch_body(),
     ).json()
@@ -181,7 +181,7 @@ def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
 
     assert created["admin_portal_access"] is False
     denied = client.post(
-        "/api/auth/admin-temporary-login",
+        "/api/v1/auth/admin-temporary-login",
         json={"password": password},
     )
     assert denied.status_code == 403
@@ -196,7 +196,7 @@ def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
     assert first_used_at is None
 
     granted = client.patch(
-        f"/api/temporary-accounts/batches/{created['batch_id']}"
+        f"/api/v1/temporary-accounts/batches/{created['batch_id']}"
         "/admin-portal-access",
         headers=admin_headers,
         json={"enabled": True},
@@ -209,35 +209,35 @@ def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
     )
 
     portal_login = client.post(
-        "/api/auth/admin-temporary-login",
+        "/api/v1/auth/admin-temporary-login",
         json={"password": password},
     )
     assert portal_login.status_code == 200
     portal_headers = {
         "Authorization": f"Bearer {portal_login.json()['token']}",
     }
-    assert client.get("/api/auth/admin-me", headers=portal_headers).status_code == 200
+    assert client.get("/api/v1/auth/admin-me", headers=portal_headers).status_code == 200
 
     revoked = client.patch(
-        f"/api/temporary-accounts/batches/{created['batch_id']}"
+        f"/api/v1/temporary-accounts/batches/{created['batch_id']}"
         "/admin-portal-access",
         headers=admin_headers,
         json={"enabled": False},
     )
     assert revoked.status_code == 200
     assert revoked.json()["admin_portal_access"] is False
-    assert client.get("/api/auth/me", headers=portal_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=portal_headers).status_code == 401
 
     normal_login = client.post(
-        "/api/auth/temporary-login",
+        "/api/v1/auth/temporary-login",
         json={"password": password},
     )
     assert normal_login.status_code == 200
     normal_headers = {
         "Authorization": f"Bearer {normal_login.json()['token']}",
     }
-    assert client.get("/api/auth/me", headers=normal_headers).status_code == 200
-    assert client.get("/api/auth/admin-me", headers=normal_headers).status_code == 403
+    assert client.get("/api/v1/auth/me", headers=normal_headers).status_code == 200
+    assert client.get("/api/v1/auth/admin-me", headers=normal_headers).status_code == 403
 
 
 @pytest.mark.parametrize("actor_role", [AccountRole.ROOT, AccountRole.ADMIN])
@@ -270,7 +270,7 @@ def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
         else _admin_headers(client)
     )
     created_response = client.post(
-        "/api/temporary-accounts/batches",
+        "/api/v1/temporary-accounts/batches",
         headers=headers,
         json=_batch_body(),
     )
@@ -291,7 +291,7 @@ def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
             ).fetchall()
         }
 
-    listed = client.get("/api/temporary-accounts/batches", headers=headers)
+    listed = client.get("/api/v1/temporary-accounts/batches", headers=headers)
     assert listed.status_code == 200
     listed_text = listed.text
     assert "password" not in listed_text.casefold()
@@ -300,7 +300,7 @@ def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
     assert all(locator not in listed_text for locator in persisted_locators)
 
     revoked = client.post(
-        f"/api/temporary-accounts/batches/{created['batch_id']}/revoke",
+        f"/api/v1/temporary-accounts/batches/{created['batch_id']}/revoke",
         headers=headers,
     )
     assert revoked.status_code == 200
@@ -327,7 +327,7 @@ def test_first_login_starts_one_hard_window_and_revoke_ends_access(
     _bootstrap(runtime)
     headers = _admin_headers(client)
     created = client.post(
-        "/api/temporary-accounts/batches",
+        "/api/v1/temporary-accounts/batches",
         headers=headers,
         json=_batch_body(),
     ).json()
@@ -337,17 +337,17 @@ def test_first_login_starts_one_hard_window_and_revoke_ends_access(
     assert user is not None
 
     formal_login = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": user.username, "password": password},
     )
     assert formal_login.status_code == 401
 
     first = client.post(
-        "/api/auth/temporary-login",
+        "/api/v1/auth/temporary-login",
         json={"password": password},
     )
     second = client.post(
-        "/api/auth/temporary-login",
+        "/api/v1/auth/temporary-login",
         json={"password": password},
     )
     assert first.status_code == second.status_code == 200
@@ -364,20 +364,20 @@ def test_first_login_starts_one_hard_window_and_revoke_ends_access(
     assert claims.expires_at <= int(hard_expiry.timestamp())
 
     bearer = {"Authorization": f"Bearer {first.json()['token']}"}
-    current = client.get("/api/auth/me", headers=bearer)
+    current = client.get("/api/v1/auth/me", headers=bearer)
     assert current.status_code == 200
     assert current.json()["expires_at"] == first_account["expires_at"]
 
     revoked = client.post(
-        f"/api/temporary-accounts/batches/{created['batch_id']}/revoke",
+        f"/api/v1/temporary-accounts/batches/{created['batch_id']}/revoke",
         headers=headers,
     )
     assert revoked.status_code == 200
     assert revoked.json()["state"] == "revoked"
-    assert client.get("/api/auth/me", headers=bearer).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=bearer).status_code == 401
     assert (
         client.post(
-            "/api/auth/temporary-login",
+            "/api/v1/auth/temporary-login",
             json={"password": password},
         ).status_code
         == 401
@@ -390,13 +390,13 @@ def test_expired_temporary_credential_is_revalidated_on_every_request(
 ):
     _bootstrap(runtime)
     created = client.post(
-        "/api/temporary-accounts/batches",
+        "/api/v1/temporary-accounts/batches",
         headers=_admin_headers(client),
         json=_batch_body(),
     ).json()
     password = created["credentials"][0]["password"]
     login = client.post(
-        "/api/auth/temporary-login",
+        "/api/v1/auth/temporary-login",
         json={"password": password},
     )
     assert login.status_code == 200
@@ -411,10 +411,10 @@ def test_expired_temporary_credential_is_revalidated_on_every_request(
         )
 
     bearer = {"Authorization": f"Bearer {login.json()['token']}"}
-    assert client.get("/api/auth/me", headers=bearer).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=bearer).status_code == 401
     assert (
         client.post(
-            "/api/auth/temporary-login",
+            "/api/v1/auth/temporary-login",
             json={"password": password},
         ).status_code
         == 401
@@ -496,7 +496,7 @@ def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
     assert violations == []
 
     login = client.post(
-        "/api/auth/temporary-login",
+        "/api/v1/auth/temporary-login",
         json={"password": legacy_password},
     )
     assert login.status_code == 200

@@ -61,7 +61,7 @@ describe("ChatMessage privacy warning rendering", () => {
 
     const image = screen.getByRole("img", { name: "官方 LINE" });
     expect(image.getAttribute("src")).toBe(
-      "/api/knowledge/qa/images/B1-4?project_id=default",
+      "/api/v1/knowledge/qa/images/B1-4?project_id=default",
     );
     expect(screen.getByRole("link", { name: "開啟相關連結" }).getAttribute("href"))
       .toBe("https://example.com/line");

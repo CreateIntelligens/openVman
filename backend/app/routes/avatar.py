@@ -1,4 +1,4 @@
-"""Avatar character asset management API (prefix /api/avatar)."""
+"""Avatar character asset management API (prefix /api/v1/avatar)."""
 
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ def _guard_not_bound(char_id: str) -> None:
         )
 
 
-@router.get("/api/avatar", summary="列出 Avatar 角色")
+@router.get("/api/v1/avatar", summary="列出 Avatar 角色")
 async def list_characters(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
@@ -121,7 +121,7 @@ async def list_characters(
     }
 
 
-@router.post("/api/avatar", summary="上傳新 Avatar 角色")
+@router.post("/api/v1/avatar", summary="上傳新 Avatar 角色")
 async def create_character(
     char_id: str = Form(...),
     label: str = Form(""),
@@ -162,7 +162,7 @@ async def create_character(
     return {"status": "ok", "character": character}
 
 
-@router.delete("/api/avatar/{char_id}", summary="刪除 Avatar 角色")
+@router.delete("/api/v1/avatar/{char_id}", summary="刪除 Avatar 角色")
 async def delete_character(
     char_id: str,
     _admin: CurrentAccount = Depends(require_admin),
@@ -184,7 +184,7 @@ async def delete_character(
     return {"status": "ok", "char_id": cid}
 
 
-@router.patch("/api/avatar/{char_id}", summary="更新 Avatar 角色顯示名稱")
+@router.patch("/api/v1/avatar/{char_id}", summary="更新 Avatar 角色顯示名稱")
 async def update_character_label(
     char_id: str,
     payload: UpdateLabelRequest,
@@ -201,7 +201,7 @@ async def update_character_label(
     return {"status": "ok", "character": character}
 
 
-@router.post("/api/avatar/{char_id}/rename", summary="重命名 Avatar 角色")
+@router.post("/api/v1/avatar/{char_id}/rename", summary="重命名 Avatar 角色")
 async def rename_character(
     char_id: str,
     payload: RenameRequest,

@@ -37,7 +37,7 @@ def test_create_uploaded_mascot(store):
     assert mascot["mascot_id"] == "custom"
     assert mascot["label"] == "自訂小助理"
     assert mascot["engine"] == "3d"
-    assert mascot["vrm_url"] == "/mascots/custom/model.vrm"
+    assert mascot["vrm_url"] == "/static/mascots/custom/model.vrm"
     assert mascot["builtin"] is False
 
 

@@ -52,14 +52,14 @@ def client(tmp_path, monkeypatch):
 
 def _upload(client, mascot_id="custom", label="自訂小助理", model=VRM_BYTES):
     return client.post(
-        "/api/avatar/mascots",
+        "/api/v1/avatar/mascots",
         data={"mascot_id": mascot_id, "label": label},
         files={"model": ("custom.vrm", io.BytesIO(model), "model/gltf-binary")},
     )
 
 
 def test_list_builtin_mascots(client):
-    response = client.get("/api/avatar/mascots")
+    response = client.get("/api/v1/avatar/mascots")
 
     assert response.status_code == 200
     mascots = response.json()["mascots"]
@@ -73,13 +73,13 @@ def test_upload_then_list(client):
 
     assert response.status_code == 200
     assert response.json()["mascot"]["mascot_id"] == "custom"
-    mascots = client.get("/api/avatar/mascots").json()["mascots"]
-    assert mascots[-1]["vrm_url"] == "/mascots/custom/model.vrm"
+    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
+    assert mascots[-1]["vrm_url"] == "/static/mascots/custom/model.vrm"
 
 
 def test_upload_bad_extension(client):
     response = client.post(
-        "/api/avatar/mascots",
+        "/api/v1/avatar/mascots",
         data={"mascot_id": "custom", "label": "x"},
         files={"model": ("custom.glb", io.BytesIO(VRM_BYTES), "model/gltf-binary")},
     )
@@ -114,7 +114,7 @@ def test_upload_duplicate_builtin_conflict(client):
 
 def test_update_label(client):
     _upload(client)
-    response = client.patch("/api/avatar/mascots/custom", json={"label": "新名稱"})
+    response = client.patch("/api/v1/avatar/mascots/custom", json={"label": "新名稱"})
 
     assert response.status_code == 200
     assert response.json()["mascot"]["label"] == "新名稱"
@@ -123,8 +123,8 @@ def test_update_label(client):
 def test_delete(client):
     _upload(client)
 
-    assert client.delete("/api/avatar/mascots/custom").status_code == 200
-    mascots = client.get("/api/avatar/mascots").json()["mascots"]
+    assert client.delete("/api/v1/avatar/mascots/custom").status_code == 200
+    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
     assert [mascot["mascot_id"] for mascot in mascots] == [
         "haru-live2d",
         "qqman",
@@ -133,7 +133,7 @@ def test_delete(client):
 
 
 def test_delete_builtin_404(client):
-    response = client.delete("/api/avatar/mascots/qqman")
+    response = client.delete("/api/v1/avatar/mascots/qqman")
 
     assert response.status_code == 404
 
@@ -179,7 +179,7 @@ def test_create_video_mascot_from_character(client, character_store):
         metadata={"label": "預設角色"},
     )
     response = client.post(
-        "/api/avatar/mascots/from-character",
+        "/api/v1/avatar/mascots/from-character",
         json={"mascot_id": "matex-000", "label": "", "character_id": "000"},
     )
 
@@ -190,13 +190,13 @@ def test_create_video_mascot_from_character(client, character_store):
     # 未填 label 時沿用角色名稱
     assert mascot["label"] == "預設角色"
 
-    mascots = client.get("/api/avatar/mascots").json()["mascots"]
+    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
     assert mascots[-1]["mascot_id"] == "matex-000"
 
 
 def test_create_video_mascot_unknown_character(client, character_store):
     response = client.post(
-        "/api/avatar/mascots/from-character",
+        "/api/v1/avatar/mascots/from-character",
         json={"mascot_id": "matex-x", "character_id": "nope"},
     )
 
@@ -205,7 +205,7 @@ def test_create_video_mascot_unknown_character(client, character_store):
 
 def test_create_video_mascot_incomplete_character(client, character_store):
     response = client.post(
-        "/api/avatar/mascots/from-character",
+        "/api/v1/avatar/mascots/from-character",
         json={"mascot_id": "matex-broken", "character_id": "broken"},
     )
 
@@ -216,7 +216,7 @@ def test_create_video_mascot_duplicate(client, character_store):
     _upload(client)
 
     response = client.post(
-        "/api/avatar/mascots/from-character",
+        "/api/v1/avatar/mascots/from-character",
         json={"mascot_id": "custom", "character_id": "000"},
     )
 
@@ -228,12 +228,12 @@ def test_video_mascot_hidden_without_character_access(client, character_store):
     from app.auth.runtime import get_auth_runtime
 
     client.post(
-        "/api/avatar/mascots/from-character",
+        "/api/v1/avatar/mascots/from-character",
         json={"mascot_id": "matex-000", "character_id": "000"},
     )
     runtime = get_auth_runtime()
     # 角色資源尚未登記時，即使小助理資源存在也不該列出
-    mascots = client.get("/api/avatar/mascots").json()["mascots"]
+    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
     assert all(m["mascot_id"] != "matex-000" for m in mascots)
 
     runtime.resources.upsert_system_resource(
@@ -241,5 +241,5 @@ def test_video_mascot_hidden_without_character_access(client, character_store):
         resource_id="000",
         metadata={"label": "預設角色"},
     )
-    mascots = client.get("/api/avatar/mascots").json()["mascots"]
+    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
     assert any(m["mascot_id"] == "matex-000" for m in mascots)

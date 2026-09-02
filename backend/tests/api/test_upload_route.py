@@ -68,19 +68,19 @@ class TestUploadSuccess:
     def test_gateway_upload_returns_202(self, client: TestClient):
         data = b"fake pdf content"
         resp = client.post(
-            "/uploads?session_id=test-session",
+            "/api/v1/uploads?session_id=test-session",
             files={"file": ("test.pdf", BytesIO(data), "application/pdf")},
         )
         assert resp.status_code == 202
         body = resp.json()
         assert body["status"] == "accepted"
-        assert body["status_url"] == "/jobs/test-job-id"
+        assert body["status_url"] == "/api/v1/jobs/test-job-id"
 
 
 class TestUploadMIME:
     def test_unsupported_mime_returns_400(self, client: TestClient):
         resp = client.post(
-            "/uploads?session_id=test-session",
+            "/api/v1/uploads?session_id=test-session",
             files={"file": ("test.xyz", BytesIO(b"data"), "application/x-unknown")},
         )
         assert resp.status_code == 400
@@ -94,7 +94,7 @@ class TestUploadSize:
         # Max is 1 MB in fixture env
         big = b"x" * (2 * 1024 * 1024)
         resp = client.post(
-            "/uploads?session_id=test-session",
+            "/api/v1/uploads?session_id=test-session",
             files={"file": ("big.pdf", BytesIO(big), "application/pdf")},
         )
         assert resp.status_code == 413
@@ -117,7 +117,7 @@ class TestUploadQuota:
             fpath.write_bytes(b"x" * 1024)
 
             resp = client.post(
-                "/uploads?session_id=test-session",
+                "/api/v1/uploads?session_id=test-session",
                 files={"file": ("test.pdf", BytesIO(b"pdf"), "application/pdf")},
             )
             assert resp.status_code == 413
@@ -134,14 +134,14 @@ class TestJobStatusRoute:
         }
 
         with patch("app.gateway.routes.get_job_status", new_callable=AsyncMock, return_value=payload):
-            resp = client.get("/jobs/test-job-id")
+            resp = client.get("/api/v1/jobs/test-job-id")
 
         assert resp.status_code == 200
         assert resp.json() == payload
 
     def test_job_status_returns_404_when_missing(self, client: TestClient):
         with patch("app.gateway.routes.get_job_status", new_callable=AsyncMock, return_value=None):
-            resp = client.get("/jobs/missing-job")
+            resp = client.get("/api/v1/jobs/missing-job")
 
         assert resp.status_code == 404
         assert resp.json()["error"] == "job_not_found"

@@ -1,14 +1,14 @@
 /**
  * useAvatarChat — Vue 3 composable for WebSocket communication
  * with the openVman backend gateway, with an optional text-mode fallback
- * that uses HTTP POST /api/chat for multi-provider LLM access.
+ * that uses HTTP POST /api/v1/chat for multi-provider LLM access.
  *
  * Protocol (live mode):
  *   client_init → server_init_ack
  *   user_speak  → server_stream_chunk (audio) → server_stop_audio
  *   client_interrupt
  *
- * Text mode: uses /api/chat (standard chat completions, any provider)
+ * Text mode: uses /api/v1/chat (standard chat completions, any provider)
  */
 import { ref, readonly, onUnmounted } from 'vue'
 import { apiFetch } from '../api/http'
@@ -81,7 +81,7 @@ interface ChatOptions {
        onDisconnect?: () => void
        /** Called after automatic reconnect attempts are exhausted */
        onReconnectExhausted?: () => void
-       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/chat */
+       /** Chat mode: 'live' uses Gemini Live WS, 'text' uses HTTP /api/v1/chat */
        mode?: 'live' | 'text'
        /** Override text-mode chat endpoint. */
        chatEndpoint?: string
@@ -117,9 +117,9 @@ function createClientId(): string {
 
 const MAX_RECONNECT_ATTEMPTS = 6
 const CONNECT_TIMEOUT_MS = 10000
-export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/chat'
-export const DEFAULT_VISION_ENDPOINT = '/api/vision/describe'
-export const DEFAULT_VISION_RESET_ENDPOINT = '/api/vision/reset'
+export const DEFAULT_TEXT_CHAT_ENDPOINT = '/api/v1/chat'
+export const DEFAULT_VISION_ENDPOINT = '/api/v1/vision/describe'
+export const DEFAULT_VISION_RESET_ENDPOINT = '/api/v1/vision/reset'
 
 const DEFAULT_VISUAL_STATE: VisualState = {
        event_key: 'person',
@@ -288,7 +288,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
                      const host = window.location.host
                      clientId = createClientId()
-                     const wsUrl = url ?? options.wsUrlBuilder?.(clientId) ?? `${protocol}://${host}/ws/${clientId}`
+                     const wsUrl = url ?? options.wsUrlBuilder?.(clientId) ?? `${protocol}://${host}/api/v1/ws/${clientId}`
                      lastUrlOverride = url
 
                      state.value = 'CONNECTING'

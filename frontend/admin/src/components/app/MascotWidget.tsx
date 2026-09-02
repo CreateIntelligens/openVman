@@ -172,7 +172,7 @@ export default function MascotWidget() {
         return;
       }
 
-      const hasLocalSnapshot = selectedMascot.thumbnailUrl?.includes("/mascots/");
+      const hasLocalSnapshot = selectedMascot.thumbnailUrl?.includes("/static/mascots/");
       const alreadyUploaded = uploadedSnapshotIdsRef.current.has(selectedMascotId);
       if (event.data.type !== "screenshot" || !event.data.dataUrl || hasLocalSnapshot || alreadyUploaded) {
         return;

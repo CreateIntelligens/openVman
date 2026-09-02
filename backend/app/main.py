@@ -102,12 +102,12 @@ for _noisy_logger in ("httpx", "httpcore"):
     logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
 
 # 角色影片、VRM、背景圖由瀏覽器分段抓取，一次播放就是幾十行 200/206
-_ACCESS_LOG_SILENT_PREFIXES = ("/assets/", "/mascots/", "/backgrounds/")
+_ACCESS_LOG_SILENT_PREFIXES = ("/static/characters/", "/static/mascots/", "/static/backgrounds/")
 _ACCESS_LOG_SILENT_PATHS = frozenset({
-    "/api/health",
-    "/api/health/detailed",
+    "/api/v1/health",
+    "/api/v1/health/detailed",
     "/healthz",
-    "/api/metrics",
+    "/api/v1/metrics",
     "/metrics",
     "/metrics/prometheus",
     "/brain/metrics/prometheus",
@@ -115,16 +115,16 @@ _ACCESS_LOG_SILENT_PATHS = frozenset({
 _PLAINTEXT_DOCUMENT_SUFFIXES = frozenset({".md", ".markdown", ".txt"})
 
 _DASHBOARD_POLLING_PATHS = frozenset({
-    "/api/projects",
-    "/api/personas",
-    "/api/tools",
-    "/api/knowledge/documents",
-    "/api/knowledge/base/documents",
-    "/api/memories",
-    "/api/sessions",
-    "/api/chat/history",
-    "/v1/tts/providers",
-    "/api/knowledge/document",
+    "/api/v1/projects",
+    "/api/v1/personas",
+    "/api/v1/tools",
+    "/api/v1/knowledge/documents",
+    "/api/v1/knowledge/base/documents",
+    "/api/v1/memories",
+    "/api/v1/sessions",
+    "/api/v1/chat/history",
+    "/api/v1/tts/providers",
+    "/api/v1/knowledge/document",
 })
 
 
@@ -239,18 +239,17 @@ app.include_router(background_routes.router)
 app.include_router(mascot_routes.router)
 app.include_router(static_assets_routes.router)
 app.include_router(project_router)
-app.include_router(brain_proxy_router)
 app.include_router(websocket_routes.router)
 
 
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:
     merged = base_schema.copy()
     
-    # Merge paths (remap /brain/ to /api/)
+    # Merge paths (remap /brain/ to /api/v1/)
     merged_paths = merged.get("paths", {})
     for path, path_item in brain_schema.get("paths", {}).items():
         if path.startswith("/brain/"):
-            mapped_path = path.replace("/brain/", "/api/", 1)
+            mapped_path = path.replace("/brain/", "/api/v1/", 1)
             local_path_item = merged_paths.get(mapped_path)
             if local_path_item is None:
                 merged_paths[mapped_path] = path_item
@@ -470,7 +469,7 @@ async def _proxy_indextts_stream(
     )
 
 
-@app.post("/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
+@app.post("/api/v1/tts/stream", tags=["TTS"], summary="串流 TTS 合成")
 async def tts_stream_endpoint(
     body: TtsStreamRequest,
     current: CurrentAccount = Depends(get_current_account),
@@ -556,7 +555,7 @@ async def tts_stream_endpoint(
 
 
 @app.post(
-    "/documents/convert",
+    "/api/v1/documents/convert",
     tags=["Documents"],
     summary="文件轉 Markdown",
     description="`.md`、`.markdown`、`.txt` 以 UTF-8 直接讀取；其餘格式使用 Firecrawl AnyDoc 轉換。本端點不保存原始檔，也不觸發知識庫索引。",
@@ -591,6 +590,12 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
     finally:
         await file.close()
         cleanup_temp_path(tmp_path)
+
+
+# The Brain proxy owns the `/api/v1/{path:path}` catch-all, so it must be the
+# last router registered — Starlette matches routes in declaration order and
+# an earlier catch-all would shadow every `@app` endpoint defined above.
+app.include_router(brain_proxy_router)
 
 
 def run_server() -> None:

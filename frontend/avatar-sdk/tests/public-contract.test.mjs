@@ -18,7 +18,7 @@ async function loadSdk({
   videoPlaySucceeds = true,
 } = {}) {
   const source = await readFile(bundleUrl, "utf8");
-  const script = { src: "https://avatar.example/openvman-avatar-sdk.js" };
+  const script = { src: "https://avatar.example/static/sdk/openvman-avatar-sdk.js" };
   const elements = new Map();
   const requests = [];
   const runtimeCalls = {
@@ -265,6 +265,23 @@ test("derives resources from the SDK script origin", async () => {
   const { sdk } = await loadSdk();
 
   assert.equal(sdk.resourceBaseUrl, "https://avatar.example");
+});
+
+test("loads character files from the /static family", async () => {
+  const { requests, sdk } = await loadSdk();
+
+  await sdk.init({ characterId: "000" });
+
+  assert.ok(
+    requests.some(
+      ({ url }) =>
+        url === "https://avatar.example/static/characters/000/combined_data.json.gz",
+    ),
+  );
+  assert.equal(
+    requests.some(({ url }) => String(url).includes("/assets/")),
+    false,
+  );
 });
 
 test("reuses identical init and rejects different page-lifetime init", async () => {
@@ -535,7 +552,7 @@ test("listCharacters fetches the public character list from the SDK origin", asy
   assert.equal(characters[1].charId, "0713");
   assert.equal(characters[1].label, "夏季限定");
   assert.ok(
-    requests.some(({ url }) => url === "https://avatar.example/characters"),
+    requests.some(({ url }) => url === "https://avatar.example/api/v1/characters"),
   );
 });
 

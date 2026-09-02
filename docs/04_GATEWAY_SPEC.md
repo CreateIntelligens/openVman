@@ -27,7 +27,7 @@
 ### 3. API 端點規範 (API Endpoints)
 
 #### 3.1 媒體上傳 (Media Upload)
-* **POST `/uploads?session_id={id}`**
+* **POST `/api/v1/uploads?session_id={id}`**
   > `trace_id` 由 Gateway 自動生成（UUID），不需由 client 提供。
 * **Content-Type**: `multipart/form-data`
 * **Response (Job Accepted)**:
@@ -53,8 +53,8 @@
 * **Format**: Prometheus Text Format
 
 #### 3.4 文件轉換與知識上傳 (Document Conversion & Knowledge Upload)
-* **POST `/documents/convert`**：單檔轉 Markdown。`.md`、`.markdown`、`.txt` 以 UTF-8 直接讀取，其餘格式交由 AnyDoc；不保存原始檔，也不觸發 Brain 索引。
-* **POST `/api/knowledge/upload`**：知識入庫。`.md`、`.txt`、`.csv` 直接轉發；PDF 先嘗試 pdf-inspector fast path，其餘 PDF / Office 文件以 Docling 轉換，Docling 失敗時依 `DOCLING_FALLBACK_TO_ANYDOC` 回退 AnyDoc。原始 binary 文件保存至 `workspace/raw/`，Markdown 衍生檔送至 `workspace/knowledge/` 並觸發索引。
+* **POST `/api/v1/documents/convert`**：單檔轉 Markdown。`.md`、`.markdown`、`.txt` 以 UTF-8 直接讀取，其餘格式交由 AnyDoc；不保存原始檔，也不觸發 Brain 索引。
+* **POST `/api/v1/knowledge/upload`**：知識入庫。`.md`、`.txt`、`.csv` 直接轉發；PDF 先嘗試 pdf-inspector fast path，其餘 PDF / Office 文件以 Docling 轉換，Docling 失敗時依 `DOCLING_FALLBACK_TO_ANYDOC` 回退 AnyDoc。原始 binary 文件保存至 `workspace/raw/`，Markdown 衍生檔送至 `workspace/knowledge/` 並觸發索引。
 * **上傳上限**：由 `DOCUMENT_MAX_UPLOAD_BYTES` 控制，預設 100 MiB。
 
 Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-8786}` / `${HTTPS_PORT:-8787}` 入口；容器內診斷才使用 `http://127.0.0.1:8200`。
@@ -68,11 +68,11 @@ Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-878
 | `api-tool` | `api_id`, `params` | `tool_result` | 代理外部系統串接 |
 | `web-crawler` | `url` | `crawl_result` | 網頁爬取與知識入庫 |
 
-`camera-live` 的長跑模式會將每次 VLM 描述轉成短 observation，透過 `/internal/enrich` 注入對應 Brain session；單次 `snapshot` 模式預設只回傳結果，帶 `forward: true` 時才注入 Brain。
+`camera-live` 的長跑模式會將每次 VLM 描述轉成短 observation，透過 `/api/v1/internal/enrich` 注入對應 Brain session；單次 `snapshot` 模式預設只回傳結果，帶 `forward: true` 時才注入 Brain。
 
 ### 5. 增強訊息轉發 (Enrichment Forwarding)
 處理完媒體或插件任務後，Gateway 必須組裝 `UserInputEnriched` 封包並發送至 Backend：
-* **URL**: `POST ${BACKEND_INTERNAL_URL}/internal/enrich`
+* **URL**: `POST ${BACKEND_INTERNAL_URL}/api/v1/internal/enrich`
 * **Payload**:
   ```json
   {

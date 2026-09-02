@@ -137,7 +137,7 @@ async def _compensate_project_creation(
     return _is_success(response)
 
 
-@router.get("/api/projects", summary="List Projects")
+@router.get("/api/v1/projects", summary="List Projects")
 async def list_projects(
     request: Request,
     current: CurrentAccount = Depends(get_current_account),
@@ -180,7 +180,7 @@ async def list_projects(
     )
 
 
-@router.post("/api/projects", summary="Create Project")
+@router.post("/api/v1/projects", summary="Create Project")
 async def create_project(
     _body: ProjectCreateRequest,
     request: Request,
@@ -236,7 +236,7 @@ async def create_project(
     return response
 
 
-@router.delete("/api/projects", summary="Delete Project")
+@router.delete("/api/v1/projects", summary="Delete Project")
 async def delete_project(
     body: ProjectDeleteRequest,
     request: Request,
@@ -278,7 +278,7 @@ async def delete_project(
     return response
 
 
-@router.get("/api/projects/{project_id}", summary="Get Project")
+@router.get("/api/v1/projects/{project_id}", summary="Get Project")
 async def get_project(
     project_id: str,
     request: Request,

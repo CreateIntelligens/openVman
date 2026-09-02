@@ -64,7 +64,7 @@ def _normalize_background_id_or_400(background_id: str) -> str:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/api/backgrounds", summary="列出 Avatar 背景")
+@router.get("/api/v1/backgrounds", summary="列出 Avatar 背景")
 async def list_backgrounds(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
@@ -86,7 +86,7 @@ async def list_backgrounds(
     }
 
 
-@router.post("/api/backgrounds", summary="上傳 Avatar 背景")
+@router.post("/api/v1/backgrounds", summary="上傳 Avatar 背景")
 async def create_background(
     background_id: str = Form(...),
     label: str = Form(""),
@@ -123,7 +123,7 @@ async def create_background(
     return {"status": "ok", "background": background}
 
 
-@router.delete("/api/backgrounds/{background_id}", summary="刪除 Avatar 背景")
+@router.delete("/api/v1/backgrounds/{background_id}", summary="刪除 Avatar 背景")
 async def delete_background(
     background_id: str,
     _admin: CurrentAccount = Depends(require_admin),
@@ -141,7 +141,7 @@ async def delete_background(
     return {"status": "ok", "background_id": bid}
 
 
-@router.patch("/api/backgrounds/{background_id}", summary="更新 Avatar 背景顯示名稱")
+@router.patch("/api/v1/backgrounds/{background_id}", summary="更新 Avatar 背景顯示名稱")
 async def update_background_label(
     background_id: str,
     payload: UpdateLabelRequest,

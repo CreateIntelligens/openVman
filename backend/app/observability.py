@@ -32,8 +32,8 @@ _HTTP_METRICS_SKIP_ENDPOINTS = frozenset({
     "/healthz",
     "/metrics",
     "/metrics/prometheus",
-    "/api/health",
-    "/api/metrics",
+    "/api/v1/health",
+    "/api/v1/metrics",
 })
 
 

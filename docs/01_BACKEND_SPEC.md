@@ -109,7 +109,7 @@ async function synthesizeWithFallback(text, session) {
   throw new Error("All TTS targets failed");
 }
 ```
-> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /tts/stream`，VoxCPM 則由同一路徑回傳完整 MP3。
+> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /api/v1/tts/stream`，VoxCPM 則由同一路徑回傳完整 MP3。
 
 #### 6.1 VoxCPM360 外部節點
 
@@ -324,7 +324,7 @@ process.on('SIGTERM', async () => {
 
 ### 17. Token Usage 查詢介面
 
-Backend 以 `GET /v1/usage/summary` 與 `GET /v1/usage/events` 提供已驗證帳號的
+Backend 以 `GET /api/v1/usage/summary` 與 `GET /api/v1/usage/events` 提供已驗證帳號的
 LLM token 用量查詢，並以 `X-Internal-Token` 轉送至 Brain 的
 `/brain/usage/*`。正式管理員可指定 `user_id`；一般或臨時帳號傳入的
 `user_id` 必須覆寫成自身帳號 ID。Brain catch-all proxy 必須阻擋 `usage`

@@ -1,6 +1,6 @@
 /**
  * useAvatarCatalog — Vue 3 composable that reads the available Avatar
- * characters from the backend (`GET /api/avatar`).
+ * characters from the backend (`GET /api/v1/avatar`).
  *
  * The app previously only ever connected with a fixed persona_id and had no
  * way to discover which visual characters exist. This composable exposes that
@@ -22,7 +22,7 @@ import {
 export { DEFAULT_AVATAR_CATALOG_ENDPOINT, type AvatarCharacter }
 
 export interface AvatarCatalogOptions {
-       /** Override the catalog endpoint (default: '/api/avatar'). */
+       /** Override the catalog endpoint (default: '/api/v1/avatar'). */
        endpoint?: string
        /** Inject a fetch implementation (default: centralized cookie API). */
        fetchImpl?: typeof fetch

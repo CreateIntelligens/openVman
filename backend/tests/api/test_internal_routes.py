@@ -44,7 +44,7 @@ def test_internal_enrich_returns_504_when_brain_times_out():
         _client() as client,
     ):
         response = client.post(
-            "/internal/enrich",
+            "/api/v1/internal/enrich",
             json=_payload(),
             headers={internal_routes.INTERNAL_TOKEN_HEADER: "test-token"},
         )
@@ -68,7 +68,7 @@ def test_internal_enrich_fails_closed_when_token_is_not_configured():
         ),
         _client() as client,
     ):
-        response = client.post("/internal/enrich", json=_payload())
+        response = client.post("/api/v1/internal/enrich", json=_payload())
 
     assert response.status_code == 503
     assert response.json() == {"detail": "internal token is not configured"}

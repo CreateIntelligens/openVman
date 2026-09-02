@@ -2,8 +2,8 @@
  * useTtsStreamer — synthesizes speech from the backend TTS service.
  *
  * Two paths based on provider:
- *   - provider === 'indextts': POST /tts/stream (IndexTTS streaming, low latency)
- *   - provider === 'auto' + IndexTTS is available: POST /tts/stream
+ *   - provider === 'indextts': POST /api/v1/tts/stream (IndexTTS streaming, low latency)
+ *   - provider === 'auto' + IndexTTS is available: POST /api/v1/tts/stream
  *     Response: audio/wav — 44-byte header + raw PCM 16 kHz mono Int16 LE, chunked
  *   - all others (edge, gcp, aws…): POST /v1/audio/speech (full file, multi-provider)
  *     Response: provider-native audio. Encoded formats are decoded to 16 kHz mono PCM.
@@ -11,7 +11,7 @@
 
 import { apiFetch } from '../api/http'
 
-const STREAM_ENDPOINT = "/tts/stream";
+const STREAM_ENDPOINT = "/api/v1/tts/stream";
 const SPEECH_ENDPOINT = "/v1/audio/speech";
 const DEFAULT_CHARACTER = "hayley";
 const WAV_HEADER_BYTES = 44;

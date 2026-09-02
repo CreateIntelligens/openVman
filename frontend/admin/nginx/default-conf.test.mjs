@@ -7,81 +7,120 @@ import { describe, expect, it } from "vitest";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "http.d/default.conf"), "utf8");
 
+// 退役路徑一律不得留下任何 location —— 沒有 301、alias、rewrite，也沒有
+// 410 過渡期。這些前綴只要再出現，就是有人偷偷把相容層加回來了。
+const RETIRED_LOCATIONS = [
+  "/embed/",
+  "/api/embed/",
+  "/ws/embed/",
+  "/vman-embed.js",
+  "/embed/avatar",
+  "/assets/",
+  "/mascots/",
+  "/backgrounds/",
+  "/tts/",
+  "/uploads",
+  "/jobs/",
+  "/documents/",
+  "/admin/dlq",
+  "/characters",
+  "/openvman-avatar-sdk.js",
+  "/sdk/runtime/",
+  "/v1/tts/",
+  "/v1/usage/",
+];
+
+function locationBody(prefix) {
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return source.match(
+    new RegExp(`location (?:= )?${escaped} \\{([\\s\\S]*?)\\n    \\}`),
+  )?.[1];
+}
+
 describe("nginx default config", () => {
-  it("proxies avatar background assets to backend before avatar frontend fallback", () => {
-    const backgroundsLocation = source.indexOf("location /backgrounds/");
-    const avatarFallback = source.indexOf("location / {");
-
-    expect(backgroundsLocation).not.toBe(-1);
-    expect(avatarFallback).not.toBe(-1);
-    expect(backgroundsLocation).toBeLessThan(avatarFallback);
-    expect(source).toMatch(/location \/backgrounds\/[\s\S]*proxy_pass \$backend\$request_uri;/);
+  it.each(RETIRED_LOCATIONS)("carries no location for the retired %s", (prefix) => {
+    // /static/mascots/ 之類的新路徑本身含有舊前綴字串，所以比對整個
+    // location 指令而不是裸字串。
+    expect(source).not.toMatch(
+      new RegExp(`location (?:= |\\^~ )?${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[ {]`),
+    );
   });
 
-  it("proxies avatar mascot assets to backend before avatar frontend fallback", () => {
-    const mascotsLocation = source.indexOf("location /mascots/");
+  it("proxies avatar background files to backend before the avatar fallback", () => {
+    const backgrounds = source.indexOf("location /static/backgrounds/");
     const avatarFallback = source.indexOf("location / {");
 
-    expect(mascotsLocation).not.toBe(-1);
-    expect(avatarFallback).not.toBe(-1);
-    expect(mascotsLocation).toBeLessThan(avatarFallback);
-    expect(source).toMatch(/location \/mascots\/[\s\S]*proxy_pass \$backend\$request_uri;/);
-  });
-
-  it("serves the direct avatar SDK and branded runtime resources with CORS", () => {
+    expect(backgrounds).not.toBe(-1);
+    expect(backgrounds).toBeLessThan(avatarFallback);
     expect(source).toMatch(
-      /location = \/openvman-avatar-sdk\.js \{[\s\S]*Access-Control-Allow-Origin "\*"/,
+      /location \/static\/backgrounds\/[\s\S]*proxy_pass \$backend\$request_uri;/,
+    );
+  });
+
+  it("proxies avatar mascot files to backend before the avatar fallback", () => {
+    const mascots = source.indexOf("location /static/mascots/");
+    const avatarFallback = source.indexOf("location / {");
+
+    expect(mascots).not.toBe(-1);
+    expect(mascots).toBeLessThan(avatarFallback);
+    expect(source).toMatch(
+      /location \/static\/mascots\/[\s\S]*proxy_pass \$backend\$request_uri;/,
+    );
+  });
+
+  it("serves the avatar SDK bundle and branded runtime under /static/sdk with CORS", () => {
+    expect(source).toMatch(
+      /location = \/static\/sdk\/openvman-avatar-sdk\.js \{[\s\S]*Access-Control-Allow-Origin "\*"/,
     );
     expect(source).toMatch(
-      /location = \/openvman-avatar-sdk\.js \{[\s\S]*alias \/usr\/share\/nginx\/html\/openvman-avatar-sdk\.js/,
+      /location = \/static\/sdk\/openvman-avatar-sdk\.js \{[\s\S]*alias \/usr\/share\/nginx\/html\/openvman-avatar-sdk\.js/,
     );
     expect(source).not.toContain("avatar-sdk:80");
     expect(source).toMatch(
-      /location = \/sdk\/runtime\/OpenVmanAvatarRuntime\.wasm \{[\s\S]*application\/wasm/,
+      /location = \/static\/sdk\/runtime\/OpenVmanAvatarRuntime\.wasm \{[\s\S]*application\/wasm/,
     );
     expect(source).toMatch(
-      /location = \/sdk\/runtime\/OpenVmanAvatarRuntime\.js \{[\s\S]*DHLiveMini2\.js/,
+      /location = \/static\/sdk\/runtime\/OpenVmanAvatarRuntime\.js \{[\s\S]*DHLiveMini2\.js/,
     );
     expect(source.match(/proxy_hide_header Access-Control-Allow-Origin;/g)).toHaveLength(2);
   });
 
-  it("does not expose the retired iframe integration routes", () => {
-    expect(source).toMatch(/location = \/embed\/avatar \{\s*return 410;/);
-    expect(source).toMatch(/location = \/vman-embed\.js \{\s*return 410;/);
-    expect(source).toMatch(/location \/embed\/ \{\s*return 410;/);
-    expect(source).not.toContain("/srv/openvman/embed");
+  it("proxies public and authorized character files without unsafe shared caching", () => {
+    const characters = locationBody("/static/characters/");
+
+    expect(characters).toContain('Access-Control-Allow-Origin "*"');
+    expect(characters).toContain("proxy_set_header Authorization $http_authorization;");
+    expect(characters).not.toContain('Cache-Control "public');
   });
 
-  it("does not proxy retired public embed backend routes", () => {
-    const embedApi = source.indexOf("location /api/embed/");
-    const embedSocket = source.indexOf("location /ws/embed/");
-    const generalApi = source.indexOf("location /api/ {");
-    const generalSocket = source.indexOf("location /ws/ {");
+  it("keeps every /static/ path on the backend instead of the avatar fallback", () => {
+    const catchAll = source.indexOf("location /static/ {");
+    const avatarFallback = source.indexOf("location / {");
 
-    expect(source).toMatch(/location \/api\/embed\/ \{\s*return 410;/);
-    expect(source).toMatch(/location \/ws\/embed\/ \{\s*return 410;/);
-    expect(embedApi).toBeLessThan(generalApi);
-    expect(embedSocket).toBeLessThan(generalSocket);
+    expect(catchAll).not.toBe(-1);
+    expect(catchAll).toBeLessThan(avatarFallback);
+    expect(locationBody("/static/")).toContain("proxy_pass $backend$request_uri;");
   });
 
-  it("proxies public and authorized character resources without unsafe shared caching", () => {
-    const assetsLocation = source.match(/location \/assets\/ \{([\s\S]*?)\n    \}/)?.[1];
-
-    expect(assetsLocation).toContain('Access-Control-Allow-Origin "*"');
-    expect(assetsLocation).toContain(
-      "proxy_set_header Authorization $http_authorization;",
-    );
-    expect(assetsLocation).not.toContain('Cache-Control "public');
+  it("limits the OpenAI-compatible family to audio", () => {
+    expect(source).toContain("location /v1/audio/ {");
+    expect(locationBody("/v1/audio/")).toContain("proxy_pass $backend$request_uri;");
   });
 
-  it("proxies the public character list with CORS and short caching", () => {
-    const charactersLocation = source.match(
-      /location = \/characters \{([\s\S]*?)\n    \}/,
-    )?.[1];
+  it("routes the application API through a single /api/ location with websocket upgrade", () => {
+    const api = locationBody("/api/");
 
-    expect(charactersLocation).toContain("proxy_pass $backend$request_uri;");
-    expect(charactersLocation).toContain('Access-Control-Allow-Origin "*"');
-    expect(charactersLocation).toContain('Cache-Control "public, max-age=300"');
+    expect(api).toContain("include /etc/nginx/http.d/websocket.conf;");
+    expect(api).toContain("proxy_pass $backend$request_uri;");
+  });
+
+  it("streams TTS unbuffered ahead of the generic API location", () => {
+    const stream = source.indexOf("location /api/v1/tts/stream {");
+    const api = source.indexOf("location /api/ {");
+
+    expect(stream).not.toBe(-1);
+    expect(stream).toBeLessThan(api);
+    expect(locationBody("/api/v1/tts/stream")).toContain("proxy_buffering off;");
   });
 
   // 兩個服務的路徑一致，都是 /api/<service>/。
@@ -115,9 +154,9 @@ describe("nginx default config", () => {
 
     expect(exact).not.toBe(-1);
     expect(exact).toBeLessThan(prefix);
-    expect(
-      source.match(/location = \/api\/embedding \{([\s\S]*?)\n    \}/)?.[1],
-    ).toContain("http://embedding:8009/embed$is_args$args");
+    expect(locationBody("/api/embedding")).toContain(
+      "http://embedding:8009/embed$is_args$args",
+    );
   });
 
   it("defines bounded shared GPU inference rate and connection zones", () => {

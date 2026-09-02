@@ -13,12 +13,12 @@ from .runtime import AuthRuntime, get_auth_runtime
 
 _PUBLIC_EXACT_PATHS = frozenset(
     {
-        "/api/auth/login",
-        "/api/auth/admin-login",
-        "/api/auth/admin-temporary-login",
-        "/api/auth/temporary-login",
-        "/api/health",
-        "/characters",
+        "/api/v1/auth/login",
+        "/api/v1/auth/admin-login",
+        "/api/v1/auth/admin-temporary-login",
+        "/api/v1/auth/temporary-login",
+        "/api/v1/health",
+        "/api/v1/characters",
         "/healthz",
         "/metrics",
         "/metrics/prometheus",
@@ -27,9 +27,9 @@ _PUBLIC_EXACT_PATHS = frozenset(
         "/redoc",
     }
 )
-_INTERNAL_AUTH_BYPASS_PATHS = frozenset({"/internal/enrich"})
+_INTERNAL_AUTH_BYPASS_PATHS = frozenset({"/api/v1/internal/enrich"})
 _PUBLIC_PREFIXES = (
-    "/assets/",
+    "/static/characters/",
     "/avatar-sdk/",
     "/favicon",
     "/login",

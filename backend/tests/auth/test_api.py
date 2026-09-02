@@ -56,7 +56,7 @@ def _bootstrap_admin(runtime: AuthRuntime):
 
 def _login(client: TestClient, username: str, password: str) -> dict:
     response = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": username, "password": password},
     )
     assert response.status_code == 200
@@ -71,11 +71,11 @@ def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
     admin = _bootstrap_admin(runtime)
 
     wrong_password = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": admin.username, "password": "wrong-password"},
     )
     unknown_account = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": "missing", "password": "wrong-password"},
     )
     assert wrong_password.status_code == unknown_account.status_code == 401
@@ -101,20 +101,20 @@ def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
     }
     assert login["token"]
 
-    cookie_me = client.get("/api/auth/me")
+    cookie_me = client.get("/api/v1/auth/me")
     bearer_me = client.get(
-        "/api/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {login['token']}"},
     )
     assert cookie_me.status_code == bearer_me.status_code == 200
     assert cookie_me.json() == bearer_me.json() == login["account"]
 
-    missing_origin = client.post("/api/auth/logout")
+    missing_origin = client.post("/api/v1/auth/logout")
     assert missing_origin.status_code == 403
-    logout = client.post("/api/auth/logout", headers=_origin_headers())
+    logout = client.post("/api/v1/auth/logout", headers=_origin_headers())
     assert logout.status_code == 200
     assert logout.json() == {"ok": True}
-    assert client.get("/api/auth/me").status_code == 401
+    assert client.get("/api/v1/auth/me").status_code == 401
 
 
 def test_admin_portal_access_defaults_denied_and_can_be_replaced(
@@ -152,11 +152,11 @@ def test_admin_portal_access_defaults_denied_and_can_be_replaced(
     }
     assert generic_login["account"]["admin_portal_access"] is False
     assert client.post(
-        "/api/auth/admin-login",
+        "/api/v1/auth/admin-login",
         json={"username": user.username, "password": _USER_PASSWORD},
     ).status_code == 403
-    assert client.get("/api/auth/admin-me", headers=generic_headers).status_code == 403
-    assert client.get("/api/auth/me", headers=generic_headers).status_code == 200
+    assert client.get("/api/v1/auth/admin-me", headers=generic_headers).status_code == 403
+    assert client.get("/api/v1/auth/me", headers=generic_headers).status_code == 200
 
     admin_headers = {
         "Authorization": f"Bearer {_login(client, admin.username, _ADMIN_PASSWORD)['token']}",
@@ -180,33 +180,33 @@ def test_admin_portal_access_defaults_denied_and_can_be_replaced(
         "admin_portal_access": True,
     }
     granted = client.put(
-        f"/api/users/{user.id}/access",
+        f"/api/v1/users/{user.id}/access",
         headers=admin_headers,
         json=access,
     )
     assert granted.status_code == 200
     assert granted.json()["admin_portal_access"] is True
-    assert client.get("/api/auth/me", headers=generic_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=generic_headers).status_code == 401
 
     portal_login = client.post(
-        "/api/auth/admin-login",
+        "/api/v1/auth/admin-login",
         json={"username": user.username, "password": _USER_PASSWORD},
     )
     assert portal_login.status_code == 200
     portal_headers = {
         "Authorization": f"Bearer {portal_login.json()['token']}",
     }
-    assert client.get("/api/auth/admin-me", headers=portal_headers).status_code == 200
+    assert client.get("/api/v1/auth/admin-me", headers=portal_headers).status_code == 200
 
     access["admin_portal_access"] = False
     denied = client.put(
-        f"/api/users/{user.id}/access",
+        f"/api/v1/users/{user.id}/access",
         headers=admin_headers,
         json=access,
     )
     assert denied.status_code == 200
     assert denied.json()["admin_portal_access"] is False
-    assert client.get("/api/auth/me", headers=portal_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=portal_headers).status_code == 401
 
 
 def test_production_login_cookie_has_required_flags(tmp_path: Path):
@@ -224,7 +224,7 @@ def test_production_login_cookie_has_required_flags(tmp_path: Path):
 
     with TestClient(app, base_url="https://testserver") as secure_client:
         response = secure_client.post(
-            "/api/auth/login",
+            "/api/v1/auth/login",
             json={"username": "admin", "password": _ADMIN_PASSWORD},
         )
 
@@ -244,7 +244,7 @@ def test_admin_lifecycle_creator_revocation_and_immediate_disable(client, runtim
     }
 
     created = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=admin_headers,
         json={
             "username": "Alice",
@@ -258,7 +258,7 @@ def test_admin_lifecycle_creator_revocation_and_immediate_disable(client, runtim
     assert user["resource_counts"] == {}
 
     duplicate = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=admin_headers,
         json={
             "username": " alice ",
@@ -270,26 +270,26 @@ def test_admin_lifecycle_creator_revocation_and_immediate_disable(client, runtim
 
     user_login = _login(client, "alice", _USER_PASSWORD)
     user_headers = {"Authorization": f"Bearer {user_login['token']}"}
-    denied = client.get("/api/users", headers=user_headers)
+    denied = client.get("/api/v1/users", headers=user_headers)
     assert denied.status_code == 403
 
-    revoked = client.post(f"/api/users/{user['id']}/revoke", headers=admin_headers)
+    revoked = client.post(f"/api/v1/users/{user['id']}/revoke", headers=admin_headers)
     assert revoked.status_code == 200
-    assert client.get("/api/auth/me", headers=user_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=user_headers).status_code == 401
 
     user_login = _login(client, "alice", _USER_PASSWORD)
     user_headers = {"Authorization": f"Bearer {user_login['token']}"}
     disabled = client.patch(
-        f"/api/users/{user['id']}/disabled",
+        f"/api/v1/users/{user['id']}/disabled",
         headers=admin_headers,
         json={"disabled": True},
     )
     assert disabled.status_code == 200
     assert disabled.json()["disabled"] is True
-    assert client.get("/api/auth/me", headers=user_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=user_headers).status_code == 401
 
     enabled = client.patch(
-        f"/api/users/{user['id']}/disabled",
+        f"/api/v1/users/{user['id']}/disabled",
         headers=admin_headers,
         json={"disabled": False},
     )
@@ -334,7 +334,7 @@ def test_admin_creates_formal_account_with_access_atomically(client, runtime):
         "admin_portal_access": True,
     }
     created = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=admin_headers,
         json={
             "username": "ready-user",
@@ -350,7 +350,7 @@ def test_admin_creates_formal_account_with_access_atomically(client, runtime):
     assert created.json()["admin_portal_access"] is True
 
     invalid = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=admin_headers,
         json={
             "username": "incomplete-user",
@@ -426,7 +426,7 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
         )
 
     created = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=admin_headers,
         json={
             "username": "scoped-user",
@@ -442,7 +442,7 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
         ResourceType.AVATAR_CHARACTER,
     ) == []
 
-    options = client.get("/api/users/access-options", headers=admin_headers)
+    options = client.get("/api/v1/users/access-options", headers=admin_headers)
     assert options.status_code == 200
     assert {item["id"] for item in options.json()["projects"]} == {
         "project-a",
@@ -467,7 +467,7 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
         },
     }
     updated = client.put(
-        f"/api/users/{user.id}/access",
+        f"/api/v1/users/{user.id}/access",
         headers=admin_headers,
         json=first_access,
     )
@@ -508,7 +508,7 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
         },
     }
     replaced = client.put(
-        f"/api/users/{user.id}/access",
+        f"/api/v1/users/{user.id}/access",
         headers=admin_headers,
         json=second_access,
     )
@@ -526,11 +526,11 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
         "Authorization": f"Bearer {_login(client, 'scoped-user', _USER_PASSWORD)['token']}",
     }
     assert client.get(
-        "/api/users/access-options",
+        "/api/v1/users/access-options",
         headers=user_headers,
     ).status_code == 403
     assert client.put(
-        f"/api/users/{user.id}/access",
+        f"/api/v1/users/{user.id}/access",
         headers=user_headers,
         json=first_access,
     ).status_code == 403
@@ -541,15 +541,15 @@ def test_account_deletion_resource_counts_and_admin_self_protection(client, runt
     admin_login = _login(client, admin.username, _ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {admin_login['token']}"}
     self_disable = client.patch(
-        f"/api/users/{admin.id}/disabled",
+        f"/api/v1/users/{admin.id}/disabled",
         headers=headers,
         json={"disabled": True},
     )
-    self_delete = client.delete(f"/api/users/{admin.id}", headers=headers)
+    self_delete = client.delete(f"/api/v1/users/{admin.id}", headers=headers)
     assert self_disable.status_code == self_delete.status_code == 403
 
     created = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=headers,
         json={
             "username": "resource-owner",
@@ -563,24 +563,24 @@ def test_account_deletion_resource_counts_and_admin_self_protection(client, runt
         owner_user_id=created["id"],
         visibility=ResourceVisibility.PRIVATE,
     )
-    account_list = client.get("/api/users", headers=headers)
+    account_list = client.get("/api/v1/users", headers=headers)
     listed_owner = next(
         account for account in account_list.json() if account["id"] == created["id"]
     )
     assert listed_owner["resource_counts"] == {"project": 1}
     client.patch(
-        f"/api/users/{created['id']}/disabled",
+        f"/api/v1/users/{created['id']}/disabled",
         headers=headers,
         json={"disabled": True},
     )
 
-    blocked = client.delete(f"/api/users/{created['id']}", headers=headers)
+    blocked = client.delete(f"/api/v1/users/{created['id']}", headers=headers)
     assert blocked.status_code == 409
     assert blocked.json()["detail"]["resource_counts"] == {"project": 1}
     assert runtime.users.get_by_id(created["id"]) is not None
 
     runtime.resources.unregister(ResourceType.PROJECT, "project-owned")
-    deleted = client.delete(f"/api/users/{created['id']}", headers=headers)
+    deleted = client.delete(f"/api/v1/users/{created['id']}", headers=headers)
     assert deleted.status_code == 204
     assert runtime.users.get_by_id(created["id"]) is None
 
@@ -605,9 +605,9 @@ def test_fail_closed_middleware_ignores_query_tokens_and_enforces_csrf(runtime):
     app.add_middleware(FailClosedAuthMiddleware, runtime=runtime)
     isolated_client = TestClient(app)
 
-    assert is_public_path("/api/auth/admin-login") is True
-    assert is_public_path("/api/auth/admin-temporary-login") is True
-    assert is_public_path("/api/auth/admin-me") is False
+    assert is_public_path("/api/v1/auth/admin-login") is True
+    assert is_public_path("/api/v1/auth/admin-temporary-login") is True
+    assert is_public_path("/api/v1/auth/admin-me") is False
     assert isolated_client.get("/healthz").status_code == 200
     assert isolated_client.get("/private").status_code == 401
     assert isolated_client.get(f"/private?token={token}").status_code == 401

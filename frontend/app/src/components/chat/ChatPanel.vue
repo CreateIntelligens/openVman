@@ -223,7 +223,7 @@ function mediaKey(index: number, message: ChatMessage): string {
 function qaImageUrl(message: ChatMessage): string {
   if (!message.imageId) return ""
   const params = new URLSearchParams({ project_id: message.projectId || "default" })
-  return `/api/knowledge/qa/images/${encodeURIComponent(message.imageId)}?${params}`
+  return `/api/v1/knowledge/qa/images/${encodeURIComponent(message.imageId)}?${params}`
 }
 
 function safeHttpUrl(value?: string): string | null {

@@ -92,7 +92,7 @@ async function init(
 async function listCharacters(): Promise<OpenVmanAvatarCharacter[]> {
   let response: Response;
   try {
-    response = await fetch(`${resourceBaseUrl}/characters`);
+    response = await fetch(`${resourceBaseUrl}/api/v1/characters`);
   } catch (error) {
     throw new OpenVmanAvatarError(
       "RESOURCE_LOAD_FAILED",
@@ -128,7 +128,7 @@ async function createInstance(
   try {
     runtime = await AvatarRuntime.create(resourceBaseUrl);
     const assetsBaseUrl = new URL(
-      options.assetsBaseUrl ?? "/assets/",
+      options.assetsBaseUrl ?? "/static/characters/",
       `${resourceBaseUrl}/`,
     ).toString().replace(/\/$/, "");
     await runtime.loadCharacter(options.characterId ?? "000", assetsBaseUrl);

@@ -114,7 +114,7 @@ describe("Avatar page", () => {
         {
           background_id: "clinic",
           label: "診間背景",
-          url: "/backgrounds/clinic/image.png",
+          url: "/static/backgrounds/clinic/image.png",
           mime_type: "image/png",
           size_bytes: 2048,
           updated_at: "2026-06-08T00:00:00Z",
@@ -137,7 +137,7 @@ describe("Avatar page", () => {
         {
           background_id: "clinic",
           label: "診間背景",
-          url: "/backgrounds/clinic/image.png",
+          url: "/static/backgrounds/clinic/image.png",
           mime_type: "image/png",
           size_bytes: 2048,
           updated_at: "2026-06-08T00:00:00Z",
@@ -159,7 +159,7 @@ describe("Avatar page", () => {
       background: {
         background_id: "clinic",
         label: "診間背景",
-        url: "/backgrounds/clinic/image.png",
+        url: "/static/backgrounds/clinic/image.png",
         mime_type: "image/png",
         size_bytes: 2048,
         updated_at: "2026-06-08T00:00:00Z",
@@ -195,7 +195,7 @@ describe("Avatar page", () => {
         {
           background_id: "clinic",
           label: "診間背景",
-          url: "/backgrounds/clinic/image.png",
+          url: "/static/backgrounds/clinic/image.png",
           mime_type: "image/png",
           size_bytes: 2048,
           updated_at: "2026-06-08T00:00:00Z",
@@ -209,7 +209,7 @@ describe("Avatar page", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Use clinic" }));
 
     expect(window.localStorage.getItem("avatar.background_id")).toBe("uploaded:clinic");
-    expect(window.localStorage.getItem("avatar.background_url")).toBe("/backgrounds/clinic/image.png");
+    expect(window.localStorage.getItem("avatar.background_url")).toBe("/static/backgrounds/clinic/image.png");
     expect(openSpy).toHaveBeenCalledWith("/", "_blank", "noopener,noreferrer");
   });
 
@@ -222,7 +222,7 @@ describe("Avatar page", () => {
           label: "Frieren",
           engine: "3d",
           model_url: "",
-          vrm_url: "/mascots/qqman/model.vrm",
+          vrm_url: "/static/mascots/qqman/model.vrm",
           fit: "",
           builtin: true,
           size_bytes: 0,
@@ -249,7 +249,7 @@ describe("Avatar page", () => {
           label: "自訂小助理",
           engine: "3d",
           model_url: "",
-          vrm_url: "/mascots/custom/model.vrm",
+          vrm_url: "/static/mascots/custom/model.vrm",
           fit: "",
           builtin: false,
           size_bytes: 4096,
@@ -264,7 +264,7 @@ describe("Avatar page", () => {
     const frame = await screen.findByTitle("Mascot snapshot capture");
     const src = decodeURIComponent(frame.getAttribute("src") ?? "");
 
-    expect(src).toContain("/mascots/custom/model.vrm");
+    expect(src).toContain("/static/mascots/custom/model.vrm");
     expect(src).toContain("engine=3d");
   });
 
@@ -278,7 +278,7 @@ describe("Avatar page", () => {
         label: "自訂小助理",
         engine: "3d",
         model_url: "",
-        vrm_url: "/mascots/custom/model.vrm",
+        vrm_url: "/static/mascots/custom/model.vrm",
         fit: "",
         builtin: false,
         size_bytes: 4096,
@@ -317,7 +317,7 @@ describe("Avatar page", () => {
           label: "自訂小助理",
           engine: "3d",
           model_url: "",
-          vrm_url: "/mascots/custom/model.vrm",
+          vrm_url: "/static/mascots/custom/model.vrm",
           fit: "",
           builtin: false,
           size_bytes: 4096,
@@ -332,7 +332,7 @@ describe("Avatar page", () => {
         label: "新小助理",
         engine: "3d",
         model_url: "",
-        vrm_url: "/mascots/custom/model.vrm",
+        vrm_url: "/static/mascots/custom/model.vrm",
         fit: "",
         builtin: false,
         size_bytes: 4096,
@@ -362,7 +362,7 @@ describe("Avatar page", () => {
           label: "Frieren",
           engine: "3d",
           model_url: "",
-          vrm_url: "/mascots/qqman/model.vrm",
+          vrm_url: "/static/mascots/qqman/model.vrm",
           fit: "",
           builtin: true,
           size_bytes: 0,
@@ -373,7 +373,7 @@ describe("Avatar page", () => {
           label: "自訂小助理",
           engine: "3d",
           model_url: "",
-          vrm_url: "/mascots/custom/model.vrm",
+          vrm_url: "/static/mascots/custom/model.vrm",
           fit: "",
           builtin: false,
           size_bytes: 4096,

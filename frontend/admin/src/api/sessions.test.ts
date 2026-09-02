@@ -30,7 +30,7 @@ describe("sessions api", () => {
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(
-      "/api/sessions/export?project_id=project-a&persona_id=doctor&date_from=2026-08-01&date_to=2026-08-31&search=hello+world&session_ids=session-a%2Csession-b",
+      "/api/v1/sessions/export?project_id=project-a&persona_id=doctor&date_from=2026-08-01&date_to=2026-08-31&search=hello+world&session_ids=session-a%2Csession-b",
     );
     expect((init as RequestInit).credentials).toBe("include");
   });

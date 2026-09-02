@@ -86,7 +86,7 @@ test("auto provider uses IndexTTS streaming when IndexTTS is available", async (
 
     await streamer.speak("你好", { provider: "auto" });
 
-    assert.equal(fetchMock.calls[0].url, "/tts/stream");
+    assert.equal(fetchMock.calls[0].url, "/api/v1/tts/stream");
     assert.deepEqual(fetchMock.calls[0].body, { text: "你好", character: "hayley" });
     assert.deepEqual(chunks, [[1, 2, 3, 4]]);
   } finally {
@@ -107,7 +107,7 @@ test("explicit IndexTTS provider sends the selected voice as character", async (
 
     await streamer.speak("測試", { provider: "indextts", voice: "morgan" });
 
-    assert.equal(fetchMock.calls[0].url, "/tts/stream");
+    assert.equal(fetchMock.calls[0].url, "/api/v1/tts/stream");
     assert.deepEqual(fetchMock.calls[0].body, { text: "測試", character: "morgan" });
   } finally {
     fetchMock.restore();
@@ -127,7 +127,7 @@ test("gemini-tts uses the streaming endpoint with provider and voice fields", as
 
     await streamer.speak("測試", { provider: "gemini-tts", voice: "Despina" });
 
-    assert.equal(fetchMock.calls[0].url, "/tts/stream");
+    assert.equal(fetchMock.calls[0].url, "/api/v1/tts/stream");
     assert.deepEqual(fetchMock.calls[0].body, {
       text: "測試",
       provider: "gemini-tts",

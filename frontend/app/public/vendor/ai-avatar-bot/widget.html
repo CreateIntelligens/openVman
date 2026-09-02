@@ -293,7 +293,7 @@
     if (window.OpenVmanAvatar) return Promise.resolve();
     return new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = location.origin + '/openvman-avatar-sdk.js';
+      s.src = location.origin + '/static/sdk/openvman-avatar-sdk.js';
       s.onload = res; s.onerror = () => rej(new Error('無法載入 Avatar SDK'));
       document.head.appendChild(s);
     });
@@ -310,7 +310,7 @@
       const inst = await window.OpenVmanAvatar.init({
         container: host,
         characterId: CHARACTER_ID,
-        assetsBaseUrl: '/assets/',
+        assetsBaseUrl: '/static/characters/',
         audioOutput: 'silent',
       });
       let alive = true;

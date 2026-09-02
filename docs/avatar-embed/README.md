@@ -17,7 +17,7 @@ SDK 只提供角色渲染、音訊播放與嘴形同步，不開放 openVman 的
 <input id="avatar-audio" type="file" accept="audio/*">
 <button id="avatar-stop" type="button">停止</button>
 
-<script src="https://YOUR_OPENVMAN_HOST/openvman-avatar-sdk.js"></script>
+<script src="https://YOUR_OPENVMAN_HOST/static/sdk/openvman-avatar-sdk.js"></script>
 <script>
   const avatarPromise = OpenVmanAvatar.init({ characterId: "000" });
 
@@ -36,7 +36,7 @@ SDK 只提供角色渲染、音訊播放與嘴形同步，不開放 openVman 的
 </script>
 ```
 
-script 必須使用完整 openVman URL。若寫成 `/openvman-avatar-sdk.js`，瀏覽器會向宿主網站自己的 origin 抓取 SDK。
+script 必須使用完整 openVman URL。若寫成 `/static/sdk/openvman-avatar-sdk.js`，瀏覽器會向宿主網站自己的 origin 抓取 SDK。
 
 可直接開啟 [embed-minimal.html](../../examples/embed-minimal.html) 作為完整範例，並將 SDK script URL 改成部署網址。
 
@@ -56,13 +56,13 @@ const avatar = await OpenVmanAvatar.init({
 
 | 選項 | 必填 | 預設值 | 說明 |
 |---|---:|---|---|
-| `characterId` | 否 | `000` | `/assets/<id>/` 下的角色 ID，可用 `OpenVmanAvatar.listCharacters()` 查詢可用清單。 |
+| `characterId` | 否 | `000` | `/static/characters/<id>/` 下的角色 ID，可用 `OpenVmanAvatar.listCharacters()` 查詢可用清單。 |
 | `position` | 否 | `bottom-right` | 預設懸浮位置，可設為 `bottom-left`。 |
 | `width` | 否 | `min(42vw, 28rem)` | CSS width 值。 |
 | `height` | 否 | `min(72dvh, 42rem)` | CSS height 值。 |
 | `zIndex` | 否 | `2147483000` | 覆寫 root 的 stacking order。 |
 | `container` | 否 | `document.body` | 指定時改為填滿該容器，不使用 viewport 懸浮位置。 |
-| `assetsBaseUrl` | 否 | SDK origin 的 `/assets` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
+| `assetsBaseUrl` | 否 | SDK origin 的 `/static/characters` | 自訂角色資料根路徑，可用相對或絕對 URL。 |
 | `audioOutput` | 否 | `speaker` | `speaker` 由 SDK 播放音訊；`silent` 保留播放時間軸與嘴型但靜音，適用於宿主另行播放同一段音訊的情境。 |
 
 同一頁只允許一個 WASM runtime。完全相同的設定會回傳既有 instance；不同設定會回報 `INSTANCE_EXISTS`。`destroy()` 後必須重新載入頁面才能再次初始化。
@@ -141,14 +141,14 @@ SDK 會建立 inline style 與 element style，因此目前需要 `style-src 'un
 
 | 路徑 | 用途 |
 |---|---|
-| `/openvman-avatar-sdk.js` | IIFE SDK。 |
-| `/sdk/runtime/OpenVmanAvatarRuntime.js` | 內部 runtime 公開別名。 |
-| `/sdk/runtime/OpenVmanAvatarRuntime.wasm` | 內部 WASM 公開別名。 |
-| `/characters` | 可用角色清單（唯讀，無需驗證）。 |
-| `/assets/<characterId>/combined_data.json.gz` | 角色驅動資料。 |
-| `/assets/<characterId>/01.webm` | 透明角色影片。 |
+| `/static/sdk/openvman-avatar-sdk.js` | IIFE SDK。 |
+| `/static/sdk/runtime/OpenVmanAvatarRuntime.js` | 內部 runtime 公開別名。 |
+| `/static/sdk/runtime/OpenVmanAvatarRuntime.wasm` | 內部 WASM 公開別名。 |
+| `/api/v1/characters` | 可用角色清單（唯讀，無需驗證）。 |
+| `/static/characters/<characterId>/combined_data.json.gz` | 角色驅動資料。 |
+| `/static/characters/<characterId>/01.webm` | 透明角色影片。 |
 
-`/api/embed/*`、`/ws/embed/*`、`/embed/avatar`、`/vman-embed.js` 與 `<vman-avatar>` 都不是支援的串接面。openVman 原本內部使用的 `/api/*`、`/ws/*`、`/tts/*` 不屬於 Avatar SDK 公開契約。
+`/api/embed/*`、`/ws/embed/*`、`/embed/avatar`、`/vman-embed.js` 與 `<vman-avatar>` 都不是支援的串接面，且已全數回 404。openVman 內部使用的 `/api/v1/*` 其餘端點不屬於 Avatar SDK 公開契約。
 
 ## 錯誤碼
 

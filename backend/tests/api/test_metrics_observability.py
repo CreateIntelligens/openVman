@@ -14,11 +14,11 @@ def test_normalize_http_metrics_endpoint_prefers_route_template():
     from app.observability import normalize_http_metrics_endpoint
 
     request = SimpleNamespace(
-        url=SimpleNamespace(path="/api/skills/demo/files"),
-        scope={"route": SimpleNamespace(path="/api/skills/{skill_id}/files")},
+        url=SimpleNamespace(path="/api/v1/skills/demo/files"),
+        scope={"route": SimpleNamespace(path="/api/v1/skills/{skill_id}/files")},
     )
 
-    assert normalize_http_metrics_endpoint(request) == "/api/skills/{skill_id}/files"
+    assert normalize_http_metrics_endpoint(request) == "/api/v1/skills/{skill_id}/files"
 
 
 def test_should_record_http_metrics_skips_health_and_metrics_routes():
@@ -27,8 +27,8 @@ def test_should_record_http_metrics_skips_health_and_metrics_routes():
     assert should_record_http_metrics("/healthz") is False
     assert should_record_http_metrics("/metrics") is False
     assert should_record_http_metrics("/metrics/prometheus") is False
-    assert should_record_http_metrics("/api/health") is False
-    assert should_record_http_metrics("/api/metrics") is False
+    assert should_record_http_metrics("/api/v1/health") is False
+    assert should_record_http_metrics("/api/v1/metrics") is False
     assert should_record_http_metrics("/v1/audio/speech") is True
 
 
@@ -131,10 +131,10 @@ def test_http_metrics_middleware_uses_route_template_for_proxy_paths(monkeypatch
 
     with TestClient(main.app, raise_server_exceptions=False) as client:
         client.headers["Authorization"] = f"Bearer {token}"
-        response = client.get("/api/skills/demo/files?project_id=default")
+        response = client.get("/api/v1/skills/demo/files?project_id=default")
 
     assert response.status_code == 502
-    assert captured[0]["endpoint"] == "/api/skills/{skill_id}/files"
+    assert captured[0]["endpoint"] == "/api/v1/skills/{skill_id}/files"
 
 
 def test_http_metrics_middleware_skips_metrics_routes(monkeypatch):

@@ -29,7 +29,7 @@ describe("knowledge api", () => {
     );
 
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/knowledge/raw/upload");
+    expect(url).toBe("/api/v1/knowledge/raw/upload");
     expect((init as RequestInit).method).toBe("POST");
     const body = (init as RequestInit).body;
     expect(body).toBeInstanceOf(FormData);
@@ -49,7 +49,7 @@ describe("knowledge api", () => {
     await previewRenormalizedKnowledgeDocument("knowledge/ocr.md");
 
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/knowledge/renormalize/preview");
+    expect(url).toBe("/api/v1/knowledge/renormalize/preview");
     expect((init as RequestInit).method).toBe("POST");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({
       path: "knowledge/ocr.md",
@@ -67,7 +67,7 @@ describe("knowledge api", () => {
     await applyRenormalizedKnowledgeDocument("knowledge/ocr.md", "# Clean");
 
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/knowledge/renormalize/apply");
+    expect(url).toBe("/api/v1/knowledge/renormalize/apply");
     expect((init as RequestInit).method).toBe("POST");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({
       path: "knowledge/ocr.md",
@@ -87,7 +87,7 @@ describe("knowledge api", () => {
     await createKnowledgeNote("FAQ", "## Q\n\nA", "faq");
 
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe("/api/knowledge/note");
+    expect(url).toBe("/api/v1/knowledge/note");
     expect((init as RequestInit).method).toBe("POST");
     expect(JSON.parse((init as RequestInit).body as string)).toEqual({
       title: "FAQ",

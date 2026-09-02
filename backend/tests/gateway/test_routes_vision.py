@@ -72,7 +72,7 @@ def test_no_event_returns_empty_reply_and_skips_brain(client):
     )
     with patch("app.gateway.routes_vision.get_camera_plugin", return_value=cam):
         with patch("app.gateway.routes_vision._generate_reply", new_callable=AsyncMock) as gen:
-            resp = client.post("/api/vision/describe", json={"frame_base64": _B64})
+            resp = client.post("/api/v1/vision/describe", json={"frame_base64": _B64})
     assert resp.status_code == 200
     assert resp.json()["reply"] == ""
     assert resp.json()["session_id"]
@@ -94,7 +94,7 @@ def test_fired_event_calls_brain_with_context_text(client):
     with patch("app.gateway.routes_vision.get_camera_plugin", return_value=cam):
         with patch("app.gateway.routes_vision._generate_reply",
                    new_callable=AsyncMock, return_value="你好！") as gen:
-            resp = client.post("/api/vision/describe", json={"frame_base64": _B64})
+            resp = client.post("/api/v1/vision/describe", json={"frame_base64": _B64})
     assert resp.json()["reply"] == "你好！"
     assert resp.json()["visual_state"] == _RED_SIGNAL
     args = gen.await_args.args
@@ -128,7 +128,7 @@ def test_generate_reply_allocates_unique_session_id_when_none(client):
         with patch("app.gateway.routes_vision._http") as mock_http:
             mock_http.get.return_value = fake_client
             # session_id 省略（None）
-            resp = client.post("/api/vision/describe", json={"frame_base64": _B64})
+            resp = client.post("/api/v1/vision/describe", json={"frame_base64": _B64})
 
     assert resp.status_code == 200
     assert len(posted_bodies) == 1
@@ -142,7 +142,7 @@ def test_vision_reset_clears_session_event_state(client):
     cam = MagicMock()
     cam.session_visual_state.return_value = _GREEN_SIGNAL
     with patch("app.gateway.routes_vision.get_camera_plugin", return_value=cam):
-        resp = client.post("/api/vision/reset", json={"session_id": "vision-text"})
+        resp = client.post("/api/v1/vision/reset", json={"session_id": "vision-text"})
 
     assert resp.status_code == 200
     assert resp.json() == {
@@ -161,7 +161,7 @@ def test_vision_health_ready(client):
         new_callable=AsyncMock,
         return_value=probe,
     ):
-        resp = client.get("/api/vision/health")
+        resp = client.get("/api/v1/vision/health")
 
     assert resp.status_code == 200
     assert resp.json() == {
@@ -179,7 +179,7 @@ def test_vision_health_disabled(client):
         new_callable=AsyncMock,
         return_value=probe,
     ):
-        resp = client.get("/api/vision/health")
+        resp = client.get("/api/v1/vision/health")
 
     assert resp.status_code == 200
     body = resp.json()

@@ -13,7 +13,7 @@ export interface SpeechResult {
 }
 
 export async function fetchTtsProviders(): Promise<TtsProvider[]> {
-  return fetchJson<TtsProvider[]>("/v1/tts/providers");
+  return fetchJson<TtsProvider[]>("/api/v1/tts/providers");
 }
 
 export async function synthesizeSpeech(

@@ -90,7 +90,7 @@ def _resolve_asset_file(
     return target
 
 
-@router.get("/mascots/{mascot_id}/{file_path:path}", summary="讀取小助理檔案")
+@router.get("/static/mascots/{mascot_id}/{file_path:path}", summary="讀取小助理檔案")
 async def get_mascot_asset(
     mascot_id: str,
     file_path: str,
@@ -102,7 +102,7 @@ async def get_mascot_asset(
     return FileResponse(_resolve_asset_file(cfg.avatar_mascots_dir, mascot_id, file_path))
 
 
-@router.get("/backgrounds/{background_id}/{file_path:path}", summary="讀取背景檔案")
+@router.get("/static/backgrounds/{background_id}/{file_path:path}", summary="讀取背景檔案")
 async def get_background_asset(
     background_id: str,
     file_path: str,
@@ -114,7 +114,7 @@ async def get_background_asset(
     return FileResponse(_resolve_asset_file(cfg.avatar_backgrounds_dir, background_id, file_path))
 
 
-@router.get("/assets/{char_id}/{file_path:path}", summary="讀取角色檔案")
+@router.get("/static/characters/{char_id}/{file_path:path}", summary="讀取角色檔案")
 async def get_character_asset(
     char_id: str,
     file_path: str,

@@ -30,7 +30,7 @@ logger = logging.getLogger("backend.brain_proxy")
 
 router = APIRouter()
 _PROXY_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-_PUBLIC_API_PREFIX = "/api"
+_PUBLIC_API_PREFIX = "/api/v1"
 _INTERNAL_BRAIN_PREFIX = "/brain"
 _TAG_BRAIN_SYSTEM = ["Brain"]
 _TAG_TOOLS = ["Brain / Tools & Skills"]
@@ -425,7 +425,7 @@ for route_def in _BRAIN_ROUTE_DEFS:
 
 
 @router.api_route(
-    "/api/{path:path}",
+    "/api/v1/{path:path}",
     methods=_PROXY_METHODS,
     include_in_schema=False,
 )

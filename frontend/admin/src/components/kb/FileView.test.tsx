@@ -85,7 +85,7 @@ describe("FileView", () => {
     expect(screen.getByDisplayValue("PRP 有哪些生長因子？")).toBeTruthy();
     const image = screen.getByRole("img", { name: /PRP 有哪些生長因子/ });
     expect(image.getAttribute("src")).toBe(
-      "/api/knowledge/qa/images/PRP(1)?project_id=default",
+      "/api/v1/knowledge/qa/images/PRP(1)?project_id=default",
     );
   });
 

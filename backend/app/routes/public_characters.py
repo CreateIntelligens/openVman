@@ -1,6 +1,6 @@
 """Public, unauthenticated character list for the Avatar embed SDK.
 
-Read-only surface consumed by third-party sites via `GET /characters`.
+Read-only surface consumed by third-party sites via `GET /api/v1/characters`.
 Distinct from `app.routes.avatar`, which is the internal admin API for
 uploading, renaming, and deleting characters — that API must stay behind
 nginx and is not part of the SDK's public contract.
@@ -34,7 +34,7 @@ def reset_store() -> None:
     _store = None
 
 
-@router.get("/characters", summary="列出可供 Avatar SDK 使用的角色")
+@router.get("/api/v1/characters", summary="列出可供 Avatar SDK 使用的角色")
 async def list_public_characters(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> dict:

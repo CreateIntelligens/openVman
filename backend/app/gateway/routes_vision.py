@@ -47,7 +47,7 @@ class VisionResetRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
 
 
-@router.post("/api/vision/describe", summary="視覺事件（text 模式）")
+@router.post("/api/v1/vision/describe", summary="視覺事件（text 模式）")
 async def vision_describe(
     payload: VisionDescribeRequest,
     current: CurrentAccount = Depends(get_current_account),
@@ -93,7 +93,7 @@ async def vision_describe(
     return {"reply": reply, "session_id": session_id, "visual_state": visual_state}
 
 
-@router.get("/api/vision/health", summary="視覺管道健康狀態")
+@router.get("/api/v1/vision/health", summary="視覺管道健康狀態")
 async def vision_health() -> dict[str, object]:
     """回報 VLM 可用性，供前端決定是否開放攝影機 UI。"""
     probe = await probe_vlm_health(client=_http.get(), cfg=get_tts_config())
@@ -106,7 +106,7 @@ async def vision_health() -> dict[str, object]:
     }
 
 
-@router.post("/api/vision/reset", summary="重置視覺事件狀態（text 模式）")
+@router.post("/api/v1/vision/reset", summary="重置視覺事件狀態（text 模式）")
 async def vision_reset(payload: VisionResetRequest) -> dict[str, object]:
     session_id = payload.session_id.strip()
     camera = get_camera_plugin()

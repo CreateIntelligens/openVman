@@ -54,7 +54,7 @@ async function testFetchProjectsUsesApiBase() {
 
   try {
     await fetchProjects();
-    assert.equal(calledUrl, "/api/projects");
+    assert.equal(calledUrl, "/api/v1/projects");
   } finally {
     globalThis.fetch = originalFetch;
   }

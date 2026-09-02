@@ -34,8 +34,8 @@ def _request_with_headers(headers: list[tuple[bytes, bytes]]) -> Request:
             "type": "http",
             "method": "GET",
             "scheme": "http",
-            "path": "/api/search",
-            "raw_path": b"/api/search",
+            "path": "/api/v1/search",
+            "raw_path": b"/api/v1/search",
             "query_string": b"",
             "headers": headers,
             "client": ("testclient", 50000),
@@ -102,7 +102,7 @@ def test_gateway_brain_proxy_forwards_to_brain_api(client: TestClient):
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
-        response = client.get("/api/health?project_id=default")
+        response = client.get("/api/v1/health?project_id=default")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -172,12 +172,12 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
 
     assert response.status_code == 200
     paths = response.json()["paths"]
-    assert "/api/health" in paths
-    assert "/api/chat" in paths
-    assert "/api/knowledge/upload" in paths
-    assert "/api/knowledge/document/meta" in paths
-    assert "/api/knowledge/note" in paths
-    assert "/api/sessions/export" in paths
+    assert "/api/v1/health" in paths
+    assert "/api/v1/chat" in paths
+    assert "/api/v1/knowledge/upload" in paths
+    assert "/api/v1/knowledge/document/meta" in paths
+    assert "/api/v1/knowledge/note" in paths
+    assert "/api/v1/sessions/export" in paths
 
 
 def test_project_content_writes_require_edit_access() -> None:
@@ -229,7 +229,7 @@ def test_portal_user_can_only_forward_granted_project_edits(
         TestClient(app) as isolated_client,
     ):
         response = isolated_client.put(
-            "/api/knowledge/document?project_id=project-a",
+            "/api/v1/knowledge/document?project_id=project-a",
             json={"path": "knowledge/a.md", "content": "updated"},
         )
 
@@ -247,7 +247,7 @@ def test_explicit_brain_routes_still_forward_options(client: TestClient):
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
-        response = client.options("/api/health")
+        response = client.options("/api/v1/health")
 
     assert response.status_code == 200
     build_kwargs = mock_client.build_request.call_args.kwargs
@@ -264,7 +264,7 @@ def test_gateway_brain_proxy_returns_502_when_upstream_disconnects(client: TestC
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
 
     assert response.status_code == 502
     assert response.json() == {"error": "brain upstream disconnected"}
@@ -279,7 +279,7 @@ def test_gateway_brain_proxy_returns_504_on_timeout(client: TestClient):
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
 
     assert response.status_code == 504
     assert response.json() == {"error": "brain request timeout"}
@@ -301,7 +301,7 @@ def test_gateway_brain_proxy_returns_504_on_read_body_timeout(client: TestClient
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
 
     assert response.status_code == 504
     assert response.json() == {"error": "brain request timeout"}
@@ -317,14 +317,14 @@ def test_gateway_brain_proxy_returns_502_on_generic_request_error(client: TestCl
         patch("app.brain_proxy.get_tts_config", return_value=_mock_cfg()),
         patch("app.brain_proxy._http.get", return_value=mock_client),
     ):
-        response = client.get("/api/health")
+        response = client.get("/api/v1/health")
 
     assert response.status_code == 502
     assert response.json() == {"error": "brain request error"}
 
 
 def test_catchall_proxy_blocks_backend_owned_usage_prefix() -> None:
-    """/api/usage/* must go through the Backend route that scopes accounts."""
+    """/api/v1/usage/* must go through the Backend route that scopes accounts."""
     import asyncio
 
     from app.brain_proxy import proxy_to_brain

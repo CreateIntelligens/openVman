@@ -43,7 +43,7 @@ describe("cookie auth API", () => {
     expect(account.username).toBe("alice");
     expect(Object.prototype.hasOwnProperty.call(account, "token")).toBe(false);
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/auth/admin-login",
+      "/api/v1/auth/admin-login",
       expect.objectContaining({ credentials: "include" }),
     );
     expect(JSON.stringify(window.localStorage)).not.toContain("secret-jwt");
@@ -80,8 +80,8 @@ describe("cookie auth API", () => {
     await temporaryLogin("temporary-password");
     await getCurrentAccount();
 
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/auth/admin-temporary-login");
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/auth/admin-me");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/auth/admin-temporary-login");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/auth/admin-me");
   });
 
   it("updates Admin portal access for an existing temporary batch", async () => {
@@ -98,7 +98,7 @@ describe("cookie auth API", () => {
     await setTemporaryBatchAdminPortalAccess("batch-1", true);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/temporary-accounts/batches/batch-1/admin-portal-access",
+      "/api/v1/temporary-accounts/batches/batch-1/admin-portal-access",
       expect.objectContaining({ method: "PATCH", credentials: "include" }),
     );
     const request = fetchMock.mock.calls[0][1] as RequestInit;
@@ -161,7 +161,7 @@ describe("cookie auth API", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/api/users/user-a/role",
+      "/api/v1/users/user-a/role",
       expect.objectContaining({ method: "PATCH", credentials: "include" }),
     );
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
@@ -169,7 +169,7 @@ describe("cookie auth API", () => {
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "/api/users/user-a/password-reset",
+      "/api/v1/users/user-a/password-reset",
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
@@ -182,7 +182,7 @@ describe("cookie auth API", () => {
     const clear = setUnauthorizedHandler(onUnauthorized);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
 
-    await apiFetch("/api/projects");
+    await apiFetch("/api/v1/projects");
 
     expect(onUnauthorized).toHaveBeenCalledOnce();
     clear();
@@ -223,7 +223,7 @@ describe("cookie auth API", () => {
 
     expect(result.credentials).toHaveLength(5);
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/temporary-accounts/batches",
+      "/api/v1/temporary-accounts/batches",
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
     const request = fetchMock.mock.calls[0][1] as RequestInit;
@@ -282,7 +282,7 @@ describe("cookie auth API", () => {
 
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/users",
+      "/api/v1/users",
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
     expect(JSON.parse(String(request.body))).toEqual({
@@ -338,12 +338,12 @@ describe("cookie auth API", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/api/users/access-options",
+      "/api/v1/users/access-options",
       expect.objectContaining({ credentials: "include" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "/api/users/user-a/access",
+      "/api/v1/users/user-a/access",
       expect.objectContaining({ method: "PUT", credentials: "include" }),
     );
   });

@@ -243,7 +243,7 @@ Brain 必須將每次 LLM 呼叫的 input、output、cached、reasoning 與 tota
 
 `POST /brain/chat` 回應包含該次 request scope 的 `usage` 彙總。內部查詢介面
 為 `GET /brain/usage/summary` 與 `GET /brain/usage/events`，兩者皆必須驗證
-`X-Internal-Token`。對外查詢由 Backend `/v1/usage/*` 套用帳號範圍：正式
+`X-Internal-Token`。對外查詢由 Backend `/api/v1/usage/*` 套用帳號範圍：正式
 管理員可指定 `user_id`，其餘帳號一律由 Backend 覆寫成自己的帳號 ID。
 
 串流呼叫預設送出 `stream_options.include_usage=true`；若相容 provider 不支援，

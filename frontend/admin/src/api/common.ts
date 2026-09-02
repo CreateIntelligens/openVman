@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = "/api/v1";
 type ApiErrorPayload = {
   detail?: string | { message?: string; resource_counts?: Record<string, number> };
   message?: string;
@@ -129,10 +129,10 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
 }
 
 const AUTH_WHITELIST = [
-  "/api/auth/admin-login",
-  "/api/auth/admin-temporary-login",
-  "/api/auth/login",
-  "/api/auth/temporary-login",
+  "/api/v1/auth/admin-login",
+  "/api/v1/auth/admin-temporary-login",
+  "/api/v1/auth/login",
+  "/api/v1/auth/temporary-login",
 ];
 
 function isAuthEndpoint(input: RequestInfo | URL): boolean {

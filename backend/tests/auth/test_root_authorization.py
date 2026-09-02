@@ -110,7 +110,7 @@ def _create_user(runtime: AuthRuntime, actor_id: str, username: str = "user"):
 
 def _headers(client: TestClient, username: str, password: str) -> dict[str, str]:
     response = client.post(
-        "/api/auth/login",
+        "/api/v1/auth/login",
         json={"username": username, "password": password},
     )
     assert response.status_code == 200
@@ -233,7 +233,7 @@ def test_root_creates_admin_while_admin_cannot_create_or_manage_admin(
     root = _root(runtime)
     root_headers = _headers(client, "ai360", _ROOT_PASSWORD)
     created = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=root_headers,
         json={
             "username": "managed-admin",
@@ -252,7 +252,7 @@ def test_root_creates_admin_while_admin_cannot_create_or_manage_admin(
     admin_headers = _headers(client, "managed-admin", _ADMIN_PASSWORD)
     audit_before = runtime.auth_audit.list()
     denied_create = client.post(
-        "/api/users",
+        "/api/v1/users",
         headers=admin_headers,
         json={
             "username": "forbidden-admin",
@@ -261,12 +261,12 @@ def test_root_creates_admin_while_admin_cannot_create_or_manage_admin(
         },
     )
     denied_disable = client.patch(
-        f"/api/users/{admin['id']}/disabled",
+        f"/api/v1/users/{admin['id']}/disabled",
         headers=admin_headers,
         json={"disabled": True},
     )
     denied_revoke = client.post(
-        f"/api/users/{admin['id']}/revoke",
+        f"/api/v1/users/{admin['id']}/revoke",
         headers=admin_headers,
     )
 
@@ -288,7 +288,7 @@ def test_root_identity_is_protected_from_account_management_apis(
 
     responses = (
         client.post(
-            "/api/users",
+            "/api/v1/users",
             headers=headers,
             json={
                 "username": "second-root",
@@ -297,18 +297,18 @@ def test_root_identity_is_protected_from_account_management_apis(
             },
         ),
         client.patch(
-            f"/api/users/{root.id}/disabled",
+            f"/api/v1/users/{root.id}/disabled",
             headers=headers,
             json={"disabled": True},
         ),
-        client.delete(f"/api/users/{root.id}", headers=headers),
+        client.delete(f"/api/v1/users/{root.id}", headers=headers),
         client.patch(
-            f"/api/users/{root.id}/role",
+            f"/api/v1/users/{root.id}/role",
             headers=headers,
             json={"role": "admin"},
         ),
         client.post(
-            f"/api/users/{root.id}/password-reset",
+            f"/api/v1/users/{root.id}/password-reset",
             headers=headers,
             json={"password": _NEW_PASSWORD},
         ),
@@ -332,7 +332,7 @@ def test_server_revalidation_rejects_stale_pre_migration_root_claim(
     stale_token = runtime.tokens.issue(stale_admin_claim)
 
     response = client.get(
-        "/api/auth/me",
+        "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {stale_token}"},
     )
 
@@ -368,7 +368,7 @@ def test_role_promotion_and_demotion_update_access_and_sessions_atomically(
     old_user_headers = _headers(client, "scoped-user", _USER_PASSWORD)
 
     promoted = client.patch(
-        f"/api/users/{user.id}/role",
+        f"/api/v1/users/{user.id}/role",
         headers=root_headers,
         json={"role": "admin"},
     )
@@ -380,12 +380,12 @@ def test_role_promotion_and_demotion_update_access_and_sessions_atomically(
     assert runtime.account_access.list_grants(user.id) == ()
     assert runtime.account_access.get_defaults(user.id) is None
     assert runtime.resources.list_owned(user.id)[0].resource_id == "owned-project"
-    assert client.get("/api/auth/me", headers=old_user_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=old_user_headers).status_code == 401
 
     old_admin_headers = _headers(client, "admin", _ADMIN_PASSWORD)
     token_version = runtime.users.get_by_id(admin.id).token_version
     invalid = client.patch(
-        f"/api/users/{admin.id}/role",
+        f"/api/v1/users/{admin.id}/role",
         headers=root_headers,
         json={"role": "user"},
     )
@@ -393,10 +393,10 @@ def test_role_promotion_and_demotion_update_access_and_sessions_atomically(
     unchanged = runtime.users.get_by_id(admin.id)
     assert unchanged.role is AccountRole.ADMIN
     assert unchanged.token_version == token_version
-    assert client.get("/api/auth/me", headers=old_admin_headers).status_code == 200
+    assert client.get("/api/v1/auth/me", headers=old_admin_headers).status_code == 200
 
     demoted = client.patch(
-        f"/api/users/{admin.id}/role",
+        f"/api/v1/users/{admin.id}/role",
         headers=root_headers,
         json={"role": "user", "access": access},
     )
@@ -404,7 +404,7 @@ def test_role_promotion_and_demotion_update_access_and_sessions_atomically(
     assert demoted.json()["role"] == "user"
     assert demoted.json()["grants"] == access["grants"]
     assert demoted.json()["defaults"] == access["defaults"]
-    assert client.get("/api/auth/me", headers=old_admin_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=old_admin_headers).status_code == 401
 
 
 def test_password_reset_never_returns_or_audits_secrets_and_revokes_sessions(
@@ -421,7 +421,7 @@ def test_password_reset_never_returns_or_audits_secrets_and_revokes_sessions(
     original = runtime.users.get_by_id(user.id)
 
     denied = client.post(
-        f"/api/users/{user.id}/password-reset",
+        f"/api/v1/users/{user.id}/password-reset",
         headers=admin_headers,
         json={"password": _NEW_PASSWORD},
     )
@@ -429,7 +429,7 @@ def test_password_reset_never_returns_or_audits_secrets_and_revokes_sessions(
     assert runtime.users.get_by_id(user.id) == original
 
     response = client.post(
-        f"/api/users/{user.id}/password-reset",
+        f"/api/v1/users/{user.id}/password-reset",
         headers=root_headers,
         json={"password": _NEW_PASSWORD},
     )
@@ -444,7 +444,7 @@ def test_password_reset_never_returns_or_audits_secrets_and_revokes_sessions(
     assert updated.password_hash != _NEW_PASSWORD
     assert verify_password(_NEW_PASSWORD, updated.password_hash) is True
     assert updated.token_version == original.token_version + 1
-    assert client.get("/api/auth/me", headers=old_user_headers).status_code == 401
+    assert client.get("/api/v1/auth/me", headers=old_user_headers).status_code == 401
 
     audit = runtime.auth_audit.list()
     reset_event = audit[-1]
@@ -475,14 +475,14 @@ def test_root_owned_resource_safety_blocks_deletion_without_partial_mutation(
         visibility=ResourceVisibility.PRIVATE,
     )
     disabled = client.patch(
-        f"/api/users/{admin.id}/disabled",
+        f"/api/v1/users/{admin.id}/disabled",
         headers=root_headers,
         json={"disabled": True},
     )
     assert disabled.status_code == 200
     audit_before = runtime.auth_audit.list()
 
-    blocked = client.delete(f"/api/users/{admin.id}", headers=root_headers)
+    blocked = client.delete(f"/api/v1/users/{admin.id}", headers=root_headers)
 
     assert blocked.status_code == 409
     assert blocked.json()["detail"]["resource_counts"] == {"project": 1}
