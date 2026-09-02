@@ -170,6 +170,8 @@ class BrainSettings(BaseSettings):
     # === 備用 Provider Keys ===
     gemini_api_key: str = ""
     groq_api_key: str = ""
+    nen_api_key: str = ""
+    nen_base_url: str = "https://nen.com.tw/v1"
     openai_api_key: str = ""
     voyage_api_key: str = ""
 
@@ -404,6 +406,8 @@ class BrainSettings(BaseSettings):
 
     def resolve_base_url_for_provider(self, provider: str) -> str:
         """Return the base URL for a given provider name."""
+        if provider == "nen":
+            return self.nen_base_url.strip()
         if self.llm_base_url and provider == self.llm_provider:
             return self.llm_base_url
         return self._BASE_URL_DEFAULTS.get(provider, "")
@@ -413,6 +417,7 @@ class BrainSettings(BaseSettings):
         key_map = {
             "gemini": self.gemini_api_key,
             "groq": self.groq_api_key,
+            "nen": self.nen_api_key,
             "openai": self.openai_api_key,
             "voyage": self.voyage_api_key,
         }

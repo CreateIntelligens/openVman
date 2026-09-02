@@ -470,6 +470,10 @@ HTTPS_PORT=8787
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=
 LLM_MODEL=gemini-3.1-flash-lite
+LLM_FALLBACK_CHAIN=gemini:gemini-3.1-flash-lite,groq:llama-3.3-70b-versatile,nen:gemini-3.5-flash-lite
+GROQ_API_KEY=
+NEN_API_KEY=
+NEN_BASE_URL=https://nen.com.tw/v1
 LLM_STREAM_INCLUDE_USAGE=true
 
 COMPOSE_PROFILES=embedding,vlm
@@ -485,6 +489,8 @@ MAX_SESSION_TTL_MINUTES=30
 MAX_INPUT_LENGTH=500
 ENABLE_CONTENT_FILTER=true
 ```
+
+`LLM_FALLBACK_CHAIN` 有值時，其排列順序就是實際呼叫順序。NEN 是獨立的 `nen` provider，但沿用 OpenAI-compatible chat-completions transport；不得以 `LLM_PROVIDER=openai`、`LLM_BASE_URL` 或 `OPENAI_API_KEY` 代替 NEN 專屬設定，否則 fallback metrics 與 usage ledger 會把 NEN 流量錯記成 OpenAI。
 
 ### 建議
 

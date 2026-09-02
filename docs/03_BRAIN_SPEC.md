@@ -15,7 +15,7 @@
 |------|------|------|
 | 向量資料庫 | **LanceDB** (嵌入式) | 無服務端、低延遲、原生 Python/JS SDK |
 | Embedding 模型 | **BAAI/bge-m3** (本地) | 多語言、Dense+Sparse 混合檢索 |
-| LLM | Gemini / OpenAI / Claude / vLLM | 依 `LLM_PROVIDER` 環境變數切換 |
+| LLM | Gemini / Groq / NEN / OpenAI / Claude / vLLM | 依 `LLM_PROVIDER` 或 `LLM_FALLBACK_CHAIN` 路由 |
 | 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
 | 知識庫格式 | Markdown + Raw (多模態) | 人類可讀、保留原始檔，並以 Markdown 作為可編輯 canonical form |
 | 解析引擎 | **Gateway (pdf-inspector + Docling + AnyDoc)** | Gateway 負責 fast path、主轉換與 fallback，再透過 API 注入 Markdown |
@@ -377,7 +377,10 @@ LLM_PROVIDER=gemini       # 預設主 provider
 GEMINI_API_KEY=***
 LLM_MODEL=gemini-3.1-flash-lite
 LLM_FALLBACK_MODEL=
-LLM_FALLBACK_CHAIN=gemini:gemini-3.1-flash-lite,groq:llama-3.3-70b-versatile,openai:gpt-4o-mini
+LLM_FALLBACK_CHAIN=gemini:gemini-3.1-flash-lite,groq:llama-3.3-70b-versatile,nen:gemini-3.5-flash-lite
+GROQ_API_KEY=***
+NEN_API_KEY=***
+NEN_BASE_URL=https://nen.com.tw/v1
 LLM_STREAM_INCLUDE_USAGE=true
 
 # === Embedding 設定 ===
@@ -398,6 +401,8 @@ MESSAGE_MAX_RETRY=2
 MAX_INPUT_LENGTH=500            # 單輪輸入最大字數
 ENABLE_CONTENT_FILTER=true      # 是否啟用內容安全過濾
 ```
+
+明確設定 `LLM_FALLBACK_CHAIN` 後，Brain 依清單順序逐一嘗試，不會把 `LLM_PROVIDER` 額外插入鏈首。NEN 以 `nen` 作為 provider identity，透過 OpenAI-compatible transport 呼叫；其金鑰與端點必須使用 `NEN_API_KEY`、`NEN_BASE_URL`，不得占用 OpenAI 或共用主 provider 欄位。
 
 ### 14. 與 Backend 層的介面約定 (Interface with Backend Layer)
 

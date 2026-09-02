@@ -43,6 +43,8 @@ base URL 本身就是 embed 端點，不需要再疊 `/embed`。OpenAI 相容路
 
 所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定，再執行 `./scripts/ensure-runtime-secrets.sh` 安全產生缺少的內部 token、session secret 與 Grafana 管理密碼；不用分開維護多份。Grafana 預設不開放匿名瀏覽，所有部署都必須設定唯一的高熵 `GRAFANA_PASSWORD`。
 
+LLM 的明確 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<model>` 加入鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，但不得占用 `OPENAI_API_KEY` 或共用的 `LLM_BASE_URL`。
+
 ### 初始 ROOT
 
 空白安裝的唯一 ROOT 固定為帳號 `ai360`。服務啟動後，在 Backend 容器執行一次：
