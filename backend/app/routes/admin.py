@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.auth.dependencies import CurrentAccount, get_current_account
@@ -436,6 +437,84 @@ async def healthz() -> dict:
         quota=quota,
         client=_health_http.get(),
     )
+
+
+UsageEndpoint = Literal["summary", "events"]
+_USAGE_QUERY_KEYS: dict[UsageEndpoint, frozenset[str]] = {
+    "summary": frozenset({
+        "group_by",
+        "user_id",
+        "project_id",
+        "session_id",
+        "kind",
+        "since",
+        "until",
+    }),
+    "events": frozenset({
+        "limit",
+        "user_id",
+        "project_id",
+        "session_id",
+        "trace_id",
+        "kind",
+        "since",
+        "until",
+    }),
+}
+
+
+async def _forward_usage_query(
+    request: Request,
+    current: CurrentAccount,
+    endpoint: UsageEndpoint,
+) -> JSONResponse:
+    """Proxy a usage query to Brain, scoping non-admin accounts to themselves.
+
+    Brain 的 ledger 沒有帳號概念，只認 header 帶進去的 user_id，所以權限
+    收在這裡：管理員可帶任意 filter，其餘帳號的 user_id 一律覆寫成自己。
+    """
+    params = {
+        key: value
+        for key, value in request.query_params.items()
+        if key in _USAGE_QUERY_KEYS[endpoint] and value
+    }
+    is_admin = (
+        current.user.account_type is AccountType.FORMAL
+        and is_at_least_admin(current.user.role)
+    )
+    if not is_admin:
+        params["user_id"] = current.user.id
+
+    cfg = get_tts_config()
+    url = f"{cfg.brain_url.rstrip('/')}/brain/usage/{endpoint}"
+    try:
+        response = await _health_http.get().get(
+            url,
+            params=params,
+            headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
+            timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
+        )
+        content = response.json()
+    except Exception as exc:
+        logger.warning("usage query to brain failed: %s", exc)
+        return JSONResponse(status_code=502, content={"error": "brain unavailable"})
+    return JSONResponse(status_code=response.status_code, content=content)
+
+
+@router.get("/v1/usage/summary", tags=["Usage"], summary="Token 用量彙總")
+async def get_usage_summary(
+    request: Request,
+    current: CurrentAccount = Depends(get_current_account),
+) -> JSONResponse:
+    return await _forward_usage_query(request, current, "summary")
+
+
+@router.get("/v1/usage/events", tags=["Usage"], summary="Token 用量事件明細")
+async def get_usage_events(
+    request: Request,
+    current: CurrentAccount = Depends(get_current_account),
+) -> JSONResponse:
+    return await _forward_usage_query(request, current, "events")
 
 
 @router.get("/metrics", tags=["System"], summary="服務監控指標")

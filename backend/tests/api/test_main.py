@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
@@ -893,3 +894,125 @@ def test_tts_providers_includes_voxcpm_when_configured(monkeypatch):
             "voices": ["barbet-hung-yi-lee", "voxcpm2-cosy-young-female-01"],
         },
     ]
+
+
+def _usage_account(module, *, admin: bool):
+    from app.auth.dependencies import AuthTransport, CurrentAccount
+    from app.auth.models import AccountRole
+    from app.auth.passwords import hash_password
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    username = "usage-admin" if admin else "usage-user"
+    user = runtime.users.get_by_username(username)
+    if not user:
+        user = runtime.users.create(
+            username=username,
+            password_hash=hash_password("password"),
+            role=AccountRole.ADMIN if admin else AccountRole.USER,
+        )
+    return CurrentAccount(user=user, transport=AuthTransport.BEARER)
+
+
+def _install_fake_brain_usage(module, captured: dict[str, object], monkeypatch):
+    class FakeResponse:
+        status_code = 200
+
+        def json(self) -> dict[str, dict[str, int]]:
+            return {"totals": {"total_tokens": 42}}
+
+    class FakeAsyncClient:
+        async def get(self, url: str, params=None, headers=None, timeout=None):
+            captured["url"] = url
+            captured["params"] = dict(params or {})
+            captured["headers"] = dict(headers or {})
+            return FakeResponse()
+
+    class FakeClient:
+        def get(self) -> FakeAsyncClient:
+            return FakeAsyncClient()
+
+        async def close(self) -> None:
+            return None
+
+    monkey_cfg = types.SimpleNamespace(
+        brain_url="http://brain:8100/",
+        gateway_internal_token="internal-secret",
+    )
+    monkeypatch.setattr(module.admin_routes, "_health_http", FakeClient())
+    monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: monkey_cfg)
+
+
+def _usage_request(query: str) -> Request:
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/v1/usage/summary",
+        "query_string": query.encode(),
+        "headers": [],
+    }
+    return Request(scope)
+
+
+def test_usage_summary_admin_forwards_filters(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+    _install_fake_brain_usage(module, captured, monkeypatch)
+
+    response = asyncio.run(
+        module.admin_routes.get_usage_summary(
+            _usage_request("group_by=user&user_id=someone&project_id=p1&bogus=1"),
+            current=_usage_account(module, admin=True),
+        )
+    )
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"totals": {"total_tokens": 42}}
+    assert captured["url"] == "http://brain:8100/brain/usage/summary"
+    assert captured["params"] == {
+        "group_by": "user",
+        "user_id": "someone",
+        "project_id": "p1",
+    }
+    assert captured["headers"] == {"X-Internal-Token": "internal-secret"}
+
+
+def test_usage_events_non_admin_is_scoped_to_self(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+    _install_fake_brain_usage(module, captured, monkeypatch)
+    current = _usage_account(module, admin=False)
+
+    response = asyncio.run(
+        module.admin_routes.get_usage_events(
+            _usage_request("user_id=someone-else&limit=5"),
+            current=current,
+        )
+    )
+
+    assert response.status_code == 200
+    assert captured["url"] == "http://brain:8100/brain/usage/events"
+    assert captured["params"] == {"user_id": current.user.id, "limit": "5"}
+
+
+def test_usage_routes_only_forward_endpoint_parameters(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+    _install_fake_brain_usage(module, captured, monkeypatch)
+    current = _usage_account(module, admin=True)
+
+    asyncio.run(
+        module.admin_routes.get_usage_summary(
+            _usage_request("group_by=model&limit=5&trace_id=t1"),
+            current=current,
+        )
+    )
+    assert captured["params"] == {"group_by": "model"}
+
+    asyncio.run(
+        module.admin_routes.get_usage_events(
+            _usage_request("limit=5&group_by=user"),
+            current=current,
+        )
+    )
+    assert captured["params"] == {"limit": "5"}

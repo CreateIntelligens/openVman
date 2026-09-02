@@ -130,6 +130,9 @@ _PROJECT_SCOPED_PREFIXES = (
     "dreaming",
 )
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+# 這些 Brain 路徑由 Backend 自己的路由（含帳號範圍限制）對外提供，
+# catch-all 直通會繞過那層限制，所以一律擋掉。
+_BACKEND_OWNED_PREFIXES = ("usage",)
 
 _http = SharedAsyncClient(connect=10, read=120, write=30, pool=10)
 
@@ -290,6 +293,12 @@ async def proxy_to_brain(
     project_id: str | None = None,
 ) -> Response:
     """Forward a request with identity supplied only by trusted Backend state."""
+    normalized_path = path.strip("/")
+    if any(
+        normalized_path == prefix or normalized_path.startswith(f"{prefix}/")
+        for prefix in _BACKEND_OWNED_PREFIXES
+    ):
+        return JSONResponse(status_code=404, content={"detail": "Resource not found"})
     try:
         project_id = await _authorize_project_context(
             request,

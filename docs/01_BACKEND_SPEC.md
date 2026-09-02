@@ -321,3 +321,15 @@ process.on('SIGTERM', async () => {
 
 #### 16.2 自動索引流程 (Auto-Indexing Pipeline)
 當文件被 `PUT` 或 Markdown `upload` 成功後，後端應非同步觸發 `LanceDB` 的重新索引任務，並透過 WebSocket 的 `gateway_status` 通知前端進度。原始檔保存與文件轉換由 Gateway 的 pdf-inspector / Docling / AnyDoc ingestion 管線負責；Brain 不直接解析 binary 辦公文件。
+
+### 17. Token Usage 查詢介面
+
+Backend 以 `GET /v1/usage/summary` 與 `GET /v1/usage/events` 提供已驗證帳號的
+LLM token 用量查詢，並以 `X-Internal-Token` 轉送至 Brain 的
+`/brain/usage/*`。正式管理員可指定 `user_id`；一般或臨時帳號傳入的
+`user_id` 必須覆寫成自身帳號 ID。Brain catch-all proxy 必須阻擋 `usage`
+路徑，避免繞過此帳號範圍限制。
+
+`summary` 只轉送 `group_by`、帳號／專案／session／類型與時間篩選；`events`
+只轉送 `limit`、帳號／專案／session／trace／類型與時間篩選。未知或屬於
+另一個 endpoint 的 query 參數不得轉送。

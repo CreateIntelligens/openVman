@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Token Usage Ledger**: Brain now records every LLM call (input / output / cached / reasoning tokens, provider, model, latency) into an append-only SQLite ledger at `brain/data/usage.db`, attributed to the user, project, session and trace of the request via a context scope. Streaming calls request `stream_options.include_usage` (toggle `LLM_STREAM_INCLUDE_USAGE`). `/brain/chat` responses carry a per-turn `usage` summary, Brain exposes `/brain/usage/summary` and `/brain/usage/events`, and Backend fronts them at `/v1/usage/*` with non-admin accounts scoped to their own user id.
 - **VoxCPM Provider**: Added `VoxCPMAdapter` (`backend/app/providers/voxcpm_adapter.py`) calling the VoxCPM360 gateway's CastAgent-compatible `/api/v1/tts/synthesize`, wired into the fallback chain after IndexTTS, the Admin provider/voice registry, the backend health payload (`voxcpm`), and configured via `TTS_VOXCPM_URL` / `TTS_VOXCPM_API_KEY` / `TTS_VOXCPM_DEFAULT_VOICE`.
 - **Admin Session Management Page**: Added a dedicated Sessions workspace for cross-persona browsing, filtering, sorting, batch export, deletion, and one-click deep links back into Chat.
 - **Filtered Chat Session Export**: Added Admin JSON export for one, selected, or all filtered sessions, including the supported public message metadata while excluding internal-only fields.

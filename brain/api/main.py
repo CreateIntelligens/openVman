@@ -29,6 +29,7 @@ from routes.protocol import router as protocol_router
 from routes.search import router as search_router
 from routes.sessions import router as sessions_router
 from routes.tools import router as tools_router
+from routes.usage import router as usage_router
 from routes.workspace import router as workspace_router
 from safety.http_filters import SilentAccessPathsFilter, is_silent_path
 from safety.observability import get_metrics_store, log_event, log_exception
@@ -256,6 +257,7 @@ for router in (
     knowledge_qa_router,
     workspace_router,
     protocol_router,
+    usage_router,
 ):
     app.include_router(router)
 

@@ -18,6 +18,7 @@ from core.sse_events import (
     build_exception_protocol_error,
     build_protocol_error,
 )
+from core.usage import summarize_collected, usage_scope
 from protocol.history import serialize_history_messages
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
@@ -26,7 +27,11 @@ from protocol.message_envelope import (
 )
 from protocol.protocol_events import ProtocolValidationError
 from protocol.schemas import ChatRequest
-from safety.internal_auth import require_internal_token
+from safety.internal_auth import (
+    USER_ID_HEADER,
+    USER_ROLE_HEADER,
+    require_internal_token,
+)
 from safety.observability import get_metrics_store, log_event, log_exception
 from tools.skill_manager import get_skill_manager
 
@@ -89,14 +94,30 @@ async def chat(request: Request, payload: ChatRequest):
         t0 = time.monotonic()
         logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
 
-        context = await asyncio.to_thread(_prepare_chat_context, request, payload)
-        result = await asyncio.to_thread(execute_generation, context)
+        # 用量歸屬：prepare 階段（recall 摘要、query expansion）也會呼叫 LLM，
+        # 所以 scope 要在 prepare 之前開，拿到正式 context 後再補齊 id。
+        with usage_scope(
+            kind="chat",
+            user_id=request.headers.get(USER_ID_HEADER, ""),
+            role=request.headers.get(USER_ROLE_HEADER, ""),
+            project_id=payload.project_id or "default",
+            session_id=payload.session_id or "",
+            persona_id=payload.persona_id or "default",
+        ) as scope:
+            context = await asyncio.to_thread(_prepare_chat_context, request, payload)
+            scope.project_id = context.project_id
+            scope.session_id = context.session_id
+            scope.persona_id = context.persona_id
+            scope.trace_id = context.trace_id
+            scope.channel = str(context.request_context.get("channel", ""))
+            result = await asyncio.to_thread(execute_generation, context)
         response_time_s = round(time.monotonic() - t0, 2)
         response = finalize_generation(
             context, result.reply, result.tool_steps, response_time_s,
         )
         response["tool_steps"] = result.tool_steps
         response["response_time_s"] = response_time_s
+        response["usage"] = summarize_collected(scope)
         _log_generation_success(context, len(result.tool_steps))
 
         logger.info("[CHAT] AI Reply: %r (Time: %ss)", result.reply, response_time_s)

@@ -38,6 +38,8 @@ class BrainSettings(BaseSettings):
     llm_fallback_model: str = ""
     llm_base_url: str = ""
     llm_temperature: float = 0.3
+    # 串流回應要求最後一個 chunk 附帶 usage（OpenAI 相容 stream_options）。
+    llm_stream_include_usage: bool = True
     llm_key_cooldown_seconds: int = 60
     llm_key_long_cooldown_seconds: int = 300
     llm_fallback_chain: str = ""

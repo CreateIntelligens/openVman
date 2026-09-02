@@ -16,6 +16,8 @@ from config import get_settings
 from core.fallback_chain import RouteHop, build_fallback_chain
 from core.key_pool import classify_failure
 from core.provider_router import LLMRoute, get_provider_router
+from core.usage import LLMUsage, usage_from_response
+from infra.usage_ledger import record_usage_event
 from privacy.filter import FilterSource, detect_llm_messages_pii
 from safety.observability import (
     record_chain_exhausted,
@@ -68,6 +70,29 @@ class LLMReply:
     content: str
     tool_calls: list[LLMToolCall]
     model: str
+    usage: LLMUsage | None = None
+
+
+def _record_llm_usage(
+    provider: str,
+    model: str,
+    usage: LLMUsage | None,
+    latency_ms: float,
+) -> None:
+    # 沒回 usage 也記一筆零值，之後才看得出哪個 provider 不回報。
+    record_usage_event(
+        provider=provider,
+        model=model,
+        usage=usage,
+        latency_ms=latency_ms,
+        raw=None if usage is not None else {"usage_missing": True},
+    )
+
+
+def _stream_usage_kwargs(cfg: Any) -> dict[str, Any]:
+    if getattr(cfg, "llm_stream_include_usage", True):
+        return {"stream_options": {"include_usage": True}}
+    return {}
 
 
 def generate_chat_reply(
@@ -124,7 +149,12 @@ def generate_chat_turn(
     ]
     if not content and not tool_calls:
         raise ValueError("LLM 沒有回傳內容")
-    return LLMReply(content=content, tool_calls=tool_calls, model=response.model)
+    return LLMReply(
+        content=content,
+        tool_calls=tool_calls,
+        model=response.model,
+        usage=usage_from_response(getattr(response, "usage", None)),
+    )
 
 
 def stream_chat_turn(
@@ -158,6 +188,8 @@ def stream_chat_turn(
     if max_tokens:
         create_kwargs["max_tokens"] = max_tokens
 
+    create_kwargs.update(_stream_usage_kwargs(cfg))
+
     if legacy_routes:
         return _stream_routes(legacy_routes, messages, cfg, router, create_kwargs)
 
@@ -178,6 +210,7 @@ def stream_chat_turn(
                 model=hop.model,
             )
             router.mark_success(hop.api_key)
+            _record_llm_usage(hop.provider, hop.model, reply.usage, _now_ms() - t0)
             record_route_attempt(
                 trace_id=tid,
                 provider=hop.provider,
@@ -306,7 +339,15 @@ def _create_sync_completion(
     )
 
     if legacy_routes:
-        return _try_routes_sync(legacy_routes, messages, tools, cfg, router, forced_tool_name=forced_tool_name, max_tokens=max_tokens)
+        return _try_routes_sync(
+            legacy_routes,
+            messages,
+            tools,
+            cfg,
+            router,
+            forced_tool_name=forced_tool_name,
+            max_tokens=max_tokens,
+        )
 
     errors: list[str] = []
     last_reason = ""
@@ -325,6 +366,12 @@ def _create_sync_completion(
                 **create_kwargs,
             )
             router.mark_success(hop.api_key)
+            _record_llm_usage(
+                hop.provider,
+                hop.model,
+                usage_from_response(getattr(response, "usage", None)),
+                _now_ms() - t0,
+            )
             record_route_attempt(
                 trace_id=tid,
                 provider=hop.provider,
@@ -380,14 +427,25 @@ def _apply_model_override(
     return overridden_chain, overridden_legacy_routes
 
 
-def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: str | None = None, max_tokens: int | None = None):
+def _try_routes_sync(
+    routes: list[LLMRoute],
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None,
+    cfg: Any,
+    router: Any,
+    *,
+    forced_tool_name: str | None = None,
+    max_tokens: int | None = None,
+) -> Any:
     """Legacy route loop for when no fallback chain is configured."""
     errors: list[str] = []
     create_kwargs = _build_create_kwargs(tools, forced_tool_name=forced_tool_name)
     if max_tokens:
         create_kwargs["max_tokens"] = max_tokens
+    provider = str(getattr(cfg, "llm_provider", "") or "")
     for route in routes:
         client = _get_sync_client(route.api_key, route.base_url)
+        t0 = _now_ms()
         try:
             response = client.chat.completions.create(
                 model=route.model,
@@ -396,6 +454,12 @@ def _try_routes_sync(routes, messages, tools, cfg, router, *, forced_tool_name: 
                 **create_kwargs,
             )
             router.mark_success(route.api_key)
+            _record_llm_usage(
+                provider,
+                route.model,
+                usage_from_response(getattr(response, "usage", None)),
+                _now_ms() - t0,
+            )
             return response
         except Exception as exc:
             router.mark_failure(route.api_key, route.model, exc)
@@ -413,8 +477,13 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
     text_buf = ""
     tool_call_acc: dict[int, dict[str, str]] = {}
     finish_reason: str | None = None
+    usage: LLMUsage | None = None
 
     for chunk in stream:
+        # include_usage 時最後一個 chunk 只有 usage、choices 為空。
+        chunk_usage = usage_from_response(getattr(chunk, "usage", None))
+        if chunk_usage is not None:
+            usage = chunk_usage
         choice = chunk.choices[0] if chunk.choices else None
         if choice is None:
             continue
@@ -427,7 +496,12 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
             for tc_delta in delta.tool_calls:
                 idx = tc_delta.index if tc_delta.index is not None else 0
                 if idx not in tool_call_acc:
-                    tool_call_acc[idx] = {"id": "", "name": "", "arguments_buf": "", "thought_signature": ""}
+                    tool_call_acc[idx] = {
+                        "id": "",
+                        "name": "",
+                        "arguments_buf": "",
+                        "thought_signature": "",
+                    }
                 entry = tool_call_acc[idx]
                 if tc_delta.id:
                     entry["id"] = tc_delta.id
@@ -448,13 +522,17 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
                 id=tool_call_acc[idx]["id"],
                 name=tool_call_acc[idx]["name"],
                 arguments=tool_call_acc[idx]["arguments_buf"],
-                extra_content={"thought_signature": tool_call_acc[idx]["thought_signature"]} if tool_call_acc[idx].get("thought_signature") else None,
+                extra_content=(
+                    {"thought_signature": tool_call_acc[idx]["thought_signature"]}
+                    if tool_call_acc[idx].get("thought_signature")
+                    else None
+                ),
             )
             for idx in sorted(tool_call_acc)
         ]
-        return LLMReply(content="", tool_calls=tool_calls, model=model)
+        return LLMReply(content="", tool_calls=tool_calls, model=model, usage=usage)
 
-    return LLMReply(content=text_buf.strip(), tool_calls=[], model=model)
+    return LLMReply(content=text_buf.strip(), tool_calls=[], model=model, usage=usage)
 
 
 def _stream_routes(
@@ -466,8 +544,10 @@ def _stream_routes(
 ) -> LLMReply:
     """Legacy route loop for streaming when no fallback chain is configured."""
     errors: list[str] = []
+    provider = str(getattr(cfg, "llm_provider", "") or "")
     for route in routes:
         client = _get_sync_client(route.api_key, route.base_url)
+        t0 = _now_ms()
         try:
             reply = _consume_stream(
                 client.chat.completions.create(
@@ -480,6 +560,7 @@ def _stream_routes(
                 model=route.model,
             )
             router.mark_success(route.api_key)
+            _record_llm_usage(provider, route.model, reply.usage, _now_ms() - t0)
             return reply
         except ValueError:
             raise
@@ -490,11 +571,18 @@ def _stream_routes(
     raise RuntimeError("所有 LLM route 皆失敗: " + " | ".join(errors))
 
 
-def _build_create_kwargs(tools: list[dict[str, Any]] | None, *, forced_tool_name: str | None = None) -> dict[str, Any]:
+def _build_create_kwargs(
+    tools: list[dict[str, Any]] | None,
+    *,
+    forced_tool_name: str | None = None,
+) -> dict[str, Any]:
     if not tools:
         return {}
     if forced_tool_name:
-        tool_choice: str | dict[str, Any] = {"type": "function", "function": {"name": forced_tool_name}}
+        tool_choice: str | dict[str, Any] = {
+            "type": "function",
+            "function": {"name": forced_tool_name},
+        }
     else:
         tool_choice = "auto"
     return {"tools": tools, "tool_choice": tool_choice}

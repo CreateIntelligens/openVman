@@ -365,9 +365,24 @@ user input
 - `POST /brain/memories`
   - 寫入 memory
 - `POST /brain/chat`
-  - 取得完整回答（含 tool call 執行結果）
+  - 取得完整回答（含 tool call 執行結果與本次模型呼叫的 `usage` 彙總）
 - `GET /brain/chat/history`
   - 讀取當前 session history
+
+### Token Usage API
+
+Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
+`/data/usage.db`。這是跨專案共用的 append-only SQLite ledger；事件仍保留
+`user_id`、`project_id`、`session_id`、`trace_id` 與呼叫類型，供查詢時篩選。
+
+- `GET /brain/usage/summary`
+  - 依 `model`、`user`、`project`、`kind` 或 `session` 彙總
+- `GET /brain/usage/events`
+  - 依帳號、專案、session、trace、類型與時間區間查詢事件
+
+這兩個 Brain endpoint 只接受 `X-Internal-Token`。瀏覽器與外部客戶端應改用
+Backend 的 `/v1/usage/summary` 與 `/v1/usage/events`；Backend 允許正式管理員
+查詢指定帳號，其餘帳號固定只能查詢自己的資料。
 
 ### 即時外部工具
 
@@ -452,9 +467,10 @@ ENV=prod
 PORT=8786
 HTTPS_PORT=8787
 
-BRAIN_LLM_PROVIDER=gemini
-BRAIN_LLM_API_KEY=
-BRAIN_LLM_MODEL=gemini-3.1-flash-lite
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=
+LLM_MODEL=gemini-3.1-flash-lite
+LLM_STREAM_INCLUDE_USAGE=true
 
 COMPOSE_PROFILES=embedding,vlm
 EMBEDDING_SERVICE_URL=
@@ -486,7 +502,7 @@ ENABLE_CONTENT_FILTER=true
 
 複製 `.env.example` 為 `.env`，填入至少：
 
-- `BRAIN_LLM_API_KEY`
+- 所選 provider 的 API key（例如 `GEMINI_API_KEY`）
 - 需要的 LLM 與 embedding gateway 路由參數
 
 ### 2. 啟動

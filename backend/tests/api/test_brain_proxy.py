@@ -321,3 +321,15 @@ def test_gateway_brain_proxy_returns_502_on_generic_request_error(client: TestCl
 
     assert response.status_code == 502
     assert response.json() == {"error": "brain request error"}
+
+
+def test_catchall_proxy_blocks_backend_owned_usage_prefix() -> None:
+    """/api/usage/* must go through the Backend route that scopes accounts."""
+    import asyncio
+
+    from app.brain_proxy import proxy_to_brain
+
+    request = _request_with_headers([])
+    for path in ("usage", "usage/summary", "usage/events"):
+        response = asyncio.run(proxy_to_brain(request, path, current=None))
+        assert response.status_code == 404

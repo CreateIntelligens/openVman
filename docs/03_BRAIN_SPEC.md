@@ -15,7 +15,7 @@
 |------|------|------|
 | 向量資料庫 | **LanceDB** (嵌入式) | 無服務端、低延遲、原生 Python/JS SDK |
 | Embedding 模型 | **BAAI/bge-m3** (本地) | 多語言、Dense+Sparse 混合檢索 |
-| LLM | OpenAI / Claude / vLLM | 依 `BRAIN_LLM_PROVIDER` 環境變數切換 |
+| LLM | Gemini / OpenAI / Claude / vLLM | 依 `LLM_PROVIDER` 環境變數切換 |
 | 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
 | 知識庫格式 | Markdown + Raw (多模態) | 人類可讀、保留原始檔，並以 Markdown 作為可編輯 canonical form |
 | 解析引擎 | **Gateway (pdf-inspector + Docling + AnyDoc)** | Gateway 負責 fast path、主轉換與 fallback，再透過 API 注入 Markdown |
@@ -234,6 +234,22 @@ Total Context Budget = 8192 tokens（依實際 LLM 模型調整）
 2. 再減少 RAG Context（只保留最相關的 Top-3）。
 3. 最後對 System Prompt 做摘要壓縮（不建議，最後手段）。
 
+#### 8.1 Token Usage Ledger
+
+Brain 必須將每次 LLM 呼叫的 input、output、cached、reasoning 與 total token
+數，連同 provider、model、延遲及 request scope 寫入 `/data/usage.db`。scope
+包含 `user_id`、`project_id`、`session_id`、`trace_id`、persona、channel 與
+呼叫類型；資料庫跨專案共用，但所有查詢仍可依這些欄位篩選。
+
+`POST /brain/chat` 回應包含該次 request scope 的 `usage` 彙總。內部查詢介面
+為 `GET /brain/usage/summary` 與 `GET /brain/usage/events`，兩者皆必須驗證
+`X-Internal-Token`。對外查詢由 Backend `/v1/usage/*` 套用帳號範圍：正式
+管理員可指定 `user_id`，其餘帳號一律由 Backend 覆寫成自己的帳號 ID。
+
+串流呼叫預設送出 `stream_options.include_usage=true`；若相容 provider 不支援，
+可用 `LLM_STREAM_INCLUDE_USAGE=false` 關閉。provider 沒有回傳 usage 時仍保留
+零值事件與 `usage_missing` 標記，且 ledger 寫入失敗不得中斷使用者請求。
+
 ### 9. 工具調用與擴充 (Tool Calling / Plugins)
 
 虛擬人必須具備與現實世界互動的能力（如查訂單、建立客訴）。
@@ -357,11 +373,12 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 ```env
 # === 大腦層設定 ===
 BRAIN_PORT=8100
-BRAIN_LLM_PROVIDER=openai       # 預設主 provider
-BRAIN_LLM_API_KEYS=sk-***,sk-***
-BRAIN_LLM_MODEL_PRIMARY=gpt-4.1
-BRAIN_LLM_MODEL_SECONDARY=gpt-4o
-BRAIN_FALLBACK_CHAIN=openai:gpt-4.1,openai:gpt-4o,claude:sonnet,vllm:qwen2.5-72b
+LLM_PROVIDER=gemini       # 預設主 provider
+GEMINI_API_KEY=***
+LLM_MODEL=gemini-3.1-flash-lite
+LLM_FALLBACK_MODEL=
+LLM_FALLBACK_CHAIN=gemini:gemini-3.1-flash-lite,groq:llama-3.3-70b-versatile,openai:gpt-4o-mini
+LLM_STREAM_INCLUDE_USAGE=true
 
 # === Embedding 設定 ===
 EMBEDDING_MODEL=BAAI/bge-m3     # 本地 Embedding 模型
