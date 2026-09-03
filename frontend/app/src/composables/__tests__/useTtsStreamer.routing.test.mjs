@@ -94,6 +94,30 @@ test("auto provider uses IndexTTS streaming when IndexTTS is available", async (
   }
 });
 
+test("auto provider streams through VoxCPM when IndexTTS is absent", async () => {
+  const fetchMock = installFetch(() => streamingWavResponse());
+  const chunks = [];
+
+  try {
+    const streamer = useTtsStreamer({
+      ttsProviders: () => [
+        { id: "auto", name: "自動", default_voice: "", voices: [] },
+        { id: "voxcpm", name: "VoxCPM", default_voice: "voxcpm2-cosy", voices: ["voxcpm2-cosy"] },
+      ],
+      onPcmChunk: (pcm) => chunks.push([...pcm]),
+    });
+
+    await streamer.speak("你好", { provider: "auto" });
+
+    assert.equal(fetchMock.calls[0].url, "/api/v1/tts/stream");
+    // 不帶 IndexTTS 的 character，讓後端用 VoxCPM 的預設 preset
+    assert.deepEqual(fetchMock.calls[0].body, { text: "你好" });
+    assert.deepEqual(chunks, [[1, 2, 3, 4]]);
+  } finally {
+    fetchMock.restore();
+  }
+});
+
 test("explicit IndexTTS provider sends the selected voice as character", async () => {
   const fetchMock = installFetch(() => streamingWavResponse());
 

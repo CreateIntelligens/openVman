@@ -3,7 +3,8 @@
  *
  * Two paths based on provider:
  *   - provider === 'indextts': POST /api/v1/tts/stream (IndexTTS streaming, low latency)
- *   - provider === 'auto' + IndexTTS is available: POST /api/v1/tts/stream
+ *   - provider === 'auto' + IndexTTS is available: POST /api/v1/tts/stream (character = IndexTTS default)
+ *   - provider === 'auto' + only VoxCPM is available: POST /api/v1/tts/stream (no character; backend picks VoxCPM)
  *     Response: audio/wav — 44-byte header + raw PCM 16 kHz mono Int16 LE, chunked
  *   - all others (edge, gcp, aws…): POST /v1/audio/speech (full file, multi-provider)
  *     Response: provider-native audio. Encoded formats are decoded to 16 kHz mono PCM.
@@ -76,12 +77,17 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     return getTtsProviders().find((candidate) => normalizedProvider(candidate.id) === "indextts");
   }
 
+  function hasVoxCpmProvider(): boolean {
+    return getTtsProviders().some((candidate) => normalizedProvider(candidate.id) === "voxcpm");
+  }
+
   function shouldUseStream(provider: string): boolean {
     if (options.shouldUseStream) return options.shouldUseStream(provider);
 
     const normalized = normalizedProvider(provider);
     if (!normalized || normalized === "indextts" || normalized === "gemini-tts" || normalized === "voxcpm") return true;
-    if (normalized === "auto") return Boolean(getIndexTtsProvider());
+    // auto 由後端挑鏈上第一個能串流的 provider：有 IndexTTS 走 IndexTTS，否則 VoxCPM。
+    if (normalized === "auto") return Boolean(getIndexTtsProvider()) || hasVoxCpmProvider();
     return false;
   }
 
@@ -102,6 +108,12 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     const provider = normalizedProvider(opts.provider ?? "");
     if (provider === "gemini-tts" || provider === "voxcpm") {
       const body: Record<string, string> = { text, provider };
+      if (opts.voice) body.voice = opts.voice;
+      return body;
+    }
+    if (provider === "auto" && !getIndexTtsProvider()) {
+      // 沒有 IndexTTS 時後端會用 VoxCPM；不能塞 IndexTTS 的角色名當 voice，否則對不到 preset。
+      const body: Record<string, string> = { text };
       if (opts.voice) body.voice = opts.voice;
       return body;
     }
