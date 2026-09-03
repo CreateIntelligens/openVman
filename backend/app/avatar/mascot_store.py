@@ -21,6 +21,8 @@ THUMBNAIL_FILENAME = "thumbnail.png"
 META_FILENAME = "meta.json"
 # 影片型小助理沒有模型檔，只在 meta.json 記錄引擎與對應的 avatar 角色 id。
 VIDEO_ENGINE = "video"
+# 由 avatar 角色自動衍生的小助理 id 前綴；目錄只用來存縮圖。
+DERIVED_VIDEO_PREFIX = "video-"
 logger = logging.getLogger("backend.mascots")
 
 BUILTIN_MASCOTS: tuple[dict[str, Any], ...] = (
@@ -98,9 +100,40 @@ class MascotStore:
         for mascot in BUILTIN_MASCOTS:
             out.append(self._builtin_summary(mascot))
         for path in sorted(self._base.iterdir()):
-            if path.is_dir() and path.name not in _BUILTIN_IDS:
+            if path.is_dir() and path.name not in _BUILTIN_IDS and self._is_mascot_dir(path):
                 out.append(self._summary(path))
         return out
+
+    def _is_mascot_dir(self, path: Path) -> bool:
+        """自動衍生的 video-* 目錄只放縮圖，沒有模型也沒有 meta，不能當上傳的 VRM 列出。"""
+        if (path / MODEL_FILENAME).exists():
+            return True
+        return self._read_meta(path).get("engine") == VIDEO_ENGINE
+
+    def video_mascot_from_character(self, character: dict[str, Any]) -> dict[str, Any]:
+        """Derive a mascot entry from an avatar character without any stored record.
+
+        每個有影片與嘴型資料的角色都直接出現在小助理清單，免手動建立；
+        縮圖若曾由 widget 自動擷取，會存在 video-<char_id>/thumbnail.png。
+        """
+        char_id = str(character["char_id"])
+        mascot_id = f"{DERIVED_VIDEO_PREFIX}{char_id}"
+        thumb = self._dir(mascot_id) / THUMBNAIL_FILENAME
+        return {
+            "mascot_id": mascot_id,
+            "label": str(character.get("label") or char_id),
+            "engine": VIDEO_ENGINE,
+            "model_url": "",
+            "vrm_url": "",
+            "character_id": char_id,
+            "thumbnail_url": (
+                f"{self._url_prefix}/{mascot_id}/{THUMBNAIL_FILENAME}" if thumb.exists() else ""
+            ),
+            "fit": "",
+            "builtin": True,
+            "size_bytes": 0,
+            "updated_at": str(character.get("updated_at") or ""),
+        }
 
     def get_mascot(self, mascot_id: str) -> dict[str, Any]:
         mid = normalize_mascot_id(mascot_id)

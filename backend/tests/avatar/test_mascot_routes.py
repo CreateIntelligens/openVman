@@ -43,6 +43,9 @@ def client(tmp_path, monkeypatch):
     )
     admin_account = CurrentAccount(user=admin_user, transport=AuthTransport.BEARER)
 
+    # 列表會自動把 avatar 角色衍生成小助理；預設給一個空的角色庫，避免碰到 /data/avatar
+    monkeypatch.setattr(mascot_routes, "get_character_store", lambda: _FakeCharacterStore([]))
+
     app = FastAPI()
     app.include_router(mascot_routes.router)
     app.dependency_overrides[get_current_account] = lambda: admin_account
@@ -243,3 +246,44 @@ def test_video_mascot_hidden_without_character_access(client, character_store):
     )
     mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
     assert any(m["mascot_id"] == "matex-000" for m in mascots)
+
+
+def test_video_characters_are_listed_automatically(client, character_store):
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    for cid in ("000", "broken"):
+        runtime.resources.upsert_system_resource(
+            resource_type=ResourceType.AVATAR_CHARACTER,
+            resource_id=cid,
+            metadata={"label": cid},
+        )
+
+    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
+    derived = [m for m in mascots if m["engine"] == "video"]
+
+    # 素材齊全的 000 自動出現，缺嘴型資料的 broken 不出現
+    assert [m["mascot_id"] for m in derived] == ["video-000"]
+    assert derived[0]["character_id"] == "000"
+    assert derived[0]["label"] == "預設角色"
+    assert derived[0]["builtin"] is True
+
+
+def test_explicit_video_mascot_suppresses_the_derived_entry(client, character_store):
+    from app.auth.models import ResourceType
+    from app.auth.runtime import get_auth_runtime
+
+    get_auth_runtime().resources.upsert_system_resource(
+        resource_type=ResourceType.AVATAR_CHARACTER,
+        resource_id="000",
+        metadata={"label": "預設角色"},
+    )
+    client.post(
+        "/api/v1/avatar/mascots/from-character",
+        json={"mascot_id": "matex-000", "character_id": "000"},
+    )
+
+    mascots = client.get("/api/v1/avatar/mascots").json()["mascots"]
+    video_ids = [m["mascot_id"] for m in mascots if m["engine"] == "video"]
+    assert video_ids == ["matex-000"]

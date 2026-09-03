@@ -98,17 +98,29 @@ async def list_mascots(
             ResourceType.AVATAR_CHARACTER,
         )
     }
-    return {
-        "mascots": [
-            mascot
-            for mascot in get_store().list_mascots()
-            if mascot.get("mascot_id") in accessible_ids
-            and (
-                mascot.get("engine") != VIDEO_ENGINE
-                or mascot.get("character_id") in accessible_character_ids
-            )
-        ]
-    }
+    store = get_store()
+    mascots = [
+        mascot
+        for mascot in store.list_mascots()
+        if mascot.get("mascot_id") in accessible_ids
+        and (
+            mascot.get("engine") != VIDEO_ENGINE
+            or mascot.get("character_id") in accessible_character_ids
+        )
+    ]
+    # 每個素材齊全且有權限的 avatar 角色都自動列為小助理，不必逐一建立；
+    # 已手動建立過的角色不重複列。
+    covered = {m.get("character_id") for m in mascots if m.get("engine") == VIDEO_ENGINE}
+    for character in get_character_store().list_characters():
+        char_id = character.get("char_id")
+        if (
+            char_id in accessible_character_ids
+            and char_id not in covered
+            and character.get("has_video")
+            and character.get("has_data")
+        ):
+            mascots.append(store.video_mascot_from_character(character))
+    return {"mascots": mascots}
 
 
 @router.post("/api/v1/avatar/mascots", summary="上傳右下角小助理 VRM")

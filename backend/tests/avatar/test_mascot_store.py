@@ -115,3 +115,14 @@ def test_video_mascot_id_conflicts_with_vrm_mascot(store):
 
     with pytest.raises(MascotExists):
         store.create_video_mascot(mascot_id="custom", label="x", character_id="000")
+
+
+def test_derived_thumbnail_dir_is_not_listed_as_a_vrm_mascot(store, tmp_path):
+    # widget 自動擷取的縮圖會落在 video-<char_id>/，該目錄沒有模型，不該被當成上傳的 VRM
+    store.update_thumbnail("video-000", b"png")
+
+    listed_ids = [m["mascot_id"] for m in store.list_mascots()]
+    assert "video-000" not in listed_ids
+
+    derived = store.video_mascot_from_character({"char_id": "000", "label": "預設"})
+    assert derived["thumbnail_url"] == "/static/mascots/video-000/thumbnail.png"
