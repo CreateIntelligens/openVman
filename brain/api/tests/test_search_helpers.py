@@ -1,4 +1,6 @@
-from tools.search_helpers import merge_search_results
+from types import SimpleNamespace
+
+from tools.search_helpers import DEFAULT_MERGE_LIMIT, fused_limit, merge_search_results
 
 
 def test_merge_search_results_ranks_hybrid_score_before_distance_fallback():
@@ -80,3 +82,16 @@ def test_merge_search_results_respects_limit_after_fusion():
     )
 
     assert len(merged) == 5
+
+
+def test_fused_limit_keeps_the_configured_floor_for_small_top_k():
+    # 模型填 top_k=2 只影響每條查詢的候選數，融合後仍保留設定值
+    assert fused_limit(2, SimpleNamespace(knowledge_search_merge_limit=5)) == 5
+
+
+def test_fused_limit_follows_a_larger_top_k():
+    assert fused_limit(8, SimpleNamespace(knowledge_search_merge_limit=5)) == 8
+
+
+def test_fused_limit_falls_back_when_settings_lack_the_field():
+    assert fused_limit(3, SimpleNamespace()) == DEFAULT_MERGE_LIMIT

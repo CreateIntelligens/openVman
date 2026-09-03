@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from config import get_settings
 from tools.context import (
     active_persona_id,
     active_project_id,
@@ -80,8 +81,6 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
                 query[:60],
                 exc,
             )
-
-    from config import get_settings
 
     merged = merge_search_results(grouped, limit=fused_limit(top_k, get_settings()))
 
@@ -164,8 +163,8 @@ def _expand_via_graph(
 
 
 def _get_document(args: dict[str, Any]) -> dict[str, Any]:
-    from config import get_settings
     from knowledge.workspace import get_workspace_root, resolve_workspace_document
+
     cfg = get_settings()
 
     project_id = active_project_id.get()
@@ -220,7 +219,7 @@ def search_knowledge_tool():
                         "若使用者只有一個問題，仍以單元素陣列回傳。"
                     ),
                 },
-                "top_k": {"type": "integer", "description": "每個 query 最多回傳幾筆結果（合併後上限相同）"},
+                "top_k": {"type": "integer", "description": "每條查詢各取幾筆候選；多條查詢融合後最多保留 KNOWLEDGE_SEARCH_MERGE_LIMIT 筆，除非此值更大"},
             },
             "required": ["queries"],
         },

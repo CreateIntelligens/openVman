@@ -47,7 +47,12 @@ def normalize_query_list(args: dict[str, Any]) -> list[str]:
 
 
 def fused_limit(top_k: int, settings: Any) -> int:
-    """How many fused records to keep: never fewer than one query's top_k.
+    """How many fused records to keep after multi-query fusion.
+
+    ``top_k`` 是模型在 tool call 裡自己填的「每條查詢各取幾筆」，不代表整輪
+    只想要那麼少；多查詢融合的目的就是讓結果比單一查詢豐富，所以融合後的
+    保留數以設定值為下限，模型填得比設定值大時才跟著放大。這是刻意的，
+    不是漏了尊重呼叫端。
 
     ``getattr`` 而非直接取屬性：部分測試用 SimpleNamespace 假設定載入此模組。
     """
