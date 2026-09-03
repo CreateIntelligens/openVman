@@ -19,6 +19,22 @@ describe("MessageMeta", () => {
     expect(screen.getByText("4.5s")).not.toBeNull();
   });
 
+  it("groups tools from one round and shows the slowest duration once", () => {
+    render(
+      <MessageMeta
+        toolSteps={[
+          { name: "search_knowledge", duration_s: 1.212, round: 0, parallel: true },
+          { name: "search_knowledge", duration_s: 0.7, round: 0, parallel: true },
+          { name: "search_web", duration_s: 1.3, round: 1, parallel: false },
+        ] as never}
+      />,
+    );
+
+    expect(screen.getByText("1.212s")).not.toBeNull();
+    expect(screen.queryByText("0.7s")).toBeNull();
+    expect(screen.getByText("1.3s")).not.toBeNull();
+  });
+
   it("renders nothing without tools, timing, or usage", () => {
     const { container } = render(<MessageMeta />);
     expect(container.firstChild).toBeNull();

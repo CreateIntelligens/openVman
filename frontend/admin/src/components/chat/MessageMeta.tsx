@@ -53,6 +53,30 @@ function describeModels(byModel: ChatUsageSummary["by_model"]): string {
     .join(" + ");
 }
 
+type ToolRound = { steps: ToolStep[]; durationS: number | null; parallel: boolean };
+
+// 同一輪平行執行的工具合成一組：牆鐘時間是最慢那個，不是加總。
+function groupToolRounds(steps: ToolStep[]): ToolRound[] {
+  const rounds: ToolRound[] = [];
+  let current: ToolRound | null = null;
+  let currentRound: number | undefined;
+  for (const step of steps) {
+    const sameRound = current !== null && step.round !== undefined && step.round === currentRound;
+    if (!sameRound) {
+      current = { steps: [], durationS: null, parallel: false };
+      currentRound = step.round;
+      rounds.push(current);
+    }
+    current!.steps.push(step);
+  }
+  for (const round of rounds) {
+    round.parallel = round.steps.length > 1;
+    const durations = round.steps.map((s) => s.duration_s).filter((d): d is number => d != null);
+    round.durationS = durations.length > 0 ? Math.max(...durations) : null;
+  }
+  return rounds;
+}
+
 function allReferences(toolSteps: ToolStep[]): ToolResultItem[] {
   return toolSteps.flatMap((s) => parseResults(s.result));
 }
@@ -118,6 +142,7 @@ export default function MessageMeta({
   const toggleRefs = useCallback(() => setRefsOpen((v) => !v), []);
 
   const visibleToolSteps = toolSteps ?? EMPTY_TOOL_STEPS;
+  const toolRounds = groupToolRounds(visibleToolSteps);
   const hasTools = visibleToolSteps.length > 0;
   const refs = useMemo(() => allReferences(visibleToolSteps), [visibleToolSteps]);
   const hasRefs = refs.length > 0;
@@ -156,11 +181,20 @@ export default function MessageMeta({
         {hasTools && (
           <>
             <span className="material-symbols-outlined text-[0.6875rem]">build</span>
-            {visibleToolSteps.map((s, i) => (
-              <span key={i} className="inline-flex items-center gap-1">
-                {toolLabel(s.name)}
-                {s.duration_s != null && <span className="opacity-40">{s.duration_s}s</span>}
-                {i < visibleToolSteps.length - 1 && <span className="opacity-30">·</span>}
+            {toolRounds.map((round, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1"
+                title={round.parallel ? "同一輪同時執行，顯示最慢的一個" : undefined}
+              >
+                {round.steps.map((s, j) => (
+                  <span key={j} className="inline-flex items-center gap-1">
+                    {toolLabel(s.name)}
+                    {j < round.steps.length - 1 && <span className="opacity-30">+</span>}
+                  </span>
+                ))}
+                {round.durationS != null && <span className="opacity-40">{round.durationS}s</span>}
+                {i < toolRounds.length - 1 && <span className="opacity-30">·</span>}
               </span>
             ))}
           </>

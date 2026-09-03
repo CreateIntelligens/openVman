@@ -77,6 +77,9 @@ export interface ToolStep {
   arguments?: string;
   result?: string;
   duration_s?: number;
+  /** 同一輪（同一次 LLM 呼叫）發出的工具共用 round；平行執行時 parallel 為 true。 */
+  round?: number;
+  parallel?: boolean;
 }
 
 export interface ChatResponse {

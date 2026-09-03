@@ -242,7 +242,7 @@ def _run_tool_phase(
             if turn.tool_calls:
                 if iteration == 0 and current_forced == REQUIRE_ANY_TOOL:
                     turn = _ensure_knowledge_search(turn, last_user_message)
-                _append_tool_turns(working_messages, tool_steps, turn)
+                _append_tool_turns(working_messages, tool_steps, turn, round_index=iteration)
                 continue
             if (
                 not hallucination_retried
@@ -305,9 +305,16 @@ def _append_tool_turns(
     working_messages: list[dict[str, Any]],
     tool_steps: list[dict[str, Any]],
     turn: LLMReply,
+    *,
+    round_index: int = 0,
 ) -> None:
     working_messages.append(_assistant_tool_message(turn))
     steps = _execute_tool_calls(turn.tool_calls)
+    # 同一輪的工具是平行跑的：標上輪次讓前端把它們合成一組，耗時取最大值而不是相加。
+    parallel = len(steps) > 1
+    for step in steps:
+        step["round"] = round_index
+        step["parallel"] = parallel
     tool_steps.extend(steps)
     for step in steps:
         working_messages.append(

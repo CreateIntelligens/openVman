@@ -613,6 +613,7 @@ class TestParallelFirstRound:
         )
 
         assert [step["name"] for step in result.tool_steps] == ["search_knowledge", "search_web"]
+        assert all(step["round"] == 0 and step["parallel"] for step in result.tool_steps)
         assert len(calls) == 2
 
 
