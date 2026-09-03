@@ -346,7 +346,7 @@ user input
   -> build prompt from workspace + persona + history
   -> LLM call 1（強制 tool_choice=search_knowledge，帶完整 tool schema）
   -> 執行 search_knowledge（AI 改寫的 queries + 原始使用者訊息各自檢索，Reciprocal Rank Fusion 融合，取前 KNOWLEDGE_SEARCH_MERGE_LIMIT 筆）
-  -> LLM call 2（不帶 tools，只能就檢索結果作答；串流走這一回合）
+  -> LLM call 2+（不再提供 search_knowledge，其他工具照常；模型可再查網路後作答，串流走這些回合）
   -> append assistant reply
   -> archive daily memory
   -> capture learnings / errors
@@ -356,7 +356,7 @@ user input
 
 - `CHAT_FORCE_KNOWLEDGE_SEARCH`（預設 `true`）：第一次呼叫強制走 `search_knowledge`。
   只在該工具真的註冊給當前 persona/project 時生效；slash command 指定的工具永遠優先。
-- `CHAT_ANSWER_PASS_TEXT_ONLY`（預設 `true`）：作答回合不帶 tools，模型無法再開新工具輪。
+- `CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`（預設 `true`）：查完知識庫後的回合拿掉 `search_knowledge`，其他工具（`search_web`、wiki、技能）照常可用，所以問天氣仍會上網查；回合數仍受 `AGENT_LOOP_MAX_ROUNDS` 限制。
 
 兩者都關閉即退回舊的 `tool_choice=auto` 多輪行為。若 provider 忽略強制設定直接回文字，
 該文字會被接受為答案並記一筆 warning，不會卡在迴圈裡。

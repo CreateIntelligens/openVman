@@ -171,7 +171,18 @@ def _run_tool_phase(
     first_forced = _resolve_forced_first_tool(
         cfg, tools, forced_tool_name, allow_forced_knowledge_search
     )
-    text_only_answer_pass = bool(first_forced and cfg.chat_answer_pass_text_only)
+    exclude_knowledge_after_search = bool(
+        first_forced == KNOWLEDGE_SEARCH_TOOL
+        and cfg.chat_answer_pass_excludes_knowledge_search
+    )
+    # 強制查完知識庫後就把 search_knowledge 拿掉：模型不能靠重複翻書拖時間，
+    # 但 search_web 這類其他工具要留著，否則問天氣時模型無工具可用、回空字串。
+    later_tools = (
+        [tool for tool in tools if tool.get("function", {}).get("name") != KNOWLEDGE_SEARCH_TOOL]
+        if exclude_knowledge_after_search
+        else tools
+    )
+    empty_reply_retried = False
 
     last_user_message = next(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
@@ -180,15 +191,11 @@ def _run_tool_phase(
     with bind_tool_context(persona_id, project_id, user_message=last_user_message):
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             current_forced = first_forced if iteration == 0 else None
-            # 作答回合起一律不帶 tools（含幻覺重試的後續回合），模型無法再開新的工具輪。
-            answer_pass = text_only_answer_pass and iteration >= 1
-            current_tools = None if answer_pass else tools
+            current_tools = tools if iteration == 0 else (later_tools or None)
             # stream_chat_turn 只是把 provider 串流即時消化成完整 LLMReply（沒有 token
-            # 外送給用戶端），所以串流純粹是 TTFB 最佳化：把它留給實際產生長文的作答回合，
-            # 強制搜尋那一回合只會吐 tool_call，不需要串流。
-            should_stream = (
-                answer_pass if text_only_answer_pass else iteration == 0
-            )
+            # 外送給用戶端），所以串流純粹是 TTFB 最佳化：強制搜尋那一回合只會吐
+            # tool_call，不需要串流；之後每一回合都可能是長文答案，都串流。
+            should_stream = iteration >= 1 if first_forced else iteration == 0
             turn_fn = _stream_turn if should_stream else _generate_turn
             turn = turn_fn(
                 working_messages,
@@ -209,6 +216,13 @@ def _run_tool_phase(
                 )
                 hallucination_retried = True
                 working_messages.append({"role": "user", "content": _HALLUCINATED_TOOL_RETRY_MSG})
+                continue
+            if not turn.content.strip() and not empty_reply_retried:
+                # Gemini 想呼叫工具卻沒被允許時會回空字串；催一次要它用文字回答，
+                # 而不是直接以「LLM 沒有回傳內容」失敗。
+                logger.warning("empty reply from provider — retrying once with a text nudge")
+                empty_reply_retried = True
+                working_messages.append({"role": "user", "content": _EMPTY_REPLY_RETRY_MSG})
                 continue
             if iteration == 0 and current_forced:
                 # 部分 provider 會忽略 tool_choice 直接回文字；接受它當答案，不要再繞圈。
@@ -304,3 +318,6 @@ def _build_hallucination_pattern(tools: list[dict[str, Any]]) -> re.Pattern[str]
     if not names:
         return None
     return re.compile(r"^(" + "|".join(re.escape(n) for n in names) + r")\s*\(.*\)\s*$", re.DOTALL)
+_EMPTY_REPLY_RETRY_MSG = (
+    "請直接以文字回答上一個問題；若手邊資料不足，請明確說明找不到相關資料，不要留空。"
+)

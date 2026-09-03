@@ -153,8 +153,9 @@ class BrainSettings(BaseSettings):
     forced_tool_max_tokens: int = 200
     # 一般使用者回合的第一次 LLM 呼叫強制走 search_knowledge，避免模型憑記憶亂答。
     chat_force_knowledge_search: bool = True
-    # 工具結果回填後的作答回合不帶 tools，模型無法再繼續開新的工具輪。
-    chat_answer_pass_text_only: bool = True
+    # 強制查完知識庫後的回合不再提供 search_knowledge（避免重複翻書），
+    # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
+    chat_answer_pass_excludes_knowledge_search: bool = True
     # 多條查詢（AI 改寫 + 原句）RRF 融合後最多餵給模型幾個片段；
     # 若只依單一查詢的 top_k 截斷，多查詢等於白查。
     knowledge_search_merge_limit: int = 5

@@ -56,7 +56,7 @@ def _install_loop_stubs(
     *,
     tools: list[dict[str, Any]] | None = None,
     force: bool = True,
-    text_only: bool = True,
+    exclude_knowledge: bool = True,
 ) -> list[dict[str, Any]]:
     """Patch registry / settings and record every LLM call the loop makes."""
     calls: list[dict[str, Any]] = []
@@ -82,7 +82,7 @@ def _install_loop_stubs(
     fake_cfg = MagicMock()
     fake_cfg.agent_loop_max_rounds = 4
     fake_cfg.chat_force_knowledge_search = force
-    fake_cfg.chat_answer_pass_text_only = text_only
+    fake_cfg.chat_answer_pass_excludes_knowledge_search = exclude_knowledge
     fake_cfg.forced_tool_model_override = ""
     fake_cfg.forced_tool_max_tokens = 200
     monkeypatch.setattr(agent_loop, "get_settings", lambda: fake_cfg)
@@ -265,17 +265,18 @@ class TestTogglesOff:
         assert calls[0]["kind"] == "stream"
         assert "forced_tool_name" not in calls[0]
 
-    def test_text_only_disabled_keeps_tools_on_answer_pass(
+    def test_exclusion_disabled_keeps_all_tools_on_answer_pass(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         agent_loop = _load_agent_loop(monkeypatch)
-        calls = _install_loop_stubs(monkeypatch, agent_loop, text_only=False)
+        calls = _install_loop_stubs(monkeypatch, agent_loop, exclude_knowledge=False)
+        # 強制搜尋那一輪走 generate、之後的回合走 stream
         _record_turns(
             monkeypatch,
             agent_loop,
             calls,
-            stream_reply=[_tool_turn(agent_loop)],
-            generate_reply=[agent_loop.LLMReply(content="答案", tool_calls=[], model="m1")],
+            stream_reply=[agent_loop.LLMReply(content="答案", tool_calls=[], model="m1")],
+            generate_reply=[_tool_turn(agent_loop)],
         )
 
         result = agent_loop.run_agent_loop(
@@ -442,3 +443,106 @@ class TestSearchToolDualRetrieval:
 
         assert result["queries"] == ["PRP 價格"]
         assert searched == ["PRP 價格"]
+
+
+_WEB_TOOL_SPEC = {
+    "type": "function",
+    "function": {"name": "search_web", "description": "web", "parameters": {}},
+}
+
+
+class TestOtherToolsStayAvailable:
+    def test_answer_pass_keeps_other_tools_but_drops_knowledge_search(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC]
+        )
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            stream_reply=[agent_loop.LLMReply(content="答案", tool_calls=[], model="m1")],
+            generate_reply=[_tool_turn(agent_loop)],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "今天天氣如何？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "答案"
+        assert calls[0]["forced_tool_name"] == "search_knowledge"
+        assert calls[1]["tools"] == [_WEB_TOOL_SPEC]
+
+    def test_model_may_call_web_search_after_the_knowledge_pass(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC]
+        )
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            stream_reply=[
+                _tool_turn(agent_loop, name="search_web"),
+                agent_loop.LLMReply(content="晴天", tool_calls=[], model="m1"),
+            ],
+            generate_reply=[_tool_turn(agent_loop)],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "今天天氣如何？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "晴天"
+        assert [c["kind"] for c in calls] == ["generate", "stream", "stream"]
+        assert calls[1]["tools"] == [_WEB_TOOL_SPEC]
+        assert calls[2]["tools"] == [_WEB_TOOL_SPEC]
+
+
+class TestEmptyReply:
+    def test_empty_reply_is_retried_once_with_a_text_nudge(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(monkeypatch, agent_loop)
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            stream_reply=[
+                agent_loop.LLMReply(content="", tool_calls=[], model="m1"),
+                agent_loop.LLMReply(content="找不到相關資料", tool_calls=[], model="m1"),
+            ],
+            generate_reply=[_tool_turn(agent_loop)],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "今天天氣如何？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "找不到相關資料"
+        assert len(calls) == 3
+
+    def test_empty_reply_twice_still_fails(self, monkeypatch: pytest.MonkeyPatch):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(monkeypatch, agent_loop)
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            stream_reply=[agent_loop.LLMReply(content="", tool_calls=[], model="m1")],
+            generate_reply=[_tool_turn(agent_loop)],
+        )
+
+        with pytest.raises(ValueError, match="沒有回傳內容"):
+            agent_loop.run_agent_loop(
+                [{"role": "user", "content": "今天天氣如何？"}],
+                allow_forced_knowledge_search=True,
+            )
