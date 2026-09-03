@@ -23,6 +23,7 @@ export const systemTabs = [
   { key: "Projects", label: "專案管理", icon: "folder_copy" },
   { key: "Accounts", label: "帳號管理", icon: "manage_accounts" },
   { key: "EmbedKeys", label: "Embed 金鑰", icon: "key" },
+  { key: "Usage", label: "用量", icon: "data_usage" },
   { key: "Health", label: "系統健康", icon: "health_metrics" },
   { key: "Monitoring", label: "系統監控", icon: "monitoring" },
 ] as const;
@@ -55,6 +56,7 @@ export const pageComponents: Record<
   Projects: lazy(() => import("../../pages/Projects")),
   Accounts: lazy(() => import("../../pages/Accounts")),
   EmbedKeys: lazy(() => import("../../pages/EmbedKeys")),
+  Usage: lazy(() => import("../../pages/Usage")),
   Health: lazy(() => import("../../pages/Health")),
   Monitoring: lazy(() => import("../../pages/Monitoring")),
 };
@@ -72,6 +74,7 @@ const tabPathSegments: Record<Tab, string> = {
   Projects: "projects",
   Accounts: "accounts",
   EmbedKeys: "embed-keys",
+  Usage: "usage",
   Health: "health",
   Monitoring: "monitoring",
 };

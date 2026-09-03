@@ -334,6 +334,25 @@ LLM token 用量查詢，並以 `X-Internal-Token` 轉送至 Brain 的
 只轉送 `limit`、帳號／專案／session／trace／類型與時間篩選。未知或屬於
 另一個 endpoint 的 query 參數不得轉送。
 
+**Admin「用量」頁。** `frontend/admin/src/pages/Usage.tsx` 是上述兩個端點的
+前台，導覽鍵為 `Usage`，所有已登入帳號都看得到（後端已依帳號範圍收斂資料，
+不需再加前端權限判斷）。篩選列提供日期區間（預設最近七天）、專案、主體類型
+（全部／帳號／Embed 金鑰）與選填的主體 ID；日期會在 `frontend/admin/src/api/usage.ts`
+轉成後端的 `since` / `until`，並因為後端上界是 `created_at < until`，結束日
+會自動往後推一天，否則當天資料會被漏掉。
+
+頁面呼叫一次 `group_by=model` 的 summary 與一次 `limit=100` 的 events。
+Ledger 沒有 `provider` 這個分組維度，但 `group_by=model` 每一列都同時帶
+`provider` 與 `model`，所以「依 Provider」表是在前端就地摺疊出來的，省一次
+請求也保證兩張表數字一致。summary 不回傳延遲，因此平均延遲與各分組延遲都
+取自事件視窗。
+
+「平均每個對話回合的 LLM 呼叫數」＝事件視窗內 `kind="chat"` 的呼叫數 ÷ 不重複
+的 `(session_id, trace_id)` 回合數；沒有 `trace_id` 的事件各自算一個回合，避免
+被併成同一格而低估。這個數字只反映已載入的事件視窗，頁面上會標明。最近事件
+表以 `trace_id` 分組並加左側色條，讓同一回合的多次呼叫視覺相鄰，讀者才看得出
+一個回合為什麼花了一次或多次呼叫。
+
 ### 18. Embed 金鑰主體 (Embed Key Principal)
 
 外部網站以 `X-Embed-Key` 標頭嵌入時，Backend 把該請求解析成一個受限主體：
