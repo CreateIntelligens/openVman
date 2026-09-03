@@ -345,7 +345,7 @@ user input
   -> session append
   -> build prompt from workspace + persona + history
   -> LLM call 1（強制 tool_choice=search_knowledge，帶完整 tool schema）
-  -> 執行 search_knowledge（AI 改寫的 queries + 原始使用者訊息一併檢索後合併去重）
+  -> 執行 search_knowledge（AI 改寫的 queries + 原始使用者訊息各自檢索，Reciprocal Rank Fusion 融合，取前 KNOWLEDGE_SEARCH_MERGE_LIMIT 筆）
   -> LLM call 2（不帶 tools，只能就檢索結果作答；串流走這一回合）
   -> append assistant reply
   -> archive daily memory

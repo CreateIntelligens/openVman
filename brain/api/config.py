@@ -155,6 +155,9 @@ class BrainSettings(BaseSettings):
     chat_force_knowledge_search: bool = True
     # 工具結果回填後的作答回合不帶 tools，模型無法再繼續開新的工具輪。
     chat_answer_pass_text_only: bool = True
+    # 多條查詢（AI 改寫 + 原句）RRF 融合後最多餵給模型幾個片段；
+    # 若只依單一查詢的 top_k 截斷，多查詢等於白查。
+    knowledge_search_merge_limit: int = 5
 
     # === Web Search ===
     gateway_base_url: str = "http://backend:8200"

@@ -1,6 +1,11 @@
 from typing import Any
 from tools.context import active_project_id, active_user_message, active_persona_id
-from tools.search_helpers import build_citations, merge_search_results, normalize_query_list
+from tools.search_helpers import (
+    build_citations,
+    fused_limit,
+    merge_search_results,
+    normalize_query_list,
+)
 
 import logging
 
@@ -59,7 +64,9 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
         except Exception as exc:
             logger.warning("search_one failed table=%s query=%r err=%s", table_name, query[:60], exc)
 
-    merged = merge_search_results(grouped, limit=top_k)
+    from config import get_settings
+
+    merged = merge_search_results(grouped, limit=fused_limit(top_k, get_settings()))
 
     # 3. Graph RAG: pull in chunks from files one hop away in the concept graph,
     #    so related concepts the query didn't lexically match still reach the LLM.

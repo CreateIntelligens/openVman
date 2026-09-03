@@ -437,7 +437,12 @@ class GeminiLiveSession:
         return await asyncio.to_thread(self._search_sync, table, args)
 
     def _search_sync(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
-        from tools.search_helpers import build_citations, merge_search_results, normalize_query_list
+        from tools.search_helpers import (
+            build_citations,
+            fused_limit,
+            merge_search_results,
+            normalize_query_list,
+        )
 
         queries = normalize_query_list(args)
         fallback = (self._last_user_message or "").strip()
@@ -473,7 +478,7 @@ class GeminiLiveSession:
             if embedding_route.version not in embedding_versions:
                 embedding_versions.append(embedding_route.version)
 
-        merged = merge_search_results(grouped, limit=top_k)
+        merged = merge_search_results(grouped, limit=fused_limit(top_k, self.config))
         return {
             "table": table,
             "queries": queries,
