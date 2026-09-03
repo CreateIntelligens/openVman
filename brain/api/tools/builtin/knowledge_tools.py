@@ -1,5 +1,11 @@
+import logging
 from typing import Any
-from tools.context import active_project_id, active_user_message, active_persona_id
+
+from tools.context import (
+    active_persona_id,
+    active_project_id,
+    active_user_message,
+)
 from tools.search_helpers import (
     build_citations,
     fused_limit,
@@ -7,9 +13,8 @@ from tools.search_helpers import (
     normalize_query_list,
 )
 
-import logging
-
 logger = logging.getLogger("brain.tools.builtin.knowledge")
+
 
 def _search_one(
     table_name: str,
@@ -38,6 +43,7 @@ def _search_one(
     )
     return results, embedding_route.version, embedding_route.vector
 
+
 def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 1. Prepare queries: deduplicated list starting with explicit queries, falling back to user message
     queries = normalize_query_list(args)
@@ -56,13 +62,24 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     primary_vector: list[float] | None = None
     for query in queries:
         try:
-            records, version, vector = _search_one(table_name, query, top_k, persona_id, project_id)
+            records, version, vector = _search_one(
+                table_name,
+                query,
+                top_k,
+                persona_id,
+                project_id,
+            )
             grouped.append((query, records))
             embedding_versions.add(version)
             if primary_vector is None:
                 primary_vector = vector
         except Exception as exc:
-            logger.warning("search_one failed table=%s query=%r err=%s", table_name, query[:60], exc)
+            logger.warning(
+                "search_one failed table=%s query=%r err=%s",
+                table_name,
+                query[:60],
+                exc,
+            )
 
     from config import get_settings
 
@@ -79,8 +96,14 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
 
     # Preserve the result shape for clients while making the trust boundary
     # explicit to the model and to telemetry consumers.
-    marked_results = [{**record, "trust_boundary": "untrusted_reference_data"} for record in merged]
-    marked_related = [{**record, "trust_boundary": "untrusted_reference_data"} for record in related]
+    marked_results = [
+        {**record, "trust_boundary": "untrusted_reference_data"}
+        for record in merged
+    ]
+    marked_related = [
+        {**record, "trust_boundary": "untrusted_reference_data"}
+        for record in related
+    ]
     return {
         "table": table_name,
         "queries": queries,

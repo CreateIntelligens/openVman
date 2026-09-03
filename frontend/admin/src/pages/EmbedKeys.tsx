@@ -4,7 +4,7 @@ import {
   createEmbedKey,
   deleteEmbedKey,
   listEmbedKeys,
-  parseOriginList,
+  parseDelimitedList,
   setEmbedKeyDisabled,
   updateEmbedKey,
   DEFAULT_DAILY_REQUEST_QUOTA,
@@ -28,6 +28,8 @@ interface KeyFormState {
   rateLimitPerMinute: number;
   dailyRequestQuota: number;
 }
+
+type PageStatus = { type: "success" | "error"; message: string } | null;
 
 const EMPTY_FORM: KeyFormState = {
   label: "",
@@ -75,9 +77,7 @@ export default function EmbedKeys() {
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [status, setStatus] = useState<
-    { type: "success" | "error"; message: string } | null
-  >(null);
+  const [status, setStatus] = useState<PageStatus>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -127,7 +127,14 @@ export default function EmbedKeys() {
     setModalOpen(true);
   }
 
-  async function runAction(action: () => Promise<unknown>, fallback: string) {
+  function updateForm(changes: Partial<KeyFormState>): void {
+    setForm((current) => ({ ...current, ...changes }));
+  }
+
+  async function runAction(
+    action: () => Promise<unknown>,
+    fallback: string,
+  ): Promise<boolean> {
     try {
       await action();
       await reload();
@@ -140,7 +147,7 @@ export default function EmbedKeys() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const origins = parseOriginList(form.origins);
+    const origins = parseDelimitedList(form.origins);
     if (origins.length === 0) {
       setStatus({ type: "error", message: "至少需要一個允許的來源網域。" });
       return;
@@ -152,7 +159,7 @@ export default function EmbedKeys() {
       label: form.label.trim(),
       allowed_origins: origins,
       default_character_id: form.defaultCharacterId.trim(),
-      allowed_character_ids: parseOriginList(form.allowedCharacterIds),
+      allowed_character_ids: parseDelimitedList(form.allowedCharacterIds),
       default_persona_id: form.defaultPersonaId.trim(),
       default_tts_provider: form.defaultTtsProvider.trim(),
       default_tts_voice: form.defaultTtsVoice.trim(),
@@ -216,13 +223,15 @@ export default function EmbedKeys() {
           />
         )}
 
-        {loading ? (
+        {loading && (
           <p className="text-sm text-content-muted">載入中…</p>
-        ) : keys.length === 0 ? (
+        )}
+        {!loading && keys.length === 0 && (
           <p className="text-sm text-content-muted">
             尚未建立任何 Embed 金鑰。
           </p>
-        ) : (
+        )}
+        {!loading && keys.length > 0 && (
           <div className="overflow-x-auto rounded-3xl border border-border bg-surface shadow-sm dark:bg-surface-sunken/40 dark:shadow-none">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-border text-xs uppercase tracking-wider text-content-subtle">
@@ -334,9 +343,7 @@ export default function EmbedKeys() {
                   id="embed-key-label"
                   type="text"
                   value={form.label}
-                  onChange={(event) =>
-                    setForm({ ...form, label: event.target.value })
-                  }
+                  onChange={(event) => updateForm({ label: event.target.value })}
                   placeholder="例：合作夥伴官網"
                   className={inputClass}
                 />
@@ -354,7 +361,7 @@ export default function EmbedKeys() {
                   <Select
                     ariaLabel="專案"
                     value={form.projectId}
-                    onChange={(value) => setForm({ ...form, projectId: value })}
+                    onChange={(value) => updateForm({ projectId: value })}
                     options={projects.map((project) => ({
                       value: project.project_id,
                       label: project.label,
@@ -372,9 +379,7 @@ export default function EmbedKeys() {
               <textarea
                 id="embed-key-origins"
                 value={form.origins}
-                onChange={(event) =>
-                  setForm({ ...form, origins: event.target.value })
-                }
+                onChange={(event) => updateForm({ origins: event.target.value })}
                 rows={3}
                 placeholder="https://partner.example"
                 className={inputClass}
@@ -390,9 +395,9 @@ export default function EmbedKeys() {
                   id="embed-key-character"
                   type="text"
                   value={form.defaultCharacterId}
-                  onChange={(event) =>
-                    setForm({ ...form, defaultCharacterId: event.target.value })
-                  }
+                  onChange={(event) => updateForm({
+                    defaultCharacterId: event.target.value,
+                  })}
                   className={inputClass}
                 />
               </div>
@@ -404,9 +409,9 @@ export default function EmbedKeys() {
                   id="embed-key-extra-characters"
                   type="text"
                   value={form.allowedCharacterIds}
-                  onChange={(event) =>
-                    setForm({ ...form, allowedCharacterIds: event.target.value })
-                  }
+                  onChange={(event) => updateForm({
+                    allowedCharacterIds: event.target.value,
+                  })}
                   className={inputClass}
                 />
               </div>
@@ -418,9 +423,9 @@ export default function EmbedKeys() {
                   id="embed-key-persona"
                   type="text"
                   value={form.defaultPersonaId}
-                  onChange={(event) =>
-                    setForm({ ...form, defaultPersonaId: event.target.value })
-                  }
+                  onChange={(event) => updateForm({
+                    defaultPersonaId: event.target.value,
+                  })}
                   className={inputClass}
                 />
               </div>
@@ -432,9 +437,9 @@ export default function EmbedKeys() {
                   id="embed-key-provider"
                   type="text"
                   value={form.defaultTtsProvider}
-                  onChange={(event) =>
-                    setForm({ ...form, defaultTtsProvider: event.target.value })
-                  }
+                  onChange={(event) => updateForm({
+                    defaultTtsProvider: event.target.value,
+                  })}
                   className={inputClass}
                 />
               </div>
@@ -446,9 +451,9 @@ export default function EmbedKeys() {
                   id="embed-key-voice"
                   type="text"
                   value={form.defaultTtsVoice}
-                  onChange={(event) =>
-                    setForm({ ...form, defaultTtsVoice: event.target.value })
-                  }
+                  onChange={(event) => updateForm({
+                    defaultTtsVoice: event.target.value,
+                  })}
                   className={inputClass}
                 />
               </div>
@@ -462,12 +467,9 @@ export default function EmbedKeys() {
                     type="number"
                     min={1}
                     value={form.rateLimitPerMinute}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        rateLimitPerMinute: Number(event.target.value),
-                      })
-                    }
+                    onChange={(event) => updateForm({
+                      rateLimitPerMinute: Number(event.target.value),
+                    })}
                     className={inputClass}
                   />
                 </div>
@@ -480,12 +482,9 @@ export default function EmbedKeys() {
                     type="number"
                     min={1}
                     value={form.dailyRequestQuota}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        dailyRequestQuota: Number(event.target.value),
-                      })
-                    }
+                    onChange={(event) => updateForm({
+                      dailyRequestQuota: Number(event.target.value),
+                    })}
                     className={inputClass}
                   />
                 </div>

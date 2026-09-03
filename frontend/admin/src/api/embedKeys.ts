@@ -48,13 +48,13 @@ export type EmbedKeyUpdateInput = Partial<
 export const DEFAULT_RATE_LIMIT_PER_MINUTE = 60;
 export const DEFAULT_DAILY_REQUEST_QUOTA = 1000;
 
-/** 逐行或逗號分隔的輸入 → 去重後的來源清單。 */
-export function parseOriginList(raw: string): string[] {
-  const origins = raw
+/** 將逐行或逗號分隔的輸入整理成不重複清單。 */
+export function parseDelimitedList(raw: string): string[] {
+  const values = raw
     .split(/[\n,]/)
-    .map((origin) => origin.trim())
+    .map((value) => value.trim())
     .filter(Boolean);
-  return Array.from(new Set(origins));
+  return Array.from(new Set(values));
 }
 
 export async function listEmbedKeys(): Promise<EmbedKey[]> {

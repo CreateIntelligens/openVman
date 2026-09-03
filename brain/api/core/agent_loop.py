@@ -75,7 +75,10 @@ def _generate_turn(
     tools: list[dict[str, Any]] | None,
     forced_tool_name: str | None = None,
 ) -> LLMReply:
-    return generate_chat_turn(messages, **_build_turn_kwargs(tools, forced_tool_name, get_settings()))
+    return generate_chat_turn(
+        messages,
+        **_build_turn_kwargs(tools, forced_tool_name, get_settings()),
+    )
 
 
 def _stream_turn(
@@ -84,7 +87,10 @@ def _stream_turn(
     tools: list[dict[str, Any]] | None,
     forced_tool_name: str | None = None,
 ) -> LLMReply:
-    return stream_chat_turn(messages, **_build_turn_kwargs(tools, forced_tool_name, get_settings()))
+    return stream_chat_turn(
+        messages,
+        **_build_turn_kwargs(tools, forced_tool_name, get_settings()),
+    )
 
 
 KNOWLEDGE_SEARCH_TOOL = "search_knowledge"
@@ -134,7 +140,10 @@ def _resolve_forced_first_tool(
         return forced_tool_name
     if not (allow_forced_knowledge_search and cfg.chat_force_knowledge_search):
         return None
-    if any(t.get("function", {}).get("name") == KNOWLEDGE_SEARCH_TOOL for t in tools):
+    if any(
+        tool.get("function", {}).get("name") == KNOWLEDGE_SEARCH_TOOL
+        for tool in tools
+    ):
         return KNOWLEDGE_SEARCH_TOOL
     return None
 
@@ -177,11 +186,15 @@ def _run_tool_phase(
             # stream_chat_turn 只是把 provider 串流即時消化成完整 LLMReply（沒有 token
             # 外送給用戶端），所以串流純粹是 TTFB 最佳化：把它留給實際產生長文的作答回合，
             # 強制搜尋那一回合只會吐 tool_call，不需要串流。
-            if text_only_answer_pass:
-                turn_fn = _stream_turn if answer_pass else _generate_turn
-            else:
-                turn_fn = _stream_turn if iteration == 0 else _generate_turn
-            turn = turn_fn(working_messages, tools=current_tools, forced_tool_name=current_forced)
+            should_stream = (
+                answer_pass if text_only_answer_pass else iteration == 0
+            )
+            turn_fn = _stream_turn if should_stream else _generate_turn
+            turn = turn_fn(
+                working_messages,
+                tools=current_tools,
+                forced_tool_name=current_forced,
+            )
             if turn.tool_calls:
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue
@@ -190,7 +203,10 @@ def _run_tool_phase(
                 and hallucination_pattern is not None
                 and hallucination_pattern.match(turn.content.strip())
             ):
-                logger.warning("hallucinated tool call detected in reply: %r — retrying", turn.content.strip()[:80])
+                logger.warning(
+                    "hallucinated tool call detected in reply: %r — retrying",
+                    turn.content.strip()[:80],
+                )
                 hallucination_retried = True
                 working_messages.append({"role": "user", "content": _HALLUCINATED_TOOL_RETRY_MSG})
                 continue

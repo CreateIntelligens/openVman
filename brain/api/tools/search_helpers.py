@@ -9,6 +9,10 @@ from __future__ import annotations
 from typing import Any
 
 
+RRF_K = 60
+DEFAULT_MERGE_LIMIT = 5
+
+
 def _record_rank(record: dict[str, Any]) -> tuple[int, float]:
     score = record.get("_score")
     if isinstance(score, int | float):
@@ -40,10 +44,6 @@ def normalize_query_list(args: dict[str, Any]) -> list[str]:
         seen.add(text)
         cleaned.append(text)
     return cleaned
-
-
-RRF_K = 60
-DEFAULT_MERGE_LIMIT = 5
 
 
 def fused_limit(top_k: int, settings: Any) -> int:
@@ -90,9 +90,9 @@ def merge_search_results(
         for rank, record in enumerate(ordered, start=1):
             key = _record_key(record)
             fused[key] = fused.get(key, 0.0) + 1.0 / (rrf_k + rank)
-            matched.setdefault(key, [])
-            if query not in matched[key]:
-                matched[key].append(query)
+            matched_queries = matched.setdefault(key, [])
+            if query not in matched_queries:
+                matched_queries.append(query)
             current = best.get(key)
             if current is None or _record_rank(record) < _record_rank(current):
                 best[key] = record

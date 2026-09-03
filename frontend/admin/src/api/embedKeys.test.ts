@@ -4,7 +4,7 @@ import {
   createEmbedKey,
   deleteEmbedKey,
   listEmbedKeys,
-  parseOriginList,
+  parseDelimitedList,
   setEmbedKeyDisabled,
   updateEmbedKey,
 } from "./embedKeys";
@@ -88,8 +88,8 @@ describe("embedKeys api", () => {
 
   it("parses origins from newlines and commas, dropping duplicates", () => {
     expect(
-      parseOriginList("https://a.example\n https://b.example , https://a.example"),
+      parseDelimitedList("https://a.example\n https://b.example , https://a.example"),
     ).toEqual(["https://a.example", "https://b.example"]);
-    expect(parseOriginList("   ")).toEqual([]);
+    expect(parseDelimitedList("   ")).toEqual([]);
   });
 });

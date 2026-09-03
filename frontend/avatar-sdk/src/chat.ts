@@ -5,6 +5,8 @@ interface ChatResponseBody {
   reply?: unknown;
 }
 
+type ConversationFailureCode = "CHAT_FAILED" | "SPEECH_FAILED";
+
 export interface AvatarConversationDeps {
   interrupt(): void;
   onReply(text: string): void;
@@ -78,7 +80,7 @@ export class AvatarConversation {
   private async send(
     url: string,
     payload: Record<string, unknown>,
-    failureCode: "CHAT_FAILED" | "SPEECH_FAILED",
+    failureCode: ConversationFailureCode,
   ): Promise<Response> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -110,7 +112,7 @@ export class AvatarConversation {
 
 function httpError(
   response: Response,
-  failureCode: "CHAT_FAILED" | "SPEECH_FAILED",
+  failureCode: ConversationFailureCode,
 ): OpenVmanAvatarError {
   if (response.status === 401 || response.status === 403) {
     return new OpenVmanAvatarError(

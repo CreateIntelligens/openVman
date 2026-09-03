@@ -472,13 +472,21 @@ class GeminiLiveSession:
                     embedding_version=embedding_route.version,
                 )
             except Exception as exc:
-                logger.warning("Gemini Live search failed table=%s query=%r err=%s", table, query[:60], exc)
+                logger.warning(
+                    "Gemini Live search failed table=%s query=%r err=%s",
+                    table,
+                    query[:60],
+                    exc,
+                )
                 continue
             grouped.append((query, results))
             if embedding_route.version not in embedding_versions:
                 embedding_versions.append(embedding_route.version)
 
-        merged = merge_search_results(grouped, limit=fused_limit(top_k, self.config))
+        merged = merge_search_results(
+            grouped,
+            limit=fused_limit(top_k, self.config),
+        )
         return {
             "table": table,
             "queries": queries,

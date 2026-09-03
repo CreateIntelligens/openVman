@@ -43,7 +43,11 @@ def test_merge_search_results_boosts_chunks_hit_by_multiple_queries():
     )
 
     # 兩個單命中片段的 RRF 分數相同，改用各自名次內的距離決勝
-    assert [record["chunk_id"] for record in merged] == ["both", "only-user", "only-ai"]
+    assert [record["chunk_id"] for record in merged] == [
+        "both",
+        "only-user",
+        "only-ai",
+    ]
     assert merged[0]["matched_queries"] == ["改寫句", "原句"]
     # 保留的是名次較好的那份，距離值仍有意義
     assert merged[0]["_distance"] == 0.2
@@ -54,7 +58,13 @@ def test_merge_search_results_does_not_compare_distances_across_queries():
     # 第二條查詢的距離整體偏大，但名次才算數：它的第一名不該被第一條查詢的第二名擠掉
     merged = merge_search_results(
         [
-            ("q1", [{"chunk_id": "q1-first", "_distance": 0.1}, {"chunk_id": "q1-second", "_distance": 0.2}]),
+            (
+                "q1",
+                [
+                    {"chunk_id": "q1-first", "_distance": 0.1},
+                    {"chunk_id": "q1-second", "_distance": 0.2},
+                ],
+            ),
             ("q2", [{"chunk_id": "q2-first", "_distance": 0.9}]),
         ],
         limit=2,
