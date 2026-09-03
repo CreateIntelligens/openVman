@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from app.auth.dependencies import CurrentAccount, get_current_account
 from app.auth.middleware import FailClosedAuthMiddleware
+from app.auth.embed_key_routes import router as embed_key_router
 from app.auth.routes import auth_router, temporary_accounts_router, users_router
 from app.auth.runtime import get_auth_runtime
 from app.brain_proxy import _http as _brain_proxy_http
@@ -231,6 +232,7 @@ app.include_router(vision_router)
 app.include_router(internal_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(embed_key_router)
 app.include_router(temporary_accounts_router)
 app.include_router(admin_routes.router)
 app.include_router(avatar_routes.router)

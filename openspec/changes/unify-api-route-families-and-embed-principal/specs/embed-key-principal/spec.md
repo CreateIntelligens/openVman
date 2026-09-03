@@ -53,11 +53,19 @@ The Backend SHALL enforce each key's `rate_limit_per_minute` with a sliding wind
 - **THEN** further requests return 429 until the next UTC day and the key's `last_used_at` still updates
 
 ### Requirement: CORS only for embed principals
-The Backend SHALL emit `Access-Control-Allow-Origin: <origin>`, `Vary: Origin`, `Access-Control-Allow-Headers: Content-Type, X-Embed-Key`, and `Access-Control-Allow-Methods` only when the request is authenticated as an embed principal, or when it is an `OPTIONS` preflight for an allowlisted path carrying a valid key and allowlisted origin. Cookie and bearer sessions SHALL keep the existing same-origin behaviour.
+The Backend SHALL emit `Access-Control-Allow-Origin: <origin>`, `Vary: Origin`, `Access-Control-Allow-Headers: Content-Type, X-Embed-Key`, and `Access-Control-Allow-Methods` only when the request carries `X-Embed-Key` (success or failure, except an unlisted origin), or when it is an `OPTIONS` preflight for an allowlisted path whose `Origin` is listed on at least one enabled key. Cookie and bearer sessions SHALL keep the existing same-origin behaviour.
 
 #### Scenario: Preflight
-- **WHEN** a browser sends `OPTIONS /api/v1/chat` with `Origin` in the key's list and `Access-Control-Request-Headers: x-embed-key`
+- **WHEN** a browser sends `OPTIONS /api/v1/chat` with `Access-Control-Request-Method` and an `Origin` listed on at least one enabled key (a preflight never carries `X-Embed-Key`, so the key itself cannot be checked yet)
 - **THEN** the response is 204 with the CORS headers above and no credentials flag
+
+#### Scenario: Preflight from an unlisted origin
+- **WHEN** the preflight `Origin` is not listed on any enabled key, or the path is not allowlisted
+- **THEN** no CORS headers are emitted
+
+#### Scenario: Embed failures stay readable by the browser
+- **WHEN** a request carrying `X-Embed-Key` from an origin the key allows (or an unknown key) is rejected with 401, 403, or 429
+- **THEN** the response still carries the CORS headers so the SDK can read the status; an unlisted origin gets none
 
 #### Scenario: Session request gets no CORS headers
 - **WHEN** a cookie-authenticated request carries a cross-site `Origin`

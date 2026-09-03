@@ -28,6 +28,8 @@ from protocol.message_envelope import (
 from protocol.protocol_events import ProtocolValidationError
 from protocol.schemas import ChatRequest
 from safety.internal_auth import (
+    PRINCIPAL_ID_HEADER,
+    PRINCIPAL_TYPE_HEADER,
     USER_ID_HEADER,
     USER_ROLE_HEADER,
     require_internal_token,
@@ -100,6 +102,11 @@ async def chat(request: Request, payload: ChatRequest):
             kind="chat",
             user_id=request.headers.get(USER_ID_HEADER, ""),
             role=request.headers.get(USER_ROLE_HEADER, ""),
+            principal_type=request.headers.get(PRINCIPAL_TYPE_HEADER, "") or "user",
+            principal_id=(
+                request.headers.get(PRINCIPAL_ID_HEADER, "")
+                or request.headers.get(USER_ID_HEADER, "")
+            ),
             project_id=payload.project_id or "default",
             session_id=payload.session_id or "",
             persona_id=payload.persona_id or "default",

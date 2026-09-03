@@ -49,6 +49,12 @@ def _check_resource_access(
         if record is None:
             raise HTTPException(status_code=404, detail="File not found")
         return record
+    if current.embed_key is not None:
+        # Embed 主體沒有資源授權；能不能讀這個角色已經由 middleware 依
+        # 金鑰的預設／額外角色清單判定過，這裡只確認資源存在。
+        if record is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        return record
     try:
         return resolve_resource(
             runtime.resources,

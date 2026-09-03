@@ -333,3 +333,53 @@ LLM token 用量查詢，並以 `X-Internal-Token` 轉送至 Brain 的
 `summary` 只轉送 `group_by`、帳號／專案／session／類型與時間篩選；`events`
 只轉送 `limit`、帳號／專案／session／trace／類型與時間篩選。未知或屬於
 另一個 endpoint 的 query 參數不得轉送。
+
+### 18. Embed 金鑰主體 (Embed Key Principal)
+
+外部網站以 `X-Embed-Key` 標頭嵌入時，Backend 把該請求解析成一個受限主體：
+`AccountType.EMBED`、`AuthTransport.EMBED_KEY`，並在 `CurrentAccount.embed_key`
+帶上金鑰紀錄。金鑰在 middleware 中「先於」cookie 與 bearer 驗證，同時帶
+session cookie 與 `X-Embed-Key` 時一律以金鑰為準；embed 主體不會拿到 session，
+每個請求都重新驗證。
+
+金鑰 ID 由伺服器產生，格式為 `ovk_` 加 24 個 base32 小寫字元。它是公開識別碼
+而非密鑰，因此每次讀取都完整回傳；真正的保護來自來源白名單與每把金鑰的用量上限。
+
+**路由允許清單。** embed 主體只能存取下列路徑，其餘一律在進入 handler 前回 403：
+
+| 方法 | 路徑 |
+|---|---|
+| POST | `/api/v1/chat` |
+| GET | `/api/v1/characters` |
+| GET | `/api/v1/tts/providers` |
+| POST | `/api/v1/tts/stream` |
+| POST | `/v1/audio/speech` |
+| GET | `/api/v1/health` |
+| GET | `/static/characters/{char_id}/*` |
+| OPTIONS | 以上路徑的 preflight |
+
+**拒絕與限流狀態碼。** 金鑰不存在或已停用回 401；缺少 `Origin`、`Origin` 不在
+白名單、路徑不在允許清單、client 帶的 `project_id` 與金鑰綁定的專案不同、
+或請求的角色不是金鑰的預設／額外允許角色，皆回 403；超過
+`rate_limit_per_minute`（行程內滑動視窗）或 `daily_request_quota`
+（存在 auth 資料庫的每日計數）回 429 並附上 `Retry-After`。preflight 只驗身分與
+來源，不計入用量，否則一次真實請求會扣掉兩次額度。
+
+**CORS。** 只有 embed 主體的回應，以及帶著有效金鑰與白名單 `Origin` 的
+allowlisted preflight（回 204），才會帶上 `Access-Control-Allow-Origin`、
+`Vary: Origin`、`Access-Control-Allow-Headers: Content-Type, X-Embed-Key` 與
+`Access-Control-Allow-Methods`，且一律不帶 credentials 旗標。cookie 與 bearer
+維持既有的同源行為。
+
+**用量歸屬。** 轉送 Brain 時額外帶上 `X-Principal-Type: embed_key` 與
+`X-Principal-Id: <key_id>`（session 帳號則是 `user` 與帳號 ID）。這兩個標頭只由
+Backend 產生，呼叫端自帶的同名標頭會被濾掉。Brain 的 usage ledger 以
+`principal_type` / `principal_id` 兩個欄位記錄，`/api/v1/usage/*` 可用
+`principal_type`、`principal_id` 篩選，`group_by=principal` 可依金鑰彙總。
+
+**管理介面。** `GET/POST /api/v1/embed-keys` 與
+`PATCH/DELETE /api/v1/embed-keys/{key_id}` 僅限管理員。建立時至少要有一個
+來源，格式必須是精確的 `scheme://host[:port]`（不接受 `*`、缺 scheme、或帶路徑），
+專案必須存在（否則 404），上限值最小為 1，省略時採 60 次/分與 1000 次/日。
+金鑰資料存在 auth 資料庫的 `embed_keys` 與 `embed_key_daily_usage` 兩張表，
+由既有的 migration 機制（v8）建立。所有設定都掛在金鑰上，不引入新的環境變數。

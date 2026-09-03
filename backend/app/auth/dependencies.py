@@ -10,9 +10,15 @@ from urllib.parse import urlsplit
 from fastapi import Depends, HTTPException, Request, WebSocket, status
 from starlette.requests import HTTPConnection
 
+from .embed import (
+    EMBED_KEY_HEADER,
+    authorize_embed_request,
+    embed_user_record,
+)
 from .models import (
     AccountRole,
     AccountType,
+    EmbedKeyRecord,
     TemporaryCredentialRecord,
     UserRecord,
     has_admin_portal_access,
@@ -29,6 +35,7 @@ _INVALID_SESSION_DETAIL = "Invalid or expired session"
 class AuthTransport(StrEnum):
     BEARER = "bearer"
     COOKIE = "cookie"
+    EMBED_KEY = "embed_key"
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +43,7 @@ class CurrentAccount:
     user: UserRecord
     transport: AuthTransport
     temporary_credential: TemporaryCredentialRecord | None = None
+    embed_key: EmbedKeyRecord | None = None
 
 
 def _unauthorized() -> HTTPException:
@@ -76,12 +84,42 @@ def enforce_same_origin(connection: HTTPConnection) -> None:
         raise HTTPException(status_code=403, detail="Same-origin request required")
 
 
+def _authenticate_embed_key(
+    connection: HTTPConnection,
+    runtime: AuthRuntime,
+    embed_key_id: str,
+) -> CurrentAccount:
+    """Authenticate an embed key and apply every embed gate before the handler."""
+    record = runtime.embed_keys.get(embed_key_id)
+    authorize_embed_request(
+        record,
+        method=connection.scope.get("method", "GET"),
+        path=connection.url.path,
+        origin=connection.headers.get("origin", ""),
+        repository=runtime.embed_keys,
+    )
+    assert record is not None  # authorize_embed_request 已排除 None
+    current = CurrentAccount(
+        user=embed_user_record(record),
+        transport=AuthTransport.EMBED_KEY,
+        embed_key=record,
+    )
+    connection.state.current_account = current
+    # Key 綁死專案，下游 proxy 直接讀這個值，不再信任 client 帶的 project_id。
+    connection.state.resolved_project_id = record.project_id
+    return current
+
+
 def _authenticate_connection(
     connection: HTTPConnection,
     runtime: AuthRuntime,
     *,
     require_cookie_origin: bool,
 ) -> CurrentAccount:
+    embed_key_id = connection.headers.get(EMBED_KEY_HEADER, "").strip()
+    if embed_key_id:
+        return _authenticate_embed_key(connection, runtime, embed_key_id)
+
     bearer = _extract_bearer(connection)
     if bearer is not None:
         token = bearer

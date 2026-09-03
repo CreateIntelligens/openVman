@@ -98,6 +98,10 @@ class UsageScope:
     kind: str = "chat"
     user_id: str = ""
     role: str = ""
+    # 主體型別／識別碼：session 帳號是 "user"，embed 金鑰是 "embed_key"，
+    # 讓帳本可以依金鑰彙總，而不必從 user_id 反推。
+    principal_type: str = ""
+    principal_id: str = ""
     project_id: str = "default"
     session_id: str = ""
     persona_id: str = "default"

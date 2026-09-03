@@ -84,7 +84,7 @@ import {
   getCurrentAccount,
   temporaryLogin,
 } from "./api/auth";
-import { allTabs } from "./components/app/navigation";
+import { allTabs, isTabVisible } from "./components/app/navigation";
 
 describe("App tab mounting", () => {
   beforeEach(() => {
@@ -131,8 +131,12 @@ describe("App tab mounting", () => {
     unmount();
   });
 
-  it("does not expose Embed Keys navigation", () => {
-    expect(allTabs.some((tab) => String(tab.key) === "EmbedKeys")).toBe(false);
+  it("exposes Embed Keys navigation to administrators only", () => {
+    const embedKeysTab = allTabs.find((tab) => String(tab.key) === "EmbedKeys");
+
+    expect(embedKeysTab).toBeTruthy();
+    expect(isTabVisible(embedKeysTab!, true)).toBe(true);
+    expect(isTabVisible(embedKeysTab!, false)).toBe(false);
   });
 
   it("restores a deep-linked tab and keeps tab changes in the URL", async () => {

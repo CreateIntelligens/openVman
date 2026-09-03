@@ -11,6 +11,7 @@ from .database import AuthDatabase
 from .repositories import (
     AccountAccessRepository,
     AuthAuditRepository,
+    EmbedKeyRepository,
     ResourceRepository,
     TemporaryAccountRepository,
     UserRepository,
@@ -27,6 +28,7 @@ class AuthRuntime:
     account_access: AccountAccessRepository
     auth_audit: AuthAuditRepository
     temporary_accounts: TemporaryAccountRepository
+    embed_keys: EmbedKeyRepository
     tokens: SessionTokenService
 
 
@@ -47,6 +49,7 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
         account_access=AccountAccessRepository(database),
         auth_audit=AuthAuditRepository(database),
         temporary_accounts=TemporaryAccountRepository(database),
+        embed_keys=EmbedKeyRepository(database),
         tokens=tokens,
     )
 

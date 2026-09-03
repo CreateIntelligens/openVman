@@ -21,17 +21,17 @@
 
 ## 4. Embed Key Principal
 
-- [ ] 4.1 Add `embed_keys` and `embed_key_daily_usage` tables through the auth database migration mechanism with a repository for create, get, list, update, delete, touch, and daily counting
-- [ ] 4.2 Add `AccountType.EMBED`, `AuthTransport.EMBED_KEY`, and `CurrentAccount.embed_key`; authenticate `X-Embed-Key` in the middleware ahead of cookie and bearer credentials
-- [ ] 4.3 Enforce the route allowlist, project binding, character restriction, origin allowlist, sliding-window rate limit, and daily quota with 401/403/429 responses
-- [ ] 4.4 Emit CORS headers and handle preflights only for embed principals on allowlisted paths
-- [ ] 4.5 Forward principal type and id to Brain on trusted headers and record them in the usage ledger; expose `principal_type` filtering in usage summary
-- [ ] 4.6 Add tests covering every scenario in the embed-key-principal spec
+- [x] 4.1 Add `embed_keys` and `embed_key_daily_usage` tables through the auth database migration mechanism with a repository for create, get, list, update, delete, touch, and daily counting
+- [x] 4.2 Add `AccountType.EMBED`, `AuthTransport.EMBED_KEY`, and `CurrentAccount.embed_key`; authenticate `X-Embed-Key` in the middleware ahead of cookie and bearer credentials
+- [x] 4.3 Enforce the route allowlist, project binding, character restriction, origin allowlist, sliding-window rate limit, and daily quota with 401/403/429 responses
+- [x] 4.4 Emit CORS headers and handle preflights only for embed principals on allowlisted paths
+- [x] 4.5 Forward principal type and id to Brain on trusted headers and record them in the usage ledger; expose `principal_type` filtering in usage summary
+- [x] 4.6 Add tests covering every scenario in the embed-key-principal spec
 
 ## 5. Embed Key Management
 
-- [ ] 5.1 Add administrator endpoints `GET/POST /api/v1/embed-keys` and `PATCH/DELETE /api/v1/embed-keys/{key_id}` with validation for origins, project existence, and limits, plus tests
-- [ ] 5.2 Add the Admin "Embed Keys" page, navigation entry, `api/embedKeys.ts`, and vitest coverage for list, create, edit, disable, and delete
+- [x] 5.1 Add administrator endpoints `GET/POST /api/v1/embed-keys` and `PATCH/DELETE /api/v1/embed-keys/{key_id}` with validation for origins, project existence, and limits, plus tests
+- [x] 5.2 Add the Admin "Embed Keys" page, navigation entry, `api/embedKeys.ts`, and vitest coverage for list, create, edit, disable, and delete
 
 ## 6. SDK Conversation
 

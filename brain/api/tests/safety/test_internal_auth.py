@@ -40,8 +40,25 @@ def test_trusted_context_returns_verified_identity() -> None:
         "project-1",
     )
 
+    # 未帶主體標頭時退回帳號主體，帳本欄位才不會是空字串。
     assert context == internal_auth.TrustedRequestContext(
         user_id="user-1",
         role="user",
         project_id="project-1",
+        principal_type="user",
+        principal_id="user-1",
     )
+
+
+def test_trusted_context_keeps_an_embed_principal() -> None:
+    context = internal_auth.trusted_request_context(
+        "internal-secret",
+        "embed:ovk_abc",
+        "user",
+        "project-1",
+        "embed_key",
+        "ovk_abc",
+    )
+
+    assert context.principal_type == "embed_key"
+    assert context.principal_id == "ovk_abc"

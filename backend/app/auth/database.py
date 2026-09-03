@@ -140,6 +140,43 @@ _ACCOUNT_DEFAULTS_MASCOT_BACKGROUND_STATEMENTS = (
     """,
 )
 
+_EMBED_KEY_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS embed_keys (
+        key_id TEXT PRIMARY KEY,
+        label TEXT NOT NULL DEFAULT '',
+        project_id TEXT NOT NULL,
+        allowed_origins_json TEXT NOT NULL DEFAULT '[]',
+        default_character_id TEXT NOT NULL DEFAULT '',
+        allowed_character_ids_json TEXT NOT NULL DEFAULT '[]',
+        default_persona_id TEXT NOT NULL DEFAULT '',
+        default_tts_provider TEXT NOT NULL DEFAULT '',
+        default_tts_voice TEXT NOT NULL DEFAULT '',
+        rate_limit_per_minute INTEGER NOT NULL DEFAULT 60
+            CHECK (rate_limit_per_minute >= 1),
+        daily_request_quota INTEGER NOT NULL DEFAULT 1000
+            CHECK (daily_request_quota >= 1),
+        disabled INTEGER NOT NULL DEFAULT 0 CHECK (disabled IN (0, 1)),
+        created_by TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_used_at TEXT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_embed_keys_project
+    ON embed_keys(project_id, disabled)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS embed_key_daily_usage (
+        key_id TEXT NOT NULL REFERENCES embed_keys(key_id) ON DELETE CASCADE,
+        day TEXT NOT NULL,
+        requests INTEGER NOT NULL DEFAULT 0 CHECK (requests >= 0),
+        PRIMARY KEY (key_id, day)
+    )
+    """,
+)
+
 _ROOT_ACCOUNT_SCHEMA_VERSION = 4
 _ROOT_ACCOUNT_MIGRATION_NAME = "root_account_role_and_auth_audit"
 # v5 的 WHERE 條件拿小寫化的 username_normalized 去比對保留原始大小寫的
@@ -148,6 +185,8 @@ _TEMPORARY_USERNAME_SCHEMA_VERSION = 6
 _TEMPORARY_USERNAME_MIGRATION_NAME = "redact_temporary_credential_locators_v2"
 _ADMIN_PORTAL_ACCESS_SCHEMA_VERSION = 7
 _ADMIN_PORTAL_ACCESS_MIGRATION_NAME = "add_admin_portal_access"
+_EMBED_KEY_SCHEMA_VERSION = 8
+_EMBED_KEY_MIGRATION_NAME = "embed_keys_and_daily_usage"
 
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
@@ -157,6 +196,7 @@ _MIGRATIONS = (
         "account_defaults_mascot_and_background",
         _ACCOUNT_DEFAULTS_MASCOT_BACKGROUND_STATEMENTS,
     ),
+    (_EMBED_KEY_SCHEMA_VERSION, _EMBED_KEY_MIGRATION_NAME, _EMBED_KEY_STATEMENTS),
 )
 
 

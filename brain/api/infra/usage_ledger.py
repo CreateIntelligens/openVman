@@ -25,6 +25,7 @@ _GROUP_COLUMNS = {
     "project": ("project_id",),
     "kind": ("kind",),
     "session": ("session_id",),
+    "principal": ("principal_type", "principal_id"),
 }
 _TOKEN_COLUMNS = (
     "input_tokens",
@@ -41,6 +42,8 @@ CREATE TABLE IF NOT EXISTS usage_events (
     kind TEXT NOT NULL DEFAULT 'chat',
     user_id TEXT NOT NULL DEFAULT '',
     role TEXT NOT NULL DEFAULT '',
+    principal_type TEXT NOT NULL DEFAULT '',
+    principal_id TEXT NOT NULL DEFAULT '',
     project_id TEXT NOT NULL DEFAULT 'default',
     session_id TEXT NOT NULL DEFAULT '',
     persona_id TEXT NOT NULL DEFAULT 'default',
@@ -60,6 +63,29 @@ CREATE INDEX IF NOT EXISTS idx_usage_user_created ON usage_events(user_id, creat
 CREATE INDEX IF NOT EXISTS idx_usage_project_created ON usage_events(project_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_usage_trace ON usage_events(trace_id);
 """
+
+_PRINCIPAL_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_usage_principal
+ON usage_events(principal_type, principal_id, created_at)
+"""
+
+# 既有帳本用 CREATE TABLE IF NOT EXISTS 建過了，新欄位只能靠 ALTER 補。
+_ADDED_COLUMNS = (
+    ("principal_type", "TEXT NOT NULL DEFAULT ''"),
+    ("principal_id", "TEXT NOT NULL DEFAULT ''"),
+)
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    existing = {
+        str(row["name"])
+        for row in conn.execute("PRAGMA table_info(usage_events)").fetchall()
+    }
+    for column, definition in _ADDED_COLUMNS:
+        if column not in existing:
+            conn.execute(
+                f"ALTER TABLE usage_events ADD COLUMN {column} {definition}"
+            )
 
 
 def get_usage_db_path() -> Path:
@@ -83,6 +109,8 @@ def _connect() -> sqlite3.Connection:
     key = str(path)
     if key not in _INITIALIZED:
         conn.executescript(_SCHEMA)
+        _add_missing_columns(conn)
+        conn.execute(_PRINCIPAL_INDEX)
         _INITIALIZED.add(key)
     return conn
 
@@ -112,6 +140,8 @@ def record_usage_event(
         "kind": kind or (scope.kind if scope else "background"),
         "user_id": scope.user_id if scope else "",
         "role": scope.role if scope else "",
+        "principal_type": scope.principal_type if scope else "",
+        "principal_id": scope.principal_id if scope else "",
         "project_id": scope.project_id if scope else "default",
         "session_id": scope.session_id if scope else "",
         "persona_id": scope.persona_id if scope else "default",
@@ -146,6 +176,8 @@ def record_usage_event(
 def _build_filters(
     *,
     user_id: str = "",
+    principal_type: str = "",
+    principal_id: str = "",
     project_id: str = "",
     session_id: str = "",
     trace_id: str = "",
@@ -157,6 +189,8 @@ def _build_filters(
     params: dict[str, Any] = {}
     for column, value in (
         ("user_id", user_id),
+        ("principal_type", principal_type),
+        ("principal_id", principal_id),
         ("project_id", project_id),
         ("session_id", session_id),
         ("trace_id", trace_id),

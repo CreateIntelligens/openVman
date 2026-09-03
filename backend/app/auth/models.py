@@ -48,6 +48,9 @@ ADMIN_OR_ABOVE_VALUES = tuple(
 class AccountType(StrEnum):
     FORMAL = "formal"
     TEMPORARY = "temporary"
+    # Embed 主體不是資料庫裡的帳號，只在請求期間由 embed key 合成，
+    # 所以 users 表的 CHECK 約束刻意不含這個值。
+    EMBED = "embed"
 
 
 class ResourceVisibility(StrEnum):
@@ -125,6 +128,41 @@ class TemporaryBatchRecord:
     created_by: str | None
     created_at: str
     revoked_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class EmbedKeyRecord:
+    key_id: str
+    label: str
+    project_id: str
+    allowed_origins: tuple[str, ...]
+    default_character_id: str
+    allowed_character_ids: tuple[str, ...]
+    default_persona_id: str
+    default_tts_provider: str
+    default_tts_voice: str
+    rate_limit_per_minute: int
+    daily_request_quota: int
+    disabled: bool
+    created_by: str | None
+    created_at: str
+    updated_at: str
+    last_used_at: str | None
+
+    def allows_origin(self, origin: str) -> bool:
+        """Match the exact `scheme://host[:port]` string, case-insensitively."""
+        candidate = origin.strip().casefold()
+        if not candidate:
+            return False
+        return any(allowed.casefold() == candidate for allowed in self.allowed_origins)
+
+    def allows_character(self, character_id: str) -> bool:
+        candidate = character_id.strip()
+        if not candidate:
+            return False
+        return candidate == self.default_character_id or (
+            candidate in self.allowed_character_ids
+        )
 
 
 @dataclass(frozen=True, slots=True)

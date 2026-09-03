@@ -20,6 +20,8 @@ router = APIRouter(
 async def usage_summary(
     group_by: str = Query("model"),
     user_id: str = "",
+    principal_type: str = "",
+    principal_id: str = "",
     project_id: str = "",
     session_id: str = "",
     kind: str = "",
@@ -30,6 +32,8 @@ async def usage_summary(
         return summarize_usage(
             group_by=group_by,
             user_id=user_id,
+            principal_type=principal_type,
+            principal_id=principal_id,
             project_id=project_id,
             session_id=session_id,
             kind=kind,
@@ -44,6 +48,8 @@ async def usage_summary(
 async def usage_events(
     limit: int = Query(100, ge=1, le=1000),
     user_id: str = "",
+    principal_type: str = "",
+    principal_id: str = "",
     project_id: str = "",
     session_id: str = "",
     trace_id: str = "",
@@ -54,6 +60,8 @@ async def usage_events(
     events = list_usage_events(
         limit=limit,
         user_id=user_id,
+        principal_type=principal_type,
+        principal_id=principal_id,
         project_id=project_id,
         session_id=session_id,
         trace_id=trace_id,

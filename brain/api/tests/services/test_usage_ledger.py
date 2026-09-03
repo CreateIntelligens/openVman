@@ -113,3 +113,85 @@ def test_summary_groups_and_filters(ledger):
 def test_ledger_write_failure_does_not_raise(ledger, monkeypatch):
     monkeypatch.setattr(ledger, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("disk")))
     assert ledger.record_usage_event(provider="g", model="m", usage=LLMUsage(1, 1, 2)) is None
+
+
+def test_embed_principal_lands_in_the_ledger_row(ledger):
+    with usage_scope(
+        kind="chat",
+        user_id="embed:ovk_abc",
+        project_id="p1",
+        principal_type="embed_key",
+        principal_id="ovk_abc",
+    ):
+        ledger.record_usage_event(
+            provider="openai", model="gpt", usage=LLMUsage(1, 2, 3),
+        )
+
+    events = ledger.list_usage_events(limit=10)
+    assert events[0]["principal_type"] == "embed_key"
+    assert events[0]["principal_id"] == "ovk_abc"
+
+
+def test_ledger_filters_and_groups_by_principal(ledger):
+    with usage_scope(principal_type="embed_key", principal_id="ovk_a", project_id="p"):
+        ledger.record_usage_event(provider="o", model="m", usage=LLMUsage(1, 1, 2))
+    with usage_scope(principal_type="user", principal_id="u1", project_id="p"):
+        ledger.record_usage_event(provider="o", model="m", usage=LLMUsage(5, 5, 10))
+
+    only_embed = ledger.summarize_usage(
+        group_by="principal", principal_type="embed_key",
+    )
+    assert only_embed["totals"]["total_tokens"] == 2
+    assert only_embed["groups"][0]["principal_id"] == "ovk_a"
+
+    filtered_events = ledger.list_usage_events(limit=10, principal_id="u1")
+    assert len(filtered_events) == 1
+    assert filtered_events[0]["principal_id"] == "u1"
+
+
+def test_ledger_adds_principal_columns_to_a_pre_existing_table(tmp_path):
+    """既有帳本是用舊 schema 建的，新欄位必須靠 ALTER 補上。"""
+    import sqlite3
+
+    path = tmp_path / "legacy.db"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        CREATE TABLE usage_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'chat',
+            user_id TEXT NOT NULL DEFAULT '',
+            role TEXT NOT NULL DEFAULT '',
+            project_id TEXT NOT NULL DEFAULT 'default',
+            session_id TEXT NOT NULL DEFAULT '',
+            persona_id TEXT NOT NULL DEFAULT 'default',
+            trace_id TEXT NOT NULL DEFAULT '',
+            channel TEXT NOT NULL DEFAULT '',
+            provider TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL DEFAULT '',
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0,
+            total_tokens INTEGER NOT NULL DEFAULT 0,
+            cached_tokens INTEGER NOT NULL DEFAULT 0,
+            reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+            latency_ms REAL NOT NULL DEFAULT 0,
+            raw TEXT
+        );
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    usage_ledger.set_usage_db_path(path)
+    try:
+        with usage_scope(principal_type="embed_key", principal_id="ovk_x"):
+            usage_ledger.record_usage_event(
+                provider="o", model="m", usage=LLMUsage(1, 1, 2),
+            )
+        events = usage_ledger.list_usage_events(limit=5)
+    finally:
+        usage_ledger.set_usage_db_path(None)
+
+    assert events[0]["principal_type"] == "embed_key"
+    assert events[0]["principal_id"] == "ovk_x"

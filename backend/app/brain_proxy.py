@@ -16,6 +16,7 @@ from app.auth.dependencies import (
     authenticate_request,
     get_current_account,
 )
+from app.auth.embed import enforce_project_binding
 from app.auth.models import ResourceType
 from app.auth.resources import (
     ResourceAccess,
@@ -114,6 +115,13 @@ _OPENVMAN_HEADER_PREFIX = "x-openvman-"
 _USER_ID_HEADER = "X-OpenVMan-User-ID"
 _USER_ROLE_HEADER = "X-OpenVMan-Role"
 _PROJECT_ID_HEADER = "X-OpenVMan-Project-ID"
+_PRINCIPAL_TYPE_HEADER = "X-Principal-Type"
+_PRINCIPAL_ID_HEADER = "X-Principal-Id"
+_PRINCIPAL_HEADERS = frozenset(
+    {_PRINCIPAL_TYPE_HEADER.lower(), _PRINCIPAL_ID_HEADER.lower()}
+)
+_EMBED_PRINCIPAL_TYPE = "embed_key"
+_SESSION_PRINCIPAL_TYPE = "user"
 _END_USER_AUTH_HEADERS = frozenset({"authorization", "cookie"})
 _PROJECT_SCOPED_PREFIXES = (
     "chat",
@@ -157,6 +165,9 @@ def _filter_external_request_headers(
         and key.lower() not in _END_USER_AUTH_HEADERS
         and key.lower() != _INTERNAL_TOKEN_HEADER.lower()
         and not key.lower().startswith(_OPENVMAN_HEADER_PREFIX)
+        # 主體標頭只由這一層產生；照抄上游帶進來的那份等於讓呼叫端
+        # 自稱是任意 embed key。
+        and key.lower() not in _PRINCIPAL_HEADERS
     }
 
 
@@ -225,6 +236,16 @@ async def _authorize_project_context(
     if current is None or not _requires_project_context(path):
         return explicit_project_id
 
+    if current.embed_key is not None:
+        # Embed key 沒有資源授權，專案由金鑰本身綁定；client 自帶不同的
+        # project_id 一律 403，不能靜默改用金鑰的專案。
+        enforce_project_binding(
+            current.embed_key,
+            await _request_project_id(request) or "",
+        )
+        request.state.resolved_project_id = current.embed_key.project_id
+        return current.embed_key.project_id
+
     supplied_project_id = await _request_project_id(request)
     resolved_project_id = explicit_project_id or supplied_project_id
     if (
@@ -261,6 +282,12 @@ def _trusted_upstream_headers(
 
     headers[_USER_ID_HEADER] = current.user.id
     headers[_USER_ROLE_HEADER] = current.user.role.value
+    if current.embed_key is not None:
+        headers[_PRINCIPAL_TYPE_HEADER] = _EMBED_PRINCIPAL_TYPE
+        headers[_PRINCIPAL_ID_HEADER] = current.embed_key.key_id
+    else:
+        headers[_PRINCIPAL_TYPE_HEADER] = _SESSION_PRINCIPAL_TYPE
+        headers[_PRINCIPAL_ID_HEADER] = current.user.id
     resolved_project_id = project_id or _resolved_project_id(request)
     if resolved_project_id:
         headers[_PROJECT_ID_HEADER] = resolved_project_id

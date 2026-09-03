@@ -316,6 +316,46 @@ def _not_found() -> HTTPException:
     return HTTPException(status_code=404, detail=_RESOURCE_NOT_FOUND)
 
 
+def _resolve_embed_tts_voice(
+    current: CurrentAccount,
+    runtime: AuthRuntime,
+    requested_provider: str,
+    requested_voice: str,
+) -> AuthorizedVoice | None:
+    """Fall back to the key's default voice, and refuse anything else.
+
+    Embed 金鑰沒有帳號層的授權資料，發音人只能是金鑰上設定的那一個；
+    請求指定了別的 provider/voice 就當作查無資源。
+    """
+    key = current.embed_key
+    assert key is not None
+    provider = requested_provider or key.default_tts_provider
+    voice_id = requested_voice or key.default_tts_voice
+    if not voice_id or not provider:
+        # 金鑰沒設預設音色時不擋，交由下游服務用自己的預設值合成。
+        return None
+    if key.default_tts_provider and provider != key.default_tts_provider:
+        raise _not_found()
+    if key.default_tts_voice and voice_id != key.default_tts_voice:
+        raise _not_found()
+
+    record = runtime.resources.get(ResourceType.CUSTOM_VOICE, voice_id)
+    if record is None:
+        raise _not_found()
+    metadata = _voice_metadata(record)
+    registered_provider = _metadata_string(metadata, "provider")
+    if registered_provider and provider != registered_provider:
+        raise _not_found()
+    runtime_key = _metadata_string(metadata, "runtime_key") or record.resource_id
+    cache_owner = record.owner_user_id or "system"
+    return AuthorizedVoice(
+        provider=registered_provider or provider,
+        resource_id=record.resource_id,
+        runtime_key=runtime_key,
+        cache_scope=f"{cache_owner}:{record.resource_id}",
+    )
+
+
 def resolve_tts_voice(
     current: CurrentAccount,
     runtime: AuthRuntime,
@@ -331,6 +371,9 @@ def resolve_tts_voice(
     provider = requested_provider.strip()
     voice_id = requested_voice.strip()
     defaults = None
+
+    if current.embed_key is not None:
+        return _resolve_embed_tts_voice(current, runtime, provider, voice_id)
 
     is_unrestricted_admin = (
         current.user.account_type is AccountType.FORMAL
@@ -382,6 +425,24 @@ def resolve_tts_voice(
         runtime_key=runtime_key,
         cache_scope=f"{cache_owner}:{record.resource_id}",
     )
+
+
+def _embed_tts_providers(current: CurrentAccount) -> list[dict[str, object]]:
+    """An embed key may only see the single provider and voice it carries."""
+    key = current.embed_key
+    if key is None or not key.default_tts_provider:
+        return []
+    return [
+        {
+            "id": key.default_tts_provider,
+            "name": _PROVIDER_NAMES.get(
+                key.default_tts_provider,
+                key.default_tts_provider,
+            ),
+            "default_voice": key.default_tts_voice,
+            "voices": [key.default_tts_voice] if key.default_tts_voice else [],
+        }
+    ]
 
 
 def _scoped_tts_providers(
@@ -444,6 +505,8 @@ _USAGE_QUERY_KEYS: dict[UsageEndpoint, frozenset[str]] = {
     "summary": frozenset({
         "group_by",
         "user_id",
+        "principal_type",
+        "principal_id",
         "project_id",
         "session_id",
         "kind",
@@ -453,6 +516,8 @@ _USAGE_QUERY_KEYS: dict[UsageEndpoint, frozenset[str]] = {
     "events": frozenset({
         "limit",
         "user_id",
+        "principal_type",
+        "principal_id",
         "project_id",
         "session_id",
         "trace_id",
@@ -532,6 +597,8 @@ async def get_tts_providers(
     current: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> JSONResponse:
+    if current.embed_key is not None:
+        return JSONResponse(content=_embed_tts_providers(current))
     if not (
         current.user.account_type is AccountType.FORMAL
         and is_at_least_admin(current.user.role)
