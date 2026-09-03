@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# 同一分支只建最新的 commit：連續 push 讓多個 run 同時寫同一個 GHA 快取 scope，
+# 會互相覆蓋而出現 "cache entry no longer exists"，而且舊 commit 的映像也沒人要。
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     name: ${{ matrix.image }} (${{ matrix.platforms }})
@@ -70,4 +76,5 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          # 快取匯出失敗（配額輪替、並行覆蓋）不該讓已建好的映像推送失敗。
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }},ignore-error=true
