@@ -1,5 +1,7 @@
 .antigravitycli/*.json
 .claude/settings.local.json
+.claude/skills/security-audit
+.kilocode/skills/security-audit
 bug-report/
 .superpowers/
 # 環境變數（含 API Key，絕對不進 git）
