@@ -209,6 +209,12 @@ def _run_tool_phase(
         else tools
     )
     empty_reply_retried = False
+    # 第一輪之後只准追加有限輪工具，超過就收掉工具逼模型作答。
+    answer_only_from = (
+        1 + max(0, int(getattr(cfg, "chat_max_followup_tool_rounds", 1)))
+        if first_forced == REQUIRE_ANY_TOOL
+        else None
+    )
 
     last_user_message = next(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
@@ -217,7 +223,12 @@ def _run_tool_phase(
     with bind_tool_context(persona_id, project_id, user_message=last_user_message):
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             current_forced = first_forced if iteration == 0 else None
-            current_tools = tools if iteration == 0 else (later_tools or None)
+            if iteration == 0:
+                current_tools = tools
+            elif answer_only_from is not None and iteration >= answer_only_from:
+                current_tools = None
+            else:
+                current_tools = later_tools or None
             # stream_chat_turn 只是把 provider 串流即時消化成完整 LLMReply（沒有 token
             # 外送給用戶端），所以串流純粹是 TTFB 最佳化：強制搜尋那一回合只會吐
             # tool_call，不需要串流；之後每一回合都可能是長文答案，都串流。

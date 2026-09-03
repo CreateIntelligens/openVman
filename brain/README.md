@@ -356,6 +356,7 @@ user input
 
 - `CHAT_FORCE_KNOWLEDGE_SEARCH`（預設 `true`）：第一次呼叫必須使用工具（`tool_choice=required`），模型一次決定要查哪些；沒叫 `search_knowledge` 會自動補上，知識庫與網路在同一輪平行查。
   只在該工具真的註冊給當前 persona/project 時生效；slash command 指定的工具永遠優先。
+- `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`（預設 `1`）：第一輪之後最多再追加幾輪工具，超過就收掉工具逼模型作答；一般問題兩次呼叫、最壞三次。
 - `CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`（預設 `true`）：查完知識庫後的回合拿掉 `search_knowledge`，其他工具（`search_web`、wiki、技能）照常可用，所以問天氣仍會上網查；回合數仍受 `AGENT_LOOP_MAX_ROUNDS` 限制。
 
 兩者都關閉即退回舊的 `tool_choice=auto` 多輪行為。若 provider 忽略強制設定直接回文字，

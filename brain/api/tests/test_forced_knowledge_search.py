@@ -84,6 +84,7 @@ def _install_loop_stubs(
     fake_cfg.chat_force_knowledge_search = force
     fake_cfg.chat_answer_pass_excludes_knowledge_search = exclude_knowledge
     fake_cfg.forced_tool_model_override = ""
+    fake_cfg.chat_max_followup_tool_rounds = 1
     fake_cfg.forced_tool_max_tokens = 200
     monkeypatch.setattr(agent_loop, "get_settings", lambda: fake_cfg)
 
@@ -623,3 +624,32 @@ def test_build_create_kwargs_maps_the_sentinel_to_required():
     assert kwargs["tool_choice"] == "required"
     named = llm_client._build_create_kwargs([_SEARCH_TOOL_SPEC], forced_tool_name="search_knowledge")
     assert named["tool_choice"] == {"type": "function", "function": {"name": "search_knowledge"}}
+
+
+class TestFollowupRoundCap:
+    def test_tools_are_withdrawn_after_the_allowed_followup_round(self, monkeypatch: pytest.MonkeyPatch):
+        """第一輪查完後只准再追加一輪；模型還想查，第三輪就沒有工具可用。"""
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC]
+        )
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            stream_reply=[
+                _tool_turn(agent_loop, name="search_web"),
+                agent_loop.LLMReply(content="答案", tool_calls=[], model="m1"),
+            ],
+            generate_reply=[_tool_turn(agent_loop)],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "好市多地址？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "答案"
+        assert len(calls) == 3
+        assert calls[1]["tools"] == [_WEB_TOOL_SPEC]
+        assert calls[2]["tools"] is None

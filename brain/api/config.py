@@ -156,6 +156,9 @@ class BrainSettings(BaseSettings):
     # 強制查完知識庫後的回合不再提供 search_knowledge（避免重複翻書），
     # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
     chat_answer_pass_excludes_knowledge_search: bool = True
+    # 第一輪平行查完後，最多再允許幾輪追加工具（例如補查一次網路或讀一頁），
+    # 之後不帶工具只能作答；避免模型一輪一查拖到七、八次呼叫。
+    chat_max_followup_tool_rounds: int = 1
     # 多條查詢（AI 改寫 + 原句）RRF 融合後最多餵給模型幾個片段；
     # 若只依單一查詢的 top_k 截斷，多查詢等於白查。
     knowledge_search_merge_limit: int = 5
