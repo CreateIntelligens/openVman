@@ -2,16 +2,19 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { fetchAvatarMascots } from "../api/avatar";
 import {
   DEFAULT_MASCOT_ID,
   FALLBACK_MASCOT_CATALOG,
   type MascotOption,
   readStoredMascotId,
+  toMascotOption,
   writeStoredMascotId,
 } from "../data/mascotCatalog";
 
@@ -65,6 +68,27 @@ export function MascotProvider({
       initialOptions?.length ? initialOptions : FALLBACK_MASCOT_CATALOG,
     ),
   );
+
+  // 右下角小助理在每個頁面都會出現，清單不能只靠 Avatar 頁載入；
+  // 這裡一掛載就向後端拿（含自動衍生的影片角色與上傳的 VRM），失敗就維持內建三個。
+  const hasInitialOptions = Boolean(initialOptions?.length);
+  useEffect(() => {
+    if (hasInitialOptions) return;
+    let cancelled = false;
+    fetchAvatarMascots()
+      .then((res) => {
+        if (cancelled) return;
+        const loaded = res.mascots.map(toMascotOption);
+        if (loaded.length === 0) return;
+        setMascotOptionsState(loaded);
+        // 先前存的選擇可能是後端才有的項目，要用完整清單重新解析
+        setSelectedMascotIdState(readStoredMascotId(loaded));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [hasInitialOptions]);
 
   const driveMouth = useCallback((volume: number) => {
     driverRef.current?.driveMouth(volume);
