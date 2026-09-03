@@ -130,16 +130,28 @@ def usage_scope(**fields: Any) -> Iterator[UsageScope]:
 def summarize_collected(scope: UsageScope) -> dict[str, Any]:
     """Aggregate the events collected in one scope for the API response."""
     totals = LLMUsage().as_dict()
-    by_model: dict[str, dict[str, int]] = {}
+    by_model: dict[str, dict[str, float]] = {}
+    # 回合裡 LLM 花的時間要跟工具時間一起讓前端看得到，否則計時器多出的秒數像憑空冒出。
+    latency_ms = 0.0
     for event in scope.collected:
         usage = {
             name: int(event.get(name, 0) or 0)
             for name in _TOKEN_FIELDS
         }
+        event_latency = float(event.get("latency_ms", 0) or 0)
+        latency_ms += event_latency
         key = f"{event.get('provider', '')}/{event.get('model', '')}"
-        bucket = by_model.setdefault(key, {"calls": 0, **LLMUsage().as_dict()})
+        bucket = by_model.setdefault(
+            key, {"calls": 0, "latency_ms": 0.0, **LLMUsage().as_dict()}
+        )
         bucket["calls"] += 1
+        bucket["latency_ms"] = round(bucket["latency_ms"] + event_latency, 2)
         for name, value in usage.items():
             totals[name] += value
             bucket[name] += value
-    return {"calls": len(scope.collected), **totals, "by_model": by_model}
+    return {
+        "calls": len(scope.collected),
+        "latency_ms": round(latency_ms, 2),
+        **totals,
+        "by_model": by_model,
+    }

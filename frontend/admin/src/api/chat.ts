@@ -1,5 +1,12 @@
 import { fetchJson, apiUrl, projectUrl, getActiveProjectId } from "./common";
 
+/** Brain 在單一回合裡的 LLM 呼叫彙總；latency_ms 是所有呼叫加總。 */
+export interface ChatUsageSummary {
+  calls: number;
+  latency_ms?: number;
+  total_tokens?: number;
+}
+
 export interface RetrievalResult {
   text: string;
   source: string;
@@ -45,6 +52,7 @@ export interface ChatMessage {
   privacy_warning?: PiiWarningSummary;
   tool_steps?: ToolStep[];
   response_time_s?: number;
+  usage?: ChatUsageSummary;
   citations?: Citation[];
   image_id?: string;
   url?: string;
@@ -78,6 +86,7 @@ export interface ChatResponse {
   memory_results?: RetrievalResult[];
   history: ChatMessage[];
   tool_steps?: ToolStep[];
+  usage?: ChatUsageSummary;
   pii_pending?: boolean;
   citations?: Citation[];
   image_id?: string;

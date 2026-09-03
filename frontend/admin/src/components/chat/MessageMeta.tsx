@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import type { ToolStep, RetrievalResult } from "../../api";
+import type { ChatUsageSummary, ToolStep, RetrievalResult } from "../../api";
 
 const TOOL_LABELS: Record<string, string> = {
   search_memory: "記憶",
@@ -93,10 +93,12 @@ export default function MessageMeta({
   toolSteps,
   sources,
   responseTimeS,
+  usage,
 }: {
   toolSteps?: ToolStep[];
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
   responseTimeS?: number;
+  usage?: ChatUsageSummary;
 }) {
   const [refsOpen, setRefsOpen] = useState(false);
   const toggleRefs = useCallback(() => setRefsOpen((v) => !v), []);
@@ -110,8 +112,10 @@ export default function MessageMeta({
   const memorySources = sources?.memory ?? [];
   const extraCitations = [...knowledgeSources, ...memorySources];
   const hasTiming = responseTimeS != null;
+  const llmCalls = usage?.calls ?? 0;
+  const llmSeconds = usage?.latency_ms != null ? (usage.latency_ms / 1000).toFixed(2) : null;
 
-  if (!hasTools && extraCitations.length === 0 && !hasTiming) return null;
+  if (!hasTools && extraCitations.length === 0 && !hasTiming && llmCalls === 0) return null;
 
   return (
     <div className="mt-2 text-xs text-content-subtle space-y-1.5">
@@ -146,8 +150,15 @@ export default function MessageMeta({
             ))}
           </>
         )}
+        {llmCalls > 0 && (
+          <span className="inline-flex items-center gap-1" title="這一輪呼叫模型的次數與合計時間">
+            <span className="material-symbols-outlined text-[0.6875rem]">smart_toy</span>
+            LLM ×{llmCalls}
+            {llmSeconds != null && <span className="opacity-40">{llmSeconds}s</span>}
+          </span>
+        )}
         {hasTiming && (
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1" title="從送出到收到回覆的總時間">
             <span className="material-symbols-outlined text-[0.6875rem]">timer</span>
             {responseTimeS}s
           </span>

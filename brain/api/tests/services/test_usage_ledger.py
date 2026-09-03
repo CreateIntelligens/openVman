@@ -72,6 +72,8 @@ def test_record_event_uses_scope_and_collects(ledger):
     assert summary["input_tokens"] == 30
     assert summary["total_tokens"] == 40
     assert summary["by_model"]["gemini/flash"]["calls"] == 2
+    assert summary["latency_ms"] == 20.5
+    assert summary["by_model"]["gemini/flash"]["latency_ms"] == 20.5
 
     events = ledger.list_usage_events(trace_id="t1")
     assert len(events) == 2

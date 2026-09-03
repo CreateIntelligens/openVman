@@ -1,4 +1,4 @@
-import type { ActionRequest, ChatMessage as ChatMessageType, PiiWarningSummary, RetrievalResult, ToolStep } from "../../api";
+import type { ActionRequest, ChatMessage as ChatMessageType, PiiWarningSummary, RetrievalResult, ToolStep, ChatUsageSummary } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
 import SourceChips from "./SourceChips";
 import ActionRequestCard from "./ActionRequestCard";
@@ -14,6 +14,7 @@ type RenderableChatMessage = Pick<
   sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
   action_requests?: ActionRequest[];
   privacy_warning?: PiiWarningSummary;
+  usage?: ChatUsageSummary;
   tool_steps?: ToolStep[];
   response_time_s?: number;
 };
@@ -167,6 +168,7 @@ export default function ChatMessage({
           toolSteps={message.tool_steps}
           sources={message.sources}
           responseTimeS={message.response_time_s}
+          usage={message.usage}
         />
       )}
     </article>

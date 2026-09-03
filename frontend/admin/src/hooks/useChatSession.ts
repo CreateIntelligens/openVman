@@ -35,6 +35,7 @@ type ChatResultPayload = {
   history?: ChatMessageType[];
   tool_steps?: import("../api/chat").ToolStep[];
   response_time_s?: number;
+  usage?: import("../api/chat").ChatUsageSummary;
   pii_pending?: boolean;
   citations?: Citation[];
   image_id?: string;
@@ -98,8 +99,8 @@ function applyChatResultToMessages(
       }
 
       history[index] = pendingActions
-        ? { ...message, ...media, sources, action_requests: pendingActions, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
-        : { ...message, ...media, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s };
+        ? { ...message, ...media, sources, action_requests: pendingActions, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s, usage: payload.usage }
+        : { ...message, ...media, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s, usage: payload.usage };
       break;
     }
     return history;
@@ -111,7 +112,7 @@ function applyChatResultToMessages(
 
   return current.map((message, index) => (
     index === current.length - 1 && message.role === "assistant"
-      ? { ...message, ...media, content: payload.reply, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s }
+      ? { ...message, ...media, content: payload.reply, sources, tool_steps: payload.tool_steps, response_time_s: payload.response_time_s, usage: payload.usage }
       : message
   ));
 }
