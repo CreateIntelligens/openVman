@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import contextvars
+import dataclasses
+import json
 import logging
 import re
 import time
@@ -11,7 +13,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from config import get_settings
-from core.llm_client import LLMReply, LLMToolCall, generate_chat_turn, stream_chat_turn
+from core.llm_client import (
+    LLMReply,
+    LLMToolCall,
+    REQUIRE_ANY_TOOL,
+    generate_chat_turn,
+    stream_chat_turn,
+)
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
 
@@ -130,11 +138,13 @@ def _resolve_forced_first_tool(
     forced_tool_name: str | None,
     allow_forced_knowledge_search: bool,
 ) -> str | None:
-    """Decide which tool (if any) the first LLM call must call.
+    """Decide the tool_choice for the first LLM call.
 
-    A slash-command forced tool always wins. Otherwise, an ordinary user turn
-    is pinned to search_knowledge so the model cannot answer from memory —
-    but only when the tool is actually registered for this persona/project.
+    A slash-command forced tool always wins. Otherwise an ordinary user turn
+    must use tools (``REQUIRE_ANY_TOOL``): the model decides in one shot which
+    searches it needs — search_knowledge is added automatically if it leaves it
+    out — so knowledge base and web run in the same parallel round instead of
+    one after the other. Only when search_knowledge is registered.
     """
     if forced_tool_name:
         return forced_tool_name
@@ -144,8 +154,24 @@ def _resolve_forced_first_tool(
         tool.get("function", {}).get("name") == KNOWLEDGE_SEARCH_TOOL
         for tool in tools
     ):
-        return KNOWLEDGE_SEARCH_TOOL
+        return REQUIRE_ANY_TOOL
     return None
+
+
+def _ensure_knowledge_search(turn: LLMReply, user_message: str) -> LLMReply:
+    """Add a search_knowledge call with the raw user message when the model skipped it.
+
+    第一輪必須查知識庫；模型只叫了 search_web 時補一筆，跟其他工具同一輪平行跑。
+    """
+    if any(call.name == KNOWLEDGE_SEARCH_TOOL for call in turn.tool_calls):
+        return turn
+    synthetic = LLMToolCall(
+        id="auto-search-knowledge",
+        name=KNOWLEDGE_SEARCH_TOOL,
+        arguments=json.dumps({"queries": [user_message]}, ensure_ascii=False),
+        extra_content=None,
+    )
+    return dataclasses.replace(turn, tool_calls=[*turn.tool_calls, synthetic])
 
 
 def _run_tool_phase(
@@ -172,7 +198,7 @@ def _run_tool_phase(
         cfg, tools, forced_tool_name, allow_forced_knowledge_search
     )
     exclude_knowledge_after_search = bool(
-        first_forced == KNOWLEDGE_SEARCH_TOOL
+        first_forced == REQUIRE_ANY_TOOL
         and cfg.chat_answer_pass_excludes_knowledge_search
     )
     # 強制查完知識庫後就把 search_knowledge 拿掉：模型不能靠重複翻書拖時間，
@@ -203,6 +229,8 @@ def _run_tool_phase(
                 forced_tool_name=current_forced,
             )
             if turn.tool_calls:
+                if iteration == 0 and current_forced == REQUIRE_ANY_TOOL:
+                    turn = _ensure_knowledge_search(turn, last_user_message)
                 _append_tool_turns(working_messages, tool_steps, turn)
                 continue
             if (

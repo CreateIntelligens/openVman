@@ -263,7 +263,7 @@ Brain 必須將每次 LLM 呼叫的 input、output、cached、reasoning 與 tota
 
 1. **Direct Chat Route**：純對話訊息（未帶 forced skill、且 LLM 判定不需調用工具）直接進入 prompt assembly 而不組裝 tool-instruction/schema 段落，降低體積與延遲。
 2. **Tool-Enabled Route**：一般使用者訊息走兩段式嚴格流程，避免模型憑記憶亂答：
-   - **第一次呼叫（強制檢索）**：帶完整 tool schema，並把 `tool_choice` 釘死在 `search_knowledge`，模型只能先查知識庫（`CHAT_FORCE_KNOWLEDGE_SEARCH`，預設開啟；只在該工具實際註冊時生效）。此回合套用 `FORCED_TOOL_MODEL_OVERRIDE` / `FORCED_TOOL_MAX_TOKENS`。
+   - **第一次呼叫（必須用工具，平行檢索）**：帶完整 tool schema，`tool_choice=required`，模型一次決定要查哪些：`search_knowledge` 一定執行（模型漏叫時系統以原句補上），問題涉及公開或即時資訊時同一輪一併叫 `search_web`；所有工具平行執行（`CHAT_FORCE_KNOWLEDGE_SEARCH`，預設開啟；只在 `search_knowledge` 實際註冊時生效）。此回合套用 `FORCED_TOOL_MODEL_OVERRIDE` / `FORCED_TOOL_MAX_TOKENS`。
    - **第二次呼叫起（排除知識庫）**：工具結果回填後不再提供 `search_knowledge`，其他工具（`search_web`、wiki、技能）照常，模型可視需要再查網路，最後以文字作答（`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`，預設開啟）。串流留給這些回合。若 provider 回空字串，會催一次要求純文字回答再失敗。
    - 若 provider 忽略 `tool_choice` 直接回文字，第一回合的文字即視為答案並記一筆 warning，不會無限重試。兩個開關關閉時退回舊的 `tool_choice=auto` 多輪行為。
 3. **Forced Tool Call Route**：呼叫端可在請求中指定 `skill_id` (或 `tool_name`)，pipeline 會強制將該 skill 注入為唯一可用工具並要求立即調用；配合 `skill_manager` 的動態註冊，使新上線或修改過的技能毋需重啟服務即可立即使用。Admin Chat 的 `/skill` slash command 即走此路徑。

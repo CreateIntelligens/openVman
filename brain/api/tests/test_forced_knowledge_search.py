@@ -141,7 +141,7 @@ class TestForcedKnowledgeSearch:
 
         assert result.reply == "答案"
         assert len(calls) == 2
-        assert calls[0]["forced_tool_name"] == "search_knowledge"
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
         assert calls[0]["tools"] == [_SEARCH_TOOL_SPEC]
         assert calls[1]["tools"] is None
         assert "forced_tool_name" not in calls[1]
@@ -286,7 +286,7 @@ class TestTogglesOff:
 
         assert result.reply == "答案"
         assert len(calls) == 2
-        assert calls[0]["forced_tool_name"] == "search_knowledge"
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
         # Old behaviour: the answer pass still advertises the tools.
         assert calls[1]["tools"] == [_SEARCH_TOOL_SPEC]
 
@@ -473,7 +473,7 @@ class TestOtherToolsStayAvailable:
         )
 
         assert result.reply == "答案"
-        assert calls[0]["forced_tool_name"] == "search_knowledge"
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
         assert calls[1]["tools"] == [_WEB_TOOL_SPEC]
 
     def test_model_may_call_web_search_after_the_knowledge_pass(
@@ -546,3 +546,80 @@ class TestEmptyReply:
                 [{"role": "user", "content": "今天天氣如何？"}],
                 allow_forced_knowledge_search=True,
             )
+
+
+class TestParallelFirstRound:
+    def test_first_round_requires_any_tool_and_backfills_knowledge_search(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        """模型第一輪只叫了 search_web：補上 search_knowledge，兩者同一輪執行。"""
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC]
+        )
+        executed: list[str] = []
+        monkeypatch.setattr(
+            agent_loop,
+            "execute_tool_call",
+            lambda name, args: executed.append(name) or '{"status":"ok","data":{},"error":""}',
+        )
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            stream_reply=[agent_loop.LLMReply(content="答案", tool_calls=[], model="m1")],
+            generate_reply=[_tool_turn(agent_loop, name="search_web")],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "附近有什麼速食？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "答案"
+        assert calls[0]["forced_tool_name"] == agent_loop.REQUIRE_ANY_TOOL
+        assert sorted(executed) == ["search_knowledge", "search_web"]
+        assert [step["name"] for step in result.tool_steps] == ["search_web", "search_knowledge"]
+        assert "附近有什麼速食？" in result.tool_steps[1]["arguments"]
+        # 兩次 LLM 呼叫就結束：查（平行）→ 答
+        assert len(calls) == 2
+
+    def test_first_round_with_both_tools_is_not_duplicated(self, monkeypatch: pytest.MonkeyPatch):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(
+            monkeypatch, agent_loop, tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC]
+        )
+        both = agent_loop.LLMReply(
+            content="",
+            tool_calls=[
+                agent_loop.LLMToolCall(id="c1", name="search_knowledge", arguments="{}", extra_content=None),
+                agent_loop.LLMToolCall(id="c2", name="search_web", arguments="{}", extra_content=None),
+            ],
+            model="m1",
+        )
+        _record_turns(
+            monkeypatch,
+            agent_loop,
+            calls,
+            stream_reply=[agent_loop.LLMReply(content="答案", tool_calls=[], model="m1")],
+            generate_reply=[both],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "附近有什麼速食？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert [step["name"] for step in result.tool_steps] == ["search_knowledge", "search_web"]
+        assert len(calls) == 2
+
+
+def test_build_create_kwargs_maps_the_sentinel_to_required():
+    from core import llm_client
+
+    kwargs = llm_client._build_create_kwargs(
+        [_SEARCH_TOOL_SPEC], forced_tool_name=llm_client.REQUIRE_ANY_TOOL
+    )
+    assert kwargs["tool_choice"] == "required"
+    named = llm_client._build_create_kwargs([_SEARCH_TOOL_SPEC], forced_tool_name="search_knowledge")
+    assert named["tool_choice"] == {"type": "function", "function": {"name": "search_knowledge"}}

@@ -57,6 +57,10 @@ def _require_api_key() -> None:
         raise ValueError("BRAIN_LLM_API_KEY / BRAIN_LLM_API_KEYS 尚未設定")
 
 
+# forced_tool_name 的哨兵值：第一輪必須用工具，但不指定是哪一個。
+REQUIRE_ANY_TOOL = "*"
+
+
 @dataclass(frozen=True, slots=True)
 class LLMToolCall:
     id: str
@@ -578,8 +582,11 @@ def _build_create_kwargs(
 ) -> dict[str, Any]:
     if not tools:
         return {}
-    if forced_tool_name:
-        tool_choice: str | dict[str, Any] = {
+    if forced_tool_name == REQUIRE_ANY_TOOL:
+        # 一定要呼叫工具，但讓模型自己決定叫哪些、可以一次叫多個。
+        tool_choice: str | dict[str, Any] = "required"
+    elif forced_tool_name:
+        tool_choice = {
             "type": "function",
             "function": {"name": forced_tool_name},
         }

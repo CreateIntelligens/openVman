@@ -150,7 +150,7 @@ class BrainSettings(BaseSettings):
     tool_document_char_limit: int = 4000
     # e.g. "gemini-2.0-flash-lite" for faster forced tool calls
     forced_tool_model_override: str = ""
-    forced_tool_max_tokens: int = 200
+    forced_tool_max_tokens: int = 400
     # 一般使用者回合的第一次 LLM 呼叫強制走 search_knowledge，避免模型憑記憶亂答。
     chat_force_knowledge_search: bool = True
     # 強制查完知識庫後的回合不再提供 search_knowledge（避免重複翻書），

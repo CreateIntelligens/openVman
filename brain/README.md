@@ -344,8 +344,8 @@ user input
   -> validate
   -> session append
   -> build prompt from workspace + persona + history
-  -> LLM call 1（強制 tool_choice=search_knowledge，帶完整 tool schema）
-  -> 執行 search_knowledge（AI 改寫的 queries + 原始使用者訊息各自檢索，Reciprocal Rank Fusion 融合，取前 KNOWLEDGE_SEARCH_MERGE_LIMIT 筆）
+  -> LLM call 1（tool_choice=required：模型一次決定要查哪些；search_knowledge 未叫會自動補上，需要時同時叫 search_web）
+  -> 平行執行第一輪的所有工具（知識庫：AI 改寫 queries + 原句各自檢索後 RRF 融合；網路：search_web）
   -> LLM call 2+（不再提供 search_knowledge，其他工具照常；模型可再查網路後作答，串流走這些回合）
   -> append assistant reply
   -> archive daily memory
@@ -354,7 +354,7 @@ user input
 
 一般使用者回合固定是「先查、再答」兩次呼叫。行為由根目錄 `.env` 控制：
 
-- `CHAT_FORCE_KNOWLEDGE_SEARCH`（預設 `true`）：第一次呼叫強制走 `search_knowledge`。
+- `CHAT_FORCE_KNOWLEDGE_SEARCH`（預設 `true`）：第一次呼叫必須使用工具（`tool_choice=required`），模型一次決定要查哪些；沒叫 `search_knowledge` 會自動補上，知識庫與網路在同一輪平行查。
   只在該工具真的註冊給當前 persona/project 時生效；slash command 指定的工具永遠優先。
 - `CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`（預設 `true`）：查完知識庫後的回合拿掉 `search_knowledge`，其他工具（`search_web`、wiki、技能）照常可用，所以問天氣仍會上網查；回合數仍受 `AGENT_LOOP_MAX_ROUNDS` 限制。
 
