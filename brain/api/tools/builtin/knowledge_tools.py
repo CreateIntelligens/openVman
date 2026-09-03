@@ -8,6 +8,7 @@ from tools.context import (
     active_user_message,
 )
 from tools.search_helpers import (
+    DEFAULT_MERGE_LIMIT,
     build_citations,
     fused_limit,
     merge_search_results,
@@ -200,6 +201,9 @@ def get_document_tool():
 
 def search_knowledge_tool():
     from ..tool_registry import Tool
+
+    # 把實際設定值寫進描述：模型看不到環境變數，只看得懂數字。
+    merge_limit = getattr(get_settings(), "knowledge_search_merge_limit", DEFAULT_MERGE_LIMIT)
     return Tool(
         name="search_knowledge",
         description=(
@@ -219,7 +223,13 @@ def search_knowledge_tool():
                         "若使用者只有一個問題，仍以單元素陣列回傳。"
                     ),
                 },
-                "top_k": {"type": "integer", "description": "每條查詢各取幾筆候選；多條查詢融合後最多保留 KNOWLEDGE_SEARCH_MERGE_LIMIT 筆，除非此值更大"},
+                "top_k": {
+                    "type": "integer",
+                    "description": (
+                        f"每條查詢各取幾筆候選，預設 3、最多 8；"
+                        f"多條查詢融合後保留 {merge_limit} 筆，只有填得比 {merge_limit} 大時才會放大。"
+                    ),
+                },
             },
             "required": ["queries"],
         },
