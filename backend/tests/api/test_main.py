@@ -36,6 +36,7 @@ def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
         "backend_port": 8000,
         "tts_cache_enabled": False,
         "tts_cache_ttl_seconds": 86400,
+        "session_jwt_secret": "x" * 32,
     }
     base.update(overrides)
     return types.SimpleNamespace(**base)
@@ -563,6 +564,41 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
     assert fake_service.requests[0].voice_hint == "hayley"
 
 
+def test_tts_stream_voxcpm_streaming(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    async def _mock_voxcpm_stream(req):
+        async def _gen():
+            yield b"voxcpm-wav-header"
+            yield b"voxcpm-pcm-chunk"
+        return _gen()
+
+    fake_voxcpm = types.SimpleNamespace(
+        enabled=True,
+        open_stream=_mock_voxcpm_stream,
+    )
+    fake_service = types.SimpleNamespace(
+        voxcpm_adapter=fake_voxcpm,
+        edge_adapter=types.SimpleNamespace(enabled=False),
+    )
+    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(
+        module,
+        "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024),
+    )
+
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={"text": "你好", "provider": "voxcpm"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav; rate=48000"
+    assert response.content == b"voxcpm-wav-headervoxcpm-pcm-chunk"
+
+
 def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 
@@ -1016,3 +1052,35 @@ def test_usage_routes_only_forward_endpoint_parameters(monkeypatch):
         )
     )
     assert captured["params"] == {"limit": "5"}
+
+
+def test_tts_stream_voxcpm_failure_falls_back_to_edge(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    from app.providers.voxcpm_adapter import VoxCPMHTTPError
+
+    async def _failing_voxcpm_stream(req):
+        raise VoxCPMHTTPError(status_code=503, detail="gpu node down")
+
+    def _edge_stream(req):
+        async def _gen():
+            yield b"edge-mp3"
+        return _gen()
+
+    fake_service = types.SimpleNamespace(
+        voxcpm_adapter=types.SimpleNamespace(enabled=True, open_stream=_failing_voxcpm_stream),
+        edge_adapter=types.SimpleNamespace(enabled=True, synthesize_stream=_edge_stream),
+    )
+    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(
+        module,
+        "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024),
+    )
+
+    client, _ = _authenticated_client(module)
+    response = client.post("/api/v1/tts/stream", json={"text": "你好", "provider": "voxcpm"})
+
+    # VoxCPM 掛了要往下走 Edge，而不是直接把錯誤丟給前端
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("audio/mpeg")
+    assert response.content == b"edge-mp3"

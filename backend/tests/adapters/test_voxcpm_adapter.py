@@ -148,3 +148,114 @@ def test_classify_voxcpm_error_by_status(status_code, expected):
 
 def test_classify_voxcpm_error_network():
     assert classify_voxcpm_error(httpx.ConnectError("refused")) == REASON_NETWORK_ERROR
+
+
+@pytest.mark.asyncio
+async def test_voxcpm_adapter_open_stream_success(monkeypatch):
+    config = TTSRouterConfig(
+        _env_file=None,
+        tts_voxcpm_url="http://10.9.0.37:8800/",
+        tts_voxcpm_api_key="secret",
+    )
+    adapter = VoxCPMAdapter(config)
+
+    class FakeResponse:
+        status_code = 200
+
+        async def aiter_bytes(self):
+            yield b"RIFF-header"
+            yield b"pcm-chunk-1"
+            yield b"pcm-chunk-2"
+
+        async def aclose(self):
+            pass
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            self.closed = False
+
+        def build_request(self, method, url, data=None, headers=None):
+            return {"method": method, "url": url, "data": data, "headers": headers}
+
+        async def send(self, req, stream=False):
+            assert req["method"] == "POST"
+            assert req["url"] == "http://10.9.0.37:8800/api/v1/synthesize/stream"
+            assert req["data"]["engine_id"] == "voxcpm2"
+            assert req["data"]["text"] == "你好"
+            assert req["data"]["reference_preset_id"] == "cosy-teen-female-01"
+            assert req["headers"] == {"Authorization": "Bearer secret"}
+            assert stream is True
+            return FakeResponse()
+
+        async def aclose(self):
+            self.closed = True
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+
+    stream = await adapter.open_stream(
+        SynthesizeRequest(text="你好", voice_hint="voxcpm2-cosy-teen-female-01")
+    )
+    chunks = [chunk async for chunk in stream]
+    assert chunks == [b"RIFF-header", b"pcm-chunk-1", b"pcm-chunk-2"]
+
+
+@pytest.mark.asyncio
+async def test_voxcpm_adapter_open_stream_http_error(monkeypatch):
+    config = TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL)
+    adapter = VoxCPMAdapter(config)
+
+    class FakeErrorResponse:
+        status_code = 400
+
+        async def aread(self):
+            return b"preset not found"
+
+        async def aclose(self):
+            pass
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def build_request(self, method, url, **kwargs):
+            return {}
+
+        async def send(self, req, stream=False):
+            return FakeErrorResponse()
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+
+    with pytest.raises(VoxCPMHTTPError) as exc_info:
+        await adapter.open_stream(SynthesizeRequest(text="你好"))
+
+    assert exc_info.value.status_code == 400
+    assert "preset not found" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_voxcpm_adapter_open_stream_network_error(monkeypatch):
+    config = TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL)
+    adapter = VoxCPMAdapter(config)
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def build_request(self, method, url, **kwargs):
+            return {}
+
+        async def send(self, req, stream=False):
+            raise httpx.ConnectError("network down")
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+
+    with pytest.raises(VoxCPMHTTPError) as exc_info:
+        await adapter.open_stream(SynthesizeRequest(text="你好"))
+
+    assert exc_info.value.status_code == 503

@@ -7,6 +7,7 @@ import ChatMessage from "../components/chat/ChatMessage";
 import QuickQaModal from "../components/chat/QuickQaModal";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import { useProject } from "../context/ProjectContext";
+import { useMascot } from "../context/MascotContext";
 import { useChatSession } from "../hooks/useChatSession";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useLiveSession, type LiveMessage } from "../hooks/useLiveSession";
@@ -38,6 +39,7 @@ export default function Chat() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [quickQaOpen, setQuickQaOpen] = useState(false);
   const { projectId } = useProject();
+  const { isClosed } = useMascot();
   const {
     messages,
     input,
@@ -215,7 +217,9 @@ export default function Chat() {
 
   const handleSlashClose = useCallback(() => setSlashOpen(false), [setSlashOpen]);
   const handleDismissFallbackToast = useCallback(() => setTtsFallbackToast(""), [setTtsFallbackToast]);
-  const handleLiveToggleMic = useCallback(() => { void liveToggleMic(); }, [liveToggleMic]);
+  const handleLiveToggleMic = useCallback(() => {
+    void liveToggleMic();
+  }, [liveToggleMic]);
   const handleLiveToggleCamera = useCallback(() => { void liveToggleCamera(); }, [liveToggleCamera]);
 
   useEffect(() => {
@@ -258,6 +262,21 @@ export default function Chat() {
 
     return () => cancelAnimationFrame(frame);
   }, [chatEndRef, liveSession.liveMessages, loadingHistory, messages, mode]);
+
+  // 小助理展開時，AI 回覆完成立即自動播放語音並帶動對嘴
+  const prevSendingRef = useRef(sending);
+  useEffect(() => {
+    const justFinishedSending = prevSendingRef.current && !sending;
+    prevSendingRef.current = sending;
+
+    if (justFinishedSending && mode === "text" && !isClosed && messages.length > 0) {
+      const lastIndex = messages.length - 1;
+      const lastMsg = messages[lastIndex];
+      if (lastMsg.role === "assistant" && lastMsg.content?.trim()) {
+        void playTts(lastMsg.content, lastIndex);
+      }
+    }
+  }, [isClosed, messages, mode, playTts, sending]);
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-surface">

@@ -18,6 +18,31 @@ import {
   writeStoredMascotId,
 } from "../data/mascotCatalog";
 
+export const MASCOT_OPEN_STORAGE_KEY = "admin-mascot-open";
+const MOBILE_MEDIA_QUERY = "(max-width: 48rem)";
+
+function isMobileViewport(): boolean {
+  return typeof window.matchMedia === "function"
+    && window.matchMedia(MOBILE_MEDIA_QUERY).matches;
+}
+
+export function initialClosed(): boolean {
+  if (isMobileViewport()) return true;
+  try {
+    return window.localStorage.getItem(MASCOT_OPEN_STORAGE_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+export function rememberMascotOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(MASCOT_OPEN_STORAGE_KEY, open ? "1" : "0");
+  } catch {
+    // 隱私模式下 localStorage 可能不可寫，忽略即可。
+  }
+}
+
 type MascotDriver = {
   driveMouth: (volume: number) => void;
   // 影片型小助理靠真正的 PCM（16kHz mono int16）算嘴型；VRM/Live2D 忽略此訊息
@@ -28,9 +53,15 @@ type MascotDriver = {
 interface MascotContextType extends MascotDriver {
   mascotOptions: MascotOption[];
   selectedMascotId: string;
+  isClosed: boolean;
+  setIsClosed: (closed: boolean) => void;
+  openMascot: () => void;
+  closeMascot: () => void;
   setMascotOptions: (mascots: MascotOption[]) => void;
   setSelectedMascotId: (mascotId: string) => void;
   registerDriver: (handler: MascotDriver | null) => void;
+  registerSpeechStopper: (stopper: () => void) => () => void;
+  stopAllSpeech: () => void;
 }
 
 const noop: MascotContextType = {
@@ -39,11 +70,17 @@ const noop: MascotContextType = {
   stopMouth: () => {},
   mascotOptions: [...FALLBACK_MASCOT_CATALOG],
   selectedMascotId: DEFAULT_MASCOT_ID,
+  isClosed: false,
+  setIsClosed: () => {},
+  openMascot: () => {},
+  closeMascot: () => {},
   setSelectedMascotId: (mascotId: string) => {
     writeStoredMascotId(mascotId, FALLBACK_MASCOT_CATALOG);
   },
   setMascotOptions: () => {},
   registerDriver: () => {},
+  registerSpeechStopper: () => () => {},
+  stopAllSpeech: () => {},
 };
 
 const MascotContext = createContext<MascotContextType>(noop);
@@ -56,6 +93,8 @@ export function MascotProvider({
   initialOptions?: MascotOption[];
 }) {
   const driverRef = useRef<MascotDriver | null>(null);
+  const speechStoppersRef = useRef<Set<() => void>>(new Set());
+  const [isClosed, setIsClosed] = useState(initialClosed);
   const [mascotOptions, setMascotOptionsState] = useState<MascotOption[]>(
     () => (
       initialOptions?.length
@@ -90,6 +129,35 @@ export function MascotProvider({
     };
   }, [hasInitialOptions]);
 
+  const registerSpeechStopper = useCallback((stopper: () => void) => {
+    speechStoppersRef.current.add(stopper);
+    return () => {
+      speechStoppersRef.current.delete(stopper);
+    };
+  }, []);
+
+  const stopAllSpeech = useCallback(() => {
+    driverRef.current?.stopMouth();
+    for (const stop of speechStoppersRef.current) {
+      try {
+        stop();
+      } catch (err) {
+        console.warn("Failed to stop speech source:", err);
+      }
+    }
+  }, []);
+
+  const openMascot = useCallback(() => {
+    setIsClosed(false);
+    rememberMascotOpen(true);
+  }, []);
+
+  const closeMascot = useCallback(() => {
+    setIsClosed(true);
+    rememberMascotOpen(false);
+    stopAllSpeech();
+  }, [stopAllSpeech]);
+
   const driveMouth = useCallback((volume: number) => {
     driverRef.current?.driveMouth(volume);
   }, []);
@@ -121,9 +189,15 @@ export function MascotProvider({
       stopMouth,
       mascotOptions,
       selectedMascotId,
+      isClosed,
+      setIsClosed,
+      openMascot,
+      closeMascot,
       setMascotOptions,
       setSelectedMascotId,
       registerDriver,
+      registerSpeechStopper,
+      stopAllSpeech,
     }),
     [
       driveMouth,
@@ -131,9 +205,14 @@ export function MascotProvider({
       stopMouth,
       mascotOptions,
       selectedMascotId,
+      isClosed,
+      openMascot,
+      closeMascot,
       setMascotOptions,
       setSelectedMascotId,
       registerDriver,
+      registerSpeechStopper,
+      stopAllSpeech,
     ],
   );
 

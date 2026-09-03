@@ -82,7 +82,14 @@ export function useTts() {
        const mascotAudioCtxRef = useRef<AudioContext | null>(null);
        const mascotAudioGraphRef = useRef<MascotAudioGraph | null>(null);
        const mascotRafRef = useRef<number | null>(null);
-       const { driveMouth, pushPcm, stopMouth, mascotOptions, selectedMascotId } = useMascot();
+       const {
+              driveMouth,
+              pushPcm,
+              stopMouth,
+              mascotOptions,
+              selectedMascotId,
+              registerSpeechStopper,
+       } = useMascot();
        const mascotEngine = resolveMascotOption(selectedMascotId, mascotOptions).engine;
        const mascotEngineRef = useRef(mascotEngine);
        mascotEngineRef.current = mascotEngine;
@@ -132,6 +139,12 @@ export function useTts() {
               stopMascotAnalyser();
               setPlayingIndex(null);
        }, [stopMascotAnalyser]);
+
+       useEffect(() => {
+              return registerSpeechStopper(() => {
+                     stopAudio();
+              });
+       }, [registerSpeechStopper, stopAudio]);
 
        const driveMascotFromAudio = useCallback((audio: HTMLAudioElement) => {
               stopMascotAnalyser();

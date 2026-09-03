@@ -54,7 +54,11 @@ from app.providers.gemini_tts_adapter import (
     GEMINI_STREAM_CONTENT_TYPE,
     GeminiTTSHTTPError,
 )
-from app.providers.voxcpm_adapter import VOXCPM_PROVIDER_NAME, VoxCPMHTTPError
+from app.providers.voxcpm_adapter import (
+    VOXCPM_PROVIDER_NAME,
+    VOXCPM_STREAM_CONTENT_TYPE,
+    VoxCPMHTTPError,
+)
 from app.routes import admin as admin_routes
 from app.routes import avatar as avatar_routes
 from app.routes import backgrounds as background_routes
@@ -506,22 +510,18 @@ async def tts_stream_endpoint(
                 return JSONResponse(status_code=502, content={"error": str(exc)})
             return StreamingResponse(stream, media_type=GEMINI_STREAM_CONTENT_TYPE)
 
-    # VoxCPM 的 castvoice 端點只有整段 mp3（無串流），直接一次回傳；
-    # 前端對非 PCM content-type 會走整段解碼路徑。失敗時往下走 Edge fallback。
-    if body.provider == VOXCPM_PROVIDER_NAME:
+    # VoxCPM 支援 /api/v1/synthesize/stream 串流，邊生成邊吐 48kHz mono WAV。
+    if provider == VOXCPM_PROVIDER_NAME:
         voxcpm = _get_service().voxcpm_adapter
         if voxcpm.enabled:
             try:
-                result = voxcpm.synthesize(
-                    SynthesizeRequest(text=cleaned, voice_hint=body.voice)
+                stream = await voxcpm.open_stream(
+                    SynthesizeRequest(text=cleaned, voice_hint=voice)
                 )
-                return Response(content=result.audio_bytes, media_type=result.content_type)
-            except VoxCPMHTTPError as exc:
-                logger.warning(
-                    "tts_stream voxcpm error status=%s detail=%s",
-                    exc.status_code,
-                    exc.detail,
-                )
+                return StreamingResponse(stream, media_type=VOXCPM_STREAM_CONTENT_TYPE)
+            except (VoxCPMHTTPError, RuntimeError) as exc:
+                # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
+                logger.warning("tts_stream voxcpm error: %s", exc)
 
     # Primary: proxy stream directly from IndexTTS
     if cfg.tts_indextts_url:

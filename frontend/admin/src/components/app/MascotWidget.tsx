@@ -62,32 +62,6 @@ function defaultMarginPixels(): number {
   return MASCOT_DEFAULT_MARGIN_REM * getRootFontSize();
 }
 
-function isMobileViewport(): boolean {
-  return typeof window.matchMedia === "function"
-    && window.matchMedia(MOBILE_MEDIA_QUERY).matches;
-}
-
-const MASCOT_OPEN_STORAGE_KEY = "admin-mascot-open";
-
-// 小助理的 VRM 模型可達 20MB，掛上 iframe 就會立刻下載並在主執行緒解析。
-// 預設收合，等使用者真的要用才載；開過一次就記住偏好。
-function initialClosed(): boolean {
-  if (isMobileViewport()) return true;
-  try {
-    return window.localStorage.getItem(MASCOT_OPEN_STORAGE_KEY) !== "1";
-  } catch {
-    return true;
-  }
-}
-
-function rememberMascotOpen(open: boolean): void {
-  try {
-    window.localStorage.setItem(MASCOT_OPEN_STORAGE_KEY, open ? "1" : "0");
-  } catch {
-    // 隱私模式下 localStorage 可能不可寫，忽略即可。
-  }
-}
-
 function clampInset(value: number, size: number, viewportSize: number, margin: number): number {
   const maxInset = Math.max(margin, viewportSize - size - margin);
   return Math.min(Math.max(value, margin), maxInset);
@@ -105,9 +79,19 @@ function mascotPreviewStyle(mascot: MascotOption): CSSProperties | undefined {
 }
 
 export default function MascotWidget() {
-  const [closed, setClosed] = useState(initialClosed);
+  const {
+    mascotOptions,
+    registerDriver,
+    selectedMascotId,
+    setSelectedMascotId,
+    isClosed,
+    setIsClosed,
+    openMascot,
+    closeMascot,
+  } = useMascot();
+
   // 開過一次就讓 iframe 留在 DOM 裡只隱藏；卸載會讓重開時重新下載模型與 three.js。
-  const [mounted, setMounted] = useState(() => !initialClosed());
+  const [mounted, setMounted] = useState(() => !isClosed);
   const [dragging, setDragging] = useState(false);
   const [position, setPosition] = useState<MascotPosition | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -116,19 +100,24 @@ export default function MascotWidget() {
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const dragSizeRef = useRef({ width: 0, height: 0 });
   const uploadedSnapshotIdsRef = useRef(new Set<string>());
-  const { mascotOptions, registerDriver, selectedMascotId, setSelectedMascotId } = useMascot();
   const selectedMascot = resolveMascotOption(selectedMascotId, mascotOptions);
   const widgetSrc = buildMascotWidgetSrc(selectedMascot);
+
+  useEffect(() => {
+    if (!isClosed) {
+      setMounted(true);
+    }
+  }, [isClosed]);
 
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
     const mediaQuery = window.matchMedia(MOBILE_MEDIA_QUERY);
     const handleCompactViewport = (event: MediaQueryListEvent) => {
-      if (event.matches) setClosed(true);
+      if (event.matches) setIsClosed(true);
     };
     mediaQuery.addEventListener("change", handleCompactViewport);
     return () => mediaQuery.removeEventListener("change", handleCompactViewport);
-  }, []);
+  }, [setIsClosed]);
 
   useEffect(() => {
     if (!switcherOpen) return;
@@ -168,8 +157,7 @@ export default function MascotWidget() {
     function handleMessage(event: MessageEvent): void {
       if (!isWidgetMessage(event.data)) return;
       if (event.data.type === "close") {
-        setClosed(true);
-        rememberMascotOpen(false);
+        closeMascot();
         return;
       }
 
@@ -253,9 +241,7 @@ export default function MascotWidget() {
       title="打開 AI 虛擬人小助理"
       aria-label="打開 AI 虛擬人小助理"
       onClick={() => {
-        setClosed(false);
-        setMounted(true);
-        rememberMascotOpen(true);
+        openMascot();
       }}
       className="mascot-trigger fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface-raised text-primary shadow-lg transition-colors hover:bg-surface-sunken"
     >
@@ -275,7 +261,7 @@ export default function MascotWidget() {
     </button>
   );
 
-  if (closed && !mounted) {
+  if (isClosed && !mounted) {
     return trigger;
   }
 
@@ -285,10 +271,10 @@ export default function MascotWidget() {
 
   return (
     <>
-      {closed && trigger}
+      {isClosed && trigger}
       <div
         ref={widgetRef}
-        hidden={closed}
+        hidden={isClosed}
         className="mascot-widget fixed h-[min(30rem,70dvh)] w-[min(21.25rem,90vw)] overflow-hidden rounded-2xl shadow-lg group"
         style={style}
       >

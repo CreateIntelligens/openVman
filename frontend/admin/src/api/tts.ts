@@ -20,6 +20,28 @@ export async function synthesizeSpeech(
   text: string,
   opts?: { provider?: string; voice?: string; signal?: AbortSignal },
 ): Promise<SpeechResult> {
+  const provider = opts?.provider;
+  if (provider === "voxcpm") {
+    try {
+      const streamBody: Record<string, string> = { text, provider };
+      if (opts?.voice) streamBody.voice = opts.voice;
+
+      const res = await apiFetch("/api/v1/tts/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(streamBody),
+        signal: opts?.signal,
+      });
+      if (res.ok) {
+        const audio = await res.arrayBuffer();
+        const fallbackReason = res.headers.get("X-TTS-Fallback-Reason") || undefined;
+        return { audio, fallback: fallbackReason };
+      }
+    } catch {
+      // 串流端點異常時往下 fallback 至 /v1/audio/speech
+    }
+  }
+
   const body: Record<string, string> = { input: text };
   if (opts?.provider) body.provider = opts.provider;
   if (opts?.voice) body.voice = opts.voice;

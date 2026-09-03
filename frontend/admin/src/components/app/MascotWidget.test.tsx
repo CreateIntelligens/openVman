@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,7 +8,7 @@ vi.mock("../../api/avatar", async (importOriginal) => ({
   fetchAvatarMascots: fetchAvatarMascotsMock,
 }));
 
-import { MascotProvider } from "../../context/MascotContext";
+import { MascotProvider, useMascot } from "../../context/MascotContext";
 import MascotWidget from "./MascotWidget";
 
 describe("MascotWidget", () => {
@@ -156,5 +157,33 @@ describe("MascotWidget", () => {
       expect(src).toContain("character=000");
     });
     expect(screen.getByText("預設角色")).not.toBeNull();
+  });
+
+  it("stops all speech when the mascot is closed", () => {
+    window.localStorage.setItem("admin-mascot-open", "1");
+    const stopper = vi.fn();
+
+    function SpeechConsumer() {
+      const { registerSpeechStopper } = useMascot();
+      useEffect(() => {
+        return registerSpeechStopper(stopper);
+      }, [registerSpeechStopper]);
+      return null;
+    }
+
+    render(
+      <MascotProvider>
+        <SpeechConsumer />
+        <MascotWidget />
+      </MascotProvider>,
+    );
+
+    expect(stopper).not.toHaveBeenCalled();
+
+    fireEvent(window, new MessageEvent("message", {
+      data: { ns: "avatar-widget", type: "close" },
+    }));
+
+    expect(stopper).toHaveBeenCalledTimes(1);
   });
 });

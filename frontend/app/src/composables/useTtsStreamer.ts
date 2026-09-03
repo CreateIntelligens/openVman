@@ -80,7 +80,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     if (options.shouldUseStream) return options.shouldUseStream(provider);
 
     const normalized = normalizedProvider(provider);
-    if (!normalized || normalized === "indextts" || normalized === "gemini-tts") return true;
+    if (!normalized || normalized === "indextts" || normalized === "gemini-tts" || normalized === "voxcpm") return true;
     if (normalized === "auto") return Boolean(getIndexTtsProvider());
     return false;
   }
@@ -100,8 +100,8 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     if (options.buildStreamBody) return options.buildStreamBody(text, opts);
 
     const provider = normalizedProvider(opts.provider ?? "");
-    if (provider === "gemini-tts") {
-      const body: Record<string, string> = { text, provider: "gemini-tts" };
+    if (provider === "gemini-tts" || provider === "voxcpm") {
+      const body: Record<string, string> = { text, provider };
       if (opts.voice) body.voice = opts.voice;
       return body;
     }
