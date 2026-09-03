@@ -168,6 +168,12 @@ class BrainSettings(BaseSettings):
     url2md_read_enabled: bool = True
     web_search_max_chars: int = 3000
     web_search_max_results: int = 8
+    # 2md 回什麼就給什麼會撈到維基百科這類泛用頁；用 embedding 對原句重排並丟掉低分的。
+    # min_relevance 是絕對下限，relevance_ratio 是相對最佳結果的比例，兩者取較嚴者。
+    web_search_min_relevance: float = 0.15
+    web_search_relevance_ratio: float = 0.7
+    # 逗號分隔的網域黑名單，子網域一併排除；例如 zh.wikipedia.org
+    web_search_blocked_domains: str = ""
 
     # === David888 Wiki ===
     wiki_api_base_url: str = "https://wiki.david888.com/api"

@@ -11,6 +11,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from config import get_settings
+from tools.context import active_user_message
 
 logger = logging.getLogger("brain.tools.builtin.web")
 
@@ -139,6 +140,64 @@ def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(f"無法讀取網址，2md fallback chain 皆失敗：{last_error}") from last_error
 
 
+def _blocked_domains(cfg: Any) -> tuple[str, ...]:
+    raw = str(getattr(cfg, "web_search_blocked_domains", "") or "")
+    return tuple(d.strip().lower().lstrip(".") for d in raw.split(",") if d.strip())
+
+
+def _is_blocked_url(url: str, blocked: tuple[str, ...]) -> bool:
+    if not blocked or not url:
+        return False
+    host = (urlparse(url).hostname or "").lower()
+    return any(host == d or host.endswith(f".{d}") for d in blocked)
+
+
+def _embed_for_rerank(anchor: str, docs: list[str]) -> tuple[list[float], list[list[float]]]:
+    """Embed the question and each result snippet with the project's embedder."""
+    from memory.embedder import get_embedder
+
+    embedder = get_embedder()
+    [anchor_vec] = embedder.encode([anchor], input_type="query")
+    doc_vecs = embedder.encode(docs, input_type="document")
+    return anchor_vec, doc_vecs
+
+
+def _rerank_web_results(
+    results: list[dict[str, Any]], anchor: str, cfg: Any
+) -> list[dict[str, Any]]:
+    """Order results by similarity to the user's question and drop the weak tail.
+
+    搜尋引擎的排序是它自己的相關度，不是對這個問題的相關度；問「附近速食」
+    撈到麥當勞的維基百科就是這樣來的。用 embedding 對原句重排，低於門檻的丟掉。
+    embedding 失敗時維持原順序，寧可多給也不讓搜尋整個失敗。
+    """
+    floor = float(getattr(cfg, "web_search_min_relevance", 0) or 0)
+    ratio = float(getattr(cfg, "web_search_relevance_ratio", 0) or 0)
+    if not results or (floor <= 0 and ratio <= 0):
+        return results
+    try:
+        from memory.fusion import cosine_similarity
+
+        docs = [f"{r['title']}\n{r['description']}".strip() or r["url"] for r in results]
+        anchor_vec, doc_vecs = _embed_for_rerank(anchor, docs)
+        scored = [
+            ({**r, "relevance": round(cosine_similarity(anchor_vec, v), 3)})
+            for r, v in zip(results, doc_vecs)
+        ]
+    except Exception as exc:  # noqa: BLE001 - reranking is best-effort
+        logger.warning("web search rerank skipped: %s", exc)
+        return results
+    scored.sort(key=lambda r: r["relevance"], reverse=True)
+    best = scored[0]["relevance"]
+    cutoff = max(floor, best * ratio)
+    kept = [r for r in scored if r["relevance"] >= cutoff]
+    if len(kept) < len(scored):
+        logger.info(
+            "web search rerank kept %d/%d results (cutoff=%.3f)", len(kept), len(scored), cutoff
+        )
+    return kept
+
+
 def _search_web(args: dict[str, Any]) -> dict[str, Any]:
     query = _validate_query(args.get("query"))
     cfg = get_settings()
@@ -157,23 +216,28 @@ def _search_web(args: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(raw_results, list):
                 raise ValueError("2md 搜尋回傳格式無效")
 
-            results: list[dict[str, str]] = []
-            citations: list[dict[str, str]] = []
-            for item in raw_results[:max_results]:
+            blocked = _blocked_domains(cfg)
+            candidates: list[dict[str, Any]] = []
+            for item in raw_results:
                 if not isinstance(item, dict):
                     continue
-                title = str(item.get("title") or "")
                 url = str(item.get("url") or "")
-                result = {
-                    "title": title,
+                if _is_blocked_url(url, blocked):
+                    continue
+                candidates.append({
+                    "title": str(item.get("title") or ""),
                     "url": url,
                     "description": str(item.get("description") or ""),
                     "content": str(item.get("content") or ""),
-                }
-                results.append(result)
-                if url:
-                    citations.append({"title": title, "url": url})
+                })
 
+            anchor = (active_user_message.get() or "").strip()
+            results = _rerank_web_results(
+                candidates, f"{anchor}\n{query}" if anchor else query, cfg
+            )[:max_results]
+            citations = [
+                {"title": r["title"], "url": r["url"]} for r in results if r["url"]
+            ]
             return {
                 "query": query,
                 "results": results,
@@ -200,7 +264,13 @@ def search_web_tool():
         parameters={
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "要搜尋的關鍵字或完整問題"},
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "要搜尋的完整關鍵字，必須帶上地點、對象、時間等限定詞，"
+                        "例如「台北內湖 舊宗路 速食店」而不是「速食」；泛詞只會撈到百科或概論頁。"
+                    ),
+                },
                 "top_k": {"type": "integer", "description": "最多回傳幾筆結果，預設 8"},
             },
             "required": ["query"],
