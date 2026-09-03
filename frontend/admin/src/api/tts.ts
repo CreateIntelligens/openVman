@@ -16,6 +16,22 @@ export async function fetchTtsProviders(): Promise<TtsProvider[]> {
   return fetchJson<TtsProvider[]>("/api/v1/tts/providers");
 }
 
+/** 打串流端點，回傳原始 Response 讓呼叫端邊收邊播；provider 空字串表示交給後端決定。 */
+export async function openSpeechStream(
+  text: string,
+  opts?: { provider?: string; voice?: string; signal?: AbortSignal },
+): Promise<Response> {
+  const body: Record<string, string> = { text };
+  if (opts?.provider) body.provider = opts.provider;
+  if (opts?.voice) body.voice = opts.voice;
+  return apiFetch("/api/v1/tts/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: opts?.signal,
+  });
+}
+
 export async function synthesizeSpeech(
   text: string,
   opts?: { provider?: string; voice?: string; signal?: AbortSignal },

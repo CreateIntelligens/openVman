@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchTtsProviders, synthesizeSpeech, type TtsProvider } from "../api";
+import { fetchTtsProviders, openSpeechStream, synthesizeSpeech, type TtsProvider } from "../api";
+import { isPcmStreamContentType, playPcmStream } from "../utils/ttsStream";
 import { useMascot } from "../context/MascotContext";
 import { resolveMascotOption } from "../data/mascotCatalog";
-import { blobToPcm16Chunks, rmsVolume } from "../utils/liveAudioUtils";
+import { audioBufferToMascotPcm, blobToPcm16Chunks, rmsVolume } from "../utils/liveAudioUtils";
 
 type WebAudioWindow = Window & typeof globalThis & {
        webkitAudioContext?: typeof AudioContext;
@@ -10,7 +11,7 @@ type WebAudioWindow = Window & typeof globalThis & {
 
 type MascotAudioGraph = {
        analyser: AnalyserNode;
-       source: MediaElementAudioSourceNode;
+       source?: MediaElementAudioSourceNode;
 };
 
 function createAudioContext(): AudioContext | null {
@@ -76,6 +77,7 @@ export function useTts() {
 
        const audioRef = useRef<HTMLAudioElement | null>(null);
        const ttsAbortRef = useRef<AbortController | null>(null);
+       const streamStopRef = useRef<(() => void) | null>(null);
        const ttsCacheRef = useRef<Map<string, CachedSpeech>>(new Map());
        const ttsPrefetchAbortRef = useRef<AbortController | null>(null);
        const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,7 +126,7 @@ export function useTts() {
                      cancelAnimationFrame(mascotRafRef.current);
                      mascotRafRef.current = null;
               }
-              mascotAudioGraphRef.current?.source.disconnect();
+              mascotAudioGraphRef.current?.source?.disconnect();
               mascotAudioGraphRef.current?.analyser.disconnect();
               mascotAudioGraphRef.current = null;
               stopMouth();
@@ -132,6 +134,8 @@ export function useTts() {
 
        const stopAudio = useCallback(() => {
               ttsAbortRef.current?.abort();
+              streamStopRef.current?.();
+              streamStopRef.current = null;
               if (audioRef.current) {
                      audioRef.current.pause();
                      audioRef.current = null;
@@ -146,37 +150,86 @@ export function useTts() {
               });
        }, [registerSpeechStopper, stopAudio]);
 
+       const ensureMascotContext = useCallback((): AudioContext | null => {
+              if (!mascotAudioCtxRef.current) {
+                     mascotAudioCtxRef.current = createAudioContext();
+              }
+              return mascotAudioCtxRef.current;
+       }, []);
+
+       // 建一個接到喇叭的 analyser，並開 rAF 迴圈把音量送給小助理；回傳 analyser 讓來源接上。
+       const startMascotAnalyser = useCallback((ctx: AudioContext): AnalyserNode => {
+              const analyser = ctx.createAnalyser();
+              analyser.fftSize = 256;
+              analyser.connect(ctx.destination);
+              mascotAudioGraphRef.current = { analyser };
+              const data = new Uint8Array(analyser.fftSize);
+              const loop = () => {
+                     analyser.getByteTimeDomainData(data);
+                     driveMouth(rmsVolume(data));
+                     mascotRafRef.current = requestAnimationFrame(loop);
+              };
+              mascotRafRef.current = requestAnimationFrame(loop);
+              return analyser;
+       }, [driveMouth]);
+
        const driveMascotFromAudio = useCallback((audio: HTMLAudioElement) => {
               stopMascotAnalyser();
-              if (!mascotAudioCtxRef.current) {
-                     const ctx = createAudioContext();
-                     if (!ctx) {
-                            return;
-                     }
-                     mascotAudioCtxRef.current = ctx;
-              }
-
+              const ctx = ensureMascotContext();
+              if (!ctx) return;
               try {
-                     const ctx = mascotAudioCtxRef.current;
                      const source = ctx.createMediaElementSource(audio);
-                     const analyser = ctx.createAnalyser();
-                     analyser.fftSize = 256;
+                     const analyser = startMascotAnalyser(ctx);
                      source.connect(analyser);
-                     analyser.connect(ctx.destination);
                      mascotAudioGraphRef.current = { analyser, source };
-                     const data = new Uint8Array(analyser.fftSize);
-
-                     const loop = () => {
-                            analyser.getByteTimeDomainData(data);
-                            driveMouth(rmsVolume(data));
-                            mascotRafRef.current = requestAnimationFrame(loop);
-                     };
-                     mascotRafRef.current = requestAnimationFrame(loop);
               } catch (reason) {
                      console.warn("Failed to connect mascot audio analyser:", reason);
                      stopMascotAnalyser();
               }
-       }, [driveMouth, stopMascotAnalyser]);
+       }, [ensureMascotContext, startMascotAnalyser, stopMascotAnalyser]);
+
+       // 邊收邊播：串流一到就排進 AudioContext，小助理同步拿音量與 PCM。
+       // 回傳 false 表示這個回應不能串流（例如 mp3），交給整段路徑。
+       const playStreamedSpeech = useCallback(async (response: Response, cacheKey: string, fallback?: string): Promise<boolean> => {
+              const contentType = response.headers.get("Content-Type") ?? "";
+              if (!response.ok || !response.body || !isPcmStreamContentType(contentType)) {
+                     return false;
+              }
+              const ctx = ensureMascotContext();
+              if (!ctx) return false;
+              if (ctx.state === "suspended") {
+                     await ctx.resume();
+              }
+              if (fallback) {
+                     setTtsFallbackToast(fallback);
+                     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+                     toastTimerRef.current = setTimeout(() => setTtsFallbackToast(""), 5000);
+              }
+              stopMascotAnalyser();
+              const analyser = startMascotAnalyser(ctx);
+              const wantsPcm = mascotEngineRef.current === "video";
+              const playback = playPcmStream(response, ctx, {
+                     outputNode: analyser,
+                     onChunk: (buffer) => {
+                            if (!wantsPcm) return;
+                            for (const chunk of audioBufferToMascotPcm(buffer, MASCOT_PCM_SAMPLE_RATE, MASCOT_PCM_CHUNK_BYTES)) {
+                                   pushPcm(chunk);
+                            }
+                     },
+              });
+              streamStopRef.current = playback.stop;
+              try {
+                     const wav = await playback.done;
+                     setTtsCacheEntry(ttsCacheRef.current, cacheKey, { audio: wav, fallback });
+              } finally {
+                     if (streamStopRef.current === playback.stop) {
+                            streamStopRef.current = null;
+                            stopMascotAnalyser();
+                            setPlayingIndex(null);
+                     }
+              }
+              return true;
+       }, [ensureMascotContext, pushPcm, startMascotAnalyser, stopMascotAnalyser]);
 
        // 只有影片型小助理需要 PCM；解碼在 play() 之前完成，讓嘴型與聲音同時起跑。
        const decodeMascotPcm = useCallback(async (buffer: ArrayBuffer): Promise<ArrayBuffer[]> => {
@@ -285,6 +338,17 @@ export function useTts() {
               const controller = new AbortController();
               ttsAbortRef.current = controller;
               try {
+                     // 先試串流端點：auto 或支援串流的 provider 會邊生成邊回 PCM；
+                     // 回的不是 PCM（例如 mp3）就退回整段路徑。
+                     if (!selection.provider || selection.provider === "voxcpm" || selection.provider === "gemini-tts" || selection.provider === "indextts") {
+                            const response = await openSpeechStream(text, { ...selection, signal: controller.signal });
+                            const streamed = await playStreamedSpeech(
+                                   response,
+                                   key,
+                                   response.headers.get("X-TTS-Fallback-Reason") || undefined,
+                            );
+                            if (streamed) return;
+                     }
                      const { audio, fallback } = await synthesizeSpeech(text, {
                             ...selection,
                             signal: controller.signal,
@@ -297,7 +361,7 @@ export function useTts() {
                      }
                      setPlayingIndex(null);
               }
-       }, [playAudioBuffer, playingIndex, stopAudio]);
+       }, [playAudioBuffer, playStreamedSpeech, playingIndex, stopAudio]);
 
        const handleTtsProviderChange = useCallback((id: string) => {
               setTtsProvider(id);

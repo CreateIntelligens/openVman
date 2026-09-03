@@ -510,6 +510,11 @@ async def tts_stream_endpoint(
                 return JSONResponse(status_code=502, content={"error": str(exc)})
             return StreamingResponse(stream, media_type=GEMINI_STREAM_CONTENT_TYPE)
 
+    # provider 未指定（auto）且沒有 IndexTTS 時，VoxCPM 是 fallback 鏈的第一站，
+    # 直接走它的串流端點，否則 auto 會掉到整段合成的路徑，前端要等好幾秒。
+    if not provider and not cfg.tts_indextts_url and _get_service().voxcpm_adapter.enabled:
+        provider = VOXCPM_PROVIDER_NAME
+
     # VoxCPM 支援 /api/v1/synthesize/stream 串流，邊生成邊吐 48kHz mono WAV。
     if provider == VOXCPM_PROVIDER_NAME:
         voxcpm = _get_service().voxcpm_adapter

@@ -1084,3 +1084,29 @@ def test_tts_stream_voxcpm_failure_falls_back_to_edge(monkeypatch):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("audio/mpeg")
     assert response.content == b"edge-mp3"
+
+
+def test_tts_stream_auto_provider_streams_voxcpm_when_indextts_is_absent(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    async def _mock_voxcpm_stream(req):
+        async def _gen():
+            yield b"wav"
+        return _gen()
+
+    fake_service = types.SimpleNamespace(
+        voxcpm_adapter=types.SimpleNamespace(enabled=True, open_stream=_mock_voxcpm_stream),
+        edge_adapter=types.SimpleNamespace(enabled=False),
+    )
+    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(
+        module,
+        "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024, tts_indextts_url=""),
+    )
+
+    client, _ = _authenticated_client(module)
+    response = client.post("/api/v1/tts/stream", json={"text": "你好"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav; rate=48000"
