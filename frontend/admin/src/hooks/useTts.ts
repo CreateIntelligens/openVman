@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchTtsProviders, synthesizeSpeech, type TtsProvider } from "../api";
 import { useMascot } from "../context/MascotContext";
 import { resolveMascotOption } from "../data/mascotCatalog";
-import { blobToPcm16Chunks } from "../utils/liveAudioUtils";
+import { blobToPcm16Chunks, rmsVolume } from "../utils/liveAudioUtils";
 
 type WebAudioWindow = Window & typeof globalThis & {
        webkitAudioContext?: typeof AudioContext;
@@ -17,15 +17,6 @@ function createAudioContext(): AudioContext | null {
        const AudioContextConstructor =
               window.AudioContext || (window as WebAudioWindow).webkitAudioContext;
        return AudioContextConstructor ? new AudioContextConstructor() : null;
-}
-
-function rmsVolume(data: Uint8Array): number {
-       let sum = 0;
-       for (let i = 0; i < data.length; i++) {
-              const v = (data[i] - 128) / 128;
-              sum += v * v;
-       }
-       return Math.min(1, Math.sqrt(sum / data.length) * 3.4);
 }
 
 // 影片型小助理的 WASM runtime 吃 16kHz mono int16；4096 samples 一包與 Avatar SDK 一致。

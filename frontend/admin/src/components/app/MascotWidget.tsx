@@ -3,6 +3,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { uploadAvatarMascotThumbnail } from "../../api/avatar";
 import { useMascot } from "../../context/MascotContext";
 import {
+  MASCOT_ENGINE_LABELS,
   buildMascotWidgetSrc,
   resolveMascotOption,
   type MascotOption,
@@ -344,7 +345,7 @@ export default function MascotWidget() {
                       />
                     ) : (
                       <span className="text-[0.625rem] text-white/40 font-bold uppercase select-none">
-                        {opt.engine}
+                        {MASCOT_ENGINE_LABELS[opt.engine]}
                       </span>
                     )}
                   </span>
@@ -352,8 +353,8 @@ export default function MascotWidget() {
                     <strong className="text-sm font-bold text-content overflow-hidden text-ellipsis whitespace-nowrap">
                       {opt.label || opt.id}
                     </strong>
-                    <small className="mt-0.5 text-content-subtle text-[0.6875rem] font-bold uppercase overflow-hidden text-ellipsis whitespace-nowrap">
-                      {opt.engine}
+                    <small className="mt-0.5 text-content-subtle text-[0.6875rem] font-bold overflow-hidden text-ellipsis whitespace-nowrap">
+                      {MASCOT_ENGINE_LABELS[opt.engine]}
                     </small>
                   </span>
                 </button>

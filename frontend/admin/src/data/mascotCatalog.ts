@@ -1,6 +1,13 @@
 export type MascotEngine = "2d" | "3d" | "video";
 export type MascotFit = "half" | "full";
 
+/** 引擎內部代號是給程式用的；給人看的名稱用這張表。 */
+export const MASCOT_ENGINE_LABELS: Record<MascotEngine, string> = {
+  "2d": "Live2D",
+  "3d": "VRM",
+  video: "Matex",
+};
+
 export interface MascotOption {
   id: string;
   label: string;

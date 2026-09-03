@@ -22,8 +22,9 @@ import PromptModal from "../components/PromptModal";
 import StatusAlert from "../components/StatusAlert";
 import { useMascot } from "../context/MascotContext";
 import {
-  buildMascotWidgetSrc,
   DEFAULT_MASCOT_ID,
+  MASCOT_ENGINE_LABELS,
+  buildMascotWidgetSrc,
   toMascotOption,
 } from "../data/mascotCatalog";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
@@ -130,9 +131,9 @@ function formatSize(bytes: number): string {
 function formatMascotMetadata(mascot: AvatarMascot): string {
   if (mascot.builtin) return "built-in";
   if (mascot.engine === "video") {
-    return `video · ${mascot.character_id ?? ""}`;
+    return `${MASCOT_ENGINE_LABELS.video} · ${mascot.character_id ?? ""}`;
   }
-  return `${mascot.engine} · ${formatSize(mascot.size_bytes)}`;
+  return `${MASCOT_ENGINE_LABELS[mascot.engine]} · ${formatSize(mascot.size_bytes)}`;
 }
 
 function tabButtonClassName(tab: AssetTab, activeTab: AssetTab): string {

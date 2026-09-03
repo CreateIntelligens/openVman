@@ -20,7 +20,13 @@ import {
   stopLivePlayback,
   transcodeRecordedBlobsToPcmChunks,
 } from "../utils/live-session-audio";
-import { preferredRecorderMimeType } from "../utils/liveAudioUtils";
+import { audioBufferToMascotPcm, preferredRecorderMimeType, rmsVolume } from "../utils/liveAudioUtils";
+import { useMascot } from "../context/MascotContext";
+import { resolveMascotOption } from "../data/mascotCatalog";
+
+// 與 Avatar SDK 一致：matex runtime 吃 16kHz mono int16，4096 samples 一包。
+const MASCOT_PCM_SAMPLE_RATE = 16000;
+const MASCOT_PCM_CHUNK_BYTES = 4096 * 2;
 import { LiveWebSocketManager, type LiveWebSocketState } from "../utils/live-websocket-manager";
 
 export type LiveWsState = LiveWebSocketState;
@@ -121,6 +127,52 @@ export function useLiveSession({
   const activeSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
 
   const clearError = useCallback(() => setError(""), []);
+
+  // 語音對話的回覆是串流分段播放，這裡把每段同時餵給小助理：
+  // analyser 量音量給 VRM/Live2D，解碼後的 PCM 給 matex。
+  const { driveMouth, pushPcm, stopMouth, mascotOptions, selectedMascotId } = useMascot();
+  const mascotEngine = resolveMascotOption(selectedMascotId, mascotOptions).engine;
+  const mascotEngineRef = useRef(mascotEngine);
+  mascotEngineRef.current = mascotEngine;
+  const mascotOutputRef = useRef<AudioNode | null>(null);
+  const mascotAnalyserRef = useRef<AnalyserNode | null>(null);
+  const mascotRafRef = useRef<number | null>(null);
+  const stopMascotMouth = useCallback(() => {
+    if (mascotRafRef.current !== null) {
+      cancelAnimationFrame(mascotRafRef.current);
+      mascotRafRef.current = null;
+    }
+    stopMouth();
+  }, [stopMouth]);
+  const handleDecodedChunk = useCallback((audioBuffer: AudioBuffer, context: AudioContext) => {
+    if (mascotAnalyserRef.current?.context !== context) {
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.connect(context.destination);
+      mascotAnalyserRef.current = analyser;
+      mascotOutputRef.current = analyser;
+    }
+    if (mascotEngineRef.current === "video") {
+      for (const chunk of audioBufferToMascotPcm(audioBuffer, MASCOT_PCM_SAMPLE_RATE, MASCOT_PCM_CHUNK_BYTES)) {
+        pushPcm(chunk);
+      }
+    }
+    if (mascotRafRef.current === null) {
+      const data = new Uint8Array(mascotAnalyserRef.current.fftSize);
+      const loop = () => {
+        const analyser = mascotAnalyserRef.current;
+        if (!analyser) return;
+        analyser.getByteTimeDomainData(data);
+        driveMouth(rmsVolume(data));
+        mascotRafRef.current = requestAnimationFrame(loop);
+      };
+      mascotRafRef.current = requestAnimationFrame(loop);
+    }
+  }, [driveMouth, pushPcm]);
+  const handlePlayingChange = useCallback((playing: boolean) => {
+    setIsPlaying(playing);
+    if (!playing) stopMascotMouth();
+  }, [stopMascotMouth]);
   const ensureAudioContext = useCallback(() => ensureLiveAudioContext(audioContextRef), []);
   const sendClientEvent = useCallback((payload: ClientEvent) => managerRef.current?.sendEvent(payload) ?? false, []);
   const handleCameraFrame = useCallback((frameBase64: string, mimeType: string, timestamp: number) => {
@@ -154,9 +206,9 @@ export function useLiveSession({
         playbackQueueRef,
         playbackUnitsRef,
       },
-      { onPlayingChange: setIsPlaying },
+      { onPlayingChange: handlePlayingChange },
     );
-  }, []);
+  }, [handlePlayingChange]);
 
   const stopMicrophone = useCallback((sendAudioEnd = true) => {
     const recorder = mediaRecorderRef.current;
@@ -203,13 +255,14 @@ export function useLiveSession({
         audioContextRef,
         isPlayingRef,
         nextPlaybackTimeRef,
+        outputNodeRef: mascotOutputRef,
         playbackGenerationRef,
         playbackQueueRef,
         playbackUnitsRef,
       },
-      { onError: setError, onPlayingChange: setIsPlaying },
+      { onError: setError, onPlayingChange: handlePlayingChange, onDecodedChunk: handleDecodedChunk },
     );
-  }, [appendAssistantText]);
+  }, [appendAssistantText, handleDecodedChunk, handlePlayingChange]);
   const handleServerEvent = useCallback((event: ServerEvent) => {
     resetIdleTimerRef.current();
     if (event.event === "server_camera_frame_status") {
@@ -267,6 +320,8 @@ export function useLiveSession({
     stopMicrophone(false);
     stopCamera();
     stopPlayback();
+    mascotAnalyserRef.current = null;
+    mascotOutputRef.current = null;
     closeLiveAudioContext(audioContextRef, nextPlaybackTimeRef);
     if (flushRafRef.current) {
       cancelAnimationFrame(flushRafRef.current);

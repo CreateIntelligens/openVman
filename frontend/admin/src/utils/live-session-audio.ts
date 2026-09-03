@@ -13,6 +13,8 @@ type RefLike<T> = { current: T };
 type PlaybackRefs = {
   activeSourcesRef: RefLike<Set<AudioBufferSourceNode>>;
   audioContextRef: RefLike<AudioContext | null>;
+  /** 播放來源接到這裡而不是直接接 destination，讓小助理的 analyser 能量到音量。 */
+  outputNodeRef?: RefLike<AudioNode | null>;
   isPlayingRef: RefLike<boolean>;
   nextPlaybackTimeRef: RefLike<number>;
   playbackGenerationRef: RefLike<number>;
@@ -23,6 +25,8 @@ type PlaybackRefs = {
 type PlaybackCallbacks = {
   onError: (message: string) => void;
   onPlayingChange: (playing: boolean) => void;
+  /** 每段音訊解碼後、排程前呼叫；小助理用它拿 PCM 驅動 matex 嘴型。 */
+  onDecodedChunk?: (audioBuffer: AudioBuffer, context: AudioContext) => void;
 };
 
 type PcmChunkOptions = {
@@ -115,9 +119,10 @@ export function queueLiveAudioChunk(
       }
 
       const audioBuffer = await context.decodeAudioData(decodeBase64ToArrayBuffer(chunk.audio_base64).slice(0));
+      callbacks.onDecodedChunk?.(audioBuffer, context);
       const source = context.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(context.destination);
+      source.connect(refs.outputNodeRef?.current ?? context.destination);
       const startTime = Math.max(context.currentTime, refs.nextPlaybackTimeRef.current);
       refs.nextPlaybackTimeRef.current = startTime + audioBuffer.duration;
       refs.activeSourcesRef.current.add(source);

@@ -1,5 +1,22 @@
 const PCM_BYTES_PER_SAMPLE = 2;
 
+/** AnalyserNode 的 8-bit 時域資料 → 0..1 的嘴型音量（增益 3.4 讓正常說話落在可見範圍）。 */
+export function rmsVolume(data: Uint8Array): number {
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = (data[i] - 128) / 128;
+    sum += v * v;
+  }
+  return Math.min(1, Math.sqrt(sum / data.length) * 3.4);
+}
+
+/** 把解碼後的 AudioBuffer 轉成小助理 matex 引擎要的 16kHz mono int16 分段。 */
+export function audioBufferToMascotPcm(audioBuffer: AudioBuffer, targetSampleRate: number, chunkBytes: number): ArrayBuffer[] {
+  const mono = downmixToMono(audioBuffer);
+  const resampled = resamplePcm(mono, audioBuffer.sampleRate, targetSampleRate);
+  return chunkArrayBuffer(encodePcm16(resampled), chunkBytes);
+}
+
 export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const batchSize = 8192;
