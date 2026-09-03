@@ -5,6 +5,8 @@ export interface ChatUsageSummary {
   calls: number;
   latency_ms?: number;
   total_tokens?: number;
+  /** 依 "provider/model" 分組；fallback 時同一輪可能用到不只一個模型。 */
+  by_model?: Record<string, { calls: number; latency_ms?: number }>;
 }
 
 export interface RetrievalResult {

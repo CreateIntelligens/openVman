@@ -39,6 +39,20 @@ function parseResults(result: string | undefined): ToolResultItem[] {
   return [];
 }
 
+// "provider/model" → 顯示模型名；同一輪用到多個模型（fallback）時各自帶次數。
+function describeModels(byModel: ChatUsageSummary["by_model"]): string {
+  if (!byModel) return "";
+  const entries = Object.entries(byModel);
+  if (entries.length === 0) return "";
+  if (entries.length === 1) {
+    const [key] = entries[0];
+    return key.split("/").pop() || key;
+  }
+  return entries
+    .map(([key, bucket]) => `${key.split("/").pop() || key} ×${bucket.calls}`)
+    .join(" + ");
+}
+
 function allReferences(toolSteps: ToolStep[]): ToolResultItem[] {
   return toolSteps.flatMap((s) => parseResults(s.result));
 }
@@ -114,6 +128,7 @@ export default function MessageMeta({
   const hasTiming = responseTimeS != null;
   const llmCalls = usage?.calls ?? 0;
   const llmSeconds = usage?.latency_ms != null ? (usage.latency_ms / 1000).toFixed(2) : null;
+  const llmModels = describeModels(usage?.by_model);
 
   if (!hasTools && extraCitations.length === 0 && !hasTiming && llmCalls === 0) return null;
 
@@ -154,6 +169,7 @@ export default function MessageMeta({
           <span className="inline-flex items-center gap-1" title="這一輪呼叫模型的次數與合計時間">
             <span className="material-symbols-outlined text-[0.6875rem]">smart_toy</span>
             LLM ×{llmCalls}
+            {llmModels && <span className="opacity-60">{llmModels}</span>}
             {llmSeconds != null && <span className="opacity-40">{llmSeconds}s</span>}
           </span>
         )}
