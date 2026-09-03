@@ -503,7 +503,8 @@ class TestOtherToolsStayAvailable:
         assert result.reply == "晴天"
         assert [c["kind"] for c in calls] == ["generate", "stream", "stream"]
         assert calls[1]["tools"] == [_WEB_TOOL_SPEC]
-        assert calls[2]["tools"] == [_WEB_TOOL_SPEC]
+        # 追加一輪後就收掉工具，第三輪只能作答
+        assert calls[2]["tools"] is None
 
 
 class TestEmptyReply:
