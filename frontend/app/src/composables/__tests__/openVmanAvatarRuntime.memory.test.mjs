@@ -82,3 +82,34 @@ test("the canvas patch is restored when the last consumer unmounts", () => {
 test("unmounting still clears queued audio", () => {
   assert.match(runtimeSource, /onUnmounted\(\(\) => \{[\s\S]*clearAudio\(\)/);
 });
+
+test("an SPA-shell response is rejected before it reaches the WASM parser", () => {
+  // 角色素材沒部署時，dev server / SPA fallback 會用 200 回 index.html。
+  // response.ok 擋不住，HTML 一路餵到 _processSecret 才炸成看不懂的指標。
+  const source = runtimeSource;
+  assert.match(
+    source,
+    /function assertCharacterPayload/,
+    "必須在餵給 WASM 之前先驗證 payload",
+  );
+  assert.match(
+    source,
+    /assertCharacterPayload\(payload, dataUrl\)[\s\S]{0,80}decodeCharacterPayload/,
+    "驗證必須發生在解碼與 _processSecret 之前",
+  );
+  assert.match(source, /回傳的是 HTML 而不是資料檔/);
+});
+
+test("character assets are fetched from the path the Backend actually serves", () => {
+  // Backend 在 /static/characters/ 下提供角色素材；舊的預設 '/assets' 沒有
+  // 對應路由，會落到 SPA fallback 拿回 index.html，最後炸在 WASM 裡。
+  assert.match(
+    runtimeSource,
+    /const CHARACTER_ASSETS_BASE = '\/static\/characters'/,
+  );
+  assert.doesNotMatch(
+    runtimeSource,
+    /assetsBase = '\/assets'/,
+    "不可再退回沒有路由的 /assets",
+  );
+});

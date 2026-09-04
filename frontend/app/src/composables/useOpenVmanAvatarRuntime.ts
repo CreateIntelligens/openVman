@@ -15,6 +15,10 @@ let idleLipSyncBypass: IdleLipSyncBypass | null = null
 // 拆掉 canvas patch：最後一個使用者卸載才還原，否則會扯掉還在用的人的嘴型。
 let activeConsumers = 0
 
+// 角色素材由 Backend 在這個前綴下提供（見 api/http.ts 的 ASSET_PATH_PREFIXES）。
+// 舊的預設值 '/assets' 沒有對應的路由，會落到 SPA fallback 拿回 index.html。
+const CHARACTER_ASSETS_BASE = '/static/characters'
+
 function isGzipPayload(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
 }
@@ -25,6 +29,28 @@ function decodeCharacterPayload(payload: Uint8Array): string {
   }
 
   return new TextDecoder().decode(payload)
+}
+
+/**
+ * Reject an asset response that is really the SPA shell.
+ *
+ * 角色檔沒部署時，dev server 與 SPA fallback 會用 200 回 index.html，
+ * 所以 response.ok 擋不住。這種 HTML 一路餵到 _processSecret 才炸，
+ * 錯誤是一個看不懂的 C++ 例外指標——在這裡就要說清楚是檔案沒部署。
+ */
+function assertCharacterPayload(payload: Uint8Array, url: string): void {
+  if (isGzipPayload(payload)) return
+
+  const head = new TextDecoder().decode(payload.subarray(0, 64)).trimStart()
+  if (head.startsWith('<')) {
+    throw new Error(
+      `角色資料 ${url} 回傳的是 HTML 而不是資料檔，`
+      + '通常代表角色素材沒有部署到這個環境（見 public/assets/.gitignore）。',
+    )
+  }
+  if (payload.length === 0) {
+    throw new Error(`角色資料 ${url} 是空的`)
+  }
 }
 
 function settleRuntimeScriptLoad(
@@ -161,7 +187,7 @@ export function useOpenVmanAvatarRuntime() {
 
   async function loadCharacter(
     charId: string,
-    assetsBase = '/assets',
+    assetsBase = CHARACTER_ASSETS_BASE,
   ): Promise<void> {
     const runtime = runtimeInstance
     if (!runtime) {
@@ -182,6 +208,7 @@ export function useOpenVmanAvatarRuntime() {
       }
 
       const payload = new Uint8Array(await response.arrayBuffer())
+      assertCharacterPayload(payload, dataUrl)
       const characterData = decodeCharacterPayload(payload)
       const encoded = new TextEncoder().encode(characterData)
       const pointer = runtime._malloc(encoded.length + 1)
