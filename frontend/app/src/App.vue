@@ -118,6 +118,7 @@
       :current-persona-id="settings.personaId"
       :personas-loading="personasLoading"
       :voice-mode="settings.voiceMode"
+      :reply-mode="settings.replyMode"
       :render-mode="settings.renderMode"
       :background-id="settings.backgroundId"
       :background-url="settings.backgroundUrl"
@@ -132,6 +133,7 @@
       @project-change="handleProjectChange"
       @persona-change="handlePersonaChange"
       @voice-mode-change="handleVoiceModeChange"
+      @reply-mode-change="handleReplyModeChange"
       @render-mode-change="handleRenderModeChange"
       @vrm-character-change="handleVrmAvatarChange"
       @background-change="handleBackgroundChange"
@@ -151,6 +153,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import type { AccountDefaults } from "./api/auth";
+import type { ReplyMode } from "./types/replyMode";
 import { apiFetch } from "./api/http";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import CameraPreview from "./components/avatar/CameraPreview.vue";
@@ -602,6 +605,7 @@ const chat = useAvatarChat({
   projectId: settings.projectId,
   personaId: settings.personaId,
   mode: settings.voiceMode,
+  replyMode: () => settings.replyMode,
   onAudioChunk: (data) => audio.playChunk(data),
   onDisconnect: () => {
     isStarted.value = false;
@@ -764,6 +768,10 @@ function handlePersonaChange(personaId: string): void {
 
 function handleVoiceModeChange(mode: 'live' | 'text'): void {
   settings.voiceMode = mode;
+}
+
+function handleReplyModeChange(mode: ReplyMode): void {
+  settings.replyMode = mode;
 }
 
 function handleRenderModeChange(mode: '2d' | '3d'): void {

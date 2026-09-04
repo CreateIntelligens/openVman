@@ -3,6 +3,7 @@ import {
   normalizeAvatarBackgroundFit,
   normalizeAvatarBackgroundId,
 } from "../types/avatarBackground"
+import { normalizeReplyMode } from "../types/replyMode"
 import { STORAGE_KEYS, readPref, writePref } from "../utils/storageUtils"
 
 function normalizeAvatarRenderMode(value: string): '2d' | '3d' {
@@ -28,6 +29,7 @@ const state = reactive({
   cameraPreviewScale: normalizeCameraPreviewScale(readPref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, "1")),
   renderMode: normalizeAvatarRenderMode(readPref(STORAGE_KEYS.RENDER_MODE, "2d")),
   vrmAvatarId: readPref(STORAGE_KEYS.VRM_AVATAR_ID, "qqman"),
+  replyMode: normalizeReplyMode(readPref(STORAGE_KEYS.REPLY_MODE, "fast")),
 })
 
 watch(() => state.ttsProvider, (v) => writePref(STORAGE_KEYS.TTS_ENGINE, v))
@@ -42,6 +44,7 @@ watch(() => state.backgroundFit, (v) => writePref(STORAGE_KEYS.BACKGROUND_FIT, v
 watch(() => state.cameraPreviewScale, (v) => writePref(STORAGE_KEYS.CAMERA_PREVIEW_SCALE, String(v)))
 watch(() => state.renderMode, (v) => writePref(STORAGE_KEYS.RENDER_MODE, v))
 watch(() => state.vrmAvatarId, (v) => writePref(STORAGE_KEYS.VRM_AVATAR_ID, v))
+watch(() => state.replyMode, (v) => writePref(STORAGE_KEYS.REPLY_MODE, v))
 
 export function useSettingsStore() {
   return state
