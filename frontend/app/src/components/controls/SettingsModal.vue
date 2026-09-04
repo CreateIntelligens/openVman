@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import CustomSelect from './CustomSelect.vue'
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
+import { REPLY_MODES, type ReplyMode } from "../../types/replyMode";
 import {
   isUploadedAvatarBackgroundId,
   type AvatarBackgroundFit,
@@ -55,6 +56,7 @@ const props = defineProps<{
   currentPersonaId: string
   personasLoading?: boolean
   voiceMode?: 'live' | 'text'
+  replyMode: ReplyMode
   renderMode: '2d' | '3d'
   backgroundId: AvatarBackgroundId
   backgroundUrl: string
@@ -73,6 +75,7 @@ const emit = defineEmits<{
   projectPreviewChange: [projectId: string]
   personaChange: [personaId: string]
   voiceModeChange: [mode: 'live' | 'text']
+  replyModeChange: [mode: ReplyMode]
   renderModeChange: [mode: '2d' | '3d']
   vrmCharacterChange: [vrmId: string]
   backgroundChange: [
@@ -141,6 +144,7 @@ const draftVrmId = ref(props.currentVrmId)
 const draftTtsProvider = ref(props.ttsProvider)
 const draftTtsVoice = ref(props.ttsVoice)
 const draftVoiceMode = ref<'live' | 'text'>(props.voiceMode ?? 'text')
+const draftReplyMode = ref<ReplyMode>(props.replyMode)
 const draftRenderMode = ref<AvatarRenderMode>(props.renderMode)
 const draftBackgroundId = ref<AvatarBackgroundId>(props.backgroundId)
 const draftBackgroundUrl = ref(props.backgroundUrl)
@@ -187,6 +191,7 @@ watch(() => props.open, async (open) => {
     draftTtsProvider.value = props.ttsProvider
     draftTtsVoice.value = props.ttsVoice
     draftVoiceMode.value = props.voiceMode ?? 'text'
+    draftReplyMode.value = props.replyMode
     draftRenderMode.value = props.renderMode
     draftBackgroundId.value = props.backgroundId
     draftBackgroundUrl.value = props.backgroundUrl
@@ -268,7 +273,8 @@ const needsReconnect = computed(() =>
   draftCharId.value !== (props.currentCharId ?? '') ||
   draftTtsProvider.value !== props.ttsProvider ||
   draftTtsVoice.value !== props.ttsVoice ||
-  draftVoiceMode.value !== (props.voiceMode ?? 'text')
+  draftVoiceMode.value !== (props.voiceMode ?? 'text') ||
+  draftReplyMode.value !== props.replyMode
 )
 const isBackgroundDirty = computed(() =>
   draftBackgroundId.value !== props.backgroundId ||
@@ -329,6 +335,9 @@ function applyAndClose(): void {
   }
   if (draftVoiceMode.value !== (props.voiceMode ?? 'text')) {
     emit('voiceModeChange', draftVoiceMode.value)
+  }
+  if (draftReplyMode.value !== props.replyMode) {
+    emit('replyModeChange', draftReplyMode.value)
   }
   if (draftRenderMode.value !== props.renderMode) {
     emit('renderModeChange', draftRenderMode.value)
@@ -522,6 +531,29 @@ function handleDialogClick(event: MouseEvent): void {
                   <span class="mode-option__text">
                     <strong>標準</strong>
                     <small>文字 AI（多模型）</small>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-card field-card--full">
+              <span class="field-card__label">回覆深度</span>
+              <div class="mode-toggle">
+                <label
+                  v-for="option in REPLY_MODES"
+                  :key="option.value"
+                  class="mode-option"
+                  :class="{ 'mode-option--active': draftReplyMode === option.value }"
+                >
+                  <input
+                    type="radio"
+                    v-model="draftReplyMode"
+                    :value="option.value"
+                    :disabled="disabled"
+                  />
+                  <span class="mode-option__text">
+                    <strong>{{ option.label }}</strong>
+                    <small>{{ option.hint }}</small>
                   </span>
                 </label>
               </div>

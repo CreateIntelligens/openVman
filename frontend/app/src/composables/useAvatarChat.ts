@@ -91,6 +91,9 @@ interface ChatOptions {
        visionResetEndpoint?: string
        /** Extra headers for text-mode requests. */
        requestHeaders?: () => Record<string, string>
+       /** 每次送出時讀取的回覆深度（fast / standard / deep）。用 getter 而不是
+        *  固定值，使用者在設定裡改完下一句就生效。 */
+       replyMode?: () => string
        /** Override live-mode WebSocket URL creation. */
        wsUrlBuilder?: (clientId: string) => string
        /** Surface name sent in client_init capabilities. */
@@ -492,6 +495,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                                     persona_id: currentPersonaId,
                                     project_id: currentProjectId,
                                     session_id: sessionId.value,
+                                    mode: options.replyMode?.() ?? '',
                              }),
                              signal: abort.signal,
                       })
