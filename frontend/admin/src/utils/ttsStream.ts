@@ -88,9 +88,26 @@ export function playPcmStream(
     if (readerDone && sources.size === 0) settle?.();
   };
 
-  const schedule = (bytes: Uint8Array) => {
-    if (bytes.byteLength < 2 || stopped) return;
-    const even = bytes.byteLength & 1 ? bytes.subarray(0, bytes.byteLength - 1) : bytes;
+  // 網路切割不保證落在 16-bit sample 邊界。落單的位元組要留到下一段接回去，
+  // 丟掉它會讓後續每個 chunk 的高低位元組互換，聲音變成爆音。
+  let carry: Uint8Array = new Uint8Array(0);
+
+  const schedule = (incoming: Uint8Array) => {
+    if (stopped) return;
+    let bytes = incoming;
+    if (carry.byteLength > 0) {
+      const joined = new Uint8Array(carry.byteLength + bytes.byteLength);
+      joined.set(carry);
+      joined.set(bytes, carry.byteLength);
+      bytes = joined;
+      carry = new Uint8Array(0);
+    }
+    if (bytes.byteLength & 1) {
+      carry = bytes.slice(bytes.byteLength - 1);
+      bytes = bytes.subarray(0, bytes.byteLength - 1);
+    }
+    if (bytes.byteLength < 2) return;
+    const even = bytes;
     pcmParts.push(even.slice());
     const buffer = pcm16ToAudioBuffer(context, even, sampleRate);
     options.onChunk?.(buffer);
@@ -102,6 +119,9 @@ export function playPcmStream(
     sources.add(source);
     source.onended = () => {
       sources.delete(source);
+      // 正常播完也要斷開：只在 stop() 斷開的話，每段語音都會在輸出節點上
+      // 留下一個已播完但仍連著的 source。
+      source.disconnect();
       finishIfIdle();
     };
     source.start(startAt);

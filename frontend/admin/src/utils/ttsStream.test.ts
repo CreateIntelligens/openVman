@@ -10,6 +10,7 @@ import {
 
 function fakeContext(sampleRateHint = 48000) {
   const started: { buffer: AudioBuffer; at: number }[] = [];
+  const counters = { disconnected: 0 };
   const context = {
     currentTime: 0,
     state: "running",
@@ -29,7 +30,9 @@ function fakeContext(sampleRateHint = 48000) {
         buffer: null as AudioBuffer | null,
         onended: null as null | (() => void),
         connect: vi.fn(),
-        disconnect: vi.fn(),
+        disconnect: vi.fn(() => {
+          counters.disconnected += 1;
+        }),
         start: vi.fn((at: number) => {
           started.push({ buffer: source.buffer!, at });
           queueMicrotask(() => source.onended?.());
@@ -39,7 +42,14 @@ function fakeContext(sampleRateHint = 48000) {
       return source;
     },
   } as unknown as AudioContext;
-  return { context, started, sampleRateHint };
+  return {
+    context,
+    started,
+    sampleRateHint,
+    get disconnected() {
+      return counters.disconnected;
+    },
+  };
 }
 
 function streamResponse(chunks: Uint8Array[], contentType = "audio/wav; rate=48000"): Response {
@@ -100,6 +110,29 @@ describe("playPcmStream", () => {
     expect(wav.byteLength).toBe(44 + pcmA.byteLength + pcmB.byteLength);
   });
 
+  it("keeps 16-bit framing when a chunk arrives with an odd byte count", async () => {
+    // 網路切割不保證落在 sample 邊界。丟掉落單的位元組會讓後面每個 chunk 的
+    // 高低位元組交換，聲音變成爆音——第一段正常、之後全壞就是這個症狀。
+    const { context, started } = fakeContext();
+    const header = new Uint8Array(44);
+    const full = new Int16Array([100, 200, 300, 400, 500, 600]);
+    const raw = new Uint8Array(full.buffer);
+    // 切在奇數位置：第一段 5 個位元組，第二段 7 個。
+    const partA = raw.slice(0, 5);
+    const partB = raw.slice(5);
+
+    const playback = playPcmStream(streamResponse([header, partA, partB]), context, {
+      minChunkBytes: 1,
+    });
+    const wav = await playback.done;
+
+    // 播出去的樣本總數必須等於原始樣本數，一個都不能少。
+    const playedSamples = started.reduce((sum, s) => sum + s.buffer.length, 0);
+    expect(playedSamples).toBe(full.length);
+    // 重組出來的 WAV 必須逐位元組等於原始 PCM。
+    expect(new Uint8Array(wav.slice(44))).toEqual(raw);
+  });
+
   it("stop() halts scheduled sources and settles the promise", async () => {
     const { context } = fakeContext();
     const body = new ReadableStream<Uint8Array>({ start() { /* never closes */ } });
@@ -109,5 +142,22 @@ describe("playPcmStream", () => {
     playback.stop();
 
     await expect(playback.done).resolves.toBeInstanceOf(ArrayBuffer);
+  });
+});
+
+describe("playPcmStream resource cleanup", () => {
+  it("disconnects each source after it finishes, not only on stop()", async () => {
+    // 每段語音都會排很多個 source；播完不斷開的話，輸出節點會一直累積。
+    const fake = fakeContext();
+    const { context } = fake;
+    const header = new Uint8Array(44);
+    const pcm = new Uint8Array(new Int16Array(2400).fill(500).buffer);
+
+    const playback = playPcmStream(streamResponse([header, pcm, pcm]), context, {
+      minChunkBytes: 1,
+    });
+    await playback.done;
+
+    expect(fake.disconnected).toBe(2);
   });
 });
