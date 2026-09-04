@@ -29,6 +29,7 @@ import {
 } from "../data/mascotCatalog";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { dataUrlToFile } from "../utils/dataUrlToFile";
+import { writeScoped } from "../utils/scopedStorage";
 
 type Status = { type: "success" | "error"; message: string } | null;
 type RenameTarget =
@@ -567,16 +568,16 @@ export default function Avatar() {
   }
 
   function handleTry(charId: string): void {
-    window.localStorage.setItem(AVATAR_CHARACTER_STORAGE_KEY, charId);
+    writeScoped(AVATAR_CHARACTER_STORAGE_KEY, charId);
     window.open("/", "_blank", "noopener,noreferrer");
   }
 
   function handleUseBackground(background: AvatarBackground): void {
-    window.localStorage.setItem(
+    writeScoped(
       AVATAR_BACKGROUND_ID_STORAGE_KEY,
       `uploaded:${background.background_id}`,
     );
-    window.localStorage.setItem(AVATAR_BACKGROUND_URL_STORAGE_KEY, background.url);
+    writeScoped(AVATAR_BACKGROUND_URL_STORAGE_KEY, background.url);
     window.open("/", "_blank", "noopener,noreferrer");
   }
 

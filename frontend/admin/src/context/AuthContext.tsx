@@ -20,6 +20,7 @@ import {
   setForbiddenHandler,
   setUnauthorizedHandler,
 } from "../api/common";
+import { setStorageScope } from "../utils/scopedStorage";
 import { publicAdminPath } from "../components/app/navigation";
 
 interface AuthContextValue {
@@ -40,6 +41,11 @@ function replacePath(path: string): void {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<AccountProfile | null>(null);
+
+  // 偏好是每個帳號各自一份。這裡在 render 期間就綁定，而不是放進 effect：
+  // 子元件的 useState 初始化會讀 localStorage，那發生在 effect 之前，
+  // 晚一步綁定就會讀到未綁定的舊值。
+  setStorageScope(account?.id ?? "");
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
 

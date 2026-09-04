@@ -4,6 +4,7 @@ import { isPcmStreamContentType, playPcmStream } from "../utils/ttsStream";
 import { useMascot } from "../context/MascotContext";
 import { resolveMascotOption } from "../data/mascotCatalog";
 import { audioBufferToMascotPcm, blobToPcm16Chunks, rmsVolume } from "../utils/liveAudioUtils";
+import { readScoped, writeScoped } from "../utils/scopedStorage";
 
 type WebAudioWindow = Window & typeof globalThis & {
        webkitAudioContext?: typeof AudioContext;
@@ -69,8 +70,8 @@ function setTtsCacheEntry(cache: Map<string, CachedSpeech>, key: string, value: 
 
 export function useTts() {
        const [ttsProviders, setTtsProviders] = useState<TtsProvider[]>([]);
-       const [ttsProvider, setTtsProvider] = useState(() => localStorage.getItem(TTS_PROVIDER_STORAGE_KEY) || "auto");
-       const [ttsVoice, setTtsVoice] = useState(() => localStorage.getItem(TTS_VOICE_STORAGE_KEY) || "");
+       const [ttsProvider, setTtsProvider] = useState(() => readScoped(TTS_PROVIDER_STORAGE_KEY) || "auto");
+       const [ttsVoice, setTtsVoice] = useState(() => readScoped(TTS_VOICE_STORAGE_KEY) || "");
        const [ttsFallbackToast, setTtsFallbackToast] = useState("");
        const [ttsPrefetching, setTtsPrefetching] = useState(false);
        const [playingIndex, setPlayingIndex] = useState<number | null>(null);
@@ -107,10 +108,10 @@ export function useTts() {
               fetchTtsProviders()
                      .then((providers) => {
                             setTtsProviders(providers);
-                            const stored = localStorage.getItem(TTS_PROVIDER_STORAGE_KEY) || "auto";
+                            const stored = readScoped(TTS_PROVIDER_STORAGE_KEY) || "auto";
                             if (!providers.some((p) => p.id === stored)) {
                                    setTtsProvider("auto");
-                                   localStorage.setItem(TTS_PROVIDER_STORAGE_KEY, "auto");
+                                   writeScoped(TTS_PROVIDER_STORAGE_KEY, "auto");
                             }
                      })
                      .catch((reason) => console.warn("Failed to load TTS providers:", reason));
@@ -365,16 +366,16 @@ export function useTts() {
 
        const handleTtsProviderChange = useCallback((id: string) => {
               setTtsProvider(id);
-              localStorage.setItem(TTS_PROVIDER_STORAGE_KEY, id);
+              writeScoped(TTS_PROVIDER_STORAGE_KEY, id);
               const provider = ttsProviders.find((item) => item.id === id);
               const nextVoice = provider?.default_voice || "";
               setTtsVoice(nextVoice);
-              localStorage.setItem(TTS_VOICE_STORAGE_KEY, nextVoice);
+              writeScoped(TTS_VOICE_STORAGE_KEY, nextVoice);
        }, [ttsProviders]);
 
        const handleTtsVoiceChange = useCallback((voice: string) => {
               setTtsVoice(voice);
-              localStorage.setItem(TTS_VOICE_STORAGE_KEY, voice);
+              writeScoped(TTS_VOICE_STORAGE_KEY, voice);
        }, []);
 
        useEffect(() => () => {

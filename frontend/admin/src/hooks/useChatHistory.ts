@@ -17,6 +17,7 @@ import {
   resolvePersonaId,
 } from "../components/chat/helpers";
 import { useRefetchOnRecovery } from "../context/BackendHealthContext";
+import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
 
 export function useChatHistory(clearTtsPrefetchState: () => void) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -46,7 +47,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
   const persistSessionId = useCallback(
     (nextSessionId: string, personaId = selectedPersonaId) => {
       setSessionId(nextSessionId);
-      window.localStorage.setItem(getSessionStorageKey(personaId), nextSessionId);
+      writeScoped(getSessionStorageKey(personaId), nextSessionId);
     },
     [selectedPersonaId],
   );
@@ -91,7 +92,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
       if (sending || personaId === selectedPersonaId) {
         return;
       }
-      window.localStorage.setItem(getPersonaStorageKey(), personaId);
+      writeScoped(getPersonaStorageKey(), personaId);
       setSelectedPersonaId(personaId);
     },
     [selectedPersonaId],
@@ -102,7 +103,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
     deleteSession(deleteSessionTarget.session_id)
       .then(() => {
         if (sessionId === deleteSessionTarget.session_id) {
-          window.localStorage.removeItem(getSessionStorageKey(selectedPersonaId));
+          removeScoped(getSessionStorageKey(selectedPersonaId));
           resetViewState();
         }
         setDeleteSessionTarget(null);
@@ -127,8 +128,8 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
     // 寫回 storage 後，下面既有的 persona / session 還原流程就會自然接手。
     const deepLink = consumeChatDeepLink();
     if (deepLink) {
-      window.localStorage.setItem(getPersonaStorageKey(), deepLink.personaId);
-      window.localStorage.setItem(
+      writeScoped(getPersonaStorageKey(), deepLink.personaId);
+      writeScoped(
         getSessionStorageKey(deepLink.personaId),
         deepLink.sessionId,
       );
@@ -136,7 +137,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
 
     const storedPersonaId =
       deepLink?.personaId ??
-      window.localStorage.getItem(getPersonaStorageKey()) ??
+      readScoped(getPersonaStorageKey()) ??
       "default";
     setLoadingPersonas(true);
     fetchPersonas()
@@ -145,7 +146,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
         const nextPersonaId = resolvePersonaId(availablePersonas, storedPersonaId);
         setPersonas(availablePersonas);
         setSelectedPersonaId(nextPersonaId);
-        window.localStorage.setItem(getPersonaStorageKey(), nextPersonaId);
+        writeScoped(getPersonaStorageKey(), nextPersonaId);
       })
       .catch((reason) => {
         setPersonas([defaultPersona]);
@@ -159,7 +160,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
     if (!selectedPersonaId || loadingPersonas) return;
 
     resetViewState();
-    const storedSessionId = window.localStorage.getItem(getSessionStorageKey(selectedPersonaId));
+    const storedSessionId = readScoped(getSessionStorageKey(selectedPersonaId));
     if (!storedSessionId) return;
 
     setSessionId(storedSessionId);
@@ -170,7 +171,7 @@ export function useChatHistory(clearTtsPrefetchState: () => void) {
         setMessages(response.history ?? []);
       })
       .catch((reason) => {
-        window.localStorage.removeItem(getSessionStorageKey(selectedPersonaId));
+        removeScoped(getSessionStorageKey(selectedPersonaId));
         setSessionId("");
         setError(String(reason));
       })

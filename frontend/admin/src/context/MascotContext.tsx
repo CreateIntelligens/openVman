@@ -17,6 +17,7 @@ import {
   toMascotOption,
   writeStoredMascotId,
 } from "../data/mascotCatalog";
+import { readScoped, writeScoped } from "../utils/scopedStorage";
 
 export const MASCOT_OPEN_STORAGE_KEY = "admin-mascot-open";
 const MOBILE_MEDIA_QUERY = "(max-width: 48rem)";
@@ -29,7 +30,7 @@ function isMobileViewport(): boolean {
 export function initialClosed(): boolean {
   if (isMobileViewport()) return true;
   try {
-    return window.localStorage.getItem(MASCOT_OPEN_STORAGE_KEY) !== "1";
+    return readScoped(MASCOT_OPEN_STORAGE_KEY) !== "1";
   } catch {
     return true;
   }
@@ -37,7 +38,7 @@ export function initialClosed(): boolean {
 
 export function rememberMascotOpen(open: boolean): void {
   try {
-    window.localStorage.setItem(MASCOT_OPEN_STORAGE_KEY, open ? "1" : "0");
+    writeScoped(MASCOT_OPEN_STORAGE_KEY, open ? "1" : "0");
   } catch {
     // 隱私模式下 localStorage 可能不可寫，忽略即可。
   }

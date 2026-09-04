@@ -1,4 +1,5 @@
 import type { PiiWarningSummary } from "../../api";
+import { readScoped, writeScoped } from "../../utils/scopedStorage";
 
 export const PRIVACY_WARNING_VISIBLE_STORAGE_KEY = "chat.privacy_warning_visible";
 
@@ -35,11 +36,11 @@ export function hasPiiWarning(warning?: PiiWarningSummary): warning is PiiWarnin
 
 export function readPrivacyWarningsVisible(): boolean {
   if (typeof window === "undefined") return true;
-  const raw = window.localStorage.getItem(PRIVACY_WARNING_VISIBLE_STORAGE_KEY);
+  const raw = readScoped(PRIVACY_WARNING_VISIBLE_STORAGE_KEY);
   return raw == null ? true : raw !== "false";
 }
 
 export function writePrivacyWarningsVisible(visible: boolean): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(PRIVACY_WARNING_VISIBLE_STORAGE_KEY, String(visible));
+  writeScoped(PRIVACY_WARNING_VISIBLE_STORAGE_KEY, String(visible));
 }

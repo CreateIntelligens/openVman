@@ -1,3 +1,4 @@
+import { readScoped, writeScoped } from "../utils/scopedStorage";
 export type MascotEngine = "2d" | "3d" | "video";
 export type MascotFit = "half" | "full";
 
@@ -114,7 +115,7 @@ export function readStoredMascotId(
 ): string {
   if (typeof window === "undefined") return DEFAULT_MASCOT_ID;
   return resolveMascotOption(
-    window.localStorage.getItem(AVATAR_MASCOT_STORAGE_KEY),
+    readScoped(AVATAR_MASCOT_STORAGE_KEY),
     catalog,
   ).id;
 }
@@ -125,7 +126,7 @@ export function writeStoredMascotId(
 ): string {
   const resolvedMascotId = resolveMascotOption(mascotId, catalog).id;
   if (typeof window !== "undefined") {
-    window.localStorage.setItem(AVATAR_MASCOT_STORAGE_KEY, resolvedMascotId);
+    writeScoped(AVATAR_MASCOT_STORAGE_KEY, resolvedMascotId);
   }
   return resolvedMascotId;
 }

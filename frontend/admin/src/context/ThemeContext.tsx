@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { readScoped, writeScoped } from "../utils/scopedStorage";
 
 type Theme = "light" | "dark";
 
@@ -11,7 +12,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem("admin-theme");
+    const saved = readScoped("admin-theme");
     return (saved as Theme) || "dark";
   });
 
@@ -22,7 +23,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } else {
       root.classList.remove("dark");
     }
-    localStorage.setItem("admin-theme", theme);
+    writeScoped("admin-theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {

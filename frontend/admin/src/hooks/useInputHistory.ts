@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { readScoped, writeScoped } from "../utils/scopedStorage";
 
 const STORAGE_KEY = "openvman.chat.history";
 const MAX_ENTRIES = 50;
@@ -6,7 +7,7 @@ const MAX_ENTRIES = 50;
 function readHistory(): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = readScoped(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -19,7 +20,7 @@ function readHistory(): string[] {
 function writeHistory(entries: string[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+    writeScoped(STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
   } catch {
     // ignore quota/security errors
   }
