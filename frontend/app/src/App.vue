@@ -183,7 +183,7 @@ import {
   type MascotApiRecord,
   type MascotOption,
 } from "./data/mascotCatalog";
-import { useSettingsStore } from "./stores/useSettingsStore";
+import { bindSettingsToAccount, useSettingsStore } from "./stores/useSettingsStore";
 import {
   isUploadedAvatarBackgroundId,
   normalizeAvatarBackgroundId,
@@ -319,6 +319,13 @@ const personasLoading = ref(false);
 const ttsProviders = ref<TtsProvider[]>([]);
 const avatarCatalog = useAvatarCatalog();
 const auth = useAuth();
+// 偏好是每個帳號各自一份。store 在登入前就初始化了，所以帳號一確定就要重新
+// 綁定並重讀——immediate 讓還原既有工作階段的情況也會走到。
+watch(
+  () => auth.account.value?.id ?? "",
+  (accountId) => bindSettingsToAccount(accountId),
+  { immediate: true },
+);
 const selectionNotices = ref<string[]>([]);
 let personaRequestId = 0;
 
