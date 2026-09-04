@@ -11,6 +11,9 @@ let runtimeInstance: OpenVmanAvatarRuntimeInstance | null = null
 let runtimeInitPromise: Promise<OpenVmanAvatarRuntimeInstance> | null = null
 let runtimeScriptPromise: Promise<void> | null = null
 let idleLipSyncBypass: IdleLipSyncBypass | null = null
+// runtime 是模組層級的單例，可能同時被多個元件使用。用引用計數決定何時真正
+// 拆掉 canvas patch：最後一個使用者卸載才還原，否則會扯掉還在用的人的嘴型。
+let activeConsumers = 0
 
 function isGzipPayload(bytes: Uint8Array): boolean {
   return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
@@ -133,6 +136,29 @@ export function useOpenVmanAvatarRuntime() {
     }
   }
 
+  /**
+   * Turn an Emscripten throw into something readable.
+   *
+   * C++ 例外逃到 JS 時丟的是一個裸指標（純數字），直接 String() 只會得到像
+   * 10609760 這種毫無資訊的值。有 getExceptionMessage 就用它取真正的訊息。
+   */
+  function describeWasmError(
+    caught: unknown,
+    runtime: OpenVmanAvatarRuntimeInstance,
+  ): string {
+    if (caught instanceof Error) return caught.message
+    if (typeof caught === 'number') {
+      try {
+        const message = runtime.getExceptionMessage?.(caught)
+        if (message) return `WASM 例外：${String(message)}`
+      } catch {
+        // getExceptionMessage 本身也可能丟出來，別讓它蓋掉原始錯誤。
+      }
+      return `WASM 例外（指標 ${caught}，未編入例外訊息支援）`
+    }
+    return String(caught)
+  }
+
   async function loadCharacter(
     charId: string,
     assetsBase = '/assets',
@@ -159,9 +185,14 @@ export function useOpenVmanAvatarRuntime() {
       const characterData = decodeCharacterPayload(payload)
       const encoded = new TextEncoder().encode(characterData)
       const pointer = runtime._malloc(encoded.length + 1)
-      runtime.stringToUTF8(characterData, pointer, encoded.length + 1)
-      runtime._processSecret(pointer)
-      runtime._free(pointer)
+      // _processSecret 失敗時也必須歸還這塊記憶體，否則每次重試都漏一段 heap；
+      // 症狀是 Emscripten 丟出的例外指標一路往上爬。
+      try {
+        runtime.stringToUTF8(characterData, pointer, encoded.length + 1)
+        runtime._processSecret(pointer)
+      } finally {
+        runtime._free(pointer)
+      }
 
       window.characterVideo.src = `${assetsBase}/${charId}/01.webm`
       window.characterVideo.loop = true
@@ -182,13 +213,9 @@ export function useOpenVmanAvatarRuntime() {
       chunkIndex = 0
       console.log(`[OpenVmanAvatarRuntime] Character ${charId} loaded`)
     } catch (caughtError) {
-      error.value = caughtError instanceof Error
-        ? caughtError.message
-        : String(caughtError)
-      console.error(
-        '[OpenVmanAvatarRuntime] loadCharacter failed:',
-        caughtError,
-      )
+      const described = describeWasmError(caughtError, runtime)
+      error.value = described
+      console.error('[OpenVmanAvatarRuntime] loadCharacter failed:', described, caughtError)
       throw caughtError
     } finally {
       isLoading.value = false
@@ -200,10 +227,23 @@ export function useOpenVmanAvatarRuntime() {
     if (!runtime) return
 
     const bytes = new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+    if (bytes.length === 0) return
+
     const pointer = runtime._malloc(bytes.length)
-    runtime.HEAPU8.set(bytes, pointer)
-    runtime._setAudioBuffer(pointer, bytes.length, chunkIndex++)
-    runtime._free(pointer)
+    if (!pointer) {
+      console.warn('[OpenVmanAvatarRuntime] _malloc failed; dropping audio chunk')
+      return
+    }
+    // 每段語音都會走這裡，所以漏掉一次 _free 就是持續性洩漏（不像
+    // loadCharacter 要人按重試才會累積）。用 finally 確保一定歸還。
+    try {
+      // HEAPU8 一定要在 _malloc 之後才讀：配置可能觸發 heap 成長，Emscripten
+      // 會換上一個新的 typed array，舊的會被 detach（寫進去就丟 TypeError）。
+      runtime.HEAPU8.set(bytes, pointer)
+      runtime._setAudioBuffer(pointer, bytes.length, chunkIndex++)
+    } finally {
+      runtime._free(pointer)
+    }
   }
 
   function clearAudio(): void {
@@ -223,9 +263,18 @@ export function useOpenVmanAvatarRuntime() {
     idleLipSyncBypass?.resetSpeaking()
   }
 
+  activeConsumers += 1
+
   onUnmounted(() => {
     clearAudio()
     resetSpeaking()
+    activeConsumers = Math.max(0, activeConsumers - 1)
+    if (activeConsumers === 0) {
+      // canvas 的 clearRect / drawImage 被我們換掉了，最後一個使用者離開時
+      // 要換回去，否則 patch 與它的 closure 會跟著 canvas 一直活著。
+      idleLipSyncBypass?.restore()
+      idleLipSyncBypass = null
+    }
   })
 
   return {

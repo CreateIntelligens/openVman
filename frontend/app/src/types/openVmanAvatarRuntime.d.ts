@@ -10,6 +10,8 @@ export interface OpenVmanAvatarRuntimeInstance {
     chunkIndex: number,
   ): void
   stringToUTF8(value: string, pointer: number, maxBytes: number): void
+  /** 只有在 Emscripten 以 -sEXPORT_EXCEPTION_HANDLING_HELPERS 建置時才存在。 */
+  getExceptionMessage?: (pointer: number) => unknown
 }
 
 export interface OpenVmanAvatarRuntimeConfig {
