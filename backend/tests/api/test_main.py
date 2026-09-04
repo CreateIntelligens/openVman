@@ -1110,3 +1110,32 @@ def test_tts_stream_auto_provider_streams_voxcpm_when_indextts_is_absent(monkeyp
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/wav; rate=48000"
+
+
+def test_voxcpm_voice_list_drops_excluded_ids(monkeypatch):
+    """上游清單不是我們維護的：黑名單裡的 voice_id 不該出現在選單。"""
+    from app.routes import admin
+
+    monkeypatch.setattr(
+        admin, "_excluded_voxcpm_voices", lambda: frozenset({"barbet-hung-yi-lee"}),
+    )
+
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"voices": [
+                {"voice_id": "barbet-hung-yi-lee", "label": "李宏毅老師"},
+                {"voice_id": "voxcpm2-cosy-young-female-01", "label": "年輕女聲"},
+            ]}
+
+    class _Client:
+        async def get(self, *args, **kwargs):
+            return _Response()
+
+    monkeypatch.setattr(admin._health_http, "get", lambda: _Client())
+
+    voices = asyncio.run(admin._fetch_voxcpm_voices("http://voxcpm.invalid"))
+
+    assert [voice_id for voice_id, _ in voices] == ["voxcpm2-cosy-young-female-01"]
