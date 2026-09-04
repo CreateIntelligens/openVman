@@ -128,3 +128,30 @@ def test_tools_read_the_active_mode_limit(monkeypatch: pytest.MonkeyPatch):
     # deep 允許 5 個，同樣的清單就過得了。
     with bind_tool_context("default", "default", reply_mode=DEEP):
         assert len(web_tools._normalize_read_urls({"urls": urls})) == 4
+
+
+def test_mode_settings_refuses_whole_object_serialisation():
+    """model_dump() 會繞過代理拿到未覆寫的底值，寧可直接報錯也不要安靜回錯答案。"""
+    from config import get_settings
+
+    scoped = ModeSettings(get_settings(), resolve_mode(DEEP))
+
+    # 屬性存取是唯一支援的用法，必須照常運作。
+    assert scoped.chat_max_followup_tool_rounds == 4
+
+    for name in ("model_dump", "dict", "json"):
+        with pytest.raises(AttributeError, match="繞過模式覆寫"):
+            getattr(scoped, name)
+
+
+def test_mode_settings_passes_through_computed_properties():
+    """底層 settings 的計算屬性要能透傳，不能因為代理而消失。"""
+    from config import get_settings
+
+    base = get_settings()
+    scoped = ModeSettings(base, resolve_mode(DEEP))
+
+    assert (
+        scoped.resolved_embedding_write_identity
+        == base.resolved_embedding_write_identity
+    )

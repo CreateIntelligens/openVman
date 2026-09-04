@@ -39,6 +39,11 @@ close_gateway_client = close_url2md_client
 
 
 # 最近一次失敗的時間戳，用來在冷卻期內跳過掛掉的主機。行程內共用，所以要鎖。
+#
+# 這份狀態是行程本地的。Brain 目前是單一 uvicorn 行程、單一容器，所以「行程
+# 本地」等同「全域」，足以擋掉逾時風暴。之後若真的橫向擴展成多 worker／多
+# pod，每個實例會各自學一次哪台掛了——屆時才值得把 host 健康狀態下沉到共用
+# 快取（Redis），現在做只是徒增依賴。
 _circuit_lock = Lock()
 _circuit_opened_at: dict[str, float] = {}
 
@@ -185,13 +190,23 @@ def _request_json(
 
 
 def _normalize_read_urls(args: dict[str, Any]) -> list[str]:
-    """Accept either ``url`` or ``urls`` and return a deduplicated, validated list."""
+    """Accept either ``url`` or ``urls`` and return a deduplicated, validated list.
+
+    模型偶爾會偏離 schema：送舊版的 ``url``、把單一網址直接當字串傳、或是把
+    ``urls`` 送成空陣列又另外給 ``url``。這些都當作同一個意思處理，不要為了
+    格式差異讓整個工具呼叫失敗。無效的網址仍然要擋（見 ``_validate_url``），
+    容忍的是外層形狀，不是內容。
+    """
     raw = args.get("urls")
-    if raw is None:
+    # 空陣列／空字串也視同沒給，才能退回 ``url``。
+    if raw is None or (isinstance(raw, (list, str)) and len(raw) == 0):
         raw = args.get("url")
     candidates = raw if isinstance(raw, list) else [raw]
     urls: list[str] = []
     for candidate in candidates:
+        # 陣列裡夾雜 None／空字串就跳過，不要讓一顆壞掉的元素毀掉整批。
+        if candidate is None or (isinstance(candidate, str) and not candidate.strip()):
+            continue
         url = _validate_url(candidate)
         if url not in urls:
             urls.append(url)

@@ -443,3 +443,37 @@ def test_chain_stops_once_the_budget_is_exhausted(monkeypatch: pytest.MonkeyPatc
 
     # 第一台花掉 2 秒，剩 1 秒還能試第二台；第二台之後預算就沒了。
     assert len(attempted) == 2
+
+
+def test_read_web_page_tolerates_tool_argument_drift(monkeypatch: pytest.MonkeyPatch):
+    """模型偏離 schema 時不該讓整個工具呼叫失敗，只要意思還清楚。"""
+    from tools.builtin import web_tools
+
+    monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
+    expected = ["https://example.com"]
+
+    # 舊版的單一 url、把陣列送成字串、空 urls 配上 url、陣列裡混進 None
+    # 或空字串——都視為同一個意思。
+    assert web_tools._normalize_read_urls({"url": "https://example.com"}) == expected
+    assert web_tools._normalize_read_urls({"urls": "https://example.com"}) == expected
+    assert web_tools._normalize_read_urls(
+        {"urls": [], "url": "https://example.com"}
+    ) == expected
+    assert web_tools._normalize_read_urls(
+        {"urls": ["https://example.com", None, "  "]}
+    ) == expected
+
+
+def test_read_web_page_still_rejects_genuinely_bad_input(monkeypatch: pytest.MonkeyPatch):
+    """容忍的是外層形狀，不是內容：無效網址仍要擋下來。"""
+    from tools.builtin import web_tools
+
+    monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
+
+    with pytest.raises(ValueError, match="url 不可為空"):
+        web_tools._normalize_read_urls({"urls": [None, ""]})
+    with pytest.raises(ValueError, match="無效的網址"):
+        # JSON 字串沒有被解析——它不是網址，不該偷偷放行。
+        web_tools._normalize_read_urls({"urls": '["https://example.com"]'})
+    with pytest.raises(ValueError, match="內部|特殊"):
+        web_tools._normalize_read_urls({"url": "http://127.0.0.1:8200/metrics"})

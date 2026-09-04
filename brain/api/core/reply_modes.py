@@ -76,11 +76,20 @@ def resolve_mode(name: str | None) -> ReplyMode:
     return _MODES.get(str(name).strip().lower(), _MODES[DEFAULT_MODE])
 
 
+# 序列化整份設定會繞過 __getattr__，拿到的是未覆寫的底值。與其安靜地回錯答案，
+# 不如直接擋下來，逼呼叫端改用屬性存取。
+_BYPASSES_OVERRIDES = ("model_dump", "dict", "json", "model_dump_json", "keys")
+
+
 class ModeSettings:
     """A read-only settings view with the mode's overrides applied.
 
     直接改全域 settings 會污染其他併發請求，所以用一層薄的代理：認得的欄位
     回傳模式值，其餘一律透傳給真正的 settings。
+
+    **只支援屬性存取**（``cfg.web_read_max_urls``）。整份序列化的方法會直接
+    讀底層 model 的欄位、繞過這層代理，所以它們被明確擋掉而不是回傳沒套用
+    覆寫的值——安靜的錯答案比明確的錯誤難查得多。
     """
 
     __slots__ = ("_base", "_overrides")
@@ -97,4 +106,9 @@ class ModeSettings:
     def __getattr__(self, name: str) -> Any:
         if name in self._overrides:
             return self._overrides[name]
+        if name in _BYPASSES_OVERRIDES:
+            raise AttributeError(
+                f"ModeSettings 不支援 {name}()：整份序列化會繞過模式覆寫。"
+                f"請改用屬性存取，或直接用 get_settings() 取未覆寫的設定。"
+            )
         return getattr(self._base, name)
