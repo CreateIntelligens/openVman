@@ -14,6 +14,7 @@ import {
   setActiveProjectId,
 } from "../api";
 import { errorMessage } from "../utils/errorMessage";
+import { readScoped, writeScoped } from "../utils/scopedStorage";
 
 const PROJECT_STORAGE_KEY = "brain-active-project";
 
@@ -35,7 +36,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     );
     const id =
       routeProject ||
-      window.localStorage.getItem(PROJECT_STORAGE_KEY) ||
+      readScoped(PROJECT_STORAGE_KEY) ||
       "default";
     setActiveProjectId(id);
     return id;
@@ -49,7 +50,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     projectIdRef.current = id;
     setProjectIdState(id);
     setActiveProjectId(id);
-    window.localStorage.setItem(PROJECT_STORAGE_KEY, id);
+    writeScoped(PROJECT_STORAGE_KEY, id);
   }, []);
 
   const refreshProjects = useCallback(async () => {

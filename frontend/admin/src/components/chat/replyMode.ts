@@ -1,3 +1,4 @@
+import { readScoped, writeScoped } from "../../utils/scopedStorage";
 /** 回覆深度：fast 只查知識庫，standard 平行查一輪，deep 允許多輪追查。 */
 export type ReplyMode = "fast" | "standard" | "deep";
 
@@ -32,12 +33,12 @@ function isReplyMode(value: string | null): value is ReplyMode {
 
 export function readReplyMode(): ReplyMode {
   if (typeof window === "undefined") return DEFAULT_REPLY_MODE;
-  const raw = window.localStorage.getItem(REPLY_MODE_STORAGE_KEY);
+  const raw = readScoped(REPLY_MODE_STORAGE_KEY);
   // 認不得的舊值（改過模式名稱、手動編輯過）一律退回預設，不要卡在壞狀態。
   return isReplyMode(raw) ? raw : DEFAULT_REPLY_MODE;
 }
 
 export function writeReplyMode(mode: ReplyMode): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(REPLY_MODE_STORAGE_KEY, mode);
+  writeScoped(REPLY_MODE_STORAGE_KEY, mode);
 }

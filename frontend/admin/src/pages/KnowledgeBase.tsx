@@ -37,6 +37,7 @@ import type { KnowledgeNoteFormat } from "../api";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { type QaNode, useQaNodes } from "../hooks/useQaNodes";
+import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
 
 const KNOWLEDGE_TABS = ["documents", "graph"] as const;
 type KnowledgeTab = (typeof KNOWLEDGE_TABS)[number];
@@ -210,7 +211,7 @@ export default function KnowledgeBase() {
   } = useQaNodes(projectId);
   const [qaSelection, setQaSelection] = useState(() => ({
     projectId,
-    nodeId: localStorage.getItem(`kb-selected-qa-node-id:${projectId}`),
+    nodeId: readScoped(`kb-selected-qa-node-id:${projectId}`),
   }));
   const selectedQaNodeId = qaSelection.projectId === projectId
     ? qaSelection.nodeId
@@ -240,7 +241,7 @@ export default function KnowledgeBase() {
 
   useEffect(() => {
     setSelectedQaNodeId(
-      localStorage.getItem(`kb-selected-qa-node-id:${projectId}`),
+      readScoped(`kb-selected-qa-node-id:${projectId}`),
     );
   }, [projectId]);
 
@@ -250,7 +251,7 @@ export default function KnowledgeBase() {
       || !selectedQaNodeId
       || findQaNode(nodesTree, selectedQaNodeId)
     ) return;
-    localStorage.removeItem(`kb-selected-qa-node-id:${projectId}`);
+    removeScoped(`kb-selected-qa-node-id:${projectId}`);
     setSelectedQaNodeId(null);
   }, [nodesTree, projectId, qaTreeLoading, selectedQaNodeId]);
 
@@ -346,15 +347,15 @@ export default function KnowledgeBase() {
 
   const handleSelectQaNode = useCallback((nodeId: string) => {
     setSelectedQaNodeId(nodeId);
-    localStorage.setItem(`kb-selected-qa-node-id:${projectId}`, nodeId);
-    localStorage.removeItem(`kb-selected-file-path:${projectId}`);
+    writeScoped(`kb-selected-qa-node-id:${projectId}`, nodeId);
+    removeScoped(`kb-selected-file-path:${projectId}`);
     closeFileView();
     setMobileTreeOpen(false);
   }, [closeFileView, projectId]);
 
   const handleSelectTreeFile = useCallback((node: TreeNode) => {
     setSelectedQaNodeId(null);
-    localStorage.removeItem(`kb-selected-qa-node-id:${projectId}`);
+    removeScoped(`kb-selected-qa-node-id:${projectId}`);
     handleTreeSelect(node);
     setMobileTreeOpen(false);
   }, [handleTreeSelect, projectId]);

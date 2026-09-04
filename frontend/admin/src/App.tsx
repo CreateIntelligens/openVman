@@ -36,6 +36,7 @@ import {
 import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { readScoped, writeScoped } from "./utils/scopedStorage";
 
 function initialRoute(): AdminRoute {
   const route = parseAdminRoute(window.location.pathname, window.location.search);
@@ -43,7 +44,7 @@ function initialRoute(): AdminRoute {
     return route;
   }
 
-  const saved = window.localStorage.getItem("brain-active-tab");
+  const saved = readScoped("brain-active-tab");
   return { tab: isTab(saved) ? saved : "Chat" };
 }
 
@@ -51,7 +52,7 @@ function AppContent() {
   const { account, logout } = useAuth();
   const [route, setRoute] = useState<AdminRoute>(initialRoute);
   const [isPinned, setIsPinned] = useState(
-    () => window.localStorage.getItem("brain-sidebar-pinned") === "true",
+    () => readScoped("brain-sidebar-pinned") === "true",
   );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const {
@@ -85,7 +86,7 @@ function AppContent() {
       if (nextProjectId !== projectId) {
         setProjectId(nextProjectId);
       }
-      window.localStorage.setItem("brain-active-tab", nextRoute.tab);
+      writeScoped("brain-active-tab", nextRoute.tab);
       currentUrlRef.current = path;
       if (historyMode === "replace") {
         window.history.replaceState(null, "", path);
@@ -185,7 +186,7 @@ function AppContent() {
           onTogglePin={() =>
             setIsPinned((value) => {
               const next = !value;
-              window.localStorage.setItem(
+              writeScoped(
                 "brain-sidebar-pinned",
                 String(next),
               );

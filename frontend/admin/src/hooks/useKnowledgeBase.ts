@@ -36,6 +36,7 @@ import { useProject } from "../context/ProjectContext";
 import { validateUploadFiles } from "../utils/uploadLimits";
 import { useLocalStorageState } from "./useLocalStorageState";
 import { useStatusState } from "./useStatusState";
+import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
 
 type UploadEntry = { file: File; relativePath: string };
 
@@ -101,11 +102,11 @@ export function useKnowledgeBase() {
   const { status, setStatus, setErrorStatus } = useStatusState();
   const [search, setSearch] = useState("");
   const [selectedPath, setSelectedPath] = useState<string>(() => {
-    return localStorage.getItem(selectedPathStorageKey(projectId)) ?? "knowledge";
+    return readScoped(selectedPathStorageKey(projectId)) ?? "knowledge";
   });
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem(expandedDirsStorageKey(projectId));
+      const saved = readScoped(expandedDirsStorageKey(projectId));
       if (saved) {
         const arr = JSON.parse(saved);
         if (Array.isArray(arr)) {
@@ -178,10 +179,10 @@ export function useKnowledgeBase() {
     setDocuments([]);
     setServerDirs([]);
     setSelectedPath(
-      localStorage.getItem(selectedPathStorageKey(projectId)) ?? "knowledge",
+      readScoped(selectedPathStorageKey(projectId)) ?? "knowledge",
     );
     try {
-      const saved = localStorage.getItem(expandedDirsStorageKey(projectId));
+      const saved = readScoped(expandedDirsStorageKey(projectId));
       const parsed = saved ? JSON.parse(saved) : null;
       setExpandedDirs(
         Array.isArray(parsed) ? new Set(parsed) : new Set(["knowledge"]),
@@ -274,7 +275,7 @@ export function useKnowledgeBase() {
 
   useEffect(() => {
     if (selectedPath && selectionProjectId === projectId) {
-      localStorage.setItem(selectedPathStorageKey(projectId), selectedPath);
+      writeScoped(selectedPathStorageKey(projectId), selectedPath);
     }
   }, [projectId, selectedPath, selectionProjectId]);
 
@@ -286,11 +287,11 @@ export function useKnowledgeBase() {
     ) return;
 
     restoredSelectionProjectRef.current = projectId;
-    const hasQaNodeSelected = !!localStorage.getItem(
+    const hasQaNodeSelected = !!readScoped(
       selectedQaNodeStorageKey(projectId),
     );
     const key = selectedPathStorageKey(projectId);
-    const initialPath = localStorage.getItem(key);
+    const initialPath = readScoped(key);
     if (hasQaNodeSelected || !initialPath || initialPath === "knowledge") return;
 
     if (documents.some((document) => document.path === initialPath)) {
@@ -306,7 +307,7 @@ export function useKnowledgeBase() {
       return;
     }
 
-    localStorage.removeItem(key);
+    removeScoped(key);
     setSelectedPath("knowledge");
     setRightPane("folder");
   }, [
@@ -320,7 +321,7 @@ export function useKnowledgeBase() {
 
   useEffect(() => {
     if (selectionProjectId === projectId) {
-      localStorage.setItem(
+      writeScoped(
         expandedDirsStorageKey(projectId),
         JSON.stringify(Array.from(expandedDirs)),
       );

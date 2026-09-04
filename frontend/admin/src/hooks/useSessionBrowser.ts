@@ -14,6 +14,7 @@ import {
   type SessionExportScope,
 } from "../components/chat/sessionExport";
 import { useRefetchOnRecovery } from "../context/BackendHealthContext";
+import { readScoped } from "../utils/scopedStorage";
 
 export type SessionSortKey = "updated_at" | "created_at" | "message_count";
 
@@ -155,7 +156,7 @@ export function useSessionBrowser() {
   useRefetchOnRecovery(loadSessions);
 
   useEffect(() => {
-    const storedPersonaId = window.localStorage.getItem(getPersonaStorageKey());
+    const storedPersonaId = readScoped(getPersonaStorageKey());
     setLoadingPersonas(true);
     fetchPersonas()
       .then((response) => {

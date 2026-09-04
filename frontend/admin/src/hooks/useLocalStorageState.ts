@@ -1,4 +1,5 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
+import { readScoped, writeScoped } from "../utils/scopedStorage";
 
 function isAllowedValue<T extends string>(
   value: string,
@@ -17,7 +18,7 @@ function readStoredValue<T extends string>(
   }
 
   try {
-    const stored = window.localStorage.getItem(key);
+    const stored = readScoped(key);
     if (!stored || !isAllowedValue(stored, allowedValues)) {
       return defaultValue;
     }
@@ -33,7 +34,7 @@ function writeStoredValue(key: string, value: string): void {
   }
 
   try {
-    window.localStorage.setItem(key, value);
+    writeScoped(key, value);
   } catch {
     // Ignore quota/security errors so browser privacy settings cannot break UI state.
   }
