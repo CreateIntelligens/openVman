@@ -104,6 +104,12 @@ async def _fetch_gemini_voices(base_url: str) -> list[str]:
     return await _fetch_provider_voices(base_url, "/api/voices", "gemini")
 
 
+def _excluded_voxcpm_voices() -> frozenset[str]:
+    """voice_id 黑名單：上游清單不是我們維護的，這裡濾掉不想露出的聲音。"""
+    raw = getattr(get_tts_config(), "tts_voxcpm_excluded_voices", "") or ""
+    return frozenset(item.strip() for item in raw.split(",") if item.strip())
+
+
 async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
     """回傳 VoxCPM360 的 ``(voice_id, label)`` 清單。
 
@@ -127,12 +133,15 @@ async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
     if not isinstance(voice_entries, list):
         return []
 
+    excluded = _excluded_voxcpm_voices()
     voices: list[tuple[str, str]] = []
     for entry in voice_entries:
         if not isinstance(entry, dict):
             continue
         voice_id = entry.get("voice_id")
         if not isinstance(voice_id, str) or not voice_id:
+            continue
+        if voice_id in excluded:
             continue
         label = entry.get("label")
         display_label = label if isinstance(label, str) and label else voice_id

@@ -74,6 +74,13 @@ class TTSRouterConfig(BaseSettings):
         default="",
         validation_alias="TTS_VOXCPM_DEFAULT_VOICE",
     )
+    # 逗號分隔的 voice_id 黑名單。上游的聲音清單不是我們維護的，這裡把不想
+    # 出現在選單裡的濾掉；預設排除 barbet-hung-yi-lee（另一套固定語者模型，
+    # 不是 VoxCPM2 的 zero-shot 克隆，行為與其餘聲音不一致）。
+    tts_voxcpm_excluded_voices: str = Field(
+        default="barbet-hung-yi-lee",
+        validation_alias="TTS_VOXCPM_EXCLUDED_VOICES",
+    )
 
     # --- TTS Text Normalization / 轉譯 API ---
     normalize_api_url: str = Field(default="", validation_alias="NORMALIZE_API_URL")
