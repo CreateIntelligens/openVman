@@ -169,8 +169,24 @@ def record_usage_event(
         )
         return None
     if scope is not None:
-        scope.collected.append(event)
+        scope.collected.append({**event, **_timeline_offsets(scope, latency_ms)})
     return event
+
+
+def _timeline_offsets(scope: UsageScope, latency_ms: float) -> dict[str, float]:
+    """位移只放進 scope 鏡像，不進 DB：帳本存的是計費事實，位移只服務
+    單次回應的「時間花在哪」視覺化。
+
+    起點由「結束時間往回推延遲」得出。延遲若比 scope 已經歷的時間還長
+    （呼叫早於 scope 建立，或兩邊用不同時鐘量測），把起點釘在 0 並讓長度
+    跟著縮短——寧可讓長條短一點，也不要讓它從負的時間開始。
+    """
+    ended_ms = max(0.0, scope.elapsed_ms())
+    started_ms = max(0.0, ended_ms - max(0.0, float(latency_ms)))
+    return {
+        "started_at_ms": round(started_ms, 2),
+        "ended_at_ms": round(ended_ms, 2),
+    }
 
 
 def _build_filters(

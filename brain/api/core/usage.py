@@ -8,6 +8,7 @@ every call site. ``asyncio.to_thread`` copies the context, so threads see it.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -108,6 +109,12 @@ class UsageScope:
     trace_id: str = ""
     channel: str = ""
     collected: list[dict[str, Any]] = field(default_factory=list)
+    # 這一個請求的時間原點（monotonic 秒）。LLM 事件與工具步驟都以它為基準記
+    # 開始／結束位移，前端才畫得出「誰跟誰重疊、時間花在哪」的時間軸。
+    clock_origin: float = field(default_factory=time.monotonic)
+
+    def elapsed_ms(self) -> float:
+        return (time.monotonic() - self.clock_origin) * 1000.0
 
 
 _usage_scope: ContextVar[UsageScope | None] = ContextVar("brain_usage_scope", default=None)
@@ -154,4 +161,18 @@ def summarize_collected(scope: UsageScope) -> dict[str, Any]:
         "latency_ms": round(latency_ms, 2),
         **totals,
         "by_model": by_model,
+        # 每次呼叫在請求時鐘上的位移，供前端畫時間軸；沒有位移的事件（例如
+        # 背景工作借用了 scope）就不列入。
+        "timeline": [
+            {
+                "provider": str(event.get("provider", "")),
+                "model": str(event.get("model", "")),
+                "kind": str(event.get("kind", "")),
+                "started_at_ms": float(event["started_at_ms"]),
+                "ended_at_ms": float(event["ended_at_ms"]),
+            }
+            for event in scope.collected
+            if event.get("started_at_ms") is not None
+            and event.get("ended_at_ms") is not None
+        ],
     }

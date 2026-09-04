@@ -177,6 +177,15 @@ class BrainSettings(BaseSettings):
     web_search_relevance_ratio: float = 0.7
     # 逗號分隔的網域黑名單，子網域一併排除；例如 zh.wikipedia.org
     web_search_blocked_domains: str = ""
+    # read_web_page 一次最多帶幾個網址：2md /v1/batch 讓多頁併成一個請求，
+    # 但頁數越多上游越慢，且整批共用一個逾時，所以設上限。
+    web_read_max_urls: int = 5
+    # 整條 fallback 鏈的總預算（秒）。逾時是「每台」計算的，三台加起來會遠超過
+    # 一次對話能等的時間，所以要有一個全域上限：預算用完就不再試下一台。
+    url2md_total_budget_s: float = 20.0
+    # 某台連續失敗後暫時跳過的秒數。沒有這個，每個請求都要為同一台掛掉的主機
+    # 重新付一次逾時代價。
+    url2md_circuit_cooldown_s: float = 60.0
 
     # === David888 Wiki ===
     wiki_api_base_url: str = "https://wiki.david888.com/api"

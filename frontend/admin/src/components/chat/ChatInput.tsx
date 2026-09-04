@@ -1,6 +1,8 @@
 import type { KeyboardEvent } from "react";
 
 import type { SkillInfo, TtsProvider } from "../../api";
+import type { ReplyMode } from "./replyMode";
+import { ReplyModeControl } from "./ReplyModeControl";
 import { TtsControls } from "./TtsControls";
 import { SlashDropdown } from "./SlashDropdown";
 import { AsrButton } from "./AsrButton";
@@ -23,6 +25,8 @@ interface ChatInputProps {
   asrSupported: boolean;
   asrSpeaking: boolean;
   privacyWarningsVisible: boolean;
+  replyMode: ReplyMode;
+  onReplyModeChange: (mode: ReplyMode) => void;
   onInputChange: (value: string) => void;
   onHistoryKeyDown?: (
     event: KeyboardEvent<HTMLTextAreaElement>,
@@ -65,6 +69,8 @@ export default function ChatInput(props: ChatInputProps) {
     asrSupported,
     asrSpeaking,
     privacyWarningsVisible,
+    replyMode,
+    onReplyModeChange,
     onInputChange,
     onHistoryKeyDown,
     onSubmit,
@@ -221,6 +227,7 @@ export default function ChatInput(props: ChatInputProps) {
             <div className="pointer-events-auto">
               {mode === "text" && (
                 <div className="flex flex-wrap items-center gap-2">
+                  <ReplyModeControl value={replyMode} onChange={onReplyModeChange} />
                   <TtsControls
                     ttsProviders={ttsProviders}
                     ttsProvider={ttsProvider}

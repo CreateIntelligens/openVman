@@ -6,6 +6,7 @@ from tools.context import (
     active_persona_id,
     active_project_id,
     active_user_message,
+    mode_settings,
 )
 from tools.search_helpers import (
     DEFAULT_MERGE_LIMIT,
@@ -83,7 +84,7 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
                 exc,
             )
 
-    merged = merge_search_results(grouped, limit=fused_limit(top_k, get_settings()))
+    merged = merge_search_results(grouped, limit=fused_limit(top_k, mode_settings()))
 
     # 3. Graph RAG: pull in chunks from files one hop away in the concept graph,
     #    so related concepts the query didn't lexically match still reach the LLM.

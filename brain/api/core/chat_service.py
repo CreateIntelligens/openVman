@@ -51,9 +51,12 @@ class GenerationContext:
     prompt_messages: list[dict[str, str]]
     prior_messages: list[dict[str, Any]] = field(default_factory=list)
     forced_tool_name: str | None = None
+    reply_mode: str = ""
 
 
-def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
+def prepare_generation(
+    envelope: MessageEnvelope, *, reply_mode: str = "",
+) -> GenerationContext:
     """Build prompt inputs and update the user side of the session.
 
     Knowledge and memory retrieval is no longer done here — the LLM will
@@ -95,6 +98,7 @@ def prepare_generation(envelope: MessageEnvelope) -> GenerationContext:
         prompt_messages=prompt_messages,
         prior_messages=prior_messages,
         forced_tool_name=route.forced_tool_name,
+        reply_mode=reply_mode,
     )
 
 
@@ -378,6 +382,7 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             allow_forced_knowledge_search=(
                 not context.route.skip_rag and not context.forced_tool_name
             ),
+            reply_mode=context.reply_mode,
         )
     except ToolPhaseError as exc:
         fallback = _inject_tool_fallback_hint(exc.partial_messages or context.prompt_messages)

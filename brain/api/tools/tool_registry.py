@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
 from safety.observability import log_exception
-from tools.context import active_persona_id, active_project_id, active_user_message
+from tools.context import (
+    active_persona_id,
+    active_project_id,
+    active_reply_mode,
+    active_user_message,
+)
 
 
 logger = logging.getLogger("brain.tools")
@@ -161,14 +166,17 @@ def bind_tool_context(
     project_id: str = "default",
     *,
     user_message: str = "",
+    reply_mode: str = "",
 ):
-    """Bind persona / project / user-message context for tool execution."""
+    """Bind persona / project / user-message / mode context for tool execution."""
     persona_token = active_persona_id.set(persona_id or "default")
     project_token = active_project_id.set(project_id or "default")
     user_token = active_user_message.set(user_message or "")
+    mode_token = active_reply_mode.set(reply_mode or "")
     try:
         yield
     finally:
         active_persona_id.reset(persona_token)
         active_project_id.reset(project_token)
         active_user_message.reset(user_token)
+        active_reply_mode.reset(mode_token)

@@ -16,6 +16,7 @@ import {
   readPrivacyWarningsVisible,
   writePrivacyWarningsVisible,
 } from "../components/chat/privacyWarnings";
+import { readReplyMode, writeReplyMode, type ReplyMode } from "../components/chat/replyMode";
 import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
@@ -158,6 +159,11 @@ export function useChatSession() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [privacyWarningsVisible, setPrivacyWarningsVisible] = useState(() => readPrivacyWarningsVisible());
+  const [replyMode, setReplyModeState] = useState<ReplyMode>(() => readReplyMode());
+  const setReplyMode = useCallback((mode: ReplyMode) => {
+    setReplyModeState(mode);
+    writeReplyMode(mode);
+  }, []);
   const abortControllerRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const stopReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -366,6 +372,7 @@ export function useChatSession() {
         selectedPersonaId,
         sessionId || undefined,
         controller.signal,
+        replyMode,
       );
       const response_time_s = Math.round((performance.now() - submitTime) / 10) / 100;
 
@@ -472,6 +479,8 @@ export function useChatSession() {
     conversationTitle,
     conversationStatus,
     privacyWarningsVisible,
+    replyMode,
+    setReplyMode,
     sessions,
     loadingSessions,
     deleteSessionTarget,

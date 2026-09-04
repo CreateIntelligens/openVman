@@ -1,3 +1,8 @@
+import {
+  DEFAULT_REPLY_MODE,
+  REPLY_MODES,
+  type ReplyMode,
+} from "../components/chat/replyMode";
 import { fetchJson, apiUrl, projectUrl, getActiveProjectId } from "./common";
 
 /** Brain 在單一回合裡的 LLM 呼叫彙總；latency_ms 是所有呼叫加總。 */
@@ -7,6 +12,16 @@ export interface ChatUsageSummary {
   total_tokens?: number;
   /** 依 "provider/model" 分組；fallback 時同一輪可能用到不只一個模型。 */
   by_model?: Record<string, { calls: number; latency_ms?: number }>;
+  /** 每次模型呼叫在請求時鐘上的位移，與 ToolStep 的位移共用同一個原點。 */
+  timeline?: UsageTimelineEntry[];
+}
+
+export interface UsageTimelineEntry {
+  provider: string;
+  model: string;
+  kind?: string;
+  started_at_ms: number;
+  ended_at_ms: number;
 }
 
 export interface RetrievalResult {
@@ -80,6 +95,9 @@ export interface ToolStep {
   /** 同一輪（同一次 LLM 呼叫）發出的工具共用 round；平行執行時 parallel 為 true。 */
   round?: number;
   parallel?: boolean;
+  /** 相對於請求開始的位移（毫秒），與 usage.timeline 共用原點。 */
+  started_at_ms?: number;
+  ended_at_ms?: number;
 }
 
 export interface ChatResponse {
@@ -101,16 +119,26 @@ export interface ChatResponse {
 
 export type ChatDoneEvent = ChatResponse;
 
+// 模式常數的單一來源在 components/chat/replyMode，轉出供既有匯入點使用。
+export { DEFAULT_REPLY_MODE, REPLY_MODES, type ReplyMode };
+
 export async function fetchChat(
   message: string,
   personaId: string,
   sessionId: string | undefined,
   signal?: AbortSignal,
+  mode: ReplyMode = DEFAULT_REPLY_MODE,
 ): Promise<ChatDoneEvent> {
   return fetchJson<ChatDoneEvent>(apiUrl("/chat"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, persona_id: personaId, session_id: sessionId, project_id: getActiveProjectId() }),
+    body: JSON.stringify({
+      message,
+      persona_id: personaId,
+      session_id: sessionId,
+      project_id: getActiveProjectId(),
+      mode,
+    }),
     signal,
   });
 }

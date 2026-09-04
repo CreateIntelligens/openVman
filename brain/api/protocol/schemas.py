@@ -86,6 +86,8 @@ class ChatRequest(BaseModel):
     persona_id: str = "default"
     session_id: str | None = None
     metadata: dict[str, Any] = {}
+    # 回覆深度：fast / standard / deep。認不得的值退回 standard，不讓請求失敗。
+    mode: str = Field("", description="Reply depth mode: fast, standard or deep")
 
 
 class KnowledgeDocumentPutRequest(BaseModel):

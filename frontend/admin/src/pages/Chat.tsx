@@ -63,6 +63,8 @@ export default function Chat() {
     conversationTitle,
     conversationStatus,
     privacyWarningsVisible,
+    replyMode,
+    setReplyMode,
     sessions,
     loadingSessions,
     deleteSessionTarget,
@@ -477,6 +479,8 @@ export default function Chat() {
             asrSupported={asrSupported}
             asrSpeaking={asrSpeaking}
             privacyWarningsVisible={privacyWarningsVisible}
+            replyMode={replyMode}
+            onReplyModeChange={setReplyMode}
             onInputChange={handleInputChange}
             onHistoryKeyDown={onHistoryKeyDown}
             onSubmit={handleSubmit}
