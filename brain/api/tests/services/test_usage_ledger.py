@@ -197,3 +197,51 @@ def test_ledger_adds_principal_columns_to_a_pre_existing_table(tmp_path):
 
     assert events[0]["principal_type"] == "embed_key"
     assert events[0]["principal_id"] == "ovk_x"
+
+
+def test_scope_events_carry_timeline_offsets(ledger):
+    """每筆事件都要帶請求時鐘上的起訖位移，前端才畫得出時間軸。"""
+    with usage_scope(kind="chat", user_id="u1") as scope:
+        usage_ledger.record_usage_event(
+            provider="gemini",
+            model="gemini-2.5-flash",
+            usage=LLMUsage(input_tokens=10, output_tokens=5, total_tokens=15),
+            latency_ms=250.0,
+        )
+        summary = summarize_collected(scope)
+
+    timeline = summary["timeline"]
+    assert len(timeline) == 1
+    entry = timeline[0]
+    assert entry["model"] == "gemini-2.5-flash"
+    # 這次呼叫的延遲（250ms）比 scope 已經歷的時間還長，起點應被釘在 0
+    # 而不是變成負數。
+    assert entry["started_at_ms"] == 0.0
+    assert 0 < entry["ended_at_ms"] < 250.0
+
+
+def test_timeline_offsets_reflect_latency_when_it_fits(ledger):
+    """延遲落在 scope 存續時間內時，長條長度就等於該次呼叫的延遲。"""
+    import time as _time
+
+    with usage_scope(kind="chat") as scope:
+        _time.sleep(0.05)
+        usage_ledger.record_usage_event(
+            provider="gemini", model="m", usage=None, latency_ms=20.0,
+        )
+        summary = summarize_collected(scope)
+
+    entry = summary["timeline"][0]
+    assert entry["started_at_ms"] > 0
+    assert entry["ended_at_ms"] - entry["started_at_ms"] == pytest.approx(20.0, abs=1.0)
+
+
+def test_ledger_row_has_no_timeline_columns(ledger):
+    """位移只在 scope 鏡像裡，不寫進帳本：帳本存的是計費事實。"""
+    with usage_scope(kind="chat") as scope:
+        row = usage_ledger.record_usage_event(
+            provider="gemini", model="m", usage=None, latency_ms=1.0,
+        )
+        assert row is not None
+        assert "started_at_ms" not in row
+        assert scope.collected[0]["started_at_ms"] is not None

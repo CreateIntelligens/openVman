@@ -1,5 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import type { ChatUsageSummary, ToolStep, RetrievalResult } from "../../api";
+import TimingChart, { buildTimingBars } from "./TimingChart";
+import { readMetaExpanded, writeMetaExpanded } from "./messageMetaPrefs";
 
 const TOOL_LABELS: Record<string, string> = {
   search_memory: "記憶",
@@ -127,19 +129,31 @@ function RefBadge({ item, index }: { item: ToolResultItem; index: number }) {
   );
 }
 
+export interface MessageMetaProps {
+  toolSteps?: ToolStep[];
+  sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
+  responseTimeS?: number;
+  usage?: ChatUsageSummary;
+}
+
 export default function MessageMeta({
   toolSteps,
   sources,
   responseTimeS,
   usage,
-}: {
-  toolSteps?: ToolStep[];
-  sources?: { knowledge: RetrievalResult[]; memory: RetrievalResult[] };
-  responseTimeS?: number;
-  usage?: ChatUsageSummary;
-}) {
+}: MessageMetaProps): JSX.Element | null {
   const [refsOpen, setRefsOpen] = useState(false);
   const toggleRefs = useCallback(() => setRefsOpen((v) => !v), []);
+  const [timingOpen, setTimingOpen] = useState(false);
+  const toggleTiming = useCallback(() => setTimingOpen((v) => !v), []);
+  // 收合狀態是跨訊息的偏好：一次收起，之後的訊息也維持收起。
+  const [expanded, setExpanded] = useState(() => readMetaExpanded());
+  const toggleExpanded = useCallback(() => {
+    setExpanded((v) => {
+      writeMetaExpanded(!v);
+      return !v;
+    });
+  }, []);
 
   const visibleToolSteps = toolSteps ?? EMPTY_TOOL_STEPS;
   const toolRounds = groupToolRounds(visibleToolSteps);
@@ -154,14 +168,82 @@ export default function MessageMeta({
   const llmCalls = usage?.calls ?? 0;
   const llmSeconds = usage?.latency_ms != null ? (usage.latency_ms / 1000).toFixed(2) : null;
   const llmModels = describeModels(usage?.by_model);
+  const hasTimingChart = useMemo(
+    () => buildTimingBars(visibleToolSteps, usage, toolLabel).length > 0,
+    [visibleToolSteps, usage],
+  );
 
   if (!hasTools && extraCitations.length === 0 && !hasTiming && llmCalls === 0) return null;
+
+  // 收合時只留一顆小徽章，把秒數與工具數帶著——不用展開也知道發生過什麼。
+  const summaryParts = [
+    hasTools ? `${visibleToolSteps.length} 個工具` : "",
+    llmCalls > 0 ? `LLM ×${llmCalls}` : "",
+    hasTiming ? `${responseTimeS}s` : "",
+  ].filter(Boolean);
+
+  if (!expanded) {
+    return (
+      <div className="mt-2 text-xs text-content-subtle">
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          title="展開處理詳情"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border bg-surface-sunken text-[0.6875rem] text-content-muted transition-colors hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400"
+        >
+          <span className="material-symbols-outlined text-[0.6875rem]">tune</span>
+          <span>{summaryParts.join(" · ") || "處理詳情"}</span>
+          <span className="material-symbols-outlined text-[0.625rem]">expand_more</span>
+        </button>
+      </div>
+    );
+  }
+
+  let timingBadge: JSX.Element | null = null;
+  if (hasTiming) {
+    if (hasTimingChart) {
+      timingBadge = (
+        <button
+          type="button"
+          onClick={toggleTiming}
+          title="展開時間軸，看時間花在哪"
+          className={[
+            "inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[0.6875rem] transition-colors",
+            timingOpen
+              ? "border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
+              : "border-border bg-surface-sunken hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400",
+          ].join(" ")}
+        >
+          <span className="material-symbols-outlined text-[0.6875rem]">timer</span>
+          {responseTimeS}s
+          <span className="material-symbols-outlined text-[0.625rem]">
+            {timingOpen ? "expand_less" : "expand_more"}
+          </span>
+        </button>
+      );
+    } else {
+      timingBadge = (
+        <span className="inline-flex items-center gap-1" title="從送出到收到回覆的總時間">
+          <span className="material-symbols-outlined text-[0.6875rem]">timer</span>
+          {responseTimeS}s
+        </span>
+      );
+    }
+  }
 
   return (
     <div className="mt-2 text-xs text-content-subtle space-y-1.5">
 
       {/* Single summary row */}
       <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          title="收合處理詳情"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border bg-surface-sunken text-[0.6875rem] text-content-muted transition-colors hover:border-indigo-300 dark:hover:border-indigo-600 hover:text-indigo-600 dark:hover:text-indigo-400"
+        >
+          <span className="material-symbols-outlined text-[0.625rem]">expand_less</span>
+        </button>
         {hasRefs && (
           <button
             type="button"
@@ -207,13 +289,17 @@ export default function MessageMeta({
             {llmSeconds != null && <span className="opacity-40">{llmSeconds}s</span>}
           </span>
         )}
-        {hasTiming && (
-          <span className="inline-flex items-center gap-1" title="從送出到收到回覆的總時間">
-            <span className="material-symbols-outlined text-[0.6875rem]">timer</span>
-            {responseTimeS}s
-          </span>
-        )}
+        {timingBadge}
       </div>
+
+      {timingOpen && hasTimingChart && (
+        <TimingChart
+          toolSteps={visibleToolSteps}
+          usage={usage}
+          responseTimeS={responseTimeS}
+          toolLabel={toolLabel}
+        />
+      )}
 
       {/* References list */}
       {refsOpen && hasRefs && (

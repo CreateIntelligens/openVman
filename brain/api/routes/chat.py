@@ -13,6 +13,7 @@ from core.chat_service import (
     prepare_generation,
     record_generation_failure,
 )
+from core.reply_modes import DEFAULT_MODE, available_modes
 from core.slash_command import try_rewrite_slash
 from core.sse_events import (
     build_exception_protocol_error,
@@ -65,7 +66,7 @@ def _maybe_rewrite_slash(payload: ChatRequest) -> dict[str, Any]:
 def _prepare_chat_context(request: Request, payload: ChatRequest) -> Any:
     raw = _maybe_rewrite_slash(payload)
     envelope = build_message_envelope(request, raw, content_key="message")
-    return prepare_generation(envelope)
+    return prepare_generation(envelope, reply_mode=payload.mode)
 
 
 def _log_generation_success(context: Any, tool_steps: int) -> None:
@@ -131,6 +132,23 @@ async def chat(request: Request, payload: ChatRequest):
         return response
     except Exception as exc:
         _handle_generation_error(exc, "chat", request)
+
+
+@router.get("/chat/modes", summary="可用的回覆深度模式")
+async def chat_modes():
+    """List the reply depth modes so clients don't hardcode them."""
+    return {
+        "default": DEFAULT_MODE,
+        "modes": [
+            {
+                "name": mode.name,
+                "label": mode.label,
+                "max_followup_tool_rounds": mode.max_followup_tool_rounds,
+                "allow_web_search": mode.allow_web_search,
+            }
+            for mode in available_modes()
+        ],
+    }
 
 
 @router.get("/chat/history", summary="對話歷史")

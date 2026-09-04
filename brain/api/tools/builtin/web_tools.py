@@ -5,13 +5,14 @@ from __future__ import annotations
 import ipaddress
 import logging
 import socket
+import time
+from threading import Lock
 from typing import Any
 from urllib.parse import quote, urlparse
 
 import httpx
 
-from config import get_settings
-from tools.context import active_user_message
+from tools.context import active_user_message, mode_settings
 
 logger = logging.getLogger("brain.tools.builtin.web")
 
@@ -37,8 +38,80 @@ def close_url2md_client() -> None:
 close_gateway_client = close_url2md_client
 
 
+# 最近一次失敗的時間戳，用來在冷卻期內跳過掛掉的主機。行程內共用，所以要鎖。
+_circuit_lock = Lock()
+_circuit_opened_at: dict[str, float] = {}
+
+
+def _note_failure(base: str) -> None:
+    with _circuit_lock:
+        _circuit_opened_at[base] = time.monotonic()
+
+
+def _note_success(base: str) -> None:
+    with _circuit_lock:
+        _circuit_opened_at.pop(base, None)
+
+
+def _is_circuit_open(base: str, cooldown_s: float) -> bool:
+    """True while *base* is still inside its cooldown after a recent failure."""
+    if cooldown_s <= 0:
+        return False
+    with _circuit_lock:
+        opened_at = _circuit_opened_at.get(base)
+    return opened_at is not None and (time.monotonic() - opened_at) < cooldown_s
+
+
+def reset_url2md_circuits() -> None:
+    """Clear the breaker state (tests, and after a config change)."""
+    with _circuit_lock:
+        _circuit_opened_at.clear()
+
+
+class _Budget:
+    """A shared deadline across the whole fallback chain.
+
+    逾時是每台各自計算的，三台串起來會遠超過一次對話能等的時間。這個預算讓
+    整條鏈有一個總上限：用完就不再試下一台，直接把最後的錯誤丟出去。
+    """
+
+    __slots__ = ("_deadline",)
+
+    def __init__(self, total_s: float) -> None:
+        self._deadline = time.monotonic() + total_s if total_s > 0 else None
+
+    def remaining(self) -> float | None:
+        if self._deadline is None:
+            return None
+        return max(0.0, self._deadline - time.monotonic())
+
+    def exhausted(self) -> bool:
+        remaining = self.remaining()
+        return remaining is not None and remaining <= 0
+
+
+def _iter_bases(cfg: Any) -> Any:
+    """Yield (base, budget) for each host worth trying, freshest first.
+
+    冷卻中的主機先跳過；但若每一台都在冷卻中，還是要全部試一遍——寧可慢，
+    也好過在上游其實已經復原時直接放棄。
+    """
+    bases = _url2md_bases()
+    cooldown = float(getattr(cfg, "url2md_circuit_cooldown_s", 0) or 0)
+    live = [base for base in bases if not _is_circuit_open(base, cooldown)]
+    if not live:
+        logger.warning("all 2md hosts are in cooldown; trying the full chain anyway")
+        live = bases
+    budget = _Budget(float(getattr(cfg, "url2md_total_budget_s", 0) or 0))
+    for base in live:
+        if budget.exhausted():
+            logger.warning("2md fallback budget exhausted before trying %s", base)
+            return
+        yield base, budget
+
+
 def _url2md_bases() -> list[str]:
-    cfg = get_settings()
+    cfg = mode_settings()
     configured = [
         str(getattr(cfg, "url2md_primary_url", "https://2md.aiurl.tw")),
         *str(
@@ -92,7 +165,14 @@ def _validate_url(raw_url: Any) -> str:
     return url
 
 
-def _request_json(method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+def _request_json(
+    method: str, endpoint: str, *, budget: _Budget | None = None, **kwargs: Any
+) -> dict[str, Any]:
+    # 這一台最多只能用掉剩餘預算，否則單台逾時就能吃掉整條鏈的時間。
+    if budget is not None and (remaining := budget.remaining()) is not None:
+        kwargs["timeout"] = httpx.Timeout(
+            connect=min(5.0, remaining), read=remaining, write=min(10.0, remaining), pool=5,
+        )
     response = _get_url2md_client().request(method, endpoint, **kwargs)
     response.raise_for_status()
     payload = response.json()
@@ -104,38 +184,124 @@ def _request_json(method: str, endpoint: str, **kwargs: Any) -> dict[str, Any]:
     return payload
 
 
-def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
-    url = _validate_url(args.get("url"))
-    cfg = get_settings()
-    max_chars = max(200, int(getattr(cfg, "web_search_max_chars", 3000)))
-    last_error: Exception | None = None
+def _normalize_read_urls(args: dict[str, Any]) -> list[str]:
+    """Accept either ``url`` or ``urls`` and return a deduplicated, validated list."""
+    raw = args.get("urls")
+    if raw is None:
+        raw = args.get("url")
+    candidates = raw if isinstance(raw, list) else [raw]
+    urls: list[str] = []
+    for candidate in candidates:
+        url = _validate_url(candidate)
+        if url not in urls:
+            urls.append(url)
+    if not urls:
+        raise ValueError("url 不可為空")
+    limit = max(1, int(getattr(mode_settings(), "web_read_max_urls", 5)))
+    if len(urls) > limit:
+        raise ValueError(f"一次最多讀取 {limit} 個網址，收到 {len(urls)} 個")
+    return urls
 
+
+def _shape_page(item: dict[str, Any], fallback_url: str, max_chars: int, base: str) -> dict[str, Any]:
+    content = str(item.get("content") or "")
+    return {
+        "title": str(item.get("title") or ""),
+        "url": str(item.get("url") or fallback_url),
+        "description": str(item.get("description") or ""),
+        "content": content[:max_chars],
+        "truncated": len(content) > max_chars,
+        "provider": base,
+    }
+
+
+def _read_single(
+    base: str, url: str, max_chars: int, budget: _Budget | None = None
+) -> dict[str, Any]:
     # The upstream API intentionally accepts the original URL as a path suffix.
     # Keep URL delimiters readable while encoding spaces and unsafe characters.
     target = quote(url, safe=":/?&=#%+;,[]@!$'()*-._~")
-    for base in _url2md_bases():
-        endpoint = f"{base}/{target}"
+    payload = _request_json(
+        "GET",
+        f"{base}/{target}",
+        headers={"Accept": "application/json", "X-Preset": "agent"},
+        budget=budget,
+    )
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise ValueError("2md URL 讀取回傳格式無效")
+    return _shape_page(data, url, max_chars, base)
+
+
+def _batch_payload_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pull the page list out of a /v1/batch response.
+
+    批次端點比單頁多包一層（``data.data`` 才是陣列），但兩種形狀都接受，
+    上游哪天拉平了也不會壞。
+    """
+    data = payload.get("data")
+    if isinstance(data, dict):
+        data = data.get("data")
+    if not isinstance(data, list):
+        raise ValueError("2md 批次讀取回傳格式無效")
+    return [item for item in data if isinstance(item, dict)]
+
+
+def _read_batch(
+    base: str, urls: list[str], max_chars: int, budget: _Budget | None = None
+) -> list[dict[str, Any]]:
+    """Read several URLs in one upstream request via /v1/batch.
+
+    上游對每個網址各自容錯，失敗的那筆就少一筆回來，所以要用回傳的 url
+    對回原始清單，而不是假設順序與長度一致。
+    """
+    payload = _request_json(
+        "POST",
+        f"{base}/v1/batch",
+        json={"urls": urls},
+        headers={"Accept": "application/json", "X-Preset": "agent"},
+        budget=budget,
+    )
+    items = _batch_payload_items(payload)
+    by_url = {str(item.get("url") or "").rstrip("/"): item for item in items}
+    pages: list[dict[str, Any]] = []
+    for index, url in enumerate(urls):
+        item = by_url.get(url.rstrip("/"))
+        if item is None and len(items) == len(urls):
+            item = items[index]  # 上游正規化了網址，退回位置對應
+        if item is None:
+            logger.warning("2md batch missing result provider=%s url=%s", base, url)
+            continue
+        pages.append(_shape_page(item, url, max_chars, base))
+    if not pages:
+        raise ValueError("2md 批次讀取沒有回傳任何頁面")
+    return pages
+
+
+def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
+    urls = _normalize_read_urls(args)
+    cfg = mode_settings()
+    max_chars = max(200, int(getattr(cfg, "web_search_max_chars", 3000)))
+    last_error: Exception | None = None
+
+    for base, budget in _iter_bases(cfg):
         try:
-            payload = _request_json(
-                "GET",
-                endpoint,
-                headers={"Accept": "application/json", "X-Preset": "agent"},
-            )
-            data = payload.get("data")
-            if not isinstance(data, dict):
-                raise ValueError("2md URL 讀取回傳格式無效")
-            content = str(data.get("content") or "")
-            return {
-                "title": str(data.get("title") or ""),
-                "url": str(data.get("url") or url),
-                "description": str(data.get("description") or ""),
-                "content": content[:max_chars],
-                "truncated": len(content) > max_chars,
-                "provider": base,
-            }
+            if len(urls) == 1:
+                pages = [_read_single(base, urls[0], max_chars, budget)]
+            else:
+                pages = _read_batch(base, urls, max_chars, budget)
         except Exception as exc:  # noqa: BLE001 - try the configured fallback chain
             last_error = exc
-            logger.warning("2md URL read failed provider=%s url=%s error=%s", base, url, exc)
+            _note_failure(base)
+            logger.warning(
+                "2md URL read failed provider=%s urls=%d error=%s", base, len(urls), exc
+            )
+            continue
+        _note_success(base)
+        # 單一網址維持原本的平面形狀，既有呼叫端與提示不必改。
+        if len(urls) == 1:
+            return pages[0]
+        return {"pages": pages, "count": len(pages), "provider": base}
 
     raise ValueError(f"無法讀取網址，2md fallback chain 皆失敗：{last_error}") from last_error
 
@@ -200,17 +366,18 @@ def _rerank_web_results(
 
 def _search_web(args: dict[str, Any]) -> dict[str, Any]:
     query = _validate_query(args.get("query"))
-    cfg = get_settings()
+    cfg = mode_settings()
     max_results = max(1, min(int(args.get("top_k", getattr(cfg, "web_search_max_results", 8)) or 8), 20))
     last_error: Exception | None = None
 
-    for base in _url2md_bases():
+    for base, budget in _iter_bases(cfg):
         try:
             payload = _request_json(
                 "GET",
                 f"{base}/search",
                 params={"q": query},
                 headers={"Accept": "application/json", "X-Preset": "agent"},
+                budget=budget,
             )
             raw_results = payload.get("data")
             if not isinstance(raw_results, list):
@@ -231,6 +398,7 @@ def _search_web(args: dict[str, Any]) -> dict[str, Any]:
                     "content": str(item.get("content") or ""),
                 })
 
+            _note_success(base)
             anchor = (active_user_message.get() or "").strip()
             results = _rerank_web_results(
                 candidates, f"{anchor}\n{query}" if anchor else query, cfg
@@ -246,6 +414,7 @@ def _search_web(args: dict[str, Any]) -> dict[str, Any]:
             }
         except Exception as exc:  # noqa: BLE001 - try the configured fallback chain
             last_error = exc
+            _note_failure(base)
             logger.warning("2md web search failed provider=%s query=%s error=%s", base, query, exc)
 
     raise ValueError(f"無法搜尋網路，2md fallback chain 皆失敗：{last_error}") from last_error
@@ -282,17 +451,29 @@ def search_web_tool():
 def read_web_page_tool():
     from tools.tool_registry import Tool
 
+    # 工具描述在註冊時就固定了，那時還沒有請求上下文，所以不能寫死某個模式的
+    # 上限；實際上限由 _normalize_read_urls 依當下模式檢查。
     return Tool(
         name="read_web_page",
         description=(
             "使用 2md 讀取指定 URL，將網頁、PDF 或其他支援文件轉成可供 LLM 閱讀的 Markdown。"
+            "要讀多個頁面時，請在同一次呼叫的 urls 一次帶上，"
+            "它們會併成一個請求，比分次呼叫快很多；不要為每個網址各發一次工具呼叫。"
+            "數量超過當前模式上限時會被拒絕，屆時請減少網址再試。"
         ),
         parameters={
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "要讀取的完整 http/https URL"},
+                "urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "要讀取的完整 http/https URL 清單。"
+                        "只有一個網址時仍以單元素陣列傳入。"
+                    ),
+                },
             },
-            "required": ["url"],
+            "required": ["urls"],
         },
         handler=_read_web_page,
     )

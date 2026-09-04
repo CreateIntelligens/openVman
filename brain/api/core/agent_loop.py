@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import contextvars
-import dataclasses
 import json
 import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from config import get_settings
@@ -20,6 +19,8 @@ from core.llm_client import (
     generate_chat_turn,
     stream_chat_turn,
 )
+from core.reply_modes import ModeSettings, ReplyMode, resolve_mode
+from core.usage import current_usage_scope
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
 
@@ -111,6 +112,7 @@ def run_agent_loop(
     *,
     forced_tool_name: str | None = None,
     allow_forced_knowledge_search: bool = False,
+    reply_mode: str = "",
 ) -> AgentLoopResult:
     """Run a bounded think -> tool -> observe loop until the model returns text."""
     working_messages, tool_steps, final_turn = _run_tool_phase(
@@ -119,6 +121,7 @@ def run_agent_loop(
         project_id,
         forced_tool_name=forced_tool_name,
         allow_forced_knowledge_search=allow_forced_knowledge_search,
+        reply_mode=reply_mode,
     )
     if final_turn is None:
         raise ToolPhaseError(
@@ -171,7 +174,24 @@ def _ensure_knowledge_search(turn: LLMReply, user_message: str) -> LLMReply:
         arguments=json.dumps({"queries": [user_message]}, ensure_ascii=False),
         extra_content=None,
     )
-    return dataclasses.replace(turn, tool_calls=[*turn.tool_calls, synthetic])
+    return replace(turn, tool_calls=[*turn.tool_calls, synthetic])
+
+
+_WEB_TOOLS = frozenset({"search_web", "read_web_page"})
+
+
+def _tools_for_mode(tools: list[dict[str, Any]], mode: ReplyMode) -> list[dict[str, Any]]:
+    """Drop the web tools when the mode forbids them.
+
+    fast 模式只查知識庫：把上網工具整個拿掉比在提示裡拜託模型別用可靠得多。
+    """
+    if mode.allow_web_search:
+        return tools
+    return [
+        tool
+        for tool in tools
+        if tool.get("function", {}).get("name") not in _WEB_TOOLS
+    ]
 
 
 def _run_tool_phase(
@@ -181,17 +201,19 @@ def _run_tool_phase(
     *,
     forced_tool_name: str | None = None,
     allow_forced_knowledge_search: bool = False,
+    reply_mode: str = "",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], LLMReply | None]:
     """Execute tool call rounds until the LLM returns a text turn or rounds are exhausted.
 
     Returns (working_messages, tool_steps, final_turn) where final_turn is the
     LLMReply that ended the loop (no tool calls), or None if max rounds were hit.
     """
-    cfg = get_settings()
+    mode = resolve_mode(reply_mode)
+    cfg = ModeSettings(get_settings(), mode)
     working_messages = [dict(message) for message in messages]
     tool_steps: list[dict[str, Any]] = []
     registry = get_tool_registry()
-    tools = registry.build_openai_tools()
+    tools = _tools_for_mode(registry.build_openai_tools(), mode)
     hallucination_pattern = _build_hallucination_pattern(tools)
     hallucination_retried = False
     first_forced = _resolve_forced_first_tool(
@@ -220,7 +242,9 @@ def _run_tool_phase(
         (str(m.get("content", "")) for m in reversed(messages) if m.get("role") == "user"),
         "",
     )
-    with bind_tool_context(persona_id, project_id, user_message=last_user_message):
+    with bind_tool_context(
+        persona_id, project_id, user_message=last_user_message, reply_mode=mode.name
+    ):
         for iteration in range(max(1, cfg.agent_loop_max_rounds)):
             current_forced = first_forced if iteration == 0 else None
             if iteration == 0:
@@ -346,16 +370,23 @@ def _execute_tool_calls(tool_calls: list[LLMToolCall]) -> list[dict[str, Any]]:
 
 
 def _execute_tool_call(tool_call: LLMToolCall) -> dict[str, Any]:
+    scope = current_usage_scope()
+    started_ms = scope.elapsed_ms() if scope else None
     t0 = time.monotonic()
     result = execute_tool_call(tool_call.name, tool_call.arguments)
     elapsed = round(time.monotonic() - t0, 3)
-    return {
+    step = {
         "tool_call_id": tool_call.id,
         "name": tool_call.name,
         "arguments": tool_call.arguments,
         "result": result,
         "duration_s": elapsed,
     }
+    # 與 LLM 事件共用同一個請求時鐘，前端才能把兩者畫在同一條時間軸上。
+    if started_ms is not None:
+        step["started_at_ms"] = round(started_ms, 2)
+        step["ended_at_ms"] = round(started_ms + elapsed * 1000.0, 2)
+    return step
 
 
 def _build_hallucination_pattern(tools: list[dict[str, Any]]) -> re.Pattern[str] | None:

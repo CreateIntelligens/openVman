@@ -384,6 +384,7 @@ describe("useChatSession TTS prefetch", () => {
         "default",
         undefined,
         expect.any(AbortSignal),
+        "standard",
       );
     });
   });
