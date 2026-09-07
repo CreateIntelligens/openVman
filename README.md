@@ -16,6 +16,7 @@
 | 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
 | 04 | [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md) | 網關 (外圍)：媒體處理 · 任務佇列 · 插件 (Camera/Web) · 臨時儲存 · 計費備援 | ✅ 已完成 |
 | 05 | [05_DOCLING_RUNBOOK.md](./docs/05_DOCLING_RUNBOOK.md) | 文件解析：pdf-inspector fast path · Docling 主轉換 · AnyDoc fallback · 驗證與修復 | ✅ 已完成 |
+| 11 | [11_DEPLOYMENT.md](./docs/11_DEPLOYMENT.md) | **部署手冊**：首次部署 · 日常更新 · 主機 nginx · 疑難排解 · 建置 · Worktree · CI/CD | ✅ 已完成 |
 | -- | [account-administration.md](./docs/account-administration.md) | 帳號管理：ROOT／admin／user 階層 · migration · 密碼 reset · 備份與 rollback | ✅ 已完成 |
 | -- | [avatar-embed/README.md](./docs/avatar-embed/README.md) | Avatar JavaScript SDK：直接 DOM · 外部音訊 · PCM 串流 · 公開錯誤碼 | ✅ 已完成 |
 | -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
@@ -43,7 +44,7 @@ base URL 本身就是 embed 端點，不需要再疊 `/embed`。OpenAI 相容路
 
 ## 環境變數 (.env)
 
-所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定，再執行 `./scripts/ensure-runtime-secrets.sh` 安全產生缺少的內部 token、session secret 與 Grafana 管理密碼；不用分開維護多份。Grafana 預設不開放匿名瀏覽，所有部署都必須設定唯一的高熵 `GRAFANA_PASSWORD`。
+所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定；缺少的內部 token、session secret 與 Grafana 管理密碼由 `./scripts/up.sh` 啟動時自動安全產生（也可單獨執行 `./scripts/ensure-runtime-secrets.sh`），不用分開維護多份。Grafana 預設不開放匿名瀏覽，所有部署都必須設定唯一的高熵 `GRAFANA_PASSWORD`。
 
 LLM 的明確 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<model>` 加入鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，但不得占用 `OPENAI_API_KEY` 或共用的 `LLM_BASE_URL`。
 安全審查流程固定在 `.agents/skills/security-audit/`，並由 `skills-lock.json` 記錄來源與 hash；`.claude` 與 `.kilocode` 下的本機 symlink 只供個人 agent runtime 使用，不提交到 repository。
@@ -59,62 +60,24 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 
 指令不接受其他 ROOT 名稱，也不會建立或取代第二個 ROOT。`ai360` 僅適合開發環境；正式部署必須在首次登入後立即更換密碼。既有兩層帳號資料庫會將原 `ai360` 原地升級為 ROOT，保留帳號 ID、密碼 hash、ownership 與 grants，但會撤銷 migration 前的 session。完整操作與 rollback 注意事項請見 [帳號管理手冊](./docs/account-administration.md)。
 
-### 部署前置：資料目錄權限
-
-`docker-compose.yml` 裡多個 volume 是 host 端 bind mount（如 `./data`、`./backend/data`）。若該目錄尚不存在，Docker 會以 root 自動建立，但容器內服務是以 `${UID:-1000}:${GID:-1000}` 非 root 身分執行，會導致寫入失敗（例如 `avatar-mascots dir not preparable at import: Permission denied`）。
-
-`./data` 底下的 `avatar`/`backgrounds`/`mascots` 子目錄統一用 `./data:/data` 一行掛載（三者都對應 `/data/*`，合併掛載即可，不用逐條列出）；子目錄由服務啟動時自行 `mkdir` 建立。
-
-首次部署或新增 bind mount 目錄後，先執行：
+### 部署與啟動
 
 ```bash
-./scripts/ensure-data-dirs.sh
+./scripts/up.sh --remove-orphans
 ```
 
-它會建立所有必要的 host 資料目錄並 `chown` 成正確的 UID:GID，之後再 `docker compose up` 即可。
+`up.sh` 等同 `docker compose up -d`，但會先建立缺少的資料目錄、修正擁有者，並補齊
+缺少的 runtime secrets——三者都冪等，沒事做時完全安靜。直接 `docker compose up -d`
+仍可運作，只是這些前置條件要自己顧：缺少的 bind mount 目錄會被 Docker 以 root 建立，
+而容器以非 root 執行，稍後才拋出難以追查的 `Permission denied`。
 
-`backend/app/config.py`、`brain/api/config.py` 兩者的 pydantic-settings 仍各自帶有一個相對路徑的 `env_file=` 備援設定，但在 Docker 部署下不會用到（容器只掛載服務子目錄，該路徑在容器內不存在）——實際生效值一律來自 compose 注入的環境變數。
-
-### GitHub Actions
-
-`protocol-contracts` workflow 使用 `actions/checkout@v6` 與 `actions/setup-python@v7`，採用 Node.js 24-compatible action runtime。若改用 self-hosted runner，runner 需支援這些 action 的 Node.js 24 runtime。
-
-### Docker Hub CI/CD
-
-`.github/workflows/docker-publish.yml` 會在 `main` push 時登入 Docker Hub，使用 Buildx + QEMU 建立並推送以下 images：
-
-| Image | Platforms | 用途 |
-|---|---|---|
-| `openvman-backend` | `linux/amd64`, `linux/arm64` | Backend 與 Gateway Worker |
-| `openvman-admin` | `linux/amd64`, `linux/arm64` | Admin UI |
-| `openvman-avatar` | `linux/amd64`, `linux/arm64` | Avatar frontend |
-| `openvman-api` | `linux/amd64` | CUDA Brain API |
-| `openvman-embedding` | `linux/amd64` | CUDA/PyTorch Embedding |
-
-GitHub Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`。正式部署預設只使用 `docker-compose.yml`；它同時保留 `image` 與 `build`，因此 Compose 會先拉取 `.env` 指定的 `tbdavid2019/openvman-*` image，遠端不存在時才從 Dockerfile build：
-
-```bash
-docker compose up -d --remove-orphans
-```
-
-正式設定不掛載 frontend、backend 或 Brain API 原始碼，因此 image 內容不會被 host 上的舊檔案遮蔽。Admin image 使用 `runner` stage，由同一個 HTTPS nginx edge 直接提供預先編譯的靜態 bundle，不會啟動 Vite 或 React Refresh。Watchtower 也由同一份 Compose 預設啟動，使用 Docker API `1.44` 相容 Docker Engine 29，只監控標記 `com.centurylinklabs.watchtower.enable=true` 的 openVman containers，每 300 秒檢查一次。目前 `tbdavid2019/openvman-*` repositories 都是 public，新主機不需要 `docker login`。Watchtower 只更新既有 image；服務增刪或 ports、volumes、environment 等 Compose 架構變更仍需先更新 repository，再執行 `docker compose up -d --remove-orphans`。
-
-### Worktree 開發與 HMR
-
-開發時從 worktree 根目錄疊加 `docker-compose.dev.yml`。這份 override 會恢復 frontend、backend 與 Brain 原始碼 bind mounts、保留 frontend node_modules volumes、將 Admin build target 改回 `dev` 並移除正式 registry image 名稱、強制 Python runtime 使用 `ENV=dev`，同時把 dev containers 的 Watchtower label 設為 `false`，避免同一台主機的正式 Watchtower 把本機開發 image 換回 Docker Hub 版本。將 worktree 自己的 git-ignored `.env` 設為：
-
-```env
-COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml
-COMPOSE_PROJECT_NAME=openvman-feature-x
-PORT=18786
-HTTPS_PORT=18787
-```
-
-之後與正式部署一樣只需執行 `docker compose up -d`；Compose 會依 worktree 的 `.env` 自動合併兩份檔案。每個 worktree 應使用不重複的 `COMPOSE_PROJECT_NAME`、`PORT` 與 `HTTPS_PORT`，以隔離 containers、networks、named volumes 與 host ports。React/Vue Vite HMR 會從瀏覽器實際連入的 HTTPS origin 推導 WebSocket port，因此請直接開啟 `https://<host>:<該 worktree 的 HTTPS_PORT>`。一般 source 修改不需要 `--build`；只有 Dockerfile 或 dependency lockfile 改變時才逐一 build 對應服務，避免平行重型 build。
+完整流程（首次部署、日常更新、主機 nginx、疑難排解、建置節奏、worktree、CI/CD）見
+**[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT.md)**。
 
 ### 對外 HTTPS：主機 nginx（compose 之外）
 
-`docker compose up -d` 會依 `.env` 的 `COMPOSE_PROFILES` 與外部服務網址啟動包含 **Docker 邊緣 nginx** 的 Compose stack（`8786` HTTP / `8787` HTTPS，自簽憑證）。對外的正式 HTTPS 由**主機自己的 nginx** 終止，再轉進來：
+`up.sh` 啟動的 Compose stack 含一個 **Docker 邊緣 nginx**（`8786` HTTP / `8787`
+HTTPS，自簽憑證）。對外的正式 HTTPS 由**主機自己的 nginx** 終止，再轉進來：
 
 ```
 瀏覽器 ──HTTPS 443──> 主機 nginx（Let's Encrypt）
@@ -122,21 +85,19 @@ HTTPS_PORT=18787
                              └──> avatar / admin / backend
 ```
 
-**這層不能塞進 compose**，原因是主機 nginx 佔用 80/443 且由其他服務共用；容器要接管得用 `network_mode: host` 並停掉主機 nginx，會影響同機的其他站台。憑證申請也需要 80 埠做 ACME 驗證，同樣會撞。
+**這層不能塞進 compose**：主機 nginx 佔用 80/443 且由同機其他站台共用，容器要接管
+得用 `network_mode: host` 並停掉它；憑證申請也需要 80 埠做 ACME 驗證，同樣會撞。
 
-因此準備好 `.env` 與資料目錄後，新主機的部署命令是（詳細變數見 `infra/nginx/native/README.md`）：
+因此它是獨立的部署目標，有自己的更新流程。改了
+`infra/nginx/native/openvman.conf.template` 不會影響線上，必須執行
+`./infra/nginx/native/deploy.sh` 推送出去（`--check` 可只比對）。
 
-```bash
-# 每次啟動／更新 Compose stack
-docker compose up -d --remove-orphans
+只想在內網測試可跳過這層，直接連 `https://<host>:8787`（自簽，瀏覽器會警告）。
 
-# 每台主機首次建立公開 HTTPS；讀取 .env 的網域與信箱
-./scripts/setup-public-https.sh
-```
+### 其他部署主題
 
-先在 `.env` 設定 `PUBLIC_DOMAIN` 與 `LETSENCRYPT_EMAIL`。這支腳本會產生 vhost、以 Docker certbot 申請首張憑證、安裝並 reload 主機 nginx，再建立每日自動執行 `renew-letsencrypt.sh` 的 crontab。重複執行會略過已存在的憑證並更新同一段 cron，不會重複追加；若臨時用命令列傳入同名環境變數，命令列值優先。
-
-只想在內網測試、不需要正式憑證的話跳過這段即可，直接連 `https://<host>:8787`（自簽，瀏覽器會跳警告）。正式部署的 `HTTPS_PORT=8787` 是 Docker edge 的 host port；worktree dev 可改用其他 port，Vite HMR 會依瀏覽器目前連入的 origin 自動使用對應 port，不需要另一個 HMR port 變數。
+Docker Hub CI/CD 與 Watchtower、Worktree 開發與 HMR、建置節奏與 I/O 注意事項、
+GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT.md)**。
 
 ### AI Coding 餵檔策略
 
@@ -339,7 +300,6 @@ docker compose up -d --remove-orphans
 
 | 文件 | 預計內容 |
 |------|----------|
-| `04_DEPLOYMENT.md` | Docker Compose 編排 · K8s Deployment YAML · 環境分離 (dev/staging/prod) · CI/CD 流程 (GitHub Actions) · GPU 節點配置 (bge-m3) · API Key 池與 Secret 管理 |
 | `05_SECURITY.md` | WebSocket JWT 認證流程 · API Key 管理 · Kiosk 設備白名單 · TLS/WSS 設定 · Prompt Injection 防護細節 |
 | `06_ASSET_PIPELINE.md` | 從照片/影片生成 idle.mp4 的 SOP · 6 張嘴型 Sprite 的製作方法 · manifest.json 的校準流程 · 素材品質檢查清單 |
 | `07_MONITORING.md` | Grafana Dashboard 設計 · 告警規則 (Alertmanager) · SLA 定義 (可用性 99.9%) · 日誌查詢範例 (ELK/Loki) |
