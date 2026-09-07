@@ -41,7 +41,9 @@ LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-$(read_env_value LETSENCRYPT_EMAIL)}"
 LETSENCRYPT_DIR="${LETSENCRYPT_DIR:-$REPO_ROOT/infra/nginx/certs/letsencrypt}"
 ACME_WEBROOT="${ACME_WEBROOT:-/usr/share/nginx/html}"
 EDGE_UPSTREAM="${EDGE_UPSTREAM:-127.0.0.1:8787}"
-NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-/etc/nginx/conf.d/openvman.conf}"
+# 與 infra/nginx/native/deploy.sh 共用同一個檔名；兩者若不一致，初次架站
+# 與後續更新會各自寫進不同的 vhost，其中一份永遠不會生效。
+NGINX_CONFIG_PATH="${NGINX_CONFIG_PATH:-/etc/nginx/conf.d/146-openvman.conf}"
 NGINX_BIN="${NGINX_BIN:-/usr/sbin/nginx}"
 SYSTEMCTL_BIN="${SYSTEMCTL_BIN:-/usr/bin/systemctl}"
 RENEW_LOG="${LETSENCRYPT_RENEW_LOG:-$REPO_ROOT/backend/logs/letsencrypt-renew.log}"

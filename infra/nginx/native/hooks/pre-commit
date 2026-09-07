@@ -1,0 +1,32 @@
+#!/bin/sh
+# Remind the committer to deploy when this commit changes the host nginx vhost.
+#
+# Editing the template does not change what the public host serves — only
+# deploy.sh does. A commit that looks complete while production still runs the
+# old vhost is exactly how /static/ once went missing in production.
+#
+# This never blocks a commit: it reports and exits 0.
+set -eu
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+TEMPLATE_PATH="infra/nginx/native/openvman.conf.template"
+
+if ! git diff --cached --name-only | grep -qx "$TEMPLATE_PATH"; then
+  exit 0
+fi
+
+echo
+echo "note: this commit changes the host nginx vhost template."
+
+# --check exits non-zero on drift; it only reads, so it is safe in a hook.
+# It needs the rendered config, which needs PUBLIC_DOMAIN — on a machine that
+# is not the deployment host, say so instead of failing.
+if "$REPO_ROOT/infra/nginx/native/deploy.sh" --check >/dev/null 2>&1; then
+  echo "      The deployed host vhost already matches — nothing to deploy."
+else
+  echo "      The deployed host vhost does NOT match this repository."
+  echo "      Deploy it with:  ./infra/nginx/native/deploy.sh"
+fi
+echo
+
+exit 0
