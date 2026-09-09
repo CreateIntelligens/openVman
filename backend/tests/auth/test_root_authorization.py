@@ -488,3 +488,132 @@ def test_root_owned_resource_safety_blocks_deletion_without_partial_mutation(
     assert blocked.json()["detail"]["resource_counts"] == {"project": 1}
     assert runtime.users.get_by_id(admin.id) is not None
     assert runtime.auth_audit.list() == audit_before
+
+
+def _register_voices(runtime, *voice_ids):
+    for voice_id in voice_ids:
+        runtime.resources.upsert_system_resource(
+            resource_type=ResourceType.CUSTOM_VOICE,
+            resource_id=voice_id,
+            metadata={"label": voice_id},
+        )
+
+
+def test_root_can_set_and_clear_an_admin_scope(client, runtime):
+    root = _root(runtime)
+    admin = _create_admin(runtime, root.id)
+    _register_voices(runtime, "voice-a", "voice-b", "voice-c")
+    headers = _headers(client, "ai360", _ROOT_PASSWORD)
+
+    response = client.put(
+        f"/api/v1/users/{admin.id}/scope",
+        json={
+            "scoped": True,
+            "resources": {"custom_voices": ["voice-a", "voice-b"]},
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["scoped"] is True
+    assert body["resources"]["custom_voices"] == ["voice-a", "voice-b"]
+
+    read_back = client.get(
+        f"/api/v1/users/{admin.id}/scope", headers=headers,
+    )
+    assert read_back.json()["resources"]["custom_voices"] == [
+        "voice-a", "voice-b",
+    ]
+
+    cleared = client.put(
+        f"/api/v1/users/{admin.id}/scope",
+        json={"scoped": False, "resources": {}},
+        headers=headers,
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["scoped"] is False
+
+
+def test_admin_cannot_set_a_scope(client, runtime):
+    root = _root(runtime)
+    admin = _create_admin(runtime, root.id)
+    target = _create_admin(runtime, root.id, username="admin-two")
+    _register_voices(runtime, "voice-a")
+
+    response = client.put(
+        f"/api/v1/users/{target.id}/scope",
+        json={"scoped": True, "resources": {"custom_voices": ["voice-a"]}},
+        headers=_headers(client, "admin", _ADMIN_PASSWORD),
+    )
+    assert response.status_code == 403
+
+
+def test_access_options_are_capped_by_the_callers_scope(client, runtime):
+    """受限 admin 的選單不該列出他無權指派的資源。"""
+    root = _root(runtime)
+    admin = _create_admin(runtime, root.id)
+    _register_voices(runtime, "voice-a", "voice-b", "voice-c")
+
+    unscoped = client.get(
+        "/api/v1/users/access-options",
+        headers=_headers(client, "admin", _ADMIN_PASSWORD),
+    )
+    assert {item["id"] for item in unscoped.json()["custom_voices"]} == {
+        "voice-a", "voice-b", "voice-c",
+    }
+
+    client.put(
+        f"/api/v1/users/{admin.id}/scope",
+        json={"scoped": True, "resources": {"custom_voices": ["voice-a"]}},
+        headers=_headers(client, "ai360", _ROOT_PASSWORD),
+    )
+
+    scoped = client.get(
+        "/api/v1/users/access-options",
+        headers=_headers(client, "admin", _ADMIN_PASSWORD),
+    )
+    assert [item["id"] for item in scoped.json()["custom_voices"]] == ["voice-a"]
+
+
+def test_scoped_admin_creating_an_account_is_rejected_outside_its_scope(
+    client, runtime,
+):
+    root = _root(runtime)
+    admin = _create_admin(runtime, root.id)
+    payload = _register_scoped_resources(runtime)
+    _register_voices(runtime, "voice-forbidden")
+
+    client.put(
+        f"/api/v1/users/{admin.id}/scope",
+        json={
+            "scoped": True,
+            "resources": {
+                "projects": ["project-a"],
+                "avatar_characters": ["character-a"],
+                "custom_voices": ["voice-a"],
+            },
+        },
+        headers=_headers(client, "ai360", _ROOT_PASSWORD),
+    )
+
+    grants = dict(payload["grants"])
+    grants["custom_voices"] = ["voice-forbidden"]
+    defaults = dict(payload["defaults"])
+    defaults["voice_id"] = "voice-forbidden"
+
+    response = client.post(
+        "/api/v1/users",
+        json={
+            "username": "downstream",
+            "password": _USER_PASSWORD,
+            "role": "user",
+            "access": {
+                "grants": grants,
+                "defaults": defaults,
+                "admin_portal_access": False,
+            },
+        },
+        headers=_headers(client, "admin", _ADMIN_PASSWORD),
+    )
+    assert response.status_code == 422
+    assert "voice-forbidden" in response.json()["detail"]

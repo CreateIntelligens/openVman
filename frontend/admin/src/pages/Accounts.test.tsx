@@ -184,6 +184,8 @@ describe("Accounts", () => {
     const userRow = screen.getByText("viewer").closest("article");
     expect(rootRow?.querySelectorAll("button")).toHaveLength(0);
     expect(rowButtonLabels(adminRow)).toEqual([
+      // ROOT 才看得到的資源上限入口，只對管理員帳號出現。
+      "資源上限",
       "變更角色",
       "重設密碼",
       "停用",

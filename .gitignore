@@ -83,3 +83,6 @@ frontend/admin/public/models/
 
 # 由 scripts/render-native-nginx.sh 產生，內容依機器而異
 infra/nginx/native/openvman.conf
+
+# Claude 工作日誌快取
+.remember/

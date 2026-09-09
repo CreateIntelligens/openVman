@@ -188,6 +188,42 @@ _ADMIN_PORTAL_ACCESS_MIGRATION_NAME = "add_admin_portal_access"
 _EMBED_KEY_SCHEMA_VERSION = 8
 _EMBED_KEY_MIGRATION_NAME = "embed_keys_and_daily_usage"
 
+_ADMIN_SCOPE_SCHEMA_VERSION = 9
+_ADMIN_SCOPE_MIGRATION_NAME = "admin_resource_scopes"
+# ROOT 指派給 admin 的可分配資源池。刻意不重用 resource_grants：那張表與
+# account_defaults 綁在一起（必須含 project/voice/角色，且 defaults 要落在
+# grants 內），而 admin 的池子沒有「預設值」的概念。分開存也讓「這個 admin
+# 有沒有被設限」是一個可直接查詢的事實，而不用從 grant 內容反推。
+_ADMIN_SCOPE_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS admin_resource_scopes (
+        admin_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        resource_type TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        granted_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (admin_user_id, resource_type, resource_id),
+        FOREIGN KEY (resource_type, resource_id)
+            REFERENCES resources(resource_type, resource_id) ON DELETE CASCADE
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_admin_scopes_resource
+    ON admin_resource_scopes(resource_type, resource_id, admin_user_id)
+    """,
+    # 一個 admin 是否受限，是「有沒有任何一列」的問題。單獨記一列旗標，
+    # 才能表達「ROOT 設了範圍，但某個資源類型刻意給空」——沒有這張表就
+    # 無法和「完全沒設限」區分開。
+    """
+    CREATE TABLE IF NOT EXISTS admin_scope_state (
+        admin_user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        scoped INTEGER NOT NULL DEFAULT 0,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+)
+
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
     (2, "temporary_accounts_grants_and_defaults", _TEMPORARY_ACCOUNT_STATEMENTS),
@@ -197,6 +233,11 @@ _MIGRATIONS = (
         _ACCOUNT_DEFAULTS_MASCOT_BACKGROUND_STATEMENTS,
     ),
     (_EMBED_KEY_SCHEMA_VERSION, _EMBED_KEY_MIGRATION_NAME, _EMBED_KEY_STATEMENTS),
+    (
+        _ADMIN_SCOPE_SCHEMA_VERSION,
+        _ADMIN_SCOPE_MIGRATION_NAME,
+        _ADMIN_SCOPE_STATEMENTS,
+    ),
 )
 
 

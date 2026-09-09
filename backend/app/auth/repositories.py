@@ -19,6 +19,7 @@ from .models import (
     AccountDefaultsRecord,
     AccountRole,
     AccountType,
+    AdminScope,
     AuthAuditEventRecord,
     EmbedKeyRecord,
     ResourceGrantRecord,
@@ -349,6 +350,48 @@ def _normalize_account_access(
     )
 
 
+def _ensure_grants_within_granter_scope(
+    connection: sqlite3.Connection,
+    *,
+    granted_by: str | None,
+    normalized_grants: Sequence[tuple[ResourceType, str]],
+) -> None:
+    """Refuse grants that exceed the granting administrator's own ceiling.
+
+    This is what makes the ceiling transitive: an administrator restricted to
+    two voices can only ever hand out those two, and any account it creates
+    inherits that same limit.
+    """
+    if granted_by is None:
+        return
+    granter = connection.execute(
+        "SELECT * FROM users WHERE id = ?",
+        (granted_by,),
+    ).fetchone()
+    if granter is None:
+        return
+    if AccountRole(granter["role"]) is AccountRole.ROOT:
+        return
+    scope = _load_admin_scope(connection, granted_by)
+    if not scope.scoped:
+        return
+    outside = [
+        (resource_type, resource_id)
+        for resource_type, resource_id in normalized_grants
+        if (resource_type, resource_id) not in scope.resources
+    ]
+    if outside:
+        detail = ", ".join(
+            f"{resource_type.value}/{resource_id}"
+            for resource_type, resource_id in sorted(
+                outside, key=lambda item: (item[0].value, item[1]),
+            )
+        )
+        raise InvalidResourceGrantError(
+            "cannot grant resources outside your assigned scope: " + detail
+        )
+
+
 def _persist_account_access(
     connection: sqlite3.Connection,
     *,
@@ -359,6 +402,11 @@ def _persist_account_access(
     now: str,
     clear_existing: bool = False,
 ) -> None:
+    _ensure_grants_within_granter_scope(
+        connection,
+        granted_by=granted_by,
+        normalized_grants=normalized_grants,
+    )
     for resource_type, resource_id in normalized_grants:
         resource = connection.execute(
             """
@@ -1170,6 +1218,281 @@ class ResourceRepository:
         return deleted > 0
 
 
+class AdminScopeRepository:
+    """Manage the resource ceiling ROOT assigns to an administrator.
+
+    An administrator with no scope row keeps the historical unrestricted
+    access, so existing deployments are unaffected until ROOT sets a ceiling.
+    """
+
+    def __init__(self, database: AuthDatabase) -> None:
+        self.database = database
+
+    def get(self, admin_user_id: str) -> AdminScope:
+        with self.database.transaction() as connection:
+            return _load_admin_scope(connection, admin_user_id)
+
+    def replace(
+        self,
+        *,
+        admin_user_id: str,
+        updated_by: str,
+        scoped: bool,
+        resources: Iterable[tuple[ResourceType, str]],
+    ) -> AdminScope:
+        """Set (or clear) an administrator's ceiling. ROOT only."""
+        normalized = tuple(
+            sorted(
+                {
+                    (item[0], item[1].strip())
+                    for item in resources
+                    if item[1].strip()
+                },
+                key=lambda item: (item[0].value, item[1]),
+            )
+        )
+        now = _now_iso()
+        with self.database.transaction(write=True) as connection:
+            actor = connection.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (updated_by,),
+            ).fetchone()
+            if actor is None:
+                raise UserNotFoundError("administrator account does not exist")
+            actor_record = _user_from_row(actor)
+            if actor_record.role is not AccountRole.ROOT:
+                raise AccountPolicyError(
+                    "only ROOT can set administrator resource scopes"
+                )
+
+            target = connection.execute(
+                "SELECT * FROM users WHERE id = ?",
+                (admin_user_id,),
+            ).fetchone()
+            if target is None:
+                raise UserNotFoundError("account does not exist")
+            target_record = _user_from_row(target)
+            if target_record.role is not AccountRole.ADMIN:
+                raise InvalidResourceGrantError(
+                    "resource scopes apply to administrator accounts only"
+                )
+
+            for resource_type, resource_id in normalized:
+                exists = connection.execute(
+                    """
+                    SELECT 1 FROM resources
+                    WHERE resource_type = ? AND resource_id = ?
+                    """,
+                    (resource_type.value, resource_id),
+                ).fetchone()
+                if exists is None:
+                    raise InvalidResourceGrantError(
+                        "resource is not registered: "
+                        f"{resource_type.value}/{resource_id}"
+                    )
+
+            connection.execute(
+                "DELETE FROM admin_resource_scopes WHERE admin_user_id = ?",
+                (admin_user_id,),
+            )
+            if scoped and normalized:
+                connection.executemany(
+                    """
+                    INSERT INTO admin_resource_scopes(
+                        admin_user_id, resource_type, resource_id,
+                        granted_by, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            admin_user_id,
+                            resource_type.value,
+                            resource_id,
+                            updated_by,
+                            now,
+                        )
+                        for resource_type, resource_id in normalized
+                    ],
+                )
+
+            if scoped:
+                connection.execute(
+                    """
+                    INSERT INTO admin_scope_state(
+                        admin_user_id, scoped, updated_by, updated_at
+                    ) VALUES (?, 1, ?, ?)
+                    ON CONFLICT(admin_user_id) DO UPDATE SET
+                        scoped = 1, updated_by = excluded.updated_by,
+                        updated_at = excluded.updated_at
+                    """,
+                    (admin_user_id, updated_by, now),
+                )
+            else:
+                connection.execute(
+                    "DELETE FROM admin_scope_state WHERE admin_user_id = ?",
+                    (admin_user_id,),
+                )
+
+            # 範圍縮小後，這個 admin 先前發出去、如今已超出自己上限的授權
+            # 必須跟著失效，否則收斂只擋新授權、擋不住既有的。
+            revoked = 0
+            if scoped:
+                revoked = _revoke_grants_outside_scope(
+                    connection,
+                    admin_user_id=admin_user_id,
+                    allowed=normalized,
+                )
+
+            _append_auth_audit(
+                connection,
+                action="admin_scope_updated",
+                actor_user_id=updated_by,
+                target_user_id=admin_user_id,
+                metadata={
+                    "scoped": scoped,
+                    "resource_count": len(normalized) if scoped else 0,
+                    "revoked_grants": revoked,
+                },
+                now=now,
+            )
+
+        return self.get(admin_user_id)
+
+    def list_scoped_admin_ids(self) -> frozenset[str]:
+        with self.database.transaction() as connection:
+            rows = connection.execute(
+                "SELECT admin_user_id FROM admin_scope_state WHERE scoped = 1"
+            ).fetchall()
+        return frozenset(row["admin_user_id"] for row in rows)
+
+
+def _load_admin_scope(
+    connection: sqlite3.Connection,
+    admin_user_id: str,
+) -> AdminScope:
+    state = connection.execute(
+        "SELECT scoped FROM admin_scope_state WHERE admin_user_id = ?",
+        (admin_user_id,),
+    ).fetchone()
+    if state is None or not int(state["scoped"]):
+        return AdminScope(
+            admin_user_id=admin_user_id,
+            scoped=False,
+            resources=frozenset(),
+        )
+    rows = connection.execute(
+        """
+        SELECT resource_type, resource_id FROM admin_resource_scopes
+        WHERE admin_user_id = ?
+        """,
+        (admin_user_id,),
+    ).fetchall()
+    return AdminScope(
+        admin_user_id=admin_user_id,
+        scoped=True,
+        resources=frozenset(
+            (ResourceType(row["resource_type"]), row["resource_id"])
+            for row in rows
+        ),
+    )
+
+
+def _revoke_grants_outside_scope(
+    connection: sqlite3.Connection,
+    *,
+    admin_user_id: str,
+    allowed: Sequence[tuple[ResourceType, str]],
+) -> int:
+    """Drop grants this administrator issued that its new ceiling excludes."""
+    rows = connection.execute(
+        """
+        SELECT grantee_user_id, resource_type, resource_id
+        FROM resource_grants
+        WHERE granted_by = ?
+        """,
+        (admin_user_id,),
+    ).fetchall()
+    allowed_set = {(item[0].value, item[1]) for item in allowed}
+    stale = [
+        (row["grantee_user_id"], row["resource_type"], row["resource_id"])
+        for row in rows
+        if (row["resource_type"], row["resource_id"]) not in allowed_set
+    ]
+    if not stale:
+        return 0
+    connection.executemany(
+        """
+        DELETE FROM resource_grants
+        WHERE grantee_user_id = ? AND resource_type = ? AND resource_id = ?
+        """,
+        stale,
+    )
+    for grantee_user_id in {item[0] for item in stale}:
+        _repoint_dangling_defaults(connection, user_id=grantee_user_id)
+    return len(stale)
+
+
+# account_defaults 的欄位名稱對應到哪一種資源。預設值是登入時真正套用的
+# 東西，撤銷授權卻留著預設值等於沒撤——帳號會繼續用那個資源。
+_DEFAULT_COLUMNS: tuple[tuple[str, ResourceType], ...] = (
+    ("project_id", ResourceType.PROJECT),
+    ("character_id", ResourceType.AVATAR_CHARACTER),
+    ("voice_id", ResourceType.CUSTOM_VOICE),
+    ("mascot_id", ResourceType.AVATAR_MASCOT),
+    ("background_id", ResourceType.AVATAR_BACKGROUND),
+)
+
+
+def _repoint_dangling_defaults(
+    connection: sqlite3.Connection,
+    *,
+    user_id: str,
+) -> None:
+    """Point defaults that lost their grant at another granted resource.
+
+    優先改指向同類型仍有授權的資源；真的沒有了才留空，讓帳號在下次設定時
+    被迫重新選，而不是靜默沿用一個已被撤銷的資源。
+    """
+    row = connection.execute(
+        "SELECT * FROM account_defaults WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    if row is None:
+        return
+
+    updates: dict[str, str] = {}
+    for column, resource_type in _DEFAULT_COLUMNS:
+        current = row[column]
+        if not current:
+            continue
+        still_granted = connection.execute(
+            """
+            SELECT 1 FROM resource_grants
+            WHERE grantee_user_id = ? AND resource_type = ? AND resource_id = ?
+            """,
+            (user_id, resource_type.value, current),
+        ).fetchone()
+        if still_granted is not None:
+            continue
+        replacement = connection.execute(
+            """
+            SELECT resource_id FROM resource_grants
+            WHERE grantee_user_id = ? AND resource_type = ?
+            ORDER BY resource_id LIMIT 1
+            """,
+            (user_id, resource_type.value),
+        ).fetchone()
+        updates[column] = replacement["resource_id"] if replacement else ""
+
+    if not updates:
+        return
+    assignments = ", ".join(f"{column} = ?" for column in updates)
+    connection.execute(
+        f"UPDATE account_defaults SET {assignments} WHERE user_id = ?",
+        (*updates.values(), user_id),
+    )
+
+
 class AccountAccessRepository:
     """Manage explicit read grants and defaults for any scoped account."""
 
@@ -1319,6 +1642,11 @@ class TemporaryAccountRepository:
                 if creator is None:
                     raise UserNotFoundError("administrator account does not exist")
                 ensure_account_manager(_user_from_row(creator))
+                _ensure_grants_within_granter_scope(
+                    connection,
+                    granted_by=created_by,
+                    normalized_grants=normalized_grants,
+                )
 
                 for resource_type, resource_id in normalized_grants:
                     resource = connection.execute(
