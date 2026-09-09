@@ -161,3 +161,24 @@ def classify_voxcpm_error(exc: Exception) -> str:
         if exc.status_code >= 500:
             return REASON_PROVIDER_UNAVAILABLE
     return _classify_network_error(exc) or REASON_UNKNOWN
+
+
+def classify_cosyvoice_error(exc: Exception) -> str:
+    """Classify an error from the CosyVoice3 service.
+
+    錯誤碼與 castvoice 相同：400 是文字空白／過長或 voice_id 不存在，
+    401 是 Bearer token 錯誤，429 是伺服器忙碌（帶 Retry-After），
+    503 是顯存不足或模型未就緒。
+    """
+    from app.providers.cosyvoice_adapter import CosyVoiceHTTPError
+
+    if isinstance(exc, CosyVoiceHTTPError):
+        if exc.status_code in (401, 403):
+            return REASON_AUTH_ERROR
+        if exc.status_code == 429:
+            return REASON_RATE_LIMITED
+        if exc.status_code in (400, 422):
+            return REASON_BAD_REQUEST
+        if exc.status_code >= 500:
+            return REASON_PROVIDER_UNAVAILABLE
+    return _classify_network_error(exc) or REASON_UNKNOWN

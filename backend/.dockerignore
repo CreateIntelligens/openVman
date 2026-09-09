@@ -1,0 +1,18 @@
+# backend 自己的 build context 排除規則。
+#
+# 這個檔案存在的理由：buildx 會從專案根目錄找 .dockerignore 並套用到
+# 這裡的 build，而根目錄那份以 `*` 排除一切、只 re-include frontend/
+# 與 contracts/，backend 不在名單內 —— context 因此只剩十幾 KB，
+# `COPY app /app/app` 複製到的是舊快取層，build 會「成功」但永遠是舊 code。
+# 放一份就近的規則覆蓋掉它。
+
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+.ruff_cache
+.venv
+data
+logs
+# TTS 模型權重，數 GB 且不需要進 image
+index-tts-vllm/assets

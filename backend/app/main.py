@@ -50,6 +50,7 @@ from app.observability import (
 )
 from app.project_routes import router as project_router
 from app.providers.base import NormalizedTTSResult, SynthesizeRequest
+from app.providers.cosyvoice_adapter import COSYVOICE_PROVIDER_NAME
 from app.providers.gemini_tts_adapter import (
     GEMINI_STREAM_CONTENT_TYPE,
     GeminiTTSHTTPError,
@@ -527,6 +528,23 @@ async def tts_stream_endpoint(
             except (VoxCPMHTTPError, RuntimeError) as exc:
                 # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
                 logger.warning("tts_stream voxcpm error: %s", exc)
+
+    # 明確指定的非串流 provider（CosyVoice 等）直接走整段合成。不這樣做的話
+    # 會掉進下面的 IndexTTS／Edge 串流，回的是別的引擎的聲音——CosyVoice 是
+    # 台語，被換成 Edge 的華語音色不會報錯，只會默默唸錯語言。
+    if provider == COSYVOICE_PROVIDER_NAME:
+        svc = _get_service()
+        try:
+            output = svc.synthesize(
+                SynthesizeRequest(text=cleaned, voice_hint=voice or character),
+                provider=provider,
+            )
+        except RuntimeError as exc:
+            return JSONResponse(status_code=502, content={"error": str(exc)})
+        return Response(
+            content=output.result.audio_bytes,
+            media_type=output.result.content_type,
+        )
 
     # Primary: proxy stream directly from IndexTTS
     if cfg.tts_indextts_url:

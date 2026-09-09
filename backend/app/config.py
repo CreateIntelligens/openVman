@@ -82,6 +82,22 @@ class TTSRouterConfig(BaseSettings):
         validation_alias="TTS_VOXCPM_EXCLUDED_VOICES",
     )
 
+    # --- CosyVoice3 (CastAgent-compatible /v1/*，臺灣台語) ---
+    tts_cosyvoice_url: str = Field(default="", validation_alias="TTS_COSYVOICE_URL")
+    tts_cosyvoice_api_key: str = Field(
+        default="",
+        validation_alias="TTS_COSYVOICE_API_KEY",
+    )
+    tts_cosyvoice_default_voice: str = Field(
+        default="",
+        validation_alias="TTS_COSYVOICE_DEFAULT_VOICE",
+    )
+    # 逗號分隔的 voice_id 黑名單，語意同 TTS_VOXCPM_EXCLUDED_VOICES。
+    tts_cosyvoice_excluded_voices: str = Field(
+        default="",
+        validation_alias="TTS_COSYVOICE_EXCLUDED_VOICES",
+    )
+
     # --- TTS Text Normalization / 轉譯 API ---
     normalize_api_url: str = Field(default="", validation_alias="NORMALIZE_API_URL")
 
