@@ -29,6 +29,9 @@ def _make_test_config(*, max_upload_bytes: int = 1024, **overrides):
         "tts_gcp_enabled": False,
         "tts_aws_enabled": False,
         "tts_gemini_url": "",
+        "tts_cosyvoice_url": "",
+        "tts_cosyvoice_api_key": "",
+        "tts_cosyvoice_default_voice": "",
         "normalize_api_url": "",
         "edge_tts_enabled": True,
         "edge_tts_voice": "zh-TW-HsiaoChenNeural",
@@ -349,6 +352,7 @@ def test_tts_providers_include_indextts_when_configured(monkeypatch):
         tts_aws_enabled=False,
         tts_gemini_url="",
         tts_voxcpm_url="",
+        tts_cosyvoice_url="",
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
     ))
@@ -394,6 +398,7 @@ def test_tts_providers_excludes_indextts_when_unreachable(monkeypatch):
         tts_aws_enabled=False,
         tts_gemini_url="",
         tts_voxcpm_url="",
+        tts_cosyvoice_url="",
         edge_tts_enabled=True,
         edge_tts_voice="zh-TW-HsiaoChenNeural",
     ))
@@ -432,6 +437,7 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
         tts_aws_enabled=False,
         tts_gemini_url="http://nurse.5gao.ai:8206",
         tts_voxcpm_url="",
+        tts_cosyvoice_url="",
         edge_tts_enabled=False,
     ))
 
@@ -917,6 +923,7 @@ def test_tts_providers_includes_voxcpm_when_configured(monkeypatch):
         tts_aws_enabled=False,
         tts_gemini_url="",
         tts_voxcpm_url="http://10.9.0.37:8800",
+        tts_cosyvoice_url="",
         tts_voxcpm_default_voice="",
         edge_tts_enabled=False,
     ))
@@ -930,6 +937,102 @@ def test_tts_providers_includes_voxcpm_when_configured(monkeypatch):
             "voices": ["barbet-hung-yi-lee", "voxcpm2-cosy-young-female-01"],
         },
     ]
+
+
+def test_tts_providers_includes_cosyvoice_when_configured(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "model_version": "taigi-2026.08",
+                "voices": [
+                    {"voice_id": "young-male-02", "label": "青年男聲 02"},
+                    {"voice_id": "teen-female-01", "label": "少女聲 01"},
+                ],
+            }
+
+    class FakeClient:
+        async def get(self, url: str, timeout=None, follow_redirects=None, headers=None):
+            assert url == "http://10.9.0.35:50010/v1/voices"
+            # CosyVoice 的 /voices 需要 Bearer token，與 VoxCPM360 不同。
+            assert headers == {"Authorization": "Bearer cosy-key"}
+            return FakeResponse()
+
+    async def _fake_close() -> None:
+        return None
+
+    module.admin_routes._health_http = types.SimpleNamespace(
+        get=lambda: FakeClient(),
+        close=_fake_close,
+    )
+    monkeypatch.setattr(module.admin_routes, "get_tts_config", lambda: types.SimpleNamespace(
+        document_max_upload_bytes=1024,
+        tts_indextts_url="",
+        tts_gcp_enabled=False,
+        tts_aws_enabled=False,
+        tts_gemini_url="",
+        tts_voxcpm_url="",
+        tts_cosyvoice_url="http://10.9.0.35:50010/v1",
+        tts_cosyvoice_api_key="cosy-key",
+        tts_cosyvoice_default_voice="",
+        tts_cosyvoice_excluded_voices="",
+        edge_tts_enabled=False,
+    ))
+
+    assert _get_tts_provider_payload(module) == [
+        {"id": "auto", "name": "自動", "default_voice": "", "voices": []},
+        {
+            "id": "cosyvoice",
+            "name": "CosyVoice",
+            "default_voice": "young-male-02",
+            "voices": ["young-male-02", "teen-female-01"],
+        },
+    ]
+
+
+def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
+    """CosyVoice 沒有相容的串流端點，不能讓它掉進 Edge-TTS 的串流 fallback。
+
+    掉下去不會報錯，只會回一段華語 Edge 音色，把台語請求默默唸成華語。
+    """
+    module, _ = _load_main(monkeypatch)
+
+    captured: dict[str, object] = {}
+
+    class FakeService:
+        def __init__(self):
+            self.edge_adapter = types.SimpleNamespace(enabled=True)
+
+        def synthesize(self, request, provider=""):
+            captured["provider"] = provider
+            return types.SimpleNamespace(
+                result=types.SimpleNamespace(
+                    audio_bytes=b"taigi-mp3",
+                    content_type="audio/mpeg",
+                ),
+            )
+
+    monkeypatch.setattr(module, "_get_service", lambda: FakeService())
+    monkeypatch.setattr(
+        module,
+        "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024),
+    )
+
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={"text": "今天天氣真好", "provider": "cosyvoice"},
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"taigi-mp3"
+    assert response.headers["content-type"] == "audio/mpeg"
+    assert captured["provider"] == "cosyvoice"
 
 
 def _usage_account(module, *, admin: bool):
@@ -1117,7 +1220,9 @@ def test_voxcpm_voice_list_drops_excluded_ids(monkeypatch):
     from app.routes import admin
 
     monkeypatch.setattr(
-        admin, "_excluded_voxcpm_voices", lambda: frozenset({"barbet-hung-yi-lee"}),
+        admin,
+        "_excluded_voices",
+        lambda _attr: frozenset({"barbet-hung-yi-lee"}),
     )
 
     class _Response:

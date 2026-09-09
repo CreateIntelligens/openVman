@@ -111,22 +111,21 @@ async def probe_indextts_health(
     }
 
 
-async def probe_voxcpm_health(
+async def _probe_castvoice_service_health(
     client: httpx.AsyncClient,
-    cfg: TTSRouterConfig | None = None,
+    name: str,
+    raw_url: str,
+    health_path: str,
 ) -> dict[str, Any]:
-    if cfg is None:
-        cfg = get_tts_config()
-
-    tts_url = (cfg.tts_voxcpm_url or "").strip()
+    tts_url = raw_url.strip()
     if not tts_url:
         return {"status": "disabled"}
 
     sanitized_url = _sanitize_url(tts_url)
     response = await _probe_service(
         client,
-        "voxcpm",
-        f"{tts_url.rstrip('/')}/api/v1/tts/health",
+        name,
+        f"{tts_url.rstrip('/')}{health_path}",
     )
     status = response.get("status", "unknown")
 
@@ -140,6 +139,34 @@ async def probe_voxcpm_health(
             "url": sanitized_url,
         }
     return {"status": status, "url": sanitized_url}
+
+
+async def probe_voxcpm_health(
+    client: httpx.AsyncClient,
+    cfg: TTSRouterConfig | None = None,
+) -> dict[str, Any]:
+    if cfg is None:
+        cfg = get_tts_config()
+    return await _probe_castvoice_service_health(
+        client,
+        "voxcpm",
+        cfg.tts_voxcpm_url or "",
+        "/api/v1/tts/health",
+    )
+
+
+async def probe_cosyvoice_health(
+    client: httpx.AsyncClient,
+    cfg: TTSRouterConfig | None = None,
+) -> dict[str, Any]:
+    if cfg is None:
+        cfg = get_tts_config()
+    return await _probe_castvoice_service_health(
+        client,
+        "cosyvoice",
+        cfg.tts_cosyvoice_url or "",
+        "/health",
+    )
 
 
 async def _probe_downstream_services(
@@ -171,6 +198,7 @@ async def _probe_downstream_services(
     probes["index-tts"] = indextts_probe
 
     probes["voxcpm"] = await probe_voxcpm_health(client, cfg)
+    probes["cosyvoice"] = await probe_cosyvoice_health(client, cfg)
 
     return probes
 

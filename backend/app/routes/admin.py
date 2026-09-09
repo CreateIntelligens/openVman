@@ -27,6 +27,10 @@ from app.gateway.temp_storage import get_temp_storage
 from app.health_payloads import build_backend_health_payload
 from app.http_client import SharedAsyncClient
 from app.observability import build_prometheus_response, get_metrics_snapshot
+from app.providers.cosyvoice_adapter import (
+    COSYVOICE_DEFAULT_VOICE,
+    COSYVOICE_PROVIDER_NAME,
+)
 from app.providers.gemini_tts_adapter import GEMINI_DEFAULT_VOICE, GEMINI_PROVIDER_NAME
 from app.providers.voxcpm_adapter import VOXCPM_DEFAULT_VOICE, VOXCPM_PROVIDER_NAME
 
@@ -45,6 +49,7 @@ _PROVIDER_NAMES = {
     GEMINI_PROVIDER_NAME: "Gemini TTS",
     "indextts": "IndexTTS",
     VOXCPM_PROVIDER_NAME: "VoxCPM",
+    COSYVOICE_PROVIDER_NAME: "CosyVoice",
 }
 
 
@@ -104,36 +109,46 @@ async def _fetch_gemini_voices(base_url: str) -> list[str]:
     return await _fetch_provider_voices(base_url, "/api/voices", "gemini")
 
 
-def _excluded_voxcpm_voices() -> frozenset[str]:
+def _excluded_voices(config_attr: str) -> frozenset[str]:
     """voice_id 黑名單：上游清單不是我們維護的，這裡濾掉不想露出的聲音。"""
-    raw = getattr(get_tts_config(), "tts_voxcpm_excluded_voices", "") or ""
+    raw = getattr(get_tts_config(), config_attr, "") or ""
     return frozenset(item.strip() for item in raw.split(",") if item.strip())
 
 
-async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
-    """回傳 VoxCPM360 的 ``(voice_id, label)`` 清單。
+async def _fetch_castvoice_voices(
+    voices_url: str,
+    provider: str,
+    excluded: frozenset[str],
+    *,
+    headers: dict[str, str] | None = None,
+) -> list[tuple[str, str]]:
+    """回傳 CastAgent 相容 /voices 端點的 ``(voice_id, label)`` 清單。
 
-    castvoice 的 /voices 用 ``voice_id``＋中文 ``label``，與其他 provider 的
-    ``name`` 欄位不同，故不走 _extract_voice_names；label 留下來給 admin 選單。
+    這類端點用 ``voice_id``＋中文 ``label``，與其他 provider 的 ``name`` 欄位
+    不同，故不走 _extract_voice_names；label 留下來給 admin 選單。
     """
-    voices_url = f"{base_url.rstrip('/')}/api/v1/tts/voices"
+    # headers 只在有值時才傳：VoxCPM360 的 /voices 不需要驗證，多送一個空
+    # dict 只是噪音。
+    extra = {"headers": headers} if headers else {}
     try:
         response = await _health_http.get().get(
             voices_url,
             timeout=_TTS_PROVIDER_TIMEOUT_SECONDS,
             follow_redirects=True,
+            **extra,
         )
         response.raise_for_status()
         payload = response.json()
     except Exception as exc:
-        logger.warning("failed to fetch voxcpm voices from %s: %s", voices_url, exc)
+        logger.warning(
+            "failed to fetch %s voices from %s: %s", provider, voices_url, exc,
+        )
         return []
 
     voice_entries = payload.get("voices") if isinstance(payload, dict) else None
     if not isinstance(voice_entries, list):
         return []
 
-    excluded = _excluded_voxcpm_voices()
     voices: list[tuple[str, str]] = []
     for entry in voice_entries:
         if not isinstance(entry, dict):
@@ -147,6 +162,30 @@ async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
         display_label = label if isinstance(label, str) and label else voice_id
         voices.append((voice_id, display_label))
     return voices
+
+
+async def _fetch_voxcpm_voices(base_url: str) -> list[tuple[str, str]]:
+    return await _fetch_castvoice_voices(
+        f"{base_url.rstrip('/')}/api/v1/tts/voices",
+        "voxcpm",
+        _excluded_voices("tts_voxcpm_excluded_voices"),
+    )
+
+
+async def _fetch_cosyvoice_voices(base_url: str) -> list[tuple[str, str]]:
+    """CosyVoice 的 /voices 需要 Bearer token（VoxCPM360 的不用）。"""
+    cfg = get_tts_config()
+    headers = (
+        {"Authorization": f"Bearer {cfg.tts_cosyvoice_api_key}"}
+        if cfg.tts_cosyvoice_api_key
+        else {}
+    )
+    return await _fetch_castvoice_voices(
+        f"{base_url.rstrip('/')}/voices",
+        COSYVOICE_PROVIDER_NAME,
+        _excluded_voices("tts_cosyvoice_excluded_voices"),
+        headers=headers,
+    )
 
 
 # 與 frontend/app/src/types/avatarBackground.ts 的 AVATAR_BACKGROUND_IDS 對應，
@@ -220,6 +259,17 @@ async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:
                 )
         except Exception as exc:
             logger.warning("failed to sync voxcpm voices: %s", exc)
+
+    if cfg.tts_cosyvoice_url:
+        try:
+            for voice_id, label in await _fetch_cosyvoice_voices(cfg.tts_cosyvoice_url):
+                runtime.resources.upsert_system_resource(
+                    resource_type=ResourceType.CUSTOM_VOICE,
+                    resource_id=voice_id,
+                    metadata={"provider": COSYVOICE_PROVIDER_NAME, "label": label},
+                )
+        except Exception as exc:
+            logger.warning("failed to sync cosyvoice voices: %s", exc)
 
     if cfg.tts_gcp_enabled and cfg.tts_gcp_voice_name:
         try:
@@ -650,6 +700,23 @@ async def get_tts_providers(
                 "name": "VoxCPM",
                 "default_voice": default_voice,
                 "voices": _prepend_default_voice(voxcpm_voices, default_voice),
+            })
+
+    if cfg.tts_cosyvoice_url:
+        # 同 IndexTTS：抓不到 voices 就不列，避免選單出現會 502 的 provider。
+        cosyvoice_voices = [
+            voice_id
+            for voice_id, _label in await _fetch_cosyvoice_voices(cfg.tts_cosyvoice_url)
+        ]
+        if cosyvoice_voices:
+            default_voice = (
+                cfg.tts_cosyvoice_default_voice or COSYVOICE_DEFAULT_VOICE
+            )
+            providers.append({
+                "id": COSYVOICE_PROVIDER_NAME,
+                "name": "CosyVoice",
+                "default_voice": default_voice,
+                "voices": _prepend_default_voice(cosyvoice_voices, default_voice),
             })
 
     if cfg.tts_gcp_enabled:

@@ -109,13 +109,23 @@ async function synthesizeWithFallback(text, session) {
   throw new Error("All TTS targets failed");
 }
 ```
-> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /api/v1/tts/stream`，VoxCPM 則由同一路徑回傳完整 MP3。
+> **實作現況**：以 Python `TTSRouterService` 實作 fallback chain（IndexTTS → VoxCPM → CosyVoice → Gemini → GCP → AWS → Edge-TTS），端點為 `POST /v1/audio/speech`；IndexTTS 與 Gemini 串流走 `POST /api/v1/tts/stream`，VoxCPM 與 CosyVoice 則由同一路徑回傳完整 MP3。
 
 #### 6.1 VoxCPM360 外部節點
 
 Backend 透過 CastAgent 相容介面整合 VoxCPM360：`GET /api/v1/tts/health` 探測狀態、`GET /api/v1/tts/voices` 同步可用聲線，並以 `POST /api/v1/tts/synthesize` 傳送 `text`、`voice_id` 與固定的 `format: "mp3"`。成功時上游回傳 `audio/mpeg`，並可用 `X-Request-ID` 標示請求。
 
 連線由 `TTS_VOXCPM_URL` 啟用；若上游設定 `TTS_API_KEY`，Backend 必須以 `TTS_VOXCPM_API_KEY` 傳送 Bearer token。`TTS_VOXCPM_DEFAULT_VOICE` 可覆寫預設聲線。金鑰不得放入 URL 或健康狀態回應；Backend 將 `400/422`、`401/403`、`429` 與 `5xx` 分別歸類為請求、驗證、限流與 provider 不可用，供有界 fallback 與監控使用。
+
+#### 6.2 CosyVoice3 外部節點（臺灣台語）
+
+同樣的 CastAgent 相容介面，差別在端點直接掛在 `/v1` 之下：`GET /v1/health`、`GET /v1/voices`、`POST /v1/synthesize`。傳送 `text`、`voice_id` 與固定的 `format: "mp3"`，成功時回傳 `audio/mpeg`。
+
+輸入華語中文即可，**不需要先轉成台文**——漢字轉換在服務端完成。回應標頭 `X-Model-Version`、`X-Spoken-Text`（實際唸出的台文）與 `X-Unfixable`（仍會念錯的字）會記入 `raw_metadata`，發音有問題時用來分辨是漢字轉換錯還是模型念錯；非 ASCII 的標頭值由服務端 percent-encode。
+
+連線由 `TTS_COSYVOICE_URL` 啟用，`/voices` 與 `/synthesize` 都需要 `TTS_COSYVOICE_API_KEY` 的 Bearer token（與 VoxCPM360 不同，後者的 `/voices` 不驗證）。`TTS_COSYVOICE_DEFAULT_VOICE` 可覆寫預設聲線，`TTS_COSYVOICE_EXCLUDED_VOICES` 濾掉不想出現在選單的 voice_id。錯誤碼歸類與 VoxCPM360 相同。
+
+服務端的串流端點用自訂的 JSON-line＋WAV chunk 格式，與本服務的 PCM 串流不相容，因此 CosyVoice 只走整段合成；`POST /api/v1/tts/stream` 指名 `provider=cosyvoice` 時會直接回完整 MP3，不落入 IndexTTS／Edge-TTS 的串流 fallback——那會把台語請求默默換成華語音色。
 
 ### 7. 資料打包與下發 (Data Serialization & Broadcast)
 
@@ -171,6 +181,9 @@ TTS_INDEXTTS_DEFAULT_CHARACTER=hayley
 TTS_VOXCPM_URL=http://voxcpm-gateway:8800
 TTS_VOXCPM_API_KEY=***
 TTS_VOXCPM_DEFAULT_VOICE=voxcpm2-cosy-young-female-01
+TTS_COSYVOICE_URL=http://10.9.0.35:50010/v1
+TTS_COSYVOICE_API_KEY=***
+TTS_COSYVOICE_DEFAULT_VOICE=young-male-02
 TTS_AWS_ACCESS_KEY_ID=***
 TTS_AWS_SECRET_ACCESS_KEY=***
 TTS_AWS_REGION=ap-northeast-1

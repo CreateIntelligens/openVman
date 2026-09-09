@@ -281,7 +281,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT
 | 前端 | **ONNX Runtime Web / WebGL** | 依設備能力選用高速引擎，捨棄舊版 Viseme 常數映射 |
 | 後端 | 標點符號截斷 (Punctuation Chunking) | LLM 串流 → 短句 → TTS，最小化延遲 |
 | 後端 | **智能中斷 (Smart Barge-in)** | 輕量 Guard Agent 判定插話，立即停止 ASR/TTS 任務 |
-| 後端 | IndexTTS / VoxCPM zh-TW | 優先使用自建語音節點，並具備 Gemini / GCP / AWS / Edge-TTS fallback；VoxCPM 聲線由外部 CastAgent 相容介面同步 |
+| 後端 | IndexTTS / VoxCPM zh-TW / CosyVoice 臺灣台語 | 優先使用自建語音節點，並具備 Gemini / GCP / AWS / Edge-TTS fallback；VoxCPM 與 CosyVoice 聲線由外部 CastAgent 相容介面同步 |
 | 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
 | 網關 | **BullMQ + Redis 佇列** | 非同步處理多模態素材 (影像/語音) 的 CPU 密集型預處理管線 |
 | 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、文件處理與 Web Crawler 等前置工具能力 |

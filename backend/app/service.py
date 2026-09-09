@@ -15,9 +15,11 @@ from app.observability import (
 )
 from app.providers.aws_adapter import AWSPollyAdapter
 from app.providers.base import NormalizedTTSResult, ProviderAdapter, SynthesizeRequest
+from app.providers.cosyvoice_adapter import CosyVoiceAdapter
 from app.providers.edge_tts_adapter import EdgeTTSAdapter
 from app.providers.error_mapping import (
     classify_aws_error,
+    classify_cosyvoice_error,
     classify_edge_tts_error,
     classify_gcp_error,
     classify_gemini_error,
@@ -55,6 +57,7 @@ class TTSRouterService:
         self._config = config or get_tts_config()
         self._indextts = IndexTTSAdapter(self._config)
         self._voxcpm = VoxCPMAdapter(self._config)
+        self._cosyvoice = CosyVoiceAdapter(self._config)
         self._gemini = GeminiTTSAdapter(self._config)
         self._aws = AWSPollyAdapter(self._config)
         self._gcp = GCPTTSAdapter(self._config)
@@ -64,6 +67,11 @@ class TTSRouterService:
     def edge_adapter(self) -> EdgeTTSAdapter:
         """Edge-TTS adapter, exposed for the streaming fallback path."""
         return self._edge
+
+    @property
+    def cosyvoice_adapter(self) -> CosyVoiceAdapter:
+        """CosyVoice adapter, exposed for the targeted synthesis path."""
+        return self._cosyvoice
 
     @property
     def gemini_adapter(self) -> GeminiTTSAdapter:
@@ -219,6 +227,7 @@ class TTSRouterService:
         return (
             ("indextts", self._indextts, classify_indextts_error),
             ("voxcpm", self._voxcpm, classify_voxcpm_error),
+            ("cosyvoice", self._cosyvoice, classify_cosyvoice_error),
             ("gemini-tts", self._gemini, classify_gemini_error),
             ("gcp-tts", self._gcp, classify_gcp_error),
             ("aws-polly", self._aws, classify_aws_error),
