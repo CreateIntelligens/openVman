@@ -166,6 +166,49 @@ class EmbedKeyRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class AdminScopeRecord:
+    """One resource ROOT has placed in an administrator's assignable pool."""
+
+    admin_user_id: str
+    resource_type: ResourceType
+    resource_id: str
+    granted_by: str | None
+    created_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class AdminScope:
+    """An administrator's effective resource ceiling.
+
+    ``scoped`` is the distinction that matters: an unscoped administrator keeps
+    the historical unrestricted access, while a scoped one may only see and
+    hand out what ``resources`` lists — including the case where ROOT has
+    deliberately left a resource type empty.
+    """
+
+    admin_user_id: str
+    scoped: bool
+    resources: frozenset[tuple[ResourceType, str]]
+
+    def allows(self, resource_type: ResourceType, resource_id: str) -> bool:
+        if not self.scoped:
+            return True
+        return (resource_type, resource_id) in self.resources
+
+    def resource_ids(self, resource_type: ResourceType) -> frozenset[str]:
+        return frozenset(
+            item[1] for item in self.resources if item[0] is resource_type
+        )
+
+
+UNSCOPED_ADMIN = AdminScope(
+    admin_user_id="",
+    scoped=False,
+    resources=frozenset(),
+)
+
+
+@dataclass(frozen=True, slots=True)
 class AuthAuditEventRecord:
     id: str
     action: str

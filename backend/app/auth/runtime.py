@@ -10,6 +10,7 @@ from app.config import TTSRouterConfig, get_tts_config
 from .database import AuthDatabase
 from .repositories import (
     AccountAccessRepository,
+    AdminScopeRepository,
     AuthAuditRepository,
     EmbedKeyRepository,
     ResourceRepository,
@@ -26,6 +27,7 @@ class AuthRuntime:
     users: UserRepository
     resources: ResourceRepository
     account_access: AccountAccessRepository
+    admin_scopes: AdminScopeRepository
     auth_audit: AuthAuditRepository
     temporary_accounts: TemporaryAccountRepository
     embed_keys: EmbedKeyRepository
@@ -47,6 +49,7 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
         users=UserRepository(database),
         resources=ResourceRepository(database),
         account_access=AccountAccessRepository(database),
+        admin_scopes=AdminScopeRepository(database),
         auth_audit=AuthAuditRepository(database),
         temporary_accounts=TemporaryAccountRepository(database),
         embed_keys=EmbedKeyRepository(database),

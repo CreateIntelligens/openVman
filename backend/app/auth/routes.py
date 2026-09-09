@@ -23,6 +23,7 @@ from .models import (
     AccountDefaultsRecord,
     AccountRole,
     AccountType,
+    AdminScope,
     ResourceGrantRecord,
     ResourceRecord,
     ResourceType,
@@ -46,6 +47,7 @@ from .repositories import (
     UserNotFoundError,
     UsernameConflictError,
 )
+from .resources import resolve_admin_scope
 from .runtime import AuthRuntime, get_auth_runtime
 
 _SESSION_COOKIE_NAME = "openvman_session"
@@ -336,6 +338,73 @@ class ResourceGrantProfile(_StrictModel):
             resource_type=record.resource_type,
             resource_id=record.resource_id,
         )
+
+
+class AdminScopeResources(_StrictModel):
+    """Resource ids in an administrator's ceiling, by type.
+
+    Unlike AccountResourceGrants every list may be empty: a ceiling that
+    deliberately excludes a whole resource type is a valid thing for ROOT to
+    express.
+    """
+
+    projects: list[str] = Field(default_factory=list)
+    avatar_characters: list[str] = Field(default_factory=list)
+    custom_voices: list[str] = Field(default_factory=list)
+    avatar_mascots: list[str] = Field(default_factory=list)
+    avatar_backgrounds: list[str] = Field(default_factory=list)
+
+    @classmethod
+    def from_scope(cls, scope: AdminScope) -> AdminScopeResources:
+        return cls(
+            projects=sorted(scope.resource_ids(ResourceType.PROJECT)),
+            avatar_characters=sorted(
+                scope.resource_ids(ResourceType.AVATAR_CHARACTER),
+            ),
+            custom_voices=sorted(scope.resource_ids(ResourceType.CUSTOM_VOICE)),
+            avatar_mascots=sorted(
+                scope.resource_ids(ResourceType.AVATAR_MASCOT),
+            ),
+            avatar_backgrounds=sorted(
+                scope.resource_ids(ResourceType.AVATAR_BACKGROUND),
+            ),
+        )
+
+    def as_pairs(self) -> list[tuple[ResourceType, str]]:
+        mapping = (
+            (ResourceType.PROJECT, self.projects),
+            (ResourceType.AVATAR_CHARACTER, self.avatar_characters),
+            (ResourceType.CUSTOM_VOICE, self.custom_voices),
+            (ResourceType.AVATAR_MASCOT, self.avatar_mascots),
+            (ResourceType.AVATAR_BACKGROUND, self.avatar_backgrounds),
+        )
+        return [
+            (resource_type, resource_id)
+            for resource_type, resource_ids in mapping
+            for resource_id in resource_ids
+        ]
+
+
+class AdminScopeProfile(_StrictModel):
+    user_id: str
+    scoped: bool
+    resources: AdminScopeResources
+
+    @classmethod
+    def from_scope(cls, scope: AdminScope, user_id: str) -> AdminScopeProfile:
+        return cls(
+            user_id=user_id,
+            scoped=scope.scoped,
+            resources=AdminScopeResources.from_scope(scope),
+        )
+
+
+class UpdateAdminScopeRequest(_StrictModel):
+    # scoped=False 清除上限，讓這個 admin 回到不受限狀態。
+    scoped: bool
+    resources: AdminScopeResources = Field(
+        default_factory=AdminScopeResources,
+    )
 
 
 class TemporaryAccountAudit(_StrictModel):
@@ -846,40 +915,43 @@ def _resource_option(record: ResourceRecord) -> AccountAccessOption:
     )
 
 
+def _scoped_options(
+    runtime: AuthRuntime,
+    scope: AdminScope,
+    resource_type: ResourceType,
+) -> list[AccountAccessOption]:
+    """List assignable resources of one type, capped by the caller's scope."""
+    records = runtime.resources.list_by_type(resource_type)
+    if scope.scoped:
+        allowed = scope.resource_ids(resource_type)
+        records = [
+            record for record in records if record.resource_id in allowed
+        ]
+    return [_resource_option(record) for record in records]
+
+
 @users_router.get("/access-options", response_model=AccountAccessOptions)
 def list_account_access_options(
-    _admin: CurrentAccount = Depends(require_admin),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> AccountAccessOptions:
+    # 受限 admin 只能看到自己範圍內的選項——否則選單會列出他無權指派的
+    # 資源，送出後才被後端擋掉。
+    scope = resolve_admin_scope(admin.user, runtime.admin_scopes)
     return AccountAccessOptions(
-        projects=[
-            _resource_option(record)
-            for record in runtime.resources.list_by_type(ResourceType.PROJECT)
-        ],
-        avatar_characters=[
-            _resource_option(record)
-            for record in runtime.resources.list_by_type(
-                ResourceType.AVATAR_CHARACTER
-            )
-        ],
-        custom_voices=[
-            _resource_option(record)
-            for record in runtime.resources.list_by_type(
-                ResourceType.CUSTOM_VOICE
-            )
-        ],
-        avatar_mascots=[
-            _resource_option(record)
-            for record in runtime.resources.list_by_type(
-                ResourceType.AVATAR_MASCOT
-            )
-        ],
-        avatar_backgrounds=[
-            _resource_option(record)
-            for record in runtime.resources.list_by_type(
-                ResourceType.AVATAR_BACKGROUND
-            )
-        ],
+        projects=_scoped_options(runtime, scope, ResourceType.PROJECT),
+        avatar_characters=_scoped_options(
+            runtime, scope, ResourceType.AVATAR_CHARACTER,
+        ),
+        custom_voices=_scoped_options(
+            runtime, scope, ResourceType.CUSTOM_VOICE,
+        ),
+        avatar_mascots=_scoped_options(
+            runtime, scope, ResourceType.AVATAR_MASCOT,
+        ),
+        avatar_backgrounds=_scoped_options(
+            runtime, scope, ResourceType.AVATAR_BACKGROUND,
+        ),
     )
 
 
@@ -912,6 +984,60 @@ def update_account_access(
     if user is None:
         raise HTTPException(status_code=404, detail="Account not found")
     return AdminAccountProfile.from_record(user, runtime)
+
+
+@users_router.get(
+    "/{user_id}/scope",
+    response_model=AdminScopeProfile,
+    summary="讀取管理員的資源上限",
+)
+def get_admin_scope(
+    user_id: str,
+    _root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AdminScopeProfile:
+    user = runtime.users.get_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return AdminScopeProfile.from_scope(
+        runtime.admin_scopes.get(user_id),
+        user_id,
+    )
+
+
+@users_router.put(
+    "/{user_id}/scope",
+    response_model=AdminScopeProfile,
+    summary="設定管理員的資源上限（僅 ROOT）",
+)
+def update_admin_scope(
+    user_id: str,
+    body: UpdateAdminScopeRequest,
+    root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> AdminScopeProfile:
+    """Cap what an administrator may see and hand out.
+
+    收斂是遞移的：受限 admin 再開帳號時，只能從自己這份上限裡分配。縮小
+    範圍會一併撤銷他先前發出、如今已超出上限的授權。
+    """
+    try:
+        scope = runtime.admin_scopes.replace(
+            admin_user_id=user_id,
+            updated_by=root.user.id,
+            scoped=body.scoped,
+            resources=body.resources.as_pairs(),
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Account not found",
+        ) from exc
+    except AccountPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except InvalidResourceGrantError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return AdminScopeProfile.from_scope(scope, user_id)
 
 
 @users_router.post(

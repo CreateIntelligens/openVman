@@ -137,6 +137,23 @@ export interface AccountAccessOptions {
   avatar_backgrounds?: AccountAccessOption[];
 }
 
+/** ROOT 指派給某個 admin 的資源上限。空清單是有意義的值——代表這一類
+ * 完全不給——所以與 AccountResourceGrants 不同，這裡每個欄位都可以是空的。 */
+export interface AdminScopeResources {
+  projects: string[];
+  avatar_characters: string[];
+  custom_voices: string[];
+  avatar_mascots: string[];
+  avatar_backgrounds: string[];
+}
+
+export interface AdminScope {
+  user_id: string;
+  /** false 代表沒有上限，這個 admin 維持不受限的存取。 */
+  scoped: boolean;
+  resources: AdminScopeResources;
+}
+
 export interface AccountAccessInput {
   grants: AccountResourceGrants;
   defaults: AccountDefaults;
@@ -273,6 +290,26 @@ export async function updateAccountAccess(
     },
   );
   return safeAccount(account);
+}
+
+export async function fetchAdminScope(userId: string): Promise<AdminScope> {
+  return fetchJson<AdminScope>(
+    apiUrl(`${itemPath("/users", userId)}/scope`),
+  );
+}
+
+export async function updateAdminScope(
+  userId: string,
+  input: { scoped: boolean; resources: AdminScopeResources },
+): Promise<AdminScope> {
+  return fetchJson<AdminScope>(
+    apiUrl(`${itemPath("/users", userId)}/scope`),
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export async function setAccountDisabled(

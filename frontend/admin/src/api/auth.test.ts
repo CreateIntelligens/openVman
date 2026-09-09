@@ -4,6 +4,7 @@ import {
   createAccount,
   createTemporaryBatch,
   fetchAccountAccessOptions,
+  fetchAdminScope,
   getCurrentAccount,
   isAtLeastAdmin,
   listAccounts,
@@ -13,6 +14,7 @@ import {
   temporaryLogin,
   updateAccountRole,
   updateAccountAccess,
+  updateAdminScope,
 } from "./auth";
 import {
   apiFetch,
@@ -344,6 +346,45 @@ describe("cookie auth API", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "/api/v1/users/user-a/access",
+      expect.objectContaining({ method: "PUT", credentials: "include" }),
+    );
+  });
+
+  it("reads and writes an administrator resource scope", async () => {
+    const scope = {
+      user_id: "admin-a",
+      scoped: true,
+      resources: {
+        projects: [],
+        avatar_characters: [],
+        custom_voices: ["voice-a", "voice-b"],
+        avatar_mascots: [],
+        avatar_backgrounds: [],
+      },
+    };
+    // 每次呼叫都要有自己的 Response：body 只能讀一次。
+    const fetchMock = vi.fn().mockImplementation(
+      async () => new Response(JSON.stringify(scope), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchAdminScope("admin-a")).resolves.toEqual(scope);
+    await expect(updateAdminScope("admin-a", {
+      scoped: true,
+      resources: scope.resources,
+    })).resolves.toEqual(scope);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/users/admin-a/scope",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/users/admin-a/scope",
       expect.objectContaining({ method: "PUT", credentials: "include" }),
     );
   });

@@ -14,6 +14,7 @@ import AccountAccessFields, {
 } from "../components/accounts/AccountAccessFields";
 import AccountPasswordResetDialog from "../components/accounts/AccountPasswordResetDialog";
 import AccountRoleDialog from "../components/accounts/AccountRoleDialog";
+import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
@@ -48,6 +49,7 @@ export default function Accounts() {
     "formal",
   );
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [editingScopeAccountId, setEditingScopeAccountId] = useState<string | null>(null);
   const [roleChangeAccount, setRoleChangeAccount] = useState<Account | null>(
     null,
   );
@@ -283,6 +285,10 @@ export default function Accounts() {
                 const grantCount = grantedResourceCount(account);
                 const canEditAccess = canManage && account.role === "user";
                 const editingAccess = editingAccountId === account.id;
+                // 資源上限只有 ROOT 能設，且只對管理員有意義。
+                const canEditScope = isRoot && !isSelf && isFormal
+                  && account.role === "admin";
+                const editingScope = editingScopeAccountId === account.id;
                 return (
                   <article key={account.id} className="px-5 py-4">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
@@ -337,6 +343,20 @@ export default function Accounts() {
                             )}
                           >
                             資源權限
+                          </button>
+                        )}
+                        {canEditScope && (
+                          <button
+                            className={editingScope
+                              ? "btn btn-primary"
+                              : "btn btn-ghost"}
+                            type="button"
+                            aria-expanded={editingScope}
+                            onClick={() => setEditingScopeAccountId(
+                              editingScope ? null : account.id,
+                            )}
+                          >
+                            資源上限
                           </button>
                         )}
                         {isRoot && canManage && (
@@ -404,6 +424,13 @@ export default function Accounts() {
                         )}
                       </div>
                     </div>
+                    {editingScope && (
+                      <AdminScopePanel
+                        account={account}
+                        onCancel={() => setEditingScopeAccountId(null)}
+                        onSaved={() => setEditingScopeAccountId(null)}
+                      />
+                    )}
                     {editingAccess && (
                       <FormalAccountAccessPanel
                         account={account}
