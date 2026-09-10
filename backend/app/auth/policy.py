@@ -32,6 +32,15 @@ def ensure_can_manage_account(actor: UserRecord, target: UserRecord) -> None:
         raise AccountPolicyError("ROOT cannot be changed through account administration")
     if target.role is AccountRole.ADMIN and actor.role is not AccountRole.ROOT:
         raise AccountPolicyError("only ROOT can manage administrators")
+    # ROOT 管所有人；admin 只管自己建立的帳號。沒有這條，任何 admin 都能
+    # 改動別的 admin 建立的使用者，資源上限的收斂就繞得過去。
+    if (
+        actor.role is not AccountRole.ROOT
+        and target.created_by != actor.id
+    ):
+        raise AccountPolicyError(
+            "administrators can only manage accounts they created"
+        )
 
 
 def ensure_can_change_role(
