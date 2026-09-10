@@ -174,26 +174,34 @@ def test_role_helpers_and_dependencies_follow_the_three_level_hierarchy():
 
 
 @pytest.mark.parametrize(
-    ("actor_role", "target_role", "target_type", "allowed"),
+    ("actor_role", "target_role", "target_type", "own", "allowed"),
     [
-        (AccountRole.ROOT, AccountRole.ADMIN, AccountType.FORMAL, True),
-        (AccountRole.ROOT, AccountRole.USER, AccountType.FORMAL, True),
-        (AccountRole.ROOT, AccountRole.USER, AccountType.TEMPORARY, True),
-        (AccountRole.ADMIN, AccountRole.ROOT, AccountType.FORMAL, False),
-        (AccountRole.ADMIN, AccountRole.ADMIN, AccountType.FORMAL, False),
-        (AccountRole.ADMIN, AccountRole.USER, AccountType.FORMAL, True),
-        (AccountRole.ADMIN, AccountRole.USER, AccountType.TEMPORARY, True),
-        (AccountRole.USER, AccountRole.USER, AccountType.FORMAL, False),
+        # ROOT 管所有人，不論是誰建的。
+        (AccountRole.ROOT, AccountRole.ADMIN, AccountType.FORMAL, False, True),
+        (AccountRole.ROOT, AccountRole.USER, AccountType.FORMAL, False, True),
+        (AccountRole.ROOT, AccountRole.USER, AccountType.TEMPORARY, False, True),
+        (AccountRole.ADMIN, AccountRole.ROOT, AccountType.FORMAL, True, False),
+        (AccountRole.ADMIN, AccountRole.ADMIN, AccountType.FORMAL, True, False),
+        # admin 只管自己建立的帳號。
+        (AccountRole.ADMIN, AccountRole.USER, AccountType.FORMAL, True, True),
+        (AccountRole.ADMIN, AccountRole.USER, AccountType.FORMAL, False, False),
+        (AccountRole.ADMIN, AccountRole.USER, AccountType.TEMPORARY, True, True),
+        (AccountRole.ADMIN, AccountRole.USER, AccountType.TEMPORARY, False, False),
+        (AccountRole.USER, AccountRole.USER, AccountType.FORMAL, True, False),
     ],
 )
 def test_actor_target_management_policy_matrix(
     actor_role: AccountRole,
     target_role: AccountRole,
     target_type: AccountType,
+    own: bool,
     allowed: bool,
 ):
     actor = _record(actor_role)
-    target = _record(target_role, account_type=target_type)
+    target = replace(
+        _record(target_role, account_type=target_type),
+        created_by=actor.id if own else "usr_someone_else",
+    )
 
     if allowed:
         ensure_can_manage_account(actor, target)

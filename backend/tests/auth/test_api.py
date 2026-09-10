@@ -129,6 +129,8 @@ def test_admin_portal_access_defaults_denied_and_can_be_replaced(
         username="portal-user",
         password_hash=hash_password(_USER_PASSWORD),
         role=AccountRole.USER,
+        # admin 只管得到自己建立的帳號，這裡要如實帶上建立者。
+        created_by=admin.id,
     )
     for resource_type, resource_id in (
         (ResourceType.PROJECT, "portal-project"),

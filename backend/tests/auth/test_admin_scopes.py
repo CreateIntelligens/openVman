@@ -375,3 +375,74 @@ def test_narrowing_a_scope_leaves_no_dangling_default(env):
     assert defaults.voice_id != "voice-c", (
         "預設聲線仍指向已撤銷的授權，帳號會繼續使用它"
     )
+
+
+def test_an_administrator_manages_only_the_accounts_it_created(env):
+    """admin 動不了別的 admin 建立的帳號。"""
+    other_admin = env["users"].create(
+        username="admin-other",
+        password_hash="hash",
+        role=AccountRole.ADMIN,
+        created_by=env["root"].id,
+    )
+    foreign_user = env["users"].create(
+        username="not-mine",
+        password_hash="hash",
+        role=AccountRole.USER,
+        created_by=other_admin.id,
+    )
+    own_user = env["users"].create(
+        username="mine",
+        password_hash="hash",
+        role=AccountRole.USER,
+        created_by=env["admin"].id,
+    )
+
+    grants = [
+        (ResourceType.PROJECT, "project-a"),
+        (ResourceType.AVATAR_CHARACTER, "char-a"),
+        (ResourceType.CUSTOM_VOICE, "voice-a"),
+    ]
+    defaults = ("project-a", "char-a", "cosyvoice", "voice-a")
+
+    env["access"].replace(
+        user_id=own_user.id,
+        granted_by=env["admin"].id,
+        grants=grants,
+        defaults=defaults,
+    )
+
+    with pytest.raises(AccountPolicyError):
+        env["access"].replace(
+            user_id=foreign_user.id,
+            granted_by=env["admin"].id,
+            grants=grants,
+            defaults=defaults,
+        )
+
+
+def test_root_manages_accounts_created_by_anyone(env):
+    other_admin = env["users"].create(
+        username="admin-third",
+        password_hash="hash",
+        role=AccountRole.ADMIN,
+        created_by=env["root"].id,
+    )
+    their_user = env["users"].create(
+        username="theirs",
+        password_hash="hash",
+        role=AccountRole.USER,
+        created_by=other_admin.id,
+    )
+
+    _, defaults = env["access"].replace(
+        user_id=their_user.id,
+        granted_by=env["root"].id,
+        grants=[
+            (ResourceType.PROJECT, "project-a"),
+            (ResourceType.AVATAR_CHARACTER, "char-a"),
+            (ResourceType.CUSTOM_VOICE, "voice-a"),
+        ],
+        defaults=("project-a", "char-a", "cosyvoice", "voice-a"),
+    )
+    assert defaults.voice_id == "voice-a"
