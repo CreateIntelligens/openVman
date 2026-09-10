@@ -10,14 +10,18 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
 from config import get_settings
-from memory.dreaming.paths import dreams_dir, write_dreaming_report
+from memory.dreaming.paths import (
+    dreaming_now,
+    dreams_dir,
+    write_dreaming_report,
+)
 from memory.dreaming.recall_tracker import read_traces
 from memory.embedder import get_embedder
 
@@ -31,12 +35,15 @@ _MIN_QUERIES_FOR_CLUSTERING = 3
 # Public API
 # ---------------------------------------------------------------------------
 
-def run_rem_phase(project_id: str = "default") -> dict[str, Any]:
+def run_rem_phase(
+    project_id: str = "default", *, now: datetime | None = None,
+) -> dict[str, Any]:
     """Execute the REM phase — extract themes from recall queries.
 
     Returns a status dict with theme count and signal path.
     """
     cfg = get_settings()
+    now = dreaming_now(now)
 
     # 1. Collect unique queries from traces
     traces = read_traces(project_id, days=cfg.dreaming_lookback_days)
@@ -67,7 +74,7 @@ def run_rem_phase(project_id: str = "default") -> dict[str, Any]:
     }
     signal_path = _write_phase_signals(project_id, signals)
 
-    _write_rem_report(project_id, themes, len(queries))
+    _write_rem_report(project_id, themes, len(queries), now=now)
 
     return {
         "status": "ok",
@@ -173,7 +180,7 @@ def _write_phase_signals(
     project_id: str,
     signals: dict[str, Any],
 ) -> Path:
-    path = _dreams_dir(project_id) / "phase-signals.json"
+    path = dreams_dir(project_id) / "phase-signals.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(signals, ensure_ascii=False, indent=2),
@@ -186,11 +193,14 @@ def _write_rem_report(
     project_id: str,
     themes: list[dict[str, Any]],
     query_count: int,
+    *,
+    now: datetime | None = None,
 ) -> None:
-    today = date.today().isoformat()
-    now = datetime.now().strftime("%H:%M:%S")
+    now = dreaming_now(now)
+    today = now.date().isoformat()
+    report_time = now.strftime("%H:%M:%S")
     lines = [
-        f"# REM Sleep — {today} {now}", "",
+        f"# REM Sleep — {today} {report_time}", "",
         "## REM Sleep", "",
         f"- 分析查詢數量：{query_count}",
         f"- 提取主題數量：{len(themes)}", "",
@@ -203,8 +213,4 @@ def _write_rem_report(
                 for q in t["sample_queries"][:3]:
                     lines.append(f"  - `{q}`")
         lines.append("")
-    write_dreaming_report(project_id, "rem", lines)
-
-
-def _dreams_dir(project_id: str) -> Path:
-    return dreams_dir(project_id)
+    write_dreaming_report(project_id, "rem", lines, now=now)

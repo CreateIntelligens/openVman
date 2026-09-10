@@ -389,10 +389,25 @@ Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
   - 依 `model`、`user`、`project`、`kind` 或 `session` 彙總
 - `GET /brain/usage/events`
   - 依帳號、專案、session、trace、類型與時間區間查詢事件
+- `GET /brain/usage/timeseries`
+  - `bucket=hour|day|month`、選填 `group_by`、`limit=1..50`（預設 8），支援與 summary 相同的資料篩選
+  - `report_timezone=UTC|Asia/Taipei`（預設 UTC），先轉報表時區再分桶；不支援的值回傳 400
+  - 回傳 `bucket`、`report_timezone`、`group_by`、`periods`、`series`、`points`；有分組時用 `series`，否則用 `points`，其餘低用量分組併成 `__other__`
 
-這兩個 Brain endpoint 只接受 `X-Internal-Token`。瀏覽器與外部客戶端應改用
-Backend 的 `/api/v1/usage/summary` 與 `/api/v1/usage/events`；Backend 允許正式管理員
+這些 Brain endpoint 只接受 `X-Internal-Token`。瀏覽器與外部客戶端應改用
+Backend 的 `/api/v1/usage/summary`、`/api/v1/usage/timeseries` 與 `/api/v1/usage/events`；Backend 允許正式管理員
 查詢指定帳號，其餘帳號固定只能查詢自己的資料。
+
+帳本以 UTC 儲存，查詢採 `since <= created_at < until`。Admin 報表以
+`Asia/Taipei` 為業務日：將開始日午夜及結束日次日午夜轉成 UTC 邊界，
+日期預設值、趨勢分桶及事件時間皆採台北時間，不受瀏覽器或容器時區影響。
+
+### Dreaming 日期與每日防重
+
+Dreaming 以 `DREAMING_TIMEZONE`（預設 `Asia/Taipei`）判斷今天是否已完成。
+`completed_at` 仍以 UTC 儲存，比較前先轉成設定時區；沒有 offset 的舊時間戳按 UTC 解讀。
+每次 cycle 使用開始時的當地日期產生每日記憶與報告，避免跨午夜或容器 `TZ`
+不同時分散到不同日期。`force=false` 略過當地同日已完成的 cycle，`force=true` 仍可強制執行。
 
 ### 即時外部工具
 

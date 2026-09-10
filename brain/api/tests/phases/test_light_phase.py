@@ -20,6 +20,7 @@ def _stub_deps(monkeypatch, tmp_path):
     """Stub config, workspace, embedder, and recall_tracker."""
     class FakeSettings:
         dreaming_enabled = True
+        dreaming_timezone = "Asia/Taipei"
         dreaming_lookback_days = 7
         dreaming_min_score = 0.45
         dreaming_min_recall_count = 2

@@ -22,6 +22,7 @@ def _stub_deps(monkeypatch, tmp_path):
     """Stub config, workspace, embedder, and recall_tracker."""
     class FakeSettings:
         dreaming_enabled = True
+        dreaming_timezone = "Asia/Taipei"
         dreaming_lookback_days = 7
 
     fake_config = types.ModuleType("config")

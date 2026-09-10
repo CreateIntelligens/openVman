@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from config import get_settings
 from knowledge.workspace import get_workspace_root
-from memory.dreaming.paths import dreams_dir
+from memory.dreaming.paths import dreams_dir, resolve_timezone as _get_tz
 from memory.dreaming.recall_tracker import rotate_traces
 
 logger = logging.getLogger(__name__)
@@ -62,28 +62,6 @@ def _parse_cron(expr: str) -> CronSpec:
     return CronSpec(minute=minute, minute_step=minute_step, hour=hour)
 
 
-def _get_tz(tz_name: str) -> ZoneInfo | timezone:
-    """Resolve timezone name, falling back to UTC on failure."""
-    if not tz_name:
-        return timezone.utc
-
-    # Handle "UTC+N" / "UTC-N" fixed-offset
-    s = tz_name.strip().upper()
-    if s == "UTC":
-        return timezone.utc
-    if s.startswith("UTC") and len(s) > 3:
-        try:
-            return timezone(timedelta(hours=int(s[3:])))
-        except (ValueError, OverflowError):
-            pass
-
-    try:
-        return ZoneInfo(tz_name)
-    except Exception:
-        logger.warning("invalid timezone %r, fallback to UTC", tz_name)
-        return timezone.utc
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -101,15 +79,17 @@ def run_dreaming_cycle(
     cfg = get_settings()
     tz = _get_tz(cfg.dreaming_timezone)
 
-    # Skip if already ran today (unless forced)
-    if not force and _already_ran_today(project_id, tz):
+    start = datetime.now(timezone.utc)
+    cycle_now = start.astimezone(tz)
+
+    # The calendar date is pinned before phases run, even across midnight.
+    if not force and _already_ran_today(project_id, tz, now=cycle_now):
         return {
             "status": "skipped",
             "reason": "already_ran_today",
             "project_id": project_id,
         }
 
-    start = datetime.now(timezone.utc)
     results: dict[str, Any] = {
         "project_id": project_id,
         "status": "ok",
@@ -117,9 +97,9 @@ def run_dreaming_cycle(
     }
 
     try:
-        results["light"] = run_light_phase(project_id)
-        results["deep"] = run_deep_phase(project_id)
-        results["rem"] = run_rem_phase(project_id)
+        results["light"] = run_light_phase(project_id, now=cycle_now)
+        results["deep"] = run_deep_phase(project_id, now=cycle_now)
+        results["rem"] = run_rem_phase(project_id, now=cycle_now)
     except Exception as exc:
         logger.error("dreaming cycle failed: %s", exc, exc_info=True)
         results.update({"status": "error", "error": str(exc)})
@@ -240,14 +220,26 @@ def _get_last_run(project_id: str) -> dict[str, Any] | None:
     return _last_run.get(project_id) or _read_run_state(project_id)
 
 
-def _already_ran_today(project_id: str, tz: ZoneInfo | timezone) -> bool:
+def _already_ran_today(
+    project_id: str,
+    tz: ZoneInfo | timezone,
+    *,
+    now: datetime | None = None,
+) -> bool:
     last_run = _get_last_run(project_id)
     if not last_run or last_run.get("status") != "ok":
         return False
 
-    completed_date = last_run.get("completed_at", "")[:10]
-    today = datetime.now(tz).date().isoformat()
-    return completed_date == today
+    try:
+        completed = datetime.fromisoformat(last_run.get("completed_at", ""))
+    except (ValueError, TypeError):
+        return False
+    if completed.tzinfo is None:
+        completed = completed.replace(tzinfo=timezone.utc)
+    current = now or datetime.now(tz)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return completed.astimezone(tz).date() == current.astimezone(tz).date()
 
 
 def _build_status_config(cfg: Any) -> dict[str, Any]:

@@ -17,7 +17,13 @@ from typing import Any
 
 from config import get_settings
 from knowledge.workspace import get_workspace_root
-from memory.dreaming.paths import DATE_STEM_RE, TABLE_MEMORIES, dreams_dir, write_dreaming_report
+from memory.dreaming.paths import (
+    DATE_STEM_RE,
+    TABLE_MEMORIES,
+    dreaming_now,
+    dreams_dir,
+    write_dreaming_report,
+)
 from memory.dreaming.recall_tracker import read_traces
 from memory.dreaming.scoring import build_signals, score_candidate
 from memory.importance import score_importance
@@ -31,17 +37,20 @@ _SUMMARY_HEADER_RE = re.compile(r"^###?\s+Summary", re.IGNORECASE)
 # Public API
 # ---------------------------------------------------------------------------
 
-def run_light_phase(project_id: str = "default") -> dict[str, Any]:
+def run_light_phase(
+    project_id: str = "default", *, now: datetime | None = None,
+) -> dict[str, Any]:
     """Execute the Light phase and write candidates.json.
 
     Returns a status dict with candidate_count and details.
     """
     cfg = get_settings()
+    now = dreaming_now(now)
     lookback = cfg.dreaming_lookback_days
     limit = cfg.dreaming_candidate_limit
 
     # 1. Collect text fragments from daily files
-    fragments = _collect_daily_fragments(project_id, lookback)
+    fragments = _collect_daily_fragments(project_id, lookback, now=now)
     logger.info("light phase: collected %d fragments from daily files", len(fragments))
 
     # 2. Read recall traces and build stats
@@ -72,7 +81,9 @@ def run_light_phase(project_id: str = "default") -> dict[str, Any]:
 
     # 9. Write candidates.json
     _write_candidates(project_id, candidates)
-    _write_light_report(project_id, candidates, len(fragments), len(trace_stats))
+    _write_light_report(
+        project_id, candidates, len(fragments), len(trace_stats), now=now,
+    )
 
     return {
         "status": "ok",
@@ -86,14 +97,16 @@ def run_light_phase(project_id: str = "default") -> dict[str, Any]:
 # Daily file scanning
 # ---------------------------------------------------------------------------
 
-def _collect_daily_fragments(project_id: str, lookback_days: int) -> list[dict[str, Any]]:
+def _collect_daily_fragments(
+    project_id: str, lookback_days: int, *, now: datetime | None = None,
+) -> list[dict[str, Any]]:
     """Extract text fragments from recent daily memory files."""
     ws = get_workspace_root(project_id)
     memory_dir = ws / "memory"
     if not memory_dir.exists():
         return []
 
-    cutoff = date.today() - timedelta(days=lookback_days)
+    cutoff = dreaming_now(now).date() - timedelta(days=lookback_days)
     fragments: list[dict[str, Any]] = []
 
     for path in sorted(memory_dir.rglob("*.md")):
@@ -321,11 +334,14 @@ def _write_light_report(
     candidates: list[dict[str, Any]],
     fragment_count: int,
     trace_unique: int,
+    *,
+    now: datetime | None = None,
 ) -> None:
-    today = date.today().isoformat()
-    now = datetime.now().strftime("%H:%M:%S")
+    now = dreaming_now(now)
+    today = now.date().isoformat()
+    report_time = now.strftime("%H:%M:%S")
     lines = [
-        f"# Light Sleep — {today} {now}", "",
+        f"# Light Sleep — {today} {report_time}", "",
         "## Light Sleep", "",
         f"- 掃描碎片（daily logs）：{fragment_count}",
         f"- 召回追蹤唯一文字：{trace_unique}",
@@ -336,4 +352,4 @@ def _write_light_report(
         for i, c in enumerate(candidates[:10], 1):
             lines.append(f"{i}. [{c.get('score', 0.0):.2f}] {c['text'][:80]}")
         lines.append("")
-    write_dreaming_report(project_id, "light", lines)
+    write_dreaming_report(project_id, "light", lines, now=now)

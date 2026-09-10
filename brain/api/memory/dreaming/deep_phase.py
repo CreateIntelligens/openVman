@@ -9,13 +9,18 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from config import get_settings
 from infra.db import get_memories_table, normalize_vector
-from memory.dreaming.paths import SOURCE_DREAMING, dreams_dir, write_dreaming_report
+from memory.dreaming.paths import (
+    SOURCE_DREAMING,
+    dreaming_now,
+    dreams_dir,
+    write_dreaming_report,
+)
 from memory.dreaming.scoring import passes_threshold
 from memory.embedder import get_embedder
 
@@ -26,12 +31,15 @@ logger = logging.getLogger(__name__)
 # Public API
 # ---------------------------------------------------------------------------
 
-def run_deep_phase(project_id: str = "default") -> dict[str, Any]:
+def run_deep_phase(
+    project_id: str = "default", *, now: datetime | None = None,
+) -> dict[str, Any]:
     """Execute the Deep phase — promote high-score candidates to memories.
 
     Returns a status dict with promoted_count and report path.
     """
     cfg = get_settings()
+    now = dreaming_now(now)
 
     # 1. Load candidates
     candidates = _load_candidates(project_id)
@@ -62,10 +70,12 @@ def run_deep_phase(project_id: str = "default") -> dict[str, Any]:
     logger.info("deep phase: %d candidates remain after semantic dedup", len(promotable))
 
     # 4. Promote to memories table
-    promoted = _promote_to_memories(promotable, project_id)
+    promoted = _promote_to_memories(promotable, project_id, now=now)
 
     # 5. Write report
-    report_path = _write_report(promoted, project_id, len(candidates), len(qualified))
+    report_path = _write_report(
+        promoted, project_id, len(candidates), len(qualified), now=now,
+    )
 
     return {
         "status": "ok",
@@ -81,7 +91,7 @@ def run_deep_phase(project_id: str = "default") -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _load_candidates(project_id: str) -> list[dict[str, Any]]:
-    path = _dreams_dir(project_id) / "candidates.json"
+    path = dreams_dir(project_id) / "candidates.json"
     if not path.exists():
         return []
     try:
@@ -123,12 +133,16 @@ def _dedup_against_memories(
     return result
 
 
-def _promote_to_memories(candidates: list[dict[str, Any]], project_id: str) -> list[dict[str, Any]]:
+def _promote_to_memories(
+    candidates: list[dict[str, Any]], project_id: str,
+    *, now: datetime | None = None,
+) -> list[dict[str, Any]]:
     """Add promoted candidates to the memories table."""
     if not candidates: return []
 
     embedder, records = get_embedder(), []
-    today = date.today().isoformat()
+    now = dreaming_now(now)
+    today = now.date().isoformat()
 
     for c in candidates:
         vec = c.get("_vector") or embedder.encode([c["text"]])[0]
@@ -162,8 +176,11 @@ def _write_report(
     project_id: str,
     total: int,
     qualified: int,
+    *,
+    now: datetime | None = None,
 ) -> Path:
-    today = date.today().isoformat()
+    now = dreaming_now(now)
+    today = now.date().isoformat()
     lines = [
         f"# Deep Phase Report — {today}", "",
         f"- Total candidates: {total}",
@@ -172,8 +189,4 @@ def _write_report(
     ]
     if promoted:
         lines += ["## Promoted Memories", ""] + [f"{i}. {r['text'][:100]}" for i, r in enumerate(promoted, 1)] + [""]
-    return write_dreaming_report(project_id, "deep", lines)
-
-
-def _dreams_dir(project_id: str) -> Path:
-    return dreams_dir(project_id)
+    return write_dreaming_report(project_id, "deep", lines, now=now)
