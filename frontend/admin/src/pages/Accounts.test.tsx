@@ -28,7 +28,6 @@ vi.mock("../api/auth", () => ({
   revokeAccountSessions: vi.fn(),
   setAccountDisabled: vi.fn(),
   updateAccountRole: vi.fn(),
-  updateAccountAccess: vi.fn(),
 }));
 
 vi.mock("../context/AuthContext", () => ({
@@ -36,7 +35,11 @@ vi.mock("../context/AuthContext", () => ({
 }));
 
 vi.mock("../components/accounts/FormalAccountAccessPanel", () => ({
-  default: () => null,
+  default: ({ account }: { account: Account }) => (
+    <section aria-label={`${account.username} 的資源權限`}>
+      資源權限面板
+    </section>
+  ),
 }));
 
 vi.mock("../components/accounts/TemporaryBatchPanel", () => ({
@@ -69,12 +72,14 @@ describe("Accounts", () => {
     });
   });
 
-  it("selects access before creating a formal user", async () => {
+  it("creates a formal user and opens rights panel separately", async () => {
+    vi.mocked(listAccounts)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([formalAccount("user-a", "alice", "user")]);
+
     render(<Accounts />);
 
-    expect(
-      await screen.findByText(/可檢視並編輯下方授權的專案/),
-    ).toBeTruthy();
+    expect(screen.getByText("新增正式帳號")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("帳號"), {
       target: { value: "alice" },
@@ -82,38 +87,20 @@ describe("Accounts", () => {
     fireEvent.change(screen.getByLabelText("密碼"), {
       target: { value: "correct horse battery staple" },
     });
-    const submit = await screen.findByRole("button", {
+    const submit = screen.getByRole("button", {
       name: "建立正式帳號",
     });
-    await waitFor(() => expect(submit.hasAttribute("disabled")).toBe(false));
+    expect(submit.hasAttribute("disabled")).toBe(false);
     fireEvent.click(submit);
 
     await waitFor(() => expect(createAccount).toHaveBeenCalledWith({
       username: "alice",
       password: "correct horse battery staple",
       role: "user",
-      access: {
-        grants: {
-          projects: ["project-a"],
-          avatar_characters: ["character-a"],
-          custom_voices: ["voice-a"],
-          avatar_mascots: [],
-          avatar_backgrounds: [],
-        },
-        defaults: {
-          project_id: "project-a",
-          character_id: "character-a",
-          voice_provider: "indextts",
-          voice_id: "voice-a",
-          mascot_id: "",
-          background_id: "",
-        },
-        admin_portal_access: false,
-      },
     }));
     await waitFor(() => {
       expect(listAccounts).toHaveBeenCalledTimes(2);
-      expect(fetchAccountAccessOptions).toHaveBeenCalledTimes(2);
+      expect(screen.getByLabelText("alice 的資源權限")).toBeTruthy();
     });
   });
 
@@ -124,7 +111,6 @@ describe("Accounts", () => {
     expect(screen.queryByText("臨時帳號批次")).toBeNull();
     await waitFor(() => {
       expect(listAccounts).toHaveBeenCalledOnce();
-      expect(fetchAccountAccessOptions).toHaveBeenCalledOnce();
     });
 
     fireEvent.click(screen.getByRole("button", { name: /臨時帳號/ }));
