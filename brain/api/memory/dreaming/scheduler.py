@@ -19,7 +19,6 @@ from config import get_settings
 from knowledge.workspace import get_workspace_root
 from memory.dreaming.paths import dreams_dir
 from memory.dreaming.recall_tracker import rotate_traces
-from memory.dreaming.date_utils import completion_date_in_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +245,7 @@ def _already_ran_today(project_id: str, tz: ZoneInfo | timezone) -> bool:
     if not last_run or last_run.get("status") != "ok":
         return False
 
-    completed_date = completion_date_in_timezone(last_run.get("completed_at", ""), tz)
+    completed_date = last_run.get("completed_at", "")[:10]
     today = datetime.now(tz).date().isoformat()
     return completed_date == today
 
