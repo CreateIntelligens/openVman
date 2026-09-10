@@ -184,6 +184,8 @@ describe("Accounts", () => {
     const userRow = screen.getByText("viewer").closest("article");
     expect(rootRow?.querySelectorAll("button")).toHaveLength(0);
     expect(rowButtonLabels(adminRow)).toEqual([
+      // 管理員也能有自己的可用資源，同樣只有 ROOT 設得了。
+      "資源權限",
       // ROOT 才看得到的資源上限入口，只對管理員帳號出現。
       "資源上限",
       "變更角色",

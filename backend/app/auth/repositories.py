@@ -505,10 +505,8 @@ class UserRepository:
             if grants is not None and defaults is not None
             else None
         )
-        if normalized_access is not None and is_at_least_admin(role):
-            raise InvalidResourceGrantError(
-                "administrator accounts already have unrestricted access"
-            )
+        # 建立 admin 時可一併給資源，但這只有 ROOT 做得到；建立者是誰要
+        # 進到交易裡才查得到，所以實際檢查延後到下面的 created_by 區塊。
 
         user_id = f"usr_{uuid4().hex}"
         display_username = _display_username(username)
@@ -524,7 +522,16 @@ class UserRepository:
                     ).fetchone()
                     if creator is None:
                         raise UserNotFoundError("creator account does not exist")
-                    ensure_can_create_role(_user_from_row(creator), role)
+                    creator_record = _user_from_row(creator)
+                    ensure_can_create_role(creator_record, role)
+                    if (
+                        normalized_access is not None
+                        and is_at_least_admin(role)
+                        and creator_record.role is not AccountRole.ROOT
+                    ):
+                        raise InvalidResourceGrantError(
+                            "only ROOT can set administrator resources"
+                        )
                 connection.execute(
                     """
                     INSERT INTO users(
@@ -823,10 +830,8 @@ class UserRepository:
                 raise InvalidResourceGrantError(
                     "demoting an administrator requires grants and defaults"
                 )
-            if role is AccountRole.ADMIN and normalized_access is not None:
-                raise InvalidResourceGrantError(
-                    "administrator accounts already have unrestricted access"
-                )
+            # 升為 admin 時一併給資源是允許的；change_role 本來就只有 ROOT
+            # 能呼叫（ensure_can_change_role），不需要再擋一次。
 
             now = _now_iso()
             if role is AccountRole.USER:
@@ -1532,9 +1537,14 @@ class AccountAccessRepository:
                 raise InvalidResourceGrantError(
                     "temporary account grants are managed by their batch"
                 )
-            if is_at_least_admin(AccountRole(target["role"])):
+            # 管理員也可以有自己的可用資源，但只有 ROOT 能指定——否則 admin
+            # 之間可以互相改對方的資源，繞過階層。
+            if (
+                is_at_least_admin(AccountRole(target["role"]))
+                and AccountRole(actor["role"]) is not AccountRole.ROOT
+            ):
                 raise InvalidResourceGrantError(
-                    "administrator accounts already have unrestricted access"
+                    "only ROOT can set administrator resources"
                 )
 
             _persist_account_access(

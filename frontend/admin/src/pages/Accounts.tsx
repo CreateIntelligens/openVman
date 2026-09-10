@@ -283,7 +283,10 @@ export default function Accounts() {
                 );
                 const resourceCount = ownedResourceCount(account);
                 const grantCount = grantedResourceCount(account);
-                const canEditAccess = canManage && account.role === "user";
+                // 管理員也能有自己的可用資源，但只有 ROOT 指定得了。
+                const canEditAccess = canManage && (
+                  account.role === "user" || (isRoot && account.role === "admin")
+                );
                 const editingAccess = editingAccountId === account.id;
                 // 資源上限只有 ROOT 能設，且只對管理員有意義。
                 const canEditScope = isRoot && !isSelf && isFormal

@@ -377,6 +377,48 @@ def test_narrowing_a_scope_leaves_no_dangling_default(env):
     )
 
 
+def test_root_can_give_an_administrator_its_own_resources(env):
+    """管理員也能有自己的可用資源，由 ROOT 指定。"""
+    grants, defaults = (
+        env["access"].replace(
+            user_id=env["admin"].id,
+            granted_by=env["root"].id,
+            grants=[
+                (ResourceType.PROJECT, "project-a"),
+                (ResourceType.AVATAR_CHARACTER, "char-a"),
+                (ResourceType.CUSTOM_VOICE, "voice-a"),
+            ],
+            defaults=("project-a", "char-a", "cosyvoice", "voice-a"),
+        )
+    )
+    assert defaults.voice_id == "voice-a"
+    assert (ResourceType.CUSTOM_VOICE, "voice-a") in {
+        (record.resource_type, record.resource_id) for record in grants
+    }
+
+
+def test_an_administrator_cannot_set_another_administrators_resources(env):
+    """只有 ROOT 能設；否則 admin 之間可以互相改對方的資源。"""
+    other = env["users"].create(
+        username="admin-peer",
+        password_hash="hash",
+        role=AccountRole.ADMIN,
+        created_by=env["root"].id,
+    )
+
+    with pytest.raises((InvalidResourceGrantError, AccountPolicyError)):
+        env["access"].replace(
+            user_id=other.id,
+            granted_by=env["admin"].id,
+            grants=[
+                (ResourceType.PROJECT, "project-a"),
+                (ResourceType.AVATAR_CHARACTER, "char-a"),
+                (ResourceType.CUSTOM_VOICE, "voice-a"),
+            ],
+            defaults=("project-a", "char-a", "cosyvoice", "voice-a"),
+        )
+
+
 def test_an_administrator_manages_only_the_accounts_it_created(env):
     """admin 動不了別的 admin 建立的帳號。"""
     other_admin = env["users"].create(
