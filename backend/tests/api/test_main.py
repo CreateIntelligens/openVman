@@ -10,6 +10,7 @@ import types
 import warnings
 from pathlib import Path
 from unittest.mock import AsyncMock
+from urllib.parse import urlencode
 
 from fastapi.testclient import TestClient
 from starlette.requests import Request
@@ -1142,7 +1143,9 @@ def test_usage_routes_only_forward_endpoint_parameters(monkeypatch):
 
     asyncio.run(
         module.admin_routes.get_usage_summary(
-            _usage_request("group_by=model&limit=5&trace_id=t1"),
+            _usage_request(
+                "group_by=model&limit=5&trace_id=t1&report_timezone=Asia/Taipei"
+            ),
             current=current,
         )
     )
@@ -1150,11 +1153,44 @@ def test_usage_routes_only_forward_endpoint_parameters(monkeypatch):
 
     asyncio.run(
         module.admin_routes.get_usage_events(
-            _usage_request("limit=5&group_by=user"),
+            _usage_request("limit=5&group_by=user&report_timezone=Asia/Taipei"),
             current=current,
         )
     )
     assert captured["params"] == {"limit": "5"}
+
+
+def test_usage_timeseries_forwards_timezone_and_preserves_account_scope(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+    _install_fake_brain_usage(module, captured, monkeypatch)
+    params = {
+        "bucket": "day",
+        "group_by": "project",
+        "limit": "3",
+        "report_timezone": "Asia/Taipei",
+        "since": "2026-12-31T16:00:00+00:00",
+        "until": "2027-01-01T16:00:00+00:00",
+        "user_id": "someone-else",
+        "project_id": "p1",
+    }
+
+    for admin in [True, False]:
+        current = _usage_account(module, admin=admin)
+        response = asyncio.run(
+            module.admin_routes.get_usage_timeseries(
+                _usage_request(urlencode({**params, "bogus": "1", "trace_id": "t1"})),
+                current=current,
+            )
+        )
+
+        assert response.status_code == 200
+        assert captured["url"] == "http://brain:8100/brain/usage/timeseries"
+        assert captured["headers"] == {"X-Internal-Token": "internal-secret"}
+        assert captured["params"] == {
+            **params,
+            "user_id": "someone-else" if admin else current.user.id,
+        }
 
 
 def test_tts_stream_voxcpm_failure_falls_back_to_edge(monkeypatch):

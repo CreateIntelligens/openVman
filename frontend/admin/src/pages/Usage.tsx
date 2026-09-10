@@ -4,17 +4,51 @@ import { fetchProjects, type ProjectSummary } from "../api/projects";
 import {
   fetchUsageEvents,
   fetchUsageSummary,
+  fetchUsageTimeseries,
+  formatUsageTime,
+  usageReportDate,
   type PrincipalTypeFilter,
+  type UsageBucket,
   type UsageEvent,
   type UsageFilters,
+  type UsageGroupBy,
   type UsageSummaryGroup,
   type UsageSummaryResponse,
+  type UsageTimeseriesResponse,
 } from "../api/usage";
 import Select from "../components/Select";
 import StatusAlert from "../components/StatusAlert";
+import UsageTrendChart from "../components/usage/UsageTrendChart";
 
 const EVENTS_LIMIT = 100;
 const ALL_PROJECTS = "__all__";
+
+/** 可切換的分析維度，對應 Brain ledger 的 _GROUP_COLUMNS。 */
+const GROUP_BY_OPTIONS: Array<{ value: UsageGroupBy | ""; label: string }> = [
+  { value: "", label: "不分組" },
+  { value: "user", label: "帳號" },
+  { value: "project", label: "專案" },
+  { value: "model", label: "模型" },
+  { value: "kind", label: "類型" },
+  { value: "principal", label: "呼叫主體" },
+  { value: "session", label: "工作階段" },
+];
+
+const BUCKET_OPTIONS: Array<{ value: UsageBucket; label: string }> = [
+  { value: "hour", label: "每小時" },
+  { value: "day", label: "每天" },
+  { value: "month", label: "每月" },
+];
+
+/** 分組維度 -> 該維度在彙總列裡的欄位名，用來取標籤。 */
+const GROUP_LABEL_KEYS: Record<string, Array<keyof UsageSummaryGroup>> = {
+  user: ["username", "user_id"],
+  project: ["project_id"],
+  model: ["model"],
+  kind: ["kind"],
+  principal: ["principal_id", "principal_type"],
+  session: ["session_id"],
+};
 
 const PRINCIPAL_TYPE_OPTIONS = [
   { value: "", label: "全部" },
@@ -26,16 +60,6 @@ const PRINCIPAL_TYPE_OPTIONS = [
 const numericCell = "px-5 py-3 text-right tabular-nums";
 const headCell = "px-5 py-3 text-left";
 const headNumericCell = "px-5 py-3 text-right";
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function defaultDateFrom(): string {
-  const from = new Date();
-  from.setUTCDate(from.getUTCDate() - 6);
-  return isoDate(from);
-}
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -53,12 +77,6 @@ function formatDecimal(value: number, digits = 1): string {
 function formatPercent(part: number, whole: number): string {
   if (!whole) return "—";
   return `${((part / whole) * 100).toFixed(1)}%`;
-}
-
-function formatTime(iso: string): string {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return iso;
-  return parsed.toLocaleString("zh-TW", { hour12: false });
 }
 
 /** 顯示用的主體名稱：Embed 金鑰要看得出來自外部嵌入。 */
@@ -173,6 +191,32 @@ function providerRows(
   return [...merged.values()].sort((a, b) => b.totalTokens - a.totalTokens);
 }
 
+/**
+ * 把任一維度的彙總列轉成表格列。model 以外的維度沒有第二欄，
+ * 標籤直接取該維度的欄位（帳號優先用 Backend 補上的 username）。
+ */
+function groupRows(
+  groupBy: UsageGroupBy,
+  groups: UsageSummaryGroup[],
+): BreakdownRow[] {
+  const keys = GROUP_LABEL_KEYS[groupBy] ?? [];
+  return groups
+    .map((group) => {
+      const labelKey = keys.find((key) => typeof group[key] === "string" && group[key]);
+      const label = labelKey ? (group[labelKey] as string) : undefined;
+      return {
+        key: label || "(unspecified)",
+        label: label || "（未指定）",
+        calls: group.calls,
+        totalTokens: group.total_tokens,
+        inputTokens: group.input_tokens,
+        outputTokens: group.output_tokens,
+        avgLatencyMs: NaN,
+      };
+    })
+    .sort((a, b) => b.totalTokens - a.totalTokens);
+}
+
 interface TileProps {
   label: string;
   value: string;
@@ -256,14 +300,20 @@ function BreakdownTable({
 }
 
 export default function Usage() {
-  const [dateFrom, setDateFrom] = useState(defaultDateFrom);
-  const [dateTo, setDateTo] = useState(() => isoDate(new Date()));
+  const [dateFrom, setDateFrom] = useState(() => usageReportDate(undefined, 6));
+  const [dateTo, setDateTo] = useState(() => usageReportDate());
   const [projectId, setProjectId] = useState(ALL_PROJECTS);
   const [principalType, setPrincipalType] = useState<PrincipalTypeFilter>("");
   const [principalId, setPrincipalId] = useState("");
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [groupBy, setGroupBy] = useState<UsageGroupBy | "">("model");
+  const [bucket, setBucket] = useState<UsageBucket>("day");
   const [summary, setSummary] = useState<UsageSummaryResponse | null>(null);
+  const [trend, setTrend] = useState<UsageTimeseriesResponse | null>(null);
+  const [groupSummary, setGroupSummary] = useState<UsageSummaryResponse | null>(
+    null,
+  );
   const [events, setEvents] = useState<UsageEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -280,20 +330,32 @@ export default function Usage() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryPayload, eventsPayload] = await Promise.all([
-        fetchUsageSummary("model", filters),
-        fetchUsageEvents(EVENTS_LIMIT, filters),
-      ]);
+      // 分組選 model（或不分組）時，下面那張表要的就是這份 model 彙總，
+      // 不必再送一次一模一樣的查詢。
+      const needsGroupQuery = Boolean(groupBy) && groupBy !== "model";
+      const [summaryPayload, trendPayload, groupPayload, eventsPayload] =
+        await Promise.all([
+          fetchUsageSummary("model", filters),
+          fetchUsageTimeseries(bucket, groupBy, filters),
+          needsGroupQuery
+            ? fetchUsageSummary(groupBy as UsageGroupBy, filters)
+            : Promise.resolve(null),
+          fetchUsageEvents(EVENTS_LIMIT, filters),
+        ]);
       setSummary(summaryPayload);
+      setTrend(trendPayload);
+      setGroupSummary(groupPayload ?? summaryPayload);
       setEvents(eventsPayload.events);
     } catch (nextError) {
       setSummary(null);
+      setTrend(null);
+      setGroupSummary(null);
       setEvents([]);
       setError(errorMessage(nextError, "無法取得用量資料"));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, bucket, groupBy]);
 
   useEffect(() => {
     void reload();
@@ -343,6 +405,8 @@ export default function Usage() {
   }, [events]);
 
   const hasData = Boolean(totals?.calls) || events.length > 0;
+  const currentGroupLabel =
+    GROUP_BY_OPTIONS.find((option) => option.value === groupBy)?.label ?? "分組";
 
   return (
     <div className="page-scroll">
@@ -378,6 +442,9 @@ export default function Usage() {
         )}
 
         <section className="card p-5" aria-label="用量篩選">
+          <p className="mb-4 text-sm text-content-muted">
+            報表時區：Asia/Taipei（UTC+08:00）；日期篩選、趨勢與事件時間皆採台北時間。
+          </p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
@@ -493,6 +560,60 @@ export default function Usage() {
               </div>
             </section>
 
+            <section className="card p-5" aria-label="用量趨勢">
+              <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="card-title">用量趨勢</h2>
+                  <p className="mt-1 text-sm text-content-muted">
+                    每個時間區間的 token 總量；分組後以堆疊呈現，只顯示用量前
+                    8 名，其餘併為「其他」。
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
+                      分組
+                    </span>
+                    <Select
+                      ariaLabel="分組"
+                      value={groupBy}
+                      onChange={(value) => setGroupBy(value as UsageGroupBy | "")}
+                      options={GROUP_BY_OPTIONS}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
+                      粒度
+                    </span>
+                    <Select
+                      ariaLabel="粒度"
+                      value={bucket}
+                      onChange={(value) => setBucket(value as UsageBucket)}
+                      options={BUCKET_OPTIONS}
+                    />
+                  </label>
+                </div>
+              </header>
+              <div className="mt-5">
+                <UsageTrendChart
+                  periods={trend?.periods ?? []}
+                  series={trend?.series ?? []}
+                  points={trend?.points ?? []}
+                  loading={loading}
+                />
+              </div>
+            </section>
+
+            {/* model 下面已有專屬的「依模型」表，不再重複一張。 */}
+            {groupBy && groupBy !== "model" && (
+              <BreakdownTable
+                title={`依${currentGroupLabel}`}
+                columnLabel={currentGroupLabel}
+                rows={groupRows(groupBy, groupSummary?.groups ?? [])}
+                totalTokens={totals?.total_tokens ?? 0}
+              />
+            )}
+
             <div className="grid gap-6 xl:grid-cols-2">
               <BreakdownTable
                 title="依 Provider"
@@ -551,7 +672,7 @@ export default function Usage() {
                             className="border-b border-border/60"
                           >
                             <td className="px-5 py-3 tabular-nums text-content-muted">
-                              {formatTime(event.created_at)}
+                              {formatUsageTime(event.created_at)}
                             </td>
                             <td className="px-5 py-3">
                               <span className="chip">{event.kind}</span>

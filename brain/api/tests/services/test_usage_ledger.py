@@ -112,6 +112,182 @@ def test_summary_groups_and_filters(ledger):
         ledger.summarize_usage(group_by="nope")
 
 
+def _record_at(ledger, monkeypatch, when: str, **kwargs):
+    """Write one event stamped at *when* so bucket boundaries are testable."""
+    monkeypatch.setattr(ledger, "_now_iso", lambda: when)
+    ledger.record_usage_event(**kwargs)
+
+
+def test_timeseries_buckets_by_day_and_splits_by_group(ledger, monkeypatch):
+    with usage_scope(user_id="a", project_id="p1"):
+        _record_at(
+            ledger, monkeypatch, "2026-09-03T01:00:00+00:00",
+            provider="g", model="m", usage=LLMUsage(1, 1, 2),
+        )
+        _record_at(
+            ledger, monkeypatch, "2026-09-03T23:00:00+00:00",
+            provider="g", model="m", usage=LLMUsage(2, 2, 4),
+        )
+    with usage_scope(user_id="b", project_id="p2"):
+        _record_at(
+            ledger, monkeypatch, "2026-09-04T05:00:00+00:00",
+            provider="g", model="m", usage=LLMUsage(5, 5, 10),
+        )
+
+    plain = ledger.timeseries_usage(bucket="day")
+    assert plain["report_timezone"] == "UTC"
+    assert plain["periods"] == ["2026-09-03", "2026-09-04"]
+    # 同一天的兩筆要併進同一個 bucket。
+    assert [p["total_tokens"] for p in plain["points"]] == [6, 10]
+
+    split = ledger.timeseries_usage(bucket="day", group_by="project")
+    assert split["report_timezone"] == "UTC"
+    assert {s["project_id"] for s in split["series"]} == {"p1", "p2"}
+    p1 = next(s for s in split["series"] if s["project_id"] == "p1")
+    assert [p["total_tokens"] for p in p1["points"]] == [6]
+
+
+def test_timeseries_hour_bucket_separates_same_day_events(ledger, monkeypatch):
+    with usage_scope(user_id="a", project_id="p"):
+        _record_at(
+            ledger, monkeypatch, "2026-09-03T01:00:00+00:00",
+            provider="g", model="m", usage=LLMUsage(1, 1, 2),
+        )
+        _record_at(
+            ledger, monkeypatch, "2026-09-03T02:00:00+00:00",
+            provider="g", model="m", usage=LLMUsage(2, 2, 4),
+        )
+
+    hourly = ledger.timeseries_usage(bucket="hour")
+    assert hourly["periods"] == ["2026-09-03T01", "2026-09-03T02"]
+
+
+def test_timeseries_folds_low_volume_groups_into_other(ledger, monkeypatch):
+    """分組是使用者資料，可能有上百個；只留前 N 名，其餘併成 __other__。"""
+    for index in range(5):
+        with usage_scope(user_id=f"u{index}", project_id=f"p{index}"):
+            _record_at(
+                ledger, monkeypatch, "2026-09-03T01:00:00+00:00",
+                provider="g", model="m",
+                usage=LLMUsage(0, 0, 100 - index),
+            )
+
+    top2 = ledger.timeseries_usage(bucket="day", group_by="project", limit=2)
+    labels = [s["project_id"] for s in top2["series"]]
+    assert labels[:2] == ["p0", "p1"]
+    assert "__other__" in labels
+    other = next(s for s in top2["series"] if s["project_id"] == "__other__")
+    # 98 + 97 + 96：其餘三組的總和要完整保留，不能被丟掉。
+    assert other["points"][0]["total_tokens"] == 291
+
+
+def test_timeseries_rejects_unknown_bucket_and_group(ledger):
+    with pytest.raises(ValueError):
+        ledger.timeseries_usage(bucket="fortnight")
+    with pytest.raises(ValueError):
+        ledger.timeseries_usage(bucket="day", group_by="nope")
+
+
+@pytest.mark.parametrize("group_by", ["", "project"])
+@pytest.mark.parametrize(
+    ("bucket", "before", "boundary", "expected_periods"),
+    [
+        (
+            "hour",
+            "2026-09-03T16:59:59.999999+00:00",
+            "2026-09-03T17:00:00+00:00",
+            ["2026-09-04T00", "2026-09-04T01"],
+        ),
+        (
+            "day",
+            "2026-09-30T15:59:59.999999+00:00",
+            "2026-09-30T16:00:00+00:00",
+            ["2026-09-30", "2026-10-01"],
+        ),
+        (
+            "month",
+            "2026-12-31T15:59:59.999999+00:00",
+            "2026-12-31T16:00:00+00:00",
+            ["2026-12", "2027-01"],
+        ),
+    ],
+)
+def test_taipei_buckets_preserve_microseconds_at_rollover(
+    ledger, monkeypatch, group_by, bucket, before, boundary,
+    expected_periods,
+):
+    with usage_scope(user_id="u1", project_id="p1"):
+        for when, tokens in [(before, 2), (boundary, 4)]:
+            _record_at(
+                ledger, monkeypatch, when,
+                provider="g", model="m", usage=LLMUsage(0, 0, tokens),
+            )
+
+    result = ledger.timeseries_usage(
+        bucket=bucket, group_by=group_by, report_timezone="Asia/Taipei",
+    )
+
+    assert result["report_timezone"] == "Asia/Taipei"
+    assert result["periods"] == expected_periods
+    points = result["series"][0]["points"] if group_by else result["points"]
+    assert [point["total_tokens"] for point in points] == [2, 4]
+    assert [point["calls"] for point in points] == [1, 1]
+
+
+def test_taipei_day_range_matches_summary_events_and_grouped_series(
+    ledger, monkeypatch,
+):
+    events = [
+        ("2026-09-02T15:59:59.999999+00:00", "outside", 100),
+        ("2026-09-02T16:00:00+00:00", "p1", 2),
+        ("2026-09-02T16:00:00.000001+00:00", "p2", 4),
+        ("2026-09-03T15:59:59.999999+00:00", "p3", 8),
+        ("2026-09-03T16:00:00+00:00", "outside", 200),
+    ]
+    for when, project, tokens in events:
+        with usage_scope(user_id="u1", project_id=project):
+            _record_at(
+                ledger, monkeypatch, when,
+                provider="g", model="m", usage=LLMUsage(0, 0, tokens),
+            )
+    filters = {
+        "since": "2026-09-02T16:00:00+00:00",
+        "until": "2026-09-03T16:00:00+00:00",
+        "user_id": "u1",
+    }
+
+    summary = ledger.summarize_usage(**filters)
+    detail = ledger.list_usage_events(**filters)
+    assert summary["totals"]["total_tokens"] == 14
+    assert summary["totals"]["calls"] == len(detail) == 3
+    assert {row["created_at"] for row in detail} == {
+        event[0] for event in events[1:4]
+    }
+
+    for group_by in ["", "project"]:
+        result = ledger.timeseries_usage(
+            bucket="day", group_by=group_by, limit=1,
+            report_timezone="Asia/Taipei", **filters,
+        )
+        assert result["periods"] == ["2026-09-03"]
+        points = (
+            [point for series in result["series"] for point in series["points"]]
+            if group_by else result["points"]
+        )
+        assert sum(point["calls"] for point in points) == 3
+        assert sum(point["total_tokens"] for point in points) == 14
+        if group_by:
+            assert {series["project_id"] for series in result["series"]} == {
+                "p3", "__other__",
+            }
+
+
+@pytest.mark.parametrize("report_timezone", ["Europe/London", "UTC+8", ""])
+def test_timeseries_rejects_unsupported_report_timezone(ledger, report_timezone):
+    with pytest.raises(ValueError, match="timezone"):
+        ledger.timeseries_usage(report_timezone=report_timezone)
+
+
 def test_ledger_write_failure_does_not_raise(ledger, monkeypatch):
     monkeypatch.setattr(ledger, "_connect", lambda: (_ for _ in ()).throw(RuntimeError("disk")))
     assert ledger.record_usage_event(provider="g", model="m", usage=LLMUsage(1, 1, 2)) is None

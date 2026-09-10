@@ -559,8 +559,22 @@ async def healthz() -> dict:
     )
 
 
-UsageEndpoint = Literal["summary", "events"]
+UsageEndpoint = Literal["summary", "timeseries", "events"]
 _USAGE_QUERY_KEYS: dict[UsageEndpoint, frozenset[str]] = {
+    "timeseries": frozenset({
+        "report_timezone",
+        "bucket",
+        "group_by",
+        "limit",
+        "user_id",
+        "principal_type",
+        "principal_id",
+        "project_id",
+        "session_id",
+        "kind",
+        "since",
+        "until",
+    }),
     "summary": frozenset({
         "group_by",
         "user_id",
@@ -622,7 +636,48 @@ async def _forward_usage_query(
     except Exception as exc:
         logger.warning("usage query to brain failed: %s", exc)
         return JSONResponse(status_code=502, content={"error": "brain unavailable"})
+    if response.status_code == 200 and isinstance(content, dict):
+        _label_usage_accounts(content)
     return JSONResponse(status_code=response.status_code, content=content)
+
+
+def _account_labels(user_ids: set[str]) -> dict[str, str]:
+    """Map account ids to display names, falling back to the raw id."""
+    runtime = get_auth_runtime()
+    labels: dict[str, str] = {}
+    for user_id in user_ids:
+        if not user_id:
+            continue
+        try:
+            user = runtime.users.get_by_id(user_id)
+        except Exception:  # noqa: BLE001 - 標籤缺失不該讓整份報表失敗
+            user = None
+        labels[user_id] = user.username if user else user_id
+    return labels
+
+
+def _label_usage_accounts(content: dict[str, object]) -> None:
+    """Annotate ledger rows keyed by ``user_id`` with a readable username.
+
+    Brain 的 ledger 只存 user_id，帳號名在 Backend 這側，所以在回程補上；
+    前端因此不必為了顯示一個名字再打一次帳號 API。
+    """
+    rows: list[dict[str, object]] = []
+    for key in ("groups", "series", "events"):
+        value = content.get(key)
+        if isinstance(value, list):
+            rows.extend(row for row in value if isinstance(row, dict))
+    if not rows:
+        return
+    labels = _account_labels({
+        str(row.get("user_id") or "")
+        for row in rows
+        if row.get("user_id")
+    })
+    for row in rows:
+        user_id = str(row.get("user_id") or "")
+        if user_id in labels:
+            row["username"] = labels[user_id]
 
 
 @router.get("/api/v1/usage/summary", tags=["Usage"], summary="Token 用量彙總")
@@ -631,6 +686,18 @@ async def get_usage_summary(
     current: CurrentAccount = Depends(get_current_account),
 ) -> JSONResponse:
     return await _forward_usage_query(request, current, "summary")
+
+
+@router.get(
+    "/api/v1/usage/timeseries",
+    tags=["Usage"],
+    summary="Token 用量時間序列",
+)
+async def get_usage_timeseries(
+    request: Request,
+    current: CurrentAccount = Depends(get_current_account),
+) -> JSONResponse:
+    return await _forward_usage_query(request, current, "timeseries")
 
 
 @router.get("/api/v1/usage/events", tags=["Usage"], summary="Token 用量事件明細")

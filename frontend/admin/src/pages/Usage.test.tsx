@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Usage, { averageCallsPerTurn } from "./Usage";
-import { fetchUsageEvents, fetchUsageSummary } from "../api/usage";
+import {
+  fetchUsageEvents,
+  fetchUsageSummary,
+  fetchUsageTimeseries,
+} from "../api/usage";
 import { fetchProjects } from "../api/projects";
 import type { UsageEvent } from "../api/usage";
 
@@ -13,6 +17,7 @@ vi.mock("../api/usage", async () => {
   return {
     ...actual,
     fetchUsageSummary: vi.fn(),
+    fetchUsageTimeseries: vi.fn(),
     fetchUsageEvents: vi.fn(),
   };
 });
@@ -81,6 +86,30 @@ const SUMMARY = {
   ],
 };
 
+const TIMESERIES = {
+  report_timezone: "Asia/Taipei",
+  bucket: "day",
+  group_by: "project",
+  periods: ["2026-09-01"],
+  series: [
+    {
+      project_id: "proj-1",
+      points: [
+        {
+          period: "2026-09-01",
+          calls: 4,
+          input_tokens: 400,
+          output_tokens: 200,
+          total_tokens: 600,
+          cached_tokens: 0,
+          reasoning_tokens: 0,
+        },
+      ],
+    },
+  ],
+  points: [],
+};
+
 // 兩個回合、四次呼叫：trace-1 有三次、trace-2 有一次 → 平均 2.00。
 const EVENTS: UsageEvent[] = [
   event({ id: 1, trace_id: "trace-1" }),
@@ -131,6 +160,10 @@ describe("averageCallsPerTurn", () => {
 });
 
 describe("Usage page", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchProjects).mockResolvedValue({
@@ -145,10 +178,30 @@ describe("Usage page", () => {
       ],
     });
     vi.mocked(fetchUsageSummary).mockResolvedValue(SUMMARY);
+    vi.mocked(fetchUsageTimeseries).mockResolvedValue(TIMESERIES);
     vi.mocked(fetchUsageEvents).mockResolvedValue({
       events: EVENTS,
       count: EVENTS.length,
     });
+  });
+
+  it("uses Taipei dates and labels the report timezone before UTC midnight", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-09T16:01:00Z"));
+    vi.mocked(fetchUsageEvents).mockResolvedValue({
+      events: [event({ created_at: "2026-09-09T16:01:00+00:00" })],
+      count: 1,
+    });
+    render(<Usage />);
+    expect((screen.getByLabelText("開始日期") as HTMLInputElement).value)
+      .toBe("2026-09-04");
+    expect((screen.getByLabelText("結束日期") as HTMLInputElement).value)
+      .toBe("2026-09-10");
+    expect(screen.getByText(/報表時區：Asia\/Taipei/)).toBeTruthy();
+    await screen.findByText("2026/9/10 00:01:00");
+    expect(fetchUsageSummary).toHaveBeenCalledWith("model", expect.objectContaining({
+      dateFrom: "2026-09-04", dateTo: "2026-09-10",
+    }));
   });
 
   it("renders the summary tiles from the mocked responses", async () => {
@@ -239,6 +292,34 @@ describe("Usage page", () => {
     expect(vi.mocked(fetchUsageSummary).mock.calls[1][1]).toMatchObject({
       projectId: "proj-1",
     });
+  });
+
+  it("switches the trend grouping and adds a breakdown for it", async () => {
+    render(<Usage />);
+
+    await waitFor(() => expect(fetchUsageTimeseries).toHaveBeenCalledTimes(1));
+    // 預設分組是 model，下面已有專屬的模型表，不該再多一張。
+    expect(screen.queryAllByRole("table", { name: "依模型" })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "分組" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "專案" }));
+
+    await waitFor(() => expect(fetchUsageTimeseries).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(fetchUsageTimeseries).mock.calls[1][1]).toBe("project");
+    expect(await screen.findByRole("table", { name: "依專案" })).toBeTruthy();
+  });
+
+  it("changes the bucket without changing the grouping", async () => {
+    render(<Usage />);
+
+    await waitFor(() => expect(fetchUsageTimeseries).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(fetchUsageTimeseries).mock.calls[0][0]).toBe("day");
+
+    fireEvent.click(screen.getByRole("combobox", { name: "粒度" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "每小時" }));
+
+    await waitFor(() => expect(fetchUsageTimeseries).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(fetchUsageTimeseries).mock.calls[1][0]).toBe("hour");
   });
 
   it("refetches on the refresh button", async () => {

@@ -1,7 +1,31 @@
 import { apiUrl, fetchJson, type QueryParams } from "./common";
 
 export const USAGE_SUMMARY_PATH = "/usage/summary";
+export const USAGE_TIMESERIES_PATH = "/usage/timeseries";
 export const USAGE_EVENTS_PATH = "/usage/events";
+export const USAGE_REPORT_TIMEZONE = "Asia/Taipei";
+
+const reportDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: USAGE_REPORT_TIMEZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export function usageReportDate(now = new Date(), daysAgo = 0): string {
+  const day = new Date(`${reportDateFormatter.format(now)}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - daysAgo);
+  return day.toISOString().slice(0, 10);
+}
+
+export function formatUsageTime(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return parsed.toLocaleString("zh-TW", {
+    timeZone: USAGE_REPORT_TIMEZONE,
+    hour12: false,
+  });
+}
 
 /** Brain ledger 支援的分組維度（見 brain/api/infra/usage_ledger.py 的 _GROUP_COLUMNS）。 */
 export type UsageGroupBy =
@@ -31,6 +55,8 @@ export type UsageSummaryGroup = UsageTokenTotals & {
   provider?: string;
   model?: string;
   user_id?: string;
+  /** Backend 依 user_id 補上的顯示名稱；ledger 本身沒有帳號名。 */
+  username?: string;
   project_id?: string;
   kind?: string;
   session_id?: string;
@@ -43,6 +69,35 @@ export interface UsageSummaryResponse {
   filters: Record<string, string>;
   totals: UsageTokenTotals;
   groups: UsageSummaryGroup[];
+}
+
+/** 時間粒度；後端先轉成報表時區，再按當地時間分桶。 */
+export type UsageBucket = "hour" | "day" | "month";
+
+export type UsageSeriesPoint = UsageTokenTotals & { period: string };
+
+/** 一條序列：分組欄位隨 group_by 改變，與 UsageSummaryGroup 同樣以字串索引承接。 */
+export type UsageSeries = {
+  provider?: string;
+  model?: string;
+  user_id?: string;
+  username?: string;
+  project_id?: string;
+  kind?: string;
+  session_id?: string;
+  principal_type?: string;
+  principal_id?: string;
+  points: UsageSeriesPoint[];
+};
+
+export interface UsageTimeseriesResponse {
+  bucket: string;
+  report_timezone: string;
+  group_by: string;
+  periods: string[];
+  /** 有分組時用 series；無分組時改用扁平的 points。 */
+  series: UsageSeries[];
+  points: UsageSeriesPoint[];
 }
 
 export interface UsageEvent {
@@ -74,9 +129,9 @@ export interface UsageEventsResponse {
 }
 
 export interface UsageFilters {
-  /** ISO 日期（YYYY-MM-DD），送出時對應後端的 since。 */
+  /** 台北日期（YYYY-MM-DD），送出時轉成 UTC since。 */
   dateFrom?: string;
-  /** ISO 日期（YYYY-MM-DD），送出時對應後端的 until。 */
+  /** 台北日期（YYYY-MM-DD），包含當天，送出時轉成 UTC until。 */
   dateTo?: string;
   projectId?: string;
   principalType?: PrincipalTypeFilter;
@@ -85,20 +140,21 @@ export interface UsageFilters {
 }
 
 /**
- * 後端以 `created_at < until` 做上界，直接帶日期會漏掉當天資料，
- * 所以把結束日往後推一天再送。
+ * 台北報表日固定 UTC+08:00，不依賴瀏覽器時區或容器 TZ。
+ * 結束日取次日午夜，維持帳本的半開區間。
  */
-function exclusiveUntil(dateTo: string): string {
-  const parsed = new Date(`${dateTo}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return dateTo;
-  parsed.setUTCDate(parsed.getUTCDate() + 1);
-  return parsed.toISOString().slice(0, 10);
+function utcBoundary(date: string, nextDay = false): string {
+  const parsed = new Date(`${date}T00:00:00+08:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  if (nextDay) parsed.setUTCDate(parsed.getUTCDate() + 1);
+  // ledger 以 ISO 字串比較，使用相同 UTC offset 與秒精度邊界。
+  return parsed.toISOString().replace(".000Z", "+00:00");
 }
 
 export function buildUsageParams(filters: UsageFilters = {}): QueryParams {
   const params: QueryParams = {};
-  if (filters.dateFrom) params.since = filters.dateFrom;
-  if (filters.dateTo) params.until = exclusiveUntil(filters.dateTo);
+  if (filters.dateFrom) params.since = utcBoundary(filters.dateFrom);
+  if (filters.dateTo) params.until = utcBoundary(filters.dateTo, true);
   if (filters.projectId) params.project_id = filters.projectId;
   if (filters.principalType) params.principal_type = filters.principalType;
   if (filters.principalId) params.principal_id = filters.principalId;
@@ -131,6 +187,32 @@ export async function fetchUsageSummary(
   filters: UsageFilters = {},
 ): Promise<UsageSummaryResponse> {
   return fetchJson<UsageSummaryResponse>(usageSummaryUrl(groupBy, filters));
+}
+
+export function usageTimeseriesUrl(
+  bucket: UsageBucket,
+  groupBy: UsageGroupBy | "",
+  filters: UsageFilters = {},
+  limit = 8,
+): string {
+  return apiUrl(USAGE_TIMESERIES_PATH, {
+    bucket,
+    report_timezone: USAGE_REPORT_TIMEZONE,
+    ...(groupBy ? { group_by: groupBy } : {}),
+    limit: String(limit),
+    ...buildUsageParams(filters),
+  });
+}
+
+export async function fetchUsageTimeseries(
+  bucket: UsageBucket,
+  groupBy: UsageGroupBy | "",
+  filters: UsageFilters = {},
+  limit = 8,
+): Promise<UsageTimeseriesResponse> {
+  return fetchJson<UsageTimeseriesResponse>(
+    usageTimeseriesUrl(bucket, groupBy, filters, limit),
+  );
 }
 
 export async function fetchUsageEvents(

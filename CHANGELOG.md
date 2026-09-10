@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Midnight Date Boundaries**: Dreaming compares completion timestamps in `DREAMING_TIMEZONE` (legacy timestamps without an offset are UTC) and uses one configured local date for each cycle's daily memories and report. Admin Usage now uses `Asia/Taipei` for its default dates, inclusive date selection, event display, and trend buckets, sending UTC half-open query boundaries. The timeseries endpoint accepts `report_timezone=UTC|Asia/Taipei` (default UTC).
+
 ### Breaking Changes
 
 - **Unified API Route Families**: The Backend HTTP and WebSocket surface collapses into three families — `/api/v1/*` for the application API, `/v1/audio/*` for OpenAI-compatible endpoints, and `/static/*` for served files. Only `/healthz`, `/metrics`, `/metrics/prometheus`, `/docs`, `/redoc`, and `/openapi.json` stay at the root. Every retired path returns **404** from the Backend and from both nginx configurations: there is no redirect, alias, rewrite, or transition period, and the `410` stubs for the iframe-era embed routes are deleted. Update every caller before deploying.
