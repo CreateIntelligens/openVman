@@ -9,9 +9,6 @@ import {
   type Account,
   type AssignableAccountRole,
 } from "../api/auth";
-import AccountAccessFields, {
-  useAccountAccessForm,
-} from "../components/accounts/AccountAccessFields";
 import AccountPasswordResetDialog from "../components/accounts/AccountPasswordResetDialog";
 import AccountRoleDialog from "../components/accounts/AccountRoleDialog";
 import AdminScopePanel from "../components/accounts/AdminScopePanel";
@@ -59,7 +56,6 @@ export default function Accounts() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const accessForm = useAccountAccessForm("formal-account-create");
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -79,25 +75,24 @@ export default function Accounts() {
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!username.trim() || !password) return;
-    if (role === "user" && !accessForm.complete) {
-      setError("一般使用者必須先選好各類資源授權與登入後預設值。");
-      return;
-    }
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername || !password) return;
     setSubmitting(true);
     setError(null);
     try {
-      await createAccount({
-        username: username.trim(),
+      const created = await createAccount({
+        username: trimmedUsername,
         password,
         role,
-        ...(role === "user" ? { access: accessForm.access } : {}),
       });
       setUsername("");
       setPassword("");
       setRole("user");
-      accessForm.reload();
       await reload();
+      // 建立一般使用者時，建立後自動展開下方列表對應的「資源權限」面板，引導完成授權
+      if (created.role === "user") {
+        setEditingAccountId(created.id);
+      }
     } catch (nextError) {
       setError(errorMessage(nextError, "建立帳號失敗"));
     } finally {
@@ -126,7 +121,7 @@ export default function Accounts() {
       <header className="page-header">
         <div>
           <h1 className="page-title">帳號管理</h1>
-          <p className="page-subtitle">先設定可用資源，再建立正式或臨時帳號；建立後仍可隨時調整。</p>
+          <p className="page-subtitle">建立正式或臨時帳號，並可於下方列表中隨時調整資源權限。</p>
         </div>
       </header>
 
@@ -169,13 +164,9 @@ export default function Accounts() {
         <>
         <section className="card mb-6 overflow-hidden">
           <header className="border-b border-border px-5 py-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="card-title">新增正式帳號</h2>
-              <span className="chip">1 帳號資料</span>
-              <span className="chip">2 資源權限</span>
-            </div>
+            <h2 className="card-title">新增正式帳號</h2>
             <p className="mt-1 text-sm text-content-muted">
-              一般使用者會在建立當下取得所選權限，不需要再到帳號列表補設定。
+              建立一般使用者或管理員帳號；建立後可於下方列表個別指派或調整資源權限。
             </p>
           </header>
           <form onSubmit={handleCreate}>
@@ -221,38 +212,16 @@ export default function Accounts() {
               </label>
             </div>
 
-            {role === "user" ? (
-              <section className="border-t border-border" aria-labelledby="new-account-access-title">
-                <div className="px-5 py-4">
-                  <h3 id="new-account-access-title" className="card-title">資源權限</h3>
-                  <p className="mt-1 text-xs text-content-muted">
-                    每一類至少選一項；預設值只能從已授權的項目中指定。
-                  </p>
-                </div>
-                {accessForm.error && (
-                  <div className="mx-5 mb-4 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
-                    {accessForm.error}
-                  </div>
-                )}
-                <AccountAccessFields form={accessForm} />
-              </section>
-            ) : (
-              <div className="border-t border-border bg-surface-sunken px-5 py-4 text-sm text-content-muted">
-                管理員可使用所有已登錄資源，因此不需要另外設定資源權限。
-              </div>
-            )}
-
             <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-content-muted">
-                建立後可從下方帳號列表重新調整一般使用者的資源權限。
+                {role === "user"
+                  ? "建立一般使用者後，系統將自動於下方列表展開權限設定面板以供指派資源。"
+                  : "管理員預設可存取全部資源，建立後亦可由 ROOT 限縮其資源上限。"}
               </p>
               <button
                 className="btn btn-primary self-start sm:self-auto"
                 type="submit"
-                disabled={
-                  submitting
-                  || (role === "user" && (accessForm.loading || !accessForm.complete))
-                }
+                disabled={submitting || !username.trim() || !password}
               >
                 {submitting ? "建立中…" : "建立正式帳號"}
               </button>
@@ -439,9 +408,7 @@ export default function Accounts() {
                         account={account}
                         onCancel={() => setEditingAccountId(null)}
                         onSaved={(updated) => {
-                          setAccounts((current) => current.map((item) => (
-                            item.id === updated.id ? updated : item
-                          )));
+                          replaceAccount(updated);
                           setEditingAccountId(null);
                         }}
                       />
