@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Midnight Boundary**: Convert stored UTC dreaming completion timestamps into the configured scheduler timezone before comparing calendar dates, preventing duplicate or skipped daily cycles around local midnight.
+
 ### Breaking Changes
 
 - **Unified API Route Families**: The Backend HTTP and WebSocket surface collapses into three families — `/api/v1/*` for the application API, `/v1/audio/*` for OpenAI-compatible endpoints, and `/static/*` for served files. Only `/healthz`, `/metrics`, `/metrics/prometheus`, `/docs`, `/redoc`, and `/openapi.json` stay at the root. Every retired path returns **404** from the Backend and from both nginx configurations: there is no redirect, alias, rewrite, or transition period, and the `410` stubs for the iframe-era embed routes are deleted. Update every caller before deploying.
