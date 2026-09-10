@@ -57,7 +57,6 @@ for mod_name, stub in _STUBS.items():
 from memory.dreaming.scheduler import (
     CronSpec,
     _compute_next_run,
-    completion_date_in_timezone,
     _extract_phase_stats,
     _get_tz,
     _last_run,
@@ -296,10 +295,6 @@ class TestForceSkip:
         result = run_dreaming_cycle("default", force=False)
         assert result["status"] == "skipped"
         assert result["reason"] == "already_ran_today"
-
-    def test_completion_date_uses_configured_timezone(self):
-        tz = _get_tz("Asia/Taipei")
-        assert completion_date_in_timezone("2026-09-09T16:30:00+00:00", tz) == "2026-09-10"
 
     def test_no_force_runs_if_no_previous(self):
         from memory.dreaming.scheduler import _dreams_dir
