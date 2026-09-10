@@ -242,9 +242,14 @@ Brain 必須將每次 LLM 呼叫的 input、output、cached、reasoning 與 tota
 呼叫類型；資料庫跨專案共用，但所有查詢仍可依這些欄位篩選。
 
 `POST /brain/chat` 回應包含該次 request scope 的 `usage` 彙總。內部查詢介面
-為 `GET /brain/usage/summary` 與 `GET /brain/usage/events`，兩者皆必須驗證
+為 `GET /brain/usage/summary`、`GET /brain/usage/timeseries` 與 `GET /brain/usage/events`，皆必須驗證
 `X-Internal-Token`。對外查詢由 Backend `/api/v1/usage/*` 套用帳號範圍：正式
 管理員可指定 `user_id`，其餘帳號一律由 Backend 覆寫成自己的帳號 ID。
+
+時間戳以 UTC 儲存，`since` 包含起點、`until` 不包含終點。Admin 將台北日期
+轉成 UTC 邊界；timeseries 以 `report_timezone=UTC|Asia/Taipei`（預設 UTC）
+決定 `hour`／`day`／`month` 的分桶日期，回傳同名欄位，非法值回傳 400。
+台北報表的篩選、趨勢分桶與事件顯示必須使用相同時區，詳見 Backend 規格第 17 節。
 
 串流呼叫預設送出 `stream_options.include_usage=true`；若相容 provider 不支援，
 可用 `LLM_STREAM_INCLUDE_USAGE=false` 關閉。provider 沒有回傳 usage 時仍保留
