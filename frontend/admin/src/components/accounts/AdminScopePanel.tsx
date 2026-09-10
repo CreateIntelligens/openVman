@@ -79,6 +79,20 @@ export default function AdminScopePanel({
     };
   }, [account.id]);
 
+  const toggleAll = useCallback((key: ScopeKey, ids: string[]) => {
+    setSelection((current) => {
+      const values = current[key] ?? [];
+      const allSelected = ids.length > 0
+        && ids.every((id) => values.includes(id));
+      return {
+        ...current,
+        [key]: allSelected
+          ? values.filter((value) => !ids.includes(value))
+          : Array.from(new Set([...values, ...ids])),
+      };
+    });
+  }, []);
+
   const toggle = useCallback((key: ScopeKey, id: string) => {
     setSelection((current) => {
       const values = current[key] ?? [];
@@ -166,9 +180,26 @@ export default function AdminScopePanel({
           <div className="mt-2 grid grid-cols-1 gap-0 md:grid-cols-2 xl:grid-cols-3">
             {GROUPS.map((group) => {
               const groupOptions = optionsFor(options, group.key);
-              return (
+                const groupIds = groupOptions.map((option) => option.id);
+                const selectedHere = selection[group.key] ?? [];
+                const allSelected = groupIds.length > 0
+                  && groupIds.every((id) => selectedHere.includes(id));
+                return (
                 <div key={group.key} className="border-t border-border px-1 py-4">
-                  <h4 className="text-sm font-semibold">{group.title}</h4>
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-semibold">{group.title}</h4>
+                    <button
+                      className="btn btn-ghost px-2 py-1 text-xs"
+                      type="button"
+                      onClick={() => toggleAll(group.key, groupIds)}
+                      disabled={groupIds.length === 0}
+                    >
+                      {allSelected ? "全部不選" : "全選"}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-content-subtle">
+                    已選 {selectedHere.length} / {groupIds.length}
+                  </p>
                   <div className="mt-3 max-h-56 space-y-1 overflow-y-auto pr-1">
                     {groupOptions.map((option) => (
                       <label

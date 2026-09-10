@@ -239,6 +239,21 @@ export function useAccountAccessForm(
       const next = selected.includes(id)
         ? selected.filter((item) => item !== id)
         : [...selected, id];
+      return applySelection(current, grantType, next);
+    });
+  }
+
+  /** 一次替換整組選擇（全選／全不選用），預設值的修正與 toggle 共用。 */
+  function setSelection(grantType: GrantType, ids: string[]) {
+    setAccess((current) => applySelection(current, grantType, ids));
+  }
+
+  function applySelection(
+    current: AccountAccessInput,
+    grantType: GrantType,
+    next: string[],
+  ): AccountAccessInput {
+    {
       const nextDefaults = { ...current.defaults };
 
       switch (grantType) {
@@ -279,7 +294,7 @@ export function useAccountAccessForm(
         grants: { ...current.grants, [grantType]: next },
         defaults: nextDefaults,
       };
-    });
+    }
   }
 
   // 舞台人物可以是 openVman 2D 角色或 VRM，兩者擇一即可（與後端
@@ -319,6 +334,7 @@ export function useAccountAccessForm(
     setAdminPortalAccess,
     setDefault,
     toggle,
+    setSelection,
   };
 }
 
@@ -434,6 +450,25 @@ function AccessGroup({
     ? options.filter((option) => option.provider === activeProvider)
     : options;
 
+  // 全選只作用在目前看得見的項目：篩了廠牌還整批全選，會選到畫面上沒
+  // 出現的聲音。
+  const allVisibleSelected = visibleOptions.length > 0
+    && visibleOptions.every(isSelected);
+
+  function toggleAllVisible() {
+    for (const type of grantTypes) {
+      const current = form.access.grants[type] ?? [];
+      const visibleIds = visibleOptions
+        .filter((option) => option.grantType === type)
+        .map((option) => option.id);
+      if (visibleIds.length === 0) continue;
+      const next = allVisibleSelected
+        ? current.filter((id) => !visibleIds.includes(id))
+        : Array.from(new Set([...current, ...visibleIds]));
+      form.setSelection(type, next);
+    }
+  }
+
   return (
     <fieldset className="min-w-0 border-b border-border px-5 py-5 last:border-b-0 lg:border-b-0">
       <legend className="font-semibold">{title}</legend>
@@ -455,7 +490,21 @@ function AccessGroup({
           </select>
         </label>
       )}
-      <div className="mt-4 max-h-56 space-y-1 overflow-y-auto pr-1">
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-xs text-content-subtle">
+          已選 {selectedOptions.length} / {options.length}
+        </span>
+        <button
+          className="btn btn-ghost px-2 py-1 text-xs"
+          type="button"
+          onClick={toggleAllVisible}
+          disabled={visibleOptions.length === 0}
+        >
+          {allVisibleSelected ? "全部不選" : "全選"}
+          {useProviderFilter && activeProvider ? "（此廠牌）" : ""}
+        </button>
+      </div>
+      <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
         {visibleOptions.map((option) => (
           <label
             key={`${option.grantType}:${option.id}`}
