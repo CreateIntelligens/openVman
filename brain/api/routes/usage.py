@@ -6,7 +6,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from infra.usage_ledger import list_usage_events, summarize_usage
+from infra.usage_ledger import (
+    list_usage_events,
+    summarize_usage,
+    timeseries_usage,
+)
 from safety.internal_auth import require_internal_token
 
 router = APIRouter(
@@ -31,6 +35,40 @@ async def usage_summary(
     try:
         return summarize_usage(
             group_by=group_by,
+            user_id=user_id,
+            principal_type=principal_type,
+            principal_id=principal_id,
+            project_id=project_id,
+            session_id=session_id,
+            kind=kind,
+            since=since,
+            until=until,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/timeseries", summary="用量時間序列")
+async def usage_timeseries(
+    bucket: str = Query("day"),
+    report_timezone: str = "UTC",
+    group_by: str = "",
+    limit: int = Query(8, ge=1, le=50),
+    user_id: str = "",
+    principal_type: str = "",
+    principal_id: str = "",
+    project_id: str = "",
+    session_id: str = "",
+    kind: str = "",
+    since: str = "",
+    until: str = "",
+) -> dict[str, Any]:
+    try:
+        return timeseries_usage(
+            bucket=bucket,
+            report_timezone=report_timezone,
+            group_by=group_by,
+            limit=limit,
             user_id=user_id,
             principal_type=principal_type,
             principal_id=principal_id,

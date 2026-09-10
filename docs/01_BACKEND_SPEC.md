@@ -337,7 +337,7 @@ process.on('SIGTERM', async () => {
 
 ### 17. Token Usage 查詢介面
 
-Backend 以 `GET /api/v1/usage/summary` 與 `GET /api/v1/usage/events` 提供已驗證帳號的
+Backend 以 `GET /api/v1/usage/summary`、`GET /api/v1/usage/timeseries` 與 `GET /api/v1/usage/events` 提供已驗證帳號的
 LLM token 用量查詢，並以 `X-Internal-Token` 轉送至 Brain 的
 `/brain/usage/*`。正式管理員可指定 `user_id`；一般或臨時帳號傳入的
 `user_id` 必須覆寫成自身帳號 ID。Brain catch-all proxy 必須阻擋 `usage`
@@ -347,14 +347,24 @@ LLM token 用量查詢，並以 `X-Internal-Token` 轉送至 Brain 的
 只轉送 `limit`、帳號／專案／session／trace／類型與時間篩選。未知或屬於
 另一個 endpoint 的 query 參數不得轉送。
 
-**Admin「用量」頁。** `frontend/admin/src/pages/Usage.tsx` 是上述兩個端點的
+`timeseries` 轉送 `bucket`（hour/day/month）、`group_by`、`limit`（1–50）、
+`report_timezone`（UTC/Asia/Taipei，預設 UTC），及帳號／主體／專案／session／類型與時間篩選。
+回傳 `bucket`、`report_timezone`、`group_by`、`periods`、`series`、`points`；
+有分組時使用 `series`，未分組時使用 `points`。時間桶先轉成報表時區，再按小時／日／月歸類；
+UTC 起訖篩選與帳號權限限制不變，不支援的報表時區回傳 400。
+
+**Admin「用量」頁。** `frontend/admin/src/pages/Usage.tsx` 是上述端點的
 前台，導覽鍵為 `Usage`，所有已登入帳號都看得到（後端已依帳號範圍收斂資料，
 不需再加前端權限判斷）。篩選列提供日期區間（預設最近七天）、專案、主體類型
 （全部／帳號／Embed 金鑰）與選填的主體 ID；日期會在 `frontend/admin/src/api/usage.ts`
-轉成後端的 `since` / `until`，並因為後端上界是 `created_at < until`，結束日
-會自動往後推一天，否則當天資料會被漏掉。
+將台北開始日午夜與結束日次日午夜轉成 UTC `since` / `until`，採用
+`created_at >= since AND created_at < until`。例如選 2026-09-10，送出
+`since=2026-09-09T16:00:00+00:00`、`until=2026-09-10T16:00:00+00:00`。
+預設最近七天、趨勢圖與事件顯示均採 `Asia/Taipei`，頁面明示時區，不受瀏覽器時區影響。
 
 頁面呼叫一次 `group_by=model` 的 summary 與一次 `limit=100` 的 events。
+趨勢另呼叫 timeseries（`report_timezone=Asia/Taipei`）；選取 model 以外的分組時，
+另查該維度的 summary，圖表保留前 8 名，其餘併為「其他」。
 Ledger 沒有 `provider` 這個分組維度，但 `group_by=model` 每一列都同時帶
 `provider` 與 `model`，所以「依 Provider」表是在前端就地摺疊出來的，省一次
 請求也保證兩張表數字一致。summary 不回傳延遲，因此平均延遲與各分組延遲都

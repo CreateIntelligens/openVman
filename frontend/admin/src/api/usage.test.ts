@@ -4,8 +4,11 @@ import {
   buildUsageParams,
   fetchUsageEvents,
   fetchUsageSummary,
+  formatUsageTime,
+  usageReportDate,
   usageEventsUrl,
   usageSummaryUrl,
+  usageTimeseriesUrl,
 } from "./usage";
 
 function jsonResponse(payload: unknown) {
@@ -16,9 +19,17 @@ function jsonResponse(payload: unknown) {
 }
 
 describe("buildUsageParams", () => {
+  it.each([
+    ["2026-09-10", "2026-09-09T16:00:00+00:00", "2026-09-10T16:00:00+00:00"],
+    ["2026-12-31", "2026-12-30T16:00:00+00:00", "2026-12-31T16:00:00+00:00"],
+    ["2028-02-29", "2028-02-28T16:00:00+00:00", "2028-02-29T16:00:00+00:00"],
+  ])("queries the complete Taipei day %s", (date, since, until) => {
+    expect(buildUsageParams({ dateFrom: date, dateTo: date })).toEqual({ since, until });
+  });
+
   it("maps the date range onto the ledger's since/until names", () => {
     expect(buildUsageParams({ dateFrom: "2026-08-01", dateTo: "2026-08-07" }))
-      .toEqual({ since: "2026-08-01", until: "2026-08-08" });
+      .toEqual({ since: "2026-07-31T16:00:00+00:00", until: "2026-08-07T16:00:00+00:00" });
   });
 
   it("omits empty filters entirely", () => {
@@ -40,6 +51,21 @@ describe("buildUsageParams", () => {
   });
 });
 
+describe("usage report clock", () => {
+  it("uses the Taipei date before UTC midnight, including the seven-day range", () => {
+    const now = new Date("2026-12-31T16:01:00Z");
+    expect(usageReportDate(now)).toBe("2027-01-01");
+    expect(usageReportDate(now, 6)).toBe("2026-12-26");
+    expect(usageReportDate(new Date("2026-12-31T15:59:59Z"))).toBe("2026-12-31");
+  });
+
+  it("displays event timestamps in the report timezone", () => {
+    expect(formatUsageTime("2026-09-09T16:01:00+00:00").replace(/\s/g, " "))
+      .toBe("2026/9/10 00:01:00");
+    expect(formatUsageTime("invalid")).toBe("invalid");
+  });
+});
+
 describe("usageSummaryUrl", () => {
   it("builds a summary URL with every filter applied", () => {
     const url = usageSummaryUrl("model", {
@@ -52,7 +78,7 @@ describe("usageSummaryUrl", () => {
     });
 
     expect(url).toBe(
-      "/api/v1/usage/summary?group_by=model&since=2026-08-01&until=2026-08-08"
+      "/api/v1/usage/summary?group_by=model&since=2026-07-31T16%3A00%3A00%2B00%3A00&until=2026-08-07T16%3A00%3A00%2B00%3A00"
       + "&project_id=proj-1&principal_type=embed_key&principal_id=key-abc&kind=chat",
     );
   });
@@ -60,6 +86,25 @@ describe("usageSummaryUrl", () => {
   it("sends only the grouping when no filters are given", () => {
     expect(usageSummaryUrl("principal")).toBe(
       "/api/v1/usage/summary?group_by=principal",
+    );
+  });
+});
+
+describe("usageTimeseriesUrl", () => {
+  it("builds a timeseries URL with bucket, grouping and filters", () => {
+    expect(usageTimeseriesUrl("day", "project", {
+      dateFrom: "2026-08-01",
+      projectId: "proj-1",
+    })).toBe(
+      "/api/v1/usage/timeseries?bucket=day&report_timezone=Asia%2FTaipei&group_by=project&limit=8"
+      + "&since=2026-07-31T16%3A00%3A00%2B00%3A00&project_id=proj-1",
+    );
+  });
+
+  it("omits group_by entirely when ungrouped", () => {
+    // 空字串會被後端當成未知維度而回 400，所以整個參數要拿掉。
+    expect(usageTimeseriesUrl("hour", "")).toBe(
+      "/api/v1/usage/timeseries?bucket=hour&report_timezone=Asia%2FTaipei&limit=8",
     );
   });
 });
@@ -75,7 +120,7 @@ describe("usageEventsUrl", () => {
     });
 
     expect(url).toBe(
-      "/api/v1/usage/events?limit=100&since=2026-08-01&until=2026-08-08"
+      "/api/v1/usage/events?limit=100&since=2026-07-31T16%3A00%3A00%2B00%3A00&until=2026-08-07T16%3A00%3A00%2B00%3A00"
       + "&project_id=proj-1&principal_type=user&principal_id=user-7",
     );
   });

@@ -289,7 +289,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT
 | 大腦 | **LanceDB** (嵌入式向量 DB) | 無服務端、低延遲、本地部署 |
 | 大腦 | **BAAI/bge-m3** (本地 Embedding) | 1024 維、多語言、Dense+Sparse 混合檢索 |
 | 大腦 | Markdown 檔案系統 | 人類可讀、Git 可追蹤的知識庫 |
-| 大腦 | SQLite Token Usage Ledger | 逐次記錄模型與 token 用量，並以帳號、專案、session 與 trace 歸屬 |
+| 大腦 | SQLite Token Usage Ledger | 逐次記錄模型與 token 用量，並以帳號、專案、session 與 trace 歸屬；Admin 日期篩選、趨勢與事件顯示統一採 Asia/Taipei，帳本仍存 UTC |
 | 大腦 | **2md Web Tools** | 以 `2md.aiurl.tw` 為主力、`2md.glsoft.ai` 與 `create360.ai` 為 fallback，提供即時搜尋與 URL / 文件轉 Markdown |
 | 大腦 | **David888 Wiki Publisher** | 由 `publish_wiki` 發布長篇 Markdown，回傳公開 `shareUrl`，不暴露內部編輯 URL |
 | 通訊 | WebSocket + JSON (Base64 音頻) | 全雙工、即時推流 |

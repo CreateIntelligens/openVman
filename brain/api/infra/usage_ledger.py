@@ -256,6 +256,130 @@ def summarize_usage(*, group_by: str = "model", **filters: str) -> dict[str, Any
     return {"group_by": group_by, "filters": params, "totals": totals, "groups": groups}
 
 
+_BUCKET_WIDTHS = {"hour": 13, "day": 10, "month": 7}
+_REPORT_TIMEZONE_OFFSETS = {"UTC": "+0 hours", "Asia/Taipei": "+8 hours"}
+
+
+def timeseries_usage(
+    *,
+    group_by: str = "",
+    bucket: str = "day",
+    limit: int = 8,
+    report_timezone: str = "UTC",
+    **filters: str,
+) -> dict[str, Any]:
+    """Aggregate tokens per time bucket, optionally split by one dimension.
+
+    *limit* 只留用量最高的前 N 個分組，其餘併成 "__other__"——分組是使用者
+    資料（帳號、專案可以有上百個），全部畫出來的圖沒有人看得懂。
+    """
+    width = _BUCKET_WIDTHS.get(bucket)
+    if width is None:
+        raise ValueError(f"unknown bucket: {bucket}")
+    if report_timezone not in _REPORT_TIMEZONE_OFFSETS:
+        raise ValueError(f"unknown report_timezone: {report_timezone}")
+
+    columns = _GROUP_COLUMNS.get(group_by) if group_by else None
+    if group_by and columns is None:
+        raise ValueError(f"unknown group_by: {group_by}")
+
+    where, params = _build_filters(**filters)
+    sums = ", ".join(
+        ["COUNT(*) AS calls"]
+        + [f"SUM({column}) AS {column}" for column in _TOKEN_COLUMNS]
+    )
+    # UTC 帳本先截到秒，避免 SQLite 將 .999999 四捨五入到下個小時／日。
+    # 時區只影響分桶；WHERE 仍直接比較 UTC 邊界，保留索引查詢。
+    period = (
+        "substr(strftime('%Y-%m-%dT%H:%M:%S', "
+        "substr(created_at, 1, 19), :report_offset), "
+        f"1, {width}) AS period"
+    )
+    params["report_offset"] = _REPORT_TIMEZONE_OFFSETS[report_timezone]
+
+    with _LOCK, _connect() as conn:
+        if columns is None:
+            rows = [
+                dict(row)
+                for row in conn.execute(
+                    f"SELECT {period}, {sums} FROM usage_events{where} "
+                    "GROUP BY period ORDER BY period",
+                    params,
+                )
+            ]
+            return {
+                "bucket": bucket,
+                "report_timezone": report_timezone,
+                "group_by": "",
+                "series": [],
+                "periods": [row["period"] for row in rows],
+                "points": rows,
+            }
+
+        select_cols = ", ".join(columns)
+        top = [
+            tuple(row[column] or "" for column in columns)
+            for row in conn.execute(
+                f"SELECT {select_cols}, SUM(total_tokens) AS total_tokens "
+                f"FROM usage_events{where} GROUP BY {select_cols} "
+                "ORDER BY total_tokens DESC LIMIT :top_limit",
+                {**params, "top_limit": max(1, min(int(limit), 50))},
+            )
+        ]
+        rows = [
+            dict(row)
+            for row in conn.execute(
+                f"SELECT {period}, {select_cols}, {sums} FROM usage_events{where} "
+                f"GROUP BY period, {select_cols} ORDER BY period",
+                params,
+            )
+        ]
+
+    top_keys = set(top)
+    periods = sorted({row["period"] for row in rows})
+    points: dict[tuple[str, ...], dict[str, dict[str, Any]]] = {}
+    for row in rows:
+        key = tuple(row[column] or "" for column in columns)
+        if key not in top_keys:
+            key = ("__other__",) * len(columns)
+        bucketed = points.setdefault(key, {})
+        period_key = row["period"]
+        if period_key not in bucketed:
+            bucketed[period_key] = {
+                "period": period_key,
+                "calls": 0,
+                **dict.fromkeys(_TOKEN_COLUMNS, 0),
+            }
+        current = bucketed[period_key]
+        current["calls"] += int(row["calls"] or 0)
+        for column in _TOKEN_COLUMNS:
+            current[column] += int(row[column] or 0)
+
+    series = [
+        {
+            **dict(zip(columns, key)),
+            "points": [values[period] for period in periods if period in values],
+        }
+        for key, values in points.items()
+    ]
+    # __other__ 是併桶，總和常大於任何單一分組；讓它參與名次會排到最前面，
+    # 圖例第一個變成「其他」。固定壓到最後。
+    def _rank(item: dict[str, Any]) -> tuple[int, int]:
+        is_other = item.get(columns[0]) == "__other__"
+        total = sum(p["total_tokens"] for p in item["points"])
+        return (1 if is_other else 0, -total)
+
+    series.sort(key=_rank)
+    return {
+        "bucket": bucket,
+        "report_timezone": report_timezone,
+        "group_by": group_by,
+        "periods": periods,
+        "series": series,
+        "points": [],
+    }
+
+
 def list_usage_events(*, limit: int = 100, **filters: str) -> list[dict[str, Any]]:
     where, params = _build_filters(**filters)
     params["limit"] = max(1, min(int(limit), 1000))
