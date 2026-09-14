@@ -52,6 +52,15 @@ def test_migration_is_idempotent_and_enables_sqlite_safety_pragmas(tmp_path: Pat
     assert foreign_keys == 1
     assert busy_timeout == 5000
     assert "admin_portal_access" in user_columns
+    assert 10 in applied
+    with database.transaction() as connection:
+        credential_columns = {
+            row["name"]: row
+            for row in connection.execute(
+                "PRAGMA table_info(temporary_credentials)",
+            )
+        }
+    assert credential_columns["password_ciphertext"]["notnull"] == 0
 
     user = UserRepository(database).create(
         username="portal-default",
@@ -61,11 +70,16 @@ def test_migration_is_idempotent_and_enables_sqlite_safety_pragmas(tmp_path: Pat
     assert user.admin_portal_access is False
 
 
-def test_temporary_migration_recovers_when_column_already_exists(tmp_path: Path):
+@pytest.mark.parametrize("version", [2, 10])
+def test_temporary_migration_recovers_when_column_already_exists(
+    tmp_path: Path, version: int,
+):
     database = AuthDatabase(tmp_path / "accounts.db")
     database.initialize()
     with database.transaction(write=True) as connection:
-        connection.execute("DELETE FROM schema_migrations WHERE version = 2")
+        connection.execute(
+            "DELETE FROM schema_migrations WHERE version = ?", (version,),
+        )
 
     database.initialize()
 
@@ -81,6 +95,7 @@ def test_temporary_migration_recovers_when_column_already_exists(tmp_path: Path)
     assert applied == sorted(set(applied))
     assert applied[:4] == [1, 2, 3, 4]
     assert "account_type" in columns
+    assert 10 in applied
 
 
 def test_normalized_usernames_are_unique(repositories):

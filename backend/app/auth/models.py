@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 
@@ -100,6 +100,7 @@ class TemporaryCredentialRecord:
     first_used_at: str | None
     expires_at: str | None
     duration_seconds: int
+    password_ciphertext: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)

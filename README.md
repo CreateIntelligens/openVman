@@ -60,6 +60,8 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 
 指令不接受其他 ROOT 名稱，也不會建立或取代第二個 ROOT。`ai360` 僅適合開發環境；正式部署必須在首次登入後立即更換密碼。既有兩層帳號資料庫會將原 `ai360` 原地升級為 ROOT，保留帳號 ID、密碼 hash、ownership 與 grants，但會撤銷 migration 前的 session。完整操作與 rollback 注意事項請見 [帳號管理手冊](./docs/account-administration.md)。
 
+帳號管理的「編輯／管理」分頁可依狀態查詢臨時批次，並查看與複製新版批次的登入密碼。密碼以加密形式保存；舊批次無法還原。`AUTH_TEMPORARY_PASSWORD_SECRET` 可獨立設定加密祕密值，未設時沿用 session 祕密；備份與金鑰輪替方式見 [帳號管理手冊](./docs/account-administration.md#臨時登入密碼保存與查閱)。
+
 ### 部署與啟動
 
 ```bash

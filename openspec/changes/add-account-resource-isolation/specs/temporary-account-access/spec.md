@@ -1,15 +1,21 @@
 ## ADDED Requirements
 
-### Requirement: Temporary passwords are random 12-character codes and non-recoverable
-The system SHALL generate each temporary password as exactly 12 random alphanumeric characters, SHALL use its first four characters as a non-secret lookup locator, SHALL store only a bcrypt hash plus that locator, and SHALL never write plaintext temporary passwords to logs or persistent storage.
+### Requirement: Temporary passwords can be retrieved by account managers
+The system SHALL generate each temporary password as exactly 20 random alphanumeric characters, SHALL use its first 12 characters as a private lookup locator, and SHALL retain bcrypt hashes for login verification. New batches SHALL additionally persist account-bound encrypted passwords for ROOT/admin retrieval, without storing plaintext in the database or logs.
 
 #### Scenario: Batch creation is persisted
 - **WHEN** five temporary passwords are generated
-- **THEN** database rows contain hashes and locators but none of the five plaintext values
+- **THEN** database rows contain hashes, private locators, and authenticated ciphertext but none of the five plaintext values
 
-#### Scenario: Password response is lost
-- **WHEN** the admin closes or refreshes the one-time result view
-- **THEN** the system requires generating a new batch instead of recovering the old plaintext passwords
+#### Scenario: Administrator reloads batch history
+- **WHEN** ROOT or admin queries batch history after a refresh or backend restart
+- **THEN** each new account exposes its original login password and the UI offers copying, with a no-store response
+- **THEN** ordinary or temporary users cannot retrieve batch history even with portal access
+
+#### Scenario: Legacy password or encryption key is unavailable
+- **WHEN** a row has no saved ciphertext or its ciphertext cannot be decrypted
+- **THEN** history returns a null password and the UI displays 密碼未保存 without showing the internal tmp account name
+- **THEN** existing bcrypt-based login and expiry behavior remains unchanged
 
 ### Requirement: Temporary access uses a hard 72-hour first-use window
 The system SHALL begin the lifetime only on the first successful password verification, SHALL retain the original expiry across later logins, and SHALL revalidate expiry on every request.

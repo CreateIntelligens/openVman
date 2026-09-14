@@ -49,6 +49,7 @@ from .repositories import (
 )
 from .resources import resolve_admin_scope
 from .runtime import AuthRuntime, get_auth_runtime
+from .temporary_passwords import TemporaryPasswordCipher
 
 _SESSION_COOKIE_NAME = "openvman_session"
 _INVALID_CREDENTIALS = "Invalid credentials"
@@ -410,6 +411,7 @@ class UpdateAdminScopeRequest(_StrictModel):
 class TemporaryAccountAudit(_StrictModel):
     user_id: str
     username: str
+    password: str | None = Field(default=None, repr=False)
     state: str
     disabled: bool
     first_used_at: str | None
@@ -693,6 +695,7 @@ def _temporary_account_state(
 def _temporary_account_audit(
     account: TemporaryBatchAccount,
     now: datetime,
+    passwords: TemporaryPasswordCipher,
 ) -> TemporaryAccountAudit:
     expires_at = account.credential.expires_at
     remaining_seconds = None
@@ -704,6 +707,10 @@ def _temporary_account_audit(
     return TemporaryAccountAudit(
         user_id=account.user.id,
         username=account.user.username,
+        password=passwords.decrypt(
+            account.credential.password_ciphertext,
+            account.credential.code_locator,
+        ),
         state=_temporary_account_state(account, now),
         disabled=account.user.disabled,
         first_used_at=account.credential.first_used_at,
@@ -718,11 +725,13 @@ def _temporary_account_audit(
 def _temporary_batch_audit(
     batch: TemporaryBatch,
     *,
+    passwords: TemporaryPasswordCipher,
     now: datetime | None = None,
 ) -> TemporaryBatchAudit:
     current_time = now or datetime.now(timezone.utc)
     accounts = [
-        _temporary_account_audit(account, current_time) for account in batch.accounts
+        _temporary_account_audit(account, current_time, passwords)
+        for account in batch.accounts
     ]
     states = {account.state for account in accounts}
     if batch.batch.revoked_at is not None or states == {"revoked"}:
@@ -766,9 +775,11 @@ def _temporary_batch_audit(
 )
 def create_temporary_batch(
     body: CreateTemporaryBatchRequest,
+    response: Response,
     admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> TemporaryBatchCreated:
+    response.headers["Cache-Control"] = "no-store"
     generated: list[tuple[str, str]] = []
     seen_locators: set[str] = set()
     while len(generated) < 5:
@@ -786,6 +797,9 @@ def create_temporary_batch(
         TemporaryCredentialCreate(
             locator=locator,
             password_hash=hash_password(password),
+            password_ciphertext=runtime.temporary_passwords.encrypt(
+                password, locator,
+            ),
         )
         for locator, password in generated
     ]
@@ -825,12 +839,16 @@ def create_temporary_batch(
     response_model=list[TemporaryBatchAudit],
 )
 def list_temporary_batches(
+    response: Response,
     _admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> list[TemporaryBatchAudit]:
+    response.headers["Cache-Control"] = "no-store"
     now = datetime.now(timezone.utc)
     return [
-        _temporary_batch_audit(batch, now=now)
+        _temporary_batch_audit(
+            batch, passwords=runtime.temporary_passwords, now=now,
+        )
         for batch in runtime.temporary_accounts.list_batches()
     ]
 
@@ -841,6 +859,7 @@ def list_temporary_batches(
 )
 def set_temporary_batch_admin_portal_access(
     batch_id: str,
+    response: Response,
     body: SetAdminPortalAccessRequest,
     admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
@@ -856,7 +875,8 @@ def set_temporary_batch_admin_portal_access(
             status_code=404,
             detail="Temporary batch not found",
         ) from exc
-    return _temporary_batch_audit(batch)
+    response.headers["Cache-Control"] = "no-store"
+    return _temporary_batch_audit(batch, passwords=runtime.temporary_passwords)
 
 
 @temporary_accounts_router.post(
@@ -865,6 +885,7 @@ def set_temporary_batch_admin_portal_access(
 )
 def revoke_temporary_batch(
     batch_id: str,
+    response: Response,
     admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> TemporaryBatchAudit:
@@ -877,7 +898,8 @@ def revoke_temporary_batch(
         raise HTTPException(
             status_code=404, detail="Temporary batch not found"
         ) from exc
-    return _temporary_batch_audit(batch)
+    response.headers["Cache-Control"] = "no-store"
+    return _temporary_batch_audit(batch, passwords=runtime.temporary_passwords)
 
 
 @users_router.get("", response_model=list[AdminAccountProfile])

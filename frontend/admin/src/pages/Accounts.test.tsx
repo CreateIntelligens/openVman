@@ -28,6 +28,7 @@ vi.mock("../api/auth", () => ({
   revokeAccountSessions: vi.fn(),
   setAccountDisabled: vi.fn(),
   updateAccountRole: vi.fn(),
+  updateAccountAccess: vi.fn(),
 }));
 
 vi.mock("../context/AuthContext", () => ({
@@ -35,15 +36,13 @@ vi.mock("../context/AuthContext", () => ({
 }));
 
 vi.mock("../components/accounts/FormalAccountAccessPanel", () => ({
-  default: ({ account }: { account: Account }) => (
-    <section aria-label={`${account.username} 的資源權限`}>
-      資源權限面板
-    </section>
-  ),
+  default: () => null,
 }));
 
 vi.mock("../components/accounts/TemporaryBatchPanel", () => ({
-  default: () => <section>臨時帳號批次</section>,
+  default: ({ view }: { view: "create" | "manage" }) => (
+    <section>{view === "create" ? "臨時帳號批次" : "批次紀錄"}</section>
+  ),
 }));
 
 describe("Accounts", () => {
@@ -72,14 +71,12 @@ describe("Accounts", () => {
     });
   });
 
-  it("creates a formal user and opens rights panel separately", async () => {
-    vi.mocked(listAccounts)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([formalAccount("user-a", "alice", "user")]);
-
+  it("selects access before creating a formal user", async () => {
     render(<Accounts />);
 
-    expect(screen.getByText("新增正式帳號")).toBeTruthy();
+    expect(
+      await screen.findByText(/可檢視並編輯下方授權的專案/),
+    ).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("帳號"), {
       target: { value: "alice" },
@@ -87,20 +84,38 @@ describe("Accounts", () => {
     fireEvent.change(screen.getByLabelText("密碼"), {
       target: { value: "correct horse battery staple" },
     });
-    const submit = screen.getByRole("button", {
+    const submit = await screen.findByRole("button", {
       name: "建立正式帳號",
     });
-    expect(submit.hasAttribute("disabled")).toBe(false);
+    await waitFor(() => expect(submit.hasAttribute("disabled")).toBe(false));
     fireEvent.click(submit);
 
     await waitFor(() => expect(createAccount).toHaveBeenCalledWith({
       username: "alice",
       password: "correct horse battery staple",
       role: "user",
+      access: {
+        grants: {
+          projects: ["project-a"],
+          avatar_characters: ["character-a"],
+          custom_voices: ["voice-a"],
+          avatar_mascots: [],
+          avatar_backgrounds: [],
+        },
+        defaults: {
+          project_id: "project-a",
+          character_id: "character-a",
+          voice_provider: "indextts",
+          voice_id: "voice-a",
+          mascot_id: "",
+          background_id: "",
+        },
+        admin_portal_access: false,
+      },
     }));
     await waitFor(() => {
       expect(listAccounts).toHaveBeenCalledTimes(2);
-      expect(screen.getByLabelText("alice 的資源權限")).toBeTruthy();
+      expect(fetchAccountAccessOptions).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -111,9 +126,10 @@ describe("Accounts", () => {
     expect(screen.queryByText("臨時帳號批次")).toBeNull();
     await waitFor(() => {
       expect(listAccounts).toHaveBeenCalledOnce();
+      expect(fetchAccountAccessOptions).toHaveBeenCalledOnce();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /臨時帳號/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^臨時帳號/ }));
 
     expect(screen.queryByText("新增正式帳號")).toBeNull();
     expect(screen.getByText("臨時帳號批次")).toBeTruthy();
@@ -148,6 +164,28 @@ describe("Accounts", () => {
     }));
   });
 
+  it("switches cleanly between create account and account management tabs", async () => {
+    vi.mocked(listAccounts).mockResolvedValue([
+      formalAccount("user-a", "alice", "user"),
+    ]);
+
+    render(<Accounts />);
+
+    expect(screen.getByText("新增正式帳號")).toBeTruthy();
+    expect(screen.queryByText("正式帳號列表")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^編輯／管理/ }));
+    expect(await screen.findByText("正式帳號列表")).toBeTruthy();
+    expect(screen.queryByText("新增正式帳號")).toBeNull();
+    expect(screen.getByText("alice")).toBeTruthy();
+    expect(screen.getByText("批次紀錄")).toBeTruthy();
+    expect(screen.queryByText("臨時帳號批次")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "+ 建立新帳號" }));
+    expect(screen.getByText("新增正式帳號")).toBeTruthy();
+    expect(screen.queryByText("正式帳號列表")).toBeNull();
+  });
+
   it("shows ROOT controls for lower accounts but no self-destructive controls", async () => {
     authState.account = {
       id: "root-a",
@@ -162,8 +200,10 @@ describe("Accounts", () => {
 
     render(<Accounts />);
 
-    expect(await screen.findByText("ROOT")).toBeTruthy();
     expect(screen.getByRole("option", { name: "管理員" })).toBeTruthy();
+    switchToManageTab();
+
+    expect(await screen.findByText("ROOT")).toBeTruthy();
 
     const rootRow = screen.getByText("ai360").closest("article");
     const adminRow = screen.getByText("operator").closest("article");
@@ -200,8 +240,10 @@ describe("Accounts", () => {
 
     render(<Accounts />);
 
-    await screen.findByText("ROOT");
     expect(screen.queryByRole("option", { name: "管理員" })).toBeNull();
+    switchToManageTab();
+
+    await screen.findByText("ROOT");
     expect(rowButtonLabels(rowByUsername("ai360"))).toEqual([]);
     expect(rowButtonLabels(rowByUsername("admin"))).toEqual([]);
     expect(rowButtonLabels(rowByUsername("operator"))).toEqual([]);
@@ -223,6 +265,7 @@ describe("Accounts", () => {
     vi.mocked(listAccounts).mockResolvedValue([user]);
 
     render(<Accounts />);
+    switchToManageTab();
     clickRowButton(
       (await screen.findByText("viewer")).closest("article"),
       "變更角色",
@@ -254,6 +297,7 @@ describe("Accounts", () => {
       .mockResolvedValueOnce({ ...user, role: "admin" });
 
     render(<Accounts />);
+    switchToManageTab();
     const row = (await screen.findByText("viewer")).closest("article");
     clickRowButton(row, "變更角色");
     fireEvent.click(screen.getByRole("button", { name: "確認變更角色" }));
@@ -283,6 +327,7 @@ describe("Accounts", () => {
     });
 
     render(<Accounts />);
+    switchToManageTab();
     clickRowButton(
       (await screen.findByText("operator")).closest("article"),
       "變更角色",
@@ -330,6 +375,7 @@ describe("Accounts", () => {
       .mockResolvedValueOnce(user);
 
     render(<Accounts />);
+    switchToManageTab();
     const row = (await screen.findByText("viewer")).closest("article");
     clickRowButton(row, "重設密碼");
     const password = screen.getByLabelText("新密碼") as HTMLInputElement;
@@ -410,4 +456,9 @@ function clickRowButton(row: Element | null, label: string): void {
     throw new Error(`找不到操作按鈕：${label}`);
   }
   fireEvent.click(button);
+}
+
+function switchToManageTab(): void {
+  const manageTabBtn = screen.getByRole("tab", { name: /^編輯／管理/ });
+  fireEvent.click(manageTabBtn);
 }
