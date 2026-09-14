@@ -72,6 +72,9 @@ class BrainSettings(BaseSettings):
     embedding_service_token: str = ""
     embedding_service_timeout: float = 30.0
     embedding_service_chunk_size: int = 32
+    embedding_service_max_retries: int = 3
+    embedding_service_retry_base_delay: float = 0.25
+    embedding_service_retry_max_delay: float = 8.0
     embedding_expected_model: str = "BAAI/bge-m3"
     embedding_expected_dimension: int = 1024
     embedding_expected_revision: str = "5617a9f61b028005a4858fdac845db406aefb181"

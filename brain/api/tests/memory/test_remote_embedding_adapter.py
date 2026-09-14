@@ -156,3 +156,87 @@ def test_readiness_incompatible_dimension(monkeypatch):
     assert ok is False
     assert info["status"] == "incompatible"
     assert "Dimension mismatch" in info["error"]
+
+
+def test_remote_adapter_retries_429_and_succeeds(monkeypatch):
+    calls = 0
+
+    def mock_post(self, endpoint, json=None, **kwargs):
+        nonlocal calls
+        calls += 1
+        req = httpx.Request("POST", f"http://test{endpoint}")
+        if calls == 1:
+            return httpx.Response(429, headers={"retry-after": "0.01"}, request=req)
+        texts = json.get("texts", [])
+        return httpx.Response(
+            200,
+            json={
+                "vectors": [[0.1] * 1024 for _ in texts],
+                "embedding_spec": {
+                    "identity": "bge:BAAI/bge-m3:1024:float32:l2:document:default",
+                    "dimensions": 1024,
+                },
+                "attempts": [{"provider": "bge", "status": "selected"}],
+            },
+            request=req,
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", mock_post)
+
+    adapter = GatewayRemoteTextEmbedder(
+        base_url="http://fake-embedding:8009",
+        max_retries=2,
+        retry_base_delay=0.01,
+        retry_max_delay=0.05,
+        expected_dimension=1024,
+    )
+    vectors = adapter.encode(["test text"])
+    assert len(vectors) == 1
+    assert len(vectors[0]) == 1024
+    assert calls == 2
+
+
+def test_remote_adapter_retries_and_exhausts_429(monkeypatch):
+    calls = 0
+
+    def mock_post(self, endpoint, json=None, **kwargs):
+        nonlocal calls
+        calls += 1
+        req = httpx.Request("POST", f"http://test{endpoint}")
+        return httpx.Response(429, headers={"retry-after": "0.01"}, request=req)
+
+    monkeypatch.setattr(httpx.Client, "post", mock_post)
+
+    adapter = GatewayRemoteTextEmbedder(
+        base_url="http://fake-embedding:8009",
+        max_retries=2,
+        retry_base_delay=0.01,
+        retry_max_delay=0.05,
+    )
+    with pytest.raises(RuntimeError) as exc_info:
+        adapter.encode(["test text"])
+    assert "Embedding gateway call failed" in str(exc_info.value)
+    assert calls == 3  # 1 initial + 2 retries
+
+
+def test_remote_adapter_non_retryable_400_fails_immediately(monkeypatch):
+    calls = 0
+
+    def mock_post(self, endpoint, json=None, **kwargs):
+        nonlocal calls
+        calls += 1
+        req = httpx.Request("POST", f"http://test{endpoint}")
+        return httpx.Response(400, json={"detail": "Bad request"}, request=req)
+
+    monkeypatch.setattr(httpx.Client, "post", mock_post)
+
+    adapter = GatewayRemoteTextEmbedder(
+        base_url="http://fake-embedding:8009",
+        max_retries=3,
+        retry_base_delay=0.01,
+        retry_max_delay=0.05,
+    )
+    with pytest.raises(RuntimeError) as exc_info:
+        adapter.encode(["test text"])
+    assert "Embedding gateway call failed" in str(exc_info.value)
+    assert calls == 1  # 400 must fail immediately without retrying

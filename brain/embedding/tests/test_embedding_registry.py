@@ -5,14 +5,31 @@ from __future__ import annotations
 import sys
 import types
 
+import httpx
 import pytest
 
 try:
     from brain.embedding.identity import EmbeddingSpec, make_canonical_identity
-    from brain.embedding.registry import BgeLocalProvider, ProviderRegistry
+    from brain.embedding.registry import (
+        BgeLocalProvider,
+        GeminiApiProvider,
+        OpenAiApiProvider,
+        ProviderRegistry,
+        VoyageApiProvider,
+        _parse_retry_after,
+        _post_with_retry,
+    )
 except ModuleNotFoundError:
     from identity import EmbeddingSpec, make_canonical_identity
-    from registry import BgeLocalProvider, ProviderRegistry
+    from registry import (
+        BgeLocalProvider,
+        GeminiApiProvider,
+        OpenAiApiProvider,
+        ProviderRegistry,
+        VoyageApiProvider,
+        _parse_retry_after,
+        _post_with_retry,
+    )
 
 
 @pytest.mark.asyncio
@@ -157,3 +174,150 @@ async def test_registry_respects_acceptable_identities():
             acceptable_identities=[bge_spec.identity],
         )
     assert "No acceptable embedding provider succeeded" in str(exc_info.value)
+
+
+def test_parse_retry_after():
+    assert _parse_retry_after(None, 10.0) is None
+    assert _parse_retry_after("", 10.0) is None
+    assert _parse_retry_after("invalid", 10.0) is None
+    assert _parse_retry_after("3", 10.0) == 3.0
+    assert _parse_retry_after("2.5", 10.0) == 2.5
+    assert _parse_retry_after("15", 8.0) == 8.0  # capped at max_delay
+    assert _parse_retry_after("-1", 10.0) is None
+
+
+@pytest.mark.asyncio
+async def test_post_with_retry_recovers_from_429():
+    calls = 0
+
+    class FakeClient:
+        async def post(self, url, json=None, headers=None):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                req = httpx.Request("POST", url)
+                return httpx.Response(429, headers={"retry-after": "0.01"}, request=req)
+            req = httpx.Request("POST", url)
+            return httpx.Response(200, json={"ok": True}, request=req)
+
+    resp = await _post_with_retry(
+        FakeClient(),
+        "http://test-api/embeddings",
+        json={"input": "test"},
+        headers={},
+        max_retries=2,
+        base_delay=0.01,
+        max_delay=0.1,
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_post_with_retry_stops_on_401():
+    calls = 0
+
+    class FakeClient:
+        async def post(self, url, json=None, headers=None):
+            nonlocal calls
+            calls += 1
+            req = httpx.Request("POST", url)
+            return httpx.Response(401, json={"error": "unauthorized"}, request=req)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await _post_with_retry(
+            FakeClient(),
+            "http://test-api/embeddings",
+            json={},
+            headers={},
+            max_retries=3,
+            base_delay=0.01,
+        )
+    assert calls == 1  # 401 is not retryable, must fail immediately
+
+
+@pytest.mark.asyncio
+async def test_post_with_retry_exhausts_and_raises():
+    calls = 0
+
+    class FakeClient:
+        async def post(self, url, json=None, headers=None):
+            nonlocal calls
+            calls += 1
+            req = httpx.Request("POST", url)
+            return httpx.Response(429, headers={"retry-after": "0.01"}, request=req)
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await _post_with_retry(
+            FakeClient(),
+            "http://test-api/embeddings",
+            json={},
+            headers={},
+            max_retries=2,
+            base_delay=0.01,
+            max_delay=0.05,
+        )
+    assert calls == 3  # initial attempt + 2 retries
+
+
+@pytest.mark.asyncio
+async def test_openai_provider_retries_429_and_succeeds():
+    provider = OpenAiApiProvider(
+        api_key="sk-test",
+        max_retries=2,
+        base_delay=0.01,
+        max_delay=0.05,
+    )
+    calls = 0
+
+    class FakeClient:
+        async def post(self, url, json=None, headers=None):
+            nonlocal calls
+            calls += 1
+            req = httpx.Request("POST", url)
+            if calls == 1:
+                return httpx.Response(429, headers={"retry-after": "0.01"}, request=req)
+            return httpx.Response(
+                200,
+                json={"data": [{"index": 0, "embedding": [0.1] * 1536}]},
+                request=req,
+            )
+
+    provider._client = FakeClient()
+    vectors = await provider.encode(["hello"])
+    assert len(vectors) == 1
+    assert len(vectors[0]) == 1536
+    assert calls == 2
+    assert provider._is_ready is True
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_retries_429_and_succeeds():
+    provider = GeminiApiProvider(
+        api_key="gemini-test",
+        max_retries=2,
+        base_delay=0.01,
+        max_delay=0.05,
+    )
+    calls = 0
+
+    class FakeClient:
+        async def post(self, url, json=None, headers=None):
+            nonlocal calls
+            calls += 1
+            req = httpx.Request("POST", url)
+            if calls == 1:
+                return httpx.Response(429, headers={"retry-after": "0.01"}, request=req)
+            return httpx.Response(
+                200,
+                json={"embeddings": [{"values": [0.2] * 768}]},
+                request=req,
+            )
+
+    provider._client = FakeClient()
+    vectors = await provider.encode(["hello"])
+    assert len(vectors) == 1
+    assert len(vectors[0]) == 768
+    assert calls == 2
+    assert provider._is_ready is True
