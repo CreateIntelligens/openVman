@@ -49,7 +49,8 @@ def resolve_admin_scope(
     The repository is resolved from the shared runtime when the caller does
     not pass one. Defaulting to *enforcing* rather than to unscoped matters:
     a call site that forgets to thread the repository through must not
-    silently regain unrestricted access.
+    silently regain unrestricted access. Runtime and repository failures
+    propagate to abort access; test doubles must inject their repository.
     """
     if account.role is AccountRole.ROOT:
         return UNSCOPED_ADMIN
@@ -58,10 +59,7 @@ def resolve_admin_scope(
         # runtime 會讓 import 順序變脆弱。
         from .runtime import get_auth_runtime
 
-        try:
-            admin_scopes = get_auth_runtime().admin_scopes
-        except Exception:  # noqa: BLE001 - 無 runtime（測試替身）時不設限
-            return UNSCOPED_ADMIN
+        admin_scopes = get_auth_runtime().admin_scopes
     return admin_scopes.get(account.id)
 
 

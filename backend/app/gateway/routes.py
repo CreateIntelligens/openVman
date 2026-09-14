@@ -81,11 +81,18 @@ async def _process_media_sync(data: dict[str, Any]) -> None:
     await process_media({}, data)
 
 
-async def _prepare_passthrough_upload(upload: UploadFile) -> tuple[str, bytes, str]:
+async def _prepare_passthrough_upload(
+    upload: UploadFile,
+    *,
+    max_bytes: int,
+) -> tuple[str, bytes, str]:
     try:
+        content = await upload.read(max_bytes + 1)
+        if len(content) > max_bytes:
+            raise UploadTooLargeError(max_bytes)
         return (
             upload.filename or "",
-            await upload.read(),
+            content,
             upload.content_type or "application/octet-stream",
         )
     finally:
@@ -435,6 +442,69 @@ async def _safe_fetch_page(url: str) -> CrawlResult | JSONResponse:
 
 
 
+@router.get(
+    "/api/v1/uploads/limits",
+    tags=["Knowledge"],
+    summary="取得知識文件每檔上傳上限",
+)
+async def get_upload_limits(
+    _current: CurrentAccount = Depends(get_current_account),
+) -> dict[str, int]:
+    return {"document_max_upload_bytes": get_tts_config().document_max_upload_bytes}
+
+
+@router.post(
+    "/api/v1/knowledge/raw/upload",
+    tags=["Knowledge"],
+    summary="上傳原始檔案至 raw 區",
+)
+async def upload_raw_knowledge_documents(
+    files: list[UploadFile] = File(...),
+    target_dir: str = Form("raw"),
+    project_id: str = Form("default"),
+    relative_paths: list[str] = Form(default_factory=list),
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> Response:
+    cfg = get_tts_config()
+    _require_project_edit(runtime, current, project_id)
+    try:
+        forwarded_files = [
+            (
+                "files",
+                await _prepare_passthrough_upload(
+                    upload, max_bytes=cfg.document_max_upload_bytes,
+                ),
+            )
+            for upload in files
+        ]
+        response = await _brain_http.get().post(
+            f"{cfg.brain_url}/brain/knowledge/raw/upload",
+            files=forwarded_files,
+            data={
+                "target_dir": target_dir,
+                "project_id": project_id,
+                "relative_paths": relative_paths,
+            },
+            headers=_trusted_brain_headers(
+                current, project_id, cfg.gateway_internal_token,
+            ),
+        )
+        return _relay_brain_response(response)
+    except UploadTooLargeError as exc:
+        return upload_failed_response(
+            status_code=413,
+            error=f"檔案超過大小限制（上限 {exc.limit_bytes} bytes）",
+        )
+    except httpx.TimeoutException:
+        return _error_response(504, "brain request timeout")
+    except httpx.RequestError:
+        return _error_response(502, "brain service unavailable")
+    finally:
+        for upload in files:
+            await upload.close()
+
+
 @router.post(
     "/api/v1/knowledge/upload",
     tags=["Knowledge"],
@@ -465,7 +535,9 @@ async def upload_knowledge_documents(
         for index, upload in enumerate(files):
             client_relative = relative_paths[index] if index < len(relative_paths) else ""
             if _should_passthrough_knowledge_upload(upload):
-                forwarded = await _prepare_passthrough_upload(upload)
+                forwarded = await _prepare_passthrough_upload(
+                    upload, max_bytes=cfg.document_max_upload_bytes,
+                )
                 forwarded_relative_path = client_relative or (upload.filename or "")
             else:
                 forwarded = await _prepare_document_upload(
@@ -495,10 +567,9 @@ async def upload_knowledge_documents(
         )
         return _relay_brain_response(resp)
     except UploadTooLargeError as exc:
-        limit_mb = exc.limit_bytes / (1024 * 1024)
         return upload_failed_response(
             status_code=413,
-            error=f"檔案超過大小限制（上限 {limit_mb:.0f} MB）",
+            error=f"檔案超過大小限制（上限 {exc.limit_bytes} bytes）",
         )
     except httpx.ConnectError:
         logger.warning("knowledge_upload_brain_unreachable target_dir=%s project_id=%s", target_dir, project_id)
@@ -509,6 +580,9 @@ async def upload_knowledge_documents(
             status_code=500,
             error=str(exc),
         )
+    finally:
+        for upload in files:
+            await upload.close()
 
 
 @router.post(

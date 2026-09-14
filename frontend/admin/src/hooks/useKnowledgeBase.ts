@@ -33,7 +33,6 @@ import {
   type SourceMode,
 } from "../components/kb/helpers";
 import { useProject } from "../context/ProjectContext";
-import { validateUploadFiles } from "../utils/uploadLimits";
 import { useLocalStorageState } from "./useLocalStorageState";
 import { useStatusState } from "./useStatusState";
 import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
@@ -360,11 +359,6 @@ export function useKnowledgeBase() {
 
   const uploadFiles = useCallback(async (entries: { file: File; relativePath: string }[]) => {
     if (!entries.length) return;
-    const sizeError = validateUploadFiles(entries.map((entry) => entry.file));
-    if (sizeError) {
-      setStatus({ type: "error", message: sizeError });
-      return;
-    }
     setUploading(true);
     setStatus(null);
     try {

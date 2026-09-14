@@ -1,3 +1,5 @@
+import { validateUploadFiles } from "../utils/uploadLimits";
+
 import {
   apiUrl,
   del,
@@ -138,6 +140,17 @@ export function moveKnowledgeDocument(sourcePath: string, targetPath: string) {
 
 export type KnowledgeUploadEntry = { file: File; relativePath: string };
 
+async function validateKnowledgeUpload(entries: KnowledgeUploadEntry[]) {
+  const limits = await fetchJson<{ document_max_upload_bytes: number }>(
+    apiUrl("/uploads/limits"),
+  );
+  const error = validateUploadFiles(
+    entries.map(({ file }) => file),
+    limits.document_max_upload_bytes,
+  );
+  if (error) throw new Error(error);
+}
+
 export async function uploadKnowledgeDocuments(
   entries: KnowledgeUploadEntry[],
   targetDir = "",
@@ -150,6 +163,7 @@ export async function uploadKnowledgeDocuments(
   formData.append("target_dir", targetDir);
   formData.append("project_id", getActiveProjectId());
 
+  await validateKnowledgeUpload(entries);
   return fetchJson<KnowledgeUploadResponse>(apiUrl(knowledgePath("/upload")), {
     method: "POST",
     body: formData,
@@ -168,6 +182,7 @@ export async function uploadRawKnowledgeDocuments(
   formData.append("target_dir", targetDir);
   formData.append("project_id", getActiveProjectId());
 
+  await validateKnowledgeUpload(entries);
   return fetchJson<KnowledgeUploadResponse>(apiUrl(knowledgePath("/raw/upload")), {
     method: "POST",
     body: formData,

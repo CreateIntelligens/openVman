@@ -345,3 +345,157 @@ def test_knowledge_upload_is_not_documented_as_brain_proxy_mirror(client: TestCl
 
     assert response.status_code == 200
     assert "/api/v1/knowledge/upload" in response.json()["paths"]
+
+
+@pytest.mark.parametrize("limit", [8, 1024 * 1024])
+def test_upload_limits_reports_configured_document_limit(client, limit):
+    cfg = _mock_cfg()
+    cfg.document_max_upload_bytes = limit
+    with patch("app.gateway.routes.get_tts_config", return_value=cfg):
+        response = client.get("/api/v1/uploads/limits")
+    assert response.status_code == 200
+    assert response.json() == {"document_max_upload_bytes": limit}
+
+
+@pytest.mark.parametrize("path", ["upload", "raw/upload"])
+@pytest.mark.parametrize("filename", ["report.md", "report.txt", "report.csv"])
+def test_knowledge_upload_rejects_oversized_files_before_brain(
+    client, path, filename,
+):
+    cfg = _mock_cfg()
+    cfg.document_max_upload_bytes = 8
+    route_client = MagicMock()
+    route_client.post = AsyncMock()
+    with (
+        patch("app.gateway.routes.get_tts_config", return_value=cfg),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+    ):
+        response = client.post(
+            f"/api/v1/knowledge/{path}",
+            data={"project_id": "default"},
+            files={"files": (filename, b"123456789", "text/plain")},
+        )
+    assert response.status_code == 413
+    route_client.post.assert_not_awaited()
+
+
+def test_raw_upload_preserves_binary_and_form_fields_at_limit(client):
+    cfg = _mock_cfg()
+    cfg.document_max_upload_bytes = 8
+    payload = {"status": "ok", "files": [{"path": "raw/folder/report.pdf"}]}
+    route_client = MagicMock()
+    route_client.post = AsyncMock(return_value=_mock_brain_response(payload))
+    with (
+        patch("app.gateway.routes.get_tts_config", return_value=cfg),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+    ):
+        response = client.post(
+            "/api/v1/knowledge/raw/upload",
+            data={
+                "project_id": "default",
+                "target_dir": "raw/folder",
+                "relative_paths": ["nested/report.pdf"],
+            },
+            files={"files": ("report.pdf", b"%PDF-123", "application/pdf")},
+        )
+    assert response.status_code == 200
+    assert response.json() == payload
+    call = route_client.post.await_args
+    assert call.args[0] == "http://brain:8100/brain/knowledge/raw/upload"
+    assert call.kwargs["data"] == {
+        "project_id": "default",
+        "target_dir": "raw/folder",
+        "relative_paths": ["nested/report.pdf"],
+    }
+    assert call.kwargs["files"] == [
+        ("files", ("report.pdf", b"%PDF-123", "application/pdf")),
+    ]
+    assert call.kwargs["headers"]["X-OpenVMan-Project-ID"] == "default"
+    assert call.kwargs["headers"]["X-Internal-Token"] == "internal-secret"
+
+
+def test_raw_upload_rejects_inaccessible_project_before_brain(client):
+    route_client = MagicMock()
+    route_client.post = AsyncMock()
+    with patch("app.gateway.routes._brain_http.get", return_value=route_client):
+        response = client.post(
+            "/api/v1/knowledge/raw/upload",
+            data={"project_id": "inaccessible"},
+            files={"files": ("report.pdf", b"%PDF-123", "application/pdf")},
+        )
+    assert response.status_code == 404
+    route_client.post.assert_not_awaited()
+
+
+@pytest.mark.parametrize("path", ["uploads/limits", "knowledge/raw/upload"])
+def test_upload_endpoints_require_authentication(client, path):
+    client.headers.pop("Authorization")
+    if path == "uploads/limits":
+        response = client.get(f"/api/v1/{path}")
+    else:
+        response = client.post(
+            f"/api/v1/{path}",
+            files={"files": ("report.txt", b"hello", "text/plain")},
+        )
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "upload/",
+        "raw/upload/",
+        "%2e/upload",
+        "a/%2e%2e/upload",
+        "raw/%2e/upload",
+        "raw/a/%2e%2e/upload",
+    ],
+)
+def test_upload_cannot_bypass_limits_through_catchall(client, path):
+    route_client = MagicMock()
+    route_client.send = AsyncMock()
+    with patch("app.brain_proxy._http.get", return_value=route_client):
+        response = client.post(
+            f"/api/v1/knowledge/{path}?project_id=default",
+            files={"files": ("report.txt", b"hello", "text/plain")},
+        )
+    assert response.status_code == 404
+    route_client.send.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("portal_access", "granted", "expected_status"),
+    [(True, True, 200), (False, True, 404), (True, False, 404)],
+)
+def test_raw_upload_requires_portal_user_project_edit_access(
+    client, portal_access, granted, expected_status,
+):
+    from app.auth.models import AccountRole
+    from app.auth.runtime import get_auth_runtime
+
+    runtime = get_auth_runtime()
+    user = runtime.users.create(
+        username="portal-user",
+        password_hash="unused",
+        role=AccountRole.USER,
+        admin_portal_access=portal_access,
+    )
+    client.headers["Authorization"] = f"Bearer {runtime.tokens.issue(user)}"
+    route_client = MagicMock()
+    route_client.post = AsyncMock(
+        return_value=_mock_brain_response({"status": "ok", "files": []}),
+    )
+    with (
+        patch.object(runtime.resources, "has_grant", return_value=granted),
+        patch("app.gateway.routes._brain_http.get", return_value=route_client),
+    ):
+        response = client.post(
+            "/api/v1/knowledge/raw/upload",
+            data={"project_id": "default"},
+            files={"files": ("report.txt", b"hello", "text/plain")},
+        )
+    assert response.status_code == expected_status
+    if expected_status == 200:
+        route_client.post.assert_awaited_once()
+    else:
+        route_client.post.assert_not_awaited()

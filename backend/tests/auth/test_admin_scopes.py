@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -22,6 +23,7 @@ from app.auth.repositories import (
 from app.auth.resources import (
     ResourceNotFoundError,
     list_accessible_resources,
+    resolve_admin_scope,
     resolve_resource,
 )
 
@@ -85,6 +87,75 @@ def _scope_two_voices(env) -> None:
             (ResourceType.AVATAR_CHARACTER, "char-a"),
         ],
     )
+
+
+@pytest.mark.parametrize("operation", ["scope", "resource", "list"])
+@pytest.mark.parametrize("failure", [RuntimeError, AttributeError])
+def test_runtime_failure_aborts_admin_resource_access(env, operation, failure):
+    _scope_two_voices(env)
+    with patch(
+        "app.auth.runtime.get_auth_runtime",
+        side_effect=failure("auth runtime unavailable"),
+    ), pytest.raises(failure, match="auth runtime unavailable"):
+        if operation == "scope":
+            resolve_admin_scope(env["admin"])
+        elif operation == "resource":
+            resolve_resource(
+                env["resources"],
+                env["admin"],
+                ResourceType.CUSTOM_VOICE,
+                "voice-c",
+            )
+        else:
+            list_accessible_resources(
+                env["resources"],
+                env["admin"],
+                ResourceType.CUSTOM_VOICE,
+            )
+
+
+def test_implicit_repository_enforces_admin_scope(env):
+    _scope_two_voices(env)
+    with patch(
+        "app.auth.runtime.get_auth_runtime",
+        return_value=Mock(admin_scopes=env["scopes"]),
+    ):
+        scope = resolve_admin_scope(env["admin"])
+
+    assert scope.allows(ResourceType.CUSTOM_VOICE, "voice-a")
+    assert not scope.allows(ResourceType.CUSTOM_VOICE, "voice-c")
+
+
+def test_explicit_scope_repository_does_not_require_runtime(env):
+    _scope_two_voices(env)
+    with patch(
+        "app.auth.runtime.get_auth_runtime",
+        side_effect=RuntimeError("auth runtime unavailable"),
+    ) as get_runtime:
+        scope = resolve_admin_scope(env["admin"], env["scopes"])
+
+    get_runtime.assert_not_called()
+    assert scope.scoped
+    assert not scope.allows(ResourceType.CUSTOM_VOICE, "voice-c")
+
+
+def test_scope_repository_failure_aborts_access(env):
+    scopes = Mock(spec=AdminScopeRepository)
+    scopes.get.side_effect = RuntimeError("scope database unavailable")
+
+    with pytest.raises(RuntimeError, match="scope database unavailable"):
+        resolve_admin_scope(env["admin"], scopes)
+
+
+def test_root_does_not_require_scope_runtime(env):
+    with patch(
+        "app.auth.runtime.get_auth_runtime",
+        side_effect=RuntimeError("auth runtime unavailable"),
+    ) as get_runtime:
+        scope = resolve_admin_scope(env["root"])
+
+    get_runtime.assert_not_called()
+    assert not scope.scoped
 
 
 def test_admin_without_a_scope_keeps_unrestricted_access(env):
