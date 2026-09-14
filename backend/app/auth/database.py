@@ -238,6 +238,11 @@ _MIGRATIONS = (
         _ADMIN_SCOPE_MIGRATION_NAME,
         _ADMIN_SCOPE_STATEMENTS,
     ),
+    (
+        10,
+        "encrypted_temporary_passwords",
+        ("ALTER TABLE temporary_credentials ADD COLUMN password_ciphertext TEXT",),
+    ),
 )
 
 
@@ -300,6 +305,15 @@ class AuthDatabase:
                 if version in applied_versions:
                     continue
                 for index, statement in enumerate(statements):
+                    if version == 10:
+                        credential_columns = {
+                            row["name"]
+                            for row in connection.execute(
+                                "PRAGMA table_info(temporary_credentials)"
+                            ).fetchall()
+                        }
+                        if "password_ciphertext" in credential_columns:
+                            continue
                     if version == 2 and index == 0:
                         user_columns = {
                             row["name"]

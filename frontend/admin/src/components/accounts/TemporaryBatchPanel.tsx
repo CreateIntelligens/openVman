@@ -33,10 +33,11 @@ function stateLabel(state?: string | null): string {
   }
 }
 
-function batchStateLabel(batch: TemporaryBatchAudit): string {
-  if (batch.revoked_at) return "已撤銷";
-  if (batch.state) return stateLabel(batch.state);
-  return batch.first_used_at ? "使用中" : "尚未啟用";
+type BatchState = NonNullable<TemporaryBatchAudit["state"]>;
+
+function batchState(batch: TemporaryBatchAudit): BatchState {
+  if (batch.revoked_at) return "revoked";
+  return batch.state ?? (batch.first_used_at ? "active" : "unused");
 }
 
 function dateLabel(value?: string | null): string {
@@ -61,7 +62,11 @@ function portalAccessButtonLabel(isUpdating: boolean, hasAccess: boolean): strin
   return hasAccess ? "關閉後台權限" : "開啟後台權限";
 }
 
-export default function TemporaryBatchPanel() {
+export default function TemporaryBatchPanel({
+  view = "create",
+}: {
+  view?: "create" | "manage";
+}) {
   const accessForm = useAccountAccessForm("temporary-account-batch");
   const [batches, setBatches] = useState<TemporaryBatchAudit[]>([]);
   const [result, setResult] = useState<TemporaryBatchResult | null>(null);
@@ -71,6 +76,7 @@ export default function TemporaryBatchPanel() {
   const [updatingPortal, setUpdatingPortal] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | BatchState>("all");
 
   const loadBatches = useCallback(async () => {
     setHistoryLoading(true);
@@ -117,6 +123,9 @@ export default function TemporaryBatchPanel() {
   }
 
   const displayedError = error ?? accessForm.error;
+  const filteredBatches = batches.filter(
+    (batch) => statusFilter === "all" || batchState(batch) === statusFilter,
+  );
 
   async function copy(value: string, key: string) {
     try {
@@ -163,142 +172,203 @@ export default function TemporaryBatchPanel() {
 
   return (
     <section className="card mb-6 overflow-hidden">
-      <header className="flex flex-col gap-3 border-b border-border px-5 py-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="card-title">臨時帳號批次</h2>
-            <span className="chip">每批固定 5 組</span>
+      {view === "create" && (
+        <header className="flex flex-col gap-3 border-b border-border px-5 py-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="card-title">臨時帳號批次</h2>
+              <span className="chip">每批固定 5 組</span>
+            </div>
+            <p className="mt-1 text-sm text-content-muted">
+              密碼在首次登入後啟動 72 小時效期；請先選擇這批帳號可使用的資源。
+            </p>
           </div>
-          <p className="mt-1 text-sm text-content-muted">
-            密碼在首次登入後啟動 72 小時效期；請先選擇這批帳號可使用的資源。
-          </p>
-        </div>
-        <button className="btn btn-ghost self-start" type="button" onClick={reload} disabled={accessForm.loading || historyLoading}>
-          重新整理資源
-        </button>
-      </header>
+          <button className="btn btn-ghost self-start" type="button" onClick={reload} disabled={accessForm.loading || historyLoading}>
+            重新整理資源
+          </button>
+        </header>
+      )}
 
-      {displayedError && (
+      {(view === "create" ? displayedError : error) && (
         <div className="mx-5 mt-5 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
-          {displayedError}
+          {view === "create" ? displayedError : error}
         </div>
       )}
 
-      <AccountAccessFields form={accessForm} />
+      {view === "create" && (
+        <>
+          <AccountAccessFields form={accessForm} />
 
-      <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-content-muted">偏好值不可用時，已自動改用目前授權清單的第一項。</p>
-        <button className="btn btn-primary" type="button" onClick={() => void generateBatch()} disabled={accessForm.loading || submitting || !accessForm.complete}>
-          {submitting ? "產生中…" : "產生 5 組帳號"}
-        </button>
-      </div>
-
-      {result && (
-        <section className="border-t border-border px-5 py-5" aria-labelledby="temporary-result-title">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h3 id="temporary-result-title" className="card-title">本次臨時密碼</h3>
-            </div>
-            <button
-              className="btn btn-ghost self-start"
-              type="button"
-              onClick={() => void copy(
-                result.credentials.map((item) => item.password).join("\n"),
-                "all",
-              )}
-            >
-              {copied === "all" ? "已複製全部" : "複製全部"}
+          <div className="flex flex-col gap-3 border-t border-border bg-surface-sunken px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-content-muted">偏好值不可用時，已自動改用目前授權清單的第一項。</p>
+            <button className="btn btn-primary" type="button" onClick={() => void generateBatch()} disabled={accessForm.loading || submitting || !accessForm.complete}>
+              {submitting ? "產生中…" : "產生 5 組帳號"}
             </button>
           </div>
-          <div className="mt-4 divide-y divide-border border-y border-border">
-            {result.credentials.map((credential, index) => (
-              <div key={credential.user_id} className="grid gap-2 py-3 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-                <span className="text-xs text-content-subtle">{String(index + 1).padStart(2, "0")}</span>
-                <code className="break-all font-mono text-sm">{credential.password}</code>
+
+          {result && (
+            <section className="border-t border-border px-5 py-5" aria-labelledby="temporary-result-title">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h3 id="temporary-result-title" className="card-title">本次臨時密碼</h3>
+                </div>
                 <button
-                  className="btn btn-ghost justify-self-start sm:justify-self-end"
+                  className="btn btn-ghost self-start"
                   type="button"
-                  onClick={() => void copy(credential.password, credential.user_id)}
+                  onClick={() => void copy(
+                    result.credentials.map((item) => item.password).join("\n"),
+                    "all",
+                  )}
                 >
-                  {copied === credential.user_id ? "已複製" : "複製密碼"}
+                  {copied === "all" ? "已複製全部" : "複製全部"}
                 </button>
               </div>
-            ))}
+              <div className="mt-4 divide-y divide-border border-y border-border">
+                {result.credentials.map((credential, index) => (
+                  <div key={credential.user_id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2">
+                    <span className="text-xs text-content-subtle">{String(index + 1).padStart(2, "0")}</span>
+                    <code className="min-w-0 break-all font-mono text-sm">{credential.password}</code>
+                    <button
+                      className="btn btn-ghost justify-self-end"
+                      type="button"
+                      onClick={() => void copy(credential.password, credential.user_id)}
+                    >
+                      {copied === credential.user_id ? "已複製" : "複製密碼"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {view === "manage" && (
+        <section aria-labelledby="temporary-history-title">
+          <div className="flex flex-wrap items-end justify-between gap-4 px-5 py-4">
+            <div>
+              <h2 id="temporary-history-title" className="card-title">批次紀錄</h2>
+              <p className="mt-1 text-xs text-content-muted">
+                依整批狀態查詢；每組帳號的個別狀態顯示於紀錄內。
+              </p>
+            </div>
+            <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto">
+              <label className="flex-1 text-sm font-medium sm:flex-none">
+                批次狀態
+                <select
+                  className="input mt-2"
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as "all" | BatchState)}
+                  disabled={historyLoading}
+                >
+                  <option value="all">全部狀態</option>
+                  <option value="unused">尚未啟用</option>
+                  <option value="active">使用中</option>
+                  <option value="expired">已到期</option>
+                  <option value="revoked">已撤銷</option>
+                </select>
+              </label>
+              <button className="btn btn-ghost" type="button" onClick={() => void loadBatches()} disabled={historyLoading}>
+                重新整理紀錄
+              </button>
+            </div>
+          </div>
+          <p className="px-5 pb-4 text-xs text-content-muted" role="status">
+            {historyLoading ? "載入批次紀錄中…" : `顯示 ${filteredBatches.length} / ${batches.length} 批`}
+          </p>
+          <div className="divide-y divide-border border-t border-border">
+            {!historyLoading && filteredBatches.map((batch) => {
+              const revoked = batchState(batch) === "revoked";
+              return (
+                <article key={batch.batch_id} className="px-5 py-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-sm">建立於 {dateLabel(batch.created_at)}</span>
+                        <span className="chip">{stateLabel(batchState(batch))}</span>
+                        <span className="chip">
+                          {batch.admin_portal_access ? "可進管理後台" : "不可進管理後台"}
+                        </span>
+                        <span className="text-xs text-content-subtle">{batch.account_count ?? 5} 組</span>
+                      </div>
+                      {batch.expires_at && (
+                        <p className="mt-1 text-xs text-content-muted">
+                          到期 {dateLabel(batch.expires_at)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2 self-start md:self-auto">
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        disabled={revoked || updatingPortal === batch.batch_id}
+                        onClick={() => void updatePortalAccess(batch)}
+                      >
+                        {portalAccessButtonLabel(
+                          updatingPortal === batch.batch_id,
+                          batch.admin_portal_access ?? false,
+                        )}
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        type="button"
+                        disabled={revoked || revoking === batch.batch_id}
+                        onClick={() => {
+                          if (!window.confirm("確定撤銷這一批臨時帳號的剩餘存取權？")) return;
+                          void revoke(batch.batch_id);
+                        }}
+                      >
+                        {revokeButtonLabel(revoking === batch.batch_id, revoked)}
+                      </button>
+                    </div>
+                  </div>
+                  {batch.accounts && batch.accounts.length > 0 && (
+                    <div className="mt-3 divide-y divide-border border-y border-border">
+                      {batch.accounts.map((account, index) => {
+                        const password = account.password ?? result?.credentials.find(
+                          (credential) => credential.user_id === account.user_id,
+                        )?.password;
+                        return (
+                          <div key={account.user_id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 text-xs">
+                            <span className="text-content-subtle">{String(index + 1).padStart(2, "0")}</span>
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                              {password ? (
+                                <code className="min-w-0 break-all font-mono text-sm">{password}</code>
+                              ) : (
+                                <span className="text-content-muted">密碼未保存</span>
+                              )}
+                              <span className="flex flex-wrap items-center gap-2">
+                                <span className="chip">{stateLabel(account.state)}</span>
+                                <span className="text-content-subtle">{remainingLabel(account.remaining_seconds)}</span>
+                              </span>
+                            </div>
+                            <button
+                              className="btn btn-ghost justify-self-end"
+                              type="button"
+                              disabled={!password}
+                              onClick={() => {
+                                if (password) void copy(password, account.user_id);
+                              }}
+                            >
+                              {copied === account.user_id ? "已複製" : "複製密碼"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+            {!historyLoading && batches.length === 0 && (
+              <p className="px-5 py-6 text-center text-sm text-content-muted">尚無臨時帳號批次</p>
+            )}
+            {!historyLoading && batches.length > 0 && filteredBatches.length === 0 && (
+              <p className="px-5 py-6 text-center text-sm text-content-muted">沒有符合此狀態的批次紀錄</p>
+            )}
           </div>
         </section>
       )}
-
-      <section className="border-t border-border" aria-labelledby="temporary-history-title">
-        <div className="px-5 py-4">
-          <h3 id="temporary-history-title" className="card-title">批次紀錄</h3>
-        </div>
-        <div className="divide-y divide-border border-t border-border">
-          {batches.map((batch) => {
-            const revoked = Boolean(batch.revoked_at || batch.state === "revoked");
-            return (
-              <article key={batch.batch_id} className="px-5 py-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-sm">建立於 {dateLabel(batch.created_at)}</span>
-                      <span className="chip">{batchStateLabel(batch)}</span>
-                      <span className="chip">
-                        {batch.admin_portal_access ? "可進管理後台" : "不可進管理後台"}
-                      </span>
-                      <span className="text-xs text-content-subtle">{batch.account_count ?? 5} 組</span>
-                    </div>
-                    {batch.expires_at && (
-                      <p className="mt-1 text-xs text-content-muted">
-                        到期 {dateLabel(batch.expires_at)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2 self-start md:self-auto">
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      disabled={revoked || updatingPortal === batch.batch_id}
-                      onClick={() => void updatePortalAccess(batch)}
-                    >
-                      {portalAccessButtonLabel(
-                        updatingPortal === batch.batch_id,
-                        batch.admin_portal_access ?? false,
-                      )}
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      type="button"
-                      disabled={revoked || revoking === batch.batch_id}
-                      onClick={() => {
-                        if (!window.confirm("確定撤銷這一批臨時帳號的剩餘存取權？")) return;
-                        void revoke(batch.batch_id);
-                      }}
-                    >
-                      {revokeButtonLabel(revoking === batch.batch_id, revoked)}
-                    </button>
-                  </div>
-                </div>
-                {batch.accounts && batch.accounts.length > 0 && (
-                  <div className="mt-3 grid gap-x-5 gap-y-2 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">
-                    {batch.accounts.map((account) => (
-                      <div key={account.user_id} className="flex min-w-0 items-center justify-between gap-3 text-xs">
-                        <span className="min-w-0">
-                          <code className="block truncate font-mono text-content-muted">{account.username}</code>
-                          <span className="block text-content-subtle">{remainingLabel(account.remaining_seconds)}</span>
-                        </span>
-                        <span className="chip shrink-0">{stateLabel(account.state)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-            );
-          })}
-          {!historyLoading && batches.length === 0 && (
-            <p className="px-5 py-6 text-center text-sm text-content-muted">尚無臨時帳號批次</p>
-          )}
-        </div>
-      </section>
     </section>
   );
 }

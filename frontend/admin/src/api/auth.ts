@@ -190,6 +190,7 @@ export interface TemporaryBatchAudit {
 export interface TemporaryAccountAudit {
   user_id: string;
   username: string;
+  password?: string | null;
   state: "unused" | "active" | "expired" | "revoked";
   disabled: boolean;
   first_used_at: string | null;

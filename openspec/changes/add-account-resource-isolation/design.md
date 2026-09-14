@@ -72,7 +72,7 @@ Backend 轉送 Brain 前 SHALL 移除外部提供的 `X-OpenVMan-*` 身分 heade
 
 刪除帳號前若仍有 private resources SHALL 回 409，要求先刪除或轉移；一般停用不刪資料。Admin 不得停用或刪除自己，且系統不得移除最後一位啟用中的 admin。
 
-Admin 帳號頁另提供臨時帳號批次建立。每次 request 固定建立 5 個 `account_type=temporary` 帳號並套用同一組 resource grants。臨時密碼是隨機 12 碼英數字元，前 4 碼同時作為非祕密 locator；資料庫只保存完整密碼的 bcrypt hash。五組明文只在成功建立 response 顯示一次，不寫 log，也不提供取回 API。
+Admin 帳號頁另提供臨時帳號批次建立。每次 request 固定建立 5 個 `account_type=temporary` 帳號並套用同一組 resource grants。臨時密碼是隨機 20 碼英數字元，前 12 碼作為私有 locator；資料庫保存完整密碼的 bcrypt hash，migration 10 另保存綁定 locator 的 Fernet 密文。ROOT／admin 可從批次紀錄取回原登入密碼；相關 response 設定 no-store，不寫明碼到 log、audit 或瀏覽器持久儲存。舊批次無密文時回傳 null，不更改原密碼或登入狀態。加密祕密使用 AUTH_TEMPORARY_PASSWORD_SECRET，未設時以 SESSION_JWT_SECRET 派生；詳見 docs/account-administration.md。
 
 `POST /api/auth/temporary-login` 只接受 `password`。Backend 先用 locator 定位候選 row，再以 bcrypt 驗證完整密碼；第一次成功登入在同一 write transaction 寫入 `first_used_at` 與 `expires_at=first_used_at+72h`。之後重複登入不延長期限。Login 與 `/me` 回傳 `expires_at`、`remaining_seconds`，前端在登入完成時明確提醒剩餘時間。
 

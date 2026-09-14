@@ -225,6 +225,11 @@ class TTSRouterConfig(BaseSettings):
 
     # --- Authentication ---
     session_jwt_secret: str = Field(default="", validation_alias="SESSION_JWT_SECRET")
+    auth_temporary_password_secret: str = Field(
+        default="",
+        repr=False,
+        validation_alias="AUTH_TEMPORARY_PASSWORD_SECRET",
+    )
     auth_database_path: str = Field(
         default="/data/auth/accounts.db",
         validation_alias="AUTH_DATABASE_PATH",

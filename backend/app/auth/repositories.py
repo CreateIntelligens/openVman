@@ -8,7 +8,7 @@ import secrets
 import sqlite3
 import unicodedata
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -95,6 +95,7 @@ class InvalidResourceGrantError(RepositoryError):
 class TemporaryCredentialCreate:
     locator: str
     password_hash: str
+    password_ciphertext: str | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +191,7 @@ def _temporary_credential_from_row(
         first_used_at=row["first_used_at"],
         expires_at=row["expires_at"],
         duration_seconds=int(row["duration_seconds"]),
+        password_ciphertext=row["password_ciphertext"],
     )
 
 
@@ -1708,14 +1710,15 @@ class TemporaryAccountRepository:
                         """
                         INSERT INTO temporary_credentials(
                             user_id, batch_id, code_locator, first_used_at,
-                            expires_at, duration_seconds
-                        ) VALUES (?, ?, ?, NULL, NULL, ?)
+                            expires_at, duration_seconds, password_ciphertext
+                        ) VALUES (?, ?, ?, NULL, NULL, ?, ?)
                         """,
                         (
                             user_id,
                             batch_id,
                             credential.locator,
                             duration_seconds,
+                            credential.password_ciphertext,
                         ),
                     )
                     _persist_account_access(
@@ -1759,7 +1762,8 @@ class TemporaryAccountRepository:
                        temporary_credentials.code_locator,
                        temporary_credentials.first_used_at,
                        temporary_credentials.expires_at,
-                       temporary_credentials.duration_seconds
+                       temporary_credentials.duration_seconds,
+                       temporary_credentials.password_ciphertext
                 FROM temporary_credentials
                 INNER JOIN users ON users.id = temporary_credentials.user_id
                 WHERE temporary_credentials.code_locator = ?
@@ -1796,7 +1800,8 @@ class TemporaryAccountRepository:
                        temporary_credentials.code_locator,
                        temporary_credentials.first_used_at,
                        temporary_credentials.expires_at,
-                       temporary_credentials.duration_seconds
+                       temporary_credentials.duration_seconds,
+                       temporary_credentials.password_ciphertext
                 FROM temporary_credentials
                 INNER JOIN users ON users.id = temporary_credentials.user_id
                 WHERE temporary_credentials.user_id = ?
@@ -1835,7 +1840,8 @@ class TemporaryAccountRepository:
                            temporary_credentials.code_locator,
                            temporary_credentials.first_used_at,
                            temporary_credentials.expires_at,
-                           temporary_credentials.duration_seconds
+                           temporary_credentials.duration_seconds,
+                           temporary_credentials.password_ciphertext
                     FROM temporary_credentials
                     INNER JOIN users ON users.id = temporary_credentials.user_id
                     WHERE temporary_credentials.user_id = ?
@@ -1867,7 +1873,8 @@ class TemporaryAccountRepository:
                        temporary_credentials.code_locator,
                        temporary_credentials.first_used_at,
                        temporary_credentials.expires_at,
-                       temporary_credentials.duration_seconds
+                       temporary_credentials.duration_seconds,
+                       temporary_credentials.password_ciphertext
                 FROM temporary_credentials
                 INNER JOIN users ON users.id = temporary_credentials.user_id
                 WHERE temporary_credentials.batch_id = ?

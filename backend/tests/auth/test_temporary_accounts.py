@@ -116,9 +116,10 @@ def _batch_body() -> dict[str, object]:
     }
 
 
-def test_batch_creates_exactly_five_one_time_plaintext_passwords(
+def test_batch_creates_five_recoverable_passwords_without_storage_leaks(
     client: TestClient,
     runtime: AuthRuntime,
+    caplog: pytest.LogCaptureFixture,
 ):
     _bootstrap(runtime)
     response = client.post(
@@ -128,6 +129,7 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
     )
 
     assert response.status_code == 201
+    assert response.headers["cache-control"] == "no-store"
     payload = response.json()
     credentials = payload["credentials"]
     assert len(credentials) == 5
@@ -144,26 +146,39 @@ def test_batch_creates_exactly_five_one_time_plaintext_passwords(
         rows = connection.execute(
             """
             SELECT users.username, users.password_hash,
-                   temporary_credentials.code_locator
+                   temporary_credentials.code_locator,
+                   temporary_credentials.password_ciphertext
             FROM temporary_credentials
             INNER JOIN users ON users.id = temporary_credentials.user_id
             """
         ).fetchall()
+        database_dump = "\n".join(connection.iterdump())
     assert len(rows) == 5
     locators = {password[:12] for password in passwords}
     assert {row["code_locator"] for row in rows} == locators
     assert all(row["username"] not in passwords for row in rows)
     assert all(row["username"] not in locators for row in rows)
+    assert all(row["password_hash"].startswith("$2") for row in rows)
+    assert all(row["password_ciphertext"] for row in rows)
+    assert all(password not in database_dump for password in passwords)
 
     audit = client.get(
         "/api/v1/temporary-accounts/batches",
         headers=_admin_headers(client),
     )
     assert audit.status_code == 200
-    audit_text = audit.text
-    assert "password_hash" not in audit_text
-    assert all(password not in audit_text for password in passwords)
-    assert all(locator not in audit_text for locator in locators)
+    assert audit.headers["cache-control"] == "no-store"
+    assert {
+        account["user_id"]: account["password"]
+        for account in audit.json()[0]["accounts"]
+    } == {item["user_id"]: item["password"] for item in credentials}
+    for field in ("password_hash", "password_ciphertext", "code_locator"):
+        assert field not in response.text
+        assert field not in audit.text
+    for row in rows:
+        assert row["password_hash"] not in audit.text
+        assert row["password_ciphertext"] not in audit.text
+    assert all(password not in caplog.text for password in passwords)
 
 
 def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
@@ -202,6 +217,7 @@ def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
         json={"enabled": True},
     )
     assert granted.status_code == 200
+    assert granted.headers["cache-control"] == "no-store"
     assert granted.json()["admin_portal_access"] is True
     assert all(
         account["admin_portal_access"] is True
@@ -241,7 +257,7 @@ def test_temporary_batch_admin_portal_access_is_explicit_and_revocable(
 
 
 @pytest.mark.parametrize("actor_role", [AccountRole.ROOT, AccountRole.ADMIN])
-def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
+def test_root_and_admin_recover_passwords_without_audit_or_storage_leaks(
     client: TestClient,
     runtime: AuthRuntime,
     actor_role: AccountRole,
@@ -294,10 +310,12 @@ def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
     listed = client.get("/api/v1/temporary-accounts/batches", headers=headers)
     assert listed.status_code == 200
     listed_text = listed.text
-    assert "password" not in listed_text.casefold()
-    assert "hash" not in listed_text.casefold()
-    assert all(secret not in listed_text for secret in plaintext_credentials)
-    assert all(locator not in listed_text for locator in persisted_locators)
+    assert listed.headers["cache-control"] == "no-store"
+    assert {
+        account["password"] for account in listed.json()[0]["accounts"]
+    } == plaintext_credentials
+    for field in ("password_hash", "password_ciphertext", "code_locator"):
+        assert field not in listed_text
 
     revoked = client.post(
         f"/api/v1/temporary-accounts/batches/{created['batch_id']}/revoke",
@@ -305,9 +323,9 @@ def test_root_and_admin_batch_audit_and_revoke_never_reveal_credentials(
     )
     assert revoked.status_code == 200
     assert revoked.json()["state"] == "revoked"
-    assert "password" not in revoked.text.casefold()
-    assert all(secret not in revoked.text for secret in plaintext_credentials)
-    assert all(locator not in revoked.text for locator in persisted_locators)
+    assert revoked.headers["cache-control"] == "no-store"
+    for field in ("password_hash", "password_ciphertext", "code_locator"):
+        assert field not in revoked.text
 
     events = runtime.auth_audit.list()
     assert [event.action for event in events[-2:]] == [
@@ -467,6 +485,9 @@ def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
             """,
             (batch.batch.id,),
         )
+        connection.execute(
+            "ALTER TABLE temporary_credentials DROP COLUMN password_ciphertext",
+        )
         connection.execute("DELETE FROM schema_migrations WHERE version >= 5")
 
     runtime.database.initialize()
@@ -492,8 +513,16 @@ def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
     assert all(row["username"] != row["code_locator"] for row in rows)
     assert all(row["username_normalized"] != row["code_locator"] for row in rows)
     # 測試刻意移除舊的遷移紀錄再重跑，所以會補回 v6 與後續 migration。
-    assert [row["version"] for row in versions] == [1, 2, 3, 4, 6, 7, 8, 9]
+    assert [row["version"] for row in versions] == [1, 2, 3, 4, 6, 7, 8, 9, 10]
     assert violations == []
+    listed = client.get(
+        "/api/v1/temporary-accounts/batches", headers=_admin_headers(client),
+    )
+    assert listed.status_code == 200
+    assert all(
+        account["password"] is None
+        for account in listed.json()[0]["accounts"]
+    )
 
     login = client.post(
         "/api/v1/auth/temporary-login",
@@ -601,3 +630,146 @@ def test_temporary_resource_list_contains_only_explicit_grants(
         )
     }
     assert project_ids == {"proj-b85afb8bb6"}
+
+
+@pytest.mark.parametrize("dedicated_secret", [None, "dedicated-key-" * 4])
+def test_passwords_survive_a_fresh_runtime(
+    runtime: AuthRuntime,
+    dedicated_secret: str | None,
+):
+    config = runtime.config.model_copy(
+        update={"auth_temporary_password_secret": dedicated_secret},
+    )
+    original_runtime = build_auth_runtime(config)
+    _bootstrap(original_runtime)
+    app = FastAPI()
+    app.include_router(auth_router)
+    app.include_router(temporary_accounts_router)
+    app.dependency_overrides[get_auth_runtime] = lambda: original_runtime
+    with TestClient(app) as original_client:
+        created = original_client.post(
+            "/api/v1/temporary-accounts/batches",
+            headers=_admin_headers(original_client),
+            json=_batch_body(),
+        )
+        assert created.status_code == 201
+        expected = {
+            item["user_id"]: item["password"]
+            for item in created.json()["credentials"]
+        }
+
+    # 專用金鑰存在時，輪替 session 金鑰不應使已存密碼失效。
+    if dedicated_secret is not None:
+        config = config.model_copy(
+            update={"session_jwt_secret": "new-session-signing-key-" * 3},
+        )
+    restarted_runtime = build_auth_runtime(config)
+    app.dependency_overrides[get_auth_runtime] = lambda: restarted_runtime
+    with TestClient(app) as restarted_client:
+        listed = restarted_client.get(
+            "/api/v1/temporary-accounts/batches",
+            headers=_admin_headers(restarted_client),
+        )
+        assert listed.status_code == 200
+        assert listed.headers["cache-control"] == "no-store"
+        assert {
+            item["user_id"]: item["password"]
+            for item in listed.json()[0]["accounts"]
+        } == expected
+        password = next(iter(expected.values()))
+        assert restarted_client.post(
+            "/api/v1/auth/temporary-login", json={"password": password},
+        ).status_code == 200
+
+
+@pytest.mark.parametrize("failure", ["legacy-null", "corrupt", "wrong-key"])
+def test_unrecoverable_password_is_null_and_does_not_break_login(
+    client: TestClient,
+    runtime: AuthRuntime,
+    failure: str,
+    caplog: pytest.LogCaptureFixture,
+):
+    _bootstrap(runtime)
+    headers = _admin_headers(client)
+    created = client.post(
+        "/api/v1/temporary-accounts/batches",
+        headers=headers,
+        json=_batch_body(),
+    ).json()
+    credential = created["credentials"][0]
+    if failure == "wrong-key":
+        runtime = build_auth_runtime(
+            runtime.config.model_copy(
+                update={"auth_temporary_password_secret": "other-key-" * 5},
+            ),
+        )
+        client.app.dependency_overrides[get_auth_runtime] = lambda: runtime
+    else:
+        with runtime.database.transaction(write=True) as connection:
+            connection.execute(
+                """
+                UPDATE temporary_credentials SET password_ciphertext = ?
+                WHERE user_id = ?
+                """,
+                (
+                    None if failure == "legacy-null" else "invalid-ciphertext",
+                    credential["user_id"],
+                ),
+            )
+
+    listed = client.get("/api/v1/temporary-accounts/batches", headers=headers)
+    assert listed.status_code == 200
+    account = next(
+        item for item in listed.json()[0]["accounts"]
+        if item["user_id"] == credential["user_id"]
+    )
+    assert "password" in account
+    assert account["password"] is None
+    assert client.post(
+        "/api/v1/auth/temporary-login",
+        json={"password": credential["password"]},
+    ).status_code == 200
+    assert credential["password"] not in caplog.text
+
+
+@pytest.mark.parametrize("actor", ["anonymous", "user", "temporary"])
+def test_batch_passwords_require_admin_even_with_portal_access(
+    client: TestClient,
+    runtime: AuthRuntime,
+    actor: str,
+):
+    _bootstrap(runtime)
+    created = client.post(
+        "/api/v1/temporary-accounts/batches",
+        headers=_admin_headers(client),
+        json={**_batch_body(), "admin_portal_access": True},
+    ).json()
+    passwords = [item["password"] for item in created["credentials"]]
+    client.cookies.clear()
+    headers = {}
+    if actor == "user":
+        runtime.users.create(
+            username="portal-user",
+            password_hash=hash_password("portal-user-password"),
+            role=AccountRole.USER,
+            admin_portal_access=True,
+        )
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"username": "portal-user", "password": "portal-user-password"},
+        )
+    elif actor == "temporary":
+        login = client.post(
+            "/api/v1/auth/admin-temporary-login",
+            json={"password": passwords[0]},
+        )
+    if actor != "anonymous":
+        assert login.status_code == 200
+        headers = {"Authorization": f"Bearer {login.json()['token']}"}
+        assert client.get(
+            "/api/v1/auth/admin-me", headers=headers,
+        ).status_code == 200
+
+    denied = client.get("/api/v1/temporary-accounts/batches", headers=headers)
+    assert denied.status_code == (401 if actor == "anonymous" else 403)
+    assert all(password not in denied.text for password in passwords)
