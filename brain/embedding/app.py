@@ -84,6 +84,9 @@ VOYAGE_MODEL = os.getenv("EMBEDDING_VOYAGE_MODEL", "voyage-3-large")
 VOYAGE_DIMENSIONS = int(os.getenv("EMBEDDING_VOYAGE_DIMENSIONS", "1024"))
 VOYAGE_BASE_URL = os.getenv("EMBEDDING_VOYAGE_BASE_URL", "https://api.voyageai.com/v1")
 PROVIDER_TIMEOUT = float(os.getenv("EMBEDDING_PROVIDER_TIMEOUT", "30.0"))
+EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "3"))
+EMBEDDING_RETRY_BASE_DELAY = float(os.getenv("EMBEDDING_RETRY_BASE_DELAY", "0.25"))
+EMBEDDING_RETRY_MAX_DELAY = float(os.getenv("EMBEDDING_RETRY_MAX_DELAY", "8.0"))
 
 raw_order = os.getenv("EMBEDDING_PROVIDER_FALLBACKS", "bge,gemini,openai,voyage")
 FALLBACK_ORDER = [p.strip().lower() for p in raw_order.split(",") if p.strip()]
@@ -120,6 +123,9 @@ def _get_registry() -> ProviderRegistry:
                 dimensions=GEMINI_DIMENSIONS,
                 base_url=GEMINI_BASE_URL,
                 timeout=PROVIDER_TIMEOUT,
+                max_retries=EMBEDDING_MAX_RETRIES,
+                base_delay=EMBEDDING_RETRY_BASE_DELAY,
+                max_delay=EMBEDDING_RETRY_MAX_DELAY,
             ),
         )
         # Register OpenAI
@@ -131,6 +137,9 @@ def _get_registry() -> ProviderRegistry:
                 dimensions=OPENAI_DIMENSIONS,
                 base_url=OPENAI_BASE_URL,
                 timeout=PROVIDER_TIMEOUT,
+                max_retries=EMBEDDING_MAX_RETRIES,
+                base_delay=EMBEDDING_RETRY_BASE_DELAY,
+                max_delay=EMBEDDING_RETRY_MAX_DELAY,
             ),
         )
         # Register Voyage
@@ -142,6 +151,9 @@ def _get_registry() -> ProviderRegistry:
                 dimensions=VOYAGE_DIMENSIONS,
                 base_url=VOYAGE_BASE_URL,
                 timeout=PROVIDER_TIMEOUT,
+                max_retries=EMBEDDING_MAX_RETRIES,
+                base_delay=EMBEDDING_RETRY_BASE_DELAY,
+                max_delay=EMBEDDING_RETRY_MAX_DELAY,
             ),
         )
         _registry = reg

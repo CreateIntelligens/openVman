@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import logging
+import random
 from threading import Lock
+import time
 from typing import Any, Protocol
 
 import httpx
@@ -11,6 +15,28 @@ import httpx
 from config import EmbeddingBackend, get_settings
 
 logger = logging.getLogger("brain.memory.embedder")
+
+
+def _parse_retry_after(retry_after_val: str | None, max_delay: float) -> float | None:
+    if not retry_after_val:
+        return None
+    val = retry_after_val.strip()
+    try:
+        delay = float(val)
+        if delay >= 0:
+            return min(delay, max_delay)
+    except ValueError:
+        pass
+    try:
+        dt = parsedate_to_datetime(val)
+        if dt is not None:
+            now = datetime.now(timezone.utc)
+            delay = (dt - now).total_seconds()
+            if delay > 0:
+                return min(delay, max_delay)
+    except Exception:
+        pass
+    return None
 
 
 class TextEmbedder(Protocol):
@@ -176,6 +202,9 @@ def _build_embedder(backend: EmbeddingBackend) -> TextEmbedder:
         expected_model=cfg.embedding_expected_model,
         expected_dimension=cfg.embedding_expected_dimension,
         version=backend.version,
+        max_retries=cfg.embedding_service_max_retries,
+        retry_base_delay=cfg.embedding_service_retry_base_delay,
+        retry_max_delay=cfg.embedding_service_retry_max_delay,
     )
 
 
@@ -191,6 +220,9 @@ class GatewayRemoteTextEmbedder:
         expected_model: str = "BAAI/bge-m3",
         expected_dimension: int = 1024,
         version: str = "bge",
+        max_retries: int = 3,
+        retry_base_delay: float = 0.25,
+        retry_max_delay: float = 8.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key.strip()
@@ -199,6 +231,9 @@ class GatewayRemoteTextEmbedder:
         self.expected_model = expected_model
         self.expected_dimension = expected_dimension
         self.version = version
+        self.max_retries = max(0, max_retries)
+        self.retry_base_delay = max(0.05, retry_base_delay)
+        self.retry_max_delay = max(self.retry_base_delay, retry_max_delay)
         self._client: httpx.Client | None = None
         self._lock = Lock()
 
@@ -216,6 +251,66 @@ class GatewayRemoteTextEmbedder:
                     timeout=self.timeout,
                 )
             return self._client
+
+    def _post_chunk_with_retry(
+        self,
+        client: httpx.Client,
+        payload: dict[str, Any],
+        chunk_idx: int,
+        chunk_len: int,
+    ) -> dict[str, Any]:
+        retryable_statuses = frozenset({429, 500, 502, 503, 504})
+        last_exc: Exception | None = None
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                resp = client.post("/embed", json=payload)
+                status_code = getattr(resp, "status_code", 200)
+                if status_code in retryable_statuses and attempt < self.max_retries:
+                    retry_headers = getattr(resp, "headers", {})
+                    retry_after = _parse_retry_after(retry_headers.get("retry-after"), self.retry_max_delay)
+                    if retry_after is not None:
+                        delay = retry_after
+                    else:
+                        delay = min(
+                            self.retry_base_delay * (2 ** attempt) + random.uniform(0.1, 0.4),
+                            self.retry_max_delay,
+                        )
+                    logger.warning(
+                        "Embedding gateway returned %d on chunk %d (len %d), retrying in %.2fs (attempt %d/%d)...",
+                        status_code,
+                        chunk_idx,
+                        chunk_len,
+                        delay,
+                        attempt + 1,
+                        self.max_retries,
+                    )
+                    time.sleep(delay)
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                last_exc = exc
+                if attempt < self.max_retries:
+                    delay = min(
+                        self.retry_base_delay * (2 ** attempt) + random.uniform(0.1, 0.4),
+                        self.retry_max_delay,
+                    )
+                    logger.warning(
+                        "Embedding gateway network/timeout error on chunk %d (%s), retrying in %.2fs (attempt %d/%d)...",
+                        chunk_idx,
+                        type(exc).__name__,
+                        delay,
+                        attempt + 1,
+                        self.max_retries,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
+
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError(f"Embedding gateway chunk {chunk_idx} exhausted retries")
 
     def encode(
         self,
@@ -264,9 +359,7 @@ class GatewayRemoteTextEmbedder:
                 payload["acceptable_identities"] = acceptable_identities
 
             try:
-                resp = client.post("/embed", json=payload)
-                resp.raise_for_status()
-                data = resp.json()
+                data = self._post_chunk_with_retry(client, payload, i // self.chunk_size, len(chunk))
             except Exception as exc:
                 logger.error("Failed chunk embed request (range %d-%d): %s", i, i + len(chunk), exc)
                 raise RuntimeError(f"Embedding gateway call failed: {exc}")

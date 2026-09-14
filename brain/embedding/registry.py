@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import logging
 import math
 import os
+import random
 import time
 from typing import Any, Sequence
 from urllib.parse import urlparse, urlunparse
@@ -42,6 +45,88 @@ def _l2_normalize(vectors: Sequence[Sequence[float]]) -> list[list[float]]:
         else:
             normalized_vectors.append([float(x) for x in vec])
     return normalized_vectors
+
+
+def _parse_retry_after(retry_after_val: str | None, max_delay: float) -> float | None:
+    if not retry_after_val:
+        return None
+    val = retry_after_val.strip()
+    try:
+        delay = float(val)
+        if delay >= 0:
+            return min(delay, max_delay)
+    except ValueError:
+        pass
+    try:
+        dt = parsedate_to_datetime(val)
+        if dt is not None:
+            now = datetime.now(timezone.utc)
+            delay = (dt - now).total_seconds()
+            if delay > 0:
+                return min(delay, max_delay)
+    except Exception:
+        pass
+    return None
+
+
+RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+
+async def _post_with_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    json: Any,
+    headers: dict[str, str],
+    max_retries: int = 3,
+    base_delay: float = 0.25,
+    max_delay: float = 8.0,
+) -> httpx.Response:
+    """Execute an HTTP POST with exponential backoff and jitter for transient errors (429, 5xx, network errors)."""
+    last_exc: Exception | None = None
+    for attempt in range(max_retries + 1):
+        try:
+            resp = await client.post(url, json=json, headers=headers)
+            status_code = getattr(resp, "status_code", 200)
+            if status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
+                retry_headers = getattr(resp, "headers", {})
+                retry_after = _parse_retry_after(retry_headers.get("retry-after"), max_delay)
+                if retry_after is not None:
+                    delay = retry_after
+                else:
+                    delay = min(base_delay * (2 ** attempt) + random.uniform(0.1, 0.4), max_delay)
+                sanitized_url = _sanitize_url(url)
+                logger.warning(
+                    "Embedding HTTP call to %s returned %d, retrying in %.2fs (attempt %d/%d)...",
+                    sanitized_url,
+                    status_code,
+                    delay,
+                    attempt + 1,
+                    max_retries,
+                )
+                await asyncio.sleep(delay)
+                continue
+            resp.raise_for_status()
+            return resp
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            last_exc = exc
+            if attempt < max_retries:
+                delay = min(base_delay * (2 ** attempt) + random.uniform(0.1, 0.4), max_delay)
+                sanitized_url = _sanitize_url(url)
+                logger.warning(
+                    "Embedding network/timeout error calling %s (%s), retrying in %.2fs (attempt %d/%d)...",
+                    sanitized_url,
+                    type(exc).__name__,
+                    delay,
+                    attempt + 1,
+                    max_retries,
+                )
+                await asyncio.sleep(delay)
+                continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"Request to {url} exhausted retries")
 
 
 class BgeLocalProvider:
@@ -175,18 +260,46 @@ class BgeLocalProvider:
         loop = asyncio.get_running_loop()
 
         def _do_encode() -> list[list[float]]:
-            if hasattr(model, "encode_dense"):
-                raw = model.encode_dense(
-                    texts,
-                    batch_size=self.batch_size,
-                    max_length=self.max_length,
-                )
-            else:
-                raw = model.encode(
-                    texts,
-                    batch_size=self.batch_size,
-                    max_length=self.max_length,
-                )
+            try:
+                if hasattr(model, "encode_dense"):
+                    raw = model.encode_dense(
+                        texts,
+                        batch_size=self.batch_size,
+                        max_length=self.max_length,
+                    )
+                else:
+                    raw = model.encode(
+                        texts,
+                        batch_size=self.batch_size,
+                        max_length=self.max_length,
+                    )
+            except Exception as e:
+                is_oom = "out of memory" in str(e).lower() or e.__class__.__name__ == "OutOfMemoryError"
+                if is_oom and len(texts) > 1:
+                    logger.warning(
+                        "BGE local provider hit CUDA OOM with batch_size=%d (texts=%d), clearing CUDA cache and retrying with batch_size=1...",
+                        self.batch_size,
+                        len(texts),
+                    )
+                    try:
+                        import torch
+                        torch.cuda.empty_cache()
+                    except Exception:
+                        pass
+                    if hasattr(model, "encode_dense"):
+                        raw = model.encode_dense(
+                            texts,
+                            batch_size=1,
+                            max_length=self.max_length,
+                        )
+                    else:
+                        raw = model.encode(
+                            texts,
+                            batch_size=1,
+                            max_length=self.max_length,
+                        )
+                else:
+                    raise
             if isinstance(raw, dict):
                 raw = raw.get("dense_vecs", raw)
             if hasattr(raw, "tolist"):
@@ -217,6 +330,9 @@ class GeminiApiProvider:
         model_revision: str = "provider-managed",
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
         timeout: float = 30.0,
+        max_retries: int = 3,
+        base_delay: float = 0.25,
+        max_delay: float = 8.0,
     ) -> None:
         self.api_key = (api_key or "").strip()
         self.model = model.strip()
@@ -224,6 +340,9 @@ class GeminiApiProvider:
         self.model_revision = model_revision
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.max_retries = max(0, max_retries)
+        self.base_delay = max(0.05, base_delay)
+        self.max_delay = max(self.base_delay, max_delay)
         self._client: httpx.AsyncClient | None = None
         self._is_ready = False
 
@@ -255,7 +374,7 @@ class GeminiApiProvider:
         )
 
     def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
+        if self._client is None or getattr(self._client, "is_closed", False):
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
@@ -299,8 +418,15 @@ class GeminiApiProvider:
         }
 
         try:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
+            resp = await _post_with_retry(
+                client,
+                url,
+                json=payload,
+                headers=headers,
+                max_retries=self.max_retries,
+                base_delay=self.base_delay,
+                max_delay=self.max_delay,
+            )
             data = resp.json()
             raw_embeddings = data.get("embeddings", [])
             vectors = [item.get("values", []) for item in raw_embeddings]
@@ -338,6 +464,9 @@ class OpenAiApiProvider:
         model_revision: str = "provider-managed",
         base_url: str = "https://api.openai.com/v1",
         timeout: float = 30.0,
+        max_retries: int = 3,
+        base_delay: float = 0.25,
+        max_delay: float = 8.0,
     ) -> None:
         self.api_key = (api_key or "").strip()
         self.model = model.strip()
@@ -345,6 +474,9 @@ class OpenAiApiProvider:
         self.model_revision = model_revision
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.max_retries = max(0, max_retries)
+        self.base_delay = max(0.05, base_delay)
+        self.max_delay = max(self.base_delay, max_delay)
         self._client: httpx.AsyncClient | None = None
         self._is_ready = False
 
@@ -376,7 +508,7 @@ class OpenAiApiProvider:
         )
 
     def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
+        if self._client is None or getattr(self._client, "is_closed", False):
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
@@ -413,8 +545,15 @@ class OpenAiApiProvider:
         }
 
         try:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
+            resp = await _post_with_retry(
+                client,
+                url,
+                json=payload,
+                headers=headers,
+                max_retries=self.max_retries,
+                base_delay=self.base_delay,
+                max_delay=self.max_delay,
+            )
             data = resp.json()
             items = sorted(data.get("data", []), key=lambda x: x.get("index", 0))
             vectors = [item.get("embedding", []) for item in items]
@@ -452,6 +591,9 @@ class VoyageApiProvider:
         model_revision: str = "provider-managed",
         base_url: str = "https://api.voyageai.com/v1",
         timeout: float = 30.0,
+        max_retries: int = 3,
+        base_delay: float = 0.25,
+        max_delay: float = 8.0,
     ) -> None:
         self.api_key = (api_key or "").strip()
         self.model = model.strip()
@@ -459,6 +601,9 @@ class VoyageApiProvider:
         self.model_revision = model_revision
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.max_retries = max(0, max_retries)
+        self.base_delay = max(0.05, base_delay)
+        self.max_delay = max(self.base_delay, max_delay)
         self._client: httpx.AsyncClient | None = None
         self._is_ready = False
 
@@ -490,7 +635,7 @@ class VoyageApiProvider:
         )
 
     def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
+        if self._client is None or getattr(self._client, "is_closed", False):
             self._client = httpx.AsyncClient(timeout=self.timeout)
         return self._client
 
@@ -527,8 +672,15 @@ class VoyageApiProvider:
         }
 
         try:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
+            resp = await _post_with_retry(
+                client,
+                url,
+                json=payload,
+                headers=headers,
+                max_retries=self.max_retries,
+                base_delay=self.base_delay,
+                max_delay=self.max_delay,
+            )
             data = resp.json()
             items = sorted(data.get("data", []), key=lambda x: x.get("index", 0))
             vectors = [item.get("embedding", []) for item in items]
