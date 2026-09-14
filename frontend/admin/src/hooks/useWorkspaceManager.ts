@@ -10,7 +10,6 @@ import {
   type KnowledgeDocumentSummary,
 } from "../api";
 import { useProject } from "../context/ProjectContext";
-import { validateUploadFiles } from "../utils/uploadLimits";
 import { useLocalStorageState } from "./useLocalStorageState";
 import { useStatusState } from "./useStatusState";
 
@@ -166,12 +165,6 @@ export function useWorkspaceManager() {
 
   const uploadFiles = useCallback(async (files: File[]) => {
     if (!files.length) {
-      return;
-    }
-
-    const sizeError = validateUploadFiles(files);
-    if (sizeError) {
-      setStatus({ type: "error", message: sizeError });
       return;
     }
 

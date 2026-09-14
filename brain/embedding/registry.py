@@ -72,6 +72,17 @@ def _parse_retry_after(retry_after_val: str | None, max_delay: float) -> float |
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
+def _calculate_backoff(
+    base_delay: float,
+    attempt: int,
+    max_delay: float,
+    retry_after: float | None = None,
+) -> float:
+    if retry_after is not None:
+        return retry_after
+    return min(base_delay * (2 ** attempt) + random.uniform(0.1, 0.4), max_delay)
+
+
 async def _post_with_retry(
     client: httpx.AsyncClient,
     url: str,
@@ -84,6 +95,7 @@ async def _post_with_retry(
 ) -> httpx.Response:
     """Execute an HTTP POST with exponential backoff and jitter for transient errors (429, 5xx, network errors)."""
     last_exc: Exception | None = None
+    sanitized_url = _sanitize_url(url)
     for attempt in range(max_retries + 1):
         try:
             resp = await client.post(url, json=json, headers=headers)
@@ -91,11 +103,7 @@ async def _post_with_retry(
             if status_code in RETRYABLE_STATUS_CODES and attempt < max_retries:
                 retry_headers = getattr(resp, "headers", {})
                 retry_after = _parse_retry_after(retry_headers.get("retry-after"), max_delay)
-                if retry_after is not None:
-                    delay = retry_after
-                else:
-                    delay = min(base_delay * (2 ** attempt) + random.uniform(0.1, 0.4), max_delay)
-                sanitized_url = _sanitize_url(url)
+                delay = _calculate_backoff(base_delay, attempt, max_delay, retry_after)
                 logger.warning(
                     "Embedding HTTP call to %s returned %d, retrying in %.2fs (attempt %d/%d)...",
                     sanitized_url,
@@ -111,8 +119,7 @@ async def _post_with_retry(
         except (httpx.TimeoutException, httpx.NetworkError) as exc:
             last_exc = exc
             if attempt < max_retries:
-                delay = min(base_delay * (2 ** attempt) + random.uniform(0.1, 0.4), max_delay)
-                sanitized_url = _sanitize_url(url)
+                delay = _calculate_backoff(base_delay, attempt, max_delay)
                 logger.warning(
                     "Embedding network/timeout error calling %s (%s), retrying in %.2fs (attempt %d/%d)...",
                     sanitized_url,

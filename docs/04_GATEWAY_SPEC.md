@@ -55,7 +55,13 @@
 #### 3.4 文件轉換與知識上傳 (Document Conversion & Knowledge Upload)
 * **POST `/api/v1/documents/convert`**：單檔轉 Markdown。`.md`、`.markdown`、`.txt` 以 UTF-8 直接讀取，其餘格式交由 AnyDoc；不保存原始檔，也不觸發 Brain 索引。
 * **POST `/api/v1/knowledge/upload`**：知識入庫。`.md`、`.txt`、`.csv` 直接轉發；PDF 先嘗試 pdf-inspector fast path，其餘 PDF / Office 文件以 Docling 轉換，Docling 失敗時依 `DOCLING_FALLBACK_TO_ANYDOC` 回退 AnyDoc。原始 binary 文件保存至 `workspace/raw/`，Markdown 衍生檔送至 `workspace/knowledge/` 並觸發索引。
-* **上傳上限**：由 `DOCUMENT_MAX_UPLOAD_BYTES` 控制，預設 100 MiB。
+* **POST `/api/v1/knowledge/raw/upload`**：由 Backend 驗證權限及大小後，將原始檔送至 Brain 暫存區，不做轉換。Multipart 欄位為 `files`（可多檔）、`target_dir`（預設 `raw`）、`project_id`（預設 `default`）、`relative_paths`（依檔案順序對應的相對路徑）。成功 response 沿用 Brain 的 `{ "status": "ok", "files": [...] }`，保留每檔路徑及 metadata。
+* **GET `/api/v1/uploads/limits`**：需使用有效 session cookie 或 bearer token 登入；回傳 `{ "document_max_upload_bytes": 104857600 }`（預設值），只公開文件大小設定。Admin 的知識庫與 workspace 上傳每次先讀此端點，再按檔案大小檢查；讀取失敗或回傳無效值會停止上傳並顯示錯誤。
+* **上傳上限**：由 `DOCUMENT_MAX_UPLOAD_BYTES` 控制，預設 100 MiB。上述兩個知識庫上傳端點，包括 `.md`、`.txt`、`.csv` passthrough，都強制每個原始檔不得超限；恰好等於上限允許，超過回 413。前端檢查不能取代 Backend 驗證，設定也應使用正整數 bytes。
+
+兩個知識庫上傳端點均要求登入及目標專案的編輯權限，未授權或不存在的專案回 404。Backend 以 internal token 和已驗證的帳號／專案 headers 呼叫 Brain；不信任 client 自帶的內部 headers。通用 Brain proxy 不接受這兩條上傳路徑及其子路徑／尾斜線變體，並拒絕含 `.`／`..` 路徑片段的請求，以免上游 URL 正規化繞過大小或授權檢查。
+
+每檔上限與 nginx 整批 request body 上限不同。目前共用 edge 設定 `frontend/admin/nginx/http.d/default.conf` 的 `/api/` location（包含 `/api/v1/knowledge/*`）body 上限為 `200m`，整批檔案加 multipart overhead 仍可能觸發 nginx 413；如部署另有外部 proxy，也需配合其限制。角色、背景與吉祥物沿用各自的 `AVATAR_MAX_UPLOAD_BYTES`、`AVATAR_BACKGROUND_MAX_UPLOAD_BYTES`、`AVATAR_MASCOT_MAX_UPLOAD_BYTES`，不使用本端點的文件上限。
 
 Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-8786}` / `${HTTPS_PORT:-8787}` 入口；容器內診斷才使用 `http://127.0.0.1:8200`。
 

@@ -62,6 +62,8 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 
 帳號管理的「編輯／管理」分頁可依狀態查詢臨時批次，並查看與複製新版批次的登入密碼。密碼以加密形式保存；舊批次無法還原。`AUTH_TEMPORARY_PASSWORD_SECRET` 可獨立設定加密祕密值，未設時沿用 session 祕密；備份與金鑰輪替方式見 [帳號管理手冊](./docs/account-administration.md#臨時登入密碼保存與查閱)。
 
+管理員的「資源上限」是 ROOT 指定的資源白名單；範圍解析失敗會中止存取。知識庫與 workspace 上傳則讀取 Backend 的 `DOCUMENT_MAX_UPLOAD_BYTES`，並由 Backend 對原始檔與文字檔一致執行每檔檢查，預設 100 MiB。API 契約見 [Gateway 規格](./docs/04_GATEWAY_SPEC.md#34-文件轉換與知識上傳-document-conversion--knowledge-upload)，本次核對與零授權帳號結論見 [權限範圍盤點](./docs/scope-audit.md)。
+
 ### 部署與啟動
 
 ```bash

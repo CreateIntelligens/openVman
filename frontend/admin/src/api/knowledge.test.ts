@@ -5,6 +5,7 @@ import {
   createKnowledgeNote,
   previewRenormalizedKnowledgeDocument,
   uploadRawKnowledgeDocuments,
+  uploadKnowledgeDocuments,
 } from "./knowledge";
 
 afterEach(() => vi.restoreAllMocks());
@@ -21,6 +22,11 @@ function mockFetch(payload: unknown, ok = true, status = 200) {
 describe("knowledge api", () => {
   it("uploads files to the raw staging endpoint", async () => {
     const f = mockFetch({ status: "ok", files: [{ path: "raw/clinic/report.docx" }] });
+    f.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ document_max_upload_bytes: 1024 }),
+    } as Response);
     const file = new File([new Uint8Array([0x50, 0x4b])], "report.docx");
 
     await uploadRawKnowledgeDocuments(
@@ -28,7 +34,8 @@ describe("knowledge api", () => {
       "raw/clinic",
     );
 
-    const [url, init] = f.mock.calls[0];
+    expect(f.mock.calls[0][0]).toBe("/api/v1/uploads/limits");
+    const [url, init] = f.mock.calls[1];
     expect(url).toBe("/api/v1/knowledge/raw/upload");
     expect((init as RequestInit).method).toBe("POST");
     const body = (init as RequestInit).body;
@@ -115,3 +122,44 @@ describe("knowledge api", () => {
     });
   });
 });
+
+
+describe.each([uploadKnowledgeDocuments, uploadRawKnowledgeDocuments])(
+  "knowledge upload limits: %s",
+  (upload) => {
+    it("rejects files above the backend limit without uploading", async () => {
+      const f = mockFetch({ document_max_upload_bytes: 8 });
+      const file = new File(["123456789"], "report.txt");
+      await expect(upload([{ file, relativePath: file.name }])).rejects.toThrow(
+        "檔案大小不可超過 8 bytes",
+      );
+      expect(f).toHaveBeenCalledTimes(1);
+    });
+
+    it("allows more than 5 MiB when the backend allows it", async () => {
+      const f = mockFetch({ document_max_upload_bytes: 6 * 1024 * 1024 });
+      const file = new File([new Uint8Array(6 * 1024 * 1024)], "report.txt");
+      await upload([{ file, relativePath: file.name }]);
+      expect(f).toHaveBeenCalledTimes(2);
+      expect(f.mock.calls[1][1]?.method).toBe("POST");
+    });
+
+    it("does not upload when fetching limits fails", async () => {
+      const f = mockFetch({ error: "unavailable" }, false, 503);
+      const file = new File(["small"], "report.txt");
+      await expect(upload([{ file, relativePath: file.name }])).rejects.toThrow(
+        "unavailable",
+      );
+      expect(f).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not upload when the limit response is invalid", async () => {
+      const f = mockFetch({});
+      const file = new File(["small"], "report.txt");
+      await expect(upload([{ file, relativePath: file.name }])).rejects.toThrow(
+        "無法取得檔案大小上限",
+      );
+      expect(f).toHaveBeenCalledTimes(1);
+    });
+  },
+);

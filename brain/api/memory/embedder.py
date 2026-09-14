@@ -252,6 +252,16 @@ class GatewayRemoteTextEmbedder:
                 )
             return self._client
 
+    def _calculate_backoff(
+        self, attempt: int, retry_after: float | None = None
+    ) -> float:
+        if retry_after is not None:
+            return retry_after
+        return min(
+            self.retry_base_delay * (2 ** attempt) + random.uniform(0.1, 0.4),
+            self.retry_max_delay,
+        )
+
     def _post_chunk_with_retry(
         self,
         client: httpx.Client,
@@ -269,13 +279,7 @@ class GatewayRemoteTextEmbedder:
                 if status_code in retryable_statuses and attempt < self.max_retries:
                     retry_headers = getattr(resp, "headers", {})
                     retry_after = _parse_retry_after(retry_headers.get("retry-after"), self.retry_max_delay)
-                    if retry_after is not None:
-                        delay = retry_after
-                    else:
-                        delay = min(
-                            self.retry_base_delay * (2 ** attempt) + random.uniform(0.1, 0.4),
-                            self.retry_max_delay,
-                        )
+                    delay = self._calculate_backoff(attempt, retry_after)
                     logger.warning(
                         "Embedding gateway returned %d on chunk %d (len %d), retrying in %.2fs (attempt %d/%d)...",
                         status_code,
@@ -292,10 +296,7 @@ class GatewayRemoteTextEmbedder:
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_exc = exc
                 if attempt < self.max_retries:
-                    delay = min(
-                        self.retry_base_delay * (2 ** attempt) + random.uniform(0.1, 0.4),
-                        self.retry_max_delay,
-                    )
+                    delay = self._calculate_backoff(attempt)
                     logger.warning(
                         "Embedding gateway network/timeout error on chunk %d (%s), retrying in %.2fs (attempt %d/%d)...",
                         chunk_idx,

@@ -23,6 +23,20 @@
 
 管理後台登入同時支援正式帳號與臨時密碼，但使用 Admin 專用登入端點先檢查後台權限。未授權的臨時密碼會直接取得 403，不會啟動首次使用後的 72 小時計時。管理員可在正式帳號權限編輯器、臨時批次建立表單與既有臨時批次紀錄調整這項權限。
 
+### 管理員資源範圍
+
+帳號頁的「資源上限」是 ROOT 指定給 admin 的資源白名單，不是數量配額。`scoped=false` 表示不限制；`scoped=true` 且清單為空表示沒有可用範圍。ROOT 本身不受此範圍限制。
+
+資源解析與清單查詢會讀取 admin 的範圍；runtime 初始化或範圍查詢失敗時中止請求，不會轉成無限制存取。只有成功讀取後確認未設限的 admin 才保留原本的全部資源權限。測試替身應明確注入 `AdminScopeRepository`，不可依賴 runtime 失敗來跳過授權。
+
+授權指派在資料庫 transaction 內直接檢查操作者的範圍；ROOT 縮小範圍時，會同步撤銷該 admin 已發出的範圍外授權並修正預設值。
+
+### 尚未授權的正式帳號
+
+管理介面建立一般使用者時，要求先選好專案、聲音、人物或 VRM 授權及登入預設值。API `POST /api/v1/users` 仍允許省略 `access`，供先建立帳號、後續指派資源的流程使用；列表會顯示「尚未授權」。
+
+此類帳號可以一般登入，但不會因此取得其他帳號或 system-public 資源的授權，管理後台權限也預設關閉。`PUT /api/v1/users/{user_id}/access` 透過共用正規化檢查要求完整 grants 與 defaults，不能以空 grants 完成設定。零 grants 也不代表撤銷原有 ownership；既有資源擁有者仍適用 ownership 規則。
+
 ## Migration 與 session
 
 Backend 啟動時會把既有正式 `ai360` 原地升級為 ROOT。Migration 會保留帳號 ID、bcrypt hash、created metadata、resource ownership、grants 與 defaults，並遞增 `token_version`，因此 migration 前的 cookie 與 bearer token 都會立即失效。

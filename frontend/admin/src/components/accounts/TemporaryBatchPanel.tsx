@@ -122,7 +122,7 @@ export default function TemporaryBatchPanel({
     void loadBatches();
   }
 
-  const displayedError = error ?? accessForm.error;
+  const activeError = view === "create" ? (error ?? accessForm.error) : error;
   const filteredBatches = batches.filter(
     (batch) => statusFilter === "all" || batchState(batch) === statusFilter,
   );
@@ -189,9 +189,9 @@ export default function TemporaryBatchPanel({
         </header>
       )}
 
-      {(view === "create" ? displayedError : error) && (
+      {activeError && (
         <div className="mx-5 mt-5 rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
-          {view === "create" ? displayedError : error}
+          {activeError}
         </div>
       )}
 
