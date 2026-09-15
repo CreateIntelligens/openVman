@@ -1626,6 +1626,43 @@ _DEFAULT_COLUMNS: tuple[tuple[str, ResourceType], ...] = (
 )
 
 
+def _ensure_batch_manageable(
+    connection: sqlite3.Connection,
+    *,
+    actor: UserRecord,
+    batch_id: str,
+) -> None:
+    """Only ROOT or the batch's creator may revoke it or toggle portal access.
+
+    跟 ensure_can_manage_account 一樣只放行直屬：admin 動得了自己發的批次，
+    動不了 ROOT 或別的 admin 發的。管不到的批次一律當不存在，不洩漏其存在。
+    """
+    ensure_account_manager(actor)
+    row = connection.execute(
+        "SELECT created_by FROM temporary_account_batches WHERE id = ?",
+        (batch_id,),
+    ).fetchone()
+    if row is None or (
+        actor.role is not AccountRole.ROOT and row["created_by"] != actor.id
+    ):
+        raise TemporaryCredentialNotFoundError("temporary batch does not exist")
+
+
+def _voice_provider_of(connection: sqlite3.Connection, voice_id: str) -> str:
+    row = connection.execute(
+        "SELECT metadata_json FROM resources WHERE resource_type = ? AND resource_id = ?",
+        (ResourceType.CUSTOM_VOICE.value, voice_id),
+    ).fetchone()
+    if row is None:
+        return ""
+    try:
+        metadata = json.loads(row["metadata_json"] or "{}")
+    except ValueError:
+        return ""
+    provider = metadata.get("provider") if isinstance(metadata, dict) else None
+    return provider.strip() if isinstance(provider, str) else ""
+
+
 def _repoint_dangling_defaults(
     connection: sqlite3.Connection,
     *,
@@ -1666,6 +1703,14 @@ def _repoint_dangling_defaults(
             (user_id, resource_type.value),
         ).fetchone()
         updates[column] = replacement["resource_id"] if replacement else ""
+        # 聲線的 provider 跟著 voice_id 走：只換 id 不換 provider 會留下一組
+        # 不存在的 (provider, voice) 組合，登入時 TTS 找不到聲線。
+        if resource_type is ResourceType.CUSTOM_VOICE:
+            updates["voice_provider"] = (
+                _voice_provider_of(connection, replacement["resource_id"])
+                if replacement
+                else ""
+            )
 
     if not updates:
         return
@@ -2083,14 +2128,38 @@ class TemporaryAccountRepository:
             accounts=tuple(accounts),
         )
 
-    def list_batches(self) -> list[TemporaryBatch]:
-        with self.database.transaction() as connection:
-            rows = connection.execute(
-                """
+    def list_batches(
+        self,
+        *,
+        visible_to: str | None = None,
+    ) -> list[TemporaryBatch]:
+        """List batches; ``visible_to`` narrows to an administrator's subtree.
+
+        臨時批次跟正式帳號走同一條可見規則：admin 只看得到自己和自己委派
+        出去的下屬所建的批次。不過濾的話，受限 admin 會看到 ROOT 發出的
+        每一批密碼。
+        """
+        if visible_to is None:
+            query = """
                 SELECT id FROM temporary_account_batches
                 ORDER BY created_at DESC, id DESC
-                """
-            ).fetchall()
+            """
+            params: tuple[object, ...] = ()
+        else:
+            query = """
+                WITH RECURSIVE subtree(id) AS (
+                    SELECT id FROM users WHERE id = ?
+                    UNION
+                    SELECT users.id FROM users
+                    JOIN subtree ON users.created_by = subtree.id
+                )
+                SELECT batches.id FROM temporary_account_batches AS batches
+                JOIN subtree ON batches.created_by = subtree.id
+                ORDER BY batches.created_at DESC, batches.id DESC
+            """
+            params = (visible_to,)
+        with self.database.transaction() as connection:
+            rows = connection.execute(query, params).fetchall()
         batches = [self.get_batch(row["id"]) for row in rows]
         return [batch for batch in batches if batch is not None]
 
@@ -2109,15 +2178,9 @@ class TemporaryAccountRepository:
             ).fetchone()
             if actor is None:
                 raise UserNotFoundError("administrator account does not exist")
-            ensure_account_manager(_user_from_row(actor))
-            exists = connection.execute(
-                "SELECT 1 FROM temporary_account_batches WHERE id = ?",
-                (batch_id,),
-            ).fetchone()
-            if exists is None:
-                raise TemporaryCredentialNotFoundError(
-                    "temporary batch does not exist"
-                )
+            _ensure_batch_manageable(
+                connection, actor=_user_from_row(actor), batch_id=batch_id,
+            )
             connection.execute(
                 """
                 UPDATE users
@@ -2161,13 +2224,9 @@ class TemporaryAccountRepository:
             ).fetchone()
             if actor is None:
                 raise UserNotFoundError("administrator account does not exist")
-            ensure_account_manager(_user_from_row(actor))
-            exists = connection.execute(
-                "SELECT 1 FROM temporary_account_batches WHERE id = ?",
-                (batch_id,),
-            ).fetchone()
-            if exists is None:
-                raise TemporaryCredentialNotFoundError("temporary batch does not exist")
+            _ensure_batch_manageable(
+                connection, actor=_user_from_row(actor), batch_id=batch_id,
+            )
             connection.execute(
                 """
                 UPDATE temporary_account_batches
@@ -2217,15 +2276,15 @@ from .embed_keys_repository import (
 )
 
 __all__ = [
+    "DEFAULT_DAILY_REQUEST_QUOTA",
+    "DEFAULT_RATE_LIMIT_PER_MINUTE",
+    "EMBED_KEY_PREFIX",
+    "EMBED_KEY_RANDOM_CHARS",
     "AccountAccessRepository",
     "AccountEnabledError",
     "AdminAlreadyExistsError",
     "AdminScopeRepository",
     "AuthAuditRepository",
-    "DEFAULT_DAILY_REQUEST_QUOTA",
-    "DEFAULT_RATE_LIMIT_PER_MINUTE",
-    "EMBED_KEY_PREFIX",
-    "EMBED_KEY_RANDOM_CHARS",
     "EmbedKeyNotFoundError",
     "EmbedKeyRepository",
     "InvalidResourceGrantError",

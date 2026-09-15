@@ -840,16 +840,18 @@ def create_temporary_batch(
 )
 def list_temporary_batches(
     response: Response,
-    _admin: CurrentAccount = Depends(require_admin),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> list[TemporaryBatchAudit]:
     response.headers["Cache-Control"] = "no-store"
     now = datetime.now(timezone.utc)
+    # 與 list_accounts 同一條可見規則：ROOT 看全部，admin 只看自己的子樹。
+    visible_to = None if admin.user.role is AccountRole.ROOT else admin.user.id
     return [
         _temporary_batch_audit(
             batch, passwords=runtime.temporary_passwords, now=now,
         )
-        for batch in runtime.temporary_accounts.list_batches()
+        for batch in runtime.temporary_accounts.list_batches(visible_to=visible_to)
     ]
 
 
