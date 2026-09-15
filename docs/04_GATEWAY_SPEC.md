@@ -95,3 +95,18 @@ Backend 沒有公開 host port。外部請求應經 admin nginx 的 `${PORT:-878
 2. **自動清理**：每 5 分鐘執行一次 Cron 任務，標記超過 `TTL` 分鐘的暫存檔為過期並刪除。
 3. **磁碟保護**：所有上傳操作前必須檢查磁碟配額，避免耗盡主機空間。
 4. **爬蟲網路邊界**：Web Crawler 在對 provider 發送請求前必須拒絕 private、loopback 與 link-local 目標，並將 DNS 解析限制在 5 秒內。
+
+### 7. 888a2a-lite Agent 橋接 (A2A Bridge)
+* **協定規範**: 遵循 `888a2a-lite` Hub 協定 (`https://a2a.david888.com/llms.txt`)。
+* **身分註冊與私有圈 (Circle)**:
+  - 只有部署明確提供 `A2A_HUB_KEY` 時，首次註冊才帶入 registration-only `X-Hub-Key`；不可在程式碼或文件硬編碼私有圈金鑰。無 key 僅在 `A2A_ALLOW_PUBLIC_CIRCLE=true` 時允許加入 public circle。
+  - 憑證持久化於 `A2A_CREDENTIALS_PATH`（預設 `/data/a2a/credentials.json`，檔案權限 0600）；`agentToken` 必須靜態加密，缺少 encryption key 時 fail closed。
+  - 只保存 registration key 的不可逆指紋；當 `.env` 中修改 `A2A_HUB_KEY` 時，Bridge 自動偵測並向新私有圈重新註冊，無痛金鑰輪替。
+  - 多 worker／replica 透過 Redis leader lease 只允許一個 SSE listener；standby 不註冊第二個 identity。
+* **即時事件串流 (SSE)**:
+  - 連線 `GET /hub/v1/agents/{agentId}/inbox/stream?afterSequence={lastSeq}`。
+  - 斷線採用指數退避演算法（1s ~ 30s）自動重連。
+* **Instant ACK 與防迴音 (Anti-Echo)**:
+  - 先將完整事件 commit 至 SQLite WAL durable queue，再對 `/inbox/{seq}/ack` 發出確認；`<50ms` 只作為受控環境的 latency target，不是網路硬保證。
+  - ACK 失敗時保留事件、重試且不前進 replay cursor。所有 peer 內容送至 Brain `/brain/chat`；只有 Brain 回應 `[[A2A_NO_REPLY]]` 才終止回送，避免在 LLM 前用硬編碼片語跳過安全流程。
+  - Brain skill 不直接讀取 Backend credential file；同儕查詢、派工與群組操作一律經 Backend internal A2A facade。

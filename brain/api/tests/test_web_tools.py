@@ -92,6 +92,71 @@ def test_read_web_page_falls_back_when_primary_fails(monkeypatch: pytest.MonkeyP
     assert result["provider"] == "https://fallback-1.invalid"
 
 
+def test_non_retryable_upstream_error_does_not_probe_fallbacks(monkeypatch: pytest.MonkeyPatch):
+    from tools.builtin import web_tools
+
+    calls: list[str] = []
+
+    class FakeClient:
+        def request(self, method, url, **kwargs):
+            calls.append(url)
+            return _response(400, {"code": 400, "status": 400, "data": {}}, url)
+
+    monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings())
+    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+
+    with pytest.raises(ValueError, match="fallback chain"):
+        web_tools._read_web_page({"url": "https://example.com"})
+
+    assert calls == ["https://primary.invalid/https://example.com"]
+
+
+def test_read_web_page_rejects_unsafe_final_source_url(monkeypatch: pytest.MonkeyPatch):
+    from tools.builtin import web_tools
+
+    class FakeClient:
+        def request(self, method, url, **kwargs):
+            return _response(200, {"code": 200, "status": 20000, "data": {
+                "title": "unsafe", "url": "http://127.0.0.1:8200/metrics", "content": "secret"
+            }}, url)
+
+    monkeypatch.setattr(web_tools, "mode_settings", lambda: _settings(
+        url2md_retry_base_delay_s=0,
+        url2md_retry_max_delay_s=0,
+    ))
+    monkeypatch.setattr(web_tools, "_get_url2md_client", lambda: FakeClient())
+
+    with pytest.raises(ValueError, match="fallback chain"):
+        web_tools._read_web_page({"url": "https://example.com"})
+
+
+def test_url2md_telemetry_does_not_log_query_or_fetched_content(monkeypatch: pytest.MonkeyPatch):
+    from tools.builtin import web_tools
+
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(web_tools, "log_event", lambda name, **fields: events.append((name, fields)))
+
+    web_tools._record_attempt(
+        "search", "https://2md.aiurl.tw", 1, result="failure", reason="http_503"
+    )
+    web_tools._record_operation(
+        "read",
+        result="success",
+        attempts=1,
+        provider="https://2md.aiurl.tw",
+        result_count=1,
+        content_chars=42,
+        truncated=False,
+        usage_tokens=29,
+    )
+
+    assert events
+    for _, fields in events:
+        assert "query" not in fields
+        assert "content" not in fields
+        assert "markdown" not in fields
+
+
 def test_web_tools_reject_invalid_url_and_empty_query(monkeypatch: pytest.MonkeyPatch):
     from tools.builtin import web_tools
 
@@ -366,8 +431,8 @@ def test_circuit_reopens_after_the_cooldown_expires(monkeypatch: pytest.MonkeyPa
     assert not web_tools._is_circuit_open("https://primary.invalid", 0.01)
 
 
-def test_all_hosts_in_cooldown_still_get_tried(monkeypatch: pytest.MonkeyPatch):
-    """全部都在冷卻中時仍要整條鏈試一遍，寧可慢也不要在上游已復原時直接放棄。"""
+def test_all_hosts_in_cooldown_are_skipped(monkeypatch: pytest.MonkeyPatch):
+    """全部都在冷卻中時不能重新施壓上游，等 half-open probe。"""
     from tools.builtin import web_tools
 
     attempted: list[str] = []
@@ -383,9 +448,10 @@ def test_all_hosts_in_cooldown_still_get_tried(monkeypatch: pytest.MonkeyPatch):
     for base in web_tools._url2md_bases():
         web_tools._note_failure(base)
 
-    web_tools._search_web({"query": "q"})
+    with pytest.raises(ValueError, match="fallback chain"):
+        web_tools._search_web({"query": "q"})
 
-    assert len(attempted) == 1  # 第一台就成功了，但它本來是被冷卻的
+    assert not attempted
 
 
 def test_budget_caps_the_per_host_timeout(monkeypatch: pytest.MonkeyPatch):

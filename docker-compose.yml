@@ -54,6 +54,7 @@ services:
       - ./.env
     environment:
       - HOME=/home/appuser
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - OPF_MOE_TRITON=false
       - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://embedding:8009}
       - EMBEDDING_SERVICE_TOKEN=${EMBEDDING_SERVICE_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}

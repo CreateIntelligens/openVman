@@ -252,6 +252,81 @@ class TTSRouterConfig(BaseSettings):
         validation_alias="AUTH_SESSION_LIFETIME_SECONDS",
     )
 
+    # --- 888a2a Agent-to-Agent Network ---
+    a2a_enabled: bool = Field(
+        default=False,
+        validation_alias="A2A_ENABLED",
+    )
+    a2a_hub_url: str = Field(
+        default="https://a2a.david888.com",
+        validation_alias="A2A_HUB_URL",
+    )
+    a2a_hub_key: str = Field(
+        default="",
+        repr=False,
+        validation_alias="A2A_HUB_KEY",
+    )
+    a2a_allow_public_circle: bool = Field(
+        default=False,
+        validation_alias="A2A_ALLOW_PUBLIC_CIRCLE",
+    )
+    a2a_display_name: str = Field(
+        default="openVman",
+        validation_alias="A2A_DISPLAY_NAME",
+    )
+    a2a_credentials_path: str = Field(
+        default="/data/a2a/credentials.json",
+        validation_alias="A2A_CREDENTIALS_PATH",
+    )
+    a2a_credentials_encryption_key: str = Field(
+        default="",
+        repr=False,
+        validation_alias="A2A_CREDENTIALS_ENCRYPTION_KEY",
+    )
+    a2a_default_project_id: str = Field(
+        default="default",
+        validation_alias="A2A_DEFAULT_PROJECT_ID",
+    )
+    a2a_default_persona_id: str = Field(
+        default="",
+        validation_alias="A2A_DEFAULT_PERSONA_ID",
+    )
+    a2a_leader_lease_ttl_seconds: int = Field(
+        default=30,
+        ge=5,
+        validation_alias="A2A_LEADER_LEASE_TTL_SECONDS",
+    )
+    a2a_queue_db_path: str = Field(
+        default="/data/a2a/work.db",
+        validation_alias="A2A_QUEUE_DB_PATH",
+    )
+    a2a_queue_retention_days: int = Field(
+        default=30,
+        ge=1,
+        validation_alias="A2A_QUEUE_RETENTION_DAYS",
+    )
+    a2a_max_concurrency: int = Field(
+        default=4,
+        ge=1,
+        le=16,
+        validation_alias="A2A_MAX_CONCURRENCY",
+    )
+    a2a_max_tasks_per_minute: int = Field(
+        default=60,
+        ge=1,
+        validation_alias="A2A_MAX_TASKS_PER_MINUTE",
+    )
+    a2a_max_delegation_hops: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        validation_alias="A2A_MAX_DELEGATION_HOPS",
+    )
+    a2a_allow_group_broadcast: bool = Field(
+        default=False,
+        validation_alias="A2A_ALLOW_GROUP_BROADCAST",
+    )
+
     @property
     def supported_mime_types(self) -> frozenset[str]:
         return frozenset(_split_csv_values(self.media_supported_types))

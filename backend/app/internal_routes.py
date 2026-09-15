@@ -89,3 +89,100 @@ async def internal_enrich(
             status_code=exc.response.status_code,
             detail=exc.response.text,
         )
+
+
+class InternalA2ASendTaskRequest(BaseModel):
+    target_agent_id: str = Field(..., min_length=1, max_length=256)
+    message: str = Field(..., min_length=1, max_length=1_048_576)
+    context_id: str | None = Field(default=None, max_length=256)
+    hop_count: int = Field(default=1, ge=0, le=10)
+
+
+class InternalA2ABroadcastGroupRequest(BaseModel):
+    group_id: str = Field(..., min_length=1, max_length=256)
+    message: str = Field(..., min_length=1, max_length=1_048_576)
+
+
+def _check_internal_auth(token: str) -> None:
+    cfg = get_tts_config()
+    if not cfg.gateway_internal_token:
+        raise HTTPException(status_code=503, detail="internal token is not configured")
+    if not hmac.compare_digest(token, cfg.gateway_internal_token):
+        raise HTTPException(status_code=403, detail="invalid internal token")
+
+
+@router.get("/api/v1/internal/a2a/peers")
+async def internal_a2a_peers(
+    state: str | None = None,
+    x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
+) -> dict[str, Any]:
+    _check_internal_auth(x_internal_token)
+    cfg = get_tts_config()
+    if not cfg.a2a_enabled:
+        return {"peers": [], "enabled": False}
+
+    from app.gateway.a2a_bridge import get_a2a_bridge_daemon
+    daemon = get_a2a_bridge_daemon()
+    if not daemon.is_leader or not daemon.client:
+        raise HTTPException(status_code=503, detail="A2A bridge is not the active leader")
+    if not daemon.client:
+        raise HTTPException(status_code=503, detail="A2A client not initialized")
+
+    peers = await daemon.client.list_peers(state=state)
+    return {"peers": peers, "total": len(peers), "enabled": True}
+
+
+@router.post("/api/v1/internal/a2a/tasks")
+async def internal_a2a_send_task(
+    payload: InternalA2ASendTaskRequest,
+    x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
+) -> dict[str, Any]:
+    _check_internal_auth(x_internal_token)
+    cfg = get_tts_config()
+    if not cfg.a2a_enabled:
+        raise HTTPException(status_code=503, detail="A2A integration is disabled")
+
+    if payload.hop_count > cfg.a2a_max_delegation_hops:
+        raise HTTPException(status_code=400, detail="Delegation hop limit exceeded")
+
+    from app.gateway.a2a_bridge import get_a2a_bridge_daemon
+    daemon = get_a2a_bridge_daemon()
+    if not daemon.is_leader or not daemon.client:
+        raise HTTPException(status_code=503, detail="A2A bridge is not the active leader")
+
+    try:
+        res = await daemon.client.send_task(
+            target_agent_id=payload.target_agent_id,
+            message=payload.message,
+            context_id=payload.context_id,
+        )
+        return {"success": True, "target": payload.target_agent_id, "result": res}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Hub dispatch failed: {exc}")
+
+
+@router.post("/api/v1/internal/a2a/groups/messages")
+async def internal_a2a_broadcast_group(
+    payload: InternalA2ABroadcastGroupRequest,
+    x_internal_token: str = Header("", alias=INTERNAL_TOKEN_HEADER),
+) -> dict[str, Any]:
+    _check_internal_auth(x_internal_token)
+    cfg = get_tts_config()
+    if not cfg.a2a_enabled:
+        raise HTTPException(status_code=503, detail="A2A integration is disabled")
+    if not cfg.a2a_allow_group_broadcast:
+        raise HTTPException(status_code=403, detail="A2A group broadcast is disabled")
+
+    from app.gateway.a2a_bridge import get_a2a_bridge_daemon
+    daemon = get_a2a_bridge_daemon()
+    if not daemon.is_leader or not daemon.client:
+        raise HTTPException(status_code=503, detail="A2A bridge is not the active leader")
+
+    try:
+        res = await daemon.client.broadcast_group(
+            group_id=payload.group_id,
+            message=payload.message,
+        )
+        return {"success": True, "groupId": payload.group_id, "result": res}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Group broadcast failed: {exc}")

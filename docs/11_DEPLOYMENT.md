@@ -42,6 +42,22 @@ LLM 的 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<mod
 鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，
 但不得占用 `OPENAI_API_KEY` 或共用的 `LLM_BASE_URL`。
 
+若啟用 A2A，必須從 secret store 注入 `A2A_HUB_KEY` 與
+`A2A_CREDENTIALS_ENCRYPTION_KEY`（或確認 `SESSION_JWT_SECRET` 已設定），並提供
+`A2A_ENABLED=true`。私有圈 key 不可寫入 repository；`A2A_ALLOW_PUBLIC_CIRCLE` 預設為
+false。正式多 worker 部署必須保留 Redis，讓單一 leader 持有 A2A SSE listener；若 Redis
+不可用，A2A bridge 應保持停用，避免重複註冊與重複收件。
+
+2md Web Tools 預設使用固定順序 `https://2md.aiurl.tw` →
+`https://2md.glsoft.ai` → `https://create360.ai`。Brain 對單一搜尋／讀取操作只會
+序列嘗試 endpoint，並由 `URL2MD_TOTAL_BUDGET_S` 限制整條 fallback chain；retryable
+錯誤才會進入下一站，等待時間含 bounded full-jitter。正式多 worker 部署應提供
+`REDIS_URL`，讓 circuit 與 half-open probe lease 跨 instance 協調；Redis 暫時不可用時
+會降級為 process-local single-flight，不會把網頁正文寫入 Redis。
+
+2md 只接收公開 HTTP(S) URL。正式環境仍須確認 upstream crawler 的 egress 與 redirect
+政策能阻擋 private／loopback 目的地；敏感文件不可送往未經專案認證的外部 reader。
+
 ### 2. 啟動
 
 ```bash

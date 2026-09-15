@@ -27,6 +27,7 @@ from app.brain_proxy import router as brain_proxy_router
 from app.config import get_tts_config
 from app.error_payloads import upload_failed_response
 from app.gateway import websocket as websocket_routes
+from app.gateway.a2a_bridge import get_a2a_bridge_daemon
 from app.gateway.crawl_adapter import _http as _crawl_http
 from app.gateway.forward import _http as _forward_http
 from app.gateway.redis_pool import close_redis, get_redis
@@ -202,10 +203,15 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await _startup_gateway_resources()
     await _build_openapi_schema()
     await admin_routes.sync_tts_custom_voices(runtime)
+    a2a_daemon = get_a2a_bridge_daemon() if get_tts_config().a2a_enabled else None
+    if a2a_daemon:
+        a2a_daemon.start()
     logger.info("backend startup complete")
     try:
         yield
     finally:
+        if a2a_daemon:
+            await a2a_daemon.stop()
         clients = [_brain_proxy_http, _internal_http, _forward_http, _crawl_http, _health_http, _vision_http]
         await asyncio.gather(*(c.close() for c in clients), admin_routes.close_http())
         await _shutdown_gateway_resources()
