@@ -2203,8 +2203,8 @@ class TemporaryAccountRepository:
         return batch
 
 
-# 呼叫端歷來從這裡 import embed key 的符號，維持原入口。__all__ 讓這些
-# re-export 不會被 linter 當成未使用而刪掉。
+# 呼叫端歷來從這裡 import embed key 的符號，維持原入口；__all__ 同時保留
+# 帳號 repository 的公開介面，避免拆分後星號匯入只剩 embed key。
 from .embed_keys_repository import (
     DEFAULT_DAILY_REQUEST_QUOTA,
     DEFAULT_RATE_LIMIT_PER_MINUTE,
@@ -2217,12 +2217,34 @@ from .embed_keys_repository import (
 )
 
 __all__ = [
+    "AccountAccessRepository",
+    "AccountEnabledError",
+    "AdminAlreadyExistsError",
+    "AdminScopeRepository",
+    "AuthAuditRepository",
     "DEFAULT_DAILY_REQUEST_QUOTA",
     "DEFAULT_RATE_LIMIT_PER_MINUTE",
     "EMBED_KEY_PREFIX",
     "EMBED_KEY_RANDOM_CHARS",
     "EmbedKeyNotFoundError",
     "EmbedKeyRepository",
+    "InvalidResourceGrantError",
+    "LastAdminError",
+    "OwnedResourcesError",
+    "RepositoryError",
+    "ResourceConflictError",
+    "ResourceRepository",
+    "SelfProtectionError",
+    "TemporaryAccountRepository",
+    "TemporaryBatch",
+    "TemporaryBatchAccount",
+    "TemporaryCredentialCreate",
+    "TemporaryCredentialExpiredError",
+    "TemporaryCredentialNotFoundError",
+    "UserNotFoundError",
+    "UserRepository",
+    "UsernameConflictError",
     "generate_embed_key_id",
+    "normalize_username",
     "utc_day",
 ]

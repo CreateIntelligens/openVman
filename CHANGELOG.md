@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Avatar Page Modules**: Split character, background, and mascot panels into `components/avatar/`, with shared asset styles and a `useMascotSnapshotQueue` hook. The page retains form state, asset loading, and the snapshot iframe; tab and upload behavior are unchanged. The snapshot comment now correctly describes recapturing missing thumbnails or URLs outside `/static/mascots/`.
+- **Embed Key Repository Module**: Move Embed key storage to `auth/embed_keys_repository.py` and shared exception/time primitives to `auth/_repository_base.py`. Keep the existing `auth.repositories` import entry point and declare its public repositories, errors, batch types, constants, and helpers in `__all__`, so wildcard imports include account repositories as well as Embed key symbols. Database transactions and authorization behavior are unchanged. See `docs/account-administration.md` for module boundaries.
+
 ### Added
 
 - **Administrator Delegation**: Administrators can now create administrators and manage the accounts they created directly, instead of every administrator action above `user` requiring ROOT. Role changes and password resets stay ROOT-only, and no administrator can manage its own account through the account APIs.
