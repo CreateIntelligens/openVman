@@ -32,7 +32,7 @@ from .models import (
     has_admin_portal_access,
 )
 from .passwords import PasswordValidationError, hash_password, verify_password
-from .policy import AccountPolicyError
+from .policy import AccountPolicyError, ensure_can_manage_account
 from .repositories import (
     AccountEnabledError,
     InvalidResourceGrantError,
@@ -904,13 +904,19 @@ def revoke_temporary_batch(
 
 @users_router.get("", response_model=list[AdminAccountProfile])
 def list_accounts(
-    _admin: CurrentAccount = Depends(require_admin),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> list[AdminAccountProfile]:
-    return [
-        AdminAccountProfile.from_record(user, runtime)
-        for user in runtime.users.list(account_type=AccountType.FORMAL)
-    ]
+    # 可見範圍必須跟 ensure_can_manage_account 一致，否則 admin 會看到一整份
+    # 他動不了的名單，連 ROOT 有哪些私有資源都一併洩漏。
+    if admin.user.role is AccountRole.ROOT:
+        users = runtime.users.list(account_type=AccountType.FORMAL)
+    else:
+        users = runtime.users.list_visible_subtree(
+            admin.user.id,
+            account_type=AccountType.FORMAL,
+        )
+    return [AdminAccountProfile.from_record(user, runtime) for user in users]
 
 
 def _resource_option(record: ResourceRecord) -> AccountAccessOption:
@@ -1015,12 +1021,21 @@ def update_account_access(
 )
 def get_admin_scope(
     user_id: str,
-    _root: CurrentAccount = Depends(require_root),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> AdminScopeProfile:
     user = runtime.users.get_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="Account not found")
+    if admin.user.role is not AccountRole.ROOT:
+        try:
+            ensure_can_manage_account(admin.user, user)
+        except AccountPolicyError as exc:
+            # 與 resolve_resource 一致：管不到的帳號等同不存在，不洩漏其存在。
+            raise HTTPException(
+                status_code=404,
+                detail="Account not found",
+            ) from exc
     return AdminScopeProfile.from_scope(
         runtime.admin_scopes.get(user_id),
         user_id,
@@ -1030,23 +1045,24 @@ def get_admin_scope(
 @users_router.put(
     "/{user_id}/scope",
     response_model=AdminScopeProfile,
-    summary="設定管理員的資源上限（僅 ROOT）",
+    summary="設定管理員的資源上限",
 )
 def update_admin_scope(
     user_id: str,
     body: UpdateAdminScopeRequest,
-    root: CurrentAccount = Depends(require_root),
+    admin: CurrentAccount = Depends(require_admin),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> AdminScopeProfile:
     """Cap what an administrator may see and hand out.
 
     收斂是遞移的：受限 admin 再開帳號時，只能從自己這份上限裡分配。縮小
-    範圍會一併撤銷他先前發出、如今已超出上限的授權。
+    範圍會一併撤銷他先前發出、如今已超出上限的授權。admin 也能設定自己
+    建立的 admin，但只能給出自己上限的子集。
     """
     try:
         scope = runtime.admin_scopes.replace(
             admin_user_id=user_id,
-            updated_by=root.user.id,
+            updated_by=admin.user.id,
             scoped=body.scoped,
             resources=body.resources.as_pairs(),
         )

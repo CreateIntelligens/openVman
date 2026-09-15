@@ -306,7 +306,7 @@ export default function Accounts() {
                         disabled={submitting}
                       >
                         <option value="user">一般使用者</option>
-                        {isRoot && <option value="admin">管理員</option>}
+                        <option value="admin">管理員</option>
                       </select>
                     </label>
                   </div>
@@ -388,21 +388,19 @@ export default function Accounts() {
                   const isFormal = (
                     account.kind ?? account.account_type ?? "formal"
                   ) === "formal";
+                  // 與後端 ensure_can_manage_account 對齊：ROOT 管所有人，
+                  // admin 管自己直接建立的帳號（含自己開出來的 admin）。
+                  // 列表看得到整棵子樹，但只有直屬下一層動得了。
                   const canManage = !isSelf && isFormal && (
                     isRoot
                       ? account.role !== "root"
-                      : account.role === "user"
+                      : account.created_by === currentAccount?.id
                   );
                   const resourceCount = ownedResourceCount(account);
                   const grantCount = grantedResourceCount(account);
-                  // 管理員也能有自己的可用資源，但只有 ROOT 指定得了。
-                  const canEditAccess = canManage && (
-                    account.role === "user" || (isRoot && account.role === "admin")
-                  );
                   const editingAccess = editingAccountId === account.id;
-                  // 資源上限只有 ROOT 能設，且只對管理員有意義。
-                  const canEditScope = isRoot && !isSelf && isFormal
-                    && account.role === "admin";
+                  // 資源上限只對管理員有意義。
+                  const canEditScope = canManage && account.role === "admin";
                   const editingScope = editingScopeAccountId === account.id;
                   return (
                     <article key={account.id} className="px-5 py-4">
@@ -413,7 +411,7 @@ export default function Accounts() {
                             <span className="chip">
                               {account.role === "root" ? "ROOT" : account.role}
                             </span>
-                            {canEditAccess && (
+                            {canManage && (
                               <>
                                 <span className="chip">
                                   {grantCount > 0
@@ -446,9 +444,9 @@ export default function Accounts() {
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                          {(canEditAccess || canEditScope) && (
-                            <div className="flex flex-wrap items-center gap-2">
-                              {canEditAccess && (
+                          {canManage && (
+                            <>
+                              <div className="flex flex-wrap items-center gap-2">
                                 <button
                                   className={editingAccess
                                     ? "btn btn-primary"
@@ -461,91 +459,81 @@ export default function Accounts() {
                                 >
                                   資源權限
                                 </button>
-                              )}
-                              {canEditScope && (
+                                {canEditScope && (
+                                  <button
+                                    className={editingScope
+                                      ? "btn btn-primary"
+                                      : "btn btn-ghost"}
+                                    type="button"
+                                    aria-expanded={editingScope}
+                                    onClick={() => setEditingScopeAccountId(
+                                      editingScope ? null : account.id,
+                                    )}
+                                  >
+                                    資源上限
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 border-l border-border pl-3">
+                                {isRoot && (
+                                  <button
+                                    className="btn btn-ghost"
+                                    type="button"
+                                    onClick={() => setRoleChangeAccount(account)}
+                                  >
+                                    變更角色
+                                  </button>
+                                )}
+                                {isRoot && (
+                                  <button
+                                    className="btn btn-ghost"
+                                    type="button"
+                                    onClick={() => setPasswordResetAccount(account)}
+                                  >
+                                    重設密碼
+                                  </button>
+                                )}
                                 <button
-                                  className={editingScope
-                                    ? "btn btn-primary"
-                                    : "btn btn-ghost"}
+                                  className="btn btn-ghost"
                                   type="button"
-                                  aria-expanded={editingScope}
-                                  onClick={() => setEditingScopeAccountId(
-                                    editingScope ? null : account.id,
+                                  onClick={() => void runAction(
+                                    () => setAccountDisabled(account.id, !account.disabled),
+                                    account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
                                   )}
                                 >
-                                  資源上限
+                                  {account.disabled ? "啟用" : "停用"}
                                 </button>
-                              )}
-                            </div>
-                          )}
-                          {canManage && (
-                            <div
-                              className={`flex flex-wrap items-center gap-2 ${
-                                canEditAccess || canEditScope
-                                  ? "border-l border-border pl-3"
-                                  : ""
-                              }`}
-                            >
-                              {isRoot && (
                                 <button
                                   className="btn btn-ghost"
                                   type="button"
-                                  onClick={() => setRoleChangeAccount(account)}
+                                  onClick={() => void runAction(
+                                    () => revokeAccountSessions(account.id),
+                                    "撤銷登入階段失敗",
+                                  )}
                                 >
-                                  變更角色
+                                  登出所有裝置
                                 </button>
-                              )}
-                              {isRoot && (
+                              </div>
+                              <div className="flex items-center border-l border-border pl-3">
                                 <button
-                                  className="btn btn-ghost"
+                                  className="btn btn-danger"
                                   type="button"
-                                  onClick={() => setPasswordResetAccount(account)}
+                                  disabled={!account.disabled || resourceCount > 0}
+                                  title={getDeleteDisabledReason(account, resourceCount)}
+                                  onClick={() => {
+                                    if (!window.confirm(
+                                      `確定刪除帳號「${account.username}」？`,
+                                    )) return;
+                                    void runAction(
+                                      () => deleteAccount(account.id),
+                                      "刪除帳號失敗",
+                                    );
+                                  }}
                                 >
-                                  重設密碼
+                                  刪除
                                 </button>
-                              )}
-                              <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={() => void runAction(
-                                  () => setAccountDisabled(account.id, !account.disabled),
-                                  account.disabled ? "啟用帳號失敗" : "停用帳號失敗",
-                                )}
-                              >
-                                {account.disabled ? "啟用" : "停用"}
-                              </button>
-                              <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={() => void runAction(
-                                  () => revokeAccountSessions(account.id),
-                                  "撤銷登入階段失敗",
-                                )}
-                              >
-                                登出所有裝置
-                              </button>
-                            </div>
-                          )}
-                          {canManage && (
-                            <div className="flex items-center border-l border-border pl-3">
-                              <button
-                                className="btn btn-danger"
-                                type="button"
-                                disabled={!account.disabled || resourceCount > 0}
-                                title={getDeleteDisabledReason(account, resourceCount)}
-                                onClick={() => {
-                                  if (!window.confirm(
-                                    `確定刪除帳號「${account.username}」？`,
-                                  )) return;
-                                  void runAction(
-                                    () => deleteAccount(account.id),
-                                    "刪除帳號失敗",
-                                  );
-                                }}
-                              >
-                                刪除
-                              </button>
-                            </div>
+                              </div>
+                            </>
                           )}
                         </div>
                       </div>

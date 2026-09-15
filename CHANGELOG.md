@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Administrator Delegation**: Administrators can now create administrators and manage the accounts they created directly, instead of every administrator action above `user` requiring ROOT. Role changes and password resets stay ROOT-only, and no administrator can manage its own account through the account APIs.
+
+  Delegation narrows monotonically, enforced in the database transaction:
+  - A new administrator inherits its creator's ceiling at creation time. Previously a missing scope row meant *unrestricted*, so a scoped administrator could create a subordinate and reach resources outside its own ceiling through it.
+  - Shrinking a ceiling now cascades down the `created_by` chain, clamping every descendant administrator's scope and revoking the grants and defaults each level can no longer support. Previously only the target's direct grants were revoked, so a subordinate kept resources its delegator had lost.
+  - A scoped administrator cannot hand out an unrestricted ceiling, and can only assign a subset of its own.
+
+  The account list shows the whole delegation subtree, but only directly created accounts are editable — releasing the whole subtree would let a demoted intermediary still reach its grandchildren.
+
 ### Fixed
 
 - **Administrator Scope Fail-Closed**: Runtime lookup errors now abort administrator resource resolution instead of granting unrestricted access. Scope regression tests cover runtime/repository failures, explicit repository injection, resource lists, and ROOT behavior. The account administration guide clarifies existing zero-grant account creation and required access-update validation.

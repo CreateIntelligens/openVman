@@ -559,3 +559,213 @@ def test_root_manages_accounts_created_by_anyone(env):
         defaults=("project-a", "char-a", "cosyvoice", "voice-a"),
     )
     assert defaults.voice_id == "voice-a"
+
+
+def _delegate_admin(env):
+    """A second-level admin created by the scoped admin, not by ROOT."""
+    return env["users"].create(
+        username="delegated-admin",
+        password_hash="hash",
+        role=AccountRole.ADMIN,
+        created_by=env["admin"].id,
+    )
+
+
+def test_scoped_admin_delegates_only_a_subset_of_its_own_ceiling(env):
+    _scope_two_voices(env)
+    delegate = _delegate_admin(env)
+
+    scope = env["scopes"].replace(
+        admin_user_id=delegate.id,
+        updated_by=env["admin"].id,
+        scoped=True,
+        resources=[(ResourceType.CUSTOM_VOICE, "voice-a")],
+    )
+
+    assert scope.scoped
+    assert scope.allows(ResourceType.CUSTOM_VOICE, "voice-a")
+    assert not scope.allows(ResourceType.CUSTOM_VOICE, "voice-b")
+
+
+def test_scoped_admin_cannot_delegate_outside_its_own_ceiling(env):
+    _scope_two_voices(env)
+    delegate = _delegate_admin(env)
+
+    # voice-c 不在委派者的上限內，整段委派必須被拒絕。
+    with pytest.raises(InvalidResourceGrantError, match="outside your own scope"):
+        env["scopes"].replace(
+            admin_user_id=delegate.id,
+            updated_by=env["admin"].id,
+            scoped=True,
+            resources=[
+                (ResourceType.CUSTOM_VOICE, "voice-a"),
+                (ResourceType.CUSTOM_VOICE, "voice-c"),
+            ],
+        )
+
+    # 委派被拒後維持建立時繼承來的範圍，voice-c 沒有混進去。
+    unchanged = env["scopes"].get(delegate.id)
+    assert unchanged.scoped
+    assert not unchanged.allows(ResourceType.CUSTOM_VOICE, "voice-c")
+
+
+def test_scoped_admin_cannot_hand_out_unrestricted_scope(env):
+    """否則受限 admin 可開一個 unscoped 下屬，再經由他取回全部資源。"""
+    _scope_two_voices(env)
+    delegate = _delegate_admin(env)
+
+    with pytest.raises(InvalidResourceGrantError, match="unrestricted"):
+        env["scopes"].replace(
+            admin_user_id=delegate.id,
+            updated_by=env["admin"].id,
+            scoped=False,
+            resources=[],
+        )
+
+
+def test_admin_cannot_set_scope_of_an_admin_it_did_not_create(env):
+    _scope_two_voices(env)
+    stranger = env["users"].create(
+        username="stranger-admin",
+        password_hash="hash",
+        role=AccountRole.ADMIN,
+        created_by=env["root"].id,
+    )
+
+    with pytest.raises(AccountPolicyError):
+        env["scopes"].replace(
+            admin_user_id=stranger.id,
+            updated_by=env["admin"].id,
+            scoped=True,
+            resources=[(ResourceType.CUSTOM_VOICE, "voice-a")],
+        )
+
+
+def test_unscoped_admin_may_delegate_any_registered_resource(env):
+    """沒有上限的 admin（未設 scope）不受子集限制。"""
+    delegate = _delegate_admin(env)
+
+    scope = env["scopes"].replace(
+        admin_user_id=delegate.id,
+        updated_by=env["admin"].id,
+        scoped=True,
+        resources=[(ResourceType.CUSTOM_VOICE, "voice-c")],
+    )
+
+    assert scope.allows(ResourceType.CUSTOM_VOICE, "voice-c")
+
+
+def test_managed_subtree_spans_delegated_generations(env):
+    """strong 看得到 tim，也看得到 tim 之後開出來的帳號。"""
+    from app.auth.models import AccountType
+
+    delegate = _delegate_admin(env)
+    grandchild = env["users"].create(
+        username="grandchild-user",
+        password_hash="hash",
+        role=AccountRole.USER,
+        created_by=delegate.id,
+    )
+    unrelated = env["users"].create(
+        username="unrelated-user",
+        password_hash="hash",
+        role=AccountRole.USER,
+        created_by=env["root"].id,
+    )
+
+    visible = {
+        user.username
+        for user in env["users"].list_visible_subtree(
+            env["admin"].id,
+            account_type=AccountType.FORMAL,
+        )
+    }
+
+    assert {"admin-user", "delegated-admin", "grandchild-user"} <= visible
+    assert unrelated.username not in visible
+    assert "ai360" not in visible
+    assert grandchild.username in visible
+
+
+def test_new_subordinate_admin_inherits_the_creator_ceiling(env):
+    """受限 admin 開出來的 admin 不得預設不設限。"""
+    _scope_two_voices(env)
+    delegate = _delegate_admin(env)
+
+    scope = env["scopes"].get(delegate.id)
+
+    assert scope.scoped
+    assert scope.allows(ResourceType.CUSTOM_VOICE, "voice-a")
+    assert not scope.allows(ResourceType.CUSTOM_VOICE, "voice-c")
+
+
+def test_root_created_admin_stays_unscoped_by_default(env):
+    """ROOT 不設限，既有部署的「沒設過就不設限」行為必須保留。"""
+    fresh = env["users"].create(
+        username="root-made-admin",
+        password_hash="hash",
+        role=AccountRole.ADMIN,
+        created_by=env["root"].id,
+    )
+
+    assert not env["scopes"].get(fresh.id).scoped
+
+
+def test_shrinking_a_ceiling_cascades_down_the_delegation_chain(env):
+    """上層被縮權後，下屬與孫節點都不得保留已超出的範圍。"""
+    _scope_two_voices(env)
+    delegate = _delegate_admin(env)
+    grandchild = env["users"].create(
+        username="grandchild-admin",
+        password_hash="hash",
+        role=AccountRole.ADMIN,
+        created_by=delegate.id,
+    )
+
+    for target in (delegate.id, grandchild.id):
+        env["scopes"].replace(
+            admin_user_id=target,
+            updated_by=env["admin"].id if target == delegate.id else delegate.id,
+            scoped=True,
+            resources=[
+                (ResourceType.CUSTOM_VOICE, "voice-a"),
+                (ResourceType.CUSTOM_VOICE, "voice-b"),
+            ],
+        )
+
+    # ROOT 把上層收到只剩 voice-a。
+    env["scopes"].replace(
+        admin_user_id=env["admin"].id,
+        updated_by=env["root"].id,
+        scoped=True,
+        resources=[(ResourceType.CUSTOM_VOICE, "voice-a")],
+    )
+
+    for target in (delegate.id, grandchild.id):
+        scope = env["scopes"].get(target)
+        assert scope.scoped
+        assert scope.allows(ResourceType.CUSTOM_VOICE, "voice-a")
+        assert not scope.allows(ResourceType.CUSTOM_VOICE, "voice-b")
+
+
+def test_clearing_a_ceiling_empties_the_whole_chain(env):
+    """清空上層等於整條鏈失去資源，不是讓下屬變成不設限。"""
+    _scope_two_voices(env)
+    delegate = _delegate_admin(env)
+    env["scopes"].replace(
+        admin_user_id=delegate.id,
+        updated_by=env["admin"].id,
+        scoped=True,
+        resources=[(ResourceType.CUSTOM_VOICE, "voice-a")],
+    )
+
+    env["scopes"].replace(
+        admin_user_id=env["admin"].id,
+        updated_by=env["root"].id,
+        scoped=True,
+        resources=[],
+    )
+
+    scope = env["scopes"].get(delegate.id)
+    assert scope.scoped
+    assert not scope.allows(ResourceType.CUSTOM_VOICE, "voice-a")
