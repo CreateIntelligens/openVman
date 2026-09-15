@@ -773,3 +773,95 @@ def test_batch_passwords_require_admin_even_with_portal_access(
     denied = client.get("/api/v1/temporary-accounts/batches", headers=headers)
     assert denied.status_code == (401 if actor == "anonymous" else 403)
     assert all(password not in denied.text for password in passwords)
+
+
+def _login_headers(client: TestClient, username: str, password: str) -> dict[str, str]:
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": password},
+    )
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['token']}"}
+
+
+def test_temporary_batches_are_scoped_to_the_creators_subtree(
+    client: TestClient,
+    runtime: AuthRuntime,
+):
+    """admin 只看得到、動得了自己子樹發出的臨時批次。
+
+    線上發現：受限 admin 登入後看到 ROOT 發的 16 批臨時帳號，且能撤銷。
+    """
+    root = runtime.users.create_root(
+        username="ai360",
+        password_hash=hash_password(_ROOT_PASSWORD),
+    )
+    for resource_type, resource_id in (
+        (ResourceType.PROJECT, "proj-b85afb8bb6"),
+        (ResourceType.AVATAR_CHARACTER, "0713"),
+        (ResourceType.CUSTOM_VOICE, "hayley"),
+    ):
+        runtime.resources.register(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            owner_user_id=None,
+            visibility=ResourceVisibility.SYSTEM_PUBLIC,
+        )
+    runtime.users.create(
+        username="admin",
+        password_hash=hash_password(_ADMIN_PASSWORD),
+        role=AccountRole.ADMIN,
+        created_by=root.id,
+    )
+    runtime.users.create(
+        username="other",
+        password_hash=hash_password(_ADMIN_PASSWORD),
+        role=AccountRole.ADMIN,
+        created_by=root.id,
+    )
+    root_headers = _root_headers(client)
+    admin_headers = _admin_headers(client)
+    other_headers = _login_headers(client, "other", _ADMIN_PASSWORD)
+
+    root_batch = client.post(
+        "/api/v1/temporary-accounts/batches",
+        headers=root_headers, json=_batch_body(),
+    ).json()["batch_id"]
+    admin_batch = client.post(
+        "/api/v1/temporary-accounts/batches",
+        headers=admin_headers, json=_batch_body(),
+    ).json()["batch_id"]
+
+    def visible(headers: dict[str, str]) -> set[str]:
+        response = client.get(
+            "/api/v1/temporary-accounts/batches", headers=headers,
+        )
+        assert response.status_code == 200
+        return {batch["batch_id"] for batch in response.json()}
+
+    assert visible(root_headers) == {root_batch, admin_batch}
+    assert visible(admin_headers) == {admin_batch}
+    assert visible(other_headers) == set()
+
+    # 別人的批次一律當不存在。
+    for path in (
+        f"/api/v1/temporary-accounts/batches/{root_batch}/revoke",
+        f"/api/v1/temporary-accounts/batches/{admin_batch}/revoke",
+    ):
+        assert client.post(path, headers=other_headers).status_code == 404
+    denied = client.patch(
+        f"/api/v1/temporary-accounts/batches/{root_batch}/admin-portal-access",
+        headers=admin_headers, json={"enabled": True},
+    )
+    assert denied.status_code == 404
+    assert runtime.temporary_accounts.get_batch(root_batch).batch.revoked_at is None
+
+    # 自己的批次照常，ROOT 動任何批次都行。
+    assert client.post(
+        f"/api/v1/temporary-accounts/batches/{admin_batch}/revoke",
+        headers=admin_headers,
+    ).status_code == 200
+    assert client.post(
+        f"/api/v1/temporary-accounts/batches/{root_batch}/revoke",
+        headers=root_headers,
+    ).status_code == 200

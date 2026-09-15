@@ -448,6 +448,46 @@ def test_narrowing_a_scope_leaves_no_dangling_default(env):
     )
 
 
+def test_repointed_voice_default_switches_provider_with_it(env):
+    """改指預設聲線時 provider 必須一起換。
+
+    線上發現：撤掉 cosyvoice 的聲線後預設改指 indextts 的 hayley，但
+    voice_provider 留著 cosyvoice，組成一個不存在的聲線。
+    """
+    env["resources"].upsert_system_resource(
+        resource_type=ResourceType.CUSTOM_VOICE,
+        resource_id="voice-a",
+        metadata={"label": "voice-a", "provider": "indextts"},
+    )
+    env["resources"].upsert_system_resource(
+        resource_type=ResourceType.CUSTOM_VOICE,
+        resource_id="voice-c",
+        metadata={"label": "voice-c", "provider": "cosyvoice"},
+    )
+    downstream = env["users"].create(
+        username="downstream-provider",
+        password_hash="hash",
+        role=AccountRole.USER,
+        created_by=env["admin"].id,
+        grants=[
+            (ResourceType.PROJECT, "project-a"),
+            (ResourceType.AVATAR_CHARACTER, "char-a"),
+            (ResourceType.CUSTOM_VOICE, "voice-a"),
+            (ResourceType.CUSTOM_VOICE, "voice-c"),
+        ],
+        defaults=("project-a", "char-a", "cosyvoice", "voice-c"),
+    )
+
+    _scope_two_voices(env)
+
+    defaults = env["access"].get_defaults(downstream.id)
+    assert defaults is not None
+    assert defaults.voice_id == "voice-a"
+    assert defaults.voice_provider == "indextts", (
+        "voice_id 換到 indextts 的聲線，provider 卻還是 cosyvoice"
+    )
+
+
 def test_root_can_give_an_administrator_its_own_resources(env):
     """管理員也能有自己的可用資源，由 ROOT 指定。"""
     grants, defaults = (
