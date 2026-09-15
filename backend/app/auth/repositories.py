@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import base64
 import json
-import secrets
 import sqlite3
 import unicodedata
 from collections.abc import Iterable, Sequence
@@ -12,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from ._repository_base import RepositoryError, now_iso
 from .database import AuthDatabase
 from .models import (
     ADMIN_OR_ABOVE_VALUES,
@@ -21,7 +20,6 @@ from .models import (
     AccountType,
     AdminScope,
     AuthAuditEventRecord,
-    EmbedKeyRecord,
     ResourceGrantRecord,
     ResourceRecord,
     ResourceType,
@@ -39,10 +37,6 @@ from .policy import (
     ensure_can_manage_account,
     ensure_can_reset_password,
 )
-
-
-class RepositoryError(RuntimeError):
-    """Base class for deterministic repository failures."""
 
 
 class UsernameConflictError(RepositoryError):
@@ -126,8 +120,6 @@ def _display_username(username: str) -> str:
     return display
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -270,7 +262,7 @@ def _append_auth_audit(
             action,
             actor_user_id,
             target_user_id,
-            now or _now_iso(),
+            now or now_iso(),
             json.dumps(safe_metadata, separators=(",", ":"), sort_keys=True),
         ),
     )
@@ -513,7 +505,7 @@ class UserRepository:
         user_id = f"usr_{uuid4().hex}"
         display_username = _display_username(username)
         normalized_username = normalize_username(username)
-        now = _now_iso()
+        now = now_iso()
 
         try:
             with self.database.transaction(write=True) as connection:
@@ -610,7 +602,7 @@ class UserRepository:
         normalized_username = normalize_username(username)
         if normalized_username != ROOT_USERNAME:
             raise ValueError(f"ROOT username must be {ROOT_USERNAME}")
-        now = _now_iso()
+        now = now_iso()
 
         try:
             with self.database.transaction(write=True) as connection:
@@ -755,7 +747,7 @@ class UserRepository:
                         "cannot disable the final enabled administrator"
                     )
             if target.disabled != disabled:
-                now = _now_iso()
+                now = now_iso()
                 connection.execute(
                     """
                     UPDATE users
@@ -786,7 +778,7 @@ class UserRepository:
         with self.database.transaction(write=True) as connection:
             actor, target = _load_actor_and_target(connection, actor_id, user_id)
             ensure_can_manage_account(actor, target)
-            now = _now_iso()
+            now = now_iso()
             connection.execute(
                 """
                 UPDATE users
@@ -833,7 +825,7 @@ class UserRepository:
             if counts:
                 raise OwnedResourcesError(counts)
 
-            now = _now_iso()
+            now = now_iso()
             connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
             _append_auth_audit(
                 connection,
@@ -876,7 +868,7 @@ class UserRepository:
             # 升為 admin 時一併給資源是允許的；change_role 本來就只有 ROOT
             # 能呼叫（ensure_can_change_role），不需要再擋一次。
 
-            now = _now_iso()
+            now = now_iso()
             if role is AccountRole.USER:
                 normalized_grants, normalized_defaults = normalized_access
                 _persist_account_access(
@@ -942,7 +934,7 @@ class UserRepository:
             actor, target = _load_actor_and_target(connection, actor_id, user_id)
             ensure_can_reset_password(actor, target)
 
-            now = _now_iso()
+            now = now_iso()
             connection.execute(
                 """
                 UPDATE users
@@ -979,7 +971,7 @@ class UserRepository:
                 or root.account_type is not AccountType.FORMAL
             ):
                 raise RepositoryError("ROOT identity is invalid")
-            now = _now_iso()
+            now = now_iso()
             connection.execute(
                 """
                 UPDATE users
@@ -1019,7 +1011,7 @@ class UserRepository:
                 raise AccountPolicyError(
                     "temporary account passwords cannot be changed"
                 )
-            now = _now_iso()
+            now = now_iso()
             connection.execute(
                 """
                 UPDATE users
@@ -1095,7 +1087,7 @@ class ResourceRepository:
                         normalized_id,
                         owner_user_id,
                         visibility.value,
-                        _now_iso(),
+                        now_iso(),
                         json.dumps(
                             metadata or {}, separators=(",", ":"), sort_keys=True
                         ),
@@ -1135,7 +1127,7 @@ class ResourceRepository:
                 (
                     resource_type.value,
                     normalized_id,
-                    _now_iso(),
+                    now_iso(),
                     json.dumps(
                         metadata or {}, separators=(",", ":"), sort_keys=True
                     ),
@@ -1299,7 +1291,7 @@ class AdminScopeRepository:
                 key=lambda item: (item[0].value, item[1]),
             )
         )
-        now = _now_iso()
+        now = now_iso()
         with self.database.transaction(write=True) as connection:
             actor = connection.execute(
                 "SELECT * FROM users WHERE id = ?",
@@ -1529,10 +1521,10 @@ def _narrow_subordinate_scopes(
     while pending:
         current = pending.pop()
         children = connection.execute(
-            """
+            f"""
             SELECT id FROM users
-            WHERE created_by = ? AND role IN ({placeholders})
-            """.format(placeholders=_ADMIN_OR_ABOVE_PLACEHOLDERS),
+            WHERE created_by = ? AND role IN ({_ADMIN_OR_ABOVE_PLACEHOLDERS})
+            """,
             (current, *ADMIN_OR_ABOVE_VALUES),
         ).fetchall()
         for child in children:
@@ -1703,7 +1695,7 @@ class AccountAccessRepository:
             grants,
             defaults,
         )
-        now = _now_iso()
+        now = now_iso()
         with self.database.transaction(write=True) as connection:
             actor = connection.execute(
                 "SELECT * FROM users WHERE id = ?",
@@ -1819,7 +1811,7 @@ class TemporaryAccountRepository:
             raise ValueError("temporary credential locators must be unique")
 
         batch_id = f"tmpbatch_{uuid4().hex}"
-        now = _now_iso()
+        now = now_iso()
         try:
             with self.database.transaction(write=True) as connection:
                 creator = connection.execute(
@@ -2109,7 +2101,7 @@ class TemporaryAccountRepository:
         actor_id: str,
         enabled: bool,
     ) -> TemporaryBatch:
-        now = _now_iso()
+        now = now_iso()
         with self.database.transaction(write=True) as connection:
             actor = connection.execute(
                 "SELECT * FROM users WHERE id = ?",
@@ -2161,7 +2153,7 @@ class TemporaryAccountRepository:
         *,
         actor_id: str,
     ) -> TemporaryBatch:
-        now = _now_iso()
+        now = now_iso()
         with self.database.transaction(write=True) as connection:
             actor = connection.execute(
                 "SELECT * FROM users WHERE id = ?",
@@ -2211,235 +2203,26 @@ class TemporaryAccountRepository:
         return batch
 
 
-EMBED_KEY_PREFIX = "ovk_"
-EMBED_KEY_RANDOM_CHARS = 24
-DEFAULT_RATE_LIMIT_PER_MINUTE = 60
-DEFAULT_DAILY_REQUEST_QUOTA = 1000
-
-_EMBED_KEY_TEXT_FIELDS = (
-    "label",
-    "default_character_id",
-    "default_persona_id",
-    "default_tts_provider",
-    "default_tts_voice",
+# 呼叫端歷來從這裡 import embed key 的符號，維持原入口。__all__ 讓這些
+# re-export 不會被 linter 當成未使用而刪掉。
+from .embed_keys_repository import (
+    DEFAULT_DAILY_REQUEST_QUOTA,
+    DEFAULT_RATE_LIMIT_PER_MINUTE,
+    EMBED_KEY_PREFIX,
+    EMBED_KEY_RANDOM_CHARS,
+    EmbedKeyNotFoundError,
+    EmbedKeyRepository,
+    generate_embed_key_id,
+    utc_day,
 )
-_EMBED_KEY_LIST_FIELDS = ("allowed_origins", "allowed_character_ids")
-_EMBED_KEY_LIMIT_FIELDS = ("rate_limit_per_minute", "daily_request_quota")
 
-
-class EmbedKeyNotFoundError(RepositoryError):
-    pass
-
-
-def generate_embed_key_id() -> str:
-    """`ovk_` plus 24 lowercase base32 characters, no padding."""
-    # 24 個 base32 字元需要 120 bits，也就是 15 bytes 才能不靠填充編滿。
-    raw = base64.b32encode(secrets.token_bytes(15)).decode("ascii")
-    return f"{EMBED_KEY_PREFIX}{raw.rstrip('=').lower()[:EMBED_KEY_RANDOM_CHARS]}"
-
-
-def utc_day(now: datetime | None = None) -> str:
-    moment = now or datetime.now(timezone.utc)
-    return moment.astimezone(timezone.utc).strftime("%Y-%m-%d")
-
-
-def _string_tuple(payload: str) -> tuple[str, ...]:
-    try:
-        values = json.loads(payload)
-    except ValueError:
-        return ()
-    if not isinstance(values, list):
-        return ()
-    return tuple(value for value in values if isinstance(value, str) and value)
-
-
-def _json_list(values: Iterable[str]) -> str:
-    return json.dumps([str(value) for value in values], separators=(",", ":"))
-
-
-def _embed_key_from_row(row: sqlite3.Row) -> EmbedKeyRecord:
-    return EmbedKeyRecord(
-        key_id=row["key_id"],
-        label=row["label"],
-        project_id=row["project_id"],
-        allowed_origins=_string_tuple(row["allowed_origins_json"]),
-        default_character_id=row["default_character_id"],
-        allowed_character_ids=_string_tuple(row["allowed_character_ids_json"]),
-        default_persona_id=row["default_persona_id"],
-        default_tts_provider=row["default_tts_provider"],
-        default_tts_voice=row["default_tts_voice"],
-        rate_limit_per_minute=int(row["rate_limit_per_minute"]),
-        daily_request_quota=int(row["daily_request_quota"]),
-        disabled=bool(row["disabled"]),
-        created_by=row["created_by"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        last_used_at=row["last_used_at"],
-    )
-
-
-class EmbedKeyRepository:
-    """CRUD plus per-day request accounting for embed keys."""
-
-    def __init__(self, database: AuthDatabase) -> None:
-        self.database = database
-
-    def create(
-        self,
-        *,
-        label: str,
-        project_id: str,
-        allowed_origins: Sequence[str],
-        default_character_id: str = "",
-        allowed_character_ids: Sequence[str] = (),
-        default_persona_id: str = "",
-        default_tts_provider: str = "",
-        default_tts_voice: str = "",
-        rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE,
-        daily_request_quota: int = DEFAULT_DAILY_REQUEST_QUOTA,
-        created_by: str | None = None,
-    ) -> EmbedKeyRecord:
-        if not allowed_origins:
-            raise ValueError("at least one allowed origin is required")
-        if rate_limit_per_minute < 1 or daily_request_quota < 1:
-            raise ValueError("limits must be at least 1")
-        key_id = generate_embed_key_id()
-        now = _now_iso()
-        with self.database.transaction(write=True) as connection:
-            connection.execute(
-                """
-                INSERT INTO embed_keys(
-                    key_id, label, project_id, allowed_origins_json,
-                    default_character_id, allowed_character_ids_json,
-                    default_persona_id, default_tts_provider,
-                    default_tts_voice, rate_limit_per_minute,
-                    daily_request_quota, disabled, created_by, created_at,
-                    updated_at, last_used_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL)
-                """,
-                (
-                    key_id,
-                    label.strip(),
-                    project_id.strip(),
-                    _json_list(allowed_origins),
-                    default_character_id.strip(),
-                    _json_list(allowed_character_ids),
-                    default_persona_id.strip(),
-                    default_tts_provider.strip(),
-                    default_tts_voice.strip(),
-                    int(rate_limit_per_minute),
-                    int(daily_request_quota),
-                    created_by,
-                    now,
-                    now,
-                ),
-            )
-        record = self.get(key_id)
-        if record is None:
-            raise RepositoryError("created embed key could not be reloaded")
-        return record
-
-    def get(self, key_id: str) -> EmbedKeyRecord | None:
-        with self.database.transaction() as connection:
-            row = connection.execute(
-                "SELECT * FROM embed_keys WHERE key_id = ?",
-                (key_id.strip(),),
-            ).fetchone()
-        return _embed_key_from_row(row) if row is not None else None
-
-    def list_all(self) -> list[EmbedKeyRecord]:
-        with self.database.transaction() as connection:
-            rows = connection.execute(
-                "SELECT * FROM embed_keys ORDER BY created_at DESC, key_id"
-            ).fetchall()
-        return [_embed_key_from_row(row) for row in rows]
-
-    def update(self, key_id: str, **changes: object) -> EmbedKeyRecord:
-        """Apply only the supplied fields; an unknown field name is a ValueError."""
-        assignments: list[str] = []
-        params: list[object] = []
-        for name, value in changes.items():
-            if name in _EMBED_KEY_TEXT_FIELDS:
-                assignments.append(f"{name} = ?")
-                params.append(str(value).strip())
-            elif name in _EMBED_KEY_LIST_FIELDS:
-                if name == "allowed_origins" and not value:
-                    raise ValueError("at least one allowed origin is required")
-                assignments.append(f"{name}_json = ?")
-                params.append(_json_list(value))  # type: ignore[arg-type]
-            elif name in _EMBED_KEY_LIMIT_FIELDS:
-                limit = int(value)  # type: ignore[call-overload]
-                if limit < 1:
-                    raise ValueError("limits must be at least 1")
-                assignments.append(f"{name} = ?")
-                params.append(limit)
-            elif name == "disabled":
-                assignments.append("disabled = ?")
-                params.append(1 if value else 0)
-            else:
-                raise ValueError(f"unknown embed key field: {name}")
-
-        if assignments:
-            assignments.append("updated_at = ?")
-            params.append(_now_iso())
-            params.append(key_id.strip())
-            with self.database.transaction(write=True) as connection:
-                cursor = connection.execute(
-                    f"UPDATE embed_keys SET {', '.join(assignments)} WHERE key_id = ?",
-                    tuple(params),
-                )
-                if cursor.rowcount == 0:
-                    raise EmbedKeyNotFoundError(key_id)
-
-        record = self.get(key_id)
-        if record is None:
-            raise EmbedKeyNotFoundError(key_id)
-        return record
-
-    def delete(self, key_id: str) -> None:
-        with self.database.transaction(write=True) as connection:
-            cursor = connection.execute(
-                "DELETE FROM embed_keys WHERE key_id = ?",
-                (key_id.strip(),),
-            )
-            if cursor.rowcount == 0:
-                raise EmbedKeyNotFoundError(key_id)
-
-    def touch(self, key_id: str) -> None:
-        with self.database.transaction(write=True) as connection:
-            connection.execute(
-                "UPDATE embed_keys SET last_used_at = ? WHERE key_id = ?",
-                (_now_iso(), key_id.strip()),
-            )
-
-    def requests_today(self, key_id: str, *, day: str | None = None) -> int:
-        with self.database.transaction() as connection:
-            row = connection.execute(
-                """
-                SELECT requests FROM embed_key_daily_usage
-                WHERE key_id = ? AND day = ?
-                """,
-                (key_id.strip(), day or utc_day()),
-            ).fetchone()
-        return int(row["requests"]) if row is not None else 0
-
-    def increment_daily(self, key_id: str, *, day: str | None = None) -> int:
-        """Count one request and return the running total for that day."""
-        target_day = day or utc_day()
-        with self.database.transaction(write=True) as connection:
-            connection.execute(
-                """
-                INSERT INTO embed_key_daily_usage(key_id, day, requests)
-                VALUES (?, ?, 1)
-                ON CONFLICT(key_id, day) DO UPDATE SET requests = requests + 1
-                """,
-                (key_id.strip(), target_day),
-            )
-            row = connection.execute(
-                """
-                SELECT requests FROM embed_key_daily_usage
-                WHERE key_id = ? AND day = ?
-                """,
-                (key_id.strip(), target_day),
-            ).fetchone()
-        return int(row["requests"]) if row is not None else 0
+__all__ = [
+    "DEFAULT_DAILY_REQUEST_QUOTA",
+    "DEFAULT_RATE_LIMIT_PER_MINUTE",
+    "EMBED_KEY_PREFIX",
+    "EMBED_KEY_RANDOM_CHARS",
+    "EmbedKeyNotFoundError",
+    "EmbedKeyRepository",
+    "generate_embed_key_id",
+    "utc_day",
+]
