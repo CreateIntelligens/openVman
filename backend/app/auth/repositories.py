@@ -566,6 +566,16 @@ class UserRepository:
                         now=now,
                         clear_existing=False,
                     )
+                if is_at_least_admin(role) and created_by is not None:
+                    # 受限 admin 開出來的 admin 必須在同一筆交易裡繼承上層的
+                    # 上限。少了這段，新帳號沒有 scope 列就等於不設限，受限
+                    # admin 只要開一個下屬就能取回自己拿不到的資源。
+                    _inherit_admin_scope(
+                        connection,
+                        admin_user_id=user_id,
+                        created_by=created_by,
+                        now=now,
+                    )
                 if created_by is not None:
                     _append_auth_audit(
                         connection,
@@ -673,6 +683,37 @@ class UserRepository:
             query += " WHERE account_type = ?"
             params.append(account_type.value)
         query += " ORDER BY username_normalized, id"
+        with self.database.transaction() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [_user_from_row(row) for row in rows]
+
+    def list_visible_subtree(
+        self,
+        actor_id: str,
+        *,
+        account_type: AccountType | None = None,
+    ) -> list[UserRecord]:
+        """List the accounts an administrator may see, plus their own row.
+
+        可見 ≠ 可管理：整棵委派子樹都看得到，但只有直屬下一層編輯得了
+        （ensure_can_manage_account 比對 created_by）。沒有遞迴的話，上層
+        就看不到自己委派出去的分支底下發生什麼事。
+        """
+        query = """
+            WITH RECURSIVE subtree(id) AS (
+                SELECT id FROM users WHERE id = ?
+                UNION
+                SELECT users.id FROM users
+                JOIN subtree ON users.created_by = subtree.id
+            )
+            SELECT users.* FROM users
+            JOIN subtree ON users.id = subtree.id
+        """
+        params: list[object] = [actor_id]
+        if account_type is not None:
+            query += " WHERE users.account_type = ?"
+            params.append(account_type.value)
+        query += " ORDER BY users.username_normalized, users.id"
         with self.database.transaction() as connection:
             rows = connection.execute(query, tuple(params)).fetchall()
         return [_user_from_row(row) for row in rows]
@@ -1267,10 +1308,6 @@ class AdminScopeRepository:
             if actor is None:
                 raise UserNotFoundError("administrator account does not exist")
             actor_record = _user_from_row(actor)
-            if actor_record.role is not AccountRole.ROOT:
-                raise AccountPolicyError(
-                    "only ROOT can set administrator resource scopes"
-                )
 
             target = connection.execute(
                 "SELECT * FROM users WHERE id = ?",
@@ -1283,6 +1320,26 @@ class AdminScopeRepository:
                 raise InvalidResourceGrantError(
                     "resource scopes apply to administrator accounts only"
                 )
+            if actor_record.role is not AccountRole.ROOT:
+                ensure_can_manage_account(actor_record, target_record)
+                # 委派出去的上限只能是自己的子集，而且不得是「不設限」——否則
+                # 受限 admin 可以開一個 unscoped 的下屬,再透過他取回全部資源。
+                actor_scope = _load_admin_scope(connection, actor_record.id)
+                if actor_scope.scoped:
+                    if not scoped:
+                        raise InvalidResourceGrantError(
+                            "a scoped administrator cannot grant unrestricted scope"
+                        )
+                    outside = [
+                        f"{resource_type.value}/{resource_id}"
+                        for resource_type, resource_id in normalized
+                        if not actor_scope.allows(resource_type, resource_id)
+                    ]
+                    if outside:
+                        raise InvalidResourceGrantError(
+                            "resources outside your own scope: "
+                            + ", ".join(sorted(outside))
+                        )
 
             for resource_type, resource_id in normalized:
                 exists = connection.execute(
@@ -1349,6 +1406,13 @@ class AdminScopeRepository:
                     admin_user_id=admin_user_id,
                     allowed=normalized,
                 )
+                _narrow_subordinate_scopes(
+                    connection,
+                    admin_user_id=admin_user_id,
+                    allowed=normalized,
+                    updated_by=updated_by,
+                    now=now,
+                )
 
             _append_auth_audit(
                 connection,
@@ -1402,6 +1466,126 @@ def _load_admin_scope(
             for row in rows
         ),
     )
+
+
+def _inherit_admin_scope(
+    connection: sqlite3.Connection,
+    *,
+    admin_user_id: str,
+    created_by: str,
+    now: str,
+) -> None:
+    """Copy the creator's ceiling onto a newly created administrator.
+
+    不設限的建立者（ROOT，或尚未被指派上限的 admin）不留下任何列，維持
+    既有部署「沒設過就不設限」的行為。
+    """
+    creator_scope = _load_admin_scope(connection, created_by)
+    if not creator_scope.scoped:
+        return
+    connection.execute(
+        """
+        INSERT INTO admin_scope_state(admin_user_id, scoped, updated_by, updated_at)
+        VALUES (?, 1, ?, ?)
+        ON CONFLICT(admin_user_id) DO UPDATE SET
+            scoped = 1, updated_by = excluded.updated_by,
+            updated_at = excluded.updated_at
+        """,
+        (admin_user_id, created_by, now),
+    )
+    connection.executemany(
+        """
+        INSERT INTO admin_resource_scopes(
+            admin_user_id, resource_type, resource_id, granted_by, created_at
+        ) VALUES (?, ?, ?, ?, ?)
+        """,
+        [
+            (admin_user_id, resource_type.value, resource_id, created_by, now)
+            for resource_type, resource_id in sorted(
+                creator_scope.resources,
+                key=lambda item: (item[0].value, item[1]),
+            )
+        ],
+    )
+
+
+def _narrow_subordinate_scopes(
+    connection: sqlite3.Connection,
+    *,
+    admin_user_id: str,
+    allowed: Sequence[tuple[ResourceType, str]],
+    updated_by: str,
+    now: str,
+) -> int:
+    """Clamp every descendant administrator to the shrunken ceiling.
+
+    收斂必須沿著委派鏈往下走：上層被縮權後，下屬保留原範圍的話，上層只要
+    先委派再被縮權就能透過下屬保住資源。每層都要跟著撤掉超出的授權。
+    """
+    allowed_set = {(item[0].value, item[1]) for item in allowed}
+    narrowed = 0
+    pending = [admin_user_id]
+    seen = {admin_user_id}
+    while pending:
+        current = pending.pop()
+        children = connection.execute(
+            """
+            SELECT id FROM users
+            WHERE created_by = ? AND role IN ({placeholders})
+            """.format(placeholders=_ADMIN_OR_ABOVE_PLACEHOLDERS),
+            (current, *ADMIN_OR_ABOVE_VALUES),
+        ).fetchall()
+        for child in children:
+            child_id = child["id"]
+            if child_id in seen:
+                continue
+            seen.add(child_id)
+            pending.append(child_id)
+
+            child_scope = _load_admin_scope(connection, child_id)
+            kept = [
+                (resource_type, resource_id)
+                for resource_type, resource_id in child_scope.resources
+                if (resource_type.value, resource_id) in allowed_set
+            ]
+            if child_scope.scoped and len(kept) == len(child_scope.resources):
+                continue
+
+            connection.execute(
+                """
+                INSERT INTO admin_scope_state(
+                    admin_user_id, scoped, updated_by, updated_at
+                ) VALUES (?, 1, ?, ?)
+                ON CONFLICT(admin_user_id) DO UPDATE SET
+                    scoped = 1, updated_by = excluded.updated_by,
+                    updated_at = excluded.updated_at
+                """,
+                (child_id, updated_by, now),
+            )
+            connection.execute(
+                "DELETE FROM admin_resource_scopes WHERE admin_user_id = ?",
+                (child_id,),
+            )
+            if kept:
+                connection.executemany(
+                    """
+                    INSERT INTO admin_resource_scopes(
+                        admin_user_id, resource_type, resource_id,
+                        granted_by, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (child_id, rt.value, rid, updated_by, now)
+                        for rt, rid in sorted(
+                            kept, key=lambda item: (item[0].value, item[1]),
+                        )
+                    ],
+                )
+            _revoke_grants_outside_scope(
+                connection, admin_user_id=child_id, allowed=kept,
+            )
+            narrowed += 1
+    return narrowed
 
 
 def _revoke_grants_outside_scope(
@@ -1538,15 +1722,6 @@ class AccountAccessRepository:
             if target["account_type"] != AccountType.FORMAL.value:
                 raise InvalidResourceGrantError(
                     "temporary account grants are managed by their batch"
-                )
-            # 管理員也可以有自己的可用資源，但只有 ROOT 能指定——否則 admin
-            # 之間可以互相改對方的資源，繞過階層。
-            if (
-                is_at_least_admin(AccountRole(target["role"]))
-                and AccountRole(actor["role"]) is not AccountRole.ROOT
-            ):
-                raise InvalidResourceGrantError(
-                    "only ROOT can set administrator resources"
                 )
 
             _persist_account_access(

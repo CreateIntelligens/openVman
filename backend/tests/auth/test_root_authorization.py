@@ -216,7 +216,7 @@ def test_actor_target_management_policy_matrix(
         (AccountRole.ROOT, AccountRole.ADMIN, True),
         (AccountRole.ROOT, AccountRole.USER, True),
         (AccountRole.ROOT, AccountRole.ROOT, False),
-        (AccountRole.ADMIN, AccountRole.ADMIN, False),
+        (AccountRole.ADMIN, AccountRole.ADMIN, True),
         (AccountRole.ADMIN, AccountRole.USER, True),
         (AccountRole.ADMIN, AccountRole.ROOT, False),
     ],
@@ -234,7 +234,7 @@ def test_create_role_policy_matrix(
             ensure_can_create_role(actor, new_role)
 
 
-def test_root_creates_admin_while_admin_cannot_create_or_manage_admin(
+def test_admin_delegates_to_own_admin_but_cannot_manage_itself(
     client: TestClient,
     runtime: AuthRuntime,
 ):
@@ -258,16 +258,30 @@ def test_root_creates_admin_while_admin_cannot_create_or_manage_admin(
     assert "hash" not in created.text.casefold()
 
     admin_headers = _headers(client, "managed-admin", _ADMIN_PASSWORD)
-    audit_before = runtime.auth_audit.list()
-    denied_create = client.post(
+
+    # 委派：admin 開得出自己的 admin，並且管得動他。
+    delegated = client.post(
         "/api/v1/users",
         headers=admin_headers,
         json={
-            "username": "forbidden-admin",
+            "username": "delegated-admin",
             "password": _ADMIN_PASSWORD,
             "role": "admin",
         },
     )
+    assert delegated.status_code == 201
+    assert delegated.json()["created_by"] == admin["id"]
+
+    managed = client.patch(
+        f"/api/v1/users/{delegated.json()['id']}/disabled",
+        headers=admin_headers,
+        json={"disabled": True},
+    )
+    assert managed.status_code == 200
+    assert runtime.users.get_by_id(delegated.json()["id"]).disabled is True
+
+    # 但自己的帳號不能經由帳號管理 API 動，否則 admin 可自我解除限制。
+    audit_before = runtime.auth_audit.list()
     denied_disable = client.patch(
         f"/api/v1/users/{admin['id']}/disabled",
         headers=admin_headers,
@@ -278,10 +292,8 @@ def test_root_creates_admin_while_admin_cannot_create_or_manage_admin(
         headers=admin_headers,
     )
 
-    assert denied_create.status_code == 403
     assert denied_disable.status_code == 403
     assert denied_revoke.status_code == 403
-    assert runtime.users.get_by_username("forbidden-admin") is None
     assert runtime.users.get_by_id(admin["id"]).disabled is False
     assert runtime.auth_audit.list() == audit_before
 

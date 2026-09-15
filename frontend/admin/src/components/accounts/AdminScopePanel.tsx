@@ -9,6 +9,7 @@ import {
   type AccountAccessOptions,
   type AdminScopeResources,
 } from "../../api/auth";
+import { useAuth } from "../../context/AuthContext";
 
 type ScopeKey = keyof AdminScopeResources;
 
@@ -51,6 +52,10 @@ export default function AdminScopePanel({
   onCancel,
   onSaved,
 }: AdminScopePanelProps) {
+  const { account: currentAccount } = useAuth();
+  // 只有 ROOT 給得出「不設限」。受限 admin 取消勾選的話 API 必回 422，
+  // 與其讓他存檔後才撞牆，不如直接停用這個選項。
+  const canUnrestrict = currentAccount?.role === "root";
   const [options, setOptions] = useState<AccountAccessOptions | null>(null);
   const [scoped, setScoped] = useState(false);
   const [selection, setSelection] = useState<AdminScopeResources>(EMPTY_RESOURCES);
@@ -161,13 +166,15 @@ export default function AdminScopePanel({
           className="mt-1 h-4 w-4 accent-primary"
           type="checkbox"
           checked={scoped}
+          disabled={!canUnrestrict}
           onChange={(event) => setScoped(event.target.checked)}
         />
         <span>
           <span className="block text-sm font-semibold">限制可用資源</span>
           <span className="mt-1 block text-xs leading-5 text-content-muted">
-            不勾選代表不設限，這位管理員維持看得到全部資源。勾選後只有下方選取的項目對他可見，
-            縮小範圍會一併撤銷他先前發出、如今已超出上限的授權。
+            {canUnrestrict
+              ? "不勾選代表不設限，這位管理員維持看得到全部資源。勾選後只有下方選取的項目對他可見，縮小範圍會一併撤銷他先前發出、如今已超出上限的授權。"
+              : "你自己的範圍有限，指派出去的上限只能是其中的子集，因此無法取消限制。縮小範圍會一併撤銷他先前發出、如今已超出上限的授權。"}
           </span>
         </span>
       </label>

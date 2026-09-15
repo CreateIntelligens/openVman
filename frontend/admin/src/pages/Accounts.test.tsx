@@ -230,24 +230,47 @@ describe("Accounts", () => {
     ]);
   });
 
-  it("hides privileged creation and mutation controls from administrators", async () => {
+  it("keeps ROOT-only controls away from administrators", async () => {
     vi.mocked(listAccounts).mockResolvedValue([
       formalAccount("root-a", "ai360", "root"),
       formalAccount("admin-a", "admin", "admin"),
-      formalAccount("admin-b", "operator", "admin"),
-      formalAccount("user-b", "viewer", "user"),
+      formalAccount("admin-b", "operator", "admin", "root-a"),
+      formalAccount("user-b", "viewer", "user", "root-a"),
     ]);
 
     render(<Accounts />);
-
-    expect(screen.queryByRole("option", { name: "管理員" })).toBeNull();
     switchToManageTab();
 
     await screen.findByText("ROOT");
+    // 子樹裡看得到，但不是自己建立的就動不了。
     expect(rowButtonLabels(rowByUsername("ai360"))).toEqual([]);
     expect(rowButtonLabels(rowByUsername("admin"))).toEqual([]);
     expect(rowButtonLabels(rowByUsername("operator"))).toEqual([]);
-    expect(rowButtonLabels(rowByUsername("viewer"))).toEqual([
+    expect(rowButtonLabels(rowByUsername("viewer"))).toEqual([]);
+  });
+
+  it("lets an administrator manage the accounts it created, admins included", async () => {
+    vi.mocked(listAccounts).mockResolvedValue([
+      formalAccount("admin-a", "admin", "admin"),
+      formalAccount("admin-c", "delegate", "admin", "admin-a"),
+      formalAccount("user-c", "own-user", "user", "admin-a"),
+    ]);
+
+    render(<Accounts />);
+    // 委派鏈要起得來，admin 得開得出 admin。
+    expect(screen.queryByRole("option", { name: "管理員" })).not.toBeNull();
+    switchToManageTab();
+
+    await screen.findByText("delegate");
+    // 變更角色／重設密碼仍是 ROOT 專屬，不出現在這裡。
+    expect(rowButtonLabels(rowByUsername("delegate"))).toEqual([
+      "資源權限",
+      "資源上限",
+      "停用",
+      "登出所有裝置",
+      "刪除",
+    ]);
+    expect(rowButtonLabels(rowByUsername("own-user"))).toEqual([
       "資源權限",
       "停用",
       "登出所有裝置",
@@ -408,11 +431,13 @@ function formalAccount(
   id: string,
   username: string,
   role: Account["role"],
+  createdBy: string | null = null,
 ): Account {
   return {
     id,
     username,
     role,
+    created_by: createdBy,
     kind: "formal",
     disabled: false,
     created_at: "2026-08-18T00:00:00Z",

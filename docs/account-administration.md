@@ -16,7 +16,7 @@
 正式帳號依序為 `ROOT > admin > user`，持久化值皆為小寫，只有介面將 `root` 顯示成 `ROOT`。
 
 - 唯一 ROOT 是正規化 username 為 `ai360` 的正式帳號。ROOT 繼承所有 admin 能力，並可建立及管理 admin／user／temporary。
-- admin 可管理 user／temporary 與專案生命週期，但不能建立或修改 admin，也不能對 ROOT 執行任何帳號管理操作。
+- admin 可管理 user／temporary 與專案生命週期，也可以建立 admin 並管理**自己直接建立**的帳號（含 admin），但不能對 ROOT 執行任何帳號管理操作，也不能管理自己的帳號。變更角色與重設密碼仍限定 ROOT。
 - user 與 temporary 沒有帳號管理或專案建立／刪除權限，資源存取仍依 ownership、grants 與 defaults 決定。
 - ROOT／admin 固定可進管理後台；user 與 temporary 只有在管理員明確開啟「允許進入管理後台」後才可進入，預設為不允許。這項權限不會提升帳號角色或擴大原有 grants，但會讓帳號可編輯已授權專案內的知識、Quick QA、Persona Prompt、記憶、Skills 與 Tools。
 - 管理 API 不允許建立第二個 ROOT，也不允許 rename、disable、delete 或 demote 既有 ROOT。
@@ -25,7 +25,13 @@
 
 ### 管理員資源範圍
 
-帳號頁的「資源上限」是 ROOT 指定給 admin 的資源白名單，不是數量配額。`scoped=false` 表示不限制；`scoped=true` 且清單為空表示沒有可用範圍。ROOT 本身不受此範圍限制。
+帳號頁的「資源上限」是指定給 admin 的資源白名單，不是數量配額。`scoped=false` 表示不限制；`scoped=true` 且清單為空表示沒有可用範圍。ROOT 本身不受此範圍限制。
+
+ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立的 admin，且只能給出自己範圍的子集，也不得給出「不設限」——否則他可以開一個無限制的下屬再取回全部資源。
+
+委派鏈上的收斂是自動的：受限 admin 建立 admin 時，新帳號在同一筆 transaction 內繼承建立者當下的上限（建立者未設限則不留列，維持既有行為）；上層範圍縮小時，會沿 `created_by` 遞迴收斂所有下層 admin 的上限，並撤銷各層超出的授權與預設值。
+
+帳號列表的可見範圍與可管理範圍不同：admin 看得到自己委派出去的**整棵子樹**，但只編輯得了直屬下一層（`created_by` 等於自己）。放行整棵子樹會讓被降權的中間人仍能繞過去改孫節點。
 
 資源解析與清單查詢會讀取 admin 的範圍；runtime 初始化或範圍查詢失敗時中止請求，不會轉成無限制存取。只有成功讀取後確認未設限的 admin 才保留原本的全部資源權限。測試替身應明確注入 `AdminScopeRepository`，不可依賴 runtime 失敗來跳過授權。
 
