@@ -247,13 +247,29 @@ Buildx + QEMU 建立並推送：
 
 | Image | Platforms | 用途 |
 |---|---|---|
-| `openvman-backend` | `linux/amd64`, `linux/arm64` | Backend 與 Gateway Worker |
+| `openvman-backend-base` | `linux/amd64`, `linux/arm64` | Backend 的 toolchain、parser stack（docling / firecrawl / pdf-inspector）與 runtime apt 套件 |
+| `openvman-backend` | `linux/amd64`, `linux/arm64` | Backend 與 Gateway Worker，`FROM openvman-backend-base` |
 | `openvman-admin` | `linux/amd64`, `linux/arm64` | Admin UI |
 | `openvman-avatar` | `linux/amd64`, `linux/arm64` | Avatar frontend |
 | `openvman-api` | `linux/amd64` | CUDA Brain API |
 | `openvman-embedding` | `linux/amd64` | CUDA/PyTorch Embedding |
 
 Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`。
+
+`openvman-backend-base` 由 `backend/Dockerfile.base` 定義，建一次要半小時以上
+（pdf-inspector 是 Rust extension、沒有 wheel，arm64 還得在 QEMU 下編）。
+`backend-base` job 只在三種情況重建：`Dockerfile.base` 相對前一個 commit 有變動、
+Docker Hub 上還沒有這個映像、或以 `workflow_dispatch` 勾選 `rebuild_base`。
+其餘時候 backend 只疊 `requirements.txt` 與 `app/`，幾分鐘完成。要升級 docling
+或改 parser 套件就改 `Dockerfile.base`，不要改回 `backend/Dockerfile`。
+
+`backend/Dockerfile` 刻意是單一 stage：直接在 base 的 venv 裡裝 requirements，
+新增的 layer 只有差異；若用 builder→runner 複製 `/opt/venv`，每次 build 都會重新
+產生整個數 GB 的 venv layer，base 映像就白拆了。
+
+本機建置 backend 時 `docker compose build backend` 會自動從 Docker Hub 拉 base；
+要改 base 本身則先
+`docker build -f backend/Dockerfile.base -t tbdavid2019/openvman-backend-base:latest backend`。
 
 `protocol-contracts` workflow 使用 `actions/checkout@v6` 與 `actions/setup-python@v7`，
 採 Node.js 24-compatible action runtime；改用 self-hosted runner 時需支援該 runtime。
