@@ -43,6 +43,12 @@ ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立�
 
 此類帳號可以一般登入，但不會因此取得其他帳號或 system-public 資源的授權，管理後台權限也預設關閉。`PUT /api/v1/users/{user_id}/access` 透過共用正規化檢查要求完整 grants 與 defaults，不能以空 grants 完成設定。零 grants 也不代表撤銷原有 ownership；既有資源擁有者仍適用 ownership 規則。
 
+## Repository 模組與匯入介面
+
+`backend/app/auth/repositories.py` 保留帳號、資源、scope、授權、臨時帳號與 audit 的資料存取；Embed key 儲存獨立放在 `embed_keys_repository.py`。兩者共用 `_repository_base.py` 的 `RepositoryError` 與時間戳 helper，避免循環匯入。
+
+既有呼叫端仍可從 `app.auth.repositories` 匯入 `EmbedKeyRepository` 等符號。`__all__` 明確列出公開 repositories、例外、批次資料型別、Embed key 常數與工具函式；`from app.auth.repositories import *` 同時包含帳號與 Embed key 介面。內部 SQL helpers 不公開匯出；權限檢查、資料更新、連動撤權及 audit 繼續共用原本的 transaction。
+
 ## Migration 與 session
 
 Backend 啟動時會把既有正式 `ai360` 原地升級為 ROOT。Migration 會保留帳號 ID、bcrypt hash、created metadata、resource ownership、grants 與 defaults，並遞增 `token_version`，因此 migration 前的 cookie 與 bearer token 都會立即失效。

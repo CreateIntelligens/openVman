@@ -26,7 +26,7 @@ function isWidgetScreenshotMessage(
 }
 
 export function needsMascotSnapshot(mascot: AvatarMascot): boolean {
-  // 只認我們自己產出的縮圖：外部 URL 代表上游給的圖，不該被自動截圖蓋掉。
+  // 以已儲存到 /static/mascots/ 的縮圖為完成標記；缺圖或其他 URL 都需重新截圖。
   return (
     !mascot.thumbnail_url
     || !mascot.thumbnail_url.includes("/static/mascots/")
