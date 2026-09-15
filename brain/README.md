@@ -18,7 +18,10 @@
 - `search_knowledge`、`search_memory` 與其他工具的回傳值一律視為不可信資料，不能授權另一個工具執行；`save_memory` 需要目前使用者明確要求記憶。
 - `main.py` 是 operator-managed skill source，不能透過技能檔案 API 上傳或替換。生產環境的 shared/project skill source 應維持唯讀並走 code review。
 - `read_web_page` 只接受可解析到公開網路位址的 HTTP(S) URL；private、loopback、link-local、reserved、multicast、unspecified 位址會被拒絕。
+- 2md endpoint 預設順序由不可變的 `TWO_MD_BASE_URLS` 統一管理；同一 logical request 只會序列呼叫一個 endpoint，並共用整條 fallback chain 的 deadline。
+- 2md 失敗時使用 bounded full-jitter、local single-flight 與可選 Redis circuit／half-open lease；Redis 不可用時降級為 process-local coordination，不保存網頁正文。
 - Embedding gateway 沒有設定 Bearer token 時會 fail closed；瀏覽器 CORS 必須由 `EMBEDDING_ALLOWED_ORIGINS` 明確列出 origin。
+- A2A tools 只透過 Backend internal facade 執行；Brain 不讀取 Backend 的 A2A credential file，也不會接觸 Hub agent token。Peer 內容一律視為 untrusted input。
 
 ## 1. 系統目標
 
@@ -431,6 +434,26 @@ Dreaming 以 `DREAMING_TIMEZONE`（預設 `Asia/Taipei`）判斷今天是否已�
 1. `https://2md.aiurl.tw`
 2. `https://2md.glsoft.ai`
 3. `https://create360.ai`
+
+TypeScript-facing consumers use the same immutable declaration:
+
+```ts
+export const TWO_MD_BASE_URLS = [
+  'https://2md.aiurl.tw',
+  'https://2md.glsoft.ai',
+  'https://create360.ai',
+] as const;
+```
+
+可用 `URL2MD_BASE_URLS` 以完整逗號分隔清單覆寫；若未設定，才相容讀取舊的
+`URL2MD_PRIMARY_URL` 與 `URL2MD_FALLBACK_URLS`。一個 request 不會平行打三個 endpoint，
+也不會把網頁正文寫入 Redis。正式部署建議保留 `REDIS_URL`，讓多個 Brain worker 共用
+circuit 與 half-open probe lease；Redis 暫時不可用時服務仍會以 local single-flight、
+sequential fallback 與 bounded deadline 執行。
+
+Retryable network error、timeout、HTTP 408/425/429/5xx 才會進入下一個 endpoint；
+其他 4xx 會立即結束。retry delay 使用 full-jitter，且計入 `URL2MD_TOTAL_BUDGET_S`。
+動態頁面或 deep crawl 不應透過同步聊天工具執行，需另行設計 async job 與資源限制。
 
 這些工具同時提供給一般 HTTP Chat 與 Gemini Live。Weather 不另設即時 API；天氣查詢走 `search_web`。
 

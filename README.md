@@ -42,6 +42,13 @@ Admin 也可將已上傳且素材完整的影片角色登記為右下角小助�
 
 base URL 本身就是 embed 端點，不需要再疊 `/embed`。OpenAI 相容路徑可直接餵給現成的 OpenAI client（base URL 設為 `.../api/embedding/v1`）。完整拓撲與 JTAI 串接設定見 [GPU 服務共用指南](./docs/gpu-service-sharing.md)。
 
+### 888a2a Agent-to-Agent 網絡整合
+
+openVman 支援接入 [888a2a-lite Hub](https://a2a.david888.com) 成為 A2A 網絡中的具身虛擬人 Agent：
+- **Inbound Bridge Daemon**：後端常駐 SSE 監聽行程，支援 deployment-injected 私有圈金鑰（註冊時才送 `X-Hub-Key`）、憑證持久化與金鑰輪替自動重新註冊、durable enqueue-before-ACK 與防迴音風暴機制（`[[A2A_NO_REPLY]]`）。
+- **Outbound Brain Skills**：大腦具備同儕發現（`a2a_list_peers`）、任務派工（`a2a_send_task`）與群組廣播（`a2a_broadcast_group`）能力。
+- **設定啟用**：在 secret store 注入 `A2A_ENABLED=true` 與 `A2A_HUB_KEY=<private-circle-secret>`（預設關閉）；若要加入 public circle，必須明確設定 `A2A_ALLOW_PUBLIC_CIRCLE=true`。詳情請參閱 [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md)。
+
 ## 環境變數 (.env)
 
 所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定；缺少的內部 token、session secret 與 Grafana 管理密碼由 `./scripts/up.sh` 啟動時自動安全產生（也可單獨執行 `./scripts/ensure-runtime-secrets.sh`），不用分開維護多份。Grafana 預設不開放匿名瀏覽，所有部署都必須設定唯一的高熵 `GRAFANA_PASSWORD`。
@@ -332,6 +339,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT
 - ✅ **Unified Admin Navigation**：以 NavigationContext 集中管理路由/分頁狀態，整合 AppSidebar、ChatSidebar 與各頁面；設計 token 改以 RGB channel 暴露，完整支援 Tailwind opacity modifier
 - ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
 - ✅ **2md 即時網路工具**：`search_web(query)` 搜尋公開網路，`read_web_page(url)` 讀取網頁、PDF 與支援文件；依主力／兩級 fallback 自動降級
+- ✅ **2md 驚群防護**：固定 `TWO_MD_BASE_URLS` 順序，採 sequential fallback、共用 deadline、full-jitter、single-flight 與可選 Redis circuit/half-open lease
 - ✅ **David888 Wiki 分享**：長篇報告可透過 `publish_wiki` 發布，完成後只回傳公開 `shareUrl`
 - ✅ **外部工具開關**：`URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`WIKI_PUBLISH_ENABLED` 預設為 `true`，可個別停用並在重啟後套用
 - ✅ **動態 Gemini 模型探索與容錯鏈 (Dynamic Fallback Chain)**：支援透過 Gemini SDK 自動探索所有可用生成模型並進行 Pro -> Flash -> Flash-Lite 語意化排序，具備 10 分鐘快取與靜態安全網降級機制

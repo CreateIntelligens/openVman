@@ -12,12 +12,33 @@ from urllib.parse import quote, urlparse
 
 import httpx
 
-from tools.context import active_user_message, mode_settings
+from core.two_md import (
+    RedisCoordination,
+    SingleFlight,
+    build_operation_key,
+    full_jitter_delay,
+    resolve_base_urls,
+)
+from safety.observability import get_metrics_store, log_event
+from tools.context import active_project_id, active_reply_mode, active_user_message, mode_settings
 
 logger = logging.getLogger("brain.tools.builtin.web")
 
 _url2md_client: httpx.Client | None = None
 _HTTP_TIMEOUT = httpx.Timeout(connect=5, read=25, write=10, pool=5)
+_single_flight = SingleFlight()
+_coordination: RedisCoordination | None = None
+_coordination_signature: tuple[str, str] | None = None
+
+
+class Url2mdUpstreamError(ValueError):
+    """Classified upstream failure used to decide whether failover is safe."""
+
+    def __init__(self, message: str, *, retryable: bool, reason: str, status_code: int = 0):
+        super().__init__(message)
+        self.retryable = retryable
+        self.reason = reason
+        self.status_code = status_code
 
 
 def _get_url2md_client() -> httpx.Client:
@@ -28,10 +49,14 @@ def _get_url2md_client() -> httpx.Client:
 
 
 def close_url2md_client() -> None:
-    global _url2md_client
+    global _url2md_client, _coordination, _coordination_signature
     if _url2md_client is not None:
         _url2md_client.close()
         _url2md_client = None
+    if _coordination is not None:
+        _coordination.close()
+        _coordination = None
+        _coordination_signature = None
 
 
 # Kept as a compatibility alias for the old Gateway client shutdown hook.
@@ -46,16 +71,19 @@ close_gateway_client = close_url2md_client
 # 快取（Redis），現在做只是徒增依賴。
 _circuit_lock = Lock()
 _circuit_opened_at: dict[str, float] = {}
+_circuit_probe_claimed: set[str] = set()
 
 
 def _note_failure(base: str) -> None:
     with _circuit_lock:
         _circuit_opened_at[base] = time.monotonic()
+        _circuit_probe_claimed.discard(base)
 
 
 def _note_success(base: str) -> None:
     with _circuit_lock:
         _circuit_opened_at.pop(base, None)
+        _circuit_probe_claimed.discard(base)
 
 
 def _is_circuit_open(base: str, cooldown_s: float) -> bool:
@@ -71,6 +99,30 @@ def reset_url2md_circuits() -> None:
     """Clear the breaker state (tests, and after a config change)."""
     with _circuit_lock:
         _circuit_opened_at.clear()
+        _circuit_probe_claimed.clear()
+
+
+def _claim_endpoint(base: str, cooldown_s: float) -> bool:
+    """Return whether this request may use an endpoint.
+
+    A cooled-down endpoint gets one local half-open probe. Other callers skip it
+    until that probe succeeds or fails, preventing synchronized recovery probes.
+    """
+    with _circuit_lock:
+        opened_at = _circuit_opened_at.get(base)
+        if opened_at is None:
+            return True
+        if cooldown_s > 0 and time.monotonic() - opened_at < cooldown_s:
+            return False
+        if base in _circuit_probe_claimed:
+            return False
+        _circuit_probe_claimed.add(base)
+        return True
+
+
+def _release_endpoint_probe(base: str) -> None:
+    with _circuit_lock:
+        _circuit_probe_claimed.discard(base)
 
 
 class _Budget:
@@ -98,36 +150,83 @@ class _Budget:
 def _iter_bases(cfg: Any) -> Any:
     """Yield (base, budget) for each host worth trying, freshest first.
 
-    冷卻中的主機先跳過；但若每一台都在冷卻中，還是要全部試一遍——寧可慢，
-    也好過在上游其實已經復原時直接放棄。
+    冷卻中的主機先跳過；冷卻結束後只允許受控的 half-open probe。
     """
     bases = _url2md_bases()
     cooldown = float(getattr(cfg, "url2md_circuit_cooldown_s", 0) or 0)
-    live = [base for base in bases if not _is_circuit_open(base, cooldown)]
-    if not live:
-        logger.warning("all 2md hosts are in cooldown; trying the full chain anyway")
-        live = bases
     budget = _Budget(float(getattr(cfg, "url2md_total_budget_s", 0) or 0))
-    for base in live:
+    max_attempts = max(1, int(getattr(cfg, "url2md_max_attempts", len(bases)) or len(bases)))
+    coordination = _get_coordination(cfg)
+    if coordination is not None and not coordination.configured:
+        get_metrics_store().increment("url2md_coordination_degraded_total", reason="unavailable")
+    lease_s = float(getattr(cfg, "url2md_half_open_lease_s", 5.0) or 5.0)
+    attempted = 0
+    for base in bases:
+        if attempted >= min(max_attempts, len(bases)):
+            return
+        if not _claim_endpoint(base, cooldown):
+            logger.info("2md endpoint skipped by circuit provider=%s", base)
+            get_metrics_store().increment("url2md_circuit_skips_total", provider=base)
+            continue
+        if coordination is not None and not coordination.endpoint_allowed(
+            base, cooldown_s=cooldown, lease_s=lease_s
+        ):
+            _release_endpoint_probe(base)
+            logger.info("2md endpoint skipped by shared circuit provider=%s", base)
+            get_metrics_store().increment("url2md_shared_circuit_skips_total", provider=base)
+            continue
         if budget.exhausted():
             logger.warning("2md fallback budget exhausted before trying %s", base)
             return
+        attempted += 1
         yield base, budget
+
+
+def _note_endpoint_failure(base: str, cfg: Any) -> None:
+    _note_failure(base)
+    get_metrics_store().increment("url2md_circuit_open_total", provider=base)
+    coordination = _get_coordination(cfg)
+    if coordination is not None:
+        coordination.mark_failure(
+            base,
+            cooldown_s=float(getattr(cfg, "url2md_circuit_cooldown_s", 60.0) or 60.0),
+        )
+
+
+def _note_endpoint_success(base: str, cfg: Any) -> None:
+    _note_success(base)
+    get_metrics_store().increment("url2md_circuit_recovered_total", provider=base)
+    coordination = _get_coordination(cfg)
+    if coordination is not None:
+        coordination.mark_success(base)
 
 
 def _url2md_bases() -> list[str]:
     cfg = mode_settings()
-    configured = [
-        str(getattr(cfg, "url2md_primary_url", "https://2md.aiurl.tw")),
-        *str(
-            getattr(
-                cfg,
-                "url2md_fallback_urls",
-                "https://2md.glsoft.ai,https://create360.ai",
-            )
-        ).split(","),
-    ]
-    return list(dict.fromkeys(value.strip().rstrip("/") for value in configured if value.strip()))
+    return list(resolve_base_urls(cfg))
+
+
+def _get_coordination(cfg: Any) -> RedisCoordination | None:
+    global _coordination, _coordination_signature
+    if not getattr(cfg, "url2md_coordination_enabled", True):
+        return None
+    redis_url = str(
+        getattr(cfg, "url2md_coordination_redis_url", "")
+        or getattr(cfg, "redis_url", "")
+        or ""
+    ).strip()
+    if not redis_url:
+        return None
+    namespace = str(getattr(cfg, "url2md_coordination_namespace", "brain:url2md") or "brain:url2md")
+    signature = (redis_url, namespace)
+    if _coordination is None or _coordination_signature != signature:
+        if _coordination is not None:
+            _coordination.close()
+        _coordination = RedisCoordination(redis_url, namespace=namespace)
+        _coordination_signature = signature
+        if not _coordination.configured:
+            get_metrics_store().increment("url2md_coordination_degraded_total", reason="unavailable")
+    return _coordination
 
 
 def _validate_query(raw_query: Any) -> str:
@@ -178,15 +277,126 @@ def _request_json(
         kwargs["timeout"] = httpx.Timeout(
             connect=min(5.0, remaining), read=remaining, write=min(10.0, remaining), pool=5,
         )
-    response = _get_url2md_client().request(method, endpoint, **kwargs)
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        response = _get_url2md_client().request(method, endpoint, **kwargs)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code
+        retryable = status_code in {408, 425, 429} or status_code >= 500
+        raise Url2mdUpstreamError(
+            f"2md HTTP error status={status_code}",
+            retryable=retryable,
+            reason=f"http_{status_code}",
+            status_code=status_code,
+        ) from exc
+    except httpx.RequestError as exc:
+        raise Url2mdUpstreamError(
+            f"2md network error: {type(exc).__name__}",
+            retryable=True,
+            reason="network_error",
+        ) from exc
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise Url2mdUpstreamError(
+            "2md 回傳不是有效 JSON",
+            retryable=True,
+            reason="invalid_json",
+        ) from exc
     if not isinstance(payload, dict):
-        raise ValueError("2md 回傳格式無效")
+        raise Url2mdUpstreamError(
+            "2md 回傳格式無效", retryable=True, reason="invalid_response"
+        )
     code = payload.get("code")
     if isinstance(code, int) and code >= 400:
-        raise ValueError(f"2md 回傳錯誤（code={code}）")
+        retryable = code in {408, 425, 429} or code >= 500
+        raise Url2mdUpstreamError(
+            f"2md 回傳錯誤（code={code}）",
+            retryable=retryable,
+            reason=f"upstream_code_{code}",
+            status_code=code,
+        )
     return payload
+
+
+def _record_attempt(
+    operation: str,
+    base: str,
+    attempt: int,
+    *,
+    result: str,
+    reason: str = "",
+    latency_ms: float = 0.0,
+) -> None:
+    get_metrics_store().increment(
+        "url2md_attempts_total",
+        operation=operation,
+        provider=base,
+        result=result,
+    )
+    get_metrics_store().observe(
+        "url2md_latency_ms",
+        latency_ms,
+        operation=operation,
+        provider=base,
+        result=result,
+    )
+    log_event(
+        "url2md_attempt",
+        operation=operation,
+        provider=base,
+        attempt=attempt,
+        result=result,
+        reason=reason,
+        latency_ms=round(latency_ms, 2),
+    )
+
+
+def _record_operation(
+    operation: str,
+    *,
+    result: str,
+    attempts: int,
+    provider: str = "",
+    reason: str = "",
+    result_count: int = 0,
+    content_chars: int = 0,
+    truncated: bool = False,
+    usage_tokens: int | float | None = None,
+) -> None:
+    get_metrics_store().increment(
+        "url2md_operations_total",
+        operation=operation,
+        result=result,
+    )
+    log_event(
+        "url2md_operation",
+        operation=operation,
+        result=result,
+        attempts=attempts,
+        provider=provider,
+        reason=reason,
+        result_count=result_count,
+        content_chars=content_chars,
+        truncated=truncated,
+        usage_tokens=usage_tokens,
+    )
+
+
+def _wait_before_fallback(cfg: Any, budget: _Budget, attempt: int) -> bool:
+    remaining = budget.remaining()
+    if remaining is not None and remaining <= 0:
+        return False
+    delay = full_jitter_delay(
+        attempt,
+        base_s=float(getattr(cfg, "url2md_retry_base_delay_s", 0.25) or 0),
+        max_s=float(getattr(cfg, "url2md_retry_max_delay_s", 2.0) or 0),
+        remaining_s=remaining,
+    )
+    if delay <= 0:
+        return True
+    time.sleep(delay)
+    return not budget.exhausted()
 
 
 def _normalize_read_urls(args: dict[str, Any]) -> list[str]:
@@ -220,14 +430,26 @@ def _normalize_read_urls(args: dict[str, Any]) -> list[str]:
 
 def _shape_page(item: dict[str, Any], fallback_url: str, max_chars: int, base: str) -> dict[str, Any]:
     content = str(item.get("content") or "")
-    return {
+    source_url = str(item.get("url") or fallback_url)
+    if source_url.rstrip("/") != fallback_url.rstrip("/"):
+        # The upstream may expose a post-redirect URL. Apply the same public
+        # destination policy before returning it to the agent.
+        source_url = _validate_url(source_url)
+    shaped: dict[str, Any] = {
         "title": str(item.get("title") or ""),
-        "url": str(item.get("url") or fallback_url),
+        "url": source_url,
         "description": str(item.get("description") or ""),
         "content": content[:max_chars],
         "truncated": len(content) > max_chars,
+        "result_count": 1,
         "provider": base,
     }
+    usage = item.get("usage")
+    if isinstance(usage, dict):
+        tokens = usage.get("tokens")
+        if isinstance(tokens, int | float) and tokens >= 0:
+            shaped["usage"] = {"tokens": tokens}
+    return shaped
 
 
 def _read_single(
@@ -293,32 +515,103 @@ def _read_batch(
     return pages
 
 
-def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
-    urls = _normalize_read_urls(args)
-    cfg = mode_settings()
-    max_chars = max(200, int(getattr(cfg, "web_search_max_chars", 3000)))
+def _read_web_page_uncached(urls: list[str], cfg: Any, max_chars: int) -> dict[str, Any]:
     last_error: Exception | None = None
-
-    for base, budget in _iter_bases(cfg):
+    attempts = 0
+    for attempt, (base, budget) in enumerate(_iter_bases(cfg), start=1):
+        attempts = attempt
+        started_at = time.monotonic()
         try:
             if len(urls) == 1:
                 pages = [_read_single(base, urls[0], max_chars, budget)]
             else:
                 pages = _read_batch(base, urls, max_chars, budget)
-        except Exception as exc:  # noqa: BLE001 - try the configured fallback chain
+        except Url2mdUpstreamError as exc:
             last_error = exc
-            _note_failure(base)
-            logger.warning(
-                "2md URL read failed provider=%s urls=%d error=%s", base, len(urls), exc
+            _note_endpoint_failure(base, cfg)
+            _record_attempt(
+                "read",
+                base,
+                attempt,
+                result="failure",
+                reason=exc.reason,
+                latency_ms=(time.monotonic() - started_at) * 1000,
             )
+            if not exc.retryable or not _wait_before_fallback(cfg, budget, attempt):
+                break
             continue
-        _note_success(base)
+        except Exception as exc:  # noqa: BLE001 - malformed upstream data may be endpoint-local
+            last_error = exc
+            _note_endpoint_failure(base, cfg)
+            _record_attempt(
+                "read",
+                base,
+                attempt,
+                result="failure",
+                reason="invalid_response",
+                latency_ms=(time.monotonic() - started_at) * 1000,
+            )
+            if not _wait_before_fallback(cfg, budget, attempt):
+                break
+            continue
+        _note_endpoint_success(base, cfg)
+        _record_attempt(
+            "read",
+            base,
+            attempt,
+            result="success",
+            latency_ms=(time.monotonic() - started_at) * 1000,
+        )
         # 單一網址維持原本的平面形狀，既有呼叫端與提示不必改。
+        content_chars = sum(len(str(page.get("content") or "")) for page in pages)
+        truncated = any(bool(page.get("truncated")) for page in pages)
+        usage_tokens = sum(
+            float(page["usage"]["tokens"])
+            for page in pages
+            if isinstance(page.get("usage"), dict)
+            and isinstance(page["usage"].get("tokens"), int | float)
+        )
+        _record_operation(
+            "read",
+            result="success",
+            attempts=attempt,
+            provider=base,
+            result_count=len(pages),
+            content_chars=content_chars,
+            truncated=truncated,
+            usage_tokens=usage_tokens or None,
+        )
         if len(urls) == 1:
             return pages[0]
         return {"pages": pages, "count": len(pages), "provider": base}
 
+    _record_operation(
+        "read",
+        result="failure",
+        attempts=attempts,
+        reason=getattr(last_error, "reason", "no_eligible_endpoint"),
+    )
     raise ValueError(f"無法讀取網址，2md fallback chain 皆失敗：{last_error}") from last_error
+
+
+def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
+    urls = _normalize_read_urls(args)
+    cfg = mode_settings()
+    max_chars = max(200, int(getattr(cfg, "web_search_max_chars", 3000)))
+    key = build_operation_key(
+        "read",
+        {"urls": urls},
+        response_policy=f"json:{max_chars}",
+        privacy_scope=f"{active_project_id.get()}:{active_reply_mode.get() or 'standard'}",
+    )
+    return _single_flight.run(
+        key,
+        lambda: _read_web_page_uncached(urls, cfg, max_chars),
+        timeout_s=float(getattr(cfg, "url2md_total_budget_s", 20.0) or 20.0),
+        on_coalesced=lambda: get_metrics_store().increment(
+            "url2md_singleflight_coalesced_total", operation="read"
+        ),
+    )
 
 
 def _blocked_domains(cfg: Any) -> tuple[str, ...]:
@@ -379,13 +672,13 @@ def _rerank_web_results(
     return kept
 
 
-def _search_web(args: dict[str, Any]) -> dict[str, Any]:
-    query = _validate_query(args.get("query"))
-    cfg = mode_settings()
-    max_results = max(1, min(int(args.get("top_k", getattr(cfg, "web_search_max_results", 8)) or 8), 20))
+def _search_web_uncached(query: str, cfg: Any, max_results: int) -> dict[str, Any]:
     last_error: Exception | None = None
+    attempts = 0
 
-    for base, budget in _iter_bases(cfg):
+    for attempt, (base, budget) in enumerate(_iter_bases(cfg), start=1):
+        attempts = attempt
+        started_at = time.monotonic()
         try:
             payload = _request_json(
                 "GET",
@@ -413,7 +706,7 @@ def _search_web(args: dict[str, Any]) -> dict[str, Any]:
                     "content": str(item.get("content") or ""),
                 })
 
-            _note_success(base)
+            _note_endpoint_success(base, cfg)
             anchor = (active_user_message.get() or "").strip()
             results = _rerank_web_results(
                 candidates, f"{anchor}\n{query}" if anchor else query, cfg
@@ -421,18 +714,91 @@ def _search_web(args: dict[str, Any]) -> dict[str, Any]:
             citations = [
                 {"title": r["title"], "url": r["url"]} for r in results if r["url"]
             ]
-            return {
+            _record_attempt(
+                "search",
+                base,
+                attempt,
+                result="success",
+                latency_ms=(time.monotonic() - started_at) * 1000,
+            )
+            meta = payload.get("meta")
+            usage = meta.get("usage") if isinstance(meta, dict) else None
+            usage_tokens = usage.get("tokens") if isinstance(usage, dict) else None
+            _record_operation(
+                "search",
+                result="success",
+                attempts=attempt,
+                provider=base,
+                result_count=len(results),
+                usage_tokens=usage_tokens if isinstance(usage_tokens, int | float) else None,
+            )
+            response: dict[str, Any] = {
                 "query": query,
                 "results": results,
                 "citations": citations,
                 "provider": base,
             }
-        except Exception as exc:  # noqa: BLE001 - try the configured fallback chain
+            if isinstance(usage, dict):
+                tokens = usage.get("tokens")
+                if isinstance(tokens, int | float) and tokens >= 0:
+                    response["usage"] = {"tokens": tokens}
+            return response
+        except Url2mdUpstreamError as exc:
             last_error = exc
-            _note_failure(base)
-            logger.warning("2md web search failed provider=%s query=%s error=%s", base, query, exc)
+            _note_endpoint_failure(base, cfg)
+            _record_attempt(
+                "search",
+                base,
+                attempt,
+                result="failure",
+                reason=exc.reason,
+                latency_ms=(time.monotonic() - started_at) * 1000,
+            )
+            if not exc.retryable or not _wait_before_fallback(cfg, budget, attempt):
+                break
+            continue
+        except Exception as exc:  # noqa: BLE001 - malformed upstream data may be endpoint-local
+            last_error = exc
+            _note_endpoint_failure(base, cfg)
+            _record_attempt(
+                "search",
+                base,
+                attempt,
+                result="failure",
+                reason="invalid_response",
+                latency_ms=(time.monotonic() - started_at) * 1000,
+            )
+            if not _wait_before_fallback(cfg, budget, attempt):
+                break
+            continue
 
+    _record_operation(
+        "search",
+        result="failure",
+        attempts=attempts,
+        reason=getattr(last_error, "reason", "no_eligible_endpoint"),
+    )
     raise ValueError(f"無法搜尋網路，2md fallback chain 皆失敗：{last_error}") from last_error
+
+
+def _search_web(args: dict[str, Any]) -> dict[str, Any]:
+    query = _validate_query(args.get("query"))
+    cfg = mode_settings()
+    max_results = max(1, min(int(args.get("top_k", getattr(cfg, "web_search_max_results", 8)) or 8), 20))
+    key = build_operation_key(
+        "search",
+        {"query": query, "top_k": max_results},
+        response_policy="json:search",
+        privacy_scope=f"{active_project_id.get()}:{active_reply_mode.get() or 'standard'}",
+    )
+    return _single_flight.run(
+        key,
+        lambda: _search_web_uncached(query, cfg, max_results),
+        timeout_s=float(getattr(cfg, "url2md_total_budget_s", 20.0) or 20.0),
+        on_coalesced=lambda: get_metrics_store().increment(
+            "url2md_singleflight_coalesced_total", operation="search"
+        ),
+    )
 
 
 def search_web_tool():

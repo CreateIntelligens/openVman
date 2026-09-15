@@ -28,7 +28,12 @@ _PUBLIC_EXACT_PATHS = frozenset(
         "/redoc",
     }
 )
-_INTERNAL_AUTH_BYPASS_PATHS = frozenset({"/api/v1/internal/enrich"})
+_INTERNAL_AUTH_BYPASS_PATHS = frozenset({
+    "/api/v1/internal/enrich",
+    "/api/v1/internal/a2a/peers",
+    "/api/v1/internal/a2a/tasks",
+    "/api/v1/internal/a2a/groups/messages",
+})
 _PUBLIC_PREFIXES = (
     "/static/characters/",
     "/avatar-sdk/",
