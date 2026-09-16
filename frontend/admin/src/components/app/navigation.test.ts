@@ -7,6 +7,13 @@ import {
 } from "./navigation";
 
 describe("admin navigation routes", () => {
+  it("exposes standalone TTS preview under the public prefix", () => {
+    window.history.replaceState(null, "", "/openvman/admin/chat");
+    expect(buildAdminPath("Tts")).toBe("/openvman/admin/tts");
+    expect(parseAdminRoute("/openvman/admin/tts")).toEqual({ tab: "Tts" });
+    window.history.replaceState(null, "", "/admin/chat");
+  });
+
   it("round-trips tab, project, and subview through a deep link", () => {
     const path = buildAdminPath("KnowledgeBase", "demo", "graph");
     const url = new URL(path, "https://openvman.test");

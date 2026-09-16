@@ -9,6 +9,10 @@
 
 ### Added
 
+- **Collapsible Navigation Groups**: Workspace, Knowledge, and System now collapse independently on desktop and mobile. Group preferences are account-scoped and shared across both menus; the active group opens on initial load and navigation, while other groups default to collapsed.
+
+- **TTS Preview**: Add `/admin/tts` with authorized provider/voice selection, editable sample text, direct speech playback, cancellation, and actual-provider fallback feedback. Preview uses the existing authenticated speech API and does not create chat history.
+
 - **Administrator Delegation**: Administrators can now create administrators and manage the accounts they created directly, instead of every administrator action above `user` requiring ROOT. Role changes and password resets stay ROOT-only, and no administrator can manage its own account through the account APIs.
 
   Delegation narrows monotonically, enforced in the database transaction:

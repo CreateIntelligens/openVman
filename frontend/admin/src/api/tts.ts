@@ -16,6 +16,41 @@ export async function fetchTtsProviders(): Promise<TtsProvider[]> {
   return fetchJson<TtsProvider[]>("/api/v1/tts/providers");
 }
 
+export interface SpeechPreview {
+  audio: Blob;
+  provider: string;
+  fallback: boolean;
+}
+
+export async function synthesizeSpeechPreview(
+  text: string,
+  provider: string,
+  voice: string,
+  signal: AbortSignal,
+): Promise<SpeechPreview> {
+  const response = await apiFetch("/v1/audio/speech", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input: text, provider, voice }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`語音產生失敗（HTTP ${response.status}），請稍後重試。`);
+  }
+  // 各供應商可能回傳 WAV 或 MP3，保留伺服器實際的 MIME type。
+  const audio = await response.blob();
+  if (!audio.size || !audio.type.startsWith("audio/")) {
+    throw new Error("未收到可播放的音訊，請換一個聲音或稍後重試。");
+  }
+  const actualProvider = response.headers.get("X-TTS-Provider") || "";
+  return {
+    audio,
+    provider: actualProvider,
+    fallback: response.headers.get("X-TTS-Fallback") === "true"
+      || Boolean(provider && actualProvider && provider !== actualProvider),
+  };
+}
+
 /** 打串流端點，回傳原始 Response 讓呼叫端邊收邊播；provider 空字串表示交給後端決定。 */
 export async function openSpeechStream(
   text: string,

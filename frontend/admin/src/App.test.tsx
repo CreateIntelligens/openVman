@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -144,10 +145,29 @@ describe("App tab mounting", () => {
     render(<App />);
 
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
     fireEvent.click(screen.getAllByRole("button", { name: /對話$/ })[0]);
 
     expect(await screen.findByTestId("tab-chat")).toBeTruthy();
     expect(window.location.pathname).toBe("/admin/chat");
+  });
+
+  it("shares group collapse state between the sidebar and mobile menu", async () => {
+    render(<App />);
+    await screen.findByTestId("tab-chat");
+    fireEvent.click(screen.getByRole("button", { name: "Knowledge" }));
+    fireEvent.click(screen.getByRole("button", { name: "開啟導覽" }));
+    const drawer = screen.getByRole("dialog", { name: "主要導覽" });
+    const knowledge = within(drawer).getByRole("button", { name: "Knowledge" });
+    expect(knowledge.getAttribute("aria-expanded")).toBe("true");
+    knowledge.focus();
+    fireEvent.click(knowledge);
+    expect(document.activeElement).toBe(knowledge);
+    expect(screen.getAllByRole("button", { name: "Knowledge" }).every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
+    fireEvent.click(within(drawer).getByRole("button", { name: "System" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: /系統健康/ }));
+    expect(await screen.findByTestId("tab-health")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "主要導覽" })).toBeNull();
   });
 
   it("shows a project loading error and retries without hiding the active project", async () => {
