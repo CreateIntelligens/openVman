@@ -33,6 +33,8 @@ ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立�
 
 帳號列表的可見範圍與可管理範圍不同：admin 看得到自己委派出去的**整棵子樹**，但只編輯得了直屬下一層（`created_by` 等於自己）。放行整棵子樹會讓被降權的中間人仍能繞過去改孫節點。
 
+臨時批次遵循相同區分：ROOT 可查看與操作全部批次；admin 可查看自己及子樹內管理員建立的批次，但只能撤銷或切換**自己建立**的批次後台權限。上層 admin 對下層 admin 建立的批次只有查看權，mutation 回傳 404；平行 admin 看不到該批次，mutation 同樣回傳 404。拒絕操作不變更帳號、token version 或 audit。
+
 資源解析與清單查詢會讀取 admin 的範圍；runtime 初始化或範圍查詢失敗時中止請求，不會轉成無限制存取。只有成功讀取後確認未設限的 admin 才保留原本的全部資源權限。測試替身應明確注入 `AdminScopeRepository`，不可依賴 runtime 失敗來跳過授權。
 
 授權指派在資料庫 transaction 內直接檢查操作者的範圍；ROOT 縮小範圍時，會同步撤銷該 admin 已發出的範圍外授權並修正預設值。
@@ -42,6 +44,12 @@ ROOT 可以設定任何 admin 的上限；受限 admin 只能設定自己建立�
 管理介面建立一般使用者時，要求先選好專案、聲音、人物或 VRM 授權及登入預設值。API `POST /api/v1/users` 仍允許省略 `access`，供先建立帳號、後續指派資源的流程使用；列表會顯示「尚未授權」。
 
 此類帳號可以一般登入，但不會因此取得其他帳號或 system-public 資源的授權，管理後台權限也預設關閉。`PUT /api/v1/users/{user_id}/access` 透過共用正規化檢查要求完整 grants 與 defaults，不能以空 grants 完成設定。零 grants 也不代表撤銷原有 ownership；既有資源擁有者仍適用 ownership 規則。
+
+## 聲線預設值的一致性
+
+建立帳號、更新授權、建立臨時批次與角色降級時，Backend 在同一筆 transaction 內，以聲線 resource metadata 的有效 `provider` 覆蓋 request 的 `voice_provider`，避免舊選擇與 `voice_id` 不相符。Metadata 缺少 provider、JSON 無效或 provider 不是非空字串時，保留管理員明確指定的 provider，以相容舊聲線資料；若也未指定具體 provider（空值或 `auto`），拒絕寫入並 rollback。
+
+縮小資源上限而撤銷預設聲線時，依 resource ID 排序，選取第一個仍有授權且 metadata 含具體 provider 的替代聲線，並同步更新兩個欄位。不會將舊聲線的 provider 猜給替代聲線。若找不到可辨識的替代聲線，將 `voice_id` 與 `voice_provider` 一起清空：帳號仍可登入，語音 provider 清單為空，TTS 請求回傳 404，前端顯示沒有可用語音，直到管理員重新指派。`auto` 不作為資源的具體 provider。
 
 ## Repository 模組與匯入介面
 

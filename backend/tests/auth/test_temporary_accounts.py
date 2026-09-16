@@ -788,7 +788,7 @@ def test_temporary_batches_are_scoped_to_the_creators_subtree(
     client: TestClient,
     runtime: AuthRuntime,
 ):
-    """admin 只看得到、動得了自己子樹發出的臨時批次。
+    """平行 admin 不得看見或管理彼此及 ROOT 發出的臨時批次。
 
     線上發現：受限 admin 登入後看到 ROOT 發的 16 批臨時帳號，且能撤銷。
     """
@@ -854,7 +854,9 @@ def test_temporary_batches_are_scoped_to_the_creators_subtree(
         headers=admin_headers, json={"enabled": True},
     )
     assert denied.status_code == 404
-    assert runtime.temporary_accounts.get_batch(root_batch).batch.revoked_at is None
+    root_batch_details = runtime.temporary_accounts.get_batch(root_batch)
+    assert root_batch_details is not None
+    assert root_batch_details.batch.revoked_at is None
 
     # 自己的批次照常，ROOT 動任何批次都行。
     assert client.post(
@@ -865,3 +867,119 @@ def test_temporary_batches_are_scoped_to_the_creators_subtree(
         f"/api/v1/temporary-accounts/batches/{root_batch}/revoke",
         headers=root_headers,
     ).status_code == 200
+
+
+@pytest.mark.parametrize("manager", ["creator", "root"])
+def test_descendant_batch_is_visible_but_only_creator_or_root_can_manage(
+    client: TestClient,
+    runtime: AuthRuntime,
+    manager: str,
+):
+    root = runtime.users.create_root(
+        username="ai360",
+        password_hash=hash_password(_ROOT_PASSWORD),
+    )
+    root_headers = _root_headers(client)
+    for resource_type, resource_id in (
+        (ResourceType.PROJECT, "proj-b85afb8bb6"),
+        (ResourceType.AVATAR_CHARACTER, "0713"),
+        (ResourceType.CUSTOM_VOICE, "hayley"),
+    ):
+        runtime.resources.register(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            owner_user_id=None,
+            visibility=ResourceVisibility.SYSTEM_PUBLIC,
+        )
+
+    def create_admin(username: str, headers: dict[str, str]):
+        response = client.post(
+            "/api/v1/users",
+            headers=headers,
+            json={
+                "username": username,
+                "password": _ADMIN_PASSWORD,
+                "role": "admin",
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json(), _login_headers(
+            client, username, _ADMIN_PASSWORD,
+        )
+
+    admin_a, a_headers = create_admin("admin-a", root_headers)
+    admin_b, b_headers = create_admin("admin-b", a_headers)
+    sibling, sibling_headers = create_admin("sibling", root_headers)
+    assert admin_a["created_by"] == root.id
+    assert admin_b["created_by"] == admin_a["id"]
+    assert sibling["created_by"] == root.id
+
+    created = client.post(
+        "/api/v1/temporary-accounts/batches",
+        headers=b_headers,
+        json=_batch_body(),
+    )
+    assert created.status_code == 201, created.text
+    batch_id = created.json()["batch_id"]
+    path = f"/api/v1/temporary-accounts/batches/{batch_id}"
+
+    for headers in (root_headers, a_headers, b_headers):
+        listed = client.get(
+            "/api/v1/temporary-accounts/batches", headers=headers,
+        )
+        assert listed.status_code == 200
+        assert {batch["batch_id"] for batch in listed.json()} == {batch_id}
+    sibling_list = client.get(
+        "/api/v1/temporary-accounts/batches", headers=sibling_headers,
+    )
+    assert sibling_list.status_code == 200
+    assert sibling_list.json() == []
+
+    before = runtime.temporary_accounts.get_batch(batch_id)
+    assert before is not None
+    assert before.batch.created_by == admin_b["id"]
+    audit_before = runtime.auth_audit.list()
+    # A 看得到孫節點，但管理權限仍只到直屬，拒絕操作不得改動狀態或審計。
+    for headers in (a_headers, sibling_headers):
+        assert client.post(
+            f"{path}/revoke", headers=headers,
+        ).status_code == 404
+        assert runtime.temporary_accounts.get_batch(batch_id) == before
+        assert runtime.auth_audit.list() == audit_before
+        assert client.patch(
+            f"{path}/admin-portal-access",
+            headers=headers,
+            json={"enabled": True},
+        ).status_code == 404
+        assert runtime.temporary_accounts.get_batch(batch_id) == before
+        assert runtime.auth_audit.list() == audit_before
+
+    manager_headers = b_headers if manager == "creator" else root_headers
+    enabled = client.patch(
+        f"{path}/admin-portal-access",
+        headers=manager_headers,
+        json={"enabled": True},
+    )
+    assert enabled.status_code == 200
+    assert enabled.json()["admin_portal_access"] is True
+    after_toggle = runtime.temporary_accounts.get_batch(batch_id)
+    assert after_toggle is not None
+    assert all(
+        account.user.admin_portal_access for account in after_toggle.accounts
+    )
+    assert all(
+        current.user.token_version == previous.user.token_version + 1
+        for previous, current in zip(before.accounts, after_toggle.accounts)
+    )
+
+    revoked = client.post(f"{path}/revoke", headers=manager_headers)
+    assert revoked.status_code == 200
+    assert revoked.json()["state"] == "revoked"
+    after_revoke = runtime.temporary_accounts.get_batch(batch_id)
+    assert after_revoke is not None
+    assert after_revoke.batch.revoked_at is not None
+    assert all(account.user.disabled for account in after_revoke.accounts)
+    assert all(
+        current.user.token_version == previous.user.token_version + 1
+        for previous, current in zip(after_toggle.accounts, after_revoke.accounts)
+    )
