@@ -256,18 +256,46 @@ Buildx + QEMU 建立並推送：
 
 Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`。
 
-**沒動到的映像不重建。** 每個 matrix 項目列出它 build 會讀到的目錄（`paths`），
-這次 push 沒動到那些目錄、workflow 檔也沒改、Hub 上又已有 `latest`，該 job 就跳過
-build，只用 `buildx imagetools` 把 `latest` 補標成這個 commit 的 sha。CUDA 的 `api`
-一建 25 分鐘以上，只改 backend 時不該陪跑。新增 COPY 來源目錄時記得同步 `paths`。
+**只有相同建置輸入已發布，才略過建置。** `scripts/image_fingerprint.py` 從各
+Dockerfile 的 `COPY`／`ADD` 自動收集來源，對 Git 中的檔案內容與執行權限產生
+指紋，再納入 Dockerfile、context 的 `.dockerignore`、Dockerfile 專屬 ignore、
+發布 workflow 與指紋程式。Registry 中存在 `source-<指紋>` tag 才能 reuse；
+否則重新建置，成功後同時發布該 tag、`latest` 與 commit SHA tag。
+略過時也只將符合指紋的映像補標為本次 SHA／`latest`，不拿浮動的 `latest`
+判斷是否可略過。因此一次 push 多個 commit，或前次建置失敗／被取消，都不會
+因只看最後一個 commit 而將舊映像誤標為新版本。
+
+新增或移動 `COPY` 來源不必維護另一份 paths 清單。未支援的來源語法（例如
+變數、遠端 ADD、heredoc、context bind mount）以及沒有已提交檔案的來源會明確
+讓 CI 失敗，擴充解析器並補測試後才能使用。指紋保守納入 COPY 範圍內被
+`.dockerignore` 排除的已提交檔案，可能多建一次，但不會因此漏建。未提交檔案
+不參與 CI 指紋。workflow 會印出完整 `github.event.before → github.sha`、
+該範圍的變動檔案、指紋與建置／略過原因；首次 push 或無法取得 before commit
+時仍以全部已提交建置輸入安全判斷。
 
 `openvman-backend-base` 是 `backend/Dockerfile` 的 `base` stage（`builder` → `base`
 → `runner` 三段同一份檔案），CI 以 `--target base` 單獨建它並推上 Hub。建一次要
 半小時以上（pdf-inspector 是 Rust extension、沒有 wheel，arm64 還得在 QEMU 下編），
-所以 `backend-base` job 只在三種情況重建：`runner` stage 之前的內容相對前一個
-commit 有變動、Docker Hub 上還沒有這個映像、或以 `workflow_dispatch` 勾選
-`rebuild_base`。其餘時候 backend 只疊 `requirements.txt` 與 `app/`，幾分鐘完成。
-要升級 docling 或改 parser 套件就改 `builder` / `base` stage。
+`backend-base` 指紋只包含 `runner` 之前的 stages、這些 stages 的 COPY 來源與
+共通建置設定，因此單改 runner 不會重建 base。找不到符合指紋的已發布 base，
+或以 `workflow_dispatch` 勾選 `rebuild_base` 時才重建。
+完成後解析 base 的實際 manifest digest，backend 使用 `BASE_IMAGE=映像名@sha256:…`
+固定該版本，並把 digest 納入自己的指紋。即使手動重建相同來源的 base，更新了
+apt／parser 依賴，backend 也會因 base digest 改變而重建。reuse base 時亦更新
+本次 SHA／`latest`，讓本機預設 base 與該次發布一致。
+要升級 docling 或改 parser 套件就改 `builder`／`base` stage；一般 backend
+build 只疊 `requirements.txt` 與 `app/`。
+
+首次採用指紋 tag 時，舊 `latest` 不足以證明輸入一致，所有 image 會各重建一次。
+指紋 tag 應只由此 workflow 寫入；清除 tag 後下次會安全重建。手動
+`workflow_dispatch` 會強制重建五個 runner，是否重建 base 則由 `rebuild_base` 決定。
+發布前的 `test-build-inputs` job 會先執行下列 regression tests，涵蓋五種 image、
+單／多 commit、shared dependency、workflow、ignore、COPY 來源變動、取消／失敗
+後的 stale latest，以及 base digest 更新：
+
+```bash
+python -m unittest discover -s tests -p 'test_image_fingerprint.py' -v
+```
 
 `runner` stage 用 `FROM ${BASE_IMAGE}`，預設指向 Hub 上的 base，所以
 `docker compose build backend` 只疊差異層；若用 builder→runner 複製 `/opt/venv`，

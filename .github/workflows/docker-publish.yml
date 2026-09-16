@@ -21,6 +21,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test-build-inputs:
+    name: Test image reuse decisions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: python -m unittest discover -s tests -p 'test_image_fingerprint.py' -v
+
   # backend 的 parser stack（docling / Rust 編譯的 pdf-inspector）建一次要半小時以上，
   # 而且幾乎不會變。它是 backend/Dockerfile 的 `base` stage，單獨建成
   # openvman-backend-base；只在 runner 之前的 stage 有改動、Docker Hub 上還沒有、
@@ -28,11 +38,14 @@ jobs:
   backend-base:
     name: backend-base (linux/amd64,linux/arm64)
     runs-on: ubuntu-latest
+    needs: test-build-inputs
+    outputs:
+      digest: ${{ steps.resolve.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -43,34 +56,36 @@ jobs:
       - name: Decide whether the base image needs rebuilding
         id: decide
         env:
-          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base:latest
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base
           FORCE: ${{ github.event.inputs.rebuild_base }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          reason=""
+          echo "Push comparison: ${BEFORE:-none} -> $GITHUB_SHA (event=$GITHUB_EVENT_NAME)"
+          if [ -n "$BEFORE" ] && [[ ! "$BEFORE" =~ ^0+$ ]] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            git diff --name-status "$BEFORE" "$GITHUB_SHA"
+          else
+            echo "No available previous commit; evaluating all committed build inputs"
+          fi
+          fingerprint="$(python scripts/image_fingerprint.py --context backend --dockerfile backend/Dockerfile --base-only)"
+          source_ref="$IMAGE:source-$fingerprint"
+          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
           if [ "$FORCE" = "true" ]; then
             reason="workflow_dispatch rebuild_base"
-          elif ! diff -q \
-              <(git show HEAD~1:backend/Dockerfile 2>/dev/null | sed '/^FROM \${BASE_IMAGE}/,$d') \
-              <(sed '/^FROM \${BASE_IMAGE}/,$d' backend/Dockerfile) >/dev/null; then
-            # 只比對 runner 之前的 stage：改 runner（COPY app 等）不該重建 base。
-            reason="base stages of backend/Dockerfile changed"
-          elif ! docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
-            reason="$IMAGE not on Docker Hub"
-          fi
-          if [ -n "$reason" ]; then
-            echo "rebuild=true" >> "$GITHUB_OUTPUT"
-            echo "Rebuilding base: $reason"
+          elif ! docker manifest inspect "$source_ref" >/dev/null 2>&1; then
+            reason="no published image for committed base inputs: $source_ref"
           else
             echo "rebuild=false" >> "$GITHUB_OUTPUT"
-            echo "Base image up to date, skipping"
+            echo "Skip base build: published inputs match $source_ref; latest is not used for reuse decisions"
+            exit 0
           fi
+          echo "rebuild=true" >> "$GITHUB_OUTPUT"
+          echo "Rebuilding base: $reason"
 
       - name: Set up QEMU
         if: steps.decide.outputs.rebuild == 'true'
         uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        if: steps.decide.outputs.rebuild == 'true'
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push base image
@@ -83,10 +98,29 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
+            ${{ steps.decide.outputs.source_ref }}
             ${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base:${{ github.sha }}
           cache-from: type=gha,scope=backend-base
           cache-to: type=gha,mode=max,scope=backend-base,ignore-error=true
+
+      - name: Resolve the exact published base digest
+        id: resolve
+        env:
+          SOURCE_REF: ${{ steps.decide.outputs.source_ref }}
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base
+        run: |
+          digest="$(docker buildx imagetools inspect --format '{{json .Manifest}}' "$SOURCE_REF" | python -c 'import json, sys; print(json.load(sys.stdin)["digest"])')"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Backend will use verified base: $IMAGE@$digest"
+
+      - name: Retag the reused base for this commit
+        if: steps.decide.outputs.rebuild != 'true'
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+        run: docker buildx imagetools create -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" "$IMAGE@$DIGEST"
 
   build-and-push:
     name: ${{ matrix.image }} (${{ matrix.platforms }})
@@ -96,44 +130,39 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # `paths` 是這個映像的 build 會讀到的目錄（Dockerfile 的 COPY 來源）。
-          # 這次 push 沒動到任何一個，就不重建，只把 latest 補標成這個 commit 的 sha。
+          # Fingerprints derive COPY/ADD inputs directly from each Dockerfile.
+          # Reuse only an image previously published for those exact inputs.
           # CPU/web images publish a linux/amd64 + linux/arm64 manifest.
           # backend builds FROM openvman-backend-base (see the backend-base job).
           - image: backend
             context: ./backend
             file: ./backend/Dockerfile
             platforms: linux/amd64,linux/arm64
-            paths: backend
           - image: admin
             context: .
             file: ./frontend/admin/Dockerfile
             target: runner
             platforms: linux/amd64,linux/arm64
-            paths: frontend/admin frontend/avatar-sdk contracts
           - image: avatar
             context: .
             file: ./frontend/app/Dockerfile
             platforms: linux/amd64,linux/arm64
-            paths: frontend/app contracts
           # CUDA/PyTorch images are amd64-only until ARM64 GPU dependencies
           # are available and verified for the production runtime.
           - image: api
             context: ./brain/api
             file: ./brain/api/Dockerfile
             platforms: linux/amd64
-            paths: brain/api
           - image: embedding
             context: ./brain/embedding
             file: ./brain/embedding/Dockerfile
             platforms: linux/amd64
-            paths: brain/embedding
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -145,23 +174,36 @@ jobs:
         id: decide
         env:
           IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}
-          PATHS: ${{ matrix.paths }}
+          CONTEXT: ${{ matrix.context }}
+          DOCKERFILE: ${{ matrix.file }}
+          IMAGE_NAME: ${{ matrix.image }}
+          BASE_DIGEST: ${{ needs.backend-base.outputs.digest }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          reason=""
+          echo "Push comparison: ${BEFORE:-none} -> $GITHUB_SHA (event=$GITHUB_EVENT_NAME)"
+          if [ -n "$BEFORE" ] && [[ ! "$BEFORE" =~ ^0+$ ]] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            git diff --name-status "$BEFORE" "$GITHUB_SHA"
+          else
+            echo "No available previous commit; evaluating all committed build inputs"
+          fi
+          args=(--context "$CONTEXT" --dockerfile "$DOCKERFILE")
+          if [ "$IMAGE_NAME" = backend ]; then
+            args+=(--base-digest "$BASE_DIGEST")
+          fi
+          fingerprint="$(python scripts/image_fingerprint.py "${args[@]}")"
+          source_ref="$IMAGE:source-$fingerprint"
+          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             reason="workflow_dispatch"
-          elif ! git diff --quiet HEAD~1 HEAD -- $PATHS .github/workflows/docker-publish.yml 2>/dev/null; then
-            reason="sources changed: $(git diff --name-only HEAD~1 HEAD -- $PATHS .github/workflows/docker-publish.yml | head -5 | tr '\n' ' ')"
-          elif ! docker manifest inspect "$IMAGE:latest" >/dev/null 2>&1; then
-            reason="$IMAGE:latest not on Docker Hub"
-          fi
-          if [ -n "$reason" ]; then
-            echo "rebuild=true" >> "$GITHUB_OUTPUT"
-            echo "Rebuilding: $reason"
+          elif ! docker manifest inspect "$source_ref" >/dev/null 2>&1; then
+            reason="no published image for committed build inputs: $source_ref"
           else
             echo "rebuild=false" >> "$GITHUB_OUTPUT"
-            echo "Unchanged, will retag latest as ${GITHUB_SHA}"
+            echo "Skip build: published inputs match $source_ref; retag this verified image as $GITHUB_SHA"
+            exit 0
           fi
+          echo "rebuild=true" >> "$GITHUB_OUTPUT"
+          echo "Rebuilding: $reason"
 
       - name: Set up QEMU
         if: steps.decide.outputs.rebuild == 'true'
@@ -175,7 +217,8 @@ jobs:
         if: steps.decide.outputs.rebuild != 'true'
         env:
           IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}
-        run: docker buildx imagetools create -t "$IMAGE:${GITHUB_SHA}" "$IMAGE:latest"
+          SOURCE_REF: ${{ steps.decide.outputs.source_ref }}
+        run: docker buildx imagetools create -t "$IMAGE:${GITHUB_SHA}" -t "$IMAGE:latest" "$SOURCE_REF"
 
       - name: Build and push image
         if: steps.decide.outputs.rebuild == 'true'
@@ -185,12 +228,14 @@ jobs:
           file: ${{ matrix.file }}
           target: ${{ matrix.target || '' }}
           platforms: ${{ matrix.platforms }}
-          # pull 讓 backend 的 FROM 拿到剛推上去的 base，而不是 runner 上的舊快取。
+          # The digest also participates in backend's fingerprint, including a
+          # forced base rebuild that changes dependencies without changing source.
           pull: true
           build-args: |
-            BASE_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base:latest
+            BASE_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/openvman-backend-base@${{ needs.backend-base.outputs.digest }}
           push: true
           tags: |
+            ${{ steps.decide.outputs.source_ref }}
             ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.image }}
