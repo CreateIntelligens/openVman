@@ -6,6 +6,7 @@ import {
 
 export const workspaceTabs = [
   { key: "Chat", label: "對話", icon: "chat" },
+  { key: "Tts", label: "TTS 試聽", icon: "graphic_eq" },
   { key: "Sessions", label: "對話紀錄", icon: "forum" },
   { key: "Search", label: "知識庫搜尋", icon: "search" },
   { key: "Workspace", label: "工作區", icon: "folder_managed" },
@@ -38,6 +39,7 @@ export const allTabs = [...workspaceTabs, ...knowledgeTabs, ...systemTabs] as co
 
 export type Tab = (typeof allTabs)[number]["key"];
 export type TabConfig = (typeof allTabs)[number];
+export type NavigationGroup = (typeof tabGroups)[number]["label"];
 export type ProjectSummary = { project_id: string; label: string };
 
 export const pageComponents: Record<
@@ -45,6 +47,7 @@ export const pageComponents: Record<
   LazyExoticComponent<ComponentType>
 > = {
   Chat: lazy(() => import("../../pages/Chat")),
+  Tts: lazy(() => import("../../pages/Tts")),
   Sessions: lazy(() => import("../../pages/Sessions")),
   Search: lazy(() => import("../../pages/Search")),
   Workspace: lazy(() => import("../../pages/Workspace")),
@@ -63,6 +66,7 @@ export const pageComponents: Record<
 
 const tabPathSegments: Record<Tab, string> = {
   Chat: "chat",
+  Tts: "tts",
   Sessions: "sessions",
   Search: "search",
   Workspace: "workspace",

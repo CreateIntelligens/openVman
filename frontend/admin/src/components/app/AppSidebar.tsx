@@ -1,6 +1,7 @@
 import { useState } from "react";
+import type { CollapsedGroups } from "../../hooks/useNavigationGroups";
 import TabGroup from "./TabGroup";
-import { isTabVisible, tabGroups, type Tab } from "./navigation";
+import { isTabVisible, tabGroups, type NavigationGroup, type Tab } from "./navigation";
 
 interface AppSidebarProps {
   active: Tab;
@@ -8,6 +9,8 @@ interface AppSidebarProps {
   isAdmin: boolean;
   onSelectTab: (tab: Tab) => void;
   onTogglePin: () => void;
+  collapsedGroups: CollapsedGroups;
+  onToggleGroup: (group: NavigationGroup) => void;
 }
 
 export default function AppSidebar({
@@ -16,6 +19,8 @@ export default function AppSidebar({
   isAdmin,
   onSelectTab,
   onTogglePin,
+  collapsedGroups,
+  onToggleGroup,
 }: AppSidebarProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [hasFocus, setHasFocus] = useState(false);
@@ -58,6 +63,8 @@ export default function AppSidebar({
               active={active}
               onSelect={onSelectTab}
               isExpanded={isExpanded}
+              isCollapsed={collapsedGroups[group.label]}
+              onToggle={() => onToggleGroup(group.label)}
             />
           ))}
         </div>

@@ -28,6 +28,16 @@
 
 Admin 也可將已上傳且素材完整的影片角色登記為右下角小助理。這類小助理同時檢查 mascot 與 avatar character 授權；宿主播放 TTS 時，會以 PCM 另行驅動嘴型，避免重複出聲。
 
+### 管理介面導覽
+
+管理介面的 Workspace、Knowledge、System 群組可點擊標題展開／收合，桌面側欄與手機選單共用狀態，並依登入帳號記住偏好。首次只展開目前頁面的群組；重新載入或切換頁面時會展開目的群組。側欄縮成窄版時，仍可透過 W／K／S 群組標題操作。
+
+### TTS 試聽
+
+管理介面側欄的「TTS 試聽」（`/admin/tts`，公開子路徑為 `/openvman/admin/tts`）可選擇帳號已授權的供應商與聲音，輸入最多 1000 字後直接播放。可停止請求／播放，並以播放器重播；若瀏覽器未允許自動播放，按播放器的播放鍵即可。此功能不建立對話紀錄，也不修改對話頁的聲音偏好。若後端改用備援供應商，頁面會標示實際供應商。
+
+聲音清單沿用 `GET /api/v1/tts/providers`，試聽沿用登入驗證的 `POST /v1/audio/speech`（`input`、`provider`、`voice`）；依回應 `Content-Type` 播放 WAV／MP3，並讀取 `X-TTS-Provider` 與 `X-TTS-Fallback`。供應商與聲音權限仍由後端執行。
+
 ### 共用推論服務端點
 
 其他 stack（JTAI、測試環境）可透過邊界 nginx 共用同一組模型權重，避免重複載入顯存。兩個服務都掛在 `/api/<service>` 底下，以 Bearer token 驗證並套用速率／連線限制：

@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { AccountProfile } from "../../api/auth";
+import type { CollapsedGroups } from "../../hooks/useNavigationGroups";
+import TabGroup from "./TabGroup";
 import {
   allTabs,
   isTabVisible,
+  tabGroups,
+  type NavigationGroup,
   type ProjectSummary,
   type Tab,
 } from "./navigation";
@@ -198,6 +202,8 @@ interface MobileNavDrawerProps {
   isAdmin: boolean;
   username: string;
   onLogout: () => void;
+  collapsedGroups: CollapsedGroups;
+  onToggleGroup: (group: NavigationGroup) => void;
 }
 
 export function MobileNavDrawer({
@@ -208,6 +214,8 @@ export function MobileNavDrawer({
   isAdmin,
   username,
   onLogout,
+  collapsedGroups,
+  onToggleGroup,
 }: MobileNavDrawerProps) {
   const drawerRef = useRef<HTMLElement>(null);
 
@@ -271,28 +279,22 @@ export function MobileNavDrawer({
             <span className="material-symbols-outlined text-[1.125rem]">close</span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {allTabs.filter((tab) => isTabVisible(tab, isAdmin)).map((tab) => {
-            const isActive = active === tab.key;
-            return (
-              <button
-                key={tab.key}
-                aria-current={isActive ? "page" : undefined}
-                onClick={() => {
-                  onSelectTab(tab.key);
-                  onClose();
-                }}
-                className={`flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium ${
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-content-muted hover:bg-surface hover:text-content"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[1.25rem]">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-2">
+          {tabGroups.map((group) => (
+            <TabGroup
+              key={group.label}
+              label={group.label}
+              tabs={group.tabs.filter((tab) => isTabVisible(tab, isAdmin))}
+              active={active}
+              isExpanded
+              isCollapsed={collapsedGroups[group.label]}
+              onToggle={() => onToggleGroup(group.label)}
+              onSelect={(tab) => {
+                onSelectTab(tab);
+                onClose();
+              }}
+            />
+          ))}
         </div>
         <div className="border-t border-border p-3">
           <div className="mb-2 truncate px-2 text-xs text-content-subtle">{username}</div>

@@ -36,6 +36,7 @@ import {
 import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useNavigationGroups } from "./hooks/useNavigationGroups";
 import { readScoped, writeScoped } from "./utils/scopedStorage";
 
 function initialRoute(): AdminRoute {
@@ -51,10 +52,12 @@ function initialRoute(): AdminRoute {
 function AppContent() {
   const { account, logout } = useAuth();
   const [route, setRoute] = useState<AdminRoute>(initialRoute);
+  const { collapsedGroups, toggleGroup } = useNavigationGroups(route.tab);
   const [isPinned, setIsPinned] = useState(
     () => readScoped("brain-sidebar-pinned") === "true",
   );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const {
     projectId,
     setProjectId,
@@ -182,6 +185,8 @@ function AppContent() {
           active={route.tab}
           isPinned={isPinned}
           isAdmin={isAdmin}
+          collapsedGroups={collapsedGroups}
+          onToggleGroup={toggleGroup}
           onSelectTab={switchTab}
           onTogglePin={() =>
             setIsPinned((value) => {
@@ -215,9 +220,11 @@ function AppContent() {
           <MobileNavDrawer
             open={mobileNavOpen}
             active={route.tab}
-            onClose={() => setMobileNavOpen(false)}
+            onClose={closeMobileNav}
             onSelectTab={switchTab}
             isAdmin={isAdmin}
+            collapsedGroups={collapsedGroups}
+            onToggleGroup={toggleGroup}
             username={account!.username}
             onLogout={() => void logout()}
           />
