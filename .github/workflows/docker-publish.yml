@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       rebuild_base:
-        description: "Rebuild openvman-backend-base even if Dockerfile.base is unchanged"
+        description: "Rebuild openvman-backend-base even if its stages are unchanged"
         type: boolean
         default: false
 
@@ -22,8 +22,9 @@ concurrency:
 
 jobs:
   # backend 的 parser stack（docling / Rust 編譯的 pdf-inspector）建一次要半小時以上，
-  # 而且幾乎不會變。它獨立成 openvman-backend-base，只在 Dockerfile.base 有改動、
-  # Docker Hub 上還沒有、或手動要求時才重建；backend 每次 push 只疊 requirements 與 app。
+  # 而且幾乎不會變。它是 backend/Dockerfile 的 `base` stage，單獨建成
+  # openvman-backend-base；只在 runner 之前的 stage 有改動、Docker Hub 上還沒有、
+  # 或手動要求時才重建。backend 每次 push 只疊 requirements 與 app。
   backend-base:
     name: backend-base (linux/amd64,linux/arm64)
     runs-on: ubuntu-latest
@@ -48,8 +49,11 @@ jobs:
           reason=""
           if [ "$FORCE" = "true" ]; then
             reason="workflow_dispatch rebuild_base"
-          elif ! git diff --quiet HEAD~1 HEAD -- backend/Dockerfile.base 2>/dev/null; then
-            reason="backend/Dockerfile.base changed"
+          elif ! diff -q \
+              <(git show HEAD~1:backend/Dockerfile 2>/dev/null | sed '/^FROM \${BASE_IMAGE}/,$d') \
+              <(sed '/^FROM \${BASE_IMAGE}/,$d' backend/Dockerfile) >/dev/null; then
+            # 只比對 runner 之前的 stage：改 runner（COPY app 等）不該重建 base。
+            reason="base stages of backend/Dockerfile changed"
           elif ! docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
             reason="$IMAGE not on Docker Hub"
           fi
@@ -74,7 +78,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: ./backend
-          file: ./backend/Dockerfile.base
+          file: ./backend/Dockerfile
+          target: base
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
@@ -91,35 +96,44 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `paths` 是這個映像的 build 會讀到的目錄（Dockerfile 的 COPY 來源）。
+          # 這次 push 沒動到任何一個，就不重建，只把 latest 補標成這個 commit 的 sha。
           # CPU/web images publish a linux/amd64 + linux/arm64 manifest.
           # backend builds FROM openvman-backend-base (see the backend-base job).
           - image: backend
             context: ./backend
             file: ./backend/Dockerfile
             platforms: linux/amd64,linux/arm64
+            paths: backend
           - image: admin
             context: .
             file: ./frontend/admin/Dockerfile
             target: runner
             platforms: linux/amd64,linux/arm64
+            paths: frontend/admin frontend/avatar-sdk contracts
           - image: avatar
             context: .
             file: ./frontend/app/Dockerfile
             platforms: linux/amd64,linux/arm64
+            paths: frontend/app contracts
           # CUDA/PyTorch images are amd64-only until ARM64 GPU dependencies
           # are available and verified for the production runtime.
           - image: api
             context: ./brain/api
             file: ./brain/api/Dockerfile
             platforms: linux/amd64
+            paths: brain/api
           - image: embedding
             context: ./brain/embedding
             file: ./brain/embedding/Dockerfile
             platforms: linux/amd64
+            paths: brain/embedding
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -127,13 +141,44 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Decide whether this image needs rebuilding
+        id: decide
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}
+          PATHS: ${{ matrix.paths }}
+        run: |
+          reason=""
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            reason="workflow_dispatch"
+          elif ! git diff --quiet HEAD~1 HEAD -- $PATHS .github/workflows/docker-publish.yml 2>/dev/null; then
+            reason="sources changed: $(git diff --name-only HEAD~1 HEAD -- $PATHS .github/workflows/docker-publish.yml | head -5 | tr '\n' ' ')"
+          elif ! docker manifest inspect "$IMAGE:latest" >/dev/null 2>&1; then
+            reason="$IMAGE:latest not on Docker Hub"
+          fi
+          if [ -n "$reason" ]; then
+            echo "rebuild=true" >> "$GITHUB_OUTPUT"
+            echo "Rebuilding: $reason"
+          else
+            echo "rebuild=false" >> "$GITHUB_OUTPUT"
+            echo "Unchanged, will retag latest as ${GITHUB_SHA}"
+          fi
+
       - name: Set up QEMU
+        if: steps.decide.outputs.rebuild == 'true'
         uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # 沒重建的映像也要有這個 commit 的 sha tag，OPENVMAN_IMAGE_TAG 釘 sha 部署時才找得到。
+      - name: Retag unchanged image with this commit
+        if: steps.decide.outputs.rebuild != 'true'
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/openvman-${{ matrix.image }}
+        run: docker buildx imagetools create -t "$IMAGE:${GITHUB_SHA}" "$IMAGE:latest"
+
       - name: Build and push image
+        if: steps.decide.outputs.rebuild == 'true'
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
