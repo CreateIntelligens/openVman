@@ -105,7 +105,7 @@ docker compose exec -T backend python -c \
 
 使用 3. 節的 parser / package 檢查命令。預期三個 import 成功，且 `firecrawl-anydoc` 顯示已安裝版本。
 
-若 import 失敗，先重新 build backend image 並確認 `backend/Dockerfile.base` 的 parser install layer（parser 套件裝在 base 映像，不在 `backend/Dockerfile`）。
+若 import 失敗，先重新 build backend image 並確認 `backend/Dockerfile` 的 `builder` stage（parser 套件裝在 base 映像 `openvman-backend-base`，一般 backend build 不會重裝它們）。
 
 ### 5. 文件上傳驗證
 

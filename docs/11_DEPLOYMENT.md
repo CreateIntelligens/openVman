@@ -256,20 +256,28 @@ Buildx + QEMU 建立並推送：
 
 Repository Secrets 必須包含 `DOCKERHUB_USERNAME` 與 `DOCKERHUB_TOKEN`。
 
-`openvman-backend-base` 由 `backend/Dockerfile.base` 定義，建一次要半小時以上
-（pdf-inspector 是 Rust extension、沒有 wheel，arm64 還得在 QEMU 下編）。
-`backend-base` job 只在三種情況重建：`Dockerfile.base` 相對前一個 commit 有變動、
-Docker Hub 上還沒有這個映像、或以 `workflow_dispatch` 勾選 `rebuild_base`。
-其餘時候 backend 只疊 `requirements.txt` 與 `app/`，幾分鐘完成。要升級 docling
-或改 parser 套件就改 `Dockerfile.base`，不要改回 `backend/Dockerfile`。
+**沒動到的映像不重建。** 每個 matrix 項目列出它 build 會讀到的目錄（`paths`），
+這次 push 沒動到那些目錄、workflow 檔也沒改、Hub 上又已有 `latest`，該 job 就跳過
+build，只用 `buildx imagetools` 把 `latest` 補標成這個 commit 的 sha。CUDA 的 `api`
+一建 25 分鐘以上，只改 backend 時不該陪跑。新增 COPY 來源目錄時記得同步 `paths`。
 
-`backend/Dockerfile` 刻意是單一 stage：直接在 base 的 venv 裡裝 requirements，
-新增的 layer 只有差異；若用 builder→runner 複製 `/opt/venv`，每次 build 都會重新
-產生整個數 GB 的 venv layer，base 映像就白拆了。
+`openvman-backend-base` 是 `backend/Dockerfile` 的 `base` stage（`builder` → `base`
+→ `runner` 三段同一份檔案），CI 以 `--target base` 單獨建它並推上 Hub。建一次要
+半小時以上（pdf-inspector 是 Rust extension、沒有 wheel，arm64 還得在 QEMU 下編），
+所以 `backend-base` job 只在三種情況重建：`runner` stage 之前的內容相對前一個
+commit 有變動、Docker Hub 上還沒有這個映像、或以 `workflow_dispatch` 勾選
+`rebuild_base`。其餘時候 backend 只疊 `requirements.txt` 與 `app/`，幾分鐘完成。
+要升級 docling 或改 parser 套件就改 `builder` / `base` stage。
 
-本機建置 backend 時 `docker compose build backend` 會自動從 Docker Hub 拉 base；
-要改 base 本身則先
-`docker build -f backend/Dockerfile.base -t tbdavid2019/openvman-backend-base:latest backend`。
+`runner` stage 用 `FROM ${BASE_IMAGE}`，預設指向 Hub 上的 base，所以
+`docker compose build backend` 只疊差異層；若用 builder→runner 複製 `/opt/venv`，
+每次 build 都會重新產生整個數 GB 的 venv layer，base 映像就白拆了。要在本機從頭
+建（例如改了 base stage 想先驗證）：
+
+```bash
+docker build --build-arg BASE_IMAGE=base -t openvman-backend:local backend
+docker build --target base -t tbdavid2019/openvman-backend-base:latest backend   # 只建 base
+```
 
 `protocol-contracts` workflow 使用 `actions/checkout@v6` 與 `actions/setup-python@v7`，
 採 Node.js 24-compatible action runtime；改用 self-hosted runner 時需支援該 runtime。
