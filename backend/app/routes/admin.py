@@ -440,7 +440,11 @@ def resolve_tts_voice(
     )
     if not is_unrestricted_admin:
         defaults = runtime.account_access.get_defaults(current.user.id)
-        if defaults is None:
+        if (
+            defaults is None
+            or not defaults.voice_provider
+            or not defaults.voice_id
+        ):
             raise _not_found()
         provider = provider or defaults.voice_provider
         voice_id = voice_id or defaults.voice_id
@@ -509,7 +513,7 @@ def _scoped_tts_providers(
     runtime: AuthRuntime,
 ) -> list[dict[str, object]]:
     defaults = runtime.account_access.get_defaults(current.user.id)
-    if defaults is None:
+    if defaults is None or not defaults.voice_provider or not defaults.voice_id:
         return []
 
     voices: list[str] = []

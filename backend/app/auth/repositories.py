@@ -269,7 +269,7 @@ def _append_auth_audit(
 
 
 def _normalize_account_access(
-    grants: Sequence[tuple[ResourceType, str]],
+    grants: Iterable[tuple[ResourceType, str]],
     defaults: tuple[str, ...],
 ) -> tuple[tuple[tuple[ResourceType, str], ...], tuple[str, str, str, str, str, str]]:
     normalized_grants = tuple(
@@ -311,7 +311,7 @@ def _normalize_account_access(
     mascot_id = normalized_defaults[4] if len(normalized_defaults) > 4 else ""
     background_id = normalized_defaults[5] if len(normalized_defaults) > 5 else ""
 
-    if not all((project_id, voice_provider, voice_id)):
+    if not all((project_id, voice_id)):
         raise InvalidResourceGrantError("all required account defaults are required")
     # 預設登入人物同樣可以是 2D 角色或 VRM，兩者至少要指定一個。
     if not character_id and not mascot_id:
@@ -441,8 +441,14 @@ def _persist_account_access(
     )
     project_id = normalized_defaults[0]
     character_id = normalized_defaults[1]
-    voice_provider = normalized_defaults[2]
     voice_id = normalized_defaults[3]
+    # Registered metadata wins over a stale client selection. Legacy resources
+    # without provider metadata still need the administrator's explicit choice.
+    voice_provider = (
+        _voice_provider_of(connection, voice_id) or normalized_defaults[2]
+    )
+    if not voice_provider or voice_provider == "auto":
+        raise InvalidResourceGrantError("a concrete voice provider is required")
     mascot_id = normalized_defaults[4] if len(normalized_defaults) > 4 else ""
     background_id = normalized_defaults[5] if len(normalized_defaults) > 5 else ""
     connection.execute(
@@ -861,15 +867,15 @@ class UserRepository:
 
             if target.role is role:
                 return target
-            if role is AccountRole.USER and normalized_access is None:
-                raise InvalidResourceGrantError(
-                    "demoting an administrator requires grants and defaults"
-                )
             # 升為 admin 時一併給資源是允許的；change_role 本來就只有 ROOT
             # 能呼叫（ensure_can_change_role），不需要再擋一次。
 
             now = now_iso()
             if role is AccountRole.USER:
+                if normalized_access is None:
+                    raise InvalidResourceGrantError(
+                        "demoting an administrator requires grants and defaults"
+                    )
                 normalized_grants, normalized_defaults = normalized_access
                 _persist_account_access(
                     connection,
@@ -1657,7 +1663,7 @@ def _voice_provider_of(connection: sqlite3.Connection, voice_id: str) -> str:
         return ""
     try:
         metadata = json.loads(row["metadata_json"] or "{}")
-    except ValueError:
+    except (TypeError, ValueError):
         return ""
     provider = metadata.get("provider") if isinstance(metadata, dict) else None
     return provider.strip() if isinstance(provider, str) else ""
@@ -1694,22 +1700,30 @@ def _repoint_dangling_defaults(
         ).fetchone()
         if still_granted is not None:
             continue
-        replacement = connection.execute(
+        replacements = connection.execute(
             """
             SELECT resource_id FROM resource_grants
             WHERE grantee_user_id = ? AND resource_type = ?
-            ORDER BY resource_id LIMIT 1
+            ORDER BY resource_id
             """,
             (user_id, resource_type.value),
-        ).fetchone()
-        updates[column] = replacement["resource_id"] if replacement else ""
-        # 聲線的 provider 跟著 voice_id 走：只換 id 不換 provider 會留下一組
-        # 不存在的 (provider, voice) 組合，登入時 TTS 找不到聲線。
+        ).fetchall()
         if resource_type is ResourceType.CUSTOM_VOICE:
-            updates["voice_provider"] = (
-                _voice_provider_of(connection, replacement["resource_id"])
-                if replacement
-                else ""
+            # 換聲線時不能把舊 provider 猜給新資源。略過無法辨識 provider
+            # 的聲線；都無法辨識時成對清空，等待管理員重新指派。
+            updates[column] = ""
+            updates["voice_provider"] = ""
+            for replacement in replacements:
+                provider = _voice_provider_of(
+                    connection, replacement["resource_id"],
+                )
+                if provider and provider != "auto":
+                    updates[column] = replacement["resource_id"]
+                    updates["voice_provider"] = provider
+                    break
+        else:
+            updates[column] = (
+                replacements[0]["resource_id"] if replacements else ""
             )
 
     if not updates:
