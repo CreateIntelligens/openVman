@@ -1,7 +1,9 @@
 """VoxCPM360 adapter for TTS routing.
 
-Talks to the CastAgent-compatible ``/api/v1/tts/*`` surface exposed by the
-VoxCPM360 gateway (see ``~/VoxCPM360/gateway/routes/castvoice.py``).
+Talks to the VoxCPM360 studio API: ``POST /api/v1/synthesize`` for one-shot
+synthesis and ``POST /api/v1/synthesize/stream`` for incremental playback.
+Both take multipart form fields, not JSON — see ``/api/v1/catalog`` for the
+engines and reference presets a given deployment exposes.
 """
 
 from __future__ import annotations
@@ -18,6 +20,8 @@ from app.providers.base import NormalizedTTSResult, SynthesizeRequest
 logger = logging.getLogger("provider.voxcpm")
 
 VOXCPM_PROVIDER_NAME = "voxcpm"
+# /api/v1/catalog 公布的引擎 id；這個部署只有 voxcpm2。
+VOXCPM_ENGINE_ID = "voxcpm2"
 # 無 TTS_VOXCPM_DEFAULT_VOICE 時的保底語音。VoxCPM2 依文字內容推斷語言，
 # 參考音只決定音色，所以台語參考音唸華語文字仍是華語。
 VOXCPM_DEFAULT_VOICE = "voxcpm2-cosy-young-female-01"
@@ -32,9 +36,7 @@ _REQUEST_TIMEOUT_SECONDS = 120.0
 
 def _resolve_reference_preset(voice: str) -> str:
     """從 voice_id 解析出 reference_preset_id（去除 voxcpm2- 前綴）。"""
-    if voice.startswith("voxcpm2-"):
-        return voice[len("voxcpm2-"):]
-    return voice
+    return voice.removeprefix("voxcpm2-")
 
 
 class VoxCPMAdapter:
@@ -42,9 +44,10 @@ class VoxCPMAdapter:
 
     def __init__(self, config: TTSRouterConfig) -> None:
         base_url = config.tts_voxcpm_url.rstrip("/") if config.tts_voxcpm_url else ""
-        self._base_url = base_url
-        self._url = f"{base_url}/api/v1/tts/synthesize" if base_url else ""
-        self._stream_url = f"{base_url}/api/v1/synthesize/stream" if base_url else ""
+        self._url = f"{base_url}/api/v1/synthesize" if base_url else ""
+        # 從 _url 衍生而不是各寫一次：這兩個 URL 分開寫正是上一個 bug 的形狀
+        # ——批次那份路徑寫錯了，而串流那份是對的，於是沒人發現。
+        self._stream_url = f"{self._url}/stream" if self._url else ""
         self._default_voice = config.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
         self._headers = _auth_headers(config.tts_voxcpm_api_key)
         self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_SECONDS)
@@ -58,14 +61,25 @@ class VoxCPMAdapter:
         return bool(self._url)
 
     def _build_payload(self, request: SynthesizeRequest) -> dict[str, str]:
+        """Build the multipart form both synthesis endpoints expect.
+
+        兩條路徑送同一組欄位，差別只在串流與否；分開寫過一次，結果非串流
+        那份帶著錯的路徑與 JSON body 沉了幾個月都沒人發現。
+        """
+        voice_raw = request.voice_hint or self._default_voice
         return {
+            "engine_id": VOXCPM_ENGINE_ID,
             "text": request.text,
-            "voice_id": request.voice_hint or self._default_voice,
-            "format": "mp3",
+            "reference_preset_id": _resolve_reference_preset(voice_raw),
+            "cfg_value": "2.0",
+            "inference_timesteps": "30",
+            "normalize": "true",
+            "denoise": "false",
+            "speed": "1.0",
         }
 
     def synthesize(self, request: SynthesizeRequest) -> NormalizedTTSResult:
-        """POST to /api/v1/tts/synthesize on the VoxCPM360 gateway."""
+        """POST to /api/v1/synthesize on the VoxCPM360 studio API."""
         if not self._url:
             raise RuntimeError("VoxCPM URL is not configured")
 
@@ -75,7 +89,7 @@ class VoxCPMAdapter:
         try:
             response = self._client.post(
                 self._url,
-                json=payload,
+                data=payload,
                 headers=self._headers,
             )
             latency_ms = (monotonic() - t0) * 1000
@@ -98,7 +112,7 @@ class VoxCPMAdapter:
                 route_target=VOXCPM_PROVIDER_NAME,
                 latency_ms=round(latency_ms, 2),
                 raw_metadata={
-                    "voice_id": payload["voice_id"],
+                    "reference_preset_id": payload["reference_preset_id"],
                     "status_code": response.status_code,
                     "request_id": response.headers.get("X-Request-ID", ""),
                 },
@@ -117,19 +131,7 @@ class VoxCPMAdapter:
         if not self._stream_url:
             raise RuntimeError("VoxCPM URL is not configured")
 
-        voice_raw = request.voice_hint or self._default_voice
-        preset_id = _resolve_reference_preset(voice_raw)
-
-        form_data = {
-            "engine_id": "voxcpm2",
-            "text": request.text,
-            "reference_preset_id": preset_id,
-            "cfg_value": "2.0",
-            "inference_timesteps": "30",
-            "normalize": "true",
-            "denoise": "false",
-            "speed": "1.0",
-        }
+        form_data = self._build_payload(request)
 
         client = httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS)
         req = client.build_request(
