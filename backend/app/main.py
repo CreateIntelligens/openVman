@@ -30,6 +30,7 @@ from app.gateway import websocket as websocket_routes
 from app.gateway.a2a_bridge import get_a2a_bridge_daemon
 from app.gateway.crawl_adapter import _http as _crawl_http
 from app.gateway.forward import _http as _forward_http
+from app.gateway.ingestion_audio import _http as _asr_http
 from app.gateway.redis_pool import close_redis, get_redis
 from app.gateway.routes import router as gateway_router
 from app.gateway.routes_vision import _http as _vision_http
@@ -212,7 +213,10 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     finally:
         if a2a_daemon:
             await a2a_daemon.stop()
-        clients = [_brain_proxy_http, _internal_http, _forward_http, _crawl_http, _health_http, _vision_http]
+        clients = [
+            _brain_proxy_http, _internal_http, _forward_http,
+            _crawl_http, _health_http, _vision_http, _asr_http,
+        ]
         await asyncio.gather(*(c.close() for c in clients), admin_routes.close_http())
         await _shutdown_gateway_resources()
         logger.info("backend shutdown complete")
