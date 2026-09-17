@@ -14,6 +14,7 @@ from app.providers.error_mapping import (
     classify_voxcpm_error,
 )
 from app.providers.voxcpm_adapter import (
+    equivalent_preset,
     VOXCPM_DEFAULT_VOICE,
     VoxCPMAdapter,
     VoxCPMHTTPError,
@@ -288,3 +289,31 @@ def test_both_endpoints_send_the_same_form_fields():
     assert payload["reference_preset_id"] == "cosy-teen-female-01"
     assert adapter._url.endswith("/api/v1/synthesize")
     assert adapter._stream_url == f"{adapter._url}/stream"
+
+
+class TestEquivalentPreset:
+    """CosyVoice 聲線換成 VoxCPM preset，讓整段合成的請求能走串流。"""
+
+    def test_maps_shared_taiwanese_voices(self):
+        assert equivalent_preset("young-female-01") == "cosy-young-female-01"
+        assert equivalent_preset("teen-male-02") == "cosy-teen-male-02"
+        assert equivalent_preset("senior-female-01") == "cosy-senior-female-01"
+
+    def test_cosyvoice_only_voices_have_no_equivalent(self):
+        """young-female-02（Hayley）只有 CosyVoice 有；硬換會唸成別人的聲音。"""
+        assert equivalent_preset("young-female-02") == ""
+        assert equivalent_preset("child-female-02") == ""
+
+    def test_voxcpm_voices_are_not_remapped(self):
+        """已經是 VoxCPM 的聲線不該再加一層 cosy- 前綴。"""
+        assert equivalent_preset("voxcpm2-cosy-young-female-01") == ""
+
+    def test_blank_voice_has_no_equivalent(self):
+        assert equivalent_preset("") == ""
+
+    def test_every_mapped_preset_exists_upstream(self):
+        """對應表不能編造 preset：每個值都要能被 _resolve_reference_preset 還原。"""
+        from app.providers.voxcpm_adapter import _VOXCPM_PRESETS
+
+        for voice in ("young-female-01", "teen-male-01", "child-male-02"):
+            assert equivalent_preset(voice) in _VOXCPM_PRESETS
