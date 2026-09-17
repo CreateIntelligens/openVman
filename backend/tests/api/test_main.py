@@ -1007,6 +1007,8 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
     class FakeService:
         def __init__(self):
             self.edge_adapter = types.SimpleNamespace(enabled=True)
+            # VoxCPM 停用，逼這個請求走整段合成而不是換引擎串流。
+            self.voxcpm_adapter = types.SimpleNamespace(enabled=False)
 
         def synthesize(self, request, provider=""):
             captured["provider"] = provider
@@ -1034,6 +1036,73 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
     assert response.content == b"taigi-mp3"
     assert response.headers["content-type"] == "audio/mpeg"
     assert captured["provider"] == "cosyvoice"
+
+
+def test_tts_stream_cosyvoice_streams_through_voxcpm_when_the_voice_matches(
+    monkeypatch,
+):
+    """有等價 preset 就走 VoxCPM 串流：整段合成要等 14.7 秒才出聲。
+
+    兩邊的臺語聲線出自同一組參考音，換過去不會變成別人的聲音；換不過去的
+    （CosyVoice 獨有聲線）由上一個測試涵蓋，維持整段。
+    """
+    module, _ = _load_main(monkeypatch)
+
+    # 兩邊共用的臺語聲線；VoxCPM 那頭同名但多一個 cosy- 前綴。
+    shared_voice = "young-female-01"
+    captured: dict[str, object] = {}
+
+    async def _open_stream(request):
+        captured["voice_hint"] = request.voice_hint
+
+        async def _chunks():
+            yield b"RIFF"
+            yield b"pcm-chunk"
+
+        return _chunks()
+
+    class FakeService:
+        def __init__(self):
+            self.edge_adapter = types.SimpleNamespace(enabled=True)
+            self.voxcpm_adapter = types.SimpleNamespace(
+                enabled=True, open_stream=_open_stream,
+            )
+
+        def synthesize(self, request, provider=""):
+            captured["buffered"] = True
+            raise AssertionError("有等價 preset 時不該走整段合成")
+
+    monkeypatch.setattr(module, "_get_service", lambda: FakeService())
+    monkeypatch.setattr(
+        module,
+        "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024),
+    )
+    # 授權層另有測試涵蓋；這裡要驗的是拿到聲線之後怎麼分派。
+    monkeypatch.setattr(
+        module.admin_routes,
+        "resolve_tts_voice",
+        lambda *args, **kwargs: types.SimpleNamespace(
+            provider="cosyvoice", runtime_key=shared_voice,
+        ),
+    )
+
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={
+            "text": "今天天氣真好",
+            "provider": "cosyvoice",
+            "voice": shared_voice,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"RIFFpcm-chunk"
+    assert response.headers["content-type"].startswith("audio/wav")
+    # 送出去的是 VoxCPM 的 preset id，不是 CosyVoice 的原始 voice id。
+    assert captured["voice_hint"] == f"cosy-{shared_voice}"
+    assert "buffered" not in captured
 
 
 def _usage_account(module, *, admin: bool):
