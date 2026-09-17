@@ -196,9 +196,17 @@ class TTSRouterConfig(BaseSettings):
     vision_llm_base_url: str = ""
 
     # --- Whisper ---
-    whisper_provider: str = "openai"  # "openai" | "local"
+    # "openai" | "local" | "sensevoice" | "breeze"
+    # 三者都是整檔上傳、無串流：使用者講完才開始算延遲。臺語實測（同一段
+    # 5.12s 語音）：sensevoice 0.83s 且保留臺語用字；breeze 1.50s 但轉寫成
+    # 華語。要臺語逐字顯示就得用 sensevoice。
+    whisper_provider: str = "openai"
     whisper_api_key: str = ""
     whisper_local_bin: str = "/usr/local/bin/whisper"
+    # Breeze-ASR-26（MediaTek Research）：POST /transcribe，multipart ``file``。
+    asr_breeze_url: str = ""
+    # SenseVoice-Small（阿里）：POST /api/v1/asr，multipart ``files`` + ``keys``。
+    asr_sensevoice_url: str = ""
 
     # --- Camera ---
     camera_snapshot_interval_sec: int = 5
