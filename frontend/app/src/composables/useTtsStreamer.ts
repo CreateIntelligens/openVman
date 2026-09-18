@@ -6,8 +6,6 @@
  *   - provider === 'auto' + IndexTTS is available: POST /api/v1/tts/stream (character = IndexTTS default)
  *   - provider === 'auto' + only VoxCPM is available: POST /api/v1/tts/stream (no character; backend picks VoxCPM)
  *     Response: audio/wav — 44-byte header + raw PCM 16 kHz mono Int16 LE, chunked
- *   - provider === 'cosyvoice': POST /api/v1/tts/stream (backend maps the voice to
- *     VoxCPM's equivalent preset and streams; falls back to a full file if there is none)
  *   - all others (edge, gcp, aws…): POST /v1/audio/speech (full file, multi-provider)
  *     Response: provider-native audio. Encoded formats are decoded to 16 kHz mono PCM.
  */
@@ -87,15 +85,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     if (options.shouldUseStream) return options.shouldUseStream(provider);
 
     const normalized = normalizedProvider(provider);
-    // cosyvoice 自己沒有串流端點，但後端會把有等價聲線的請求轉給 VoxCPM 串流；
-    // 轉不成時後端照樣回整段音訊，所以這裡走串流端點一律安全。
-    if (
-      !normalized
-      || normalized === "indextts"
-      || normalized === "gemini-tts"
-      || normalized === "voxcpm"
-      || normalized === "cosyvoice"
-    ) return true;
+    if (!normalized || normalized === "indextts" || normalized === "gemini-tts" || normalized === "voxcpm") return true;
     // auto 由後端挑鏈上第一個能串流的 provider：有 IndexTTS 走 IndexTTS，否則 VoxCPM。
     if (normalized === "auto") return Boolean(getIndexTtsProvider()) || hasVoxCpmProvider();
     return false;
@@ -116,7 +106,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
     if (options.buildStreamBody) return options.buildStreamBody(text, opts);
 
     const provider = normalizedProvider(opts.provider ?? "");
-    if (provider === "gemini-tts" || provider === "voxcpm" || provider === "cosyvoice") {
+    if (provider === "gemini-tts" || provider === "voxcpm") {
       const body: Record<string, string> = { text, provider };
       if (opts.voice) body.voice = opts.voice;
       return body;
