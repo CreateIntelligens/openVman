@@ -74,6 +74,13 @@ class TTSRouterConfig(BaseSettings):
         default="",
         validation_alias="TTS_VOXCPM_DEFAULT_VOICE",
     )
+    # VoxCPM diffusion 去噪步數。延遲與步數幾乎線性（實測 31 字：10 步 3.2 秒、
+    # 30 步 8.0 秒），而串流的首音延遲幾乎不受影響——多出來的時間全在後續段落。
+    # 部署預設是 10；adapter 先前寫死 30，等於把整段合成的時間變成兩倍多。
+    tts_voxcpm_inference_timesteps: int = Field(
+        default=10,
+        validation_alias="TTS_VOXCPM_INFERENCE_TIMESTEPS",
+    )
     # 逗號分隔的 voice_id 黑名單。上游的聲音清單不是我們維護的，這裡把不想
     # 出現在選單裡的濾掉；預設排除 barbet-hung-yi-lee（另一套固定語者模型，
     # 不是 VoxCPM2 的 zero-shot 克隆，行為與其餘聲音不一致）。

@@ -49,6 +49,7 @@ class VoxCPMAdapter:
         # ——批次那份路徑寫錯了，而串流那份是對的，於是沒人發現。
         self._stream_url = f"{self._url}/stream" if self._url else ""
         self._default_voice = config.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
+        self._inference_timesteps = str(config.tts_voxcpm_inference_timesteps)
         self._headers = _auth_headers(config.tts_voxcpm_api_key)
         self._client = httpx.Client(timeout=_REQUEST_TIMEOUT_SECONDS)
 
@@ -72,7 +73,7 @@ class VoxCPMAdapter:
             "text": request.text,
             "reference_preset_id": _resolve_reference_preset(voice_raw),
             "cfg_value": "2.0",
-            "inference_timesteps": "30",
+            "inference_timesteps": self._inference_timesteps,
             "normalize": "true",
             "denoise": "false",
             "speed": "1.0",
