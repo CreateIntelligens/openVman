@@ -78,7 +78,12 @@ export default function AsrProviderPanel() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const mimeType = preferredRecorderMimeType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      // 明確指定位元率：opus 壓到 24 kbps 時辨識會崩壞（實測「今仔日天氣袂歹」
+      // 變成「今拿日天氣袂買」），128 kbps 的結果與未壓縮的 WAV 完全一致。
+      const recorder = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 128_000,
+      });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (event) => {
         if (event.data.size) chunks.push(event.data);
