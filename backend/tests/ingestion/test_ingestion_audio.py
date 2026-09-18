@@ -37,7 +37,6 @@ def _asr_cfg(provider: str, **overrides) -> MagicMock:
         "asr_sensevoice_url": "",
         "asr_breeze_url": "",
         "whisper_api_key": "",
-        "whisper_local_bin": "",
     }
     fields.update(overrides)
     return MagicMock(**fields)
@@ -62,11 +61,6 @@ def _stub_post(handler, seen: dict):
 
     return MagicMock(get=MagicMock(return_value=MagicMock(post=_post)))
 
-
-def _local_cfg() -> MagicMock:
-    # _provider_ready 會檢查 binary 真的存在，所以指向一個必然存在的檔案；
-    # subprocess.run 在這些測試裡都被 patch 掉，不會真的執行它。
-    return _asr_cfg("local", whisper_local_bin="/bin/sh")
 
 
 class TestOpenAITranscription:
@@ -97,47 +91,6 @@ class TestOpenAITranscription:
 
         assert "轉錄失敗" in result.content
 
-
-class TestLocalTranscription:
-    @pytest.mark.asyncio
-    async def test_local_success_from_file(self, fake_audio, tmp_path):
-        # whisper writes to <input>.txt
-        txt_path = tmp_path / "test.txt"
-        txt_path.write_text("本地轉錄結果", encoding="utf-8")
-
-        mock_result = MagicMock(returncode=0, stdout="", stderr="")
-
-        with (
-            patch("app.gateway.ingestion_audio.get_tts_config", return_value=_local_cfg()),
-            patch("app.gateway.ingestion_audio.subprocess.run", return_value=mock_result),
-        ):
-            result = await transcribe(fake_audio, "trace-3")
-
-        assert result.content == "本地轉錄結果"
-
-    @pytest.mark.asyncio
-    async def test_local_success_from_stdout(self, fake_audio):
-        mock_result = MagicMock(returncode=0, stdout="stdout轉錄", stderr="")
-
-        with (
-            patch("app.gateway.ingestion_audio.get_tts_config", return_value=_local_cfg()),
-            patch("app.gateway.ingestion_audio.subprocess.run", return_value=mock_result),
-        ):
-            result = await transcribe(fake_audio, "trace-4")
-
-        assert result.content == "stdout轉錄"
-
-    @pytest.mark.asyncio
-    async def test_local_nonzero_exit(self, fake_audio):
-        mock_result = MagicMock(returncode=1, stderr="error")
-
-        with (
-            patch("app.gateway.ingestion_audio.get_tts_config", return_value=_local_cfg()),
-            patch("app.gateway.ingestion_audio.subprocess.run", return_value=mock_result),
-        ):
-            result = await transcribe(fake_audio, "trace-5")
-
-        assert "轉錄失敗" in result.content
 
 
 class TestSenseVoiceTranscription:
@@ -323,15 +276,6 @@ class TestProviderFallbackChain:
         # 失敗日誌要說試過誰，不然看不出是全掛還是根本沒排進來。
         assert "sensevoice" in caplog.text and "breeze" in caplog.text
 
-    def test_local_whisper_needs_the_binary_to_exist(self, tmp_path):
-        """whisper_local_bin 有預設值，光看設定永遠 truthy。"""
-        missing = _asr_cfg("local", whisper_local_bin="/nonexistent/whisper")
-        assert ingestion_audio._resolve_chain(missing) == []
-
-        present = tmp_path / "whisper"
-        present.write_text("#!/bin/sh\n")
-        installed = _asr_cfg("local", whisper_local_bin=str(present))
-        assert ingestion_audio._resolve_chain(installed) == ["local"]
 
 
 class TestStoredProviderOverride:

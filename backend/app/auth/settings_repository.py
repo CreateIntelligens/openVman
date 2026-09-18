@@ -20,7 +20,7 @@ class InvalidSettingValueError(RepositoryError):
 # 行為，打錯一個字母就整站沒有語音辨識，而且要到下一次有人講話才發現。
 ASR_PROVIDER_KEY = "asr_provider"
 _ALLOWED_VALUES: dict[str, frozenset[str]] = {
-    ASR_PROVIDER_KEY: frozenset({"sensevoice", "breeze", "openai", "local"}),
+    ASR_PROVIDER_KEY: frozenset({"sensevoice", "breeze", "openai"}),
 }
 
 

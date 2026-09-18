@@ -1,9 +1,8 @@
-"""Audio ingestion — Whisper API, local binary, SenseVoice, or Breeze-ASR."""
+"""Audio ingestion — SenseVoice, Breeze-ASR, or the OpenAI Whisper API."""
 
 from __future__ import annotations
 
 import logging
-import subprocess
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -84,33 +83,12 @@ async def _transcribe_breeze(file_path: str, trace_id: str) -> str:
     return str(response.json().get("text", "")).strip()
 
 
-def _transcribe_local(file_path: str, trace_id: str) -> str:
-    """Transcribe audio using local whisper binary."""
-    cfg = get_tts_config()
-    result = subprocess.run(
-        [cfg.whisper_local_bin, file_path, "--language", "zh", "--output_format", "txt"],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"whisper local failed: {result.stderr}")
 
-    # whisper outputs to <input>.txt
-    txt_path = Path(file_path).with_suffix(".txt")
-    if txt_path.exists():
-        return txt_path.read_text(encoding="utf-8").strip()
-
-    return result.stdout.strip()
-
-
-# provider 名稱 → 轉寫函式。async 與 sync 都收：_transcribe_local 跑的是
-# 子行程，包成 to_thread 反而多一層。
+# provider 名稱 → 轉寫函式。
 _TRANSCRIBERS: dict[str, object] = {
     "sensevoice": _transcribe_sensevoice,
     "breeze": _transcribe_breeze,
     "openai": _transcribe_openai,
-    "local": _transcribe_local,
 }
 
 
@@ -157,11 +135,7 @@ def _provider_ready(cfg, name: str) -> bool:
         return bool(cfg.asr_sensevoice_url)
     if name == "breeze":
         return bool(cfg.asr_breeze_url)
-    if name == "openai":
-        return bool(cfg.whisper_api_key)
-    # whisper_local_bin 有預設值，光看設定永遠是 truthy；檔案不在就別排進
-    # chain，否則每次 fallback 都要先付一次 FileNotFoundError。
-    return bool(cfg.whisper_local_bin) and Path(cfg.whisper_local_bin).exists()
+    return bool(cfg.whisper_api_key)
 
 
 async def transcribe(file_path: str, trace_id: str) -> IngestionResult:
@@ -179,10 +153,7 @@ async def transcribe(file_path: str, trace_id: str) -> IngestionResult:
     for name in chain:
         transcriber = _TRANSCRIBERS[name]
         try:
-            if name == "local":
-                content = transcriber(file_path, trace_id)
-            else:
-                content = await transcriber(file_path, trace_id)
+            content = await transcriber(file_path, trace_id)
         except Exception as exc:
             logger.warning(
                 "transcription_attempt_failed trace_id=%s provider=%s err=%s",
