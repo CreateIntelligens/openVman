@@ -513,7 +513,11 @@ def test_legacy_locator_username_is_scrubbed_without_breaking_legacy_login(
     assert all(row["username"] != row["code_locator"] for row in rows)
     assert all(row["username_normalized"] != row["code_locator"] for row in rows)
     # 測試刻意移除舊的遷移紀錄再重跑，所以會補回 v6 與後續 migration。
-    assert [row["version"] for row in versions] == [1, 2, 3, 4, 6, 7, 8, 9, 10]
+    # 不寫死完整清單：那會讓每一個新 migration 都弄壞這個與它無關的測試。
+    applied = [row["version"] for row in versions]
+    assert applied == sorted(applied)
+    assert 5 not in applied, "被移除的 v5 不該補回來"
+    assert {1, 2, 3, 4, 6}.issubset(applied)
     assert violations == []
     listed = client.get(
         "/api/v1/temporary-accounts/batches", headers=_admin_headers(client),

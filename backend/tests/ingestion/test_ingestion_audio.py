@@ -332,3 +332,33 @@ class TestProviderFallbackChain:
         present.write_text("#!/bin/sh\n")
         installed = _asr_cfg("local", whisper_local_bin=str(present))
         assert ingestion_audio._resolve_chain(installed) == ["local"]
+
+
+class TestStoredProviderOverride:
+    """後台改過的 provider 要蓋掉 .env，但讀不到設定時不能讓辨識停擺。"""
+
+    def test_stored_override_takes_precedence_over_the_environment(self):
+        cfg = _asr_cfg(
+            "openai",
+            whisper_api_key="sk-test",
+            asr_sensevoice_url="http://asr:50002",
+        )
+        stored = MagicMock(settings=MagicMock(get=MagicMock(return_value="sensevoice")))
+        with patch("app.auth.runtime.get_auth_runtime", return_value=stored):
+            assert ingestion_audio._active_provider(cfg) == "sensevoice"
+            assert ingestion_audio._resolve_chain(cfg)[0] == "sensevoice"
+
+    def test_absent_override_falls_back_to_the_environment(self):
+        cfg = _asr_cfg("breeze", asr_breeze_url="http://asr:8801")
+        stored = MagicMock(settings=MagicMock(get=MagicMock(return_value=None)))
+        with patch("app.auth.runtime.get_auth_runtime", return_value=stored):
+            assert ingestion_audio._active_provider(cfg) == "breeze"
+
+    def test_unreadable_settings_still_transcribe(self):
+        """資料庫還沒 migrate 或 auth runtime 沒起來時，照 .env 走就好。"""
+        cfg = _asr_cfg("sensevoice", asr_sensevoice_url="http://asr:50002")
+        with patch(
+            "app.auth.runtime.get_auth_runtime",
+            side_effect=RuntimeError("no such table: system_settings"),
+        ):
+            assert ingestion_audio._active_provider(cfg) == "sensevoice"

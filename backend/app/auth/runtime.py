@@ -17,6 +17,7 @@ from .repositories import (
     TemporaryAccountRepository,
     UserRepository,
 )
+from .settings_repository import SystemSettingsRepository
 from .temporary_passwords import TemporaryPasswordCipher
 from .tokens import SessionTokenService
 
@@ -33,6 +34,7 @@ class AuthRuntime:
     temporary_accounts: TemporaryAccountRepository
     embed_keys: EmbedKeyRepository
     tokens: SessionTokenService
+    settings: SystemSettingsRepository
     temporary_passwords: TemporaryPasswordCipher
 
 
@@ -55,6 +57,7 @@ def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:
         auth_audit=AuthAuditRepository(database),
         temporary_accounts=TemporaryAccountRepository(database),
         embed_keys=EmbedKeyRepository(database),
+        settings=SystemSettingsRepository(database),
         tokens=tokens,
         temporary_passwords=TemporaryPasswordCipher(
             config.auth_temporary_password_secret or config.session_jwt_secret,

@@ -6,7 +6,7 @@ import {
 
 export const workspaceTabs = [
   { key: "Chat", label: "對話", icon: "chat" },
-  { key: "Tts", label: "TTS 試聽", icon: "graphic_eq" },
+  { key: "Tts", label: "語音", icon: "graphic_eq" },
   { key: "Sessions", label: "對話紀錄", icon: "forum" },
   { key: "Search", label: "知識庫搜尋", icon: "search" },
   { key: "Workspace", label: "工作區", icon: "folder_managed" },

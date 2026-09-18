@@ -12,6 +12,8 @@ from math import ceil
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.config import get_tts_config
+
 from .dependencies import (
     CurrentAccount,
     get_current_account,
@@ -49,6 +51,11 @@ from .repositories import (
 )
 from .resources import resolve_admin_scope
 from .runtime import AuthRuntime, get_auth_runtime
+from .settings_repository import (
+    ASR_PROVIDER_KEY,
+    InvalidSettingValueError,
+    UnknownSettingError,
+)
 from .temporary_passwords import TemporaryPasswordCipher
 
 _SESSION_COOKIE_NAME = "openvman_session"
@@ -65,6 +72,7 @@ _TEMPORARY_LOCATOR_LENGTH = 12
 
 auth_router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 users_router = APIRouter(prefix="/api/v1/users", tags=["Accounts"])
+settings_router = APIRouter(prefix="/api/v1/settings", tags=["Settings"])
 temporary_accounts_router = APIRouter(
     prefix="/api/v1/temporary-accounts",
     tags=["Temporary accounts"],
@@ -1200,6 +1208,70 @@ def change_account_role(
     except InvalidResourceGrantError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return AdminAccountProfile.from_record(user, runtime)
+
+
+class SystemSettingProfile(_StrictModel):
+    key: str
+    value: str
+    # 目前生效的值：沒有覆寫時等於環境變數的預設。前端要能分辨「沒設定」
+    # 與「設成跟預設一樣」，否則清除按鈕沒有意義。
+    effective: str
+    overridden: bool
+    options: list[str]
+
+
+class UpdateSystemSettingRequest(_StrictModel):
+    value: str
+
+
+def _asr_setting_profile(runtime: AuthRuntime) -> SystemSettingProfile:
+    stored = runtime.settings.get(ASR_PROVIDER_KEY)
+    default = get_tts_config().whisper_provider
+    return SystemSettingProfile(
+        key=ASR_PROVIDER_KEY,
+        value=stored or "",
+        effective=stored or default,
+        overridden=stored is not None,
+        options=sorted(runtime.settings.allowed_values(ASR_PROVIDER_KEY)),
+    )
+
+
+@settings_router.get("/asr-provider", response_model=SystemSettingProfile)
+def get_asr_provider(
+    _admin: CurrentAccount = Depends(require_admin),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> SystemSettingProfile:
+    return _asr_setting_profile(runtime)
+
+
+@settings_router.put("/asr-provider", response_model=SystemSettingProfile)
+def set_asr_provider(
+    body: UpdateSystemSettingRequest,
+    root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> SystemSettingProfile:
+    """Override which ASR engine every request uses.
+
+    限 ROOT：這個設定影響每一個使用者的每一次語音輸入，而且改錯了要到下一
+    次有人講話才會發現。
+    """
+    try:
+        runtime.settings.set(ASR_PROVIDER_KEY, body.value, actor_id=root.user.id)
+    except InvalidSettingValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except UnknownSettingError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _asr_setting_profile(runtime)
+
+
+@settings_router.delete("/asr-provider", response_model=SystemSettingProfile)
+def clear_asr_provider(
+    root: CurrentAccount = Depends(require_root),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> SystemSettingProfile:
+    """Drop the override so the environment default applies again."""
+    runtime.settings.clear(ASR_PROVIDER_KEY, actor_id=root.user.id)
+    return _asr_setting_profile(runtime)
 
 
 @users_router.post(

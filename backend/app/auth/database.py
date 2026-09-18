@@ -224,6 +224,23 @@ _ADMIN_SCOPE_STATEMENTS = (
     """,
 )
 
+_SYSTEM_SETTINGS_SCHEMA_VERSION = 11
+_SYSTEM_SETTINGS_MIGRATION_NAME = "system_settings"
+# 營運時可改的全站設定。環境變數仍是預設值來源：這張表只存「被人改過」的
+# 項目，沒有紀錄就回退到 .env，所以新部署不必先寫一輪設定才能啟動。
+# 存 updated_by 與 updated_at 是因為這些設定會影響每一個使用者，出事時要
+# 查得到是誰在什麼時候動的。
+_SYSTEM_SETTINGS_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+)
+
 _MIGRATIONS = (
     (1, "initial_accounts_and_resources", _INITIAL_SCHEMA_STATEMENTS),
     (2, "temporary_accounts_grants_and_defaults", _TEMPORARY_ACCOUNT_STATEMENTS),
@@ -242,6 +259,11 @@ _MIGRATIONS = (
         10,
         "encrypted_temporary_passwords",
         ("ALTER TABLE temporary_credentials ADD COLUMN password_ciphertext TEXT",),
+    ),
+    (
+        _SYSTEM_SETTINGS_SCHEMA_VERSION,
+        _SYSTEM_SETTINGS_MIGRATION_NAME,
+        _SYSTEM_SETTINGS_STATEMENTS,
     ),
 )
 

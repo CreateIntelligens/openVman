@@ -114,6 +114,24 @@ _TRANSCRIBERS: dict[str, object] = {
 }
 
 
+def _active_provider(cfg) -> str:
+    """The operator's stored choice, or the environment default.
+
+    設定表只存「被人改過」的項目：沒有紀錄就用 .env，所以新部署不必先寫一
+    輪設定才能啟動。讀失敗（資料庫還沒 migrate、或整個 auth runtime 沒起來）
+    也回退到 .env——語音辨識不該因為一張設定表而停擺。
+    """
+    try:
+        from app.auth.runtime import get_auth_runtime
+        from app.auth.settings_repository import ASR_PROVIDER_KEY
+
+        stored = get_auth_runtime().settings.get(ASR_PROVIDER_KEY)
+    except Exception as exc:
+        logger.debug("asr_provider_setting_unavailable err=%s", exc)
+        return cfg.whisper_provider
+    return stored or cfg.whisper_provider
+
+
 def _resolve_chain(cfg) -> list[str]:
     """Ordered ASR providers to try: the configured one, then the rest.
 
@@ -123,7 +141,7 @@ def _resolve_chain(cfg) -> list[str]:
     URL 的排進來只會白等一次連線逾時。
     """
     configured = [
-        name for name in (cfg.whisper_provider, *_TRANSCRIBERS)
+        name for name in (_active_provider(cfg), *_TRANSCRIBERS)
         if name in _TRANSCRIBERS
     ]
     ordered: list[str] = []
@@ -155,7 +173,7 @@ async def transcribe(file_path: str, trace_id: str) -> IngestionResult:
     chain = _resolve_chain(cfg)
     logger.info(
         "transcribe trace_id=%s provider=%s chain=%s",
-        trace_id, cfg.whisper_provider, ",".join(chain),
+        trace_id, _active_provider(cfg), ",".join(chain),
     )
 
     for name in chain:
