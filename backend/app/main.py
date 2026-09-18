@@ -63,7 +63,6 @@ from app.providers.gemini_tts_adapter import (
     GeminiTTSHTTPError,
 )
 from app.providers.voxcpm_adapter import (
-    equivalent_preset,
     VOXCPM_PROVIDER_NAME,
     VOXCPM_STREAM_CONTENT_TYPE,
     VoxCPMHTTPError,
@@ -545,22 +544,6 @@ async def tts_stream_endpoint(
             except (VoxCPMHTTPError, RuntimeError) as exc:
                 # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
                 logger.warning("tts_stream voxcpm error: %s", exc)
-
-    # CosyVoice 沒有串流端點，整段合成要等到最後一個字才出聲（實測 49 字
-    # 14.7 秒）。兩邊的臺語聲線出自同一組參考音，所以有等價 preset 的就改走
-    # VoxCPM 串流，首音 0.47 秒；沒有的（CosyVoice 獨有聲線）維持整段。
-    if provider == COSYVOICE_PROVIDER_NAME:
-        preset = equivalent_preset(voice or character)
-        voxcpm = _get_service().voxcpm_adapter
-        if preset and voxcpm.enabled:
-            try:
-                stream = await voxcpm.open_stream(
-                    SynthesizeRequest(text=cleaned, voice_hint=preset)
-                )
-                return StreamingResponse(stream, media_type=VOXCPM_STREAM_CONTENT_TYPE)
-            except (VoxCPMHTTPError, RuntimeError) as exc:
-                # 換不成就照原路整段合成，不要讓聲音變成別的引擎。
-                logger.warning("tts_stream cosyvoice->voxcpm error: %s", exc)
 
     # 明確指定的非串流 provider（CosyVoice 等）直接走整段合成。不這樣做的話
     # 會掉進下面的 IndexTTS／Edge 串流，回的是別的引擎的聲音——CosyVoice 是

@@ -39,40 +39,6 @@ def _resolve_reference_preset(voice: str) -> str:
     return voice.removeprefix("voxcpm2-")
 
 
-def equivalent_preset(voice: str) -> str:
-    """CosyVoice 聲線在 VoxCPM 的等價 preset，沒有就回空字串。
-
-    兩邊的臺語聲線出自同一組參考音，VoxCPM 只是多了 ``cosy-`` 前綴。這個
-    對應讓 CosyVoice 的請求能改走 VoxCPM 的串流端點：同一句話整段合成要等
-    14.7 秒才出聲，串流 0.47 秒就開始播。沒有對應的（例如 CosyVoice 獨有的
-    young-female-02）回空字串，呼叫端照原本的整段路徑走。
-    """
-    if not voice or voice.startswith("voxcpm2-"):
-        return ""
-    candidate = f"cosy-{voice}"
-    return candidate if candidate in _VOXCPM_PRESETS else ""
-
-
-# /api/v1/catalog 公布的 reference presets。寫死而不是開機時抓：抓失敗的話
-# 整個 TTS 就沒有串流可走，而這份清單變動的頻率遠低於服務重啟的頻率。
-_VOXCPM_PRESETS = frozenset({
-    "cosy-child-female-01",
-    "cosy-child-male-01",
-    "cosy-child-male-02",
-    "cosy-senior-female-01",
-    "cosy-senior-male-01",
-    "cosy-teen-female-01",
-    "cosy-teen-female-02",
-    "cosy-teen-female-03",
-    "cosy-teen-male-01",
-    "cosy-teen-male-02",
-    "cosy-young-female-01",
-    "cosy-young-male-01",
-    "cosy-young-male-02",
-    "cosy-young-male-03",
-})
-
-
 class VoxCPMAdapter:
     """Synthesize speech via VoxCPM360 (HTTP) and return a NormalizedTTSResult or stream."""
 
