@@ -17,7 +17,11 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.dependencies import (
+    CurrentAccount,
+    get_current_account,
+    require_admin,
+)
 from app.auth.middleware import FailClosedAuthMiddleware
 from app.auth.embed_key_routes import router as embed_key_router
 from app.auth.routes import (
@@ -628,6 +632,50 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
             status_code=500,
             error=str(exc),
         )
+    finally:
+        await file.close()
+        cleanup_temp_path(tmp_path)
+
+
+@app.post(
+    "/api/v1/settings/asr-provider/preview",
+    tags=["Settings"],
+    summary="以目前設定的引擎試辨識一段語音",
+)
+async def preview_asr(
+    _admin: CurrentAccount = Depends(require_admin),
+    file: UploadFile = File(...),
+) -> JSONResponse:
+    """Transcribe an uploaded clip so an operator can hear-test the engine.
+
+    切換引擎卻沒辦法驗證結果，等於要人憑說明文字選。這個端點走的是正式對話
+    用的同一條 transcribe()，所以看到的就是實際會發生的行為，包含 fallback。
+    """
+    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
+    tmp_path: str | None = None
+    cfg = get_tts_config()
+    try:
+        tmp_path, _ = await persist_upload_to_tempfile(
+            file,
+            suffix=suffix,
+            max_bytes=cfg.document_max_upload_bytes,
+        )
+        from app.gateway.ingestion_audio import _active_provider, transcribe
+
+        result = await transcribe(tmp_path, "asr-preview")
+        return JSONResponse(content={
+            "text": result.content,
+            "provider": _active_provider(cfg),
+        })
+    except UploadTooLargeError as exc:
+        limit_mb = exc.limit_bytes / (1024 * 1024)
+        return upload_failed_response(
+            status_code=413,
+            error=f"音檔超過大小限制（上限 {limit_mb:.0f} MB）",
+        )
+    except Exception as exc:
+        logger.error("asr preview failed: %s", exc)
+        return upload_failed_response(status_code=500, error=str(exc))
     finally:
         await file.close()
         cleanup_temp_path(tmp_path)

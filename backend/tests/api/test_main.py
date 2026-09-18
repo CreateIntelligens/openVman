@@ -1280,3 +1280,53 @@ def test_voxcpm_voice_list_drops_excluded_ids(monkeypatch):
     voices = asyncio.run(admin._fetch_voxcpm_voices("http://voxcpm.invalid"))
 
     assert [voice_id for voice_id, _ in voices] == ["voxcpm2-cosy-young-female-01"]
+
+
+def test_asr_preview_returns_the_transcript_and_active_engine(monkeypatch):
+    """切換引擎卻沒辦法驗證結果，等於要人憑說明文字選。
+
+    這個端點必須走正式對話用的同一條 transcribe()，否則試辨識看到的行為
+    和實際發生的可能不同——包含 fallback 換了引擎這件事。
+    """
+    module, _ = _load_main(monkeypatch)
+    seen: dict[str, object] = {}
+
+    async def _transcribe(path, trace_id):
+        seen["trace_id"] = trace_id
+        return types.SimpleNamespace(
+            content_type="audio_transcription", content="今仔日天氣袂䆀",
+        )
+
+    import app.gateway.ingestion_audio as ingestion_audio
+
+    monkeypatch.setattr(ingestion_audio, "transcribe", _transcribe)
+    monkeypatch.setattr(ingestion_audio, "_active_provider", lambda cfg: "sensevoice")
+    monkeypatch.setattr(
+        module, "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024 * 1024),
+    )
+
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/settings/asr-provider/preview",
+        files={"file": ("preview.webm", b"fake-audio-bytes", "audio/webm")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"text": "今仔日天氣袂䆀", "provider": "sensevoice"}
+
+
+def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    monkeypatch.setattr(
+        module, "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=8),
+    )
+
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/settings/asr-provider/preview",
+        files={"file": ("preview.webm", b"x" * 64, "audio/webm")},
+    )
+
+    assert response.status_code == 413

@@ -1,31 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   clearAsrProvider,
   fetchAsrProvider,
+  previewAsr,
   setAsrProvider,
   type SystemSetting,
 } from "../api/settings";
+import { preferredRecorderMimeType } from "../utils/liveAudioUtils";
 import Select from "./Select";
 
-// 引擎的實測差異。使用者要在選單上就看得出差別，不然「sensevoice」和
-// 「breeze」只是兩個沒有意義的字串。數字來自 2026-09-17 的同一段臺語語音。
+// 選單上只有代號的話，使用者無從判斷該選哪個。寫辨識行為的差異，不寫
+// 延遲秒數——那隨文字長度與 GPU 負載變動，標在介面上等於給一個做不到的承諾。
 const ENGINE_NOTES: Record<string, { label: string; note: string }> = {
   sensevoice: {
     label: "SenseVoice-Small",
-    note: "0.8 秒。聽得懂臺語並以臺語漢字輸出，臺語場景建議用這個。",
+    note: "聽得懂臺語並以臺語漢字輸出，臺語場景建議用這個。",
   },
   breeze: {
     label: "Breeze-ASR-26",
-    note: "1.5 秒。臺語會轉寫成華語：語意保留、用字不保留。",
+    note: "臺語會轉寫成華語：語意保留、用字不保留。",
   },
   openai: {
     label: "OpenAI Whisper",
     note: "需要 API 金鑰，語音會送出到外部服務。",
-  },
-  local: {
-    label: "本機 Whisper",
-    note: "需要主機上裝有 whisper 執行檔。",
   },
 };
 
@@ -39,6 +37,11 @@ export default function AsrProviderPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -61,6 +64,53 @@ export default function AsrProviderPanel() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function stopTracks() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }
+
+  async function startRecording() {
+    setError("");
+    setTranscript("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = preferredRecorderMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        stopTracks();
+        const clip = new Blob(chunks, { type: mimeType || "audio/webm" });
+        if (!clip.size) {
+          setError("沒有錄到聲音，請確認麥克風。");
+          return;
+        }
+        setTranscribing(true);
+        previewAsr(clip)
+          .then((result) => setTranscript(result.text))
+          .catch((reason) => setError(
+            reason instanceof Error ? reason.message : "辨識失敗，請重試。",
+          ))
+          .finally(() => setTranscribing(false));
+      };
+      recorderRef.current = recorder;
+      recorder.start();
+      setRecording(true);
+    } catch {
+      stopTracks();
+      setError("無法存取麥克風，請檢查瀏覽器權限。");
+    }
+  }
+
+  function stopRecording() {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    setRecording(false);
   }
 
   if (loading) {
@@ -110,6 +160,32 @@ export default function AsrProviderPanel() {
           >
             改回部署設定
           </button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-sm font-semibold">試辨識</h2>
+        <p className="text-xs leading-5 text-content-muted">
+          錄一段話，看目前的引擎辨識成什麼。走的是正式對話用的同一條路徑，
+          所以結果就是實際會發生的行為。
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className={recording ? "btn btn-danger" : "btn btn-secondary"}
+            disabled={transcribing}
+            onClick={() => (recording ? stopRecording() : void startRecording())}
+          >
+            {recording ? "停止並辨識" : "開始錄音"}
+          </button>
+          {transcribing && (
+            <span role="status" className="text-sm text-content-muted">辨識中…</span>
+          )}
+        </div>
+        {transcript && (
+          <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm">
+            {transcript}
+          </p>
         )}
       </div>
 
