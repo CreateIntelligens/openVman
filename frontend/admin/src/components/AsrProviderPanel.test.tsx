@@ -17,7 +17,7 @@ vi.mock("../api/settings", () => ({
   previewAsr: vi.fn(),
 }));
 
-const OPTIONS = ["breeze", "local", "openai", "sensevoice"];
+const OPTIONS = ["breeze", "openai", "sensevoice", "xiaomi"];
 
 function setting(overrides: Partial<SystemSetting> = {}): SystemSetting {
   return {
@@ -46,6 +46,14 @@ describe("AsrProviderPanel", () => {
     expect(await screen.findByText(/SenseVoice-Small/)).toBeTruthy();
     // 選單上只有引擎代號的話，使用者無從判斷該選哪個。
     expect(screen.getByText(/臺語漢字輸出/)).toBeTruthy();
+  });
+
+  it("新加的引擎也要有說明，不能只出現代號", async () => {
+    vi.mocked(fetchAsrProvider).mockResolvedValue(setting({ effective: "xiaomi" }));
+    render(<AsrProviderPanel />);
+
+    expect(await screen.findByText(/Xiaomi-CocktailASR-1/)).toBeTruthy();
+    expect(screen.getByText(/自動轉繁/)).toBeTruthy();
   });
 
   it("沿用部署設定時不顯示還原按鈕", async () => {

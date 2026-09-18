@@ -203,15 +203,19 @@ class TTSRouterConfig(BaseSettings):
     vision_llm_base_url: str = ""
 
     # --- Whisper ---
-    # "sensevoice" | "breeze" | "openai"
-    # 都是整檔上傳、無串流端點：使用者講完才開始辨識。sensevoice 會以臺語
-    # 漢字輸出臺語語音，breeze 則轉寫成華語。
-    whisper_provider: str = "sensevoice"
+    # "breeze" | "xiaomi" | "sensevoice" | "openai"
+    # 都是整檔上傳、無串流端點：使用者講完才開始辨識。我們要的是華語逐字稿：
+    # breeze 與 xiaomi 都把臺語轉寫成華語，sensevoice 則保留臺語漢字，所以它
+    # 退居備援——全掛時臺語漢字仍比「音訊轉錄失敗」六個字進 prompt 好。
+    whisper_provider: str = "breeze"
     whisper_api_key: str = ""
     # Breeze-ASR-26（MediaTek Research）：POST /transcribe，multipart ``file``。
     asr_breeze_url: str = ""
     # SenseVoice-Small（阿里）：POST /api/v1/asr，multipart ``files`` + ``keys``。
     asr_sensevoice_url: str = ""
+    # Xiaomi-CocktailASR-1：POST /transcribe，multipart ``target`` + ``ref``。
+    # 目標語者模型，我們把同一個音檔同時當 target 與 ref 送出。輸出簡體。
+    asr_xiaomi_url: str = ""
 
     # --- Camera ---
     camera_snapshot_interval_sec: int = 5
