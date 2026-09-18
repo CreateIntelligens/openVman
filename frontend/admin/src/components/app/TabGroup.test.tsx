@@ -12,13 +12,13 @@ describe("collapsible navigation group", () => {
     const toggle = screen.getByRole("button", { name: "Workspace" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(document.getElementById(toggle.getAttribute("aria-controls")!)?.hidden).toBe(true);
-    expect(screen.queryByRole("button", { name: /TTS 試聽/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /語音$/ })).toBeNull();
     fireEvent.click(toggle);
     expect(onToggle).toHaveBeenCalledOnce();
     rerender(<TabGroup {...props} isCollapsed={false} />);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("button", { name: /對話$/ }).getAttribute("aria-current")).toBe("page");
-    fireEvent.click(screen.getByRole("button", { name: /TTS 試聽/ }));
+    fireEvent.click(screen.getByRole("button", { name: /語音$/ }));
     expect(props.onSelect).toHaveBeenCalledWith("Tts");
   });
 
