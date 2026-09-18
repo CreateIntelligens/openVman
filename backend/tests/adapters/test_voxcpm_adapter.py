@@ -62,7 +62,7 @@ def test_voxcpm_adapter_synthesis_success(monkeypatch):
             "text": "你好",
             "reference_preset_id": "cosy-teen-female-01",
             "cfg_value": "2.0",
-            "inference_timesteps": "30",
+            "inference_timesteps": "10",
             "normalize": "true",
             "denoise": "false",
             "speed": "1.0",
@@ -288,3 +288,31 @@ def test_both_endpoints_send_the_same_form_fields():
     assert payload["reference_preset_id"] == "cosy-teen-female-01"
     assert adapter._url.endswith("/api/v1/synthesize")
     assert adapter._stream_url == f"{adapter._url}/stream"
+
+
+class TestInferenceTimesteps:
+    """去噪步數直接決定合成時間，不該寫死在 adapter 裡。"""
+
+    def test_defaults_to_the_deployment_value(self):
+        adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
+        payload = adapter._build_payload(SynthesizeRequest(text="你好"))
+        # 實測 31 字：10 步 3.2 秒、30 步 8.0 秒，幾乎線性。
+        assert payload["inference_timesteps"] == "10"
+
+    def test_config_overrides_the_default(self):
+        adapter = VoxCPMAdapter(TTSRouterConfig(
+            _env_file=None, tts_voxcpm_url=_VOXCPM_URL,
+            tts_voxcpm_inference_timesteps=30,
+        ))
+        payload = adapter._build_payload(SynthesizeRequest(text="你好"))
+        assert payload["inference_timesteps"] == "30"
+
+    def test_both_endpoints_use_the_same_value(self):
+        """串流與整段共用 _build_payload，設定一次兩邊都生效。"""
+        adapter = VoxCPMAdapter(TTSRouterConfig(
+            _env_file=None, tts_voxcpm_url=_VOXCPM_URL,
+            tts_voxcpm_inference_timesteps=20,
+        ))
+        assert adapter._build_payload(
+            SynthesizeRequest(text="你好"),
+        )["inference_timesteps"] == "20"
