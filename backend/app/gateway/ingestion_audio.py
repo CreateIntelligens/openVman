@@ -1,4 +1,4 @@
-"""Audio ingestion — SenseVoice, Breeze-ASR, or the OpenAI Whisper API."""
+"""Audio ingestion — Breeze-ASR, Xiaomi, SenseVoice, or the OpenAI Whisper API."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from openai import AsyncOpenAI
 from app.config import get_tts_config
 from app.gateway.ingestion import IngestionResult
 from app.http_client import SharedAsyncClient
+from app.utils.chinese import convert_to_traditional
 
 logger = logging.getLogger("gateway.ingestion_audio")
 
@@ -127,11 +128,51 @@ async def _transcribe_breeze(file_path: str, trace_id: str) -> str:
     return str(response.json().get("text", "")).strip()
 
 
+async def _transcribe_xiaomi(file_path: str, trace_id: str) -> str:
+    """Transcribe via Xiaomi-CocktailASR-1 (POST /transcribe, target + ref).
+
+    這是目標語者模型：要一段參考聲紋 ``ref``，只轉錄 ``ref`` 那個人的聲音，
+    對不上就回空字串（``rejected``）。我們沒有聲紋註冊流程，所以把同一個音檔
+    同時當 target 與 ref 送出——自己跟自己 100% 吻合，語者閘門必然放行，效果
+    等同一般 ASR。實測 ref 換成別人的聲音仍會 rejected，閘門沒有被繞過。
+
+    輸出是簡體，轉成繁體才能跟其他 provider 一致。
+    """
+    cfg = get_tts_config()
+    url = cfg.asr_xiaomi_url.rstrip("/")
+    if not url:
+        raise RuntimeError("ASR_XIAOMI_URL is not configured")
+
+    source, scratch = _as_wav(file_path)
+    try:
+        payload = Path(source).read_bytes()
+        name = Path(source).name
+        response = await _http.get().post(
+            f"{url}/transcribe",
+            files={
+                "target": (name, payload),
+                "ref": (name, payload),
+            },
+        )
+    finally:
+        if scratch:
+            Path(scratch).unlink(missing_ok=True)
+    response.raise_for_status()
+    body = response.json()
+    # rejected 代表語者閘門擋下來。self-reference 下不該發生，真的發生就是
+    # 音檔有問題，回空字串會讓 chain 誤以為成功，所以往上拋讓它 fallback。
+    if body.get("rejected"):
+        raise RuntimeError("Xiaomi ASR rejected the clip (speaker gate)")
+    return convert_to_traditional(str(body.get("text", "")).strip())
+
 
 # provider 名稱 → 轉寫函式。
+# 順序就是 fallback 順序（設定選的那個會被提到最前面）。預設把輸出華語的
+# 排在前面：使用者要的是華語逐字稿，臺語漢字只在全都掛掉時才聊勝於無。
 _TRANSCRIBERS: dict[str, object] = {
-    "sensevoice": _transcribe_sensevoice,
     "breeze": _transcribe_breeze,
+    "xiaomi": _transcribe_xiaomi,
+    "sensevoice": _transcribe_sensevoice,
     "openai": _transcribe_openai,
 }
 
@@ -179,6 +220,8 @@ def _provider_ready(cfg, name: str) -> bool:
         return bool(cfg.asr_sensevoice_url)
     if name == "breeze":
         return bool(cfg.asr_breeze_url)
+    if name == "xiaomi":
+        return bool(cfg.asr_xiaomi_url)
     return bool(cfg.whisper_api_key)
 
 

@@ -36,6 +36,7 @@ def _asr_cfg(provider: str, **overrides) -> MagicMock:
         "whisper_provider": provider,
         "asr_sensevoice_url": "",
         "asr_breeze_url": "",
+        "asr_xiaomi_url": "",
         "whisper_api_key": "",
     }
     fields.update(overrides)
@@ -50,12 +51,17 @@ def _breeze_cfg(url: str = "http://asr:8801/") -> MagicMock:
     return _asr_cfg("breeze", asr_breeze_url=url)
 
 
+def _xiaomi_cfg(url: str = "http://asr:8802/") -> MagicMock:
+    return _asr_cfg("xiaomi", asr_xiaomi_url=url)
+
+
 def _stub_post(handler, seen: dict):
     """Replace the shared client's post(), recording what the adapter sent."""
 
     async def _post(url, files=None, data=None, **kwargs):
         seen["url"] = url
         seen["file_field"] = next(iter(files))
+        seen["files"] = files
         seen["data"] = data
         return handler(url)
 
@@ -182,6 +188,63 @@ class TestBreezeTranscription:
             ingestion_audio, "get_tts_config", return_value=_breeze_cfg(url=""),
         ):
             result = await transcribe(fake_audio, "trace-bz-nourl")
+
+        assert result.content == "（音訊轉錄失敗）"
+
+
+class TestXiaomiTranscription:
+    """目標語者模型：同一個音檔同時當 target 與 ref，閘門才會放行。"""
+
+    @pytest.mark.asyncio
+    async def test_sends_the_same_clip_as_both_target_and_ref(self, fake_audio):
+        seen: dict = {}
+        def handler(url):
+            return httpx.Response(
+                200,
+                json={"text": " 你好请回复我 ", "rejected": False},
+                request=httpx.Request("POST", url),
+            )
+        with patch.object(
+            ingestion_audio, "get_tts_config", return_value=_xiaomi_cfg(),
+        ), patch.object(
+            ingestion_audio, "_http", _stub_post(handler, seen),
+        ):
+            result = await transcribe(fake_audio, "trace-xm")
+
+        assert seen["url"] == "http://asr:8802/transcribe"
+        # 少送 ref 會被當成「目標語者沒開口」而回空字串，這兩個欄位缺一不可。
+        assert set(seen["files"]) == {"target", "ref"}
+        assert seen["files"]["target"][1] == seen["files"]["ref"][1]
+        # 簡體要轉繁，否則跟其他 provider 的輸出不一致。s2t 的「复」一律對到
+        # 「復」，回覆的「覆」要靠詞庫才分得出來，這裡不苛求。
+        assert result.content == "你好請回復我"
+
+    @pytest.mark.asyncio
+    async def test_rejected_clip_falls_through_instead_of_returning_empty(
+        self, fake_audio,
+    ):
+        """rejected 回空字串，當成成功會讓使用者「說了一句空話」。"""
+        def handler(url):
+            return httpx.Response(
+                200,
+                json={"text": "", "rejected": True},
+                request=httpx.Request("POST", url),
+            )
+        with patch.object(
+            ingestion_audio, "get_tts_config", return_value=_xiaomi_cfg(),
+        ), patch.object(
+            ingestion_audio, "_http", _stub_post(handler, {}),
+        ):
+            result = await transcribe(fake_audio, "trace-xm-rej")
+
+        assert result.content == "（音訊轉錄失敗）"
+
+    @pytest.mark.asyncio
+    async def test_missing_url_reports_failure(self, fake_audio):
+        with patch.object(
+            ingestion_audio, "get_tts_config", return_value=_xiaomi_cfg(url=""),
+        ):
+            result = await transcribe(fake_audio, "trace-xm-nourl")
 
         assert result.content == "（音訊轉錄失敗）"
 

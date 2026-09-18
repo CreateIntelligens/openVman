@@ -13,13 +13,17 @@ import Select from "./Select";
 // 選單上只有代號的話，使用者無從判斷該選哪個。寫辨識行為的差異，不寫
 // 延遲秒數——那隨文字長度與 GPU 負載變動，標在介面上等於給一個做不到的承諾。
 const ENGINE_NOTES: Record<string, { label: string; note: string }> = {
-  sensevoice: {
-    label: "SenseVoice-Small",
-    note: "聽得懂臺語並以臺語漢字輸出，臺語場景建議用這個。",
-  },
   breeze: {
     label: "Breeze-ASR-26",
-    note: "臺語會轉寫成華語：語意保留、用字不保留。",
+    note: "臺語會轉寫成華語：語意保留、用字不保留。預設用這個。",
+  },
+  xiaomi: {
+    label: "Xiaomi-CocktailASR-1",
+    note: "臺語轉寫成華語，輸出簡體會自動轉繁。吵雜環境的辨識較穩。",
+  },
+  sensevoice: {
+    label: "SenseVoice-Small",
+    note: "以臺語漢字輸出臺語語音，要保留臺語用字才選它。",
   },
   openai: {
     label: "OpenAI Whisper",
