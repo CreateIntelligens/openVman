@@ -7,7 +7,7 @@ import {
   setAsrProvider,
   type SystemSetting,
 } from "../api/settings";
-import { preferredRecorderMimeType } from "../utils/liveAudioUtils";
+import { preferredRecorderMimeType, rmsVolume } from "../utils/liveAudioUtils";
 import Select from "./Select";
 
 // 選單上只有代號的話，使用者無從判斷該選哪個。寫辨識行為的差異，不寫
@@ -40,8 +40,11 @@ export default function AsrProviderPanel() {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [level, setLevel] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const meterFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -66,9 +69,48 @@ export default function AsrProviderPanel() {
     }
   }
 
+  async function sendForTranscription(clip: Blob) {
+    setTranscribing(true);
+    setError("");
+    try {
+      setTranscript((await previewAsr(clip)).text);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "辨識失敗，請重試。");
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
   function stopTracks() {
+    if (meterFrameRef.current !== null) {
+      cancelAnimationFrame(meterFrameRef.current);
+      meterFrameRef.current = null;
+    }
+    void audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    setLevel(0);
+  }
+
+  /** 錄音時顯示輸入音量：靜音的麥克風和「講了但沒收到」看起來一模一樣。 */
+  function startMeter(stream: MediaStream) {
+    try {
+      const context = new AudioContext();
+      audioContextRef.current = context;
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      context.createMediaStreamSource(stream).connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteTimeDomainData(data);
+        setLevel(rmsVolume(data));
+        meterFrameRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch {
+      // 音量條只是輔助，拿不到 AudioContext 不該讓錄音失敗。
+    }
   }
 
   async function startRecording() {
@@ -95,16 +137,11 @@ export default function AsrProviderPanel() {
           setError("沒有錄到聲音，請確認麥克風。");
           return;
         }
-        setTranscribing(true);
-        previewAsr(clip)
-          .then((result) => setTranscript(result.text))
-          .catch((reason) => setError(
-            reason instanceof Error ? reason.message : "辨識失敗，請重試。",
-          ))
-          .finally(() => setTranscribing(false));
+        void sendForTranscription(clip);
       };
       recorderRef.current = recorder;
       recorder.start();
+      startMeter(stream);
       setRecording(true);
     } catch {
       stopTracks();
@@ -117,6 +154,8 @@ export default function AsrProviderPanel() {
     recorderRef.current = null;
     setRecording(false);
   }
+
+  useEffect(() => stopTracks, []);
 
   if (loading) {
     return <p role="status" className="text-sm text-content-muted">載入語音辨識設定中…</p>;
@@ -171,8 +210,9 @@ export default function AsrProviderPanel() {
       <div className="flex flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-sm font-semibold">試辨識</h2>
         <p className="text-xs leading-5 text-content-muted">
-          錄一段話，看目前的引擎辨識成什麼。走的是正式對話用的同一條路徑，
-          所以結果就是實際會發生的行為。
+          錄一段話或上傳音檔，看目前的引擎辨識成什麼。走的是正式對話用的同一
+          條路徑，所以結果就是實際會發生的行為。用同一個檔案切換引擎再試一次，
+          就能直接比較兩家的差異。
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -183,6 +223,37 @@ export default function AsrProviderPanel() {
           >
             {recording ? "停止並辨識" : "開始錄音"}
           </button>
+          <label className={`btn btn-ghost ${recording || transcribing ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+            上傳音檔
+            <input
+              type="file"
+              accept="audio/*"
+              className="sr-only"
+              disabled={recording || transcribing}
+              onChange={(event) => {
+                const picked = event.target.files?.[0];
+                // 清掉 value，選同一個檔案兩次才會再次觸發 change。
+                event.target.value = "";
+                if (picked) {
+                  setTranscript("");
+                  void sendForTranscription(picked);
+                }
+              }}
+            />
+          </label>
+          {recording && (
+            <span className="flex items-center gap-2" aria-hidden="true">
+              <span className="h-2 w-32 overflow-hidden rounded-full bg-border">
+                <span
+                  className="block h-full rounded-full bg-primary transition-[width] duration-75"
+                  style={{ width: `${Math.round(level * 100)}%` }}
+                />
+              </span>
+              <span className="text-xs text-content-muted">
+                {level > 0.02 ? "收音中" : "聽不到聲音"}
+              </span>
+            </span>
+          )}
           {transcribing && (
             <span role="status" className="text-sm text-content-muted">辨識中…</span>
           )}

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearAsrProvider,
   fetchAsrProvider,
+  previewAsr,
   setAsrProvider,
   type SystemSetting,
 } from "../api/settings";
@@ -13,6 +14,7 @@ vi.mock("../api/settings", () => ({
   fetchAsrProvider: vi.fn(),
   setAsrProvider: vi.fn(),
   clearAsrProvider: vi.fn(),
+  previewAsr: vi.fn(),
 }));
 
 const OPTIONS = ["breeze", "local", "openai", "sensevoice"];
@@ -32,6 +34,7 @@ beforeEach(() => {
   vi.mocked(fetchAsrProvider).mockReset().mockResolvedValue(setting());
   vi.mocked(setAsrProvider).mockReset();
   vi.mocked(clearAsrProvider).mockReset();
+  vi.mocked(previewAsr).mockReset();
 });
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -64,6 +67,37 @@ describe("AsrProviderPanel", () => {
 
     await waitFor(() => expect(clearAsrProvider).toHaveBeenCalled());
     expect(await screen.findByText(/已改回部署設定/)).toBeTruthy();
+  });
+
+  it("上傳音檔就送辨識，不必先錄音", async () => {
+    // 同一個檔案切換引擎再試一次才能客觀比較，重錄每次都是不同輸入。
+    vi.mocked(previewAsr).mockResolvedValue({
+      text: "今仔日天氣袂歹", provider: "sensevoice",
+    });
+    render(<AsrProviderPanel />);
+    await screen.findByText(/SenseVoice-Small/);
+
+    const clip = new File(["audio"], "clip.wav", { type: "audio/wav" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [clip] } });
+
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip));
+    expect(await screen.findByText("今仔日天氣袂歹")).toBeTruthy();
+  });
+
+  it("上傳辨識失敗時顯示錯誤", async () => {
+    vi.mocked(previewAsr).mockRejectedValue(new Error("音檔超過大小限制"));
+    render(<AsrProviderPanel />);
+    await screen.findByText(/SenseVoice-Small/);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { files: [new File(["x"], "big.wav", { type: "audio/wav" })] },
+    });
+
+    await waitFor(() => expect(
+      screen.getByRole("alert").textContent,
+    ).toContain("音檔超過大小限制"));
   });
 
   it("載入失敗時說明原因，不是留一個空面板", async () => {
