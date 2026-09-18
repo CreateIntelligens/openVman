@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import subprocess
+import tempfile
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -36,6 +38,39 @@ async def _transcribe_openai(file_path: str, trace_id: str) -> str:
     return response.text
 
 
+# 引擎能直接吃的容器格式。瀏覽器 MediaRecorder 錄出來的是 webm/opus，
+# SenseVoice 對它回 500（Breeze 可以，但不能只讓一家能用）。
+_NATIVE_SUFFIXES = frozenset({".wav", ".mp3", ".flac", ".m4a", ".ogg"})
+
+
+def _as_wav(file_path: str) -> tuple[str, str | None]:
+    """Return a path the engines accept, plus a temp file to clean up.
+
+    已是原生格式就原樣回傳，不白跑一次 ffmpeg。轉檔輸出 16 kHz 單聲道：
+    兩家引擎內部都會降到這個取樣率，先降可以少傳幾倍的資料。
+    """
+    if Path(file_path).suffix.lower() in _NATIVE_SUFFIXES:
+        return file_path, None
+
+    handle = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    handle.close()
+    result = subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", file_path,
+            "-ac", "1", "-ar", "16000",
+            handle.name,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if result.returncode != 0:
+        Path(handle.name).unlink(missing_ok=True)
+        raise RuntimeError(f"audio conversion failed: {result.stderr[:200]}")
+    return handle.name, handle.name
+
+
 async def _transcribe_sensevoice(file_path: str, trace_id: str) -> str:
     """Transcribe via SenseVoice-Small (POST /api/v1/asr).
 
@@ -49,12 +84,17 @@ async def _transcribe_sensevoice(file_path: str, trace_id: str) -> str:
     if not url:
         raise RuntimeError("ASR_SENSEVOICE_URL is not configured")
 
-    name = Path(file_path).name
-    response = await _http.get().post(
-        f"{url}/api/v1/asr",
-        files={"files": (name, Path(file_path).read_bytes())},
-        data={"keys": name, "lang": "auto"},
-    )
+    source, scratch = _as_wav(file_path)
+    try:
+        name = Path(source).name
+        response = await _http.get().post(
+            f"{url}/api/v1/asr",
+            files={"files": (name, Path(source).read_bytes())},
+            data={"keys": name, "lang": "auto"},
+        )
+    finally:
+        if scratch:
+            Path(scratch).unlink(missing_ok=True)
     response.raise_for_status()
     results = response.json().get("result") or []
     if not results:
@@ -74,11 +114,15 @@ async def _transcribe_breeze(file_path: str, trace_id: str) -> str:
     if not url:
         raise RuntimeError("ASR_BREEZE_URL is not configured")
 
-    name = Path(file_path).name
-    response = await _http.get().post(
-        f"{url}/transcribe",
-        files={"file": (name, Path(file_path).read_bytes())},
-    )
+    source, scratch = _as_wav(file_path)
+    try:
+        response = await _http.get().post(
+            f"{url}/transcribe",
+            files={"file": (Path(source).name, Path(source).read_bytes())},
+        )
+    finally:
+        if scratch:
+            Path(scratch).unlink(missing_ok=True)
     response.raise_for_status()
     return str(response.json().get("text", "")).strip()
 

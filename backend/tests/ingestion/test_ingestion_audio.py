@@ -306,3 +306,50 @@ class TestStoredProviderOverride:
             side_effect=RuntimeError("no such table: system_settings"),
         ):
             assert ingestion_audio._active_provider(cfg) == "sensevoice"
+
+
+class TestAudioConversion:
+    """瀏覽器錄的是 webm/opus，SenseVoice 對它直接回 500。"""
+
+    def test_native_formats_skip_ffmpeg(self, tmp_path):
+        """已是引擎吃得下的格式就不白跑一次轉檔。"""
+        clip = tmp_path / "clip.wav"
+        clip.write_bytes(b"RIFF")
+
+        source, scratch = ingestion_audio._as_wav(str(clip))
+
+        assert source == str(clip)
+        assert scratch is None
+
+    def test_webm_is_converted_and_the_temp_file_is_reported(
+        self, tmp_path, monkeypatch,
+    ):
+        clip = tmp_path / "clip.webm"
+        clip.write_bytes(b"webm")
+        seen: dict = {}
+
+        def _run(cmd, **kwargs):
+            seen["cmd"] = cmd
+            return MagicMock(returncode=0, stderr="")
+
+        monkeypatch.setattr(ingestion_audio.subprocess, "run", _run)
+
+        source, scratch = ingestion_audio._as_wav(str(clip))
+
+        assert source == scratch and source.endswith(".wav")
+        # 16 kHz 單聲道：兩家引擎內部都會降到這個取樣率。
+        assert "-ar" in seen["cmd"] and "16000" in seen["cmd"]
+        assert "-ac" in seen["cmd"] and "1" in seen["cmd"]
+
+    def test_a_failed_conversion_does_not_leave_the_temp_file_behind(
+        self, tmp_path, monkeypatch,
+    ):
+        clip = tmp_path / "clip.webm"
+        clip.write_bytes(b"not audio")
+        monkeypatch.setattr(
+            ingestion_audio.subprocess, "run",
+            lambda cmd, **kw: MagicMock(returncode=1, stderr="invalid data"),
+        )
+
+        with pytest.raises(RuntimeError, match="conversion failed"):
+            ingestion_audio._as_wav(str(clip))
