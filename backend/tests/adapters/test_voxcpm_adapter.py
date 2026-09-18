@@ -55,17 +55,14 @@ def test_voxcpm_adapter_synthesis_success(monkeypatch):
     assert res.route_target == "voxcpm"
     assert res.raw_metadata["request_id"] == "abc"
 
+    # CastVoice 端點收 JSON 且 voice_id 保留 voxcpm2- 前綴；studio 的
+    # /api/v1/synthesize 收 multipart 並固定回 48 kHz WAV，同一句 49 字
+    # 實測 1.38 MB 對 155 KB，差 9 倍，所以整段合成不走那邊。
     mock_post.assert_called_once_with(
-        "http://10.9.0.37:8800/api/v1/synthesize",
-        data={
-            "engine_id": "voxcpm2",
+        "http://10.9.0.37:8800/api/v1/tts/synthesize",
+        json={
             "text": "你好",
-            "reference_preset_id": "cosy-teen-female-01",
-            "cfg_value": "2.0",
-            "inference_timesteps": "10",
-            "normalize": "true",
-            "denoise": "false",
-            "speed": "1.0",
+            "voice_id": "voxcpm2-cosy-teen-female-01",
         },
         headers={"Authorization": "Bearer secret"},
     )
@@ -85,10 +82,7 @@ def test_voxcpm_adapter_default_voice_and_no_auth_header(monkeypatch):
 
     adapter.synthesize(SynthesizeRequest(text="你好"))
 
-    # 預設聲線同樣要去掉 voxcpm2- 前綴才是 catalog 裡的 reference preset id。
-    assert mock_post.call_args.kwargs["data"]["reference_preset_id"] == (
-        VOXCPM_DEFAULT_VOICE.removeprefix("voxcpm2-")
-    )
+    assert mock_post.call_args.kwargs["json"]["voice_id"] == VOXCPM_DEFAULT_VOICE
     assert mock_post.call_args.kwargs["headers"] == {}
 
 
@@ -106,9 +100,7 @@ def test_voxcpm_adapter_env_default_voice(monkeypatch):
 
     adapter.synthesize(SynthesizeRequest(text="你好"))
 
-    assert mock_post.call_args.kwargs["data"]["reference_preset_id"] == (
-        "barbet-hung-yi-lee"
-    )
+    assert mock_post.call_args.kwargs["json"]["voice_id"] == "barbet-hung-yi-lee"
 
 
 def test_voxcpm_adapter_synthesis_http_error(monkeypatch):
@@ -271,23 +263,26 @@ async def test_voxcpm_adapter_open_stream_network_error(monkeypatch):
     assert exc_info.value.status_code == 503
 
 
-def test_both_endpoints_send_the_same_form_fields():
-    """批次與串流必須送同一組欄位，只差在路徑。
+def test_the_two_endpoints_use_their_own_naming_and_transport():
+    """兩個端點是兩套 API，各自的欄位名與命名空間不能混用。
 
-    這兩條路徑先前各寫各的，結果批次那份帶著錯的 URL 與 JSON body 沉了幾個
-    月：串流有人用所以是對的，批次沒人用所以沒人發現。共用 _build_payload
-    之後，這個測試確保它們不會再各自漂移。
+    CastVoice 收 JSON + voice_id（帶 voxcpm2- 前綴），studio 收 multipart +
+    reference_preset_id（不帶前綴）。拿錯一邊的名字會 voice_not_found。
     """
     config = TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL)
     adapter = VoxCPMAdapter(config)
     request = SynthesizeRequest(text="你好", voice_hint="voxcpm2-cosy-teen-female-01")
 
-    payload = adapter._build_payload(request)
+    assert adapter._build_payload(request) == {
+        "text": "你好",
+        "voice_id": "voxcpm2-cosy-teen-female-01",
+    }
+    stream_form = adapter._build_stream_form(request)
+    assert stream_form["engine_id"] == "voxcpm2"
+    assert stream_form["reference_preset_id"] == "cosy-teen-female-01"
 
-    assert payload["engine_id"] == "voxcpm2"
-    assert payload["reference_preset_id"] == "cosy-teen-female-01"
-    assert adapter._url.endswith("/api/v1/synthesize")
-    assert adapter._stream_url == f"{adapter._url}/stream"
+    assert adapter._url.endswith("/api/v1/tts/synthesize")
+    assert adapter._stream_url.endswith("/api/v1/synthesize/stream")
 
 
 class TestInferenceTimesteps:
@@ -295,24 +290,27 @@ class TestInferenceTimesteps:
 
     def test_defaults_to_the_deployment_value(self):
         adapter = VoxCPMAdapter(TTSRouterConfig(_env_file=None, tts_voxcpm_url=_VOXCPM_URL))
-        payload = adapter._build_payload(SynthesizeRequest(text="你好"))
-        # 實測 31 字：10 步 3.2 秒、30 步 8.0 秒，幾乎線性。
-        assert payload["inference_timesteps"] == "10"
+        form = adapter._build_stream_form(SynthesizeRequest(text="你好"))
+        # 非部署預設值會退出 CUDA graph 走 eager，比多算幾步還貴。
+        assert form["inference_timesteps"] == "10"
 
     def test_config_overrides_the_default(self):
         adapter = VoxCPMAdapter(TTSRouterConfig(
             _env_file=None, tts_voxcpm_url=_VOXCPM_URL,
             tts_voxcpm_inference_timesteps=30,
         ))
-        payload = adapter._build_payload(SynthesizeRequest(text="你好"))
-        assert payload["inference_timesteps"] == "30"
+        form = adapter._build_stream_form(SynthesizeRequest(text="你好"))
+        assert form["inference_timesteps"] == "30"
 
-    def test_both_endpoints_use_the_same_value(self):
-        """串流與整段共用 _build_payload，設定一次兩邊都生效。"""
+    def test_only_the_streaming_endpoint_takes_this_field(self):
+        """CastVoice 端點不吃 inference_timesteps，送過去也沒用。"""
         adapter = VoxCPMAdapter(TTSRouterConfig(
             _env_file=None, tts_voxcpm_url=_VOXCPM_URL,
             tts_voxcpm_inference_timesteps=20,
         ))
-        assert adapter._build_payload(
+        assert adapter._build_stream_form(
             SynthesizeRequest(text="你好"),
         )["inference_timesteps"] == "20"
+        assert "inference_timesteps" not in adapter._build_payload(
+            SynthesizeRequest(text="你好"),
+        )
