@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
@@ -202,12 +202,18 @@ class TTSRouterConfig(BaseSettings):
     vision_llm_model: str = "gpt-4o"
     vision_llm_base_url: str = ""
 
-    # --- Whisper ---
+    # --- ASR ---
     # "breeze" | "xiaomi" | "sensevoice" | "openai"
     # 都是整檔上傳、無串流端點：使用者講完才開始辨識。我們要的是華語逐字稿：
     # breeze 與 xiaomi 都把臺語轉寫成華語，sensevoice 則保留臺語漢字，所以它
     # 退居備援——全掛時臺語漢字仍比「音訊轉錄失敗」六個字進 prompt 好。
-    whisper_provider: str = "breeze"
+    #
+    # 四個選項沒有一個是 Whisper，叫 WHISPER_PROVIDER 只會讓人以為改了沒用。
+    # 舊名留著讀，既有部署的 .env 不必跟著改。
+    asr_provider: str = Field(
+        default="breeze",
+        validation_alias=AliasChoices("ASR_PROVIDER", "WHISPER_PROVIDER"),
+    )
     whisper_api_key: str = ""
     # Breeze-ASR-26（MediaTek Research）：POST /transcribe，multipart ``file``。
     asr_breeze_url: str = ""

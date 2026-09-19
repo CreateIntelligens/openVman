@@ -1226,7 +1226,7 @@ class UpdateSystemSettingRequest(_StrictModel):
 
 def _asr_setting_profile(runtime: AuthRuntime) -> SystemSettingProfile:
     stored = runtime.settings.get(ASR_PROVIDER_KEY)
-    default = get_tts_config().whisper_provider
+    default = get_tts_config().asr_provider
     return SystemSettingProfile(
         key=ASR_PROVIDER_KEY,
         value=stored or "",

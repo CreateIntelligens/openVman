@@ -191,8 +191,8 @@ def _active_provider(cfg) -> str:
         stored = get_auth_runtime().settings.get(ASR_PROVIDER_KEY)
     except Exception as exc:
         logger.debug("asr_provider_setting_unavailable err=%s", exc)
-        return cfg.whisper_provider
-    return stored or cfg.whisper_provider
+        return cfg.asr_provider
+    return stored or cfg.asr_provider
 
 
 def _resolve_chain(cfg) -> list[str]:
