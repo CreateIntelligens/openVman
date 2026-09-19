@@ -30,6 +30,8 @@ _ENV_KEYS_TO_CLEAR = (
     "PDF_REPAIR_ENABLED",
     "PDF_REPAIR_TIMEOUT_MS",
     "UVICORN_RELOAD",
+    "ASR_PROVIDER",
+    "WHISPER_PROVIDER",
 )
 
 
@@ -131,3 +133,35 @@ def test_legacy_uvicorn_reload_env_no_longer_changes_mode(tmp_path: Path):
     config = TTSRouterConfig(_env_file=env_file)
 
     assert config.is_dev is False
+
+
+class TestAsrProviderAlias:
+    """改名不能讓既有部署的 .env 失效——舊名要一直讀得到。"""
+
+    def test_reads_the_new_name(self, tmp_path: Path):
+        env_file = tmp_path / ".env"
+        env_file.write_text("ASR_PROVIDER=xiaomi\n", encoding="utf-8")
+
+        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "xiaomi"
+
+    def test_still_reads_the_legacy_whisper_name(self, tmp_path: Path):
+        """WHISPER_PROVIDER 是舊名，既有 .env 還在用，不能只留在註解裡承諾。"""
+        env_file = tmp_path / ".env"
+        env_file.write_text("WHISPER_PROVIDER=sensevoice\n", encoding="utf-8")
+
+        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "sensevoice"
+
+    def test_the_new_name_wins_when_both_are_set(self, tmp_path: Path):
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "ASR_PROVIDER=xiaomi\nWHISPER_PROVIDER=sensevoice\n", encoding="utf-8",
+        )
+
+        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "xiaomi"
+
+    def test_defaults_to_breeze(self, tmp_path: Path):
+        """預設要是輸出華語的引擎。"""
+        env_file = tmp_path / ".env"
+        env_file.write_text("ENV=dev\n", encoding="utf-8")
+
+        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "breeze"

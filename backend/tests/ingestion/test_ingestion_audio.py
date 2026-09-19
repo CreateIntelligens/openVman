@@ -20,7 +20,7 @@ def fake_audio(tmp_path):
 
 def _openai_cfg() -> MagicMock:
     return MagicMock(
-        whisper_provider="openai",
+        asr_provider="openai",
         whisper_api_key="test-key",
         vision_llm_base_url="",
     )
@@ -33,7 +33,7 @@ def _asr_cfg(provider: str, **overrides) -> MagicMock:
     否則 MagicMock 的自動屬性是 truthy，整條 chain 都會被排進來。
     """
     fields = {
-        "whisper_provider": provider,
+        "asr_provider": provider,
         "asr_sensevoice_url": "",
         "asr_breeze_url": "",
         "asr_xiaomi_url": "",
