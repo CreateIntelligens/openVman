@@ -222,8 +222,13 @@ async def _handle_client_init(data: dict, session: Session, websocket: WebSocket
 
 
 async def _handle_client_interrupt(data: dict, session: Session, websocket: WebSocket) -> None:
-    text = data.get("partial_asr") or ""
-    action = await _guard_agent.classify(text)
+    text = data.get("partial_asr")
+    if text is not None and not isinstance(text, str):
+        logger.debug("Ignoring interruption with a non-string transcript")
+        return
+    text = text or ""
+    # A control event without a transcript is the UI's explicit stop request.
+    action = await _guard_agent.classify(text) if text.strip() else "STOP"
     if action != "STOP":
         logger.debug("Ignoring potential interruption: %s", text)
         return

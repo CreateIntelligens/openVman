@@ -152,11 +152,17 @@ ws.send(JSON.stringify(payload));
 
 ### 8. 打斷機制處理 (Interruption Handling)
 
-當收到前端發送的 `client_interrupt` 事件時，後端必須立即執行以下清理動作，避免浪費算力與頻寬：
+`client_interrupt` 分成兩種情況：未附帶 `partial_asr`，或內容為空白時，代表明確的停止控制（例如主頁停止操作），直接中斷；帶有辨識文字時，先由 `GuardAgent` 的本地規則判斷。非字串的辨識欄位會被忽略，不中斷或關閉連線。
+
+辨識文字中的單字「停」、stop、等一下、新問題及修正要求可觸發停止；已識別的附和、繼續／否定停止語句和帶引號的背景話不單獨觸發停止。規則僅移除已識別的非中斷片語，因此「不用停，繼續說。請問明天幾點開門？」仍會因新問題中斷。未知長句保留原有保守停止策略；這是確定性啟發式規則，不是完整語意理解，也不載入模型。
+
+判斷為停止後，後端必須立即執行以下清理動作，避免浪費算力與頻寬：
 
 1. **終止 LLM 生成**：如果 LLM API 支援 AbortController，立即 `abort()` 當前的請求。
 2. **清空佇列**：清空該 Session 尚未丟給 TTS 的文字緩衝區，以及尚未下發的 WebSocket 佇列。
 3. **更新狀態**：將 Session 的狀態重置，準備接收新的 `user_speak` 事件。
+
+目前 WebSocket handler 會取消 Session 的可中斷工作、保留 heartbeat 等背景工作，通知已存在的 Brain live relay，並下發 `server_stop_audio`。判斷為附和／背景話時，工作與播放不變，不通知 relay，也不下發停止事件。
 
 ### 9. 錯誤處理與斷線重連 (Error Handling & Reconnection)
 
