@@ -1,0 +1,584 @@
+{
+  "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f",
+  "guard_source_sha256": "c432c1843cc29cd9bacb4dc3c89126f530cfef8df3c426c32e9f0fc4249cecc9",
+  "guard": {
+    "count": 16,
+    "correct": 9,
+    "accuracy": 0.5625,
+    "confusion_rows_gold_columns_predicted": {
+      "STOP": {
+        "STOP": 7,
+        "IGNORE": 1
+      },
+      "IGNORE": {
+        "STOP": 6,
+        "IGNORE": 2
+      }
+    },
+    "latency_ms": {
+      "mean": 0.004310859367251396,
+      "median": 0.002556014806032181,
+      "p95_nearest_rank": 0.026952475309371948
+    },
+    "rows": [
+      {
+        "id": "interrupt-01",
+        "expected": "STOP",
+        "predicted": "IGNORE",
+        "latency_ms": 0.005189329385757446
+      },
+      {
+        "id": "interrupt-02",
+        "expected": "STOP",
+        "predicted": "STOP",
+        "latency_ms": 0.026952475309371948
+      },
+      {
+        "id": "interrupt-03",
+        "expected": "STOP",
+        "predicted": "STOP",
+        "latency_ms": 0.005403533577919006
+      },
+      {
+        "id": "interrupt-04",
+        "expected": "STOP",
+        "predicted": "STOP",
+        "latency_ms": 0.004684552550315857
+      },
+      {
+        "id": "interrupt-05",
+        "expected": "STOP",
+        "predicted": "STOP",
+        "latency_ms": 0.0027334317564964294
+      },
+      {
+        "id": "interrupt-06",
+        "expected": "STOP",
+        "predicted": "STOP",
+        "latency_ms": 0.002507120370864868
+      },
+      {
+        "id": "interrupt-07",
+        "expected": "STOP",
+        "predicted": "STOP",
+        "latency_ms": 0.0026151537895202637
+      },
+      {
+        "id": "interrupt-08",
+        "expected": "STOP",
+        "predicted": "STOP",
+        "latency_ms": 0.002312473952770233
+      },
+      {
+        "id": "interrupt-09",
+        "expected": "IGNORE",
+        "predicted": "IGNORE",
+        "latency_ms": 0.0005178153514862061
+      },
+      {
+        "id": "interrupt-10",
+        "expected": "IGNORE",
+        "predicted": "IGNORE",
+        "latency_ms": 0.002030283212661743
+      },
+      {
+        "id": "interrupt-11",
+        "expected": "IGNORE",
+        "predicted": "STOP",
+        "latency_ms": 0.00211130827665329
+      },
+      {
+        "id": "interrupt-12",
+        "expected": "IGNORE",
+        "predicted": "STOP",
+        "latency_ms": 0.002280808985233307
+      },
+      {
+        "id": "interrupt-13",
+        "expected": "IGNORE",
+        "predicted": "STOP",
+        "latency_ms": 0.002648681402206421
+      },
+      {
+        "id": "interrupt-14",
+        "expected": "IGNORE",
+        "predicted": "STOP",
+        "latency_ms": 0.0020954757928848267
+      },
+      {
+        "id": "interrupt-15",
+        "expected": "IGNORE",
+        "predicted": "STOP",
+        "latency_ms": 0.0022863969206809998
+      },
+      {
+        "id": "interrupt-16",
+        "expected": "IGNORE",
+        "predicted": "STOP",
+        "latency_ms": 0.0026049092411994934
+      }
+    ],
+    "latency_scope": "single awaited classify call; excludes import and initialization"
+  },
+  "prototypes": {
+    "chat": [
+      "嗨，祝你有美好的一天！",
+      "真開心可以和你分享生活中的小事。",
+      "多謝你的協助，再見。"
+    ],
+    "knowledge": [
+      "依公司內部規章，新進員工如何申請門禁卡？",
+      "請查本專案技術文件中的部署架構。",
+      "本中心的到宅服務需要準備哪些申請文件？"
+    ],
+    "web": [
+      "請搜尋今日國際股市最新消息。",
+      "請開啟 https://example.org/ 並摘要該網頁。",
+      "請查交通部網站目前公布的最新交通管制資訊。"
+    ],
+    "clarify": [
+      "請處理那個東西。",
+      "他現在怎樣了？",
+      "我要問一下這件事。"
+    ]
+  },
+  "embedding": {
+    "rows": [
+      {
+        "id": "routing-01",
+        "expected": "chat",
+        "predicted": "chat",
+        "scores": {
+          "chat": 0.8991155348731742,
+          "knowledge": 0.7026294700374967,
+          "web": 0.6997528038464355,
+          "clarify": 0.8313033542006756
+        },
+        "latency_ms": 80.59408143162727
+      },
+      {
+        "id": "routing-02",
+        "expected": "chat",
+        "predicted": "chat",
+        "scores": {
+          "chat": 0.8500308117040941,
+          "knowledge": 0.6856021042521601,
+          "web": 0.7310657122909213,
+          "clarify": 0.8004342860811909
+        },
+        "latency_ms": 74.94855858385563
+      },
+      {
+        "id": "routing-03",
+        "expected": "chat",
+        "predicted": "chat",
+        "scores": {
+          "chat": 0.7963933587152204,
+          "knowledge": 0.6640008922469626,
+          "web": 0.7014756756636001,
+          "clarify": 0.7540730794560958
+        },
+        "latency_ms": 82.83233363181353
+      },
+      {
+        "id": "routing-04",
+        "expected": "chat",
+        "predicted": "chat",
+        "scores": {
+          "chat": 0.8745490149023818,
+          "knowledge": 0.6621783070052333,
+          "web": 0.7184196148959747,
+          "clarify": 0.8065871645662712
+        },
+        "latency_ms": 86.4577665925026
+      },
+      {
+        "id": "routing-05",
+        "expected": "chat",
+        "predicted": "chat",
+        "scores": {
+          "chat": 0.719384413460638,
+          "knowledge": 0.5962965616261493,
+          "web": 0.6626984413586404,
+          "clarify": 0.7092422767119493
+        },
+        "latency_ms": 114.02775347232819
+      },
+      {
+        "id": "routing-06",
+        "expected": "chat",
+        "predicted": "chat",
+        "scores": {
+          "chat": 0.8076512376801829,
+          "knowledge": 0.6728399474506622,
+          "web": 0.6862187814924591,
+          "clarify": 0.7943024624696466
+        },
+        "latency_ms": 80.95530327409506
+      },
+      {
+        "id": "routing-07",
+        "expected": "chat",
+        "predicted": "chat",
+        "scores": {
+          "chat": 0.7801128189066506,
+          "knowledge": 0.619426466929382,
+          "web": 0.6698918828065281,
+          "clarify": 0.6970305054807181
+        },
+        "latency_ms": 94.78245303034782
+      },
+      {
+        "id": "routing-08",
+        "expected": "chat",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.6312166742572308,
+          "knowledge": 0.5825023884059457,
+          "web": 0.6460573214036698,
+          "clarify": 0.6259437748925829
+        },
+        "latency_ms": 93.97110994905233
+      },
+      {
+        "id": "routing-09",
+        "expected": "knowledge",
+        "predicted": "knowledge",
+        "scores": {
+          "chat": 0.5948732652158235,
+          "knowledge": 0.7196295326204416,
+          "web": 0.6260830248964148,
+          "clarify": 0.6136329856600445
+        },
+        "latency_ms": 69.04167775064707
+      },
+      {
+        "id": "routing-10",
+        "expected": "knowledge",
+        "predicted": "knowledge",
+        "scores": {
+          "chat": 0.5224772071909708,
+          "knowledge": 0.6057129221483789,
+          "web": 0.5469367702879888,
+          "clarify": 0.5425098029724635
+        },
+        "latency_ms": 71.23261038213968
+      },
+      {
+        "id": "routing-11",
+        "expected": "knowledge",
+        "predicted": "knowledge",
+        "scores": {
+          "chat": 0.6843574485360687,
+          "knowledge": 0.795098788354472,
+          "web": 0.7025379347739643,
+          "clarify": 0.7012862196332613
+        },
+        "latency_ms": 81.01301454007626
+      },
+      {
+        "id": "routing-12",
+        "expected": "knowledge",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.6647468896043318,
+          "knowledge": 0.7278445216730566,
+          "web": 0.750789001592878,
+          "clarify": 0.693467871023336
+        },
+        "latency_ms": 72.32440635561943
+      },
+      {
+        "id": "routing-13",
+        "expected": "knowledge",
+        "predicted": "knowledge",
+        "scores": {
+          "chat": 0.5946845506940617,
+          "knowledge": 0.6899779297870002,
+          "web": 0.6193331056397231,
+          "clarify": 0.6168388229977607
+        },
+        "latency_ms": 73.22679366916418
+      },
+      {
+        "id": "routing-14",
+        "expected": "knowledge",
+        "predicted": "knowledge",
+        "scores": {
+          "chat": 0.5747989820305167,
+          "knowledge": 0.6918540631508482,
+          "web": 0.6093637377903768,
+          "clarify": 0.5790898784512104
+        },
+        "latency_ms": 75.60786046087742
+      },
+      {
+        "id": "routing-15",
+        "expected": "knowledge",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.6642663641242468,
+          "knowledge": 0.6846866471413564,
+          "web": 0.6928230442787411,
+          "clarify": 0.6743048474010033
+        },
+        "latency_ms": 70.8538955077529
+      },
+      {
+        "id": "routing-16",
+        "expected": "knowledge",
+        "predicted": "knowledge",
+        "scores": {
+          "chat": 0.6301215501238077,
+          "knowledge": 0.7303802223645165,
+          "web": 0.6952739656692575,
+          "clarify": 0.6450786810825968
+        },
+        "latency_ms": 73.95151443779469
+      },
+      {
+        "id": "routing-17",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.5589323499637152,
+          "knowledge": 0.5426795088824575,
+          "web": 0.6755373499017797,
+          "clarify": 0.5516114831106712
+        },
+        "latency_ms": 72.19339068979025
+      },
+      {
+        "id": "routing-18",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.5944329082316941,
+          "knowledge": 0.6532707234790759,
+          "web": 0.726343163410966,
+          "clarify": 0.5751014819941761
+        },
+        "latency_ms": 69.83896624296904
+      },
+      {
+        "id": "routing-19",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.6047969974183578,
+          "knowledge": 0.5998359491112265,
+          "web": 0.7112714689454465,
+          "clarify": 0.63076839109134
+        },
+        "latency_ms": 67.22831353545189
+      },
+      {
+        "id": "routing-20",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.5652392500151127,
+          "knowledge": 0.6648648770231895,
+          "web": 0.7133601500582851,
+          "clarify": 0.5907142064031239
+        },
+        "latency_ms": 67.08593666553497
+      },
+      {
+        "id": "routing-21",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.6553173129815554,
+          "knowledge": 0.6229147318275492,
+          "web": 0.7186723243405216,
+          "clarify": 0.6596542489340804
+        },
+        "latency_ms": 54.060496389865875
+      },
+      {
+        "id": "routing-22",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.6308266415693654,
+          "knowledge": 0.590032977783371,
+          "web": 0.6934049796790133,
+          "clarify": 0.6355548153504985
+        },
+        "latency_ms": 58.68535488843918
+      },
+      {
+        "id": "routing-23",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.6444351037121285,
+          "knowledge": 0.6814774817871898,
+          "web": 0.7507684510275376,
+          "clarify": 0.632302719273831
+        },
+        "latency_ms": 56.43839295953512
+      },
+      {
+        "id": "routing-24",
+        "expected": "web",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.5868668043602914,
+          "knowledge": 0.646662321768087,
+          "web": 0.6998702107122992,
+          "clarify": 0.5901495370182398
+        },
+        "latency_ms": 62.52300459891558
+      },
+      {
+        "id": "routing-25",
+        "expected": "clarify",
+        "predicted": "clarify",
+        "scores": {
+          "chat": 0.8035053101988398,
+          "knowledge": 0.7481021151403059,
+          "web": 0.7076652940782556,
+          "clarify": 0.9200874560787352
+        },
+        "latency_ms": 74.08975902944803
+      },
+      {
+        "id": "routing-26",
+        "expected": "clarify",
+        "predicted": "clarify",
+        "scores": {
+          "chat": 0.8392913247408194,
+          "knowledge": 0.7595487522623371,
+          "web": 0.8007382570001432,
+          "clarify": 0.8898971000294477
+        },
+        "latency_ms": 68.62970348447561
+      },
+      {
+        "id": "routing-27",
+        "expected": "clarify",
+        "predicted": "clarify",
+        "scores": {
+          "chat": 0.7685265958949011,
+          "knowledge": 0.75020914149728,
+          "web": 0.6987338358039638,
+          "clarify": 0.8469042583642634
+        },
+        "latency_ms": 61.70336343348026
+      },
+      {
+        "id": "routing-28",
+        "expected": "clarify",
+        "predicted": "clarify",
+        "scores": {
+          "chat": 0.785019353630224,
+          "knowledge": 0.7053746897223031,
+          "web": 0.7559387498941627,
+          "clarify": 0.8443439580455111
+        },
+        "latency_ms": 67.24203377962112
+      },
+      {
+        "id": "routing-29",
+        "expected": "clarify",
+        "predicted": "clarify",
+        "scores": {
+          "chat": 0.7822242275982835,
+          "knowledge": 0.7147288946550163,
+          "web": 0.7134340178063164,
+          "clarify": 0.8288428778068935
+        },
+        "latency_ms": 58.97644627839327
+      },
+      {
+        "id": "routing-30",
+        "expected": "clarify",
+        "predicted": "knowledge",
+        "scores": {
+          "chat": 0.5792539460082868,
+          "knowledge": 0.6237422981214286,
+          "web": 0.604779306394169,
+          "clarify": 0.5831863579550123
+        },
+        "latency_ms": 62.61575035750866
+      },
+      {
+        "id": "routing-31",
+        "expected": "clarify",
+        "predicted": "web",
+        "scores": {
+          "chat": 0.8191335995161507,
+          "knowledge": 0.7350364634913156,
+          "web": 0.8701988055169798,
+          "clarify": 0.843098222635084
+        },
+        "latency_ms": 63.36421053856611
+      },
+      {
+        "id": "routing-32",
+        "expected": "clarify",
+        "predicted": "clarify",
+        "scores": {
+          "chat": 0.6764797935158803,
+          "knowledge": 0.6519178676012198,
+          "web": 0.6865675596431745,
+          "clarify": 0.7110407374325511
+        },
+        "latency_ms": 69.92210634052753
+      }
+    ],
+    "embedding_spec": {
+      "identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "provider": "bge",
+      "model": "BAAI/bge-m3",
+      "dimensions": 1024,
+      "dtype": "float32",
+      "normalized": true,
+      "normalization": "l2",
+      "input_semantics": "symmetric",
+      "model_revision": "5617a9f61b028005a4858fdac845db406aefb181",
+      "service_revision": "1.0.0"
+    },
+    "prototype_batch_latency_ms": 147.05711975693703,
+    "prototype_batch_count": 12,
+    "latency_scope": "32 sequential individual HTTP requests; includes request, network, server, JSON decode; excludes centroid scoring; 12-prototype batch timed separately",
+    "method": "mean of 3 independent prototype vectors per class, normalized centroid, cosine nearest centroid; input JSON includes history and message; symmetric embedding identity locked after prototypes",
+    "count": 32,
+    "correct": 27,
+    "accuracy": 0.84375,
+    "confusion_rows_gold_columns_predicted": {
+      "chat": {
+        "chat": 7,
+        "knowledge": 0,
+        "web": 1,
+        "clarify": 0
+      },
+      "knowledge": {
+        "chat": 0,
+        "knowledge": 6,
+        "web": 2,
+        "clarify": 0
+      },
+      "web": {
+        "chat": 0,
+        "knowledge": 0,
+        "web": 8,
+        "clarify": 0
+      },
+      "clarify": {
+        "chat": 0,
+        "knowledge": 1,
+        "web": 1,
+        "clarify": 6
+      }
+    },
+    "latency_ms": {
+      "mean": 72.82557382131927,
+      "median": 71.04325294494629,
+      "p95_nearest_rank": 94.78245303034782
+    }
+  },
+  "recorded_at_utc": "2026-09-19T15:43:49.914267+00:00"
+}

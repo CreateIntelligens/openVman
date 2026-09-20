@@ -708,3 +708,7 @@ API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gatew
 - web chat UI
 
 `brain` 的價值不是單一模型呼叫，而是把這三層接成一個可維護、可編輯、可操作的本地大腦系統。
+
+## SemIf 語意分流離線實驗
+
+[實驗操作與限制](../scripts/experiments/semif/README.md)提供獨立 Compose 容器、繁體中文合成案例及選項分數評估。這是離線可行性驗證，尚未接入 Brain 正式路由，也不取代強制知識庫搜尋或權限判斷。模型推論建議獨立服務，分類政策與 fallback 留在 openVman。

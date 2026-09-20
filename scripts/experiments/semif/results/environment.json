@@ -1,0 +1,23 @@
+{
+  "image_id": "sha256:e2a0010693e604b6169606d4e17f84ef8fe0d77c065762a7a37aafae2082e3ab",
+  "python": "3.12.14",
+  "machine": "x86_64",
+  "cpu": "Intel(R) Xeon(R) Silver 4114 CPU @ 2.20GHz",
+  "gpu": "NVIDIA RTX A4000, 16376 MiB",
+  "packages": {
+    "torch": "2.13.0",
+    "transformers": "5.15.0",
+    "bitsandbytes": "0.49.2",
+    "huggingface-hub": "1.28.0"
+  },
+  "experiment_limits": {
+    "cpus": 4,
+    "memory": "16g",
+    "torch_threads": 2
+  },
+  "baseline_timing_caveat": "Guard in-process and embedding HTTP timing have different boundaries from direct model scoring. Shared production hardware; traffic and load not controlled. SemIf model was downloading but not loaded during embedding baseline.",
+  "initial_gpu_used_mib": 11335,
+  "gcc": "gcc (Debian 14.2.0-19) 14.2.0",
+  "initial_download_and_load_seconds_before_compiler_fix": 260.34884874057025,
+  "verification": "160 prediction rows, unique IDs/order, probability normalization, gold labels, accuracy summaries, and baseline fixture identity validated"
+}

@@ -1,0 +1,23 @@
+services:
+  experiment:
+    image: tbdavid2019/openvman-embedding:latest
+    entrypoint: ["sleep", "infinity"]
+    user: "1000:1000"
+    working_dir: /workspace
+    environment:
+      HF_HOME: /tmp/semif-cache
+      PYTHONUNBUFFERED: "1"
+      OMP_NUM_THREADS: "2"
+      TOKENIZERS_PARALLELISM: "false"
+    volumes:
+      - ../../..:/workspace
+    cpus: 4
+    mem_limit: 16g
+    shm_size: 1g
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: cdi
+              capabilities: [gpu]
+              device_ids: ["nvidia.com/gpu=all"]

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Experiments
+- 新增隔離的 SemIf 語意分流／語音打斷離線實驗，提供繁體中文合成案例、固定上游與模型版本、選項順序穩定性及延遲量測；不變更正式服務路由。
+
+
 ### Changed
 
 - **Avatar Page Modules**: Split character, background, and mascot panels into `components/avatar/`, with shared asset styles and a `useMascotSnapshotQueue` hook. The page retains form state, asset loading, and the snapshot iframe; tab and upload behavior are unchanged. The snapshot comment now correctly describes recapturing missing thumbnails or URLs outside `/static/mascots/`.

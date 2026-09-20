@@ -1,0 +1,199 @@
+{
+  "metadata": {
+    "variant": "prompt-v2-development",
+    "upstream_commit": "ca3ba65f142967030ecb453346e94d6f476a69df",
+    "upstream_sha256": {
+      "core.py": "c33dc41a789c39c095c85c1d23d09690dee3726d737bc3dbd051a4f97115e486",
+      "direct.py": "2c89209787b1b51e5f8f8062b4f602da4c82ba7efad50a4df0863b04aef70c9f"
+    },
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "device": "cuda",
+    "torch": "2.13.0+cu130",
+    "transformers": "5.15.0",
+    "quantization": "bitsandbytes NF4 double quant, BF16 compute",
+    "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f",
+    "note": "Synthetic offline development set, not a production or held-out KPI. Scores are uncalibrated.",
+    "load_seconds": 11.794300355017185,
+    "unexpected_keys": [],
+    "gpu": "NVIDIA RTX A4000",
+    "peak_allocated_gib": 2.9924468994140625,
+    "peak_reserved_gib": 3.056640625
+  },
+  "tasks": {
+    "routing": {
+      "original": {
+        "count": 32,
+        "correct": 19,
+        "accuracy": 0.59375,
+        "balanced_accuracy": 0.59375,
+        "p50_ms": 421.121948864311,
+        "p95_ms": 521.5216912329197,
+        "confusion": {
+          "chat": {
+            "chat": 4,
+            "clarify": 4,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 8,
+            "knowledge": 0,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 4,
+            "knowledge": 4,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 5,
+            "knowledge": 0,
+            "web": 3
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-04",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.6184193622634863
+          },
+          {
+            "id": "routing-05",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9612974606216972
+          },
+          {
+            "id": "routing-06",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9162381594058061
+          },
+          {
+            "id": "routing-08",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.7130093340890855
+          },
+          {
+            "id": "routing-10",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.97610440109257
+          },
+          {
+            "id": "routing-11",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.9680695465828466
+          },
+          {
+            "id": "routing-12",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.7443390113662067
+          },
+          {
+            "id": "routing-16",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.7481021790527547
+          },
+          {
+            "id": "routing-17",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.7625753016752601
+          },
+          {
+            "id": "routing-19",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.8423292967735552
+          },
+          {
+            "id": "routing-21",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.9221426621649871
+          },
+          {
+            "id": "routing-22",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.7442720948447851
+          },
+          {
+            "id": "routing-24",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.5674175817706139
+          }
+        ]
+      },
+      "reversed": {
+        "count": 32,
+        "correct": 31,
+        "accuracy": 0.96875,
+        "balanced_accuracy": 0.96875,
+        "p50_ms": 398.7786043435335,
+        "p95_ms": 518.0306397378445,
+        "confusion": {
+          "chat": {
+            "chat": 8,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 7,
+            "knowledge": 1,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 8,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 8
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-30",
+            "expected": "clarify",
+            "predicted": "knowledge",
+            "top_score": 0.6495709261312235
+          }
+        ]
+      },
+      "order_flips": [
+        "routing-04",
+        "routing-05",
+        "routing-06",
+        "routing-08",
+        "routing-10",
+        "routing-11",
+        "routing-12",
+        "routing-16",
+        "routing-17",
+        "routing-19",
+        "routing-21",
+        "routing-22",
+        "routing-24",
+        "routing-30"
+      ]
+    }
+  }
+}

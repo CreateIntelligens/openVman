@@ -1,0 +1,271 @@
+Loading {"variant": "prompt-v2-development", "upstream_commit": "ca3ba65f142967030ecb453346e94d6f476a69df", "upstream_sha256": {"core.py": "c33dc41a789c39c095c85c1d23d09690dee3726d737bc3dbd051a4f97115e486", "direct.py": "2c89209787b1b51e5f8f8062b4f602da4c82ba7efad50a4df0863b04aef70c9f"}, "model": "Qwen/Qwen3.5-4B", "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a", "device": "cuda", "torch": "2.13.0+cu130", "transformers": "5.15.0", "quantization": "bitsandbytes NF4 double quant, BF16 compute", "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f", "note": "Synthetic offline development set, not a production or held-out KPI. Scores are uncalibrated."}
+GPU free before load: 4.37 GiB
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 616.22it/s]
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights:   0%|          | 1/426 [00:00<04:51,  1.46it/s]/tmp/semif-deps/bitsandbytes/backends/cuda/ops.py:213: FutureWarning: _check_is_size will be removed in a future PyTorch release along with guard_size_oblivious.     Use _check(i >= 0) instead.
+  torch._check_is_size(blocksize)
+Loading weights:   2%|▏         | 8/426 [00:00<00:31, 13.20it/s]Loading weights:   3%|▎         | 14/426 [00:00<00:18, 22.21it/s]Loading weights:   7%|▋         | 28/426 [00:01<00:08, 46.36it/s]Loading weights:  10%|▉         | 41/426 [00:01<00:06, 63.07it/s]Loading weights:  12%|█▏        | 50/426 [00:01<00:05, 68.57it/s]Loading weights:  15%|█▌        | 65/426 [00:01<00:04, 85.60it/s]Loading weights:  18%|█▊        | 78/426 [00:01<00:03, 95.15it/s]Loading weights:  21%|██        | 89/426 [00:01<00:03, 98.91it/s]Loading weights:  23%|██▎       | 100/426 [00:01<00:04, 80.67it/s]Loading weights:  27%|██▋       | 117/426 [00:01<00:03, 99.22it/s]Loading weights:  30%|███       | 129/426 [00:02<00:03, 95.13it/s]Loading weights:  33%|███▎      | 140/426 [00:02<00:02, 96.94it/s]Loading weights:  35%|███▌      | 151/426 [00:02<00:03, 88.45it/s]Loading weights:  39%|███▉      | 166/426 [00:02<00:02, 103.38it/s]Loading weights:  42%|████▏     | 178/426 [00:02<00:02, 97.16it/s] Loading weights:  44%|████▍     | 189/426 [00:02<00:02, 89.77it/s]Loading weights:  47%|████▋     | 200/426 [00:02<00:02, 89.46it/s]Loading weights:  49%|████▉     | 210/426 [00:02<00:02, 81.73it/s]Loading weights:  53%|█████▎    | 224/426 [00:03<00:02, 94.18it/s]Loading weights:  56%|█████▌    | 237/426 [00:03<00:01, 100.88it/s]Loading weights:  58%|█████▊    | 248/426 [00:03<00:01, 99.30it/s] Loading weights:  61%|██████    | 259/426 [00:03<00:02, 82.76it/s]Loading weights:  65%|██████▍   | 276/426 [00:03<00:01, 101.09it/s]Loading weights:  67%|██████▋   | 287/426 [00:03<00:01, 99.95it/s] Loading weights:  70%|██████▉   | 298/426 [00:03<00:01, 101.79it/s]Loading weights:  73%|███████▎  | 309/426 [00:03<00:01, 85.65it/s] Loading weights:  75%|███████▍  | 319/426 [00:04<00:01, 74.60it/s]Loading weights:  78%|███████▊  | 331/426 [00:04<00:01, 76.41it/s]Loading weights:  81%|████████  | 343/426 [00:04<00:00, 85.73it/s]Loading weights:  83%|████████▎ | 353/426 [00:04<00:00, 77.95it/s]Loading weights:  85%|████████▍ | 362/426 [00:04<00:00, 76.73it/s]Loading weights:  87%|████████▋ | 371/426 [00:04<00:00, 78.42it/s]Loading weights:  90%|█████████ | 384/426 [00:04<00:00, 90.70it/s]Loading weights:  93%|█████████▎| 397/426 [00:05<00:00, 93.29it/s]Loading weights:  96%|█████████▌| 408/426 [00:05<00:00, 97.50it/s]Loading weights:  98%|█████████▊| 419/426 [00:05<00:00, 86.48it/s]Loading weights: 100%|██████████| 426/426 [00:05<00:00, 80.01it/s]
+Loaded in 11.794300355017185 seconds
+routing-01 original chat chat 366 ms
+routing-02 original chat chat 440 ms
+routing-03 original chat chat 384 ms
+routing-04 original chat clarify 421 ms
+routing-05 original chat clarify 372 ms
+routing-06 original chat clarify 392 ms
+routing-07 original chat chat 522 ms
+routing-08 original chat clarify 563 ms
+routing-09 original knowledge knowledge 517 ms
+routing-10 original knowledge clarify 460 ms
+routing-11 original knowledge clarify 422 ms
+routing-12 original knowledge clarify 424 ms
+routing-13 original knowledge knowledge 462 ms
+routing-14 original knowledge knowledge 424 ms
+routing-15 original knowledge knowledge 413 ms
+routing-16 original knowledge clarify 407 ms
+routing-17 original web clarify 412 ms
+routing-18 original web web 416 ms
+routing-19 original web clarify 395 ms
+routing-20 original web web 433 ms
+routing-21 original web clarify 400 ms
+routing-22 original web clarify 482 ms
+routing-23 original web web 447 ms
+routing-24 original web clarify 399 ms
+routing-25 original clarify clarify 400 ms
+routing-26 original clarify clarify 429 ms
+routing-27 original clarify clarify 427 ms
+routing-28 original clarify clarify 416 ms
+routing-29 original clarify clarify 516 ms
+routing-30 original clarify clarify 421 ms
+routing-31 original clarify clarify 406 ms
+routing-32 original clarify clarify 412 ms
+routing-01 reversed chat chat 398 ms
+routing-02 reversed chat chat 397 ms
+routing-03 reversed chat chat 398 ms
+routing-04 reversed chat chat 400 ms
+routing-05 reversed chat chat 461 ms
+routing-06 reversed chat chat 433 ms
+routing-07 reversed chat chat 500 ms
+routing-08 reversed chat chat 578 ms
+routing-09 reversed knowledge knowledge 455 ms
+routing-10 reversed knowledge knowledge 468 ms
+routing-11 reversed knowledge knowledge 412 ms
+routing-12 reversed knowledge knowledge 445 ms
+routing-13 reversed knowledge knowledge 400 ms
+routing-14 reversed knowledge knowledge 518 ms
+routing-15 reversed knowledge knowledge 449 ms
+routing-16 reversed knowledge knowledge 404 ms
+routing-17 reversed web web 443 ms
+routing-18 reversed web web 389 ms
+routing-19 reversed web web 397 ms
+routing-20 reversed web web 449 ms
+routing-21 reversed web web 399 ms
+routing-22 reversed web web 390 ms
+routing-23 reversed web web 370 ms
+routing-24 reversed web web 369 ms
+routing-25 reversed clarify clarify 370 ms
+routing-26 reversed clarify clarify 368 ms
+routing-27 reversed clarify clarify 364 ms
+routing-28 reversed clarify clarify 378 ms
+routing-29 reversed clarify clarify 365 ms
+routing-30 reversed clarify knowledge 377 ms
+routing-31 reversed clarify clarify 368 ms
+routing-32 reversed clarify clarify 367 ms
+{
+  "metadata": {
+    "variant": "prompt-v2-development",
+    "upstream_commit": "ca3ba65f142967030ecb453346e94d6f476a69df",
+    "upstream_sha256": {
+      "core.py": "c33dc41a789c39c095c85c1d23d09690dee3726d737bc3dbd051a4f97115e486",
+      "direct.py": "2c89209787b1b51e5f8f8062b4f602da4c82ba7efad50a4df0863b04aef70c9f"
+    },
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "device": "cuda",
+    "torch": "2.13.0+cu130",
+    "transformers": "5.15.0",
+    "quantization": "bitsandbytes NF4 double quant, BF16 compute",
+    "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f",
+    "note": "Synthetic offline development set, not a production or held-out KPI. Scores are uncalibrated.",
+    "load_seconds": 11.794300355017185,
+    "unexpected_keys": [],
+    "gpu": "NVIDIA RTX A4000",
+    "peak_allocated_gib": 2.9924468994140625,
+    "peak_reserved_gib": 3.056640625
+  },
+  "tasks": {
+    "routing": {
+      "original": {
+        "count": 32,
+        "correct": 19,
+        "accuracy": 0.59375,
+        "balanced_accuracy": 0.59375,
+        "p50_ms": 421.121948864311,
+        "p95_ms": 521.5216912329197,
+        "confusion": {
+          "chat": {
+            "chat": 4,
+            "clarify": 4,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 8,
+            "knowledge": 0,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 4,
+            "knowledge": 4,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 5,
+            "knowledge": 0,
+            "web": 3
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-04",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.6184193622634863
+          },
+          {
+            "id": "routing-05",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9612974606216972
+          },
+          {
+            "id": "routing-06",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9162381594058061
+          },
+          {
+            "id": "routing-08",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.7130093340890855
+          },
+          {
+            "id": "routing-10",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.97610440109257
+          },
+          {
+            "id": "routing-11",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.9680695465828466
+          },
+          {
+            "id": "routing-12",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.7443390113662067
+          },
+          {
+            "id": "routing-16",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.7481021790527547
+          },
+          {
+            "id": "routing-17",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.7625753016752601
+          },
+          {
+            "id": "routing-19",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.8423292967735552
+          },
+          {
+            "id": "routing-21",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.9221426621649871
+          },
+          {
+            "id": "routing-22",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.7442720948447851
+          },
+          {
+            "id": "routing-24",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.5674175817706139
+          }
+        ]
+      },
+      "reversed": {
+        "count": 32,
+        "correct": 31,
+        "accuracy": 0.96875,
+        "balanced_accuracy": 0.96875,
+        "p50_ms": 398.7786043435335,
+        "p95_ms": 518.0306397378445,
+        "confusion": {
+          "chat": {
+            "chat": 8,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 7,
+            "knowledge": 1,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 8,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 8
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-30",
+            "expected": "clarify",
+            "predicted": "knowledge",
+            "top_score": 0.6495709261312235
+          }
+        ]
+      },
+      "order_flips": [
+        "routing-04",
+        "routing-05",
+        "routing-06",
+        "routing-08",
+        "routing-10",
+        "routing-11",
+        "routing-12",
+        "routing-16",
+        "routing-17",
+        "routing-19",
+        "routing-21",
+        "routing-22",
+        "routing-24",
+        "routing-30"
+      ]
+    }
+  }
+}

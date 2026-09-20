@@ -1,0 +1,370 @@
+Loading {"upstream_commit": "ca3ba65f142967030ecb453346e94d6f476a69df", "upstream_sha256": {"core.py": "c33dc41a789c39c095c85c1d23d09690dee3726d737bc3dbd051a4f97115e486", "direct.py": "2c89209787b1b51e5f8f8062b4f602da4c82ba7efad50a4df0863b04aef70c9f"}, "model": "Qwen/Qwen3.5-4B", "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a", "device": "cuda", "torch": "2.13.0+cu130", "transformers": "5.15.0", "quantization": "bitsandbytes NF4 double quant, BF16 compute", "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f", "note": "Synthetic offline development set, not a production or held-out KPI. Scores are uncalibrated."}
+GPU free before load: 4.37 GiB
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 608.80it/s]
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights:   0%|          | 1/426 [00:00<04:29,  1.58it/s]/tmp/semif-deps/bitsandbytes/backends/cuda/ops.py:213: FutureWarning: _check_is_size will be removed in a future PyTorch release along with guard_size_oblivious.     Use _check(i >= 0) instead.
+  torch._check_is_size(blocksize)
+Loading weights:   2%|▏         | 8/426 [00:00<00:29, 14.10it/s]Loading weights:   5%|▌         | 22/426 [00:00<00:10, 39.20it/s]Loading weights:   8%|▊         | 36/426 [00:00<00:06, 58.88it/s]Loading weights:  11%|█         | 46/426 [00:01<00:06, 60.94it/s]Loading weights:  15%|█▌        | 64/426 [00:01<00:04, 86.58it/s]Loading weights:  18%|█▊        | 76/426 [00:01<00:04, 78.67it/s]Loading weights:  20%|██        | 86/426 [00:01<00:04, 81.59it/s]Loading weights:  23%|██▎       | 96/426 [00:01<00:04, 72.22it/s]Loading weights:  25%|██▍       | 105/426 [00:01<00:04, 75.32it/s]Loading weights:  28%|██▊       | 119/426 [00:01<00:03, 86.67it/s]Loading weights:  31%|███       | 133/426 [00:02<00:03, 90.87it/s]Loading weights:  34%|███▍      | 146/426 [00:02<00:02, 95.31it/s]Loading weights:  37%|███▋      | 156/426 [00:02<00:02, 92.82it/s]Loading weights:  40%|████      | 171/426 [00:02<00:02, 105.32it/s]Loading weights:  43%|████▎     | 185/426 [00:02<00:02, 109.23it/s]Loading weights:  47%|████▋     | 199/426 [00:02<00:01, 114.18it/s]Loading weights:  50%|████▉     | 211/426 [00:02<00:02, 106.04it/s]Loading weights:  53%|█████▎    | 225/426 [00:02<00:01, 111.11it/s]Loading weights:  56%|█████▌    | 239/426 [00:02<00:01, 116.43it/s]Loading weights:  59%|█████▉    | 253/426 [00:03<00:01, 118.21it/s]Loading weights:  62%|██████▏   | 265/426 [00:03<00:01, 111.08it/s]Loading weights:  65%|██████▌   | 278/426 [00:03<00:01, 114.09it/s]Loading weights:  69%|██████▊   | 292/426 [00:03<00:01, 116.46it/s]Loading weights:  72%|███████▏  | 306/426 [00:03<00:01, 119.84it/s]Loading weights:  75%|███████▍  | 319/426 [00:03<00:00, 112.40it/s]Loading weights:  78%|███████▊  | 332/426 [00:03<00:00, 114.49it/s]Loading weights:  81%|████████  | 346/426 [00:03<00:00, 118.05it/s]Loading weights:  85%|████████▍ | 360/426 [00:04<00:00, 117.60it/s]Loading weights:  87%|████████▋ | 372/426 [00:04<00:00, 117.44it/s]Loading weights:  90%|█████████ | 385/426 [00:04<00:00, 115.25it/s]Loading weights:  93%|█████████▎| 398/426 [00:04<00:00, 118.18it/s]Loading weights:  97%|█████████▋| 412/426 [00:04<00:00, 114.92it/s]Loading weights: 100%|█████████▉| 424/426 [00:04<00:00, 96.99it/s] Loading weights: 100%|██████████| 426/426 [00:04<00:00, 91.15it/s]
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loaded in 11.204017815180123 seconds
+routing-01 original chat clarify 407 ms
+routing-02 original chat clarify 402 ms
+routing-03 original chat chat 480 ms
+routing-04 original chat clarify 404 ms
+routing-05 original chat clarify 424 ms
+routing-06 original chat clarify 392 ms
+routing-07 original chat clarify 424 ms
+routing-08 original chat clarify 453 ms
+routing-09 original knowledge knowledge 452 ms
+routing-10 original knowledge clarify 444 ms
+routing-11 original knowledge clarify 419 ms
+routing-12 original knowledge clarify 408 ms
+routing-13 original knowledge knowledge 443 ms
+routing-14 original knowledge knowledge 428 ms
+routing-15 original knowledge knowledge 416 ms
+routing-16 original knowledge clarify 459 ms
+routing-17 original web web 450 ms
+routing-18 original web web 433 ms
+routing-19 original web web 455 ms
+routing-20 original web web 504 ms
+routing-21 original web web 397 ms
+routing-22 original web web 408 ms
+routing-23 original web web 401 ms
+routing-24 original web clarify 418 ms
+routing-25 original clarify clarify 397 ms
+routing-26 original clarify clarify 397 ms
+routing-27 original clarify clarify 392 ms
+routing-28 original clarify clarify 407 ms
+routing-29 original clarify clarify 404 ms
+routing-30 original clarify clarify 401 ms
+routing-31 original clarify clarify 389 ms
+routing-32 original clarify clarify 401 ms
+interrupt-01 original STOP STOP 404 ms
+interrupt-02 original STOP STOP 372 ms
+interrupt-03 original STOP STOP 527 ms
+interrupt-04 original STOP STOP 377 ms
+interrupt-05 original STOP STOP 375 ms
+interrupt-06 original STOP STOP 409 ms
+interrupt-07 original STOP STOP 384 ms
+interrupt-08 original STOP STOP 393 ms
+interrupt-09 original IGNORE STOP 400 ms
+interrupt-10 original IGNORE IGNORE 418 ms
+interrupt-11 original IGNORE IGNORE 505 ms
+interrupt-12 original IGNORE IGNORE 462 ms
+interrupt-13 original IGNORE IGNORE 439 ms
+interrupt-14 original IGNORE IGNORE 419 ms
+interrupt-15 original IGNORE IGNORE 431 ms
+interrupt-16 original IGNORE IGNORE 439 ms
+routing-01 reversed chat chat 442 ms
+routing-02 reversed chat chat 425 ms
+routing-03 reversed chat chat 416 ms
+routing-04 reversed chat chat 428 ms
+routing-05 reversed chat chat 426 ms
+routing-06 reversed chat chat 415 ms
+routing-07 reversed chat chat 421 ms
+routing-08 reversed chat chat 432 ms
+routing-09 reversed knowledge knowledge 435 ms
+routing-10 reversed knowledge knowledge 430 ms
+routing-11 reversed knowledge knowledge 485 ms
+routing-12 reversed knowledge knowledge 456 ms
+routing-13 reversed knowledge knowledge 445 ms
+routing-14 reversed knowledge knowledge 398 ms
+routing-15 reversed knowledge knowledge 396 ms
+routing-16 reversed knowledge knowledge 406 ms
+routing-17 reversed web web 411 ms
+routing-18 reversed web web 410 ms
+routing-19 reversed web web 411 ms
+routing-20 reversed web web 399 ms
+routing-21 reversed web web 418 ms
+routing-22 reversed web web 404 ms
+routing-23 reversed web knowledge 399 ms
+routing-24 reversed web clarify 400 ms
+routing-25 reversed clarify clarify 412 ms
+routing-26 reversed clarify clarify 389 ms
+routing-27 reversed clarify clarify 395 ms
+routing-28 reversed clarify clarify 390 ms
+routing-29 reversed clarify clarify 393 ms
+routing-30 reversed clarify knowledge 402 ms
+routing-31 reversed clarify clarify 411 ms
+routing-32 reversed clarify clarify 404 ms
+interrupt-01 reversed STOP STOP 374 ms
+interrupt-02 reversed STOP STOP 376 ms
+interrupt-03 reversed STOP STOP 380 ms
+interrupt-04 reversed STOP STOP 367 ms
+interrupt-05 reversed STOP STOP 364 ms
+interrupt-06 reversed STOP STOP 396 ms
+interrupt-07 reversed STOP STOP 366 ms
+interrupt-08 reversed STOP STOP 367 ms
+interrupt-09 reversed IGNORE STOP 372 ms
+interrupt-10 reversed IGNORE IGNORE 372 ms
+interrupt-11 reversed IGNORE IGNORE 371 ms
+interrupt-12 reversed IGNORE IGNORE 376 ms
+interrupt-13 reversed IGNORE IGNORE 376 ms
+interrupt-14 reversed IGNORE IGNORE 382 ms
+interrupt-15 reversed IGNORE STOP 371 ms
+interrupt-16 reversed IGNORE IGNORE 374 ms
+{
+  "metadata": {
+    "upstream_commit": "ca3ba65f142967030ecb453346e94d6f476a69df",
+    "upstream_sha256": {
+      "core.py": "c33dc41a789c39c095c85c1d23d09690dee3726d737bc3dbd051a4f97115e486",
+      "direct.py": "2c89209787b1b51e5f8f8062b4f602da4c82ba7efad50a4df0863b04aef70c9f"
+    },
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "device": "cuda",
+    "torch": "2.13.0+cu130",
+    "transformers": "5.15.0",
+    "quantization": "bitsandbytes NF4 double quant, BF16 compute",
+    "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f",
+    "note": "Synthetic offline development set, not a production or held-out KPI. Scores are uncalibrated.",
+    "load_seconds": 11.204017815180123,
+    "unexpected_keys": [],
+    "gpu": "NVIDIA RTX A4000",
+    "peak_allocated_gib": 2.9810848236083984,
+    "peak_reserved_gib": 3.05859375
+  },
+  "tasks": {
+    "routing": {
+      "original": {
+        "count": 32,
+        "correct": 20,
+        "accuracy": 0.625,
+        "balanced_accuracy": 0.625,
+        "p50_ms": 412.165742367506,
+        "p95_ms": 479.7590272501111,
+        "confusion": {
+          "chat": {
+            "chat": 1,
+            "clarify": 7,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 8,
+            "knowledge": 0,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 4,
+            "knowledge": 4,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 1,
+            "knowledge": 0,
+            "web": 7
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-01",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.7974358247718897
+          },
+          {
+            "id": "routing-02",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9028221332749663
+          },
+          {
+            "id": "routing-04",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9607617197682635
+          },
+          {
+            "id": "routing-05",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9783079192897106
+          },
+          {
+            "id": "routing-06",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9930126459581915
+          },
+          {
+            "id": "routing-07",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.8574582208716692
+          },
+          {
+            "id": "routing-08",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9512878901079386
+          },
+          {
+            "id": "routing-10",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.9273723970558957
+          },
+          {
+            "id": "routing-11",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.9739264658260696
+          },
+          {
+            "id": "routing-12",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.5876403922019136
+          },
+          {
+            "id": "routing-16",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.4959081164018871
+          },
+          {
+            "id": "routing-24",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.5806709246465516
+          }
+        ]
+      },
+      "reversed": {
+        "count": 32,
+        "correct": 29,
+        "accuracy": 0.90625,
+        "balanced_accuracy": 0.90625,
+        "p50_ms": 411.17333248257637,
+        "p95_ms": 455.7797620072961,
+        "confusion": {
+          "chat": {
+            "chat": 8,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 7,
+            "knowledge": 1,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 8,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 1,
+            "knowledge": 1,
+            "web": 6
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-23",
+            "expected": "web",
+            "predicted": "knowledge",
+            "top_score": 0.5190156409319931
+          },
+          {
+            "id": "routing-24",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.5737569499317772
+          },
+          {
+            "id": "routing-30",
+            "expected": "clarify",
+            "predicted": "knowledge",
+            "top_score": 0.5360445177307308
+          }
+        ]
+      },
+      "order_flips": [
+        "routing-01",
+        "routing-02",
+        "routing-04",
+        "routing-05",
+        "routing-06",
+        "routing-07",
+        "routing-08",
+        "routing-10",
+        "routing-11",
+        "routing-12",
+        "routing-16",
+        "routing-23",
+        "routing-30"
+      ]
+    },
+    "interrupt": {
+      "original": {
+        "count": 16,
+        "correct": 15,
+        "accuracy": 0.9375,
+        "balanced_accuracy": 0.9375,
+        "p50_ms": 413.73642859980464,
+        "p95_ms": 527.060329914093,
+        "confusion": {
+          "IGNORE": {
+            "IGNORE": 7,
+            "STOP": 1
+          },
+          "STOP": {
+            "IGNORE": 0,
+            "STOP": 8
+          }
+        },
+        "errors": [
+          {
+            "id": "interrupt-09",
+            "expected": "IGNORE",
+            "predicted": "STOP",
+            "top_score": 0.5926665999540697
+          }
+        ]
+      },
+      "reversed": {
+        "count": 16,
+        "correct": 14,
+        "accuracy": 0.875,
+        "balanced_accuracy": 0.875,
+        "p50_ms": 372.9507764801383,
+        "p95_ms": 396.40998467803,
+        "confusion": {
+          "IGNORE": {
+            "IGNORE": 6,
+            "STOP": 2
+          },
+          "STOP": {
+            "IGNORE": 0,
+            "STOP": 8
+          }
+        },
+        "errors": [
+          {
+            "id": "interrupt-09",
+            "expected": "IGNORE",
+            "predicted": "STOP",
+            "top_score": 0.6224593312018546
+          },
+          {
+            "id": "interrupt-15",
+            "expected": "IGNORE",
+            "predicted": "STOP",
+            "top_score": 0.5926665999540697
+          }
+        ]
+      },
+      "order_flips": [
+        "interrupt-15"
+      ]
+    }
+  }
+}

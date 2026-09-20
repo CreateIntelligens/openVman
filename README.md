@@ -366,3 +366,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT
 ## 九、授權協議 (License)
 
 本專案採用 **GNU General Public License v3.0 (GPLv3)** 授權。詳情請參閱 [LICENSE](./LICENSE) 檔案。
+
+### 語意分流可行性實驗
+
+[SemIf 離線實驗](scripts/experiments/semif/README.md)使用隔離 Compose 容器評估 Brain 分流與語音打斷，包含繁體中文合成案例、既有 GuardAgent／embedding 基線及逐筆結果。這不是正式功能開關，不會改變既有聊天或授權流程。

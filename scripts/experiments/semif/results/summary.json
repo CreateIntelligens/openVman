@@ -1,0 +1,266 @@
+{
+  "metadata": {
+    "upstream_commit": "ca3ba65f142967030ecb453346e94d6f476a69df",
+    "upstream_sha256": {
+      "core.py": "c33dc41a789c39c095c85c1d23d09690dee3726d737bc3dbd051a4f97115e486",
+      "direct.py": "2c89209787b1b51e5f8f8062b4f602da4c82ba7efad50a4df0863b04aef70c9f"
+    },
+    "model": "Qwen/Qwen3.5-4B",
+    "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+    "device": "cuda",
+    "torch": "2.13.0+cu130",
+    "transformers": "5.15.0",
+    "quantization": "bitsandbytes NF4 double quant, BF16 compute",
+    "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f",
+    "note": "Synthetic offline development set, not a production or held-out KPI. Scores are uncalibrated.",
+    "load_seconds": 11.204017815180123,
+    "unexpected_keys": [],
+    "gpu": "NVIDIA RTX A4000",
+    "peak_allocated_gib": 2.9810848236083984,
+    "peak_reserved_gib": 3.05859375
+  },
+  "tasks": {
+    "routing": {
+      "original": {
+        "count": 32,
+        "correct": 20,
+        "accuracy": 0.625,
+        "balanced_accuracy": 0.625,
+        "p50_ms": 412.165742367506,
+        "p95_ms": 479.7590272501111,
+        "confusion": {
+          "chat": {
+            "chat": 1,
+            "clarify": 7,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 8,
+            "knowledge": 0,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 4,
+            "knowledge": 4,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 1,
+            "knowledge": 0,
+            "web": 7
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-01",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.7974358247718897
+          },
+          {
+            "id": "routing-02",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9028221332749663
+          },
+          {
+            "id": "routing-04",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9607617197682635
+          },
+          {
+            "id": "routing-05",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9783079192897106
+          },
+          {
+            "id": "routing-06",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9930126459581915
+          },
+          {
+            "id": "routing-07",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.8574582208716692
+          },
+          {
+            "id": "routing-08",
+            "expected": "chat",
+            "predicted": "clarify",
+            "top_score": 0.9512878901079386
+          },
+          {
+            "id": "routing-10",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.9273723970558957
+          },
+          {
+            "id": "routing-11",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.9739264658260696
+          },
+          {
+            "id": "routing-12",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.5876403922019136
+          },
+          {
+            "id": "routing-16",
+            "expected": "knowledge",
+            "predicted": "clarify",
+            "top_score": 0.4959081164018871
+          },
+          {
+            "id": "routing-24",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.5806709246465516
+          }
+        ]
+      },
+      "reversed": {
+        "count": 32,
+        "correct": 29,
+        "accuracy": 0.90625,
+        "balanced_accuracy": 0.90625,
+        "p50_ms": 411.17333248257637,
+        "p95_ms": 455.7797620072961,
+        "confusion": {
+          "chat": {
+            "chat": 8,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 7,
+            "knowledge": 1,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 8,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 1,
+            "knowledge": 1,
+            "web": 6
+          }
+        },
+        "errors": [
+          {
+            "id": "routing-23",
+            "expected": "web",
+            "predicted": "knowledge",
+            "top_score": 0.5190156409319931
+          },
+          {
+            "id": "routing-24",
+            "expected": "web",
+            "predicted": "clarify",
+            "top_score": 0.5737569499317772
+          },
+          {
+            "id": "routing-30",
+            "expected": "clarify",
+            "predicted": "knowledge",
+            "top_score": 0.5360445177307308
+          }
+        ]
+      },
+      "order_flips": [
+        "routing-01",
+        "routing-02",
+        "routing-04",
+        "routing-05",
+        "routing-06",
+        "routing-07",
+        "routing-08",
+        "routing-10",
+        "routing-11",
+        "routing-12",
+        "routing-16",
+        "routing-23",
+        "routing-30"
+      ]
+    },
+    "interrupt": {
+      "original": {
+        "count": 16,
+        "correct": 15,
+        "accuracy": 0.9375,
+        "balanced_accuracy": 0.9375,
+        "p50_ms": 413.73642859980464,
+        "p95_ms": 527.060329914093,
+        "confusion": {
+          "IGNORE": {
+            "IGNORE": 7,
+            "STOP": 1
+          },
+          "STOP": {
+            "IGNORE": 0,
+            "STOP": 8
+          }
+        },
+        "errors": [
+          {
+            "id": "interrupt-09",
+            "expected": "IGNORE",
+            "predicted": "STOP",
+            "top_score": 0.5926665999540697
+          }
+        ]
+      },
+      "reversed": {
+        "count": 16,
+        "correct": 14,
+        "accuracy": 0.875,
+        "balanced_accuracy": 0.875,
+        "p50_ms": 372.9507764801383,
+        "p95_ms": 396.40998467803,
+        "confusion": {
+          "IGNORE": {
+            "IGNORE": 6,
+            "STOP": 2
+          },
+          "STOP": {
+            "IGNORE": 0,
+            "STOP": 8
+          }
+        },
+        "errors": [
+          {
+            "id": "interrupt-09",
+            "expected": "IGNORE",
+            "predicted": "STOP",
+            "top_score": 0.6224593312018546
+          },
+          {
+            "id": "interrupt-15",
+            "expected": "IGNORE",
+            "predicted": "STOP",
+            "top_score": 0.5926665999540697
+          }
+        ]
+      },
+      "order_flips": [
+        "interrupt-15"
+      ]
+    }
+  }
+}
