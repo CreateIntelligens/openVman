@@ -8,10 +8,14 @@
 
 ### Changed
 
+- **Intent Shadow Readability**: Separate centroid initialization from query scoring, centralize observation input limits, and remove redundant test setup without changing classification or scheduling behavior.
+
 - **Avatar Page Modules**: Split character, background, and mascot panels into `components/avatar/`, with shared asset styles and a `useMascotSnapshotQueue` hook. The page retains form state, asset loading, and the snapshot iframe; tab and upload behavior are unchanged. The snapshot comment now correctly describes recapturing missing thumbnails or URLs outside `/static/mascots/`.
 - **Embed Key Repository Module**: Move Embed key storage to `auth/embed_keys_repository.py` and shared exception/time primitives to `auth/_repository_base.py`. Keep the existing `auth.repositories` import entry point and declare its public repositories, errors, batch types, constants, and helpers in `__all__`, so wildcard imports include account repositories as well as Embed key symbols. Database transactions and authorization behavior are unchanged. See `docs/account-administration.md` for module boundaries.
 
 ### Added
+
+- **Embedding Intent Shadow**: Add opt-in, sampled BGE intent observations for ordinary chat and SSE without changing routing, prompts, or forced knowledge search. Limit each process to one background task with no queue, HTTP timeout, no retries, and failure cooldown; pin embedding identity and omit message text from observation logs. Add fault-injection tests and a frozen 64-case evaluation (52 correct; one knowledge-to-chat error), so predictions remain observational.
 
 - **Collapsible Navigation Groups**: Workspace, Knowledge, and System now collapse independently on desktop and mobile. Group preferences are account-scoped and shared across both menus; the active group opens on initial load and navigation, while other groups default to collapsed.
 

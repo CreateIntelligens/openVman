@@ -709,6 +709,13 @@ API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gatew
 
 `brain` 的價值不是單一模型呼叫，而是把這三層接成一個可維護、可編輯、可操作的本地大腦系統。
 
+
 ## SemIf 語意分流離線實驗
 
 [實驗操作與限制](../scripts/experiments/semif/README.md)提供獨立 Compose 容器、繁體中文合成案例及選項分數評估。這是離線可行性驗證，尚未接入 Brain 正式路由，也不取代強制知識庫搜尋或權限判斷。模型推論建議獨立服務，分類政策與 fallback 留在 openVman。
+
+## Embedding 意圖影子模式
+
+普通 chat／SSE 可抽樣使用既有 BGE embedding 觀察 chat、knowledge、web、clarify 建議分類。預設關閉；背景結果不改路由、prompt 或強制知識庫檢索，每個 process 同時只處理一筆，不排隊。設定、記錄格式與故障行為見 [操作文件](../docs/intent-shadow.md)，獨立 64 筆合成案例結果見 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。目前 52/64 正確，包含一筆知識庫問題誤判閒聊，不能用來跳過 RAG。
+
+實作將範例 centroid 初始化與 query 評分分開，文字截斷限制集中管理；這項整理不改變分類、背景排程或正式 RAG 行為。

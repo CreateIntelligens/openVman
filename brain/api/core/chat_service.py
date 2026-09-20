@@ -12,6 +12,7 @@ from typing import Any
 
 from config import get_settings
 from core.agent_loop import AgentLoopResult, ToolPhaseError, run_agent_loop  # noqa: F401 (ToolPhaseError re-exported)
+from core.intent_shadow import submit_intent_shadow
 from core.llm_client import LLMReply, generate_chat_turn
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
@@ -86,6 +87,19 @@ def prepare_generation(
         session_messages=prior_messages,
         allow_tools=not route.skip_tools,
     )
+
+    if envelope.context.message_type == "user" and not route.forced_tool_name:
+        try:
+            submit_intent_shadow(
+                message=stored_user_message, history=prior_messages,
+                trace_id=envelope.context.trace_id, project_id=project_id,
+                actual_route=route.path,
+            )
+        except Exception as exc:
+            logger.warning(
+                "intent_shadow_schedule_failed error_type=%s",
+                type(exc).__name__,
+            )
 
     return GenerationContext(
         trace_id=envelope.context.trace_id,

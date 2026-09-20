@@ -1,0 +1,44 @@
+{
+  "submission_ms": 0.7479246705770493,
+  "timeout_submission_ms": 0.06751995533704758,
+  "assertions": [
+    "real BGE classification completed",
+    "concurrent submission skipped",
+    "real HTTP read timeout isolated",
+    "cooldown skipped new work",
+    "worker slot released"
+  ],
+  "events": [
+    {
+      "actual_route": "tool",
+      "elapsed_ms": 491.03382509201765,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "event": "intent_shadow",
+      "force_knowledge_search": true,
+      "input_truncated": false,
+      "margin": 0.07251660760833856,
+      "project_id": "synthetic-evaluation",
+      "prototype_version": "intent-centroid-v1",
+      "scores": {
+        "chat": 0.7237403919862464,
+        "clarify": 0.7647718536996299,
+        "knowledge": 0.8372884613079684,
+        "web": 0.7458129739963232
+      },
+      "status": "ok",
+      "suggestion": "knowledge",
+      "trace_id": "shadow-live-success"
+    },
+    {
+      "actual_route": "tool",
+      "elapsed_ms": 96.87734581530094,
+      "error_type": "RuntimeError",
+      "event": "intent_shadow",
+      "force_knowledge_search": true,
+      "input_truncated": false,
+      "project_id": "synthetic-evaluation",
+      "status": "error",
+      "trace_id": "shadow-live-timeout"
+    }
+  ]
+}

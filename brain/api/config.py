@@ -3,6 +3,7 @@ from functools import cached_property
 import json
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_INTERNAL_PORT = 8100
@@ -159,6 +160,11 @@ class BrainSettings(BaseSettings):
     # 強制查完知識庫後的回合不再提供 search_knowledge（避免重複翻書），
     # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
     chat_answer_pass_excludes_knowledge_search: bool = True
+
+    intent_shadow_enabled: bool = False
+    intent_shadow_sample_rate: float = Field(default=0.1, ge=0, le=1)
+    intent_shadow_timeout_seconds: float = Field(default=0.5, gt=0, le=5)
+    intent_shadow_cooldown_seconds: float = Field(default=30, ge=0, le=3600)
     # 第一輪平行查完後，最多再允許幾輪追加工具（例如補查一次網路或讀一頁），
     # 之後不帶工具只能作答；避免模型一輪一查拖到七、八次呼叫。
     chat_max_followup_tool_rounds: int = 1

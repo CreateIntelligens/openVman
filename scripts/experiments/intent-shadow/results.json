@@ -1,0 +1,1007 @@
+{
+  "fixture_sha256": "4cf2fe0027456d940c87726d2f5f307102f9e300c25ce5957ade11dbc77d01a4",
+  "classifier_sha256": "ce7d3be7e5c024bc5b73ce41ed7fb6b233bdd651cedfb3d96e623dd49f7a5fda",
+  "prototype_version": "intent-centroid-v1",
+  "prototype_sha256": "4911eddb6ff8f2007a733019bde85b4a4ec7dcbca9a1c04ca9e7993aa983fb78",
+  "count": 64,
+  "correct": 52,
+  "accuracy": 0.8125,
+  "confusion": {
+    "chat": {
+      "chat": 15,
+      "knowledge": 0,
+      "web": 1,
+      "clarify": 0,
+      "error": 0
+    },
+    "knowledge": {
+      "chat": 1,
+      "knowledge": 12,
+      "web": 3,
+      "clarify": 0,
+      "error": 0
+    },
+    "web": {
+      "chat": 1,
+      "knowledge": 0,
+      "web": 15,
+      "clarify": 0,
+      "error": 0
+    },
+    "clarify": {
+      "chat": 0,
+      "knowledge": 2,
+      "web": 4,
+      "clarify": 10,
+      "error": 0
+    }
+  },
+  "warmup_ms": 339.1381734982133,
+  "p50_ms": 53.94334066659212,
+  "p95_ms": 57.34918173402548,
+  "knowledge_to_chat": 1,
+  "errors": 0,
+  "note": "Independent synthetic phrases, not production traffic or calibrated confidence; no prototype tuning after evaluation.",
+  "rows": [
+    {
+      "id": "intent-001",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.8361250566540464,
+        "knowledge": 0.6898117968152905,
+        "web": 0.7181028094346013,
+        "clarify": 0.7909498000575136
+      },
+      "margin": 0.045175256596532765,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 69.0532997250557
+    },
+    {
+      "id": "intent-002",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.8438991722341675,
+        "knowledge": 0.6748472561101527,
+        "web": 0.6871903346131222,
+        "clarify": 0.7746636051592724
+      },
+      "margin": 0.0692355670748952,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.829628206789494
+    },
+    {
+      "id": "intent-003",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.8062028825088428,
+        "knowledge": 0.6814931148750479,
+        "web": 0.6546339343442934,
+        "clarify": 0.7554542459574218
+      },
+      "margin": 0.05074863655142092,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.56838367879391
+    },
+    {
+      "id": "intent-004",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.6785908221120854,
+        "knowledge": 0.5673742726100354,
+        "web": 0.5641572001517046,
+        "clarify": 0.6497340965400024
+      },
+      "margin": 0.028856725572083075,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.505460895597935
+    },
+    {
+      "id": "intent-005",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.8578063335050635,
+        "knowledge": 0.6686010827251577,
+        "web": 0.7352428417827351,
+        "clarify": 0.824760037028133
+      },
+      "margin": 0.03304629647693047,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.61352877318859
+    },
+    {
+      "id": "intent-006",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.8622217345208509,
+        "knowledge": 0.6712652877519651,
+        "web": 0.6976079188900824,
+        "clarify": 0.8299484342007377
+      },
+      "margin": 0.03227330032011322,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 56.17182422429323
+    },
+    {
+      "id": "intent-007",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.8431018571213748,
+        "knowledge": 0.6854729416596382,
+        "web": 0.7022347283987518,
+        "clarify": 0.7887410046677129
+      },
+      "margin": 0.054360852453661845,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.60765305906534
+    },
+    {
+      "id": "intent-008",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.691274784627278,
+        "knowledge": 0.6134967011202204,
+        "web": 0.6512294765492088,
+        "clarify": 0.6910975522574587
+      },
+      "margin": 0.00017723236981925794,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.37327455729246
+    },
+    {
+      "id": "intent-009",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.7679095119907654,
+        "knowledge": 0.6521507583869561,
+        "web": 0.6701840084199966,
+        "clarify": 0.707374867124571
+      },
+      "margin": 0.06053464486619442,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 52.4915587157011
+    },
+    {
+      "id": "intent-010",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.7810910127752548,
+        "knowledge": 0.6556536119572338,
+        "web": 0.6918850710835642,
+        "clarify": 0.7382678370491668
+      },
+      "margin": 0.04282317572608807,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.50902134180069
+    },
+    {
+      "id": "intent-011",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.8267917143123432,
+        "knowledge": 0.6391781500741238,
+        "web": 0.689511365955358,
+        "clarify": 0.7963836340647696
+      },
+      "margin": 0.030408080247573577,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 56.161715649068356
+    },
+    {
+      "id": "intent-012",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.7134402977307803,
+        "knowledge": 0.6126603190681404,
+        "web": 0.6072880183309649,
+        "clarify": 0.6591426869126628
+      },
+      "margin": 0.05429761081811757,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 56.7230898886919
+    },
+    {
+      "id": "intent-013",
+      "expected": "chat",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.651675769649522,
+        "knowledge": 0.6250448708777456,
+        "web": 0.7143060577711549,
+        "clarify": 0.6656583819946433
+      },
+      "margin": 0.04864767577651152,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 55.440292693674564
+    },
+    {
+      "id": "intent-014",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.6928063592087685,
+        "knowledge": 0.6774973188854413,
+        "web": 0.6339407416140189,
+        "clarify": 0.63706412011549
+      },
+      "margin": 0.01530904032332725,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.677427746355534
+    },
+    {
+      "id": "intent-015",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.7296515537485982,
+        "knowledge": 0.6272341063899175,
+        "web": 0.7106633562640846,
+        "clarify": 0.7044509609247926
+      },
+      "margin": 0.018988197484513636,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.02983911335468
+    },
+    {
+      "id": "intent-016",
+      "expected": "chat",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.7558795161591249,
+        "knowledge": 0.6169384089327163,
+        "web": 0.6174628874314254,
+        "clarify": 0.6938233378135166
+      },
+      "margin": 0.06205617834560828,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 52.78333090245724
+    },
+    {
+      "id": "intent-017",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.614484249203688,
+        "knowledge": 0.7538032504310752,
+        "web": 0.5971486866144731,
+        "clarify": 0.6092503152633418
+      },
+      "margin": 0.13931900122738716,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 52.52351891249418
+    },
+    {
+      "id": "intent-018",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.6230464153679477,
+        "knowledge": 0.7397717314200821,
+        "web": 0.6745666063553636,
+        "clarify": 0.6353228416697774
+      },
+      "margin": 0.06520512506471854,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.30198537558317
+    },
+    {
+      "id": "intent-019",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.5743619874026006,
+        "knowledge": 0.6548973455887284,
+        "web": 0.5478684160428487,
+        "clarify": 0.5828533296065141
+      },
+      "margin": 0.07204401598221422,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.31782717257738
+    },
+    {
+      "id": "intent-020",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.586443625514958,
+        "knowledge": 0.6670201298998449,
+        "web": 0.5496904757689309,
+        "clarify": 0.5782946835013835
+      },
+      "margin": 0.08057650438488695,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.75225765258074
+    },
+    {
+      "id": "intent-021",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.7110327984399994,
+        "knowledge": 0.7893878018900978,
+        "web": 0.7395465493865188,
+        "clarify": 0.7296398549234223
+      },
+      "margin": 0.04984125250357907,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.990619257092476
+    },
+    {
+      "id": "intent-022",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.6505825848945568,
+        "knowledge": 0.7438308982932377,
+        "web": 0.6346347360251885,
+        "clarify": 0.6756922006685884
+      },
+      "margin": 0.0681386976246493,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 56.60927947610617
+    },
+    {
+      "id": "intent-023",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.6613686824131162,
+        "knowledge": 0.7257059740498587,
+        "web": 0.7254529186292585,
+        "clarify": 0.6946210517318434
+      },
+      "margin": 0.00025305542060016784,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.084536619484425
+    },
+    {
+      "id": "intent-024",
+      "expected": "knowledge",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6258513521768412,
+        "knowledge": 0.6939175091808454,
+        "web": 0.7165387622816358,
+        "clarify": 0.6433051100409869
+      },
+      "margin": 0.02262125310079044,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 52.502053789794445
+    },
+    {
+      "id": "intent-025",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.6009119568847923,
+        "knowledge": 0.7084202776035744,
+        "web": 0.6683184237166455,
+        "clarify": 0.6187082194880483
+      },
+      "margin": 0.040101853886928884,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.52200534939766
+    },
+    {
+      "id": "intent-026",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.6023208126493808,
+        "knowledge": 0.683516565023955,
+        "web": 0.6401172625278441,
+        "clarify": 0.6269249161190862
+      },
+      "margin": 0.0433993024961109,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.55031383037567
+    },
+    {
+      "id": "intent-027",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.5480950664519028,
+        "knowledge": 0.6974414706685527,
+        "web": 0.6427382547950176,
+        "clarify": 0.5753210134775538
+      },
+      "margin": 0.054703215873535105,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 50.75775273144245
+    },
+    {
+      "id": "intent-028",
+      "expected": "knowledge",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6092272773965988,
+        "knowledge": 0.6668880299535891,
+        "web": 0.6693460693708331,
+        "clarify": 0.5936260812129069
+      },
+      "margin": 0.0024580394172439846,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.18017862737179
+    },
+    {
+      "id": "intent-029",
+      "expected": "knowledge",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6233571646490028,
+        "knowledge": 0.6573418967282951,
+        "web": 0.7115848195590166,
+        "clarify": 0.6485983203370335
+      },
+      "margin": 0.05424292283072152,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.880695417523384
+    },
+    {
+      "id": "intent-030",
+      "expected": "knowledge",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.7171948876838351,
+        "knowledge": 0.6339576908084817,
+        "web": 0.6528044286181252,
+        "clarify": 0.6856652104366966
+      },
+      "margin": 0.03152967724713851,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.62123870104551
+    },
+    {
+      "id": "intent-031",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.7036025898181506,
+        "knowledge": 0.7741355316796341,
+        "web": 0.7351598107067607,
+        "clarify": 0.7368640122086416
+      },
+      "margin": 0.0372715194709925,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 55.770402774214745
+    },
+    {
+      "id": "intent-032",
+      "expected": "knowledge",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.589412604199028,
+        "knowledge": 0.6879036683568576,
+        "web": 0.6181257173225999,
+        "clarify": 0.5959586823789276
+      },
+      "margin": 0.06977795103425766,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.9033572897315
+    },
+    {
+      "id": "intent-033",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6439630436693565,
+        "knowledge": 0.6699810753837294,
+        "web": 0.8028607309321929,
+        "clarify": 0.6397492116545034
+      },
+      "margin": 0.13287965554846348,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 56.736755184829235
+    },
+    {
+      "id": "intent-034",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5953251855591081,
+        "knowledge": 0.6460724997644577,
+        "web": 0.7448439842812323,
+        "clarify": 0.5996997851266027
+      },
+      "margin": 0.09877148451677464,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.022279404103756
+    },
+    {
+      "id": "intent-035",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6353161998859491,
+        "knowledge": 0.624929789769066,
+        "web": 0.7928269474980595,
+        "clarify": 0.6508190220468302
+      },
+      "margin": 0.1420079254512293,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.27650548517704
+    },
+    {
+      "id": "intent-036",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6060978520765208,
+        "knowledge": 0.6132439905052677,
+        "web": 0.7624886307304926,
+        "clarify": 0.6156949584195591
+      },
+      "margin": 0.14679367231093343,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.896062076091766
+    },
+    {
+      "id": "intent-037",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5809654359202502,
+        "knowledge": 0.603648482667304,
+        "web": 0.6903298878078721,
+        "clarify": 0.6209806903354914
+      },
+      "margin": 0.06934919747238066,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 52.08608694374561
+    },
+    {
+      "id": "intent-038",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6479666324408814,
+        "knowledge": 0.5885788692228096,
+        "web": 0.7945399987654874,
+        "clarify": 0.6450121513649473
+      },
+      "margin": 0.14657336632460605,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.64004445821047
+    },
+    {
+      "id": "intent-039",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6350835708648562,
+        "knowledge": 0.6399192290566751,
+        "web": 0.7344812785799123,
+        "clarify": 0.6601603277601824
+      },
+      "margin": 0.07432095081972989,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.191204227507114
+    },
+    {
+      "id": "intent-040",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5801430398553516,
+        "knowledge": 0.6452132569724217,
+        "web": 0.7290776000233774,
+        "clarify": 0.5716806351334411
+      },
+      "margin": 0.08386434305095569,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.7521882429719
+    },
+    {
+      "id": "intent-041",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6650748309951117,
+        "knowledge": 0.7077597810435219,
+        "web": 0.7741149484374887,
+        "clarify": 0.6828357821398202
+      },
+      "margin": 0.06635516739396685,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.15264966338873
+    },
+    {
+      "id": "intent-042",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5997560448422999,
+        "knowledge": 0.6032150946551433,
+        "web": 0.7286728423715323,
+        "clarify": 0.6204381583254907
+      },
+      "margin": 0.10823468404604164,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.725044406950474
+    },
+    {
+      "id": "intent-043",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5678604337785655,
+        "knowledge": 0.5655570678954682,
+        "web": 0.6636056527084284,
+        "clarify": 0.5970242390802396
+      },
+      "margin": 0.06658141362818881,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.56955637782812
+    },
+    {
+      "id": "intent-044",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5436633532332519,
+        "knowledge": 0.6119385967091047,
+        "web": 0.6536175651390397,
+        "clarify": 0.5561193946969848
+      },
+      "margin": 0.041678968429935015,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.26356738805771
+    },
+    {
+      "id": "intent-045",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.586258189711143,
+        "knowledge": 0.6642275841620183,
+        "web": 0.7049920945551335,
+        "clarify": 0.5992036487331535
+      },
+      "margin": 0.04076451039311513,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 50.39380583912134
+    },
+    {
+      "id": "intent-046",
+      "expected": "web",
+      "suggestion": "chat",
+      "scores": {
+        "chat": 0.6936023695043204,
+        "knowledge": 0.6006936562577102,
+        "web": 0.6789264237887683,
+        "clarify": 0.6524989733614631
+      },
+      "margin": 0.014675945715552086,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.77033506333828
+    },
+    {
+      "id": "intent-047",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5678362043301971,
+        "knowledge": 0.6891988588330791,
+        "web": 0.7114605836707105,
+        "clarify": 0.5829005790085444
+      },
+      "margin": 0.022261724837631447,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.692512817680836
+    },
+    {
+      "id": "intent-048",
+      "expected": "web",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6164599289995788,
+        "knowledge": 0.6995523639082886,
+        "web": 0.7355464493127637,
+        "clarify": 0.6674985085725934
+      },
+      "margin": 0.03599408540447513,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.131330758333206
+    },
+    {
+      "id": "intent-049",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.8327634625641811,
+        "knowledge": 0.7710481771028677,
+        "web": 0.8006559759787517,
+        "clarify": 0.8668578000897456
+      },
+      "margin": 0.034094337525564455,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.13755867630243
+    },
+    {
+      "id": "intent-050",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.8020836733605297,
+        "knowledge": 0.7963192787704351,
+        "web": 0.7508414465362075,
+        "clarify": 0.854118247858803
+      },
+      "margin": 0.05203457449827331,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.75057552009821
+    },
+    {
+      "id": "intent-051",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.8275930166112355,
+        "knowledge": 0.7337421199849392,
+        "web": 0.770845434554819,
+        "clarify": 0.8769015785323365
+      },
+      "margin": 0.049308561921101,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.38127538561821
+    },
+    {
+      "id": "intent-052",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.7789788349375799,
+        "knowledge": 0.7464319736497346,
+        "web": 0.774458838918013,
+        "clarify": 0.854292049008332
+      },
+      "margin": 0.07531321407075209,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 57.916044257581234
+    },
+    {
+      "id": "intent-053",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.7826865680963689,
+        "knowledge": 0.7232809754217543,
+        "web": 0.6981273649396668,
+        "clarify": 0.8631471386355059
+      },
+      "margin": 0.08046057053913691,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.28705085068941
+    },
+    {
+      "id": "intent-054",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.7919994538814222,
+        "knowledge": 0.7192075341815222,
+        "web": 0.7409598686350376,
+        "clarify": 0.836677048814088
+      },
+      "margin": 0.044677594932665765,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.123075515031815
+    },
+    {
+      "id": "intent-055",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.781777382670355,
+        "knowledge": 0.7144752957799984,
+        "web": 0.7308595442241248,
+        "clarify": 0.8220076178369681
+      },
+      "margin": 0.04023023516661306,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.37748397141695
+    },
+    {
+      "id": "intent-056",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.7687787429001433,
+        "knowledge": 0.7791700221395423,
+        "web": 0.783400202312501,
+        "clarify": 0.821431030741817
+      },
+      "margin": 0.038030828429316044,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 52.525460720062256
+    },
+    {
+      "id": "intent-057",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.744987814868628,
+        "knowledge": 0.6912800580319263,
+        "web": 0.7066886521653976,
+        "clarify": 0.7883876502583057
+      },
+      "margin": 0.04339983538967773,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.54085860401392
+    },
+    {
+      "id": "intent-058",
+      "expected": "clarify",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.7201376518904655,
+        "knowledge": 0.7192849895920336,
+        "web": 0.7817629979537436,
+        "clarify": 0.7781053537525786
+      },
+      "margin": 0.003657644201164989,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 53.10173146426678
+    },
+    {
+      "id": "intent-059",
+      "expected": "clarify",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6849959419513327,
+        "knowledge": 0.6550296330050229,
+        "web": 0.7154487420893725,
+        "clarify": 0.7116193386200965
+      },
+      "margin": 0.0038294034692759604,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 51.18747055530548
+    },
+    {
+      "id": "intent-060",
+      "expected": "clarify",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.5839116716758972,
+        "knowledge": 0.6254400386191556,
+        "web": 0.5998125963307577,
+        "clarify": 0.5782270669604658
+      },
+      "margin": 0.025627442288397972,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 50.49360916018486
+    },
+    {
+      "id": "intent-061",
+      "expected": "clarify",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.5966910158367302,
+        "knowledge": 0.6070087622866855,
+        "web": 0.6743451527584265,
+        "clarify": 0.6089039177875716
+      },
+      "margin": 0.06544123497085497,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 52.457431331276894
+    },
+    {
+      "id": "intent-062",
+      "expected": "clarify",
+      "suggestion": "web",
+      "scores": {
+        "chat": 0.6063533232528047,
+        "knowledge": 0.633457942169371,
+        "web": 0.7056480339017228,
+        "clarify": 0.633264506617587
+      },
+      "margin": 0.0721900917323518,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 57.84480832517147
+    },
+    {
+      "id": "intent-063",
+      "expected": "clarify",
+      "suggestion": "knowledge",
+      "scores": {
+        "chat": 0.5800328466435065,
+        "knowledge": 0.7076988302576531,
+        "web": 0.6685623109751716,
+        "clarify": 0.6179301989652084
+      },
+      "margin": 0.03913651928248152,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 54.51694130897522
+    },
+    {
+      "id": "intent-064",
+      "expected": "clarify",
+      "suggestion": "clarify",
+      "scores": {
+        "chat": 0.7810326940600106,
+        "knowledge": 0.7203198855818135,
+        "web": 0.7047781089080201,
+        "clarify": 0.8689148408196552
+      },
+      "margin": 0.08788214675964456,
+      "embedding_identity": "bge:BAAI/bge-m3:1024:float32:l2:symmetric:5617a9f61b028005a4858fdac845db406aefb181",
+      "prototype_version": "intent-centroid-v1",
+      "elapsed_ms": 57.34918173402548
+    }
+  ]
+}
