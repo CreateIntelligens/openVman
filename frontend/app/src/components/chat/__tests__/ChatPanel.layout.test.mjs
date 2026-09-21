@@ -65,3 +65,21 @@ test("send button styles do not leak into the microphone child component", () =>
   assert.match(source, /\.chat-send-btn\s*\{/);
   assert.doesNotMatch(source, /\.chat-input-bar button\s*\{/);
 });
+
+test("the composer says whether the microphone is live, and how to send", () => {
+  // 使用者回報過「點了看不到反饋，不知道有沒有收音」。提示寫在輸入框裡，
+  // 那是按下麥克風後眼睛會看的地方。
+  assert.match(source, /:placeholder="composerPlaceholder"/);
+  assert.match(source, /收音中…講完請再按一次麥克風送出/);
+  assert.match(source, /收音中…請直接說話/);
+  assert.match(source, /辨識中，請稍候…/);
+  // 兩種引擎的操作方式不同，提示要跟著引擎走。
+  assert.match(source, /props\.asrEngine === "server"/);
+});
+
+test("the listening status reaches assistive tech", () => {
+  assert.match(source, /class="composer-status" role="status" aria-live="polite"/);
+  // display: none 會連螢幕閱讀器一起擋掉，狀態區不能用它。
+  const rule = source.slice(source.indexOf(".composer-status {"));
+  assert.doesNotMatch(rule.slice(0, rule.indexOf("}")), /display:\s*none/);
+});

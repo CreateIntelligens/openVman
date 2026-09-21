@@ -92,17 +92,20 @@
     <div class="chat-input-bar">
       <AsrButton
         :is-listening="asrListening"
+        :is-transcribing="asrTranscribing"
         :disabled="!canSend || !asrSupported"
         :is-supported="asrSupported"
         @toggle="emit('asr-toggle')"
       />
-      <label class="composer-shell">
+      <!-- 給螢幕閱讀器的收音狀態；看得到的人讀的是輸入框裡的提示。 -->
+      <span class="composer-status" role="status" aria-live="polite">{{ asrStatusText }}</span>
+      <label class="composer-shell" :class="{ 'composer-shell--listening': asrStatusText }">
         <span class="composer-label">輸入問題</span>
         <input
           ref="inputRef"
           v-model="inputText"
           type="text"
-          :placeholder="placeholder"
+          :placeholder="composerPlaceholder"
           :disabled="!canSend"
           :aria-describedby="feedbackMessage ? 'chat-composer-feedback' : undefined"
           @input="feedbackMessage = ''"
@@ -143,6 +146,10 @@ const props = withDefaults(defineProps<{
   isTyping?: boolean
   asrListening?: boolean
   asrSupported?: boolean
+  /** 伺服器引擎是整段上傳：停止收音到出字之間有幾秒空窗，要讓使用者看得到。 */
+  asrTranscribing?: boolean
+  /** 兩種引擎操作方式不同：瀏覽器辨識講完自動送，伺服器引擎要再按一次才送。 */
+  asrEngine?: 'browser' | 'server'
   asrError?: string
   compact?: boolean
 }>(), {
@@ -168,6 +175,16 @@ const feedbackMessage = computed({
     localFeedback.value = value
   },
 })
+// 收音狀態直接寫在輸入框裡：那是使用者按下麥克風後眼睛會看的地方。只靠按鈕
+// 變色的話，使用者回報過「點了看不到反饋，不知道有沒有收音」。
+const asrStatusText = computed(() => {
+  if (props.asrTranscribing) return "辨識中，請稍候…"
+  if (!props.asrListening) return ""
+  return props.asrEngine === "server"
+    ? "收音中…講完請再按一次麥克風送出"
+    : "收音中…請直接說話"
+})
+const composerPlaceholder = computed(() => asrStatusText.value || props.placeholder)
 const messagesRef = ref<HTMLDivElement>()
 const contentRef = ref<HTMLDivElement>()
 const inputRef = ref<HTMLInputElement>()
@@ -563,6 +580,26 @@ useStickToBottom(messagesRef, contentRef)
 
 .composer-label {
   display: none;
+}
+
+/* 視覺上隱藏但螢幕閱讀器讀得到。display: none 會連輔助科技一起擋掉。 */
+.composer-status {
+  position: absolute;
+  width: 0.0625rem;
+  height: 0.0625rem;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 收音中的提示不能長得跟平常的 placeholder 一樣灰，否則等於沒提示。 */
+.composer-shell--listening input {
+  border-color: rgb(var(--ov-color-danger));
+}
+
+.composer-shell--listening input::placeholder {
+  color: rgb(var(--ov-color-danger));
+  opacity: 1;
 }
 
 .chat-input-bar input {

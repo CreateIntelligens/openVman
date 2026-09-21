@@ -90,8 +90,10 @@
         :placeholder="chatPlaceholder"
         :is-thinking="chat.state.value === 'THINKING'"
         :is-typing="isTyping"
-        :asr-listening="asr.isListening.value"
-        :asr-supported="asr.isSupported.value"
+        :asr-listening="activeAsr.isListening.value"
+        :asr-supported="activeAsr.isSupported.value"
+        :asr-transcribing="serverAsr.isTranscribing.value"
+        :asr-engine="useBrowserAsr ? 'browser' : 'server'"
         :asr-error="asrError"
         :compact="immersive"
         @send="handleComposerSend"
@@ -692,9 +694,13 @@ void fetchMyAsrProvider()
   })
   .catch(() => { /* 讀不到就沿用伺服器引擎，不該因此不能講話。 */ });
 
+// 按鈕顯示的狀態要跟實際在收音的引擎同一個。先前畫面綁的永遠是瀏覽器辨識，
+// 選了伺服器引擎時按下去有在錄音，但按鈕毫無反應，使用者無從得知有沒有收音。
+const activeAsr = computed(() => (useBrowserAsr.value ? asr : serverAsr));
+
 function handleAsrToggle(): void {
   asrError.value = "";
-  const active = useBrowserAsr.value ? asr : serverAsr;
+  const active = activeAsr.value;
   if (active.isListening.value) active.stop(); else void active.start();
 }
 
@@ -717,11 +723,21 @@ const webcam = useWebcamCapture({
 // 之前一律不顯示，問到了再決定。
 const visionAvailable = ref<boolean | null>(null);
 
-async function fetchVisionHealth(): Promise<void> {
+async function fetchVisionHealth(retryOnUnauthorized = true): Promise<void> {
   try {
     const res = await apiFetch("/api/v1/vision/health");
+    if (res.status === 401 || res.status === 403) {
+      // 401 不是「後端掛了」，是這一刻工作階段還沒就緒——開場的請求偶爾會跑在
+      // cookie 生效前面。當成 fail-open 會讓沒開 VLM 的環境冒出鏡頭按鈕，所以
+      // 這裡重問一次；再不行就維持 null（不顯示），不要猜。
+      if (retryOnUnauthorized) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        await fetchVisionHealth(false);
+      }
+      return;
+    }
     if (!res.ok) {
-      // 查不到就當作可用（fail-open）：後端暫時掛掉不該讓功能整個消失。
+      // 其他錯誤（5xx、代理問題）才 fail-open：後端暫時掛掉不該讓功能整個消失。
       visionAvailable.value = true;
       return;
     }
@@ -852,8 +868,8 @@ async function bootstrapRenderer(vrmReady?: Promise<unknown>): Promise<void> {
 watch(() => chat.state.value, (newState) => {
   if (newState === 'THINKING') triggerStageAvatarGesture("thinking-hand");
   if (newState === 'SPEAKING') triggerStageAvatarGesture("explain-open-hand");
-  if ((newState === 'THINKING' || newState === 'SPEAKING') && asr.isListening.value) {
-    asr.pause();
+  if ((newState === 'THINKING' || newState === 'SPEAKING') && activeAsr.value.isListening.value) {
+    activeAsr.value.pause();
   }
 });
 
