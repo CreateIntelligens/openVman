@@ -100,3 +100,33 @@ def test_clearing_is_audited_too(env):
         ).fetchall()
 
     assert [row["actor_user_id"] for row in rows] == [env["root"].id, env["admin"].id]
+
+
+def test_root_may_pick_any_asr_engine_without_grants(env):
+    """ROOT 在這個系統裡從不受 scope 限制，聲音與專案也都不必逐一授權。
+
+    只看 resource_grants 會讓 ROOT 反而什麼都選不了——它的 grants 是空的。
+    """
+    from types import SimpleNamespace
+
+    from app.auth.models import ResourceType, ResourceVisibility
+    from app.auth.repositories import AccountAccessRepository, ResourceRepository
+    from app.auth.settings_routes import _asr_user_choices
+
+    resources = ResourceRepository(env["database"])
+    for engine in ("breeze", "browser"):
+        resources.register(
+            resource_type=ResourceType.ASR_ENGINE,
+            resource_id=engine,
+            owner_user_id=None,
+            visibility=ResourceVisibility.SYSTEM_PUBLIC,
+        )
+    runtime = SimpleNamespace(
+        resources=resources,
+        account_access=AccountAccessRepository(env["database"]),
+    )
+
+    # ROOT 沒有任何 grant，卻該看得到全部。
+    assert _asr_user_choices(runtime, env["root"]) == ["breeze", "browser"]
+    # 一般帳號沒授權就是空的，授權才有。
+    assert _asr_user_choices(runtime, env["admin"]) == []

@@ -20,7 +20,7 @@ from .dependencies import (
     require_admin,
     require_root,
 )
-from .models import ResourceType
+from .models import AccountRole, ResourceType, UserRecord
 from .runtime import AuthRuntime, get_auth_runtime
 from .settings_repository import (
     ASR_PROVIDER_KEY,
@@ -112,41 +112,27 @@ class UpdateMyAsrProviderRequest(_StrictModel):
     value: str
 
 
-def _asr_user_choices(runtime: AuthRuntime, user_id: str) -> list[str]:
+def _asr_user_choices(runtime: AuthRuntime, account: UserRecord) -> list[str]:
     """Which engines this account may pick.
 
     跟 TTS 的聲音一樣看 resource_grants：管理者在帳號頁授權了哪些，這裡就
     只列哪些。沒有授權任何一個就回空清單，聊天室不顯示選單，一律用預設值。
+
+    ROOT 例外：它在這個系統裡從不受 scope 限制（resolve_admin_scope 直接回
+    UNSCOPED_ADMIN），聲音與專案也都不必逐一授權。只看 grants 會讓 ROOT 反而
+    什麼都選不了。
     """
+    if account.role is AccountRole.ROOT:
+        return sorted(
+            record.resource_id
+            for record in runtime.resources.list_by_type(ResourceType.ASR_ENGINE)
+        )
     granted = [
         grant.resource_id
-        for grant in runtime.account_access.list_grants(user_id)
+        for grant in runtime.account_access.list_grants(account.id)
         if grant.resource_type is ResourceType.ASR_ENGINE
     ]
     return sorted(granted)
-
-
-def _asr_user_choices(runtime: AuthRuntime, user_id: str) -> list[str]:
-    """Which engines this account may pick.
-
-    跟 TTS 的聲音一樣看 resource_grants：管理者在帳號頁授權了哪些，這裡就
-    只列哪些。沒有授權任何一個就回空清單，聊天室不顯示選單，一律用預設值。
-    """
-    granted = [
-        grant.resource_id
-        for grant in runtime.account_access.list_grants(user_id)
-        if grant.resource_type is ResourceType.ASR_ENGINE
-    ]
-    return sorted(granted)
-
-
-def _asr_user_choices_profile(runtime: AuthRuntime) -> AsrUserChoicesProfile:
-    stored = runtime.settings.get_many(ASR_USER_CHOICES_KEY)
-    return AsrUserChoicesProfile(
-        allowed=_DEFAULT_USER_CHOICES if stored is None else stored,
-        options=_DEFAULT_USER_CHOICES,
-        overridden=stored is not None,
-    )
 
 
 @settings_router.get("/my-asr-provider", response_model=MyAsrProviderProfile)
@@ -155,7 +141,7 @@ def get_my_asr_provider(
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> MyAsrProviderProfile:
     """Any signed-in user may read their own choice."""
-    allowed = _asr_user_choices(runtime, account.user.id)
+    allowed = _asr_user_choices(runtime, account.user)
     stored = runtime.account_access.get_asr_provider(account.user.id)
     site_default = runtime.settings.get(ASR_PROVIDER_KEY) or ""
     # 選過但之後被管理者關閉的引擎不該繼續生效，否則關閉形同虛設。
@@ -176,7 +162,7 @@ def set_my_asr_provider(
     白名單在後端把關：前端送什麼都要對照管理者開放的清單，否則使用者改一
     個 API 請求就能繞過後台設定。空字串代表改回沿用全站設定。
     """
-    allowed = _asr_user_choices(runtime, account.user.id)
+    allowed = _asr_user_choices(runtime, account.user)
     if body.value and body.value not in allowed:
         raise HTTPException(
             status_code=422,
