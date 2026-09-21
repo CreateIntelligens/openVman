@@ -1,0 +1,75 @@
+{
+  "non_tied_order_sensitive_cases": [
+    "routing-24",
+    "routing-12",
+    "routing-06",
+    "routing-14",
+    "routing-04",
+    "routing-21",
+    "routing-09",
+    "routing-16",
+    "routing-30",
+    "routing-31",
+    "routing-05",
+    "routing-10",
+    "routing-01",
+    "routing-22",
+    "routing-11",
+    "routing-15",
+    "routing-02",
+    "routing-23",
+    "routing-08",
+    "routing-19",
+    "routing-07"
+  ],
+  "tied_combinations": 6,
+  "label_positions": {
+    "clarify": {
+      "position_1_trials": 576,
+      "position_1_selected": 153,
+      "position_4_trials": 576,
+      "position_4_selected": 327,
+      "position_2_trials": 576,
+      "position_3_trials": 576,
+      "position_3_selected": 219,
+      "position_2_selected": 192
+    },
+    "knowledge": {
+      "position_2_trials": 576,
+      "position_1_trials": 576,
+      "position_3_trials": 576,
+      "position_1_selected": 75,
+      "position_4_trials": 576,
+      "position_4_selected": 174,
+      "position_3_selected": 147,
+      "position_2_selected": 138
+    },
+    "chat": {
+      "position_3_trials": 576,
+      "position_2_trials": 576,
+      "position_1_trials": 576,
+      "position_4_trials": 576,
+      "position_3_selected": 96,
+      "position_4_selected": 132,
+      "position_2_selected": 99,
+      "position_1_selected": 66
+    },
+    "web": {
+      "position_4_trials": 576,
+      "position_3_trials": 576,
+      "position_4_selected": 153,
+      "position_2_trials": 576,
+      "position_1_trials": 576,
+      "position_1_selected": 96,
+      "position_3_selected": 129,
+      "position_2_selected": 108
+    }
+  },
+  "previous_run_comparison": {
+    "count": 64,
+    "identical_labels": 64,
+    "identical_probabilities": 64
+  },
+  "knowledge_to_chat_predictions": 0,
+  "knowledge_to_chat_cases": []
+}

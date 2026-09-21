@@ -48,3 +48,32 @@ docker compose -p openvman-semif -f scripts/experiments/semif/compose.yaml down
 ```
 
 容器 /tmp 的模型快取與臨時套件會隨容器移除；repository 中的案例、腳本與結果保留。
+
+
+## 固定輸入與全排列穩定性
+
+追加測試使用原 initial prompt、原 32 筆 routing 案例、相同模型 revision 與 NF4 設定。每題四個選項的 24 種排列全部測量，每種排列重跑三次，共 2,304 次；固定 RNG seed 並打散每輪順序，模型不抽樣答案。這仍只有 32 題已知開發案例，不是 2,304 題獨立測試。
+
+依上方步驟啟動實驗容器並安裝依賴後執行：
+
+```bash
+docker compose -p openvman-semif -f scripts/experiments/semif/compose.yaml exec -T -e PYTHONPATH=/tmp/semif-deps experiment python scripts/experiments/semif/stability.py
+```
+
+結果獨立寫入 results/stability/；已有 predictions.jsonl 時拒絕覆蓋。metadata.json 在模型執行前保存完整排程、問題、選項、來源與 fixture hash；完成後補上顯存及載入時間。逐筆記錄以語意 option ID 對應分數，保留 prompt hash、repeat、排列、執行次序、同分與 margin。
+
+summary.json 分開統計相同輸入的三次標籤／分數變化，以及每題跨排列的標籤分布。跨排列統計固定使用第一輪，不挑選較好的重跑；同分沿用上游原本的第一位置勝出行為並明示。同一模型載入內的重複測試，不能證明跨程序、跨硬體或跨模型版本一致。
+
+不需載入模型即可重建摘要：
+
+```bash
+docker compose -p openvman-semif -f scripts/experiments/semif/compose.yaml exec -T experiment python scripts/experiments/semif/stability.py --summarize-only
+```
+
+原始推論程式快照保存在 results/stability/runner_used.py，對應 metadata.json 的 runner_sha256。後續僅加強摘要完整性檢查與欄位命名；summary.json 的 summary_runner_sha256 對應目前 stability.py，沒有重寫逐筆推論結果。摘要會核對完整執行排程、唯一組合、execution index 與每組的三個 repeat。此快照用於來源追溯，不作為新的執行入口。
+
+摘要驗證測試（不需要 GPU 或下載模型）：
+
+```bash
+docker compose -p openvman-semif -f scripts/experiments/semif/compose.yaml exec -T experiment python scripts/experiments/semif/test_stability.py
+```
