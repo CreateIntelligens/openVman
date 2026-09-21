@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   QUICK_QA_TREE_PATH,
+  findNodeReferencingSource,
+  findQaNode,
+  getFileParentPaths,
+  getQaNodeAncestors,
+  isQaNodeDescendant,
   SOURCE_MODES,
   SOURCE_MODE_COPY,
   getSourceMeta,
@@ -107,5 +112,47 @@ describe("QA tree merge", () => {
       "not-found",
     );
     expect(miss.children).toEqual([]);
+  });
+});
+
+describe("QA 節點樹的走訪", () => {
+  const nodes = [
+    {
+      node_id: "root", label: "退貨",
+      qa_entries: [{ source_path: "returns.csv" }],
+      children: [
+        { node_id: "mail", label: "郵寄退貨", children: [] },
+        { node_id: "store", label: "門市退貨", children: [
+          { node_id: "deep", label: "當日退貨", children: [] },
+        ] },
+      ],
+    },
+  ] as never[];
+
+  it("依 id 找節點，會走到最深層", () => {
+    expect(findQaNode(nodes, "deep")?.label).toBe("當日退貨");
+    expect(findQaNode(nodes, "missing")).toBeUndefined();
+  });
+
+  it("找得到引用某個來源檔的節點", () => {
+    expect(findNodeReferencingSource(nodes, "returns.csv")?.node_id).toBe("root");
+    expect(findNodeReferencingSource(nodes, "other.csv")).toBeUndefined();
+  });
+
+  it("祖先鏈不含節點自己", () => {
+    expect(getQaNodeAncestors(nodes, "deep")).toEqual(["root", "store"]);
+    // 根節點沒有祖先，但「找得到」與「找不到」不同：後者回 null。
+    expect(getQaNodeAncestors(nodes, "root")).toEqual([]);
+    expect(getQaNodeAncestors(nodes, "missing")).toBeNull();
+  });
+
+  it("自己不算自己的後代", () => {
+    expect(isQaNodeDescendant(nodes[0], "deep")).toBe(true);
+    expect(isQaNodeDescendant(nodes[0], "root")).toBe(false);
+  });
+
+  it("逐層列出檔案的上層目錄", () => {
+    expect(getFileParentPaths("a/b/c.md")).toEqual(["a", "a/b"]);
+    expect(getFileParentPaths("top.md")).toEqual([]);
   });
 });

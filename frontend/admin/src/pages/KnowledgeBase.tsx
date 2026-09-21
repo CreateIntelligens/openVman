@@ -22,6 +22,11 @@ import TreeView from "../components/kb/TreeView";
 import type { TreeNode } from "../components/kb/helpers";
 import {
   collectFolderPaths,
+  findNodeReferencingSource,
+  findQaNode,
+  getFileParentPaths,
+  getQaNodeAncestors,
+  isQaNodeDescendant,
   isUploadDerivedKnowledgeFile,
   mergeQaNodesIntoTree,
   parseQaEntryDragPath,
@@ -47,55 +52,6 @@ type QaNodeDialog =
   | { type: "rename"; node: QaNode }
   | { type: "delete"; node: QaNode };
 
-function findQaNodeMatching(nodes: QaNode[], predicate: (node: QaNode) => boolean): QaNode | undefined {
-  for (const node of nodes) {
-    if (predicate(node)) {
-      return node;
-    }
-    if (node.children && node.children.length > 0) {
-      const found = findQaNodeMatching(node.children, predicate);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
-function findQaNode(nodes: QaNode[], targetId: string): QaNode | undefined {
-  return findQaNodeMatching(nodes, (node) => node.node_id === targetId);
-}
-
-function findNodeReferencingSource(nodes: QaNode[], sourcePath: string): QaNode | undefined {
-  return findQaNodeMatching(nodes, (node) =>
-    (node.qa_entries ?? []).some((entry) => entry.source_path === sourcePath));
-}
-
-function getFileParentPaths(path: string): string[] {
-  const parts = path.split("/");
-  const parents: string[] = [];
-  for (let i = 1; i < parts.length; i++) {
-    parents.push(parts.slice(0, i).join("/"));
-  }
-  return parents;
-}
-
-function isQaNodeDescendant(node: QaNode, targetId: string): boolean {
-  return (node.children ?? []).some(
-    (child) => child.node_id === targetId || isQaNodeDescendant(child, targetId),
-  );
-}
-
-function getQaNodeAncestors(nodes: QaNode[], targetId: string, ancestors: string[] = []): string[] | null {
-  for (const node of nodes) {
-    if (node.node_id === targetId) {
-      return ancestors;
-    }
-    if (node.children && node.children.length > 0) {
-      const result = getQaNodeAncestors(node.children, targetId, [...ancestors, node.node_id]);
-      if (result) return result;
-    }
-  }
-  return null;
-}
 
 export default function KnowledgeBase() {
   const {

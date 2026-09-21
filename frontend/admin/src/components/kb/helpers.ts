@@ -1,4 +1,5 @@
 import type { KnowledgeDocumentSummary } from "../../api";
+import type { QaNode } from "../../hooks/useQaNodes";
 
 /* ── Types ── */
 
@@ -302,4 +303,59 @@ export function mergeQaNodesIntoTree(
     ...documentTree,
     children,
   };
+}
+
+
+/* ── QA 節點樹的走訪 ──
+ * 從 KnowledgeBase.tsx 搬出來的，行為未改。純函式，不依賴 React。
+ */
+
+export function findQaNodeMatching(nodes: QaNode[], predicate: (node: QaNode) => boolean): QaNode | undefined {
+  for (const node of nodes) {
+    if (predicate(node)) {
+      return node;
+    }
+    if (node.children && node.children.length > 0) {
+      const found = findQaNodeMatching(node.children, predicate);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+export function findQaNode(nodes: QaNode[], targetId: string): QaNode | undefined {
+  return findQaNodeMatching(nodes, (node) => node.node_id === targetId);
+}
+
+export function findNodeReferencingSource(nodes: QaNode[], sourcePath: string): QaNode | undefined {
+  return findQaNodeMatching(nodes, (node) =>
+    (node.qa_entries ?? []).some((entry) => entry.source_path === sourcePath));
+}
+
+export function getFileParentPaths(path: string): string[] {
+  const parts = path.split("/");
+  const parents: string[] = [];
+  for (let i = 1; i < parts.length; i++) {
+    parents.push(parts.slice(0, i).join("/"));
+  }
+  return parents;
+}
+
+export function isQaNodeDescendant(node: QaNode, targetId: string): boolean {
+  return (node.children ?? []).some(
+    (child) => child.node_id === targetId || isQaNodeDescendant(child, targetId),
+  );
+}
+
+export function getQaNodeAncestors(nodes: QaNode[], targetId: string, ancestors: string[] = []): string[] | null {
+  for (const node of nodes) {
+    if (node.node_id === targetId) {
+      return ancestors;
+    }
+    if (node.children && node.children.length > 0) {
+      const result = getQaNodeAncestors(node.children, targetId, [...ancestors, node.node_id]);
+      if (result) return result;
+    }
+  }
+  return null;
 }
