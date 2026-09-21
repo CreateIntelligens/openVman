@@ -50,6 +50,9 @@ const props = defineProps<{
   ttsProvider: string
   ttsVoice: string
   ttsProviders: TtsProvider[]
+  /** 這個帳號被授權的語音辨識引擎；空陣列代表不能自選。 */
+  asrEngines: { id: string; label: string }[]
+  asrProvider: string
   projects: ProjectSummary[]
   currentProjectId: string
   personas: PersonaSummary[]
@@ -70,6 +73,7 @@ const emit = defineEmits<{
   'update:open': [boolean]
   charChange: [charId: string]
   ttsProviderChange: [provider: string]
+  asrProviderChange: [provider: string]
   ttsVoiceChange: [voice: string]
   projectChange: [projectId: string]
   projectPreviewChange: [projectId: string]
@@ -142,6 +146,7 @@ const draftPersonaId = ref(props.currentPersonaId)
 const draftCharId = ref(props.currentCharId ?? '')
 const draftVrmId = ref(props.currentVrmId)
 const draftTtsProvider = ref(props.ttsProvider)
+const draftAsrProvider = ref(props.asrProvider)
 const draftTtsVoice = ref(props.ttsVoice)
 const draftVoiceMode = ref<'live' | 'text'>(props.voiceMode ?? 'text')
 const draftReplyMode = ref<ReplyMode>(props.replyMode)
@@ -189,6 +194,7 @@ watch(() => props.open, async (open) => {
     draftCharId.value = props.currentCharId ?? ''
     draftVrmId.value = pickVrmId(props.currentVrmId)
     draftTtsProvider.value = props.ttsProvider
+    draftAsrProvider.value = props.asrProvider
     draftTtsVoice.value = props.ttsVoice
     draftVoiceMode.value = props.voiceMode ?? 'text'
     draftReplyMode.value = props.replyMode
@@ -258,6 +264,12 @@ const ttsProviderOptions = computed(() =>
   props.ttsProviders.map((p) => ({ value: p.id, label: p.name }))
 )
 
+// 空字串是「沿用管理者設定的預設」，跟「選了某一家」要分得出來。
+const asrProviderOptions = computed(() => [
+  { value: '', label: '預設（依系統設定）' },
+  ...props.asrEngines.map((e) => ({ value: e.id, label: e.label })),
+])
+
 const ttsVoiceOptions = computed(() => {
   if (!activeTtsProvider.value) return []
   return activeTtsProvider.value.voices.map((v) => ({ value: v, label: v }))
@@ -272,6 +284,7 @@ const needsReconnect = computed(() =>
   draftPersonaId.value !== props.currentPersonaId ||
   draftCharId.value !== (props.currentCharId ?? '') ||
   draftTtsProvider.value !== props.ttsProvider ||
+  draftAsrProvider.value !== props.asrProvider ||
   draftTtsVoice.value !== props.ttsVoice ||
   draftVoiceMode.value !== (props.voiceMode ?? 'text') ||
   draftReplyMode.value !== props.replyMode
@@ -326,6 +339,9 @@ function applyAndClose(): void {
   }
   if (draftCharId.value !== (props.currentCharId ?? '')) {
     emit('charChange', draftCharId.value)
+  }
+  if (draftAsrProvider.value !== props.asrProvider) {
+    emit('asrProviderChange', draftAsrProvider.value)
   }
   if (draftTtsProvider.value !== props.ttsProvider) {
     emit('ttsProviderChange', draftTtsProvider.value)
@@ -432,6 +448,17 @@ function handleDialogClick(event: MouseEvent): void {
                 <CustomSelect
                   v-model="draftTtsVoice"
                   :options="ttsVoiceOptions"
+                  :disabled="disabled"
+                />
+              </div>
+
+              <!-- 沒有被授權任何引擎就不顯示：給一個只有「預設」的選單，
+                   看起來像壞掉。 -->
+              <div v-if="asrEngines.length" class="field-card">
+                <span class="field-card__label">語音辨識</span>
+                <CustomSelect
+                  v-model="draftAsrProvider"
+                  :options="asrProviderOptions"
                   :disabled="disabled"
                 />
               </div>

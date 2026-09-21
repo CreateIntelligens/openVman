@@ -112,6 +112,8 @@
       :tts-provider="settings.ttsProvider"
       :tts-voice="settings.ttsVoice"
       :tts-providers="ttsProviders"
+      :asr-engines="asrEngines"
+      :asr-provider="myAsrProvider"
       :projects="projects"
       :current-project-id="settings.projectId"
       :personas="personas"
@@ -128,6 +130,7 @@
       :disabled="rendererDisabled"
       @char-change="handleCharChange"
       @tts-provider-change="handleTtsChange"
+      @asr-provider-change="handleAsrProviderChange"
       @tts-voice-change="handleTtsVoiceChange"
       @project-preview-change="handleProjectPreviewChange"
       @project-change="handleProjectChange"
@@ -171,7 +174,7 @@ import { useAsr } from "./composables/useAsr";
 import { useServerAsr } from "./composables/useServerAsr";
 import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
-import { BROWSER_ASR, fetchMyAsrProvider } from "./api/asr";
+import { BROWSER_ASR, fetchMyAsrProvider, setMyAsrProvider } from "./api/asr";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
 import { leaveFullscreen, unlockKeyboard } from "./sessionCleanup";
 import { useTtsStreamer } from "./composables/useTtsStreamer";
@@ -646,6 +649,26 @@ const serverAsr = useServerAsr({
 // 這個帳號選的引擎。空字串代表沿用全站設定，那一定是伺服器引擎——瀏覽器
 // 辨識只能由使用者自己選，後端跑不了它。
 const myAsrProvider = ref("");
+// 管理者在帳號頁授權了哪些引擎。空陣列代表這個帳號不能自選，設定裡不顯示。
+const asrEngines = ref<{ id: string; label: string }[]>([]);
+
+const ASR_ENGINE_LABELS: Record<string, string> = {
+  breeze: "Breeze-ASR-26",
+  xiaomi: "Xiaomi-CocktailASR-1",
+  sensevoice: "SenseVoice-Small",
+  openai: "OpenAI Whisper",
+  browser: "瀏覽器內建辨識",
+};
+
+function handleAsrProviderChange(provider: string): void {
+  const previous = myAsrProvider.value;
+  myAsrProvider.value = provider;
+  void setMyAsrProvider(provider).catch(() => {
+    // 存不起來就退回原值，不要讓畫面顯示一個其實沒生效的選擇。
+    myAsrProvider.value = previous;
+    statusToastRef.value?.show("語音辨識引擎沒有存成功，已還原。");
+  });
+}
 
 /** 是否該用瀏覽器內建辨識。
  *
@@ -661,7 +684,12 @@ const useBrowserAsr = computed(
 );
 
 void fetchMyAsrProvider()
-  .then((profile) => { myAsrProvider.value = profile.value || profile.effective; })
+  .then((profile) => {
+    myAsrProvider.value = profile.value;
+    asrEngines.value = profile.allowed.map(
+      (id) => ({ id, label: ASR_ENGINE_LABELS[id] ?? id }),
+    );
+  })
   .catch(() => { /* 讀不到就沿用伺服器引擎，不該因此不能講話。 */ });
 
 function handleAsrToggle(): void {
