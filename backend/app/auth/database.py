@@ -40,7 +40,8 @@ _INITIAL_SCHEMA_STATEMENTS = (
                 'avatar_character',
                 'avatar_background',
                 'avatar_mascot',
-                'custom_voice'
+                'custom_voice',
+                'asr_engine'
             )
         ),
         resource_id TEXT NOT NULL,
@@ -151,6 +152,35 @@ _ACCOUNT_ASR_PROVIDER_STATEMENTS = (
     ADD COLUMN asr_provider TEXT NOT NULL DEFAULT ''
     """,
 )
+
+_ASR_ENGINE_RESOURCE_SCHEMA_VERSION = 13
+_ASR_ENGINE_RESOURCE_MIGRATION_NAME = "resources_allow_asr_engine"
+_ASR_ENGINE_RESOURCES_TABLE = """
+    CREATE TABLE resources_rebuilt (
+        resource_type TEXT NOT NULL CHECK (
+            resource_type IN (
+                'project',
+                'avatar_character',
+                'avatar_background',
+                'avatar_mascot',
+                'custom_voice',
+                'asr_engine'
+            )
+        ),
+        resource_id TEXT NOT NULL,
+        owner_user_id TEXT REFERENCES users(id) ON DELETE RESTRICT,
+        visibility TEXT NOT NULL CHECK (
+            visibility IN ('private', 'system_public')
+        ),
+        created_at TEXT NOT NULL,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        PRIMARY KEY (resource_type, resource_id),
+        CHECK (
+            (visibility = 'private' AND owner_user_id IS NOT NULL)
+            OR (visibility = 'system_public' AND owner_user_id IS NULL)
+        )
+    )
+"""
 
 _EMBED_KEY_STATEMENTS = (
     """
@@ -396,6 +426,7 @@ class AuthDatabase:
                 )
 
         self._migrate_root_account_schema()
+        self._migrate_asr_engine_resource_type()
         self._redact_temporary_usernames()
         self._add_admin_portal_access()
 
@@ -474,6 +505,109 @@ class AuthDatabase:
                     ),
                 ),
             )
+
+    def _migrate_asr_engine_resource_type(self) -> None:
+        """Widen the resources CHECK so ASR engines can be granted per account.
+
+        SQLite 不能 ALTER 既有的 CHECK，只能重建表。而 resource_grants 與
+        admin_resource_scopes 都有外鍵指向它：DROP TABLE 會把授權整批
+        CASCADE 掉（實測線上副本掉光全部 920 筆）。
+
+        PRAGMA foreign_keys 在交易中無效，所以必須跟 ROOT 那次遷移一樣，
+        在 BEGIN 之前關閉外鍵、提交後再打開並驗證。
+        """
+        connection = self.connect()
+        try:
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_ASR_ENGINE_RESOURCE_SCHEMA_VERSION,),
+            ).fetchone()
+            if applied is not None:
+                return
+
+            existing = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'resources'"
+            ).fetchone()
+            if existing is None:
+                return
+            if "asr_engine" in existing["sql"]:
+                # 全新資料庫的基礎 schema 已經允許，只要記錄版本。
+                connection.execute(
+                    "INSERT INTO schema_migrations(version, details_json) VALUES (?, ?)",
+                    (
+                        _ASR_ENGINE_RESOURCE_SCHEMA_VERSION,
+                        json.dumps(
+                            {"name": _ASR_ENGINE_RESOURCE_MIGRATION_NAME},
+                            separators=(",", ":"),
+                        ),
+                    ),
+                )
+                connection.commit()
+                return
+
+            grants_before = int(
+                connection.execute("SELECT COUNT(*) FROM resource_grants").fetchone()[0]
+            )
+            resources_before = int(
+                connection.execute("SELECT COUNT(*) FROM resources").fetchone()[0]
+            )
+
+            connection.execute("PRAGMA foreign_keys = OFF")
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(_ASR_ENGINE_RESOURCES_TABLE)
+            connection.execute(
+                """
+                INSERT INTO resources_rebuilt(
+                    resource_type, resource_id, owner_user_id, visibility,
+                    created_at, metadata_json
+                )
+                SELECT resource_type, resource_id, owner_user_id, visibility,
+                       created_at, metadata_json
+                FROM resources
+                """
+            )
+            connection.execute("DROP TABLE resources")
+            connection.execute("ALTER TABLE resources_rebuilt RENAME TO resources")
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_resources_owner_visibility_type
+                ON resources(owner_user_id, visibility, resource_type)
+                """
+            )
+            connection.execute(
+                "INSERT INTO schema_migrations(version, details_json) VALUES (?, ?)",
+                (
+                    _ASR_ENGINE_RESOURCE_SCHEMA_VERSION,
+                    json.dumps(
+                        {"name": _ASR_ENGINE_RESOURCE_MIGRATION_NAME},
+                        separators=(",", ":"),
+                    ),
+                ),
+            )
+            connection.commit()
+            connection.execute("PRAGMA foreign_keys = ON")
+
+            # 授權掉光是這次遷移最實際的風險，明確驗證而不是只看外鍵。
+            grants_after = int(
+                connection.execute("SELECT COUNT(*) FROM resource_grants").fetchone()[0]
+            )
+            resources_after = int(
+                connection.execute("SELECT COUNT(*) FROM resources").fetchone()[0]
+            )
+            if grants_after != grants_before or resources_after != resources_before:
+                raise RuntimeError(
+                    "asr_engine migration lost rows: "
+                    f"grants {grants_before}->{grants_after}, "
+                    f"resources {resources_before}->{resources_after}"
+                )
+            violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if violations:
+                raise RuntimeError("asr_engine migration left invalid foreign keys")
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def _migrate_root_account_schema(self) -> None:
         """Rebuild users outside FK enforcement, then verify every reference."""

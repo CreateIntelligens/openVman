@@ -64,6 +64,7 @@ class ResourceType(StrEnum):
     AVATAR_BACKGROUND = "avatar_background"
     AVATAR_MASCOT = "avatar_mascot"
     CUSTOM_VOICE = "custom_voice"
+    ASR_ENGINE = "asr_engine"
 
 
 @dataclass(frozen=True, slots=True)
