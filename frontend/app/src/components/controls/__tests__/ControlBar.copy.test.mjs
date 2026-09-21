@@ -22,9 +22,12 @@ test("immersive camera mode exposes a camera size slider", () => {
   assert.match(source, /max="1\.35"/);
 });
 
-test("camera button explains itself when vision service is unavailable", () => {
-  assert.match(source, /cameraDisabled\?:\s*boolean/);
-  assert.match(source, /攝影機功能未啟用（視覺辨識服務未開啟）/);
+test("camera button disappears when the vision service is unavailable", () => {
+  // 先前是 disabled + tooltip 說明。但一個永遠按不下去的按鈕只是雜訊，
+  // 使用者也無從得知「未啟用」是暫時的還是永久的。改成整個不顯示。
+  assert.match(source, /v-if="cameraAvailable"/);
+  assert.match(source, /cameraAvailable\?:\s*boolean/);
+  assert.doesNotMatch(source, /cameraDisabled/);
   assert.match(source, /:title="cameraTitle"/);
   assert.match(source, /:aria-label="cameraTitle"/);
 });
@@ -32,5 +35,5 @@ test("camera button explains itself when vision service is unavailable", () => {
 test("settings button can stay enabled while renderer actions are disabled", () => {
   assert.match(source, /settingsDisabled\?:\s*boolean/);
   assert.match(source, /class="control-btn settings-btn"[\s\S]*?:disabled="settingsDisabled"/);
-  assert.match(source, /:disabled="disabled \|\| cameraDisabled"/);
+  assert.match(source, /:disabled="disabled"/);
 });

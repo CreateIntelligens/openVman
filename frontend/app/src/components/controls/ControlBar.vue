@@ -6,9 +6,10 @@
 
     <div class="control-bar__right">
       <button
+        v-if="cameraAvailable"
         class="control-btn"
         :class="{ 'control-btn--active': cameraActive }"
-        :disabled="disabled || cameraDisabled"
+        :disabled="disabled"
         @click="$emit('toggleCamera')"
         :title="cameraTitle"
         :aria-label="cameraTitle"
@@ -102,7 +103,8 @@ const props = defineProps<{
   disabled?: boolean
   errorMessage?: string | null
   cameraActive?: boolean
-  cameraDisabled?: boolean
+  /** 視覺服務可用時才顯示鏡頭按鈕；未啟用就整個不出現。 */
+  cameraAvailable?: boolean
   settingsDisabled?: boolean
   immersive?: boolean
   cameraPreviewScale?: number
@@ -115,10 +117,9 @@ const emit = defineEmits<{
   cameraPreviewScaleChange: [scale: number]
 }>()
 
-const cameraTitle = computed(() => {
-  if (props.cameraDisabled) return "攝影機功能未啟用（視覺辨識服務未開啟）"
-  return props.cameraActive ? "關閉攝影機" : "開啟攝影機"
-})
+const cameraTitle = computed(() =>
+  props.cameraActive ? "關閉攝影機" : "開啟攝影機"
+)
 
 function handleCameraPreviewScaleInput(event: Event): void {
   const target = event.target as HTMLInputElement | null

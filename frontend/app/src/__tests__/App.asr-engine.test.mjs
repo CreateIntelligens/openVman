@@ -58,3 +58,18 @@ test("a failed save rolls the selection back", () => {
   assert.match(source, /setMyAsrProvider\(provider\)\.catch/);
   assert.match(source, /myAsrProvider\.value = previous/);
 });
+
+test("the camera button is hidden, not just disabled, when vision is off", () => {
+  // 一個永遠按不下去的按鈕只是雜訊。
+  const bar = readFileSync(
+    resolve(__dirname, "../components/controls/ControlBar.vue"), "utf8",
+  );
+  assert.match(bar, /v-if="cameraAvailable"/);
+  assert.doesNotMatch(bar, /cameraDisabled/);
+});
+
+test("vision availability starts unknown so the button does not flicker", () => {
+  // 預設 true 會先亮一下才消失；預設 false 則是真的可用時先消失再出現。
+  assert.match(source, /visionAvailable = ref<boolean \| null>\(null\)/);
+  assert.match(source, /visionAvailable === true/);
+});

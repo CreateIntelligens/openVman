@@ -14,7 +14,7 @@
         :disabled="rendererDisabled"
         :error-message="rendererErrorMessage"
         :camera-active="webcam.active.value"
-        :camera-disabled="!visionAvailable"
+        :camera-available="visionAvailable === true"
         :immersive="immersive"
         :camera-preview-scale="settings.cameraPreviewScale"
         @open-settings="showSettings = true"
@@ -709,18 +709,26 @@ const webcam = useWebcamCapture({
   },
 });
 
-// VLM（視覺辨識）未啟用時攝影機只會白打 API，直接鎖住開鏡頭按鈕。
-// 查不到健康狀態時不鎖（fail-open），避免誤擋可用功能。
-const visionAvailable = ref(true);
+// VLM（視覺辨識）未啟用時攝影機只會白打 API，整個按鈕不顯示——一個永遠按不
+// 下去的按鈕只是雜訊。
+//
+// 三種狀態而不是布林：還沒問到結果時不能當成「不可用」（按鈕會先出現再消失，
+// 閃一下），也不能當成「可用」（真的沒 VLM 時會先亮一下才收起來）。所以問到
+// 之前一律不顯示，問到了再決定。
+const visionAvailable = ref<boolean | null>(null);
 
 async function fetchVisionHealth(): Promise<void> {
   try {
     const res = await apiFetch("/api/v1/vision/health");
-    if (!res.ok) return;
+    if (!res.ok) {
+      // 查不到就當作可用（fail-open）：後端暫時掛掉不該讓功能整個消失。
+      visionAvailable.value = true;
+      return;
+    }
     const data = (await res.json()) as { available?: boolean };
     visionAvailable.value = data.available !== false;
   } catch {
-    // 網路層失敗視同「無法判定」，維持 fail-open
+    visionAvailable.value = true;
   }
 }
 
