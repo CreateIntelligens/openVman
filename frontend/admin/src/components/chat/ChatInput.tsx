@@ -1,9 +1,11 @@
 import type { KeyboardEvent } from "react";
 
 import type { SkillInfo, TtsProvider } from "../../api";
+import type { MyAsrProvider } from "../../api/asr";
 import type { ReplyMode } from "./replyMode";
 import { ReplyModeControl } from "./ReplyModeControl";
 import { TtsControls } from "./TtsControls";
+import { AsrControls } from "./AsrControls";
 import { SlashDropdown } from "./SlashDropdown";
 import { AsrButton } from "./AsrButton";
 import PrivacyWarningToggle from "./PrivacyWarningToggle";
@@ -24,6 +26,10 @@ interface ChatInputProps {
   asrListening: boolean;
   asrSupported: boolean;
   asrSpeaking: boolean;
+  asrTranscribing?: boolean;
+  asrEngine?: "browser" | "server";
+  asrProvider?: MyAsrProvider | null;
+  onAsrProviderChange?: (value: string) => void;
   privacyWarningsVisible: boolean;
   replyMode: ReplyMode;
   onReplyModeChange: (mode: ReplyMode) => void;
@@ -68,6 +74,10 @@ export default function ChatInput(props: ChatInputProps) {
     asrListening,
     asrSupported,
     asrSpeaking,
+    asrTranscribing,
+    asrEngine,
+    asrProvider,
+    onAsrProviderChange,
     privacyWarningsVisible,
     replyMode,
     onReplyModeChange,
@@ -236,6 +246,13 @@ export default function ChatInput(props: ChatInputProps) {
                     onTtsProviderChange={onTtsProviderChange}
                     onTtsVoiceChange={onTtsVoiceChange}
                   />
+                  {onAsrProviderChange && (
+                    <AsrControls
+                      provider={asrProvider ?? null}
+                      disabled={asrListening || Boolean(asrTranscribing)}
+                      onChange={onAsrProviderChange}
+                    />
+                  )}
                   <PrivacyWarningToggle
                     visible={privacyWarningsVisible}
                     onChange={onPrivacyWarningsVisibleChange}
@@ -259,6 +276,8 @@ export default function ChatInput(props: ChatInputProps) {
                   supported={asrSupported}
                   listening={asrListening}
                   speaking={asrSpeaking}
+                  transcribing={asrTranscribing}
+                  engine={asrEngine}
                   onToggle={onToggleAsr}
                 />
               )}

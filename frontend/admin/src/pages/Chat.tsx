@@ -93,6 +93,10 @@ export default function Chat() {
     asrSupported,
     toggleAsr,
     asrSpeaking,
+    asrEngine,
+    asrTranscribing,
+    asrProvider,
+    changeAsrProvider,
     handleActionConfirmed,
     handleActionCancelled,
     setMessages,
@@ -478,6 +482,10 @@ export default function Chat() {
             asrListening={asrListening}
             asrSupported={asrSupported}
             asrSpeaking={asrSpeaking}
+            asrEngine={asrEngine}
+            asrTranscribing={asrTranscribing}
+            asrProvider={asrProvider}
+            onAsrProviderChange={changeAsrProvider}
             privacyWarningsVisible={privacyWarningsVisible}
             replyMode={replyMode}
             onReplyModeChange={setReplyMode}

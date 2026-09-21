@@ -16,17 +16,27 @@ import {
   readPrivacyWarningsVisible,
   writePrivacyWarningsVisible,
 } from "../components/chat/privacyWarnings";
+import {
+  BROWSER_ASR,
+  fetchMyAsrProvider,
+  setMyAsrProvider,
+  type MyAsrProvider,
+} from "../api/asr";
 import { readReplyMode, writeReplyMode, type ReplyMode } from "../components/chat/replyMode";
 import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
 import { useInputHistory } from "./useInputHistory";
 import { useStarterPrompts } from "./useStarterPrompts";
+import { useServerSpeechRecognition } from "./useServerSpeechRecognition";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 
 const STOP_REPLY_NOTICE = "已停止回覆";
 const STOP_REPLY_NOTICE_MS = 2500;
 const ASR_IDLE_TIMEOUT_MS = 10000;
+// 伺服器引擎錄音時沒有「有人在講話」的訊號可以重置計時，10 秒會把一句話講到
+// 一半切掉。這裡當成單段錄音的上限：到了就停止並送出，避免麥克風忘了關。
+const SERVER_ASR_MAX_CLIP_MS = 60000;
 
 type ChatResultPayload = {
   session_id: string;
@@ -251,13 +261,26 @@ export function useChatSession() {
       asrIdleTimerRef.current = null;
     }
   }, []);
+  // 依帳號生效的引擎決定行為：browser 走瀏覽器內建的連續聆聽，其餘走錄音上傳。
+  // 讀不到就沿用瀏覽器辨識（原本的行為），不該因此不能講話。
+  const [asrProvider, setAsrProviderState] = useState<MyAsrProvider | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyAsrProvider()
+      .then((profile) => { if (!cancelled) setAsrProviderState(profile); })
+      .catch(() => { /* 沿用瀏覽器辨識 */ });
+    return () => { cancelled = true; };
+  }, []);
+  const asrEngine: "browser" | "server" =
+    asrProvider && asrProvider.effective !== BROWSER_ASR ? "server" : "browser";
+
   const scheduleAsrIdleTimeout = useCallback(() => {
     clearAsrIdleTimer();
     asrIdleTimerRef.current = setTimeout(() => {
       asrIdleTimerRef.current = null;
       setAsrListening(false);
-    }, ASR_IDLE_TIMEOUT_MS);
-  }, [clearAsrIdleTimer]);
+    }, asrEngine === "server" ? SERVER_ASR_MAX_CLIP_MS : ASR_IDLE_TIMEOUT_MS);
+  }, [asrEngine, clearAsrIdleTimer]);
   const markAsrActivity = useCallback(() => {
     if (asrListening) scheduleAsrIdleTimeout();
   }, [asrListening, scheduleAsrIdleTimeout]);
@@ -293,9 +316,9 @@ export function useChatSession() {
 
   const {
     speaking: asrSpeaking,
-    supported: asrSupported,
+    supported: browserAsrSupported,
   } = useSpeechRecognition({
-    enabled: asrListening,
+    enabled: asrListening && asrEngine === "browser",
     onActivity: markAsrActivity,
     onError: useCallback((message: string) => {
       setError(message);
@@ -303,6 +326,30 @@ export function useChatSession() {
     }, [setError]),
     onFinalTranscript: handleFinalTranscript,
   });
+
+  const {
+    supported: serverAsrSupported,
+    transcribing: asrTranscribing,
+  } = useServerSpeechRecognition({
+    enabled: asrListening && asrEngine === "server",
+    onError: useCallback((message: string) => {
+      setError(message);
+      setAsrListening(false);
+    }, [setError]),
+    onFinalTranscript: handleFinalTranscript,
+  });
+
+  const asrSupported = asrEngine === "server" ? serverAsrSupported : browserAsrSupported;
+
+  const changeAsrProvider = useCallback(async (value: string) => {
+    // 換引擎前先停掉收音，否則舊引擎的錄音會卡在半空中。
+    setAsrListening(false);
+    try {
+      setAsrProviderState(await setMyAsrProvider(value));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "無法變更語音辨識引擎。");
+    }
+  }, [setError]);
 
   useEffect(() => {
     if (asrListening && !asrSupported) setAsrListening(false);
@@ -507,6 +554,10 @@ export function useChatSession() {
     handleTtsVoiceChange,
     asrListening,
     asrSupported,
+    asrEngine,
+    asrTranscribing,
+    asrProvider,
+    changeAsrProvider,
     toggleAsr,
     asrSpeaking,
     handleActionConfirmed,

@@ -127,6 +127,23 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 > **現況更新（2026-07-01）**：行為精神相符，但實作分層不同：`useAsr.ts` 只負責瀏覽器語音辨識本身並透過 callback 回傳文字，實際送出訊息、interrupt、狀態切換是由 `useAvatarChat.ts` 的 `sendMessage()` / `stopActiveResponse()` 處理，並非單一模組完成。
 
+> **現況更新（2026-09-21）**：語音輸入有兩種引擎，由帳號生效的設定決定
+> （`GET /api/v1/settings/my-asr-provider` 的 `effective`），虛擬人聊天室與後台
+> 聊天室行為一致：
+>
+> | 引擎 | 實作 | 操作方式 |
+> |---|---|---|
+> | `browser` | Web Speech API（app `useAsr.ts`、admin `useSpeechRecognition.ts`） | 開著連續聆聽，講完自動送出 |
+> | 其餘（breeze / xiaomi / sensevoice / openai） | MediaRecorder 錄音後整段上傳 `POST /api/v1/asr/transcribe`（app `useServerAsr.ts`、admin `useServerSpeechRecognition.ts`） | 按一下開始收音，再按一次才送出；沒有中途結果 |
+>
+> 引擎由後端依帳號查，前端不指定——否則改個請求就能繞過授權。可選清單是
+> `allowed`（帳號頁授權的 `asr_engine` 資源），只有一個可選時不顯示選單。
+>
+> **收音狀態必須看得到**：按鈕要反映「實際在收音的那個引擎」的狀態，收音中有
+> 動態與文字提示，伺服器引擎另有「辨識中」狀態（停止收音到出字之間有數秒
+> 空窗）。提示文字跟著引擎走，因為兩者送出的方式不同。後台伺服器引擎單段錄音
+> 上限 60 秒，到了自動停止並送出。
+
 ### 7. 狀態機控制 (State Transitions)
 
 * **IDLE** -> **THINKING**：觸發時機為發送 `user_speak`。行為：清空 Canvas，可選播思考音效或切換底層 Video 為點頭動作。
