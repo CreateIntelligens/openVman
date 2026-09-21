@@ -132,6 +132,42 @@ describe("App tab mounting", () => {
     unmount();
   });
 
+  it("restores the remembered sub-view when the url carries no route", async () => {
+    // 從沒帶路由的網址進來（登入後轉址就是這種），子視圖也要跟著還原，
+    // 不然使用者會回到分頁的預設視圖而不是他離開時的那個。
+    window.localStorage.setItem("brain-active-tab", "KnowledgeBase");
+    window.localStorage.setItem("brain-active-sub-view", "graph");
+
+    const { unmount } = render(<App />);
+
+    await waitFor(() => {
+      expect(window.location.search).toContain("view=graph");
+    });
+
+    unmount();
+  });
+
+  it("drops the remembered sub-view once a route without one is applied", async () => {
+    window.localStorage.setItem("brain-active-tab", "KnowledgeBase");
+    window.localStorage.setItem("brain-active-sub-view", "graph");
+
+    const { unmount } = render(<App />);
+    await waitFor(() => {
+      expect(window.localStorage.getItem("brain-active-sub-view")).toBe("graph");
+    });
+    unmount();
+
+    // 切到沒有子視圖的分頁，殘留的值要清掉，否則會跟著跑到別的分頁上。
+    window.history.replaceState(null, "", "/admin/health");
+    const second = render(<App />);
+
+    await waitFor(() => {
+      expect(window.localStorage.getItem("brain-active-sub-view")).toBeNull();
+    });
+
+    second.unmount();
+  });
+
   it("exposes Embed Keys navigation to administrators only", () => {
     const embedKeysTab = allTabs.find((tab) => String(tab.key) === "EmbedKeys");
 

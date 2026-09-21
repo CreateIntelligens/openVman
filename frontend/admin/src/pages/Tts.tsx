@@ -1,7 +1,6 @@
-import { useState } from "react";
-
 import AsrProviderPanel from "../components/AsrProviderPanel";
 import TtsPreviewPanel from "../components/TtsPreviewPanel";
+import { useLocalStorageState } from "../hooks/useLocalStorageState";
 
 type Tab = "tts" | "asr";
 
@@ -10,8 +9,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "asr", label: "語音辨識" },
 ];
 
+const TAB_IDS = TABS.map((entry) => entry.id);
+
 export default function Voice() {
-  const [tab, setTab] = useState<Tab>("tts");
+  const [tab, setTab] = useLocalStorageState<Tab>("admin.tts.active_tab", "tts", TAB_IDS);
 
   return (
     <div className="page-scroll p-6 lg:p-8">

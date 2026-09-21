@@ -37,7 +37,7 @@ import { ProjectProvider, useProject } from "./context/ProjectContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { useNavigationGroups } from "./hooks/useNavigationGroups";
-import { readScoped, writeScoped } from "./utils/scopedStorage";
+import { readScoped, removeScoped, writeScoped } from "./utils/scopedStorage";
 
 function initialRoute(): AdminRoute {
   const route = parseAdminRoute(window.location.pathname, window.location.search);
@@ -46,7 +46,16 @@ function initialRoute(): AdminRoute {
   }
 
   const saved = readScoped("brain-active-tab");
-  return { tab: isTab(saved) ? saved : "Chat" };
+  if (!isTab(saved)) {
+    return { tab: "Chat" };
+  }
+
+  // 子視圖跟著分頁一起記。只記分頁的話，從沒帶路由的網址進來（登入後轉址就是）
+  // 會還原分頁卻掉回該頁預設視圖。存的是「這個分頁上次停在哪」，換分頁就不適用。
+  const savedSubView = readScoped("brain-active-sub-view");
+  return savedSubView
+    ? { tab: saved, subView: savedSubView }
+    : { tab: saved };
 }
 
 function AppContent() {
@@ -89,7 +98,6 @@ function AppContent() {
       if (nextProjectId !== projectId) {
         setProjectId(nextProjectId);
       }
-      writeScoped("brain-active-tab", nextRoute.tab);
       currentUrlRef.current = path;
       if (historyMode === "replace") {
         window.history.replaceState(null, "", path);
@@ -106,6 +114,14 @@ function AppContent() {
       projectId,
       route.subView,
     );
+    // 記住落腳處。寫在這裡而不是 applyRoute，因為從網址直接進來的路由不會經過
+    // applyRoute——寫在那邊的話，切到沒有子視圖的分頁時舊值會殘留下來。
+    writeScoped("brain-active-tab", route.tab);
+    if (route.subView) {
+      writeScoped("brain-active-sub-view", route.subView);
+    } else {
+      removeScoped("brain-active-sub-view");
+    }
     currentUrlRef.current = canonicalPath;
     if (`${window.location.pathname}${window.location.search}` !== canonicalPath) {
       window.history.replaceState(null, "", canonicalPath);

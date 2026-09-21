@@ -86,4 +86,32 @@ describe("useKnowledgeBase project selection", () => {
       window.localStorage.getItem("kb-selected-file-path:fishing"),
     ).toBe("knowledge/fishing.md");
   });
+
+  // 重整後選取會還原，右側面板要跟著回到檔案檢視——只還原選取卻停在資料夾
+  // 檢視的話，使用者看到的不是他離開時的畫面。
+  it("restores the file pane when the remembered path is a document", async () => {
+    window.localStorage.setItem(
+      "kb-selected-file-path:fishing",
+      "knowledge/fishing.md",
+    );
+
+    const { result } = renderHook(() => useKnowledgeBase());
+
+    await waitFor(() => {
+      expect(result.current.selectedPath).toBe("knowledge/fishing.md");
+      expect(result.current.rightPane).toBe("file");
+    });
+  });
+
+  it("keeps the folder pane when the remembered path is a directory", async () => {
+    window.localStorage.setItem("kb-selected-file-path:fishing", "knowledge");
+
+    const { result } = renderHook(() => useKnowledgeBase());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.rightPane).toBe("folder");
+    expect(fetchKnowledgeDocumentMock).not.toHaveBeenCalled();
+  });
 });

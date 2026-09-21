@@ -32,16 +32,39 @@ function scopedKey(key: string): string {
   return scopeId ? `${key}::${scopeId}` : key
 }
 
+// 無痕模式或封鎖網站資料時，localStorage 的存取會直接拋例外（Safari 無痕下
+// setItem 是 QuotaExceededError）。寫入是從 store 的 watch() 裡呼叫的，例外會
+// 竄進 Vue 的響應式系統，所以這裡一律吞掉——偏好存不下來只是不方便，不該讓
+// 整個畫面壞掉。
 export function readPref(key: string, fallback: string): string {
   if (typeof window === "undefined") return fallback
-  const scoped = window.localStorage.getItem(scopedKey(key))
-  if (scoped !== null) return scoped
-  // 這個帳號還沒有自己的值：沿用未綁定的舊值當起點，讓既有使用者升級後
-  // 不會突然被重設，但之後的寫入都會落在自己的鍵上。
-  return window.localStorage.getItem(key) ?? fallback
+  try {
+    const scoped = window.localStorage.getItem(scopedKey(key))
+    if (scoped !== null) return scoped
+    // 這個帳號還沒有自己的值：沿用未綁定的舊值當起點，讓既有使用者升級後
+    // 不會突然被重設，但之後的寫入都會落在自己的鍵上。
+    return window.localStorage.getItem(key) ?? fallback
+  } catch {
+    return fallback
+  }
 }
 
 export function writePref(key: string, value: string): void {
   if (typeof window === "undefined") return
-  window.localStorage.setItem(scopedKey(key), value)
+  try {
+    window.localStorage.setItem(scopedKey(key), value)
+  } catch {
+    // 存不下來就算了，下次開啟沿用預設值。
+  }
+}
+
+/** 清掉這個帳號的偏好，連同未綁定的舊鍵——不然 readPref 的舊值回退會把它復活。 */
+export function removePref(key: string): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(scopedKey(key))
+    window.localStorage.removeItem(key)
+  } catch {
+    // 同上。
+  }
 }

@@ -20,6 +20,17 @@
 
 ### Fixed
 
+- **語音頁分頁不記位置**: `Tts.tsx` 用裸 `useState`，是後台唯一沒存的頂層分頁。
+  改用 `useLocalStorageState`（`admin.tts.active_tab`，帶允許值清單）。順手補上
+  該檔測試的 `localStorage.clear()`——分頁一旦會持久化，案例之間就會互相污染。
+- **後台子視圖重整後掉回預設**: 只記了分頁沒記 `?view=`，從沒帶路由的網址進來
+  （登入後轉址就是）會還原分頁卻掉子視圖。改記 `brain-active-sub-view`，且寫在
+  正規化網址的 effect 裡而不是 `applyRoute`——從網址直接進來的路由不經過後者，
+  寫在那邊會讓舊子視圖殘留到沒有子視圖的分頁上。
+- **偏好寫入在無痕模式會炸掉畫面**: `writePref`／`readPref` 沒有 try/catch，
+  Safari 無痕下 `setItem` 丟 `QuotaExceededError`，而它是從 store 的 `watch()`
+  裡呼叫的，例外會竄進 Vue 的響應式系統。一併補上 `removePref`（同時清掉未綁定
+  的舊鍵，否則 `readPref` 的舊值回退會把它復活）。
 - **後台下拉選單樣式**: `select.input` 補上 `appearance: none`。先前只有頭像端的
   `CustomSelect` 修過，後台四處原生 `<select>`（帳號權限、角色、批次臨時帳號）
   仍由瀏覽器另外畫一層邊框與箭頭，看起來像沒套樣式。一併讓 option 跟著深淺色走。
