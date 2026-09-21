@@ -36,6 +36,7 @@
 - **沒開 VLM 卻出現鏡頭按鈕**: 開場的 `/vision/health` 偶爾跑在工作階段就緒前面
   而拿到 401，前端的 fail-open 把它當成「後端掛了、先當作可用」。401/403 改為
   重問一次，仍失敗就維持不顯示；5xx 與網路錯誤照舊 fail-open。
+- **Prompt 與專案模板預設強制純文字**: 在全域回答規則（`DEFAULT_ANSWER_RULES`、`NO_TOOLS_ANSWER_RULES`）與新專案模板（`WORKSPACE_TEMPLATES`）中明定純文字格式規範，嚴禁 Markdown 格式（`**` 粗體星號、`*` 斜體、`#` 標題、`-` 列表分點或反引號）與 emoji，防止 LLM 在規格與數值周圍輸出星號導致字幕顯示及前端樣式異常。
 - **語音頁分頁不記位置**: `Tts.tsx` 用裸 `useState`，是後台唯一沒存的頂層分頁。
   改用 `useLocalStorageState`（`admin.tts.active_tab`，帶允許值清單）。順手補上
   該檔測試的 `localStorage.clear()`——分頁一旦會持久化，案例之間就會互相污染。
