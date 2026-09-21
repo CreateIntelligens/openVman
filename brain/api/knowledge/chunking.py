@@ -18,21 +18,11 @@ import re
 from typing import Any
 
 from config import get_settings
+from knowledge.fingerprint import fingerprint_document
 from knowledge.qa_csv import extract_image_id
 from knowledge.workspace import ALLOWED_CODE_SUFFIXES, ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
-
-
-def _document_fingerprint(path: Path) -> str:
-    """Delegate to the indexer's fingerprint.
-
-    指紋裡含索引格式版本，那是 indexer 的職責。在函式內 import 是為了避開
-    循環依賴：indexer 也要 import 這個模組的切塊函式。
-    """
-    from knowledge.indexer import _fingerprint_document
-
-    return _fingerprint_document(path)
 
 
 @dataclass(slots=True)
@@ -69,7 +59,7 @@ def _extract_text_chunks(path: Path, workspace_root: Path | None = None) -> list
     title = path.stem
     ws = workspace_root or ensure_workspace_scaffold()
     relative_path = path.relative_to(ws).as_posix()
-    fingerprint = _document_fingerprint(path)
+    fingerprint = fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
 
     # Code files: skip heading parsing, chunk by line groups with overlap
@@ -665,7 +655,7 @@ def _extract_csv_chunks(path: Path, workspace_root: Path | None = None) -> list[
     ws = workspace_root or ensure_workspace_scaffold()
     relative_path = path.relative_to(ws).as_posix()
     title = path.stem
-    fingerprint = _document_fingerprint(path)
+    fingerprint = fingerprint_document(path)
     persona_id = extract_persona_id_from_relative_path(relative_path)
 
     chunks: list[ChunkSpec] = []

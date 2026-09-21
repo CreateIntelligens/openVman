@@ -24,6 +24,7 @@ from infra.db import (
 )
 from infra.pipeline import CheckpointStore, PipelineConfig, run_pipeline
 from infra.project_context import resolve_embedding_index_state_path
+from knowledge.fingerprint import fingerprint_document as _fingerprint_document
 from knowledge.chunking import (
     ChunkSpec,
     _extract_csv_chunks,
@@ -40,8 +41,6 @@ from knowledge.workspace import (
 from memory.embedder import get_embedder
 from personas.personas import extract_persona_id_from_relative_path
 
-# 索引欄位或切塊規格改變時升版，讓內容未變的既有文件也會重建一次。
-_KNOWLEDGE_INDEX_FORMAT_VERSION = "2"
 
 
 
@@ -355,14 +354,6 @@ def _build_placeholder_records() -> list[dict[str, Any]]:
             "metadata": json.dumps({"placeholder": True}, ensure_ascii=False),
         }
     ]
-
-
-def _fingerprint_document(path: Path) -> str:
-    digest = hashlib.sha256()
-    # 索引欄位或切塊規格改變時升版，讓內容未變的既有文件也會重建一次。
-    digest.update(f"openvman-knowledge-v{_KNOWLEDGE_INDEX_FORMAT_VERSION}\0".encode())
-    digest.update(path.read_bytes())
-    return digest.hexdigest()
 
 
 def _load_existing_knowledge_records(project_id: str = "default") -> list[dict[str, Any]]:
