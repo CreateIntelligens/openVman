@@ -23,6 +23,7 @@ import {
   type MascotOption,
 } from '../data/mascotCatalog'
 import { bindSettingsToAccount } from '../stores/useSettingsStore'
+import { hasPref, STORAGE_KEYS } from '../utils/storageUtils'
 import {
   normalizeAvatarBackgroundId,
   type AvatarBackgroundFit,
@@ -97,6 +98,18 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     return auth.account.value?.defaults?.[key] ?? fallback;
   }
 
+  /**
+   * 使用者自己選過的值優先，其次才是帳號預設。
+   *
+   * 帳號預設是「還沒選過時從哪裡開始」，不是每次開啟都要套用一次的規則。直接用
+   * accountDefault() 會把 store 從 localStorage 還原的選擇蓋掉，使用者的感受就是
+   * 「重整之後設定又變回預設」。清單仍是權威：存的值不在清單裡（被收回授權、
+   * 被刪掉）就落回帳號預設，不要把失效的選擇留在畫面上。
+   */
+  function preferSaved(saved: string, isValid: (id: string) => boolean, fallback: string): string {
+    return saved && isValid(saved) ? saved : fallback;
+  }
+
   function pickFallbackPersonaId(items: PersonaSummary[], preferredId: string): string {
     if (items.some((p) => p.persona_id === preferredId)) return preferredId;
     return items.find((p) => p.persona_id === "default")?.persona_id
@@ -133,7 +146,11 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     } catch {
       vrmAvatarOptions.value = [];
     } finally {
-      const preferred = accountDefault("mascot_id", "");
+      const preferred = preferSaved(
+        settings.vrmAvatarId,
+        (id) => vrmAvatarOptions.value.some((m) => m.id === id),
+        accountDefault("mascot_id", "") ?? "",
+      );
       const preferredOption = vrmAvatarOptions.value.find((m) => m.id === preferred);
       const selected = preferredOption ?? vrmAvatarOptions.value[0];
       settings.vrmAvatarId = selected?.id ?? "";
@@ -164,6 +181,9 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   }
 
   async function fetchProjects(): Promise<void> {
+    // 先記下還原回來的選擇再清空。下面那行會觸發 store 的 watch 把空字串寫回
+    // localStorage，不先留一份，存的值在清單回來之前就沒了。
+    const savedProjectId = settings.projectId;
     projects.value = [];
     settings.projectId = "";
     getChat().setProject("");
@@ -178,7 +198,11 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
         persona_count: p.persona_count,
       }));
       projects.value = items;
-      const preferred = accountDefault("project_id", PREFERRED_PROJECT_ID);
+      const preferred = preferSaved(
+        savedProjectId,
+        (id) => items.some((project) => project.project_id === id),
+        accountDefault("project_id", PREFERRED_PROJECT_ID),
+      );
       const selected = items.some((project) => project.project_id === preferred)
         ? preferred
         : pickFallbackProjectId(items);
@@ -240,6 +264,9 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   }
 
   async function fetchTtsProviders(): Promise<void> {
+    // 同 fetchProjects：清空會被寫回 localStorage，先留一份。
+    const savedProvider = settings.ttsProvider;
+    const savedVoice = settings.ttsVoice;
     ttsProviders.value = [];
     settings.ttsProvider = "";
     settings.ttsVoice = "";
@@ -248,8 +275,17 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       if (!res.ok) return;
       const items = await res.json() as TtsProvider[];
       ttsProviders.value = items;
-      const preferredProvider = accountDefault("voice_provider", PREFERRED_VOICE_PROVIDER);
-      const preferredVoice = accountDefault("voice_id", PREFERRED_VOICE_ID);
+      // 引擎與聲音是一組：存的那一對仍然可用才整組沿用，否則整組退回帳號預設，
+      // 不要拼出「存的引擎 + 預設的聲音」這種使用者沒選過的組合。
+      const savedPairValid = items.some(
+        (item) => item.id === savedProvider && item.voices.includes(savedVoice),
+      );
+      const preferredProvider = savedPairValid
+        ? savedProvider
+        : accountDefault("voice_provider", PREFERRED_VOICE_PROVIDER);
+      const preferredVoice = savedPairValid
+        ? savedVoice
+        : accountDefault("voice_id", PREFERRED_VOICE_ID);
       const provider = items.find(
         (item) => item.id === preferredProvider && item.voices.includes(preferredVoice),
       );
@@ -279,6 +315,9 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       const data = await res.json();
       const items = data.backgrounds ?? [];
       backgrounds.value = items;
+      // 背景的預設值是 "dark"，光看值分不出是選的還是沒選過，所以看有沒有存過。
+      // 選過就不動它；失效的上傳背景由 normalizeAvatarBackgroundId 那條路處理。
+      if (hasPref(STORAGE_KEYS.BACKGROUND_ID)) return;
       const preferred = accountDefault("background_id", "");
       if (preferred && items.some((b: { background_id: string }) => b.background_id === preferred)) {
         settings.backgroundId = normalizeAvatarBackgroundId(`uploaded:${preferred}`);
@@ -307,6 +346,7 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     fetchPersonas,
     fetchTtsProviders,
     fetchBackgrounds,
+    preferSaved,
     stageBackgroundFitStyle,
     resolveVrmAvatarOption,
     PREFERRED_CHARACTER_ID,

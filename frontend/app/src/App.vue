@@ -284,6 +284,7 @@ const {
   selectionNotices,
   vrmAvatarOptions,
   accountDefault,
+  preferSaved,
   addSelectionNotice,
   fetchVrmAvatars,
   fetchInitialProjectData,
@@ -819,7 +820,12 @@ function handleFullscreenChange(): void {
 }
 
 function pickInitialCharacter(): string {
-  const preferred = accountDefault("character_id", PREFERRED_CHARACTER_ID);
+  // 選過的人物優先，帳號預設只是還沒選過時的起點。
+  const preferred = preferSaved(
+    settings.characterId,
+    (id) => characters.value.some((character) => character.id === id),
+    accountDefault("character_id", PREFERRED_CHARACTER_ID),
+  );
   const selected = characters.value.some((character) => character.id === preferred)
     ? preferred
     : characters.value[0]?.id ?? "";

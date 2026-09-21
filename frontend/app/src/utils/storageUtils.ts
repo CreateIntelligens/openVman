@@ -49,6 +49,18 @@ export function readPref(key: string, fallback: string): string {
   }
 }
 
+/** 這個偏好有沒有被存過。有預設值的欄位（例如背景的 "dark"）光看值分不出
+ *  「使用者選了 dark」還是「從沒選過」，要用這個判斷。 */
+export function hasPref(key: string): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return window.localStorage.getItem(scopedKey(key)) !== null
+      || window.localStorage.getItem(key) !== null
+  } catch {
+    return false
+  }
+}
+
 export function writePref(key: string, value: string): void {
   if (typeof window === "undefined") return
   try {

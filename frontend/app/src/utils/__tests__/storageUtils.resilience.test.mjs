@@ -79,3 +79,17 @@ test("removing a preference clears the legacy key so the fallback cannot resurre
   assert.deepEqual(storage.snapshot(), {});
   assert.equal(readPref("avatar.reply_mode", "fast"), "fast");
 });
+
+test("hasPref tells a chosen default apart from a value that was never stored", async () => {
+  const storage = memoryStorage({ "avatar.background_id::acct-1": "dark" });
+  const { setPrefScope, hasPref } = await loadStorageUtils(storage);
+
+  setPrefScope("acct-1");
+  assert.equal(hasPref("avatar.background_id"), true);
+  assert.equal(hasPref("avatar.reply_mode"), false);
+});
+
+test("hasPref reports false instead of throwing when storage is blocked", async () => {
+  const { hasPref } = await loadStorageUtils(throwingStorage());
+  assert.equal(hasPref("avatar.background_id"), false);
+});
