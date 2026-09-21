@@ -77,7 +77,7 @@ def _build_seed_record(
     )
     return {
         "text": text,
-        "vector": encode_text(text, embedding_version),
+        "vector": encode_text(text, embedding_version=embedding_version),
         "source": "system",
         "date": date.today().isoformat(),
         "metadata": json.dumps({"embedding_identity": identity}),

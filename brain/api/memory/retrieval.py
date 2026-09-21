@@ -201,7 +201,7 @@ def _try_fts_search(table: Any, query_text: str, limit: int) -> list[dict[str, A
 def _try_encode(term: str, embedding_version: str | None) -> list[float] | None:
     """編碼擴展詞;失敗時回 None 並略過該詞。"""
     try:
-        return encode_text(term, embedding_version)
+        return encode_text(term, embedding_version=embedding_version)
     except Exception as exc:
         logger.debug("expansion term encode failed for %r: %s", term, exc)
         return None

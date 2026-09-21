@@ -427,7 +427,10 @@ class GatewayRemoteTextEmbedder:
                 self._client = None
 
 
-def encode_text(text: str, *, embedding_version: str | None = None) -> list[float]:
+def encode_text(
+    text: str,
+    embedding_version: str | None = None,
+) -> list[float]:
     """Encode a single string into a vector."""
     cfg = get_settings()
     value = embedding_version or cfg.resolved_embedding_active_version
