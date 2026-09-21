@@ -82,4 +82,5 @@ docker compose -p openvman-semif -f scripts/experiments/semif/compose.yaml exec 
 
 - 版本控制保留腳本、固定案例、README／REPORT，以及供結果核對的 metadata、summary 與 predictions.jsonl；不整批忽略 `results/`。
 - `*.log`、下載快取與執行暫存不進 Git。本機日誌集中在根目錄 `logs/experiments/semif/`，重新執行時先建立目錄，再將標準輸出導向該處。
-- `results/stability-0p8b/` 是另外一輪模型實驗；原始資料保留供審查，是否提交應連同對應報告一起確認。不要把它與既有 4B 結果混合或覆寫。
+- `results/stability-0p8b/` 是 Qwen3.5-0.8B 的同條件對照（32 題 × 24 排列 × 3 次）。結論：準確率 41.93%、**32/32 題全部順序敏感**、沒有任何一題在 24 種排列下都答對（4B 分別是 80.73%、21/32、11 題）。這一輪是為了決定瀏覽器端小模型分類要不要做，結果是不做，見 [結案紀錄](../browser-intent/P0-COMPATIBILITY.md)。不要把它與既有 4B 結果混合或覆寫。
+- 換模型重測用 `stability.py --model <名稱> --revision <sha> --output <新目錄>`，各存各的。

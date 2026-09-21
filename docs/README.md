@@ -38,7 +38,7 @@
 - [SemIf 可行性與穩定性實驗](../scripts/experiments/semif/README.md)
 - [意圖觀測實驗操作](../scripts/experiments/intent-shadow/OPERATIONS.md)：預設關閉的旁路觀測功能。
 - [BGE 意圖觀測評估](../scripts/experiments/intent-shadow/REPORT.md)
-- [瀏覽器小模型相容性紀錄](../scripts/experiments/browser-intent/P0-COMPATIBILITY.md)
+- [瀏覽器小模型相容性與結案紀錄](../scripts/experiments/browser-intent/P0-COMPATIBILITY.md)：介面可行（WebLLM/MLC），但 Qwen3.5-0.8B 在 32 題上全部順序敏感，**不進 P1**。
 - [A2A 真實往返紀錄](../scripts/experiments/a2a-live/README.md)
 
 ## 歷史資料
