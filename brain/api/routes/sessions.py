@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import calendar
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,6 +24,61 @@ router = APIRouter(
 )
 
 
+# 對話紀錄的保存期限，跟 JTAI 的後台一致：查得到半年，只載得回三個月。
+# 兩個數字不同是刻意的——看是為了查問題，下載是把資料帶離系統。
+_HISTORY_MAX_MONTHS = 6
+_EXPORT_MAX_MONTHS = 3
+# 日期以台北時間判斷。用 UTC 會讓早上八點前的「今天」算成昨天，使用者選了
+# 今天卻查不到剛剛的對話。
+_TZ_TAIPEI = timezone(timedelta(hours=8))
+
+
+def _months_ago(months: int, base: datetime | None = None) -> date:
+    """Return the same day-of-month N months back, clamped to month length.
+
+    3/31 往回一個月沒有 2/31，取當月最後一天。直接減 30*N 天會讓界線隨月份
+    長度漂移，使用者看到的「半年」會前後差好幾天。
+    """
+    base = base or datetime.now(_TZ_TAIPEI)
+    year, month = base.year, base.month - months
+    while month <= 0:
+        month += 12
+        year -= 1
+    return date(year, month, min(base.day, calendar.monthrange(year, month)[1]))
+
+
+def _validate_date_range(
+    date_from: str | None,
+    date_to: str | None,
+    *,
+    max_months: int,
+    limit_msg: str,
+) -> None:
+    """Reject ranges that reach past the retention window."""
+    minimum = _months_ago(max_months)
+    parsed_from: date | None = None
+    if date_from:
+        try:
+            parsed_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail="無效的開始日期格式，請使用 YYYY-MM-DD",
+            ) from exc
+        if parsed_from < minimum:
+            raise HTTPException(status_code=400, detail=limit_msg)
+    if date_to:
+        try:
+            parsed_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400, detail="無效的結束日期格式，請使用 YYYY-MM-DD",
+            ) from exc
+        if parsed_from and parsed_to < parsed_from:
+            raise HTTPException(
+                status_code=400, detail="結束日期不能早於開始日期",
+            )
+
+
 @router.get("/sessions", summary="列出對話 Session")
 async def list_sessions(
     project_id: str = "default",
@@ -30,6 +87,11 @@ async def list_sessions(
     date_to: str | None = None,
     search: str | None = None,
 ):
+    _validate_date_range(
+        date_from, date_to,
+        max_months=_HISTORY_MAX_MONTHS,
+        limit_msg="查詢區間限制為半年內",
+    )
     try:
         sessions = list_sessions_for_project(
             project_id=project_id,
@@ -63,6 +125,13 @@ def export_sessions(
     search: str | None = None,
     session_ids: str | None = None,
 ) -> dict[str, Any]:
+    _validate_date_range(
+        date_from, date_to,
+        max_months=_EXPORT_MAX_MONTHS,
+        limit_msg="下載區間限制為近三個月內",
+    )
+    # 不填起始日就等於從頭撈，那會讓限制形同虛設，所以補上界線。
+    date_from = date_from or _months_ago(_EXPORT_MAX_MONTHS).isoformat()
     try:
         store = get_session_store(project_id=project_id)
         summaries = store.list_sessions(
