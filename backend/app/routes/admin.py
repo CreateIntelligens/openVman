@@ -203,6 +203,35 @@ _EDGE_TTS_VOICE_LABELS = {
 }
 
 
+# 引擎清單是程式碼決定的（_TRANSCRIBERS 加 browser），不像聲音要跟外部服務
+# 查。label 與前台選單一致，後台授權時看得懂在給什麼。
+_ASR_ENGINE_LABELS = {
+    "breeze": "Breeze-ASR-26（臺語轉華語）",
+    "xiaomi": "Xiaomi-CocktailASR-1（臺語轉華語，自動轉繁）",
+    "sensevoice": "SenseVoice-Small（臺語漢字）",
+    "openai": "OpenAI Whisper（語音送往外部服務）",
+    "browser": "瀏覽器內建辨識（語音留在使用者裝置）",
+}
+
+
+def sync_asr_engines(runtime: AuthRuntime) -> None:
+    """Register the ASR engines so they can be granted per account.
+
+    跟聲音一樣註冊成 system_public 資源，管理者才能在帳號頁逐一授權。這裡不
+    管哪一家「設定齊全」——沒填 URL 的引擎照樣列出來，否則管理者會看到清單
+    隨部署設定忽隱忽現，反而難判斷。實際可不可用由 fallback chain 決定。
+    """
+    for engine_id, label in _ASR_ENGINE_LABELS.items():
+        try:
+            runtime.resources.upsert_system_resource(
+                resource_type=ResourceType.ASR_ENGINE,
+                resource_id=engine_id,
+                metadata={"label": label},
+            )
+        except Exception as exc:
+            logger.warning("failed to register asr engine %s: %s", engine_id, exc)
+
+
 async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:
     """Register voices from enabled providers into the resource ownership registry."""
     cfg = get_tts_config()

@@ -20,12 +20,10 @@ from .dependencies import (
     require_admin,
     require_root,
 )
+from .models import ResourceType
 from .runtime import AuthRuntime, get_auth_runtime
 from .settings_repository import (
     ASR_PROVIDER_KEY,
-    ASR_USER_CHOICES_KEY,
-    BROWSER_ASR_PROVIDER,
-    SERVER_ASR_PROVIDERS,
     InvalidSettingValueError,
     UnknownSettingError,
 )
@@ -101,18 +99,6 @@ def clear_asr_provider(
     return _asr_setting_profile(runtime)
 
 
-class AsrUserChoicesProfile(_StrictModel):
-    """Which engines an ordinary user may pick for their own chat."""
-
-    allowed: list[str]
-    options: list[str]
-    overridden: bool
-
-
-class UpdateAsrUserChoicesRequest(_StrictModel):
-    allowed: list[str]
-
-
 class MyAsrProviderProfile(_StrictModel):
     """The caller's own engine choice."""
 
@@ -126,14 +112,32 @@ class UpdateMyAsrProviderRequest(_StrictModel):
     value: str
 
 
-# 預設全部開放：管理者要縮小範圍再自己關。開放清單是「誰能選」，不是
-# 「用哪個」——後者仍由 asr_provider 與各使用者的選擇決定。
-_DEFAULT_USER_CHOICES = sorted(SERVER_ASR_PROVIDERS | {BROWSER_ASR_PROVIDER})
+def _asr_user_choices(runtime: AuthRuntime, user_id: str) -> list[str]:
+    """Which engines this account may pick.
+
+    跟 TTS 的聲音一樣看 resource_grants：管理者在帳號頁授權了哪些，這裡就
+    只列哪些。沒有授權任何一個就回空清單，聊天室不顯示選單，一律用預設值。
+    """
+    granted = [
+        grant.resource_id
+        for grant in runtime.account_access.list_grants(user_id)
+        if grant.resource_type is ResourceType.ASR_ENGINE
+    ]
+    return sorted(granted)
 
 
-def _asr_user_choices(runtime: AuthRuntime) -> list[str]:
-    stored = runtime.settings.get_many(ASR_USER_CHOICES_KEY)
-    return _DEFAULT_USER_CHOICES if stored is None else stored
+def _asr_user_choices(runtime: AuthRuntime, user_id: str) -> list[str]:
+    """Which engines this account may pick.
+
+    跟 TTS 的聲音一樣看 resource_grants：管理者在帳號頁授權了哪些，這裡就
+    只列哪些。沒有授權任何一個就回空清單，聊天室不顯示選單，一律用預設值。
+    """
+    granted = [
+        grant.resource_id
+        for grant in runtime.account_access.list_grants(user_id)
+        if grant.resource_type is ResourceType.ASR_ENGINE
+    ]
+    return sorted(granted)
 
 
 def _asr_user_choices_profile(runtime: AuthRuntime) -> AsrUserChoicesProfile:
@@ -145,43 +149,13 @@ def _asr_user_choices_profile(runtime: AuthRuntime) -> AsrUserChoicesProfile:
     )
 
 
-@settings_router.get("/asr-user-choices", response_model=AsrUserChoicesProfile)
-def get_asr_user_choices(
-    _admin: CurrentAccount = Depends(require_admin),
-    runtime: AuthRuntime = Depends(get_auth_runtime),
-) -> AsrUserChoicesProfile:
-    return _asr_user_choices_profile(runtime)
-
-
-@settings_router.put("/asr-user-choices", response_model=AsrUserChoicesProfile)
-def set_asr_user_choices(
-    body: UpdateAsrUserChoicesRequest,
-    root: CurrentAccount = Depends(require_root),
-    runtime: AuthRuntime = Depends(get_auth_runtime),
-) -> AsrUserChoicesProfile:
-    """Choose which engines ordinary users may select.
-
-    限 ROOT：開放 openai 等於允許每個使用者自行把語音送往外部服務，那是
-    組織層級的決定，不該讓一般管理者順手改掉。
-    """
-    try:
-        runtime.settings.set_many(
-            ASR_USER_CHOICES_KEY, body.allowed, actor_id=root.user.id,
-        )
-    except InvalidSettingValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except UnknownSettingError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return _asr_user_choices_profile(runtime)
-
-
 @settings_router.get("/my-asr-provider", response_model=MyAsrProviderProfile)
 def get_my_asr_provider(
     account: CurrentAccount = Depends(get_current_account),
     runtime: AuthRuntime = Depends(get_auth_runtime),
 ) -> MyAsrProviderProfile:
     """Any signed-in user may read their own choice."""
-    allowed = _asr_user_choices(runtime)
+    allowed = _asr_user_choices(runtime, account.user.id)
     stored = runtime.account_access.get_asr_provider(account.user.id)
     site_default = runtime.settings.get(ASR_PROVIDER_KEY) or ""
     # 選過但之後被管理者關閉的引擎不該繼續生效，否則關閉形同虛設。
@@ -202,7 +176,7 @@ def set_my_asr_provider(
     白名單在後端把關：前端送什麼都要對照管理者開放的清單，否則使用者改一
     個 API 請求就能繞過後台設定。空字串代表改回沿用全站設定。
     """
-    allowed = _asr_user_choices(runtime)
+    allowed = _asr_user_choices(runtime, account.user.id)
     if body.value and body.value not in allowed:
         raise HTTPException(
             status_code=422,

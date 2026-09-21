@@ -170,6 +170,7 @@ def test_admin_portal_access_defaults_denied_and_can_be_replaced(
             "custom_voices": ["portal-voice"],
             "avatar_mascots": [],
             "avatar_backgrounds": [],
+            "asr_engines": [],
         },
         "defaults": {
             "project_id": "portal-project",
@@ -324,6 +325,7 @@ def test_admin_creates_formal_account_with_access_atomically(client, runtime):
             "custom_voices": ["voice-a"],
             "avatar_mascots": [],
             "avatar_backgrounds": [],
+            "asr_engines": [],
         },
         "defaults": {
             "project_id": "project-a",
@@ -458,6 +460,7 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
             "custom_voices": ["voice-a"],
             "avatar_mascots": [],
             "avatar_backgrounds": [],
+            "asr_engines": [],
         },
         "defaults": {
             "project_id": "project-a",
@@ -499,6 +502,7 @@ def test_admin_assigns_and_replaces_formal_account_resource_access(
             "custom_voices": ["voice-b"],
             "avatar_mascots": [],
             "avatar_backgrounds": [],
+            "asr_engines": [],
         },
         "defaults": {
             "project_id": "project-b",

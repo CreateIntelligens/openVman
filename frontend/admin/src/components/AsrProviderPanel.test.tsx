@@ -4,10 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearAsrProvider,
   fetchAsrProvider,
-  fetchAsrUserChoices,
   previewAsr,
   setAsrProvider,
-  setAsrUserChoices,
   type SystemSetting,
 } from "../api/settings";
 import AsrProviderPanel from "./AsrProviderPanel";
@@ -17,8 +15,6 @@ vi.mock("../api/settings", () => ({
   setAsrProvider: vi.fn(),
   clearAsrProvider: vi.fn(),
   previewAsr: vi.fn(),
-  fetchAsrUserChoices: vi.fn(),
-  setAsrUserChoices: vi.fn(),
 }));
 
 const OPTIONS = ["breeze", "browser", "openai", "sensevoice", "xiaomi"];
@@ -39,10 +35,6 @@ beforeEach(() => {
   vi.mocked(setAsrProvider).mockReset();
   vi.mocked(clearAsrProvider).mockReset();
   vi.mocked(previewAsr).mockReset();
-  vi.mocked(fetchAsrUserChoices).mockReset().mockResolvedValue({
-    allowed: OPTIONS, options: OPTIONS, overridden: false,
-  });
-  vi.mocked(setAsrUserChoices).mockReset();
 });
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -160,26 +152,6 @@ describe("AsrProviderPanel", () => {
 
     await waitFor(() => expect(setAsrProvider).toHaveBeenCalledWith("breeze"));
     expect(await screen.findByText(/預設已改為 Breeze-ASR-26/)).toBeTruthy();
-  });
-
-  it("取消勾選就把該引擎從開放清單移除", async () => {
-    // 管理者關掉某個引擎後，使用者的聊天室就不該再看到它。
-    vi.mocked(setAsrUserChoices).mockResolvedValue({
-      allowed: OPTIONS.filter((id) => id !== "openai"),
-      options: OPTIONS,
-      overridden: true,
-    });
-    render(<AsrProviderPanel />);
-    await screen.findByText("可使用的引擎");
-
-    const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
-    const openaiBox = boxes[OPTIONS.indexOf("openai")];
-    expect(openaiBox.checked).toBe(true);
-    fireEvent.click(openaiBox);
-
-    await waitFor(() => expect(setAsrUserChoices).toHaveBeenCalledWith(
-      OPTIONS.filter((id) => id !== "openai"),
-    ));
   });
 
   it("儲存失敗時顯示後端的訊息", async () => {

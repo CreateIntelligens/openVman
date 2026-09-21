@@ -3,11 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   clearAsrProvider,
   fetchAsrProvider,
-  fetchAsrUserChoices,
   previewAsr,
   setAsrProvider,
-  setAsrUserChoices,
-  type AsrUserChoices,
   type SystemSetting,
 } from "../api/settings";
 import { preferredRecorderMimeType, rmsVolume } from "../utils/liveAudioUtils";
@@ -52,7 +49,6 @@ export default function AsrProviderPanel() {
   const [transcribing, setTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [elapsed, setElapsed] = useState<number | null>(null);
-  const [choices, setChoices] = useState<AsrUserChoices | null>(null);
   const [level, setLevel] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -65,10 +61,6 @@ export default function AsrProviderPanel() {
       .then((value) => { if (!disposed) setSetting(value); })
       .catch(() => { if (!disposed) setError("無法載入語音辨識設定。"); })
       .finally(() => { if (!disposed) setLoading(false); });
-    // 開放清單載入失敗不該擋住整個面板：全站設定仍然可以改。
-    fetchAsrUserChoices()
-      .then((value) => { if (!disposed) setChoices(value); })
-      .catch(() => {});
     return () => { disposed = true; };
   }, []);
 
@@ -193,6 +185,7 @@ export default function AsrProviderPanel() {
         <p className="text-xs leading-5 text-content-muted">
           使用者沒有自己選的時候用這個。變更立即生效，不需重新啟動；所選引擎無法
           使用時，系統會自動改用其他已設定的引擎，不會讓辨識中斷。
+          要讓某個帳號能自己換引擎，到「帳號」頁授權給他。
         </p>
         <Select
           value={setting.effective}
@@ -226,55 +219,6 @@ export default function AsrProviderPanel() {
           </button>
         )}
       </div>
-
-      {choices && (
-        <div className="flex flex-col gap-3 border-t border-border pt-6">
-          <h2 className="text-sm font-semibold">可使用的引擎</h2>
-          <p className="text-xs leading-5 text-content-muted">
-            勾選的引擎會出現在聊天室的選單裡，讓使用者替自己的對話挑一個。
-            沒有自己選的人，用上面那個預設值。
-          </p>
-          <div className="flex flex-col gap-2">
-            {choices.options.map((id) => {
-              const engine = describe(id);
-              const checked = choices.allowed.includes(id);
-              return (
-                <label key={id} className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={checked}
-                    disabled={busy}
-                    onChange={() => {
-                      const next = checked
-                        ? choices.allowed.filter((item) => item !== id)
-                        : [...choices.allowed, id];
-                      setBusy(true);
-                      setError("");
-                      setStatus("");
-                      setAsrUserChoices(next)
-                        .then((value) => {
-                          setChoices(value);
-                          setStatus("已更新開放清單。");
-                        })
-                        .catch((reason) => setError(
-                          reason instanceof Error ? reason.message : "設定失敗，請重試。",
-                        ))
-                        .finally(() => setBusy(false));
-                    }}
-                  />
-                  <span className="flex flex-col">
-                    <span>{engine.label}</span>
-                    {engine.note && (
-                      <span className="text-xs text-content-muted">{engine.note}</span>
-                    )}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-sm font-semibold">試辨識</h2>

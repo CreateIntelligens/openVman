@@ -212,6 +212,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     runtime = get_auth_runtime()
     await _startup_gateway_resources()
     await _build_openapi_schema()
+    admin_routes.sync_asr_engines(runtime)
     await admin_routes.sync_tts_custom_voices(runtime)
     a2a_daemon = get_a2a_bridge_daemon() if get_tts_config().a2a_enabled else None
     if a2a_daemon:

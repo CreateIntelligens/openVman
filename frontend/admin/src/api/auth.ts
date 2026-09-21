@@ -92,6 +92,9 @@ function safeAccount(account: Account): Account {
       avatar_backgrounds: account.grants.avatar_backgrounds
         ? [...account.grants.avatar_backgrounds]
         : undefined,
+      asr_engines: account.grants.asr_engines
+        ? [...account.grants.asr_engines]
+        : undefined,
     }
     : account.grants;
   return {
@@ -121,6 +124,7 @@ export interface AccountResourceGrants {
   custom_voices: string[];
   avatar_mascots?: string[];
   avatar_backgrounds?: string[];
+  asr_engines?: string[];
 }
 
 export interface AccountAccessOption {
@@ -135,6 +139,7 @@ export interface AccountAccessOptions {
   custom_voices: AccountAccessOption[];
   avatar_mascots?: AccountAccessOption[];
   avatar_backgrounds?: AccountAccessOption[];
+  asr_engines?: AccountAccessOption[];
 }
 
 /** ROOT 指派給某個 admin 的資源上限。空清單是有意義的值——代表這一類

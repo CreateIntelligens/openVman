@@ -65,6 +65,13 @@ const GROUPS: Array<{
     title: "舞台背景",
     description: "選擇可使用的背景，並指定登入後預設背景。",
   },
+  {
+    // 沒有「預設引擎」欄位：預設值是全站一份，在「語音」頁設定。這裡只決定
+    // 這個帳號能不能自己換，不授權就是一律用全站預設。
+    grantType: "asr_engines",
+    title: "語音辨識引擎",
+    description: "選擇這個帳號可以在聊天室自選的引擎；不授權就一律用全站預設。",
+  },
 ];
 
 function messageFrom(error: unknown, fallback: string): string {
@@ -229,6 +236,10 @@ export function useAccountAccessForm(
             ...current,
             defaults: { ...current.defaults, background_id: value },
           };
+        case "asr_engines":
+          // 語音辨識引擎沒有「帳號預設值」：預設是全站一份，在「語音」頁設。
+          // 這裡只管授權，所以不動 defaults。
+          return current;
       }
     });
   }
@@ -355,6 +366,9 @@ function defaultOptionValue(
       return defaults.mascot_id ?? "";
     case "avatar_backgrounds":
       return defaults.background_id ?? "";
+    case "asr_engines":
+      // 沒有帳號層級的預設引擎，所以沒有「預設」可標記。
+      return "";
   }
 }
 

@@ -136,6 +136,7 @@ def _register_scoped_resources(runtime: AuthRuntime) -> dict[str, object]:
             "custom_voices": ["voice-a"],
             "avatar_mascots": [],
             "avatar_backgrounds": [],
+            "asr_engines": [],
         },
         "defaults": {
             "project_id": "project-a",
