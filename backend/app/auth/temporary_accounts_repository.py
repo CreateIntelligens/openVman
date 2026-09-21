@@ -9,14 +9,17 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from uuid import uuid4
 
 from ._repository_base import RepositoryError, now_iso
 from .database import AuthDatabase
 from .models import (
+    AccountDefaultsRecord,
     AccountRole,
     AccountType,
+    ResourceGrantRecord,
     ResourceType,
     TemporaryBatchRecord,
     TemporaryCredentialRecord,
@@ -24,17 +27,42 @@ from .models import (
 )
 from .policy import ensure_account_manager
 
+
+class TemporaryCredentialNotFoundError(RepositoryError):
+    pass
+
+
+class TemporaryCredentialExpiredError(RepositoryError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class TemporaryCredentialCreate:
+    locator: str
+    password_hash: str
+    password_ciphertext: str | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class TemporaryBatchAccount:
+    user: UserRecord
+    credential: TemporaryCredentialRecord
+    grants: tuple[ResourceGrantRecord, ...]
+    defaults: AccountDefaultsRecord
+
+
+@dataclass(frozen=True, slots=True)
+class TemporaryBatch:
+    batch: TemporaryBatchRecord
+    accounts: tuple[TemporaryBatchAccount, ...]
+
+
 # 共用 helper 與錯誤型別仍住在 repositories.py：它們同時服務正式帳號那幾個
 # repository。延後到函式外的模組層 import 會造成循環（repositories 也要
 # re-export 這個模組的 class），所以放在檔案尾端由 repositories 注入不可行，
 # 改為在此直接引用——Python 只在第一次使用時解析，循環在 import 時不會觸發。
 from .repositories import (
     InvalidResourceGrantError,
-    TemporaryBatch,
-    TemporaryBatchAccount,
-    TemporaryCredentialCreate,
-    TemporaryCredentialExpiredError,
-    TemporaryCredentialNotFoundError,
     UserNotFoundError,
     _append_auth_audit,
     _as_utc,
