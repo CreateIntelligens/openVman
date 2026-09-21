@@ -638,6 +638,56 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
 
 
 @app.post(
+    "/api/v1/asr/transcribe",
+    tags=["Settings"],
+    summary="以這個帳號選定的引擎轉寫一段語音",
+)
+async def transcribe_for_account(
+    account: CurrentAccount = Depends(get_current_account),
+    file: UploadFile = File(...),
+) -> JSONResponse:
+    """Transcribe a clip for an ordinary signed-in user.
+
+    跟後台的試辨識走同一條 transcribe()，差別只在權限：這個端點任何登入帳號
+    都能用，而引擎由後端依帳號自己查（_account_asr_provider），不接受呼叫端
+    指定——否則使用者改個請求就能繞過管理者的開放清單。
+    """
+    from app.gateway.worker import _account_asr_provider
+
+    suffix = os.path.splitext(file.filename or "")[1] or ".wav"
+    tmp_path: str | None = None
+    cfg = get_tts_config()
+    try:
+        tmp_path, _ = await persist_upload_to_tempfile(
+            file,
+            suffix=suffix,
+            max_bytes=cfg.document_max_upload_bytes,
+        )
+        from app.gateway.ingestion_audio import transcribe
+
+        preferred = _account_asr_provider({"owner_user_id": account.user.id})
+        started = monotonic()
+        result = await transcribe(tmp_path, "asr-chat", preferred)
+        return JSONResponse(content={
+            "text": result.content,
+            "provider": preferred or "",
+            "elapsed_seconds": round(monotonic() - started, 2),
+        })
+    except UploadTooLargeError as exc:
+        limit_mb = exc.limit_bytes / (1024 * 1024)
+        return upload_failed_response(
+            status_code=413,
+            error=f"音檔超過大小限制（上限 {limit_mb:.0f} MB）",
+        )
+    except Exception as exc:
+        logger.error("asr transcribe failed: %s", exc)
+        return upload_failed_response(status_code=500, error=str(exc))
+    finally:
+        await file.close()
+        cleanup_temp_path(tmp_path)
+
+
+@app.post(
     "/api/v1/settings/asr-provider/preview",
     tags=["Settings"],
     summary="以目前設定的引擎試辨識一段語音",
@@ -662,10 +712,15 @@ async def preview_asr(
         )
         from app.gateway.ingestion_audio import _active_provider, transcribe
 
+        # 只量轉寫本身，不含上傳與轉檔：操作者要比的是引擎誰快，把網路時間
+        # 算進去會讓同一個引擎在不同網路下看起來像兩回事。
+        started = monotonic()
         result = await transcribe(tmp_path, "asr-preview")
+        elapsed = monotonic() - started
         return JSONResponse(content={
             "text": result.content,
             "provider": _active_provider(cfg),
+            "elapsed_seconds": round(elapsed, 2),
         })
     except UploadTooLargeError as exc:
         limit_mb = exc.limit_bytes / (1024 * 1024)

@@ -1313,7 +1313,72 @@ def test_asr_preview_returns_the_transcript_and_active_engine(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json() == {"text": "今仔日天氣袂䆀", "provider": "sensevoice"}
+    body = response.json()
+    assert body["text"] == "今仔日天氣袂䆀"
+    assert body["provider"] == "sensevoice"
+    # 操作者要能比較兩家引擎誰快，所以回傳這一次實測到的耗時。
+    assert isinstance(body["elapsed_seconds"], (int, float))
+
+
+def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
+    """一般使用者要能在聊天室用語音，後台那個端點限 admin。"""
+    module, _ = _load_main(monkeypatch)
+
+    async def _transcribe(path, trace_id, preferred=None):
+        return types.SimpleNamespace(
+            content_type="audio_transcription", content="你好",
+        )
+
+    import app.gateway.ingestion_audio as ingestion_audio
+
+    monkeypatch.setattr(ingestion_audio, "transcribe", _transcribe)
+    monkeypatch.setattr(
+        module, "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024 * 1024),
+    )
+
+    client, _ = _authenticated_client(module, admin=False)
+    response = client.post(
+        "/api/v1/asr/transcribe",
+        files={"file": ("speech.webm", b"fake-audio-bytes", "audio/webm")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["text"] == "你好"
+
+
+def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
+    """引擎由後端依帳號查，不接受呼叫端指定。
+
+    否則使用者改一個請求就能繞過管理者的開放清單，關閉某個引擎形同虛設。
+    """
+    module, _ = _load_main(monkeypatch)
+    seen: dict[str, object] = {}
+
+    async def _transcribe(path, trace_id, preferred=None):
+        seen["preferred"] = preferred
+        return types.SimpleNamespace(
+            content_type="audio_transcription", content="你好",
+        )
+
+    import app.gateway.ingestion_audio as ingestion_audio
+
+    monkeypatch.setattr(ingestion_audio, "transcribe", _transcribe)
+    monkeypatch.setattr(
+        module, "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024 * 1024),
+    )
+
+    client, _ = _authenticated_client(module, admin=False)
+    response = client.post(
+        "/api/v1/asr/transcribe",
+        data={"provider": "openai"},
+        files={"file": ("speech.webm", b"fake-audio-bytes", "audio/webm")},
+    )
+
+    assert response.status_code == 200
+    # 請求裡塞的 provider 不該被採用：這個帳號沒選過，preferred 就是 None。
+    assert seen["preferred"] is None
 
 
 def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):

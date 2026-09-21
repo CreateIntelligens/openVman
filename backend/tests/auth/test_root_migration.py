@@ -41,6 +41,17 @@ def _create_v3_database(path: Path) -> None:
                         continue
                     if index == 1 and "background_id" in columns:
                         continue
+                # 基礎 schema 已含的欄位不重加；這段刻意對照 database.py 的
+                # 同名守衛，兩邊要一起改。
+                if version == 12:
+                    columns = {
+                        row[1]
+                        for row in connection.execute(
+                            "PRAGMA table_info(account_defaults)"
+                        ).fetchall()
+                    }
+                    if "asr_provider" in columns:
+                        continue
                 connection.execute(statement)
             connection.execute(
                 "INSERT INTO schema_migrations(version, details_json) VALUES (?, ?)",
@@ -236,6 +247,7 @@ def test_v3_migration_promotes_ai360_in_place_and_preserves_related_data(
         "voice_id": "granted-voice",
         "mascot_id": "",
         "background_id": "",
+        "asr_provider": "",
     }
     assert violations == []
 

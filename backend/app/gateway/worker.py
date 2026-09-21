@@ -88,6 +88,25 @@ async def _set_job_failed(job_id: str, failure: dict[str, Any]) -> None:
     )
 
 
+def _account_asr_provider(data: dict[str, Any]) -> str | None:
+    """Look up the job owner's chosen ASR engine, if any.
+
+    用 job 裡的 owner_user_id 自己查，而不是讓呼叫端把引擎名稱傳進來：那等於
+    讓前端指定要用哪個引擎，管理者的開放清單就形同虛設。查不到就回 None，
+    沿用全站設定——語音辨識不該因為讀不到一個偏好就停擺。
+    """
+    user_id = data.get("owner_user_id") or ""
+    if not user_id:
+        return None
+    try:
+        from app.auth.runtime import get_auth_runtime
+
+        return get_auth_runtime().account_access.get_asr_provider(user_id) or None
+    except Exception as exc:
+        logger.debug("account_asr_provider_unavailable err=%s", exc)
+        return None
+
+
 async def process_media(ctx: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
     """Process uploaded media through the dispatcher, then forward to brain."""
     file_path = data.get("file_path", "")
@@ -102,7 +121,9 @@ async def process_media(ctx: dict[str, Any], data: dict[str, Any]) -> dict[str, 
         if job_id:
             await set_job_status(job_id, "processing")
 
-        result = await dispatch(file_path, mime_type, trace_id)
+        result = await dispatch(
+            file_path, mime_type, trace_id, _account_asr_provider(data),
+        )
 
         if result.get("type") == "processing_error":
             failure = {

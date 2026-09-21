@@ -22,7 +22,9 @@ def _route_mime(mime_type: str) -> str:
     return "unknown"
 
 
-async def _process(category: str, file_path: str, trace_id: str) -> IngestionResult:
+async def _process(
+    category: str, file_path: str, trace_id: str, asr_provider: str | None = None,
+) -> IngestionResult:
     """Call the appropriate ingestion function.
 
     Imports are kept at call-time so that handlers can be patched in tests.
@@ -36,7 +38,7 @@ async def _process(category: str, file_path: str, trace_id: str) -> IngestionRes
 
     if category == "audio":
         from app.gateway.ingestion_audio import transcribe as transcribe_audio
-        return await transcribe_audio(file_path, trace_id)
+        return await transcribe_audio(file_path, trace_id, asr_provider)
 
     if category == "video":
         from app.gateway.ingestion_video import describe as describe_video
@@ -58,7 +60,9 @@ def _build_result(result: IngestionResult, mime_type: str) -> dict[str, Any]:
     }
 
 
-async def dispatch(file_path: str, mime_type: str, trace_id: str) -> dict[str, Any]:
+async def dispatch(
+    file_path: str, mime_type: str, trace_id: str, asr_provider: str | None = None,
+) -> dict[str, Any]:
     """Route media to the appropriate ingestion handler.
 
     Applies a timeout from config.media_processing_timeout_ms.
@@ -79,7 +83,7 @@ async def dispatch(file_path: str, mime_type: str, trace_id: str) -> dict[str, A
 
     try:
         result = await asyncio.wait_for(
-            _process(category, file_path, trace_id),
+            _process(category, file_path, trace_id, asr_provider),
             timeout=timeout_sec,
         )
         return _build_result(result, mime_type)

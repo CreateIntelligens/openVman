@@ -416,3 +416,40 @@ class TestAudioConversion:
 
         with pytest.raises(RuntimeError, match="conversion failed"):
             ingestion_audio._as_wav(str(clip))
+
+
+class TestPreferredProvider:
+    """使用者自己選的引擎排最前面，但不取消備援。"""
+
+    @pytest.mark.asyncio
+    async def test_preferred_goes_first_and_keeps_the_rest_as_fallback(self):
+        cfg = _asr_cfg(
+            "breeze",
+            asr_breeze_url="http://b:8801",
+            asr_sensevoice_url="http://s:50002",
+        )
+        with patch.object(ingestion_audio, "get_tts_config", return_value=cfg):
+            chain = ingestion_audio._resolve_chain(cfg, "sensevoice")
+
+        assert chain[0] == "sensevoice"
+        # 選了 sensevoice 不代表放棄 fallback：它掛了還是要有下一家。
+        assert "breeze" in chain
+
+    @pytest.mark.asyncio
+    async def test_browser_is_not_a_server_engine(self):
+        """browser 在使用者裝置上跑，音檔根本不會送到這裡。"""
+        cfg = _asr_cfg("breeze", asr_breeze_url="http://b:8801")
+        with patch.object(ingestion_audio, "get_tts_config", return_value=cfg):
+            chain = ingestion_audio._resolve_chain(cfg, "browser")
+
+        assert "browser" not in chain
+        assert chain == ["breeze"]
+
+    @pytest.mark.asyncio
+    async def test_unconfigured_preference_is_skipped(self):
+        """選了一個沒設 URL 的引擎，不該白等一次連線逾時。"""
+        cfg = _asr_cfg("breeze", asr_breeze_url="http://b:8801")
+        with patch.object(ingestion_audio, "get_tts_config", return_value=cfg):
+            chain = ingestion_audio._resolve_chain(cfg, "xiaomi")
+
+        assert chain == ["breeze"]

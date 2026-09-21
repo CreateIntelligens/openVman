@@ -124,7 +124,8 @@ _TEMPORARY_ACCOUNT_STATEMENTS = (
         voice_provider TEXT NOT NULL,
         voice_id TEXT NOT NULL,
         mascot_id TEXT NOT NULL DEFAULT '',
-        background_id TEXT NOT NULL DEFAULT ''
+        background_id TEXT NOT NULL DEFAULT '',
+        asr_provider TEXT NOT NULL DEFAULT ''
     )
     """,
 )
@@ -137,6 +138,17 @@ _ACCOUNT_DEFAULTS_MASCOT_BACKGROUND_STATEMENTS = (
     """
     ALTER TABLE account_defaults
     ADD COLUMN background_id TEXT NOT NULL DEFAULT ''
+    """,
+)
+
+_ACCOUNT_ASR_PROVIDER_SCHEMA_VERSION = 12
+_ACCOUNT_ASR_PROVIDER_MIGRATION_NAME = "account_defaults_asr_provider"
+# 空字串代表「沒選過」，沿用全站設定。用空字串而不是 NULL，跟這張表其他
+# 欄位一致，讀取端也不必到處判斷 None。
+_ACCOUNT_ASR_PROVIDER_STATEMENTS = (
+    """
+    ALTER TABLE account_defaults
+    ADD COLUMN asr_provider TEXT NOT NULL DEFAULT ''
     """,
 )
 
@@ -265,6 +277,11 @@ _MIGRATIONS = (
         _SYSTEM_SETTINGS_MIGRATION_NAME,
         _SYSTEM_SETTINGS_STATEMENTS,
     ),
+    (
+        _ACCOUNT_ASR_PROVIDER_SCHEMA_VERSION,
+        _ACCOUNT_ASR_PROVIDER_MIGRATION_NAME,
+        _ACCOUNT_ASR_PROVIDER_STATEMENTS,
+    ),
 )
 
 
@@ -355,6 +372,16 @@ class AuthDatabase:
                         if index == 0 and "mascot_id" in defaults_columns:
                             continue
                         if index == 1 and "background_id" in defaults_columns:
+                            continue
+                    if version == _ACCOUNT_ASR_PROVIDER_SCHEMA_VERSION:
+                        # 全新資料庫的基礎 schema 已經含這個欄位，重加會炸。
+                        defaults_columns = {
+                            row["name"]
+                            for row in connection.execute(
+                                "PRAGMA table_info(account_defaults)"
+                            ).fetchall()
+                        }
+                        if "asr_provider" in defaults_columns:
                             continue
                     connection.execute(statement)
                 connection.execute(

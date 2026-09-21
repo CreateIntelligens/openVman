@@ -26,9 +26,29 @@ export async function clearAsrProvider(): Promise<SystemSetting> {
   return request<SystemSetting>("DELETE", SETTING_PATH);
 }
 
+const USER_CHOICES_PATH = "/settings/asr-user-choices";
+
+export interface AsrUserChoices {
+  /** 開放給一般使用者自選的引擎。 */
+  allowed: string[];
+  /** 全部可開放的引擎。 */
+  options: string[];
+  overridden: boolean;
+}
+
+export async function fetchAsrUserChoices(): Promise<AsrUserChoices> {
+  return fetchJson<AsrUserChoices>(apiUrl(USER_CHOICES_PATH));
+}
+
+export async function setAsrUserChoices(allowed: string[]): Promise<AsrUserChoices> {
+  return put<AsrUserChoices>(USER_CHOICES_PATH, { allowed });
+}
+
 export interface AsrPreview {
   text: string;
   provider: string;
+  /** 後端量到的轉寫耗時，不含上傳與轉檔。 */
+  elapsed_seconds?: number;
 }
 
 /** 以目前生效的引擎轉寫一段錄音，讓操作者當場驗證選擇。 */

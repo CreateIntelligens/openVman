@@ -195,16 +195,20 @@ def _active_provider(cfg) -> str:
     return stored or cfg.asr_provider
 
 
-def _resolve_chain(cfg) -> list[str]:
-    """Ordered ASR providers to try: the configured one, then the rest.
+def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
+    """Ordered ASR providers to try: the preferred one, then the rest.
 
     一台 GPU 節點重啟就讓每一輪語音變成「音訊轉錄失敗」送進 prompt，模型會
     把那六個字當成使用者說的話——那不是降級，是講錯話。TTS 早就有 bounded
     fallback chain，ASR 沒理由只有單點。只排入設定齊全的 provider：沒填
     URL 的排進來只會白等一次連線逾時。
+
+    preferred 是這個使用者自己選的引擎，排在最前面；其餘順序不變，所以他選
+    的那家掛掉時仍有備援。不認得的名字（例如瀏覽器端的 browser）直接忽略：
+    它根本不會走到這裡，音檔不會送上來。
     """
     configured = [
-        name for name in (_active_provider(cfg), *_TRANSCRIBERS)
+        name for name in (preferred, _active_provider(cfg), *_TRANSCRIBERS)
         if name in _TRANSCRIBERS
     ]
     ordered: list[str] = []
@@ -225,16 +229,18 @@ def _provider_ready(cfg, name: str) -> bool:
     return bool(cfg.whisper_api_key)
 
 
-async def transcribe(file_path: str, trace_id: str) -> IngestionResult:
+async def transcribe(
+    file_path: str, trace_id: str, preferred: str | None = None,
+) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
 
     Returns IngestionResult with content_type="audio_transcription".
     """
     cfg = get_tts_config()
-    chain = _resolve_chain(cfg)
+    chain = _resolve_chain(cfg, preferred)
     logger.info(
-        "transcribe trace_id=%s provider=%s chain=%s",
-        trace_id, _active_provider(cfg), ",".join(chain),
+        "transcribe trace_id=%s provider=%s preferred=%s chain=%s",
+        trace_id, _active_provider(cfg), preferred or "-", ",".join(chain),
     )
 
     for name in chain:

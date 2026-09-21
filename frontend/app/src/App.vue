@@ -171,6 +171,8 @@ import {
   type SendMessageResult,
 } from "./composables/useAvatarChat";
 import { useAsr } from "./composables/useAsr";
+import { useServerAsr } from "./composables/useServerAsr";
+import { BROWSER_ASR, fetchMyAsrProvider } from "./api/asr";
 import { useAuth } from "./composables/useAuth";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
 import { leaveFullscreen, unlockKeyboard } from "./sessionCleanup";
@@ -196,6 +198,11 @@ const HOST_MESSAGE_NAMESPACE = "avatar-widget-host";
 const isStarted = ref(false);
 const rendererBootstrapState = ref<"loading" | "ready" | "error">("loading");
 const asrError = ref("");
+// 這幾種錯誤代表這台裝置的瀏覽器辨識用不了，換引擎才有意義；
+// no-speech 之類是這一次沒講話，重試即可，不該換掉引擎。
+const BROWSER_FALLBACK_ERRORS = new Set([
+  "not-supported", "not-allowed", "audio-capture", "service-not-allowed",
+]);
 const isTyping = ref(false);
 const showSettings = ref(false);
 const showQuickQa = ref(false);
@@ -861,25 +868,67 @@ const asr = useAsr({
     });
   },
   onError: (error) => {
-    console.warn('[ASR]', error);
-    const messages: Record<string, string> = {
-      "not-supported": "此瀏覽器不支援語音輸入，請改用鍵盤輸入。",
-      "not-allowed": "麥克風權限遭拒，請在瀏覽器設定中允許存取。",
-      "audio-capture": "找不到可用的麥克風。",
-      "network": "語音辨識服務目前無法連線。",
-      "no-speech": "沒有偵測到語音，請再試一次。",
-      "start-failed": "無法啟動語音輸入，請稍後再試。",
-    };
-    asrError.value = messages[error] || "語音輸入發生錯誤，請再試一次。";
+    // 瀏覽器辨識當場失敗（沒權限、沒麥克風、服務被停用）就退回伺服器引擎，
+    // 而不是叫使用者改用鍵盤：伺服器引擎在這些情況下仍然可用。
+    if (BROWSER_FALLBACK_ERRORS.has(error) && myAsrProvider.value === BROWSER_ASR) {
+      myAsrProvider.value = "";
+      asrError.value = "此裝置無法使用瀏覽器語音辨識，已改用伺服器辨識。";
+      return;
+    }
+    reportAsrError(error);
   },
 });
-if (!asr.isSupported.value) {
-  asrError.value = "此瀏覽器不支援語音輸入，請改用鍵盤輸入。";
+function reportAsrError(error: string): void {
+  console.warn('[ASR]', error);
+  const messages: Record<string, string> = {
+    "not-supported": "此瀏覽器不支援語音輸入，請改用鍵盤輸入。",
+    "not-allowed": "麥克風權限遭拒，請在瀏覽器設定中允許存取。",
+    "audio-capture": "找不到可用的麥克風。",
+    "network": "語音辨識服務目前無法連線。",
+    "no-speech": "沒有偵測到語音，請再試一次。",
+    "start-failed": "無法啟動語音輸入，請稍後再試。",
+    "transcribe-failed": "語音辨識失敗，請再試一次。",
+  };
+  asrError.value = messages[error] || "語音輸入發生錯誤，請再試一次。";
 }
+
+const serverAsr = useServerAsr({
+  onResult: (transcript) => {
+    asrError.value = "";
+    void handleSend(transcript).then((result) => {
+      if (!result.accepted && result.message) {
+        statusToastRef.value?.show(result.message);
+      }
+    });
+  },
+  onError: reportAsrError,
+});
+
+// 這個帳號選的引擎。空字串代表沿用全站設定，那一定是伺服器引擎——瀏覽器
+// 辨識只能由使用者自己選，後端跑不了它。
+const myAsrProvider = ref("");
+
+/** 是否該用瀏覽器內建辨識。
+ *
+ * 兩道判斷缺一不可：`isSupported` 只看建構子在不在，Chrome 上它是 true，
+ * 但使用者拒絕麥克風或裝置上沒有麥克風時照樣不能用——那要等實際 start()
+ * 失敗才知道，由 onError 那條路退回伺服器引擎。
+ *
+ * 另外注意 Web Speech API 在部分瀏覽器只在 secure context 暴露：本機用
+ * http:// 加內網 IP 測會拿到 false，換成 https 就有了。
+ */
+const useBrowserAsr = computed(
+  () => myAsrProvider.value === BROWSER_ASR && asr.isSupported.value,
+);
+
+void fetchMyAsrProvider()
+  .then((profile) => { myAsrProvider.value = profile.value || profile.effective; })
+  .catch(() => { /* 讀不到就沿用伺服器引擎，不該因此不能講話。 */ });
 
 function handleAsrToggle(): void {
   asrError.value = "";
-  if (asr.isListening.value) asr.stop(); else asr.start();
+  const active = useBrowserAsr.value ? asr : serverAsr;
+  if (active.isListening.value) active.stop(); else void active.start();
 }
 
 function handleCameraPreviewScaleChange(scale: number): void {

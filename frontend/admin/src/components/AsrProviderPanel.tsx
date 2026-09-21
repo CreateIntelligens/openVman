@@ -3,8 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   clearAsrProvider,
   fetchAsrProvider,
+  fetchAsrUserChoices,
   previewAsr,
   setAsrProvider,
+  setAsrUserChoices,
+  type AsrUserChoices,
   type SystemSetting,
 } from "../api/settings";
 import { preferredRecorderMimeType, rmsVolume } from "../utils/liveAudioUtils";
@@ -29,6 +32,10 @@ const ENGINE_NOTES: Record<string, { label: string; note: string }> = {
     label: "OpenAI Whisper",
     note: "需要 API 金鑰，語音會送出到外部服務。",
   },
+  browser: {
+    label: "瀏覽器內建辨識",
+    note: "在使用者裝置上辨識，語音不會送到伺服器；部分瀏覽器不支援。",
+  },
 };
 
 function describe(id: string): { label: string; note: string } {
@@ -44,6 +51,8 @@ export default function AsrProviderPanel() {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [elapsed, setElapsed] = useState<number | null>(null);
+  const [choices, setChoices] = useState<AsrUserChoices | null>(null);
   const [level, setLevel] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -56,6 +65,10 @@ export default function AsrProviderPanel() {
       .then((value) => { if (!disposed) setSetting(value); })
       .catch(() => { if (!disposed) setError("無法載入語音辨識設定。"); })
       .finally(() => { if (!disposed) setLoading(false); });
+    // 開放清單載入失敗不該擋住整個面板：全站設定仍然可以改。
+    fetchAsrUserChoices()
+      .then((value) => { if (!disposed) setChoices(value); })
+      .catch(() => {});
     return () => { disposed = true; };
   }, []);
 
@@ -76,8 +89,11 @@ export default function AsrProviderPanel() {
   async function sendForTranscription(clip: Blob, filename?: string) {
     setTranscribing(true);
     setError("");
+    setElapsed(null);
     try {
-      setTranscript((await previewAsr(clip, filename)).text);
+      const preview = await previewAsr(clip, filename);
+      setTranscript(preview.text);
+      setElapsed(preview.elapsed_seconds ?? null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "辨識失敗，請重試。");
     } finally {
@@ -211,6 +227,55 @@ export default function AsrProviderPanel() {
         )}
       </div>
 
+      {choices && (
+        <div className="flex flex-col gap-3 border-t border-border pt-6">
+          <h2 className="text-sm font-semibold">開放使用者自選</h2>
+          <p className="text-xs leading-5 text-content-muted">
+            勾選的引擎會出現在聊天室的選單裡，讓使用者替自己的對話挑一個。
+            沒有勾選的一律沿用上面的全站設定。
+          </p>
+          <div className="flex flex-col gap-2">
+            {choices.options.map((id) => {
+              const engine = describe(id);
+              const checked = choices.allowed.includes(id);
+              return (
+                <label key={id} className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={checked}
+                    disabled={busy}
+                    onChange={() => {
+                      const next = checked
+                        ? choices.allowed.filter((item) => item !== id)
+                        : [...choices.allowed, id];
+                      setBusy(true);
+                      setError("");
+                      setStatus("");
+                      setAsrUserChoices(next)
+                        .then((value) => {
+                          setChoices(value);
+                          setStatus("已更新開放清單。");
+                        })
+                        .catch((reason) => setError(
+                          reason instanceof Error ? reason.message : "設定失敗，請重試。",
+                        ))
+                        .finally(() => setBusy(false));
+                    }}
+                  />
+                  <span className="flex flex-col">
+                    <span>{engine.label}</span>
+                    {engine.note && (
+                      <span className="text-xs text-content-muted">{engine.note}</span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-sm font-semibold">試辨識</h2>
         <p className="text-xs leading-5 text-content-muted">
@@ -265,9 +330,18 @@ export default function AsrProviderPanel() {
           )}
         </div>
         {transcript && (
-          <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm">
-            {transcript}
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm">
+              {transcript}
+            </p>
+            {elapsed !== null && (
+              // 這是這一次實測到的耗時，不是對引擎的效能承諾：同一個引擎會隨
+              // 音檔長度與 GPU 當下負載變動，拿它跨次比較要留意這點。
+              <p className="text-xs text-content-muted">
+                本次辨識耗時 {elapsed.toFixed(2)} 秒（不含上傳與轉檔）
+              </p>
+            )}
+          </div>
         )}
       </div>
 
