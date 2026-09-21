@@ -20,6 +20,12 @@
 
 ### Fixed
 
+- **後台下拉選單樣式**: `select.input` 補上 `appearance: none`。先前只有頭像端的
+  `CustomSelect` 修過，後台四處原生 `<select>`（帳號權限、角色、批次臨時帳號）
+  仍由瀏覽器另外畫一層邊框與箭頭，看起來像沒套樣式。一併讓 option 跟著深淺色走。
+- **回覆深度選項排版**: `.mode-toggle` 原本寫死兩欄，三個選項會排成 2+1，最後一個
+  獨佔一列。改成依選項數平均分欄；窄螢幕仍疊成一欄（`grid-auto-flow` 需一併改回
+  `row`，只覆寫 `grid-template-columns` 蓋不掉）。
 - **ASR 試辨識上傳音檔**: 修正選了檔案卻顯示「未選擇任何檔案」——清空 input 的
   `value` 會一併清空 `files`，那行被放在讀取檔案之前。同時把真實檔名一起送出，
   先前寫死 `preview.webm` 會讓上傳的 mp3 在後端以 webm 解碼而轉檔失敗。

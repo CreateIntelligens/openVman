@@ -94,3 +94,6 @@ infra/nginx/native/openvman.conf
 
 # Claude 工作日誌快取
 .remember/
+
+# tsc -b 的增量建置快取
+*.tsbuildinfo

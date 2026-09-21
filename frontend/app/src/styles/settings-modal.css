@@ -324,9 +324,12 @@
   opacity: 0;
 }
 
+/* 選項數量隨欄位而異（模式兩個、回覆深度三個），寫死兩欄會讓三選項變成
+   2+1，最後一張獨佔一列。改成平均分配，有幾個就幾欄。 */
 .mode-toggle {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 0.5rem;
 }
 
@@ -388,8 +391,14 @@
 
 @media (max-width: 34rem) {
   .background-options,
-  .background-fit-options,
-  .mode-toggle {
+  .background-fit-options {
     grid-template-columns: 1fr;
+  }
+
+  /* mode-toggle 用 auto-flow: column，單靠 grid-template-columns 蓋不掉，
+     要把流向改回 row 才會疊成一欄。 */
+  .mode-toggle {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
   }
 }
