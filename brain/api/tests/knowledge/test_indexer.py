@@ -118,7 +118,12 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     monkeypatch.setitem(sys.modules, "config", fake_settings_mod)
 
     # Force reimport
+    # 切塊邏輯住在 knowledge.chunking，它在 import 時就綁定了 workspace 等
+    # 符號。只重載 indexer 會讓 chunking 留著上一個測試的 stub，於是文件路徑
+    # 對不上另一個 tmp_path。兩個都要丟掉重載。
+    sys.modules.pop("knowledge.chunking", None)
     sys.modules.pop("knowledge.indexer", None)
+    importlib.import_module("knowledge.chunking")
     indexer = importlib.import_module("knowledge.indexer")
     return indexer, workspace_root, fake_embedder, fake_db
 
