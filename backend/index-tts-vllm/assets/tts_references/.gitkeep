@@ -1,0 +1,4 @@
+# compose 把 ./backend/app/assets/tts_references 掛到
+# /indextts-assets/tts_references，而父層 /indextts-assets 是唯讀掛載。
+# Docker 無法在唯讀掛載裡建立掛載點，所以這個目錄必須先存在，否則 backend
+# 會起不來，而且錯誤訊息只說 "read-only file system"，看不出是少了目錄。
