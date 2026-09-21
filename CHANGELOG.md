@@ -8,6 +8,12 @@
 - 新增隔離的 SemIf 語意分流／語音打斷離線實驗，提供繁體中文合成案例、固定上游與模型版本、選項順序穩定性及延遲量測；不變更正式服務路由。
 
 
+### Fixed
+
+- **ASR 試辨識上傳音檔**: 修正選了檔案卻顯示「未選擇任何檔案」——清空 input 的
+  `value` 會一併清空 `files`，那行被放在讀取檔案之前。同時把真實檔名一起送出，
+  先前寫死 `preview.webm` 會讓上傳的 mp3 在後端以 webm 解碼而轉檔失敗。
+
 ### Changed
 
 - **A2A Validation Readability**: Consolidate absent/blank input and length checks, simplify optional context normalization, and share task/group type regression cases without changing errors or outbound payloads.

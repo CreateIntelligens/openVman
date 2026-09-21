@@ -89,8 +89,30 @@ describe("AsrProviderPanel", () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [clip] } });
 
-    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip));
+    // 檔名要一起送：後端拿副檔名決定怎麼解這個檔，mp3 冠上 .webm 會轉檔失敗。
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.wav"));
     expect(await screen.findByText("今仔日天氣袂歹")).toBeTruthy();
+  });
+
+  it("清空 input 不能把選到的檔案一起清掉", async () => {
+    // 真實的 <input type=file> 一旦把 value 設成 ""，files 也會跟著變空。
+    // 先清再讀就永遠讀不到檔案，畫面只會說「未選擇任何檔案」。
+    vi.mocked(previewAsr).mockResolvedValue({ text: "有聽到", provider: "breeze" });
+    render(<AsrProviderPanel />);
+    await screen.findByText(/SenseVoice-Small/);
+
+    const clip = new File(["audio"], "clip.mp3", { type: "audio/mpeg" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    let files: File[] = [clip];
+    Object.defineProperty(input, "files", { get: () => files, configurable: true });
+    Object.defineProperty(input, "value", {
+      get: () => (files.length ? "C:\\fakepath\\clip.mp3" : ""),
+      set: () => { files = []; },
+      configurable: true,
+    });
+    fireEvent.change(input);
+
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.mp3"));
   });
 
   it("上傳辨識失敗時顯示錯誤", async () => {

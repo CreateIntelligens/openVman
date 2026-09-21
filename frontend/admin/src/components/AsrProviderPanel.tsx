@@ -73,11 +73,11 @@ export default function AsrProviderPanel() {
     }
   }
 
-  async function sendForTranscription(clip: Blob) {
+  async function sendForTranscription(clip: Blob, filename?: string) {
     setTranscribing(true);
     setError("");
     try {
-      setTranscript((await previewAsr(clip)).text);
+      setTranscript((await previewAsr(clip, filename)).text);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "辨識失敗，請重試。");
     } finally {
@@ -235,13 +235,15 @@ export default function AsrProviderPanel() {
               className="sr-only"
               disabled={recording || transcribing}
               onChange={(event) => {
-                const picked = event.target.files?.[0];
-                // 清掉 value，選同一個檔案兩次才會再次觸發 change。
-                event.target.value = "";
+                const input = event.target;
+                const picked = input.files?.[0];
                 if (picked) {
                   setTranscript("");
-                  void sendForTranscription(picked);
+                  void sendForTranscription(picked, picked.name);
                 }
+                // 清 value 要等取完檔案：清掉會一併清空 files，先清就什麼都
+                // 讀不到。清它是為了讓同一個檔案選第二次仍會觸發 change。
+                input.value = "";
               }}
             />
           </label>
