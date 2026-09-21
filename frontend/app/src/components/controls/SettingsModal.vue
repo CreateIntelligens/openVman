@@ -406,23 +406,27 @@ function handleDialogClick(event: MouseEvent): void {
           </div>
 
           <div class="modal-body">
-            <div class="field-card field-card--full">
-              <span class="field-card__label">大腦/知識庫</span>
-              <CustomSelect
-                v-model="draftProjectId"
-                :options="projectOptions"
-                :disabled="projectDisabled"
-                @change="handleProjectDraftChange"
-              />
-            </div>
+            <!-- 知識庫與人設是一組：換了知識庫就要重挑人設，放同一列才看得
+                 出關聯，也不必為了兩個下拉各佔掉一整行。 -->
+            <div class="field-row">
+              <div class="field-card">
+                <span class="field-card__label">大腦/知識庫</span>
+                <CustomSelect
+                  v-model="draftProjectId"
+                  :options="projectOptions"
+                  :disabled="projectDisabled"
+                  @change="handleProjectDraftChange"
+                />
+              </div>
 
-            <div class="field-card field-card--full">
-              <span class="field-card__label">人設</span>
-              <CustomSelect
-                v-model="draftPersonaId"
-                :options="personaOptions"
-                :disabled="personaDisabled"
-              />
+              <div class="field-card">
+                <span class="field-card__label">人設</span>
+                <CustomSelect
+                  v-model="draftPersonaId"
+                  :options="personaOptions"
+                  :disabled="personaDisabled"
+                />
+              </div>
             </div>
 
             <div class="field-row">

@@ -109,9 +109,12 @@
   opacity: 0.6;
 }
 
+/* 欄數跟著內容走，不是寫死兩欄。這一列的卡片數量會變（「聲音」與「語音
+   辨識」都是條件顯示），寫死兩欄時三張卡就變成 2+1，最後一張獨佔一整列
+   看起來像沒對齊。auto-fit 讓它們自己排，窄螢幕自動變一欄。 */
 .field-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 1rem;
 }
 
