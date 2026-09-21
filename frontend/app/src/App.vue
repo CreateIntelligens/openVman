@@ -152,20 +152,17 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import type { AccountDefaults } from "./api/auth";
 import type { ReplyMode } from "./types/replyMode";
 import { apiFetch } from "./api/http";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import CameraPreview from "./components/avatar/CameraPreview.vue";
 import ChatPanel from "./components/chat/ChatPanel.vue";
 import ControlBar from "./components/controls/ControlBar.vue";
-import type { PersonaSummary } from "./components/controls/ControlBar.vue";
 import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
 import QuickQaPanel from "./components/controls/QuickQaPanel.vue";
 import { useAudioPlayer } from "./composables/useAudioPlayer";
-import { useAvatarCatalog } from "./composables/useAvatarCatalog";
 import {
   useAvatarChat,
   type SendMessageResult,
@@ -173,23 +170,17 @@ import {
 import { useAsr } from "./composables/useAsr";
 import { useServerAsr } from "./composables/useServerAsr";
 import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
+import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { BROWSER_ASR, fetchMyAsrProvider } from "./api/asr";
-import { useAuth } from "./composables/useAuth";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
 import { leaveFullscreen, unlockKeyboard } from "./sessionCleanup";
-import { useTtsStreamer, type TtsProvider } from "./composables/useTtsStreamer";
+import { useTtsStreamer } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useWebcamCapture } from "./composables/useWebcamCapture";
-import {
-  buildMascotWidgetSrc,
-  toMascotOption,
-  type MascotApiRecord,
-  type MascotOption,
-} from "./data/mascotCatalog";
-import { bindSettingsToAccount, useSettingsStore } from "./stores/useSettingsStore";
+import { buildMascotWidgetSrc, type MascotOption } from "./data/mascotCatalog";
+import { useSettingsStore } from "./stores/useSettingsStore";
 import {
   isUploadedAvatarBackgroundId,
-  normalizeAvatarBackgroundId,
   type AvatarBackgroundFit,
   type AvatarBackgroundId,
 } from "./types/avatarBackground";
@@ -245,14 +236,11 @@ function onAudioQueueEmpty(): void {
 }
 
 const settings = useSettingsStore();
-// 初始為空：清單一律以後端回傳為準。用寫死的 catalog 當初始值會在
-// fetchVrmAvatars() 回來前就去抓未授權的 VRM，換來一個 403。
-const vrmAvatarOptions = ref<MascotOption[]>([]);
 const selectedVrmAvatar = computed(() =>
   resolveVrmAvatarOption(settings.vrmAvatarId, vrmAvatarOptions.value),
 );
 const vrmCharacterOptions = computed(() =>
-  vrmAvatarOptions.value.map((mascot) => ({
+  vrmAvatarOptions.value.map((mascot: MascotOption) => ({
     id: mascot.id,
     label: mascot.label,
   })),
@@ -280,260 +268,28 @@ const stageBackgroundStyle = computed<Record<string, string>>(() => {
   };
 });
 
-interface ProjectSummary {
-  project_id: string;
-  label: string;
-  document_count?: number;
-  persona_count?: number;
-}
+const {
+  avatarCatalog,
+  projects,
+  personas,
+  personasLoading,
+  ttsProviders,
+  backgrounds,
+  characters,
+  selectionNotices,
+  vrmAvatarOptions,
+  accountDefault,
+  addSelectionNotice,
+  fetchVrmAvatars,
+  fetchInitialProjectData,
+  fetchPersonas,
+  fetchTtsProviders,
+  fetchBackgrounds,
+  stageBackgroundFitStyle,
+  resolveVrmAvatarOption,
+  PREFERRED_CHARACTER_ID,
+} = useAvatarBootstrap({ settings, chat: () => chat });
 
-interface AvatarBackgroundSummary {
-  background_id: string;
-  label: string;
-  url: string;
-}
-
-interface VrmMascotsResponse {
-  mascots?: MascotApiRecord[];
-}
-
-const PREFERRED_PROJECT_ID = "proj-b85afb8bb6";
-const PREFERRED_CHARACTER_ID = "0713";
-const PREFERRED_VOICE_PROVIDER = "indextts";
-const PREFERRED_VOICE_ID = "hayley";
-const DEFAULT_PERSONA: PersonaSummary = { persona_id: "default", label: "預設" };
-const projects = ref<ProjectSummary[]>([]);
-const personas = ref<PersonaSummary[]>([DEFAULT_PERSONA]);
-const backgrounds = ref<AvatarBackgroundSummary[]>([]);
-const personasLoading = ref(false);
-const ttsProviders = ref<TtsProvider[]>([]);
-const avatarCatalog = useAvatarCatalog();
-const auth = useAuth();
-// 偏好是每個帳號各自一份。store 在登入前就初始化了，所以帳號一確定就要重新
-// 綁定並重讀——immediate 讓還原既有工作階段的情況也會走到。
-watch(
-  () => auth.account.value?.id ?? "",
-  (accountId) => bindSettingsToAccount(accountId),
-  { immediate: true },
-);
-const selectionNotices = ref<string[]>([]);
-let personaRequestId = 0;
-
-const characters = computed(() => {
-  const loaded = avatarCatalog.characters.value
-    .filter((c) => c.has_video && c.has_data)
-    .map((c) => ({
-      id: c.char_id,
-      name: c.label && c.label !== c.char_id ? c.label : `角色 ${c.char_id}`,
-    }));
-  return loaded;
-});
-
-function pickFallbackProjectId(items: ProjectSummary[]): string {
-  return items[0]?.project_id ?? "";
-}
-
-function addSelectionNotice(message: string): void {
-  if (!selectionNotices.value.includes(message)) selectionNotices.value.push(message);
-}
-
-function accountDefault<K extends keyof AccountDefaults>(
-  key: K,
-  fallback: AccountDefaults[K],
-): AccountDefaults[K] {
-  return auth.account.value?.defaults?.[key] ?? fallback;
-}
-
-function pickFallbackPersonaId(items: PersonaSummary[], preferredId: string): string {
-  if (items.some((p) => p.persona_id === preferredId)) return preferredId;
-  return items.find((p) => p.persona_id === "default")?.persona_id
-    ?? items[0]?.persona_id
-    ?? DEFAULT_PERSONA.persona_id;
-}
-
-function pickProviderVoice(provider: TtsProvider | undefined): string {
-  if (!provider) return "";
-  if (provider.voices.includes(provider.default_voice)) {
-    return provider.default_voice;
-  }
-  return provider.voices[0] ?? "";
-}
-
-function resolveVrmAvatarOption(
-  vrmId: string | null | undefined,
-  catalog: readonly MascotOption[],
-): MascotOption | null {
-  return catalog.find((mascot) => mascot.id === vrmId)
-    ?? catalog[0]
-    ?? null;
-}
-
-async function fetchVrmAvatars(): Promise<void> {
-  try {
-    const res = await apiFetch("/api/v1/avatar/mascots");
-    if (!res.ok) return;
-    const data = (await res.json()) as VrmMascotsResponse;
-    const items = (data.mascots ?? [])
-      .map(toMascotOption)
-      .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
-    vrmAvatarOptions.value = items;
-  } catch {
-    vrmAvatarOptions.value = [];
-  } finally {
-    const preferred = accountDefault("mascot_id", "");
-    const preferredOption = vrmAvatarOptions.value.find((m) => m.id === preferred);
-    const selected = preferredOption ?? vrmAvatarOptions.value[0];
-    settings.vrmAvatarId = selected?.id ?? "";
-  }
-}
-
-function stageBackgroundFitStyle(fit: AvatarBackgroundFit): Record<string, string> {
-  switch (fit) {
-    case "repeat":
-      return {
-        backgroundPosition: "top left",
-        backgroundRepeat: "repeat",
-        backgroundSize: "auto",
-      };
-    case "contain":
-      return {
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundSize: "contain",
-      };
-    default:
-      return {
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        backgroundSize: "cover",
-      };
-  }
-}
-
-async function fetchProjects(): Promise<void> {
-  projects.value = [];
-  settings.projectId = "";
-  chat.setProject("");
-  try {
-    const res = await apiFetch("/api/v1/projects");
-    if (!res.ok) return;
-    const data = await res.json();
-    const items: ProjectSummary[] = (data.projects ?? []).map((p: ProjectSummary) => ({
-      project_id: p.project_id,
-      label: p.label || p.project_id,
-      document_count: p.document_count,
-      persona_count: p.persona_count,
-    }));
-    projects.value = items;
-    const preferred = accountDefault("project_id", PREFERRED_PROJECT_ID);
-    const selected = items.some((project) => project.project_id === preferred)
-      ? preferred
-      : pickFallbackProjectId(items);
-    settings.projectId = selected;
-    if (selected && selected !== preferred) {
-      addSelectionNotice(`預設專案 ${preferred} 未獲授權，已改用 ${selected}。`);
-    } else if (!selected) {
-      addSelectionNotice("目前帳號沒有可使用的知識庫專案。");
-    }
-    chat.setProject(selected);
-  } catch {
-    projects.value = [];
-    settings.projectId = "";
-    chat.setProject("");
-  }
-}
-
-async function fetchInitialProjectData(): Promise<void> {
-  await fetchProjects();
-  if (settings.projectId) {
-    await fetchPersonas(settings.projectId);
-  }
-}
-
-async function fetchPersonas(
-  projectId = settings.projectId,
-  options: { syncSelected?: boolean } = {},
-): Promise<void> {
-  const targetProjectId = projectId;
-  if (!targetProjectId) {
-    personas.value = [];
-    settings.personaId = "";
-    chat.setPersona("");
-    return;
-  }
-  const requestId = ++personaRequestId;
-  personasLoading.value = true;
-
-  try {
-    const res = await apiFetch(`/api/v1/personas?project_id=${encodeURIComponent(targetProjectId)}`);
-    if (!res.ok || requestId !== personaRequestId) return;
-    const data = await res.json();
-    if (requestId !== personaRequestId) return;
-    const items: PersonaSummary[] = (data.personas ?? []).map((p: { persona_id: string; label: string }) => ({
-      persona_id: p.persona_id,
-      label: p.label || p.persona_id,
-    }));
-    const nextPersonas = items.length > 0 ? items : [DEFAULT_PERSONA];
-    personas.value = nextPersonas;
-    if (options.syncSelected ?? targetProjectId === settings.projectId) {
-      settings.personaId = pickFallbackPersonaId(nextPersonas, settings.personaId);
-      chat.setPersona(settings.personaId);
-    }
-  } catch {
-    if (requestId === personaRequestId) personas.value = [DEFAULT_PERSONA];
-  } finally {
-    if (requestId === personaRequestId) personasLoading.value = false;
-  }
-}
-
-async function fetchTtsProviders(): Promise<void> {
-  ttsProviders.value = [];
-  settings.ttsProvider = "";
-  settings.ttsVoice = "";
-  try {
-    const res = await apiFetch("/api/v1/tts/providers");
-    if (!res.ok) return;
-    const items = await res.json() as TtsProvider[];
-    ttsProviders.value = items;
-    const preferredProvider = accountDefault("voice_provider", PREFERRED_VOICE_PROVIDER);
-    const preferredVoice = accountDefault("voice_id", PREFERRED_VOICE_ID);
-    const provider = items.find(
-      (item) => item.id === preferredProvider && item.voices.includes(preferredVoice),
-    );
-    const fallbackProvider = items.find((item) => item.voices.length > 0);
-    const selectedProvider = provider ?? fallbackProvider;
-    const selectedVoice = provider
-      ? preferredVoice
-      : pickProviderVoice(selectedProvider);
-    settings.ttsProvider = selectedProvider?.id ?? "";
-    settings.ttsVoice = selectedVoice;
-    if (selectedProvider && (selectedProvider.id !== preferredProvider || selectedVoice !== preferredVoice)) {
-      addSelectionNotice(
-        `預設聲音 ${preferredProvider}/${preferredVoice} 未獲授權，已改用 ${selectedProvider.id}/${selectedVoice}。`,
-      );
-    } else if (!selectedProvider) {
-      addSelectionNotice("目前沒有可用的語音");
-    }
-  } catch {
-    // silently keep empty — SettingsModal falls back to showing nothing
-  }
-}
-
-async function fetchBackgrounds(): Promise<void> {
-  try {
-    const res = await apiFetch("/api/v1/backgrounds");
-    if (!res.ok) return;
-    const data = await res.json();
-    const items = data.backgrounds ?? [];
-    backgrounds.value = items;
-    const preferred = accountDefault("background_id", "");
-    if (preferred && items.some((b: { background_id: string }) => b.background_id === preferred)) {
-      settings.backgroundId = normalizeAvatarBackgroundId(`uploaded:${preferred}`);
-    }
-  } catch {
-    backgrounds.value = [];
-  }
-}
 
 const wasm = useOpenVmanAvatarRuntime();
 const rendererDisabled = computed(() =>

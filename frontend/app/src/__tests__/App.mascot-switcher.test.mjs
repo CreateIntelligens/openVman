@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
+// 清單載入與備援選擇的邏輯住在 useAvatarBootstrap，樣板仍在 App.vue。
+// 兩邊合起來看才是這個畫面的完整定義。
+const source = [
+  readFileSync(resolve(__dirname, "../App.vue"), "utf8"),
+  readFileSync(resolve(__dirname, "../composables/useAvatarBootstrap.ts"), "utf8"),
+].join("\n");
 const bridgeSource = readFileSync(
   resolve(__dirname, "../composables/useStageAvatarBridge.ts"), "utf8",
 );

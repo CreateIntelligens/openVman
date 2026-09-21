@@ -33,7 +33,9 @@ test("the store rebinds when the account resolves after startup", () => {
   // 同一個帳號重複綁定要短路，不要無謂地重讀。
   assert.match(store, /if \(currentPrefScope\(\) === \(accountId \|\| ""\)\) return/);
 
-  const app = read("App.vue");
+  // 帳號綁定與備援選擇搬到 useAvatarBootstrap，兩邊一起看。
+  const app = read("App.vue") + "\n"
+    + read("composables/useAvatarBootstrap.ts");
   assert.match(app, /bindSettingsToAccount\(accountId\)/);
   // immediate 讓「還原既有工作階段」也會綁定，不是只有互動式登入。
   assert.match(app, /\{ immediate: true \}/);
