@@ -3,10 +3,13 @@
 ## [Unreleased]
 
 ### Experiments
+- 保存 A2A 隔離私有圈的真實 Hub／SSE／Brain 回覆證據；完成派工、durable enqueue、雙向 ACK 與約 9.55 秒往返，正式 A2A 開關保持關閉。
 - 新增隔離的 SemIf 語意分流／語音打斷離線實驗，提供繁體中文合成案例、固定上游與模型版本、選項順序穩定性及延遲量測；不變更正式服務路由。
 
 
 ### Changed
+
+- **A2A Validation Readability**: Consolidate absent/blank input and length checks, simplify optional context normalization, and share task/group type regression cases without changing errors or outbound payloads.
 
 - **Intent Shadow Readability**: Separate centroid initialization from query scoring, centralize observation input limits, and remove redundant test setup without changing classification or scheduling behavior.
 
@@ -31,6 +34,8 @@
   The account list shows the whole delegation subtree, but only directly created accounts are editable — releasing the whole subtree would let a demoted intermediary still reach its grandchildren.
 
 ### Fixed
+
+- **A2A Skill Validation**: Reject non-string task/group fields, boolean delegation hops, and invalid or oversized context IDs before contacting Backend. Normalize blank context IDs to absent, document the existing UTF-8 byte limit, and align tool declarations. Replace stale error-message expectations with field-specific regression tests and a loopback HTTP transport check.
 
 - **Interruption Guard**: Handle single-word stop commands before noise filtering; ignore recognized acknowledgements, continue/negated-stop phrases, and quoted background speech while preserving later corrections and new questions. Treat transcript-free `client_interrupt` events as explicit stop controls, preserving the avatar stop action. Add classifier and WebSocket/task-cancellation regression coverage; no model inference is introduced.
 

@@ -1,0 +1,111 @@
+{
+  "run_id": "a2a-smoke-60cdc55af1e6",
+  "steps": [
+    {
+      "step": "registered",
+      "role": "sender",
+      "agent_id": "agent-4efcce0b1b5bf3b979793475",
+      "circle_id": "circle-1759ce38994bb2781d2d08674af4bb75"
+    },
+    {
+      "step": "registered",
+      "role": "receiver",
+      "agent_id": "agent-304708b54078282eb24c3c2f",
+      "circle_id": "circle-1759ce38994bb2781d2d08674af4bb75"
+    },
+    {
+      "step": "private_peer_discovery",
+      "peer_count": 2
+    },
+    {
+      "step": "skill_facade_dispatch",
+      "result": {
+        "success": true,
+        "target": "agent-304708b54078282eb24c3c2f",
+        "result": {
+          "contextId": "a2a-smoke-60cdc55af1e6",
+          "deliveryOutcome": "QUEUED",
+          "sequence": 361,
+          "state": "PENDING",
+          "targetAgentId": "agent-304708b54078282eb24c3c2f",
+          "taskId": "2166e807-561c-4d20-a85e-42be3652784a"
+        }
+      }
+    },
+    {
+      "step": "receiver_durable_inbox",
+      "task_id": "2166e807-561c-4d20-a85e-42be3652784a",
+      "sequence": 361,
+      "acked": true,
+      "message_matches": true
+    },
+    {
+      "step": "receiver_processing",
+      "status": "COMPLETED",
+      "error": null,
+      "reply": "A2A_PONG a2a-smoke-60cdc55af1e6"
+    },
+    {
+      "step": "sender_received_reply",
+      "task_id": "b695ff73-351b-4c5c-905e-f47eccbd30ab",
+      "sequence": 362,
+      "acked": true,
+      "message": "A2A_PONG a2a-smoke-60cdc55af1e6",
+      "elapsed_ms": 9553.383185528219
+    },
+    {
+      "step": "local_cleanup",
+      "listeners_stopped": true,
+      "credentials_in_temporary_file": true,
+      "note": "Hub identities remain registered; no self-revoke endpoint confirmed."
+    }
+  ],
+  "production_a2a_enabled": false,
+  "passed": true,
+  "first_attempt": {
+    "run_id": "a2a-smoke-be7566d74ad1",
+    "steps": [
+      {
+        "step": "registered",
+        "role": "sender",
+        "agent_id": "agent-0764848a6326a7dea703857c",
+        "circle_id": "circle-19bbfde0ff61e4914590fea6eff20407"
+      },
+      {
+        "step": "registered",
+        "role": "receiver",
+        "agent_id": "agent-1a082273051c3d18adbb9425",
+        "circle_id": "circle-19bbfde0ff61e4914590fea6eff20407"
+      },
+      {
+        "step": "private_peer_discovery",
+        "peer_count": 2
+      },
+      {
+        "step": "failed",
+        "error_type": "AttributeError",
+        "message": "'A2ABridgeDaemon' object has no attribute '_listen_sse'"
+      },
+      {
+        "step": "local_cleanup",
+        "listeners_stopped": true,
+        "credentials_persisted": false,
+        "note": "Hub identities remain registered; no self-revoke endpoint confirmed."
+      }
+    ],
+    "production_a2a_enabled": false,
+    "passed": false
+  },
+  "skill_sha256": "0f54ed0cd76d3a428d3b07fec4dcd9900d26ae778138ba654b3a7697340b993d",
+  "scope": {
+    "hub": "https://a2a.david888.com",
+    "facade": "real router in isolated loopback server, not production listener",
+    "brain": "deployed Brain /brain/chat",
+    "sse": "real bridge _stream_inbox with durable queue and ACK",
+    "leader_election": "not exercised; isolated harness explicitly designates leader",
+    "reconnect_and_restart": "not exercised",
+    "total_temporary_hub_identities_registered": 4,
+    "first_attempt": "two registrations, then harness method-name error before task dispatch"
+  },
+  "local_secrets_removed": true
+}

@@ -719,3 +719,15 @@ API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gatew
 普通 chat／SSE 可抽樣使用既有 BGE embedding 觀察 chat、knowledge、web、clarify 建議分類。預設關閉；背景結果不改路由、prompt 或強制知識庫檢索，每個 process 同時只處理一筆，不排隊。設定、記錄格式與故障行為見 [操作文件](../docs/intent-shadow.md)，獨立 64 筆合成案例結果見 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。目前 52/64 正確，包含一筆知識庫問題誤判閒聊，不能用來跳過 RAG。
 
 實作將範例 centroid 初始化與 query 評分分開，文字截斷限制集中管理；這項整理不改變分類、背景排程或正式 RAG 行為。
+
+## A2A 工具輸入驗證
+
+a2a_send_task 的 target_agent_id 與 message、a2a_broadcast_group 的 group_id 與 message 必須是非空白字串，不再將數字、布林值、陣列或物件轉成字串送出。ID 去除前後空白後最多 256 字元，message 去除前後空白後最多 1048576 UTF-8 bytes（中文可能先達到位元組限制）。
+
+a2a_send_task 的 context_id 可省略或為 null；字串去除前後空白後最多 256 字元，空白視為未指定。hop_count 必須是 0–10 的整數，true／false 不算整數；Backend 仍會依部署設定套用更嚴格的 hop 上限。
+
+驗證失敗回傳 {"error": "..."}，例如 target_agent_id is required、context_id is too long，不發出 HTTP 請求。合法請求仍透過既有 Backend internal facade 與 X-Internal-Token；不改 Hub 憑證、派工或群組政策。a2a_list_peers 的 state 為 all／online／offline，省略時不加狀態條件。
+
+A2A 真實往返已於 2026-09-20 在隔離私有圈驗證：Brain skill → 隔離 Backend facade → 真實 Hub／SSE → 已部署 Brain → Hub 回覆，約 9.55 秒。正式 A2A 開關未啟用；範圍、清理與原始證據見 [實測紀錄](../scripts/experiments/a2a-live/README.md)。
+
+A2A 驗證共用缺值／空白與長度判斷；整理後保留原有錯誤字串、驗證順序與送出 payload。派工與廣播的非字串回歸測試共用案例表，context_id 正規化則以明列的輸入／預期結果驗證。

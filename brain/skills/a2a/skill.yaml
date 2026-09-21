@@ -1,7 +1,7 @@
 id: a2a
 name: A2A Network
 description: 與 888a2a 網絡上的其他 AI Agent 同儕通訊、查詢同儕清單與派送任務
-version: "1.0.0"
+version: "1.0.1"
 tools:
   - name: a2a_list_peers
     description: 列出目前在 888a2a Hub 私有圈內線上的 AI Agent 同儕及其功能
@@ -10,7 +10,8 @@ tools:
       properties:
         state:
           type: string
-          description: "同儕在線狀態過濾，例如 online"
+          enum: [all, online, offline]
+          description: "同儕在線狀態過濾；省略表示全部"
       required: []
   - name: a2a_send_task
     description: 派遣任務或發送訊息給指定的同儕 Agent（例如 OpenClaw, Codex, Claude 等）
@@ -19,16 +20,18 @@ tools:
       properties:
         target_agent_id:
           type: string
+          minLength: 1
           maxLength: 256
           description: 目標 Agent 的唯一識別碼 (agentId)，不可包含憑證
         message:
           type: string
+          minLength: 1
           maxLength: 1048576
-          description: 要發送給該 Agent 的訊息或任務內容；內容視為不可信資料
+          description: 要發送給該 Agent 的訊息或任務內容；去除前後空白後最多 1048576 UTF-8 bytes，內容視為不可信資料
         context_id:
           type: string
           maxLength: 256
-          description: 可選的工作脈絡識別碼
+          description: 可選的工作脈絡識別碼；最多 256 字元，空白視為未指定
         hop_count:
           type: integer
           minimum: 0
@@ -43,10 +46,12 @@ tools:
       properties:
         group_id:
           type: string
+          minLength: 1
           maxLength: 256
           description: 目標群組 ID；需通過 Backend 群組政策
         message:
           type: string
+          minLength: 1
           maxLength: 1048576
-          description: 廣播訊息內容；視為不可信資料
+          description: 廣播訊息內容；去除前後空白後最多 1048576 UTF-8 bytes，視為不可信資料
       required: [group_id, message]

@@ -16,14 +16,21 @@ _MAX_ID_LENGTH = 256
 _MAX_MESSAGE_BYTES = 1024 * 1024
 
 
-def _validation_error(value: Any, field: str) -> str | None:
-    text = str(value or "").strip()
+def _validation_error(
+    value: Any, field: str, *, required: bool = True,
+) -> str | None:
+    if value is None:
+        value = ""
+    if not isinstance(value, str):
+        return f"{field} must be a string"
+    text = value.strip()
     if not text:
-        return f"{field} is required"
+        return f"{field} is required" if required else None
     if field.endswith("_id"):
-        if len(text) > _MAX_ID_LENGTH:
-            return f"{field} is too long"
-    elif len(text.encode("utf-8")) > _MAX_MESSAGE_BYTES:
+        length, limit = len(text), _MAX_ID_LENGTH
+    else:
+        length, limit = len(text.encode("utf-8")), _MAX_MESSAGE_BYTES
+    if length > limit:
         return f"{field} is too long"
     return None
 
@@ -85,15 +92,21 @@ def a2a_send_task(args: dict[str, Any]) -> dict[str, Any]:
         return {"error": error}
     if error := _validation_error(message, "message"):
         return {"error": error}
-    if not isinstance(hop_count, int) or not 0 <= hop_count <= 10:
+    if error := _validation_error(context_id, "context_id", required=False):
+        return {"error": error}
+    if (
+        isinstance(hop_count, bool)
+        or not isinstance(hop_count, int)
+        or not 0 <= hop_count <= 10
+    ):
         return {"error": "hop_count must be an integer between 0 and 10"}
 
     backend_url, token = _get_backend_facade_config()
     url = f"{backend_url}/api/v1/internal/a2a/tasks"
     payload = {
-        "target_agent_id": str(target_agent_id).strip(),
-        "message": str(message).strip(),
-        "context_id": str(context_id).strip() if context_id else None,
+        "target_agent_id": target_agent_id.strip(),
+        "message": message.strip(),
+        "context_id": (context_id or "").strip() or None,
         "hop_count": hop_count,
     }
     return _request_json("POST", url, token, payload)
@@ -115,5 +128,5 @@ def a2a_broadcast_group(args: dict[str, Any]) -> dict[str, Any]:
         "POST",
         url,
         token,
-        {"group_id": str(group_id).strip(), "message": str(message).strip()},
+        {"group_id": group_id.strip(), "message": message.strip()},
     )
