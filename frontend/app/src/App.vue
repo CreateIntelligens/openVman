@@ -172,6 +172,7 @@ import {
 } from "./composables/useAvatarChat";
 import { useAsr } from "./composables/useAsr";
 import { useServerAsr } from "./composables/useServerAsr";
+import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
 import { BROWSER_ASR, fetchMyAsrProvider } from "./api/asr";
 import { useAuth } from "./composables/useAuth";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
@@ -194,7 +195,6 @@ import {
 } from "./types/avatarBackground";
 
 const FATAL_ERROR_CODES = new Set(['BRAIN_UNAVAILABLE', 'AUTH_FAILED']);
-const HOST_MESSAGE_NAMESPACE = "avatar-widget-host";
 const isStarted = ref(false);
 const rendererBootstrapState = ref<"loading" | "ready" | "error">("loading");
 const asrError = ref("");
@@ -207,30 +207,13 @@ const isTyping = ref(false);
 const showSettings = ref(false);
 const showQuickQa = ref(false);
 const immersive = ref(false);
-const stageAvatarFrameRef = ref<HTMLIFrameElement | null>(null);
-
-function postToStageAvatar(message: Record<string, unknown>): void {
-  const frame = stageAvatarFrameRef.value;
-  if (!frame?.contentWindow) return;
-  frame.contentWindow.postMessage(
-    { ns: HOST_MESSAGE_NAMESPACE, ...message },
-    window.location.origin,
-  );
-}
-
-function driveStageAvatarMouth(volume: number): void {
-  if (settings.renderMode !== "3d") return;
-  postToStageAvatar({ type: "mouth", volume });
-}
-
-function stopStageAvatarMouth(): void {
-  postToStageAvatar({ type: "mouth-stop" });
-}
-
-function triggerStageAvatarGesture(name: string): void {
-  if (settings.renderMode !== "3d") return;
-  postToStageAvatar({ type: "gesture", name });
-}
+// settings 在下方才宣告，所以用 getter 延後求值。
+const {
+  frameRef: stageAvatarFrameRef,
+  driveMouth: driveStageAvatarMouth,
+  stopMouth: stopStageAvatarMouth,
+  triggerGesture: triggerStageAvatarGesture,
+} = useStageAvatarBridge({ renderMode: () => settings.renderMode });
 
 // Error overlay state (fatal errors shown full-screen)
 const fatalError = ref<{ code: string; message: string } | null>(null);

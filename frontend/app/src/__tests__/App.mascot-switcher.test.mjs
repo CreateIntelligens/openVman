@@ -6,6 +6,9 @@ import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
+const bridgeSource = readFileSync(
+  resolve(__dirname, "../composables/useStageAvatarBridge.ts"), "utf8",
+);
 
 test("app no longer mounts the right-corner mascot widget", () => {
   assert.doesNotMatch(source, /class="mascot-widget"/);
@@ -42,16 +45,25 @@ test("VRM choices are loaded from the avatar mascot catalog", () => {
 });
 
 test("audio mouth movement targets the active 3D stage renderer", () => {
-  assert.match(source, /function driveStageAvatarMouth\(volume:\s*number\):\s*void/);
-  assert.match(source, /function stopStageAvatarMouth\(\):\s*void/);
+  // 嘴型與手勢的實作搬到 useStageAvatarBridge，這裡只確認 App.vue 有接上它，
+  // 以及舊的 mascot 版本沒有殘留。函式怎麼宣告是實作細節，不該綁死在測試裡。
+  assert.match(source, /useStageAvatarBridge\(/);
+  assert.match(source, /driveMouth:\s*driveStageAvatarMouth/);
+  assert.match(source, /stopMouth:\s*stopStageAvatarMouth/);
   assert.match(source, /onPlaybackVolume:\s*driveStageAvatarMouth/);
   assert.doesNotMatch(source, /driveMascotMouth/);
   assert.doesNotMatch(source, /stopMascotMouth/);
 });
 
+test("the stage bridge only drives the 3D renderer", () => {
+  // 2D 模式沒有可驅動的模型，送過去只會被忽略；這個判斷現在住在 composable。
+  assert.match(bridgeSource, /renderMode\(\) !== '3d'/);
+  assert.match(bridgeSource, /type: 'mouth', volume/);
+  assert.match(bridgeSource, /type: 'gesture', name/);
+});
+
 test("chat states trigger semantic VRM stage gestures", () => {
-  assert.match(source, /function triggerStageAvatarGesture\(name:\s*string\):\s*void/);
-  assert.match(source, /postToStageAvatar\(\{ type: "gesture", name \}\)/);
+  assert.match(source, /triggerGesture:\s*triggerStageAvatarGesture/);
   assert.match(source, /if \(newState === 'THINKING'\) triggerStageAvatarGesture\("thinking-hand"\)/);
   assert.match(source, /if \(newState === 'SPEAKING'\) triggerStageAvatarGesture\("explain-open-hand"\)/);
 });
