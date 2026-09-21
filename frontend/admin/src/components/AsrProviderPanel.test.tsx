@@ -159,7 +159,7 @@ describe("AsrProviderPanel", () => {
     fireEvent.mouseDown(await screen.findByRole("option", { name: /Breeze-ASR-26/ }));
 
     await waitFor(() => expect(setAsrProvider).toHaveBeenCalledWith("breeze"));
-    expect(await screen.findByText(/已改用 Breeze-ASR-26/)).toBeTruthy();
+    expect(await screen.findByText(/預設已改為 Breeze-ASR-26/)).toBeTruthy();
   });
 
   it("取消勾選就把該引擎從開放清單移除", async () => {
@@ -170,7 +170,7 @@ describe("AsrProviderPanel", () => {
       overridden: true,
     });
     render(<AsrProviderPanel />);
-    await screen.findByText("開放使用者自選");
+    await screen.findByText("可使用的引擎");
 
     const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
     const openaiBox = boxes[OPTIONS.indexOf("openai")];

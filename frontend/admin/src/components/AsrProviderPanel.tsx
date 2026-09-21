@@ -189,10 +189,10 @@ export default function AsrProviderPanel() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">語音辨識引擎</h2>
+        <h2 className="text-sm font-semibold">預設語音辨識引擎</h2>
         <p className="text-xs leading-5 text-content-muted">
-          全站共用，變更立即生效，不需重新啟動。所選引擎無法使用時，系統會自動改用
-          其他已設定的引擎，不會讓辨識中斷。
+          使用者沒有自己選的時候用這個。變更立即生效，不需重新啟動；所選引擎無法
+          使用時，系統會自動改用其他已設定的引擎，不會讓辨識中斷。
         </p>
         <Select
           value={setting.effective}
@@ -201,7 +201,7 @@ export default function AsrProviderPanel() {
           options={setting.options.map((id) => ({ value: id, label: describe(id).label }))}
           onChange={(next) => {
             if (next === setting.effective) return;
-            void apply(() => setAsrProvider(next), `已改用 ${describe(next).label}。`);
+            void apply(() => setAsrProvider(next), `預設已改為 ${describe(next).label}。`);
           }}
         />
         {active.note && (
@@ -212,15 +212,15 @@ export default function AsrProviderPanel() {
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-content-muted">
           {setting.overridden
-            ? "目前由後台指定，已覆寫部署設定。"
-            : "目前沿用部署設定（.env）。"}
+            ? "預設值由後台指定，已覆寫部署設定。"
+            : "預設值沿用部署設定（.env）。"}
         </span>
         {setting.overridden && (
           <button
             type="button"
             className="btn btn-ghost"
             disabled={busy}
-            onClick={() => void apply(clearAsrProvider, "已改回部署設定。")}
+            onClick={() => void apply(clearAsrProvider, "預設已改回部署設定。")}
           >
             改回部署設定
           </button>
@@ -229,10 +229,10 @@ export default function AsrProviderPanel() {
 
       {choices && (
         <div className="flex flex-col gap-3 border-t border-border pt-6">
-          <h2 className="text-sm font-semibold">開放使用者自選</h2>
+          <h2 className="text-sm font-semibold">可使用的引擎</h2>
           <p className="text-xs leading-5 text-content-muted">
             勾選的引擎會出現在聊天室的選單裡，讓使用者替自己的對話挑一個。
-            沒有勾選的一律沿用上面的全站設定。
+            沒有自己選的人，用上面那個預設值。
           </p>
           <div className="flex flex-col gap-2">
             {choices.options.map((id) => {
