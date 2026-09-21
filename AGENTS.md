@@ -99,7 +99,7 @@ Pyright configured for `backend/` and `brain/api/` (see `pyrightconfig.json`). B
 
 ## Documentation
 
-Detailed specs in `docs/` (00–05 numbered). `README.md` is the architecture index. Feed specific spec pairs depending on the task:
+Documentation index: `docs/README.md`. Architecture and protocol specs are in `docs/specs/`; runbooks in `docs/operations/`; integration guides in `docs/guides/`; plans in `docs/plans/`; historical notes and early TASK plans in `docs/archive/`. Archive status is historical, not proof of current completion. Feed specific spec pairs depending on the task:
 
 | Task | Read |
 |------|------|

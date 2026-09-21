@@ -1,6 +1,6 @@
 ## Why
 
-目前 openVman 虛擬人系統的對嘴技術僅支援 Viseme 查表法（6 張 Sprite 圖片輪播），這是 2020 年代的古早技術，畫質極差、無法呈現牙齒與口腔細節。根據 `docs/ref/dinet.md` 的調研，2023 年發表的 DINet (Deformation Inpainting Network) 技術可在客戶端瀏覽器執行，算力需求僅 39 Mflops，畫質卻能保留牙齒、口腔內部細節。這是升級對嘴技術的最佳時機。
+目前 openVman 虛擬人系統的對嘴技術僅支援 Viseme 查表法（6 張 Sprite 圖片輪播），這是 2020 年代的古早技術，畫質極差、無法呈現牙齒與口腔細節。根據 `docs/archive/research/dinet.md` 的調研，2023 年發表的 DINet (Deformation Inpainting Network) 技術可在客戶端瀏覽器執行，算力需求僅 39 Mflops，畫質卻能保留牙齒、口腔內部細節。這是升級對嘴技術的最佳時機。
 
 ## What Changes
 

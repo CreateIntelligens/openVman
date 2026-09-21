@@ -1,6 +1,6 @@
 ## Context
 
-Backend 目前的 `observability.py` 使用自製 in-memory metrics store，透過 `GET /metrics` 回傳 JSON snapshot。資料存於 process 記憶體，重啟歸零。`docs/01_BACKEND_SPEC.md` 第 12 節要求暴露 Prometheus 格式指標，但目前尚未實作。
+Backend 目前的 `observability.py` 使用自製 in-memory metrics store，透過 `GET /metrics` 回傳 JSON snapshot。資料存於 process 記憶體，重啟歸零。`docs/specs/01_BACKEND_SPEC.md` 第 12 節要求暴露 Prometheus 格式指標，但目前尚未實作。
 
 現有的 JSON `/metrics` endpoint 被 admin UI 和測試使用，必須保持不變。
 

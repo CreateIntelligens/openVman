@@ -16,7 +16,7 @@
 
 - [x] 3.1 Migrate the Admin `api/common.ts` base and all callers, hooks, and vitest mocks to `/api/v1`, `/v1/audio`, and `/static`
 - [x] 3.2 Migrate the App `api/http.ts`, `App.vue`, composables, and tests; migrate `widget.html` SDK and asset URLs
-- [x] 3.3 Migrate the Avatar SDK runtime, character, and character-list URLs and its contract tests; update `docs/avatar-embed/README.md` and the minimal example to `/static/sdk/openvman-avatar-sdk.js`
+- [x] 3.3 Migrate the Avatar SDK runtime, character, and character-list URLs and its contract tests; update `docs/guides/avatar-embed/README.md` and the minimal example to `/static/sdk/openvman-avatar-sdk.js`
 - [x] 3.4 Run Admin, App, and SDK test suites and type checks
 
 ## 4. Embed Key Principal
@@ -38,10 +38,10 @@
 - [x] 6.1 Add `embedKey`, `projectId`, `personaId`, and `tts` options to the SDK types and instance signature
 - [x] 6.2 Implement a chat module with `ask(text)`, per-instance session id, `reply` event, credential mode selection, and the four named error codes
 - [x] 6.3 Add contract tests for keyed, session, continuity, interrupt, silent, and error scenarios
-- [x] 6.4 Document keyed and session usage with `ask()` in `docs/avatar-embed/README.md`
+- [x] 6.4 Document keyed and session usage with `ask()` in `docs/guides/avatar-embed/README.md`
 
 ## 7. Documentation and Verification
 
-- [x] 7.1 Add the full old-to-new path table and the embed-key feature to `CHANGELOG.md`; update `README.md`, `docs/04_GATEWAY_SPEC.md`, and `.env.example` if any setting is introduced
+- [x] 7.1 Add the full old-to-new path table and the embed-key feature to `CHANGELOG.md`; update `README.md`, `docs/specs/04_GATEWAY_SPEC.md`, and `.env.example` if any setting is introduced
 - [x] 7.2 Run Backend, Brain, Admin, App, SDK, and nginx test suites, `openspec validate`, and `git diff --check`
 - [ ] 7.3 Rebuild the Admin image and verify a keyed conversation from a page on an allowlisted origin plus a 404 on one retired path per family

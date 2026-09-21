@@ -1,6 +1,6 @@
 ## Why
 
-`docs/03_BRAIN_SPEC.md` 與 Knowledge Base Admin 相關設計文件已經把最終形態定義得很清楚：知識庫應採用 `workspace/raw/` 保存原始檔、`workspace/knowledge/` 保存轉出的 Markdown，並由 Brain 只針對 Markdown / text / code files 做 chunking 與 LanceDB 索引。
+`docs/specs/03_BRAIN_SPEC.md` 與 Knowledge Base Admin 相關設計文件已經把最終形態定義得很清楚：知識庫應採用 `workspace/raw/` 保存原始檔、`workspace/knowledge/` 保存轉出的 Markdown，並由 Brain 只針對 Markdown / text / code files 做 chunking 與 LanceDB 索引。
 
 現況雖然已經有「文件上傳 -> 轉 Markdown -> Brain upload」這條路徑，但基礎轉換器對複雜版面、表格與大型文件的還原品質有限。另一方面，若直接讓 Brain 的 workspace reindex 去讀 `.pdf`、`.docx`、`.pptx`，會違反 docs 中既定的責任邊界，也會和 Universal Markdown strategy 衝突。
 

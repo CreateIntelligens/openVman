@@ -1,6 +1,6 @@
 ## Context
 
-`docs/03_BRAIN_SPEC.md` 已定義知識庫的最終形態：
+`docs/specs/03_BRAIN_SPEC.md` 已定義知識庫的最終形態：
 
 - `workspace/raw/` 保存原始檔案
 - `workspace/knowledge/` 保存轉出的 Markdown

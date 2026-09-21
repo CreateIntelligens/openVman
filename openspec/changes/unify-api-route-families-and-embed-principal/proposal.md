@@ -32,6 +32,6 @@ None. The existing `public-avatar-js-sdk` spec lives in the unarchived `replace-
 
 - Backend: every router in `backend/app/routes/`, `backend/app/gateway/`, `backend/app/auth/`, `backend/app/brain_proxy.py`, `backend/app/main.py`, the auth middleware public-path table, and a new embed-key repository table in the auth database.
 - Frontends: `frontend/admin/src/api/common.ts` path constants and every caller, `frontend/app/src/api/http.ts` and `App.vue`, the SDK's `main.ts`/`types.ts` plus a new chat module, `widget.html`'s SDK and asset URLs.
-- Infrastructure: both nginx configs, `infra/prometheus` scrape targets, Docker Compose health checks that reference `/healthz` or `/api/health`, `docs/avatar-embed/README.md`, `docs/04_GATEWAY_SPEC.md`, `README.md`, `CHANGELOG.md`.
+- Infrastructure: both nginx configs, `infra/prometheus` scrape targets, Docker Compose health checks that reference `/healthz` or `/api/health`, `docs/guides/avatar-embed/README.md`, `docs/specs/04_GATEWAY_SPEC.md`, `README.md`, `CHANGELOG.md`.
 - Tests: backend route tests, nginx `default-conf.test.mjs`, SDK contract tests, Admin vitest API mocks, App tests.
 - Operations: any external caller of the old paths breaks immediately by design; the CHANGELOG entry carries the full old-to-new path table.

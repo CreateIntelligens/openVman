@@ -6,7 +6,7 @@
 - [x] 1.2 Update `client_interrupt` schema to allow optional `partial_asr` while preserving its control-signal semantics
 - [x] 1.3 Update `server_stream_chunk` schema so audio-driven chunks no longer require `visemes`
 - [x] 1.4 Regenerate TypeScript and Python protocol contracts and update validator consumers in Brain and frontend admin
-- [x] 1.5 Record follow-up alignment notes for owner-maintained docs such as `docs/00_SYSTEM_ARCHITECTURE.md` and `docs/09_API_WS_LINKAGE.md` without blocking implementation
+- [x] 1.5 Record follow-up alignment notes for owner-maintained docs such as `docs/specs/00_SYSTEM_ARCHITECTURE.md` and `docs/specs/09_API_WS_LINKAGE.md` without blocking implementation
 
 ## 2. Backend Live Orchestration
 

@@ -1,6 +1,6 @@
 ## Why
 
-目前 backend metrics 僅存於 process 記憶體，服務重啟即歸零（VH-131），且沒有標準格式輸出，無法接外部監控工具。`docs/01_BACKEND_SPEC.md` 第 12 節明確要求暴露指標供 Prometheus / Grafana 收集，現在 staging 硬化階段需要落實。
+目前 backend metrics 僅存於 process 記憶體，服務重啟即歸零（VH-131），且沒有標準格式輸出，無法接外部監控工具。`docs/specs/01_BACKEND_SPEC.md` 第 12 節明確要求暴露指標供 Prometheus / Grafana 收集，現在 staging 硬化階段需要落實。
 
 ## What Changes
 

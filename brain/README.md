@@ -716,7 +716,7 @@ API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gatew
 
 ## Embedding 意圖影子模式
 
-普通 chat／SSE 可抽樣使用既有 BGE embedding 觀察 chat、knowledge、web、clarify 建議分類。預設關閉；背景結果不改路由、prompt 或強制知識庫檢索，每個 process 同時只處理一筆，不排隊。設定、記錄格式與故障行為見 [操作文件](../docs/intent-shadow.md)，獨立 64 筆合成案例結果見 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。目前 52/64 正確，包含一筆知識庫問題誤判閒聊，不能用來跳過 RAG。
+普通 chat／SSE 可抽樣使用既有 BGE embedding 觀察 chat、knowledge、web、clarify 建議分類。預設關閉；背景結果不改路由、prompt 或強制知識庫檢索，每個 process 同時只處理一筆，不排隊。設定、記錄格式與故障行為見 [操作文件](../scripts/experiments/intent-shadow/OPERATIONS.md)，獨立 64 筆合成案例結果見 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。目前 52/64 正確，包含一筆知識庫問題誤判閒聊，不能用來跳過 RAG。
 
 實作將範例 centroid 初始化與 query 評分分開，文字截斷限制集中管理；這項整理不改變分類、背景排程或正式 RAG 行為。
 

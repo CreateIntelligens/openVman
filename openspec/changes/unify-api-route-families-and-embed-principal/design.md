@@ -79,7 +79,7 @@ The user has decided that retired paths must fail hard: no 301, no alias, no dua
 3. Migrate Admin, App, widget.html, and the SDK to the new paths; run all frontend suites.
 4. Add the embed-key tables, principal, middleware branch, allowlist, limiter, CORS, and usage headers with tests.
 5. Add embed-key management API and Admin page.
-6. Add SDK conversation options and `ask()` with contract tests; update `docs/avatar-embed/README.md` with a keyed example.
+6. Add SDK conversation options and `ask()` with contract tests; update `docs/guides/avatar-embed/README.md` with a keyed example.
 7. Rebuild images (Admin image bundles the SDK) and verify a keyed conversation from a page on an allowlisted origin.
 
 Rollback is a revert of the change; there is no data migration to undo except dropping the two new tables, which the migration mechanism handles.

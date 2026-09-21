@@ -23,5 +23,5 @@
 ## Impact
 
 - **前端 (brain/web)**：需新增設備偵測模組、Wav2Lip TF.js 整合、對嘴技術切換邏輯
-- **現有規範 (docs/02_FRONTEND_SPEC.md)**：需新增章節說明設備自適應對嘴流程
+- **現有規範 (docs/specs/02_FRONTEND_SPEC.md)**：需新增章節說明設備自適應對嘴流程
 - **依賴**：TensorFlow.js、Wav2Lip 預訓練模型 (wav2lip_gan 等)

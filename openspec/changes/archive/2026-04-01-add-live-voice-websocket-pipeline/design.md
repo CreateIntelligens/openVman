@@ -2,7 +2,7 @@
 
 The current codebase already contains the main ingredients for live voice interaction, but they are fragmented across layers. `frontend/app` has browser ASR and lip-sync service skeletons, `brain/api` can stream tokens over SSE, and `backend/app` can synthesize audio through `VibeVoiceAdapter` (VibeVoice-0.5B). The existing `/ws/{client_id}` handler is still a placeholder, the shared protocol is missing live control events, and frontend runtime wiring is incomplete.
 
-Recently added documentation at `docs/00_SYSTEM_ARCHITECTURE.md` and `docs/09_API_WS_LINKAGE.md` already moves the repository toward the same layered model, but those docs still need live-interruption-specific alignment. This change should treat them as upstream architectural references, keep any implementation-critical clarifications in local planning/OpenSpec artifacts, and leave owner-maintained doc synchronization as a follow-up instead of a delivery blocker.
+Recently added documentation at `docs/specs/00_SYSTEM_ARCHITECTURE.md` and `docs/specs/09_API_WS_LINKAGE.md` already moves the repository toward the same layered model, but those docs still need live-interruption-specific alignment. This change should treat them as upstream architectural references, keep any implementation-critical clarifications in local planning/OpenSpec artifacts, and leave owner-maintained doc synchronization as a follow-up instead of a delivery blocker.
 
 This change crosses multiple modules and requires explicit architectural decisions because it touches control flow, streaming behavior, protocol contracts, and interruption semantics. The core constraint is to keep cognition in Brain, fast reaction in Backend, and rendering/input in Frontend without duplicating responsibility across layers.
 

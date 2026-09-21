@@ -4,7 +4,7 @@
 1. **Viseme 查表**（現有最低層）：6 張 Sprite 圖片輪播，畫質極差
 2. **Wav2Lip**（正在實作）：AI 生成 2D 嘴型，可能有馬賽克
 
-根據 `docs/ref/dinet.md` 的調研，2023 年的 DINet 技術可在瀏覽器執行，算力僅 39 Mflops，畫質卻能保留牙齒與口腔細節。本設計旨在引進 DINet 技術，移除 Viseme 查表。
+根據 `docs/archive/research/dinet.md` 的調研，2023 年的 DINet 技術可在瀏覽器執行，算力僅 39 Mflops，畫質卻能保留牙齒與口腔細節。本設計旨在引進 DINet 技術，移除 Viseme 查表。
 
 ## Goals / Non-Goals
 

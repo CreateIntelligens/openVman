@@ -8,23 +8,21 @@
 
 ## 一、文件導覽 (Document Map)
 
-| 編號 | 文件 | 職責 | 狀態 |
-|------|------|------|------|
-| 00 | [00_CORE_PROTOCOL.md](./docs/00_CORE_PROTOCOL.md) | 通訊協定 · WebSocket JSON · Lip-Sync 技術 · 狀態機 · 錯誤事件 · 心跳 · 版本管理 | ✅ 已完成 |
-| 01 | [01_BACKEND_SPEC.md](./docs/01_BACKEND_SPEC.md) | 後端 (神經)：Session · 訊息處理層 · Chunking · zh-TW TTS · Key Fallback · 中斷 · 配置 · 健檢 · 指標 · 關機 · 日誌 | ✅ 已完成 |
-| 02 | [02_FRONTEND_SPEC.md](./docs/02_FRONTEND_SPEC.md) | 前端 (感官)：DOM · Audio Queue · 對嘴 · ASR · 素材 · RWD · 重連 · 錯誤處理 | ✅ 已完成 |
-| 03 | [03_BRAIN_SPEC.md](./docs/03_BRAIN_SPEC.md) | 大腦 (認知)：LanceDB · bge-m3 · RAG v2 · Token 預算 · Tool · 反思 · 多角色 · 安全 | ✅ 已完成 |
-| 04 | [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md) | 網關 (外圍)：媒體處理 · 任務佇列 · 插件 (Camera/Web) · 臨時儲存 · 計費備援 | ✅ 已完成 |
-| 05 | [05_DOCLING_RUNBOOK.md](./docs/05_DOCLING_RUNBOOK.md) | 文件解析：pdf-inspector fast path · Docling 主轉換 · AnyDoc fallback · 驗證與修復 | ✅ 已完成 |
-| 11 | [11_DEPLOYMENT.md](./docs/11_DEPLOYMENT.md) | **部署手冊**：首次部署 · 日常更新 · 主機 nginx · 疑難排解 · 建置 · Worktree · CI/CD | ✅ 已完成 |
-| -- | [account-administration.md](./docs/account-administration.md) | 帳號管理：ROOT／admin／user 階層 · migration · 密碼 reset · 備份與 rollback | ✅ 已完成 |
-| -- | [avatar-embed/README.md](./docs/avatar-embed/README.md) | Avatar JavaScript SDK：直接 DOM · 外部音訊 · PCM 串流 · 公開錯誤碼 | ✅ 已完成 |
-| -- | [CHANGELOG.md](./CHANGELOG.md) | **更新日誌**：版本紀錄與功能更新歷史 | ✅ 持續更新 |
+完整分類見 **[文件總覽](docs/README.md)**。常用入口：
 
+| 需求 | 文件 |
+|------|------|
+| 了解架構與協定 | [架構與規格](docs/README.md#架構與規格) |
+| 部署與維運 | [部署手冊](docs/operations/11_DEPLOYMENT.md)、[帳號管理](docs/operations/account-administration.md) |
+| 整合 Avatar | [JavaScript SDK](docs/guides/avatar-embed/README.md) |
+| 文件匯入與 QA | [解析手冊](docs/operations/05_DOCLING_RUNBOOK.md)、[型錄 QA SOP](docs/guides/PDF_CATALOG_TO_QA_SOP.md) |
+| 查計畫與實驗 | [計畫與實驗](docs/README.md#計畫與實驗) |
+| 查早期討論與任務 | [歷史資料](docs/archive/README.md) |
+| 查版本變更 | [CHANGELOG](CHANGELOG.md) |
 
 ## 對外接入
 
-第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](./docs/avatar-embed/README.md)。
+第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](docs/guides/avatar-embed/README.md)。
 
 Admin 也可將已上傳且素材完整的影片角色登記為右下角小助理。這類小助理同時檢查 mascot 與 avatar character 授權；宿主播放 TTS 時，會以 PCM 另行驅動嘴型，避免重複出聲。
 
@@ -50,14 +48,14 @@ Admin 也可將已上傳且素材完整的影片角色登記為右下角小助�
 | 存活檢查 | `GET /api/{embedding,vlm}/health` | 公開 |
 | 就緒檢查 | `GET /api/embedding/health/ready` | Bearer |
 
-base URL 本身就是 embed 端點，不需要再疊 `/embed`。OpenAI 相容路徑可直接餵給現成的 OpenAI client（base URL 設為 `.../api/embedding/v1`）。完整拓撲與 JTAI 串接設定見 [GPU 服務共用指南](./docs/gpu-service-sharing.md)。
+base URL 本身就是 embed 端點，不需要再疊 `/embed`。OpenAI 相容路徑可直接餵給現成的 OpenAI client（base URL 設為 `.../api/embedding/v1`）。Consumer 設定與現有 edge 路由見 [GPU 服務共用指南](docs/operations/gpu-service-sharing.md)。
 
 ### 888a2a Agent-to-Agent 網絡整合
 
 openVman 支援接入 [888a2a-lite Hub](https://a2a.david888.com) 成為 A2A 網絡中的具身虛擬人 Agent：
 - **Inbound Bridge Daemon**：後端常駐 SSE 監聽行程，支援 deployment-injected 私有圈金鑰（註冊時才送 `X-Hub-Key`）、憑證持久化與金鑰輪替自動重新註冊、durable enqueue-before-ACK 與防迴音風暴機制（`[[A2A_NO_REPLY]]`）。
 - **Outbound Brain Skills**：大腦具備同儕發現（`a2a_list_peers`）、任務派工（`a2a_send_task`）與群組廣播（`a2a_broadcast_group`）能力。
-- **設定啟用**：在 secret store 注入 `A2A_ENABLED=true` 與 `A2A_HUB_KEY=<private-circle-secret>`（預設關閉）；若要加入 public circle，必須明確設定 `A2A_ALLOW_PUBLIC_CIRCLE=true`。詳情請參閱 [04_GATEWAY_SPEC.md](./docs/04_GATEWAY_SPEC.md)。
+- **設定啟用**：在 secret store 注入 `A2A_ENABLED=true` 與 `A2A_HUB_KEY=<private-circle-secret>`（預設關閉）；若要加入 public circle，必須明確設定 `A2A_ALLOW_PUBLIC_CIRCLE=true`。詳情請參閱 [04_GATEWAY_SPEC.md](docs/specs/04_GATEWAY_SPEC.md)。
 
 ## 環境變數 (.env)
 
@@ -75,11 +73,11 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
   python -m app.scripts.create_user --username ai360
 ```
 
-指令不接受其他 ROOT 名稱，也不會建立或取代第二個 ROOT。`ai360` 僅適合開發環境；正式部署必須在首次登入後立即更換密碼。既有兩層帳號資料庫會將原 `ai360` 原地升級為 ROOT，保留帳號 ID、密碼 hash、ownership 與 grants，但會撤銷 migration 前的 session。完整操作與 rollback 注意事項請見 [帳號管理手冊](./docs/account-administration.md)。
+指令不接受其他 ROOT 名稱，也不會建立或取代第二個 ROOT。`ai360` 僅適合開發環境；正式部署必須在首次登入後立即更換密碼。既有兩層帳號資料庫會將原 `ai360` 原地升級為 ROOT，保留帳號 ID、密碼 hash、ownership 與 grants，但會撤銷 migration 前的 session。完整操作與 rollback 注意事項請見 [帳號管理手冊](docs/operations/account-administration.md)。
 
-帳號管理的「編輯／管理」分頁可依狀態查詢臨時批次，並查看與複製新版批次的登入密碼。密碼以加密形式保存；舊批次無法還原。`AUTH_TEMPORARY_PASSWORD_SECRET` 可獨立設定加密祕密值，未設時沿用 session 祕密；備份與金鑰輪替方式見 [帳號管理手冊](./docs/account-administration.md#臨時登入密碼保存與查閱)。
+帳號管理的「編輯／管理」分頁可依狀態查詢臨時批次，並查看與複製新版批次的登入密碼。密碼以加密形式保存；舊批次無法還原。`AUTH_TEMPORARY_PASSWORD_SECRET` 可獨立設定加密祕密值，未設時沿用 session 祕密；備份與金鑰輪替方式見 [帳號管理手冊](docs/operations/account-administration.md#臨時登入密碼保存與查閱)。
 
-管理員的「資源上限」是 ROOT 指定的資源白名單；範圍解析失敗會中止存取。知識庫與 workspace 上傳則讀取 Backend 的 `DOCUMENT_MAX_UPLOAD_BYTES`，並由 Backend 對原始檔與文字檔一致執行每檔檢查，預設 100 MiB。API 契約見 [Gateway 規格](./docs/04_GATEWAY_SPEC.md#34-文件轉換與知識上傳-document-conversion--knowledge-upload)，本次核對與零授權帳號結論見 [權限範圍盤點](./docs/scope-audit.md)。
+管理員的「資源上限」是 ROOT 指定的資源白名單；範圍解析失敗會中止存取。知識庫與 workspace 上傳則讀取 Backend 的 `DOCUMENT_MAX_UPLOAD_BYTES`，並由 Backend 對原始檔與文字檔一致執行每檔檢查，預設 100 MiB。API 契約見 [Gateway 規格](docs/specs/04_GATEWAY_SPEC.md#34-文件轉換與知識上傳-document-conversion--knowledge-upload)。
 
 ### 部署與啟動
 
@@ -93,7 +91,7 @@ docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
 而容器以非 root 執行，稍後才拋出難以追查的 `Permission denied`。
 
 完整流程（首次部署、日常更新、主機 nginx、疑難排解、建置節奏、worktree、CI/CD）見
-**[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT.md)**。
+**[11_DEPLOYMENT.md](docs/operations/11_DEPLOYMENT.md)**。
 
 ### 對外 HTTPS：主機 nginx（compose 之外）
 
@@ -118,7 +116,7 @@ HTTPS，自簽憑證）。對外的正式 HTTPS 由**主機自己的 nginx** 終
 ### 其他部署主題
 
 Docker Hub CI/CD 與 Watchtower、Worktree 開發與 HMR、建置節奏與 I/O 注意事項、
-GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT.md)**。
+GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_DEPLOYMENT.md)**。
 
 ### AI Coding 餵檔策略
 
@@ -317,53 +315,13 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT
 
 ---
 
-## 七、待撰寫文件規劃
+## 七、計畫與歷史資料
 
-| 文件 | 預計內容 |
-|------|----------|
-| `05_SECURITY.md` | WebSocket JWT 認證流程 · API Key 管理 · Kiosk 設備白名單 · TLS/WSS 設定 · Prompt Injection 防護細節 |
-| `06_ASSET_PIPELINE.md` | 從照片/影片生成 idle.mp4 的 SOP · 6 張嘴型 Sprite 的製作方法 · manifest.json 的校準流程 · 素材品質檢查清單 |
-| `07_MONITORING.md` | Grafana Dashboard 設計 · 告警規則 (Alertmanager) · SLA 定義 (可用性 99.9%) · 日誌查詢範例 (ELK/Loki) |
+目前文件入口見 [文件總覽](docs/README.md)。早期的文件待辦與功能宣稱保留於 [README 歷史快照](docs/archive/notes/readme-planning-snapshot.md)，不作為目前驗收清單。
 
 ---
 
-## 八、結論
-
-**核心架構完整度高**，四份 Spec 共 41 個章節，覆蓋了從通訊協定到認知系統的完整技術棧。
-
-**架構亮點**：
-- ✅ 感官 / 神經 / 靈魂 三層解耦，職責零重疊 (Frontend 獨立運作)
-- ✅ **獨立網關層 (Gateway)**：前置消化多模態素材與非同步任務 (BullMQ)，保持大腦與核心後端輕量、穩定。
-- ✅ **系統外掛擴充 (Gateway Plugins)**：原生支援 Camera Live 與 Web Crawler，強化視覺感知與即時爬網能力。
-- ✅ LLM → Chunker → TTS → WebSocket 串流管線，延遲最小化
-- ✅ **設備自適應對嘴 (Device-Adaptive Lip-Sync)**：高階設備 → Wav2Lip，低階設備 → DINet (39 Mflops)
-- ✅ VideoSync 唯一時鐘源 + 徑向漸變羽化，杜絕嘴型漂移與生硬邊界
-- ✅ **Knowledge Base Admin Panel**：整合遞迴式檔案探索器與雙視窗 Markdown 編輯器，支援 LanceDB 同步狀態展示。
-- ✅ **Admin Web Light Mode**：整合專屬風格系統，支援深淺色模式切換與持久化儲存。
-- ✅ **RAG v2 架構**：整合 LanceDB Hybrid Search (BM25) + pdf-inspector / Docling / AnyDoc 文件 ingestion 管線
-- ✅ **Brain Skills 模組化擴充系統**：支援動態載入外部技能工具，技能註冊表在執行期同步（無須重啟）
-- ✅ **Forced Tool Call Routing**：可針對單次請求強制指定技能調用路徑，結合動態 skill registry 讓新註冊的技能立即可用
-- ✅ **Direct Chat Route**：純對話訊息跳過 tool-instruction 組裝，降低 prompt 體積與延遲
-- ✅ **Chat Action Request Flow**：Brain 以結構化 action proposal 形式回傳工具調用請求，Admin UI 以 ActionRequestCard 讓操作者逐項審批
-- ✅ **Knowledge Graph (graphify)**：內建 graphify 技能與 graph HTTP endpoints，Admin 知識庫新增 Graph 視覺化分頁
-- ✅ **Unified Admin Navigation**：以 NavigationContext 集中管理路由/分頁狀態，整合 AppSidebar、ChatSidebar 與各頁面；設計 token 改以 RGB channel 暴露，完整支援 Tailwind opacity modifier
-- ✅ **LLM Failover (DR Mode)**：支援跨 Provider (Gemini/OpenAI/Groq) 自動故障轉移
-- ✅ **2md 即時網路工具**：`search_web(query)` 搜尋公開網路，`read_web_page(url)` 讀取網頁、PDF 與支援文件；依主力／兩級 fallback 自動降級
-- ✅ **2md 驚群防護**：固定 `TWO_MD_BASE_URLS` 順序，採 sequential fallback、共用 deadline、full-jitter、single-flight 與可選 Redis circuit/half-open lease
-- ✅ **David888 Wiki 分享**：長篇報告可透過 `publish_wiki` 發布，完成後只回傳公開 `shareUrl`
-- ✅ **外部工具開關**：`URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`WIKI_PUBLISH_ENABLED` 預設為 `true`，可個別停用並在重啟後套用
-- ✅ **動態 Gemini 模型探索與容錯鏈 (Dynamic Fallback Chain)**：支援透過 Gemini SDK 自動探索所有可用生成模型並進行 Pro -> Flash -> Flash-Lite 語意化排序，具備 10 分鐘快取與靜態安全網降級機制
-- ✅ 完整的錯誤處理、斷線重連、優雅關機機制
-- ✅ Token 預算管理 + 安全防護 (Guardrails)
-
-**後續方向**：
-- 📋 撰寫 `04~07` 補充文件（部署 / 安全 / 素材 / 監控）
-- 📋 擴充更多專業領域的 Brain Skills
-- 📋 進入實作階段
-
----
-
-## 九、授權協議 (License)
+## 八、授權協議 (License)
 
 本專案採用 **GNU General Public License v3.0 (GPLv3)** 授權。詳情請參閱 [LICENSE](./LICENSE) 檔案。
 
@@ -375,8 +333,12 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](./docs/11_DEPLOYMENT
 
 ### 語音插話與停止控制
 
-停止操作不需要 ASR 文字即可中斷後端工作。帶辨識文字的插話以本地規則處理：「停」立即中斷，「不用停，繼續說」、附和與已識別的引用背景話不誤停；句中另有新問題或修正要求仍會中斷。此修正不引入 SemIf 或其他模型。行為與邊界見 [中斷機制](docs/01_BACKEND_SPEC.md#8-打斷機制處理-interruption-handling)。
+停止操作不需要 ASR 文字即可中斷後端工作。帶辨識文字的插話以本地規則處理：「停」立即中斷，「不用停，繼續說」、附和與已識別的引用背景話不誤停；句中另有新問題或修正要求仍會中斷。此修正不引入 SemIf 或其他模型。行為與邊界見 [中斷機制](docs/specs/01_BACKEND_SPEC.md#8-打斷機制處理-interruption-handling)。
 
 ### Embedding 意圖觀測
 
-[意圖影子模式](docs/intent-shadow.md)可抽樣使用既有 BGE embedding 記錄建議分類，預設關閉，不影響正式 RAG 決策。[獨立案例評估](scripts/experiments/intent-shadow/REPORT.md)為 52/64 正確，目前僅適合觀測。
+[意圖影子模式](scripts/experiments/intent-shadow/OPERATIONS.md)可抽樣使用既有 BGE embedding 記錄建議分類，預設關閉，不影響正式 RAG 決策。[獨立案例評估](scripts/experiments/intent-shadow/REPORT.md)為 52/64 正確，目前僅適合觀測。
+
+### 前端小模型實驗
+
+瀏覽器模型相容性調查與後續驗證項目，見 [P0 相容性紀錄](scripts/experiments/browser-intent/P0-COMPATIBILITY.md)。實驗紀錄不代表已整合正式環境。

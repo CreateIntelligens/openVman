@@ -7,10 +7,10 @@ The system has evolved to include a comprehensive Knowledge Base Admin Panel, bu
 ## Goals / Non-Goals
 
 **Goals:**
-- Synchronize `docs/01_BACKEND_SPEC.md` with KB API endpoints (`/brain/knowledge/...`).
-- Synchronize `docs/02_FRONTEND_SPEC.md` with KB Admin Panel UI/UX (Split-Pane, Markdown Strategy).
-- Create a foundational `docs/00_SYSTEM_ARCHITECTURE.md` (General Architecture) replacing or complementing the nervous system doc.
-- [ ] Create `docs/09_API_WS_LINKAGE.md` to document cross-component communication.
+- Synchronize `docs/specs/01_BACKEND_SPEC.md` with KB API endpoints (`/brain/knowledge/...`).
+- Synchronize `docs/specs/02_FRONTEND_SPEC.md` with KB Admin Panel UI/UX (Split-Pane, Markdown Strategy).
+- Create a foundational `docs/specs/00_SYSTEM_ARCHITECTURE.md` (General Architecture) replacing or complementing the nervous system doc.
+- [ ] Create `docs/specs/09_API_WS_LINKAGE.md` to document cross-component communication.
 - [ ] Create `docs/superpowers/specs/2026-03-26-kb-admin-panel-rationale.md` to explain features and design "Why".
 
 **Non-Goals:**

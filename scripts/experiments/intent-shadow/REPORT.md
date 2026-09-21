@@ -59,7 +59,7 @@ PYTHONPATH=/app python /path/to/intent-shadow/evaluate.py   --module /app/core/i
 
 evaluate.py 的同一目錄需有 cases.jsonl，stdout 為 JSON。請保留本次 results.json 作為基準；後續更換分類範例應另建版本與獨立評估集。既有服務必須可用並具備原有憑證，請勿把憑證寫入結果檔。
 
-本次功能預設關閉，未修改正式 .env，未部署；操作契約見 [意圖影子模式](../../../docs/intent-shadow.md)。
+本次功能預設關閉，未修改正式 .env，未部署；操作契約見 [意圖影子模式](OPERATIONS.md)。
 
 ## 程式整理後的驗證
 

@@ -13,6 +13,9 @@ infra/nginx/certs/*
 !infra/nginx/certs/README.md
 
 # Runtime
+*.log
+/logs/
+/data/gateway-temp/
 supervisord.pid
 
 # Avatar uploads and runtime media
@@ -20,6 +23,11 @@ data/avatar/
 data/backgrounds/
 data/mascots/
 data/auth/
+
+# Catalog & QA extraction temporary/generated data
+/Sewage and Dewatering Pump-50HZ-Vol.PIE-23121.pdf
+/pump_catalog_qa_test.csv
+/data/evak_catalog/
 
 # Python
 __pycache__/

@@ -76,7 +76,7 @@
 
 - [x] 10.1 更新 `00_CORE_PROTOCOL.md`：新增 `user_media_upload` 與 `gateway_status` 事件定義
 - [x] 10.2 更新 `readme.md`：系統全景圖加入 Gateway 層，更新 AI Coding 餵檔策略（新增 `04_GATEWAY_SPEC.md`）
-- [x] 10.3 撰寫 `docs/04_GATEWAY_SPEC.md`：Gateway 服務的完整實作指南（對應本次所有 specs）
+- [x] 10.3 撰寫 `docs/specs/04_GATEWAY_SPEC.md`：Gateway 服務的完整實作指南（對應本次所有 specs）
 
 ## 11. 測試
 
