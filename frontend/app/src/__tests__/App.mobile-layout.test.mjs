@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
+// 版面規則住在 styles/app-shell.css（由 App.vue 以 scoped 匯入），樣板仍在
+// App.vue。兩邊合起來看才是這個畫面的完整定義。
+const source = [
+  readFileSync(resolve(__dirname, "../App.vue"), "utf8"),
+  readFileSync(resolve(__dirname, "../styles/global.css"), "utf8"),
+  readFileSync(resolve(__dirname, "../styles/app-shell.css"), "utf8"),
+].join("\n");
 
 function cssBlockAfter(marker, selector) {
   const markerStart = source.indexOf(marker);

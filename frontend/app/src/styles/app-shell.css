@@ -1,0 +1,388 @@
+/* App.vue 的版面樣式。
+ *
+ * 從 App.vue 搬出來的，內容未改。仍由 App.vue 以 scoped 匯入，所以選擇器的
+ * 作用範圍不變——這裡的規則只套用到 App.vue 自己的元素。
+ */
+.app-shell {
+  height: 100dvh;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.authorization-notice {
+  flex: none;
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: var(--hairline) solid color-mix(in srgb, var(--primary) 35%, var(--line));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-soft));
+  color: var(--text);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.kiosk-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(24rem, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "stage controls"
+    "stage chat";
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.stage-panel {
+  grid-area: stage;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.control-area {
+  grid-area: controls;
+}
+
+.chat-area {
+  grid-area: chat;
+  min-height: 0;
+}
+
+.stage-card {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 1rem;
+  padding: 1rem;
+  background: var(--bg-soft);
+  border: var(--hairline) solid var(--line);
+  box-shadow: var(--surface-shadow);
+  overflow: hidden;
+}
+
+.stage-frame {
+  position: relative;
+  height: 100%;
+  border-radius: 0.5rem;
+  background: #0a0a0f;
+  overflow: hidden;
+}
+
+.stage-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.stage-background--dark {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(47, 65, 88, 0.92) 0%, rgba(9, 14, 20, 0) 54%),
+    linear-gradient(180deg, #121722 0%, #06080d 100%);
+}
+
+.stage-background--clinic {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(135deg, #dbeafe 0%, #f8fafc 48%, #d1fae5 100%);
+}
+
+.stage-background--studio {
+  background:
+    radial-gradient(circle at 50% 24%, rgba(250, 204, 21, 0.28) 0%, rgba(250, 204, 21, 0) 34%),
+    radial-gradient(circle at 18% 78%, rgba(20, 184, 166, 0.35) 0%, rgba(20, 184, 166, 0) 36%),
+    linear-gradient(145deg, #16110f 0%, #243042 52%, #101820 100%);
+}
+
+.stage-background--custom {
+  background-color: #0a0a0f;
+}
+
+.stage-avatar-frame {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  background: transparent;
+}
+
+/* Immersive mode: avatar fills the entire viewport, other panels float on top */
+.app-shell.immersive {
+  padding: 0;
+}
+
+.app-shell.immersive .kiosk-layout {
+  position: relative;
+  display: block;
+  height: 100%;
+}
+
+.app-shell.immersive .stage-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.app-shell.immersive .stage-card {
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.app-shell.immersive .stage-frame {
+  border-radius: 0;
+}
+
+.app-shell.immersive .control-area {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(0.5rem);
+  -webkit-backdrop-filter: blur(0.5rem);
+}
+
+.app-shell.immersive .chat-area {
+  position: absolute;
+  left: 50%;
+  bottom: 1.5rem;
+  z-index: 2;
+  width: min(32rem, calc(100% - 2rem));
+  max-height: 30%;
+  transform: translateX(-50%);
+}
+
+.app-shell.immersive.camera-active .chat-area {
+  left: clamp(1rem, 6vw, 6rem);
+  width: min(34rem, 56vw, calc(100% - 2rem));
+  transform: none;
+}
+
+.app-shell.immersive.camera-active .stage-frame :deep(.camera-preview) {
+  right: clamp(1rem, 3vw, 2.5rem);
+  bottom: clamp(1rem, 3dvh, 2.5rem);
+  width: clamp(calc(15rem * var(--camera-preview-scale, 1)), calc(30vw * var(--camera-preview-scale, 1)), calc(28rem * var(--camera-preview-scale, 1)));
+}
+
+.app-shell.immersive .chat-area :deep(.chat-msg) {
+  background: rgba(28, 26, 23, 0.55);
+  backdrop-filter: blur(0.5rem);
+  -webkit-backdrop-filter: blur(0.5rem);
+  color: #fff;
+  border: none;
+}
+
+.app-shell.immersive .chat-area :deep(.chat-msg.user) {
+  background: color-mix(in srgb, var(--primary) 78%, transparent);
+}
+
+.app-shell.immersive .chat-area :deep(.chat-role),
+.app-shell.immersive .chat-area :deep(.chat-time) {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.app-shell.immersive .chat-area :deep(.chat-input-bar input) {
+  background: rgba(28, 26, 23, 0.55);
+  backdrop-filter: blur(0.5rem);
+  -webkit-backdrop-filter: blur(0.5rem);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.app-shell.immersive .chat-area :deep(.chat-input-bar input::placeholder) {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+@media (max-width: 68.75rem) {
+  .app-shell {
+    height: 100dvh;
+    overflow: hidden;
+    padding: 1rem;
+  }
+
+  .kiosk-layout {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.875rem;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .control-area {
+    order: 1;
+    flex: none;
+  }
+
+  .stage-panel {
+    order: 2;
+    flex: 0 1 48%;
+    min-height: 0;
+    gap: 0.625rem;
+  }
+
+  .stage-card {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+  }
+
+  .chat-area {
+    order: 3;
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 48rem) {
+  .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .kiosk-layout {
+    display: flex;
+    flex: initial;
+    flex-direction: column;
+    gap: 0.875rem;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .stage-panel {
+    flex: none;
+    gap: 0.625rem;
+  }
+
+  .stage-card {
+    flex: none;
+    height: clamp(16rem, 48svh, 28rem);
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+  }
+
+  .chat-area {
+    flex: none;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-shell.immersive.camera-active .chat-area {
+    left: 1rem;
+    width: min(28rem, calc(100% - 2rem));
+  }
+
+  .app-shell.immersive.camera-active .stage-frame :deep(.camera-preview) {
+    top: clamp(5rem, 16svh, 7rem);
+    bottom: auto;
+    width: clamp(calc(10.5rem * var(--camera-preview-scale, 1)), calc(42vw * var(--camera-preview-scale, 1)), calc(14rem * var(--camera-preview-scale, 1)));
+  }
+}
+
+@media (max-width: 68.75rem) and (max-height: 36rem) {
+  .stage-panel {
+    flex-basis: 44%;
+  }
+}
+
+@media (max-width: 48rem) and (max-height: 36rem) {
+  .stage-card {
+    height: clamp(14rem, 44svh, 22rem);
+  }
+}
+
+.quick-qa-toggle-btn {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 10;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 0.09375rem solid rgba(255, 255, 255, 0.6);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0.25rem 0.875rem color-mix(in srgb, var(--primary) 35%, transparent);
+  transition:
+    background var(--ov-dur-short) var(--ov-ease-out),
+    border-color var(--ov-dur-short) var(--ov-ease-out),
+    box-shadow var(--ov-dur-short) var(--ov-ease-out),
+    transform var(--ov-dur-short) var(--ov-ease-out);
+}
+
+.quick-qa-toggle-btn:hover {
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.quick-qa-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.quick-qa-toggle-btn--active {
+  background: var(--primary-hover);
+  border-color: #ffffff;
+  box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--primary-hover) 45%, transparent);
+}
+
+.toggle-btn-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.toggle-icon {
+  stroke: #ffffff;
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+.toggle-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.02rem;
+  white-space: nowrap;
+}
+
+.app-shell.immersive .quick-qa-toggle-btn {
+  top: 1.5rem;
+  right: 1.5rem;
+  box-shadow:
+    0 0.375rem 1.125rem rgba(0, 0, 0, 0.3),
+    0 0.25rem 0.875rem rgba(13, 148, 136, 0.35);
+}
+
+.app-shell.immersive .quick-qa-toggle-btn:hover {
+  background: rgba(28, 26, 23, 0.8);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.app-shell.immersive .quick-qa-toggle-btn--active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
