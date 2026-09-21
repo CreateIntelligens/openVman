@@ -124,8 +124,13 @@ def summarize(rows: list[dict], metadata: dict) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--summarize-only", action="store_true")
+    # 換模型比大小時，證據要各存各的：原始 4B 結果不覆寫。
+    parser.add_argument("--model", default=MODEL)
+    parser.add_argument("--revision", default=REVISION)
+    parser.add_argument("--output", default="stability")
     args = parser.parse_args()
-    output = ROOT / "results" / "stability"
+    model_name, revision = args.model, args.revision
+    output = ROOT / "results" / args.output
     if args.summarize_only:
         rows = [json.loads(line) for line in
                 (output / "predictions.jsonl").read_text().splitlines()]
@@ -173,7 +178,7 @@ def main() -> None:
         rng.shuffle(jobs)
         schedule.extend(jobs)
     metadata = {
-        "model": MODEL, "revision": REVISION, "upstream_commit": UPSTREAM,
+        "model": model_name, "revision": revision, "upstream_commit": UPSTREAM,
         "upstream_sha256": SOURCE_HASHES,
         "fixture_sha256": hashlib.sha256(cases_path.read_bytes()).hexdigest(),
         "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
@@ -199,11 +204,11 @@ def main() -> None:
         raise RuntimeError("Less than 4 GiB free; refusing model load")
     write_json(output / "metadata.json", metadata)
     print("Frozen schedule:", len(schedule), "predictions", flush=True)
-    config = AutoConfig.from_pretrained(MODEL, revision=REVISION).get_text_config()
-    tokenizer = AutoTokenizer.from_pretrained(MODEL, revision=REVISION)
+    config = AutoConfig.from_pretrained(model_name, revision=revision).get_text_config()
+    tokenizer = AutoTokenizer.from_pretrained(model_name, revision=revision)
     started = time.perf_counter()
     model, loading = Qwen3_5ForCausalLM.from_pretrained(
-        MODEL, config=config, revision=REVISION, dtype=torch.bfloat16,
+        model_name, config=config, revision=revision, dtype=torch.bfloat16,
         device_map={"": "cuda"}, output_loading_info=True,
         quantization_config=BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_quant_type="nf4",
