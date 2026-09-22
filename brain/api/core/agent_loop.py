@@ -13,9 +13,10 @@ from typing import Any
 
 from config import get_settings
 from core.llm_client import (
+    REQUIRE_ANY_TOOL,
+    LLMEmptyReplyError,
     LLMReply,
     LLMToolCall,
-    REQUIRE_ANY_TOOL,
     generate_chat_turn,
     stream_chat_turn,
 )
@@ -131,7 +132,7 @@ def run_agent_loop(
         )
     reply = final_turn.content.strip()
     if not reply:
-        raise ValueError("LLM 沒有回傳內容")
+        raise LLMEmptyReplyError("LLM 沒有回傳內容")
     return AgentLoopResult(reply=reply, tool_steps=tool_steps)
 
 

@@ -51,6 +51,13 @@
 
 ### Fixed
 
+- **Brain 對模型空回覆回 400**: 模型連續回空（`agent_loop` 已催過一次仍空）時，
+  `ValueError("LLM 沒有回傳內容")` 被 `routes/chat.py` 當成 guardrail 擋下的壞
+  請求：回 400 讓前端不重試、`guardrail_blocks_total` 誤計，且該路徑不記 log，
+  錯誤訊息只進 metrics。新增 `LLMEmptyReplyError`（仍是 `ValueError` 子類，
+  fallback chain 靠 `except ValueError: raise` 讓空回覆不在下一個 hop 重試，型別
+  不能改），route 改回 502 `LLM_OVERLOAD` + `retry_after_ms`，並在兩條錯誤路徑都
+  記 `log_exception` 帶 trace_id。
 - **按下麥克風後頭一兩秒收不到音**: 兩個前端的 VAD 每次按鍵都重新載套件、抓 ORT
   WASM 與 2 MB 模型、要麥克風、建 worklet，第一次一兩秒、之後幾百毫秒，而畫面在
   這段期間已顯示「等待語音」——開頭說的字其實收不到。改成實例只建一次、跨次按鍵

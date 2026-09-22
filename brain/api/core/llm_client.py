@@ -69,6 +69,15 @@ class LLMToolCall:
     extra_content: dict[str, Any] | None = None
 
 
+class LLMEmptyReplyError(ValueError):
+    """模型回了空內容——沒有文字也沒有 tool call。
+
+    這是模型端的暫時性故障，不是使用者請求有誤。保持是 ValueError 的子類是刻意的：
+    fallback chain 用 ``except ValueError: raise`` 讓空回覆不在下一個 hop 重試，
+    改型別會讓那條路悄悄變成「換 provider 再試一次」。
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class LLMReply:
     content: str
@@ -152,7 +161,7 @@ def generate_chat_turn(
         for tool_call in (message.tool_calls or [])
     ]
     if not content and not tool_calls:
-        raise ValueError("LLM 沒有回傳內容")
+        raise LLMEmptyReplyError("LLM 沒有回傳內容")
     return LLMReply(
         content=content,
         tool_calls=tool_calls,
@@ -518,7 +527,7 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
                     entry["thought_signature"] = sig
 
     if not text_buf and not tool_call_acc:
-        raise ValueError("LLM 沒有回傳內容")
+        raise LLMEmptyReplyError("LLM 沒有回傳內容")
 
     if finish_reason == "tool_calls" or tool_call_acc:
         tool_calls = [

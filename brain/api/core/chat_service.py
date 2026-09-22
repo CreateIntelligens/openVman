@@ -11,9 +11,13 @@ from datetime import date
 from typing import Any
 
 from config import get_settings
-from core.agent_loop import AgentLoopResult, ToolPhaseError, run_agent_loop  # noqa: F401 (ToolPhaseError re-exported)
+from core.agent_loop import (  # noqa: F401 (ToolPhaseError re-exported)
+    AgentLoopResult,
+    ToolPhaseError,
+    run_agent_loop,
+)
 from core.intent_shadow import submit_intent_shadow
-from core.llm_client import LLMReply, generate_chat_turn
+from core.llm_client import LLMEmptyReplyError, LLMReply, generate_chat_turn
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
 from infra.learnings import record_error_event
@@ -24,7 +28,10 @@ from memory.memory import (
     list_session_messages,
     update_session_message_metadata,
 )
-from memory.memory_governance import maybe_run_memory_maintenance, write_summary_and_reindex
+from memory.memory_governance import (
+    maybe_run_memory_maintenance,
+    write_summary_and_reindex,
+)
 from privacy.filter import PiiDetectionReport, detect_llm_messages_pii
 from protocol.message_envelope import (
     METADATA_ORIGINAL_USER_MESSAGE,
@@ -255,7 +262,7 @@ def finalize_generation(
     """
     cleaned_reply = reply.strip()
     if not cleaned_reply:
-        raise ValueError("LLM 沒有回傳內容")
+        raise LLMEmptyReplyError("LLM 沒有回傳內容")
 
     ephemeral_user = bool(
         context.request_context.get("metadata", {}).get("ephemeral_user_message")
@@ -369,7 +376,7 @@ def _string_context_value(context: Any, name: str, default: str = "") -> str:
 def _reply_from_turn(turn: LLMReply) -> str:
     reply = turn.content.strip()
     if not reply:
-        raise ValueError("LLM 沒有回傳內容")
+        raise LLMEmptyReplyError("LLM 沒有回傳內容")
     return reply
 
 

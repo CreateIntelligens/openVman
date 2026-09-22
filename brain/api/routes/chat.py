@@ -13,6 +13,7 @@ from core.chat_service import (
     prepare_generation,
     record_generation_failure,
 )
+from core.llm_client import LLMEmptyReplyError
 from core.reply_modes import DEFAULT_MODE, available_modes
 from core.slash_command import try_rewrite_slash
 from core.sse_events import (
@@ -80,12 +81,24 @@ def _log_generation_success(context: Any, tool_steps: int) -> None:
 
 
 def _handle_generation_error(exc: Exception, action: str, request: Request) -> NoReturn:
+    trace_id = getattr(request.state, "trace_id", "")
+    # 模型回空是伺服器端的暫時性故障，跟 guardrail 擋下的壞請求是兩回事：回 400
+    # 會讓前端不重試、監控把它算成 guardrail block。它是 ValueError 的子類，所以要
+    # 排在下面那個泛用判斷前面。
+    if isinstance(exc, LLMEmptyReplyError):
+        log_exception(f"{action}_empty_reply", exc, trace_id=trace_id)
+        record_generation_failure(action, "llm_failure", str(exc))
+        error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
+        raise HTTPException(status_code=502, detail=error_payload) from exc
+
     if isinstance(exc, (ValueError, ProtocolValidationError)):
+        # 這條路以前不記 log，錯誤訊息只進 metrics，出事時得靠推理拼回來。
+        log_exception(f"{action}_rejected", exc, trace_id=trace_id)
         get_metrics_store().increment("guardrail_blocks_total", action=action)
         record_generation_failure(action, "validation", str(exc))
         raise HTTPException(status_code=400, detail=build_exception_protocol_error(exc)) from exc
 
-    log_exception(f"{action}_error", exc, trace_id=getattr(request.state, "trace_id", ""))
+    log_exception(f"{action}_error", exc, trace_id=trace_id)
     record_generation_failure(action, "llm_failure", str(exc))
     error_payload = build_protocol_error("LLM_OVERLOAD", "LLM 生成失敗", retry_after_ms=3000)
     raise HTTPException(status_code=502, detail=error_payload) from exc
