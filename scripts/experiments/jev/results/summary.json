@@ -1,0 +1,124 @@
+{
+  "metadata": {
+    "model": "jev-latest",
+    "fixture_sha256": "a1c635ca3eed7e507fdda82c57e501bc94068d2935aa9bf77a60330b3f50665f",
+    "recorded_at_utc": "2026-09-22T05:43:56.391171+00:00",
+    "note": "Same synthetic offline development set as SemIf experiment. Jev API call via typesafe-sdk. Not a production or held-out KPI."
+  },
+  "tasks": {
+    "interrupt": {
+      "original": {
+        "count": 16,
+        "correct": 16,
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "p50_ms": 274.8867473565042,
+        "p95_ms": 322.4239284172654,
+        "confusion": {
+          "IGNORE": {
+            "IGNORE": 8,
+            "STOP": 0
+          },
+          "STOP": {
+            "IGNORE": 0,
+            "STOP": 8
+          }
+        },
+        "errors": []
+      },
+      "reversed": {
+        "count": 16,
+        "correct": 16,
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "p50_ms": 289.47785357013345,
+        "p95_ms": 383.0722952261567,
+        "confusion": {
+          "IGNORE": {
+            "IGNORE": 8,
+            "STOP": 0
+          },
+          "STOP": {
+            "IGNORE": 0,
+            "STOP": 8
+          }
+        },
+        "errors": []
+      },
+      "order_flips": []
+    },
+    "routing": {
+      "original": {
+        "count": 32,
+        "correct": 32,
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "p50_ms": 257.50785134732723,
+        "p95_ms": 321.53109461069107,
+        "confusion": {
+          "chat": {
+            "chat": 8,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 8,
+            "knowledge": 0,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 8,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 8
+          }
+        },
+        "errors": []
+      },
+      "reversed": {
+        "count": 32,
+        "correct": 32,
+        "accuracy": 1.0,
+        "balanced_accuracy": 1.0,
+        "p50_ms": 270.4618205316365,
+        "p95_ms": 331.0646750032902,
+        "confusion": {
+          "chat": {
+            "chat": 8,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 0
+          },
+          "clarify": {
+            "chat": 0,
+            "clarify": 8,
+            "knowledge": 0,
+            "web": 0
+          },
+          "knowledge": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 8,
+            "web": 0
+          },
+          "web": {
+            "chat": 0,
+            "clarify": 0,
+            "knowledge": 0,
+            "web": 8
+          }
+        },
+        "errors": []
+      },
+      "order_flips": []
+    }
+  }
+}
