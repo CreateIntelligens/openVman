@@ -69,7 +69,7 @@ async def test_gemini_live_pipeline_emits_audio_chunks_from_server_content():
     cfg = types.SimpleNamespace(
 
         gemini_api_key="test-key",
-        live_gemini_model="gemini-3.1-flash-live-preview",
+        live_gemini_model="gemini-3.8-live",
         live_gemini_system_instruction="",
         live_gemini_output_audio_transcription=True,
         live_gemini_tools_enabled=True,
@@ -91,7 +91,7 @@ async def test_gemini_live_pipeline_emits_audio_chunks_from_server_content():
     assert events[0]["text"] == "哈囉"
     decoded = base64.b64decode(events[0]["audio_base64"])
     assert decoded.startswith(b"RIFF")
-    assert transport.sent_messages[0]["setup"]["model"] == "models/gemini-3.1-flash-live-preview"
+    assert transport.sent_messages[0]["setup"]["model"] == "models/gemini-3.8-live"
     assert transport.sent_messages[1]["clientContent"]["turns"][0]["parts"][0]["text"] == "你好"
 
 
@@ -126,7 +126,7 @@ async def test_gemini_live_pipeline_executes_search_tool_calls_and_returns_tool_
     cfg = types.SimpleNamespace(
 
         gemini_api_key="test-key",
-        live_gemini_model="gemini-3.1-flash-live-preview",
+        live_gemini_model="gemini-3.8-live",
         live_gemini_system_instruction="",
         live_gemini_output_audio_transcription=True,
         live_gemini_tools_enabled=True,

@@ -33,6 +33,18 @@ _SETUP_COMPLETE_TIMEOUT_SECONDS = 10
 EventSink = Callable[[dict[str, Any]], Awaitable[None]]
 
 
+def _supports_thinking_level(model: str) -> bool:
+    """Whether a Live model accepts generationConfig.thinkingConfig.
+
+    3.8 起 thinkingLevel 只留在 extended-thinking 變體；一般的 gemini-3.8-live
+    收到這個欄位會直接報錯。3.1 preview 兩者都吃。
+    """
+    name = model.strip().removeprefix("models/")
+    if name.startswith("gemini-3.1-"):
+        return True
+    return "extended-thinking" in name
+
+
 class JsonTransport(Protocol):
     async def connect(self) -> None: ...
 
@@ -623,11 +635,19 @@ class GeminiLiveSession:
             "model": f"models/{self.config.live_gemini_model}",
             "generationConfig": {"responseModalities": ["AUDIO"]},
         }
+        # gemini-3.8-live 不支援 thinkingLevel，帶了會被拒絕；extended-thinking
+        # 變體才吃這個欄位，所以依模型決定要不要送，而不是無條件帶上。
         thinking_level = self.config.live_gemini_thinking_level.strip()
-        if thinking_level:
+        if thinking_level and _supports_thinking_level(self.config.live_gemini_model):
             setup["generationConfig"]["thinkingConfig"] = {
                 "thinkingLevel": thinking_level,
             }
+        elif thinking_level:
+            logger.warning(
+                "ignoring live_gemini_thinking_level=%r: %s does not accept it",
+                thinking_level,
+                self.config.live_gemini_model,
+            )
         instruction = self._system_instruction.strip() or self.config.live_gemini_system_instruction.strip()
         if instruction:
             setup["systemInstruction"] = {

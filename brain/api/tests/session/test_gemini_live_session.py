@@ -22,7 +22,7 @@ _saved_modules: dict[str, object] = {}
 def _load_module():
     fake_config = types.SimpleNamespace(
         gemini_api_key="test-key",
-        live_gemini_model="gemini-3.1-flash-live-preview",
+        live_gemini_model="gemini-3.8-live",
         live_gemini_system_instruction="",
         live_gemini_output_audio_transcription=True,
         live_gemini_tools_enabled=True,
@@ -126,7 +126,7 @@ async def test_gemini_live_session_reuses_transport_across_text_turns():
     assert transport.connect_calls == 1
     assert transport.close_calls == 1
     setup = transport.sent_messages[0]["setup"]
-    assert setup["model"] == "models/gemini-3.1-flash-live-preview"
+    assert setup["model"] == "models/gemini-3.8-live"
     # Compression lifts the 2-min/15-min session cap that otherwise triggers 1008.
     assert setup["contextWindowCompression"] == {"slidingWindow": {}}
     assert transport.sent_messages[1]["realtimeInput"]["text"] == "你好"
@@ -716,3 +716,27 @@ async def test_live_voice_turn_records_user_message_for_archive():
     await session._handle_input_transcription({"text": "[視覺事件] 有人走近。"})
     assert session._last_user_message == "我剛問了幾題"
 
+
+def test_thinking_level_is_dropped_for_models_that_reject_it():
+    """3.8 起一般 live 模型不吃 thinkingLevel，帶了會被 API 拒絕。"""
+    module, fake_config = _load_module()
+    fake_config.live_gemini_thinking_level = "high"
+
+    def _setup_for(model: str) -> dict:
+        fake_config.live_gemini_model = model
+        session = module.GeminiLiveSession(
+            relay_session_id="relay-think",
+            client_id="client-think",
+            config=fake_config,
+            transport_factory=lambda _cfg: FakeTransport(),
+        )
+        return session._build_setup_message()
+
+    assert "thinkingConfig" not in _setup_for("gemini-3.8-live")["generationConfig"]
+    # extended-thinking 變體與舊的 3.1 preview 仍然接受這個欄位。
+    assert _setup_for("gemini-3.8-live-extended-thinking")["generationConfig"][
+        "thinkingConfig"
+    ] == {"thinkingLevel": "high"}
+    assert _setup_for("gemini-3.1-flash-live-preview")["generationConfig"][
+        "thinkingConfig"
+    ] == {"thinkingLevel": "high"}

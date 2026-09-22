@@ -53,6 +53,21 @@
   拒絕麥克風／沒有麥克風時，當場退回伺服器引擎。後台試辨識與聊天室都會顯示
   這一次實測到的轉寫耗時。Migration 12 為 `account_defaults` 新增 `asr_provider`。
 
+### Changed
+
+- **Gemini Live 升級到 `gemini-3.8-live`**：預設模型由 `gemini-3.1-flash-live-preview`
+  換成 `gemini-3.8-live`（`brain/api/config.py`）。同時處理遷移文件列出的破壞性
+  變更：3.8 一般版**不接受** `thinkingConfig.thinkingLevel`，帶上去會被 websocket
+  以 1007 關閉，因此 `_build_setup_message()` 改成依模型判斷才送，設了卻用不到時
+  留一筆 warning；`extended-thinking` 變體與舊的 3.1 preview 仍照送。遷移文件其餘
+  項目對本專案是 no-op：從未使用 `enable_affective_dialog` 或 `proactive_audio`，
+  工具宣告沒有設 `behavior`（沿用新的 `NON_BLOCKING` 預設），回覆模態本來就是
+  `AUDIO` 搭配 `outputAudioTranscription`。`.env.example` 補上 `LIVE_GEMINI_MODEL`
+  與 `LIVE_GEMINI_THINKING_LEVEL` 說明。
+  以真實 API 驗證：`gemini-3.8-live` setupComplete 正常、單輪對話取得 14 個音訊
+  chunk 與完整逐字稿；帶 `thinkingLevel` 則重現 1007「Thinking level is not
+  supported for this model」。
+
 ### Fixed
 
 - **Gemini Live 沒有保存模型回覆，切回文字模式後上下文斷掉**：
