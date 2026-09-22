@@ -92,8 +92,9 @@
         :is-typing="isTyping"
         :asr-listening="activeAsr.isListening.value"
         :asr-supported="activeAsr.isSupported.value"
-        :asr-transcribing="serverAsr.isTranscribing.value"
-        :asr-engine="useBrowserAsr ? 'browser' : 'server'"
+        :asr-transcribing="serverAsr.isTranscribing.value || vadAsr.isTranscribing.value"
+        :asr-speaking="vadAsr.isSpeaking.value"
+        :asr-input-mode="asrInputMode"
         :asr-error="asrError"
         :compact="immersive"
         @send="handleComposerSend"
@@ -174,6 +175,7 @@ import {
 } from "./composables/useAvatarChat";
 import { useAsr } from "./composables/useAsr";
 import { useServerAsr } from "./composables/useServerAsr";
+import { useVadAsr } from "./composables/useVadAsr";
 import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { BROWSER_ASR, fetchMyAsrProvider, setMyAsrProvider } from "./api/asr";
@@ -649,6 +651,29 @@ const serverAsr = useServerAsr({
   onError: reportAsrError,
 });
 
+// 伺服器引擎優先走 VAD（講完自動送）。VAD 起不來——模型或 WASM 載不到，例如
+// 內網連不到 CDN——就退回 serverAsr 的按鍵錄音，並直接幫使用者開始錄，不要讓
+// 他按了麥克風卻什麼都沒發生。
+const vadAvailable = ref(true);
+const vadAsr = useVadAsr({
+  onResult: (transcript) => {
+    asrError.value = "";
+    void handleSend(transcript).then((result) => {
+      if (!result.accepted && result.message) {
+        statusToastRef.value?.show(result.message);
+      }
+    });
+  },
+  onError: (error) => {
+    if (error === "vad-unavailable") {
+      vadAvailable.value = false;
+      void serverAsr.start();
+      return;
+    }
+    reportAsrError(error);
+  },
+});
+
 // 這個帳號選的引擎。空字串代表沿用全站設定，那一定是伺服器引擎——瀏覽器
 // 辨識只能由使用者自己選，後端跑不了它。
 const myAsrProvider = ref("");
@@ -697,7 +722,14 @@ void fetchMyAsrProvider()
 
 // 按鈕顯示的狀態要跟實際在收音的引擎同一個。先前畫面綁的永遠是瀏覽器辨識，
 // 選了伺服器引擎時按下去有在錄音，但按鈕毫無反應，使用者無從得知有沒有收音。
-const activeAsr = computed(() => (useBrowserAsr.value ? asr : serverAsr));
+const activeAsr = computed(() => {
+  if (useBrowserAsr.value) return asr;
+  return vadAvailable.value ? vadAsr : serverAsr;
+});
+// 提示文字跟著操作方式走：continuous 講完自動送，push-to-talk 要再按一次。
+const asrInputMode = computed<"continuous" | "push-to-talk">(
+  () => (activeAsr.value === serverAsr ? "push-to-talk" : "continuous"),
+);
 
 function handleAsrToggle(): void {
   asrError.value = "";

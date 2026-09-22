@@ -148,8 +148,11 @@ const props = withDefaults(defineProps<{
   asrSupported?: boolean
   /** 伺服器引擎是整段上傳：停止收音到出字之間有幾秒空窗，要讓使用者看得到。 */
   asrTranscribing?: boolean
-  /** 兩種引擎操作方式不同：瀏覽器辨識講完自動送，伺服器引擎要再按一次才送。 */
-  asrEngine?: 'browser' | 'server'
+  /** 操作方式不同，提示也不同：continuous 講完自動送（瀏覽器辨識，或伺服器
+   *  引擎 + VAD）；push-to-talk 要再按一次才送（VAD 起不來時的退路）。 */
+  asrInputMode?: 'continuous' | 'push-to-talk'
+  /** VAD 偵測到正在講話。瀏覽器辨識沒有這個訊號，一律是 false。 */
+  asrSpeaking?: boolean
   asrError?: string
   compact?: boolean
 }>(), {
@@ -180,9 +183,8 @@ const feedbackMessage = computed({
 const asrStatusText = computed(() => {
   if (props.asrTranscribing) return "辨識中，請稍候…"
   if (!props.asrListening) return ""
-  return props.asrEngine === "server"
-    ? "收音中…講完請再按一次麥克風送出"
-    : "收音中…請直接說話"
+  if (props.asrInputMode === "push-to-talk") return "收音中…講完請再按一次麥克風送出"
+  return props.asrSpeaking ? "聆聽中…講完會自動送出" : "收音中…請直接說話"
 })
 const composerPlaceholder = computed(() => asrStatusText.value || props.placeholder)
 const messagesRef = ref<HTMLDivElement>()

@@ -10,8 +10,10 @@ const source = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
 test("the chat picks an engine instead of always using the browser one", () => {
   assert.match(source, /useServerAsr/);
   assert.match(source, /const useBrowserAsr = computed/);
-  // 切換要看使用者選的引擎，不是寫死用 asr。
-  assert.match(source, /useBrowserAsr\.value \? asr : serverAsr/);
+  // 切換要看使用者選的引擎，不是寫死用 asr。伺服器引擎再分兩種：VAD 可用就
+  // 講完自動送，否則退回按鍵錄音。
+  assert.match(source, /if \(useBrowserAsr\.value\) return asr;/);
+  assert.match(source, /return vadAvailable\.value \? vadAsr : serverAsr;/);
 });
 
 test("browser recognition needs both the capability check and the account choice", () => {

@@ -73,8 +73,10 @@ test("the composer says whether the microphone is live, and how to send", () => 
   assert.match(source, /收音中…講完請再按一次麥克風送出/);
   assert.match(source, /收音中…請直接說話/);
   assert.match(source, /辨識中，請稍候…/);
-  // 兩種引擎的操作方式不同，提示要跟著引擎走。
-  assert.match(source, /props\.asrEngine === "server"/);
+  // 操作方式不同，提示要跟著走：push-to-talk 要提醒再按一次才會送。
+  assert.match(source, /props\.asrInputMode === "push-to-talk"/);
+  // VAD 偵測到講話時換一句，讓使用者知道聲音真的有進來。
+  assert.match(source, /props\.asrSpeaking \? "聆聽中…講完會自動送出"/);
 });
 
 test("the listening status reaches assistive tech", () => {

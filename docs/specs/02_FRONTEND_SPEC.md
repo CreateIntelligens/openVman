@@ -134,7 +134,8 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 > | 引擎 | 實作 | 操作方式 |
 > |---|---|---|
 > | `browser` | Web Speech API（app `useAsr.ts`、admin `useSpeechRecognition.ts`） | 開著連續聆聽，講完自動送出 |
-> | 其餘（breeze / xiaomi / sensevoice / openai） | MediaRecorder 錄音後整段上傳 `POST /api/v1/asr/transcribe`（app `useServerAsr.ts`、admin `useServerSpeechRecognition.ts`） | 按一下開始收音，再按一次才送出；沒有中途結果 |
+> | 其餘（breeze / xiaomi / sensevoice / openai） | 本機 Silero VAD 切句（app `useVadAsr.ts`；admin `useVadSpeechRecognition.ts`，沿用 Live 模式的 `useVad.ts`），每句包成 16 kHz WAV 上傳 `POST /api/v1/asr/transcribe` | 講完自動送。admin 連續聆聽；app 一次按鍵收一句（AI 回話時麥克風若開著會收到喇叭聲）。VAD 起不來時退回下一列 |
+> | 上一列的退路 | MediaRecorder 錄音後整段上傳（app `useServerAsr.ts`、admin `useServerSpeechRecognition.ts`） | 按一下開始收音，再按一次才送出；沒有中途結果 |
 >
 > 引擎由後端依帳號查，前端不指定——否則改個請求就能繞過授權。可選清單是
 > `allowed`（帳號頁授權的 `asr_engine` 資源），只有一個可選時不顯示選單。
@@ -143,6 +144,16 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 > 動態與文字提示，伺服器引擎另有「辨識中」狀態（停止收音到出字之間有數秒
 > 空窗）。提示文字跟著引擎走，因為兩者送出的方式不同。後台伺服器引擎單段錄音
 > 上限 60 秒，到了自動停止並送出。
+>
+> VAD 的模型檔在 `frontend/admin/public/vad/`，由後台 nginx 在 `/admin/vad/` 提供；
+> app 與 admin 同源，直接共用這一份。兩邊的 `@ricky0123/vad-web` 與 ORT WASM 版本
+> 要一起升。ONNX Runtime 的 WASM 從 jsdelivr
+> CDN 載入——連不到外網的部署 VAD 會初始化失敗，此時自動走按鍵錄音。
+>
+> **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
+> 顯示（app 在 `App.vue`、admin 在 `useVisionAvailable.ts`）。三態：問到之前與
+> 401/403 都不顯示，`available: false` 不顯示，5xx 與網路錯誤 fail-open。不可用時
+> 是整個不出現，不是 disabled。
 
 ### 7. 狀態機控制 (State Transitions)
 
