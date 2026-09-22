@@ -339,6 +339,7 @@ export function useChatSession() {
   // 伺服器引擎優先用 VAD：開著一直聽、講完自動送，跟瀏覽器辨識同一種操作。
   const {
     speaking: vadSpeaking,
+    starting: asrStarting,
     supported: vadSupported,
     transcribing: vadTranscribing,
   } = useVadSpeechRecognition({
@@ -587,6 +588,7 @@ export function useChatSession() {
     asrListening,
     asrSupported,
     asrInputMode,
+    asrStarting,
     asrTranscribing,
     asrProvider,
     changeAsrProvider,

@@ -42,7 +42,8 @@ test("the button reflects whichever engine is actually recording", () => {
   // 先前畫面永遠綁瀏覽器辨識，選了伺服器引擎時按下去毫無反應。
   const app = readFileSync(resolve(__dirname, "../../../App.vue"), "utf8");
   assert.match(app, /if \(useBrowserAsr\.value\) return asr;\s*return vadAvailable\.value \? vadAsr : serverAsr;/);
-  assert.match(app, /:asr-listening="activeAsr\.isListening\.value"/);
+  // 啟動中也算「按下了」，按鈕要有反應，但實際收音狀態由提示文字區分。
+  assert.match(app, /:asr-listening="activeAsr\.isListening\.value \|\| vadAsr\.isStarting\.value"/);
   assert.match(app, /:asr-supported="activeAsr\.isSupported\.value"/);
   assert.match(app, /:asr-transcribing="serverAsr\.isTranscribing\.value \|\| vadAsr\.isTranscribing\.value"/);
   assert.doesNotMatch(app, /:asr-listening="asr\.isListening\.value"/);

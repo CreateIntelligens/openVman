@@ -40,7 +40,10 @@ test("encodeWav writes a header the backend's decoder will accept", async () => 
 
 test("one press captures one sentence, then the microphone closes", () => {
   // AI 回話時麥克風若還開著，會把喇叭的聲音再收進來。
-  const onSpeechEnd = source.slice(source.indexOf("onSpeechEnd:"), source.indexOf("onVADMisfire:"));
+  const onSpeechEnd = source.slice(
+    source.indexOf("callbacks.onSpeechEnd = "),
+    source.indexOf("callbacks.onVADMisfire = "),
+  );
   assert.ok(onSpeechEnd.indexOf("stop()") < onSpeechEnd.indexOf("send(audio)"));
 });
 
@@ -63,5 +66,26 @@ test("a denied microphone is reported as such, not as a VAD failure", () => {
 
 test("stopping while the model is still loading cancels the pending start", () => {
   assert.match(source, /const mine = \+\+generation/);
-  assert.match(source, /if \(mine !== generation\) \{\s*await instance\.destroy\(\)/);
+  // 載完發現這一輪已經被停掉：pause 而不是開始收音。
+  assert.match(source, /await instance\.start\(\)\s*if \(mine !== generation\) \{\s*await instance\.pause\(\)/);
+});
+
+test("the VAD instance is built once and reused across presses", () => {
+  // 每次按鍵都 destroy 再 new 的話，第一次一兩秒、之後幾百毫秒，開頭的字都漏掉。
+  assert.match(source, /if \(vadReady\) return vadReady/);
+  assert.match(source, /startOnLoad: false/);
+  const stopFn = source.slice(source.indexOf("function stop(): void"), source.indexOf("function pause(): void"));
+  assert.match(stopFn, /current\?\.pause\(\)/);
+  // 只比對程式碼，註解裡提到 destroy 沒關係。
+  assert.doesNotMatch(stopFn.replace(/\/\/.*$/gm, ""), /destroy/);
+  // 只有整個元件卸載才 destroy。
+  const unmount = source.slice(source.indexOf("onUnmounted("));
+  assert.match(unmount, /instance\.destroy\(\)/);
+});
+
+test("starting is reported separately so the UI can say the mic is not live yet", () => {
+  assert.match(source, /isStarting: readonly\(isStarting\)/);
+  const startFn = source.slice(source.indexOf("async function start()"), source.indexOf("function stop(): void"));
+  // isListening 要等 instance.start() 真的成功才變 true。
+  assert.ok(startFn.indexOf("await instance.start()") < startFn.indexOf("isListening.value = true"));
 });

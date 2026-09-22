@@ -6,6 +6,8 @@ interface AsrButtonProps {
   speaking: boolean;
   /** 伺服器引擎：音檔已送出、等後端回字。 */
   transcribing?: boolean;
+  /** VAD 還在載模型／要麥克風。這一兩秒說的話收不到，不能顯示成已經在聽。 */
+  starting?: boolean;
   /**
    * 兩種操作方式的提示文字不同：continuous 是開著一直聽、講完自動送（瀏覽器
    * 辨識，或伺服器引擎 + VAD）；push-to-talk 是按一下錄、再按一下才送（VAD
@@ -28,6 +30,7 @@ export const AsrButton: React.FC<AsrButtonProps> = ({
   listening,
   speaking,
   transcribing = false,
+  starting = false,
   inputMode = "continuous",
   onToggle,
 }) => {
@@ -37,7 +40,12 @@ export const AsrButton: React.FC<AsrButtonProps> = ({
   let label = "";
   let title = "語音輸入";
 
-  if (transcribing && !listening) {
+  if (listening && starting) {
+    // 使用者回報「剛點下去好像都沒收音」——那一兩秒在載模型、要麥克風。
+    styles = `${WAITING_STYLES} animate-none`;
+    label = "麥克風啟動中…";
+    title = "麥克風啟動中";
+  } else if (transcribing && !listening) {
     styles = BUSY_STYLES;
     label = "辨識中…";
     title = "辨識中";

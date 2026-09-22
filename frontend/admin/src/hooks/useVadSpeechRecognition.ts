@@ -71,7 +71,7 @@ export function useVadSpeechRecognition({
       });
   }, []);
 
-  const { speaking, supported } = useVad({
+  const { speaking, starting, supported } = useVad({
     enabled,
     onSpeechStart: onActivity,
     onAudio: handleAudio,
@@ -79,5 +79,5 @@ export function useVadSpeechRecognition({
     onSpeechCommit: () => {},
   });
 
-  return { speaking, supported, transcribing: pending > 0 };
+  return { speaking, starting, supported, transcribing: pending > 0 };
 }

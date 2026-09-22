@@ -11,7 +11,7 @@ let vadOptions: VadOptions;
 vi.mock("./useVad", () => ({
   useVad: (options: VadOptions) => {
     vadOptions = options;
-    return { speaking: false, supported: true };
+    return { speaking: false, starting: false, supported: true };
   },
 }));
 

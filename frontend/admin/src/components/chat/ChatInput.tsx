@@ -27,6 +27,8 @@ interface ChatInputProps {
   asrSupported: boolean;
   asrSpeaking: boolean;
   asrTranscribing?: boolean;
+  /** VAD 還在載模型／要麥克風，這段期間說的話收不到。 */
+  asrStarting?: boolean;
   asrInputMode?: "continuous" | "push-to-talk";
   asrProvider?: MyAsrProvider | null;
   onAsrProviderChange?: (value: string) => void;
@@ -77,6 +79,7 @@ export default function ChatInput(props: ChatInputProps) {
     asrSupported,
     asrSpeaking,
     asrTranscribing,
+    asrStarting,
     asrInputMode,
     asrProvider,
     onAsrProviderChange,
@@ -283,6 +286,7 @@ export default function ChatInput(props: ChatInputProps) {
                   listening={asrListening}
                   speaking={asrSpeaking}
                   transcribing={asrTranscribing}
+                  starting={asrStarting}
                   inputMode={asrInputMode}
                   onToggle={onToggleAsr}
                 />

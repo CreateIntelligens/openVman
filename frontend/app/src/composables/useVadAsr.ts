@@ -26,6 +26,12 @@ type VadInstance = {
   destroy: () => Promise<void> | void
 }
 
+type VadCallbacks = {
+  onSpeechStart: () => void
+  onSpeechEnd: (audio: Float32Array) => void
+  onVADMisfire: () => void
+}
+
 // 模型與 worklet 由後台的 nginx 在同一個來源提供，兩個前端共用一份，不必在
 // 版本庫裡再放一份 2 MB 的模型檔。
 const VAD_ASSET_BASE = '/admin/vad/'
@@ -36,16 +42,30 @@ const VAD_SAMPLE_RATE = 16000
 
 export function useVadAsr(options: VadAsrOptions = {}) {
   const isListening = ref(false)
+  // 按下去到真的開始收音之間：載模型、要麥克風、建 worklet。這段期間說的話
+  // 收不到，畫面要照實顯示「啟動中」，不能假裝已經在聽。
+  const isStarting = ref(false)
   const isSpeaking = ref(false)
   const isTranscribing = ref(false)
   const isSupported = ref(
     typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia),
   )
 
+  // 實例跨次按鍵重用：載套件、抓 WASM 與模型、建 worklet 只做一次，之後每次
+  // 按鍵只剩 pause()/start()——pause 會放掉麥克風軌（瀏覽器的錄音指示會熄），
+  // start 再要回來，模型不必重載。每次都 destroy 再 new 的話，第一次要一兩秒、
+  // 之後也要幾百毫秒，開頭那幾個字都會漏掉。
   let vad: VadInstance | null = null
-  // start() 還在載模型時使用者就按了停止：載完要直接收掉，不能開始收音。
+  let vadReady: Promise<VadInstance> | null = null
+  // start() 還在載模型時使用者就按了停止：載完要直接停下，不能開始收音。
   let generation = 0
   let alive = true
+  // 回呼看的是「現在這一輪」，實例只建一次，所以透過這層轉接而不是綁死。
+  const callbacks: VadCallbacks = {
+    onSpeechStart: () => {},
+    onSpeechEnd: () => {},
+    onVADMisfire: () => {},
+  }
 
   async function send(samples: Float32Array): Promise<void> {
     if (!samples.length) return
@@ -71,56 +91,60 @@ export function useVadAsr(options: VadAsrOptions = {}) {
     }
   }
 
-  async function teardown(): Promise<void> {
-    const current = vad
-    vad = null
-    isSpeaking.value = false
-    try {
-      await current?.destroy()
-    } catch {
-      // 收掉失敗沒有什麼可做的，麥克風軌在 destroy 內部已經盡力釋放。
-    }
+  async function loadVad(): Promise<VadInstance> {
+    if (vadReady) return vadReady
+    vadReady = (async () => {
+      const { MicVAD } = await import('@ricky0123/vad-web')
+      return await MicVAD.new({
+        baseAssetPath: VAD_ASSET_BASE,
+        onnxWASMBasePath: ORT_WASM_CDN,
+        model: 'v5',
+        // 載好先不要開麥克風：由 start() 決定，否則停止得太快會跟載入賽跑。
+        startOnLoad: false,
+        onSpeechStart: () => callbacks.onSpeechStart(),
+        onSpeechEnd: (audio: Float32Array) => callbacks.onSpeechEnd(audio),
+        onVADMisfire: () => callbacks.onVADMisfire(),
+      }) as VadInstance
+    })()
+    vadReady.catch(() => { vadReady = null })
+    return vadReady
   }
 
   async function start(): Promise<boolean> {
-    if (isListening.value) return true
+    if (isListening.value || isStarting.value) return true
     if (!isSupported.value) {
       options.onError?.('vad-unavailable')
       return false
     }
     const mine = ++generation
-    isListening.value = true
+    isStarting.value = true
     try {
-      const { MicVAD } = await import('@ricky0123/vad-web')
-      const instance = await MicVAD.new({
-        baseAssetPath: VAD_ASSET_BASE,
-        onnxWASMBasePath: ORT_WASM_CDN,
-        model: 'v5',
-        startOnLoad: true,
-        onSpeechStart: () => {
-          if (mine === generation) isSpeaking.value = true
-        },
-        onSpeechEnd: (audio: Float32Array) => {
-          if (mine !== generation) return
-          isSpeaking.value = false
-          // 一次按鍵收一句：跟瀏覽器辨識一樣，講完就收音結束、送出。AI 回話時
-          // 麥克風若還開著，會把喇叭的聲音再收進來。
-          stop()
-          void send(audio)
-        },
-        onVADMisfire: () => {
-          if (mine === generation) isSpeaking.value = false
-        },
-      }) as VadInstance
+      const instance = await loadVad()
+      if (mine !== generation) return false
+      callbacks.onSpeechStart = () => {
+        if (mine === generation) isSpeaking.value = true
+      }
+      callbacks.onSpeechEnd = (audio) => {
+        if (mine !== generation) return
+        isSpeaking.value = false
+        // 一次按鍵收一句：跟瀏覽器辨識一樣，講完就收音結束、送出。AI 回話時
+        // 麥克風若還開著，會把喇叭的聲音再收進來。
+        stop()
+        void send(audio)
+      }
+      callbacks.onVADMisfire = () => {
+        if (mine === generation) isSpeaking.value = false
+      }
+      await instance.start()
       if (mine !== generation) {
-        await instance.destroy()
+        await instance.pause()
         return false
       }
       vad = instance
+      isListening.value = true
       return true
     } catch (error) {
       if (mine !== generation) return false
-      isListening.value = false
       const denied = error instanceof DOMException
         && (error.name === 'NotAllowedError' || error.name === 'NotFoundError')
       // 權限被拒換引擎也沒用，那是麥克風的問題；其餘（模型、WASM 載不到）才是
@@ -132,13 +156,20 @@ export function useVadAsr(options: VadAsrOptions = {}) {
         options.onError?.('vad-unavailable')
       }
       return false
+    } finally {
+      if (mine === generation) isStarting.value = false
     }
   }
 
   function stop(): void {
     generation += 1
     isListening.value = false
-    void teardown()
+    isStarting.value = false
+    isSpeaking.value = false
+    const current = vad
+    vad = null
+    // pause 而不是 destroy：麥克風放掉，模型留著給下一次。
+    void current?.pause()
   }
 
   function pause(): void { stop() }
@@ -147,10 +178,14 @@ export function useVadAsr(options: VadAsrOptions = {}) {
   onUnmounted(() => {
     alive = false
     stop()
+    const pending = vadReady
+    vadReady = null
+    void pending?.then((instance) => instance.destroy()).catch(() => {})
   })
 
   return {
     isListening: readonly(isListening),
+    isStarting: readonly(isStarting),
     isSpeaking: readonly(isSpeaking),
     isTranscribing: readonly(isTranscribing),
     isSupported: readonly(isSupported),

@@ -85,3 +85,11 @@ test("the listening status reaches assistive tech", () => {
   const rule = source.slice(source.indexOf(".composer-status {"));
   assert.doesNotMatch(rule.slice(0, rule.indexOf("}")), /display:\s*none/);
 });
+
+test("the composer does not claim to be listening while the VAD is still starting", () => {
+  // 使用者回報「剛點下去好像都沒收音，要等一秒」——那一秒在載模型、要麥克風，
+  // 說的話真的收不到。提示要照實講，而且要排在「收音中」之前。
+  const fn = source.slice(source.indexOf("const asrStatusText"), source.indexOf("const composerPlaceholder"));
+  assert.match(fn, /props\.asrStarting\) return "麥克風啟動中…"/);
+  assert.ok(fn.indexOf("asrStarting") < fn.indexOf("if (!props.asrListening)"));
+});

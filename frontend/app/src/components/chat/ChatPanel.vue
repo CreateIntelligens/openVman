@@ -153,6 +153,8 @@ const props = withDefaults(defineProps<{
   asrInputMode?: 'continuous' | 'push-to-talk'
   /** VAD 偵測到正在講話。瀏覽器辨識沒有這個訊號，一律是 false。 */
   asrSpeaking?: boolean
+  /** VAD 還在載模型／要麥克風，這段期間說的話收不到。 */
+  asrStarting?: boolean
   asrError?: string
   compact?: boolean
 }>(), {
@@ -182,6 +184,8 @@ const feedbackMessage = computed({
 // 變色的話，使用者回報過「點了看不到反饋，不知道有沒有收音」。
 const asrStatusText = computed(() => {
   if (props.asrTranscribing) return "辨識中，請稍候…"
+  // 載模型、要麥克風那一兩秒說的話收不到，照實講，不能假裝已經在聽。
+  if (props.asrStarting) return "麥克風啟動中…"
   if (!props.asrListening) return ""
   if (props.asrInputMode === "push-to-talk") return "收音中…講完請再按一次麥克風送出"
   return props.asrSpeaking ? "聆聽中…講完會自動送出" : "收音中…請直接說話"

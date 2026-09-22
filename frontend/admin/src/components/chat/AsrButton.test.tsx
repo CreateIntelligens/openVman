@@ -23,6 +23,11 @@ describe("AsrButton", () => {
     expect(screen.getByRole("status").textContent).toBe("聆聽中...");
   });
 
+  it("VAD 還在啟動時不說「等待語音」，那一秒真的收不到", () => {
+    render(<AsrButton supported listening speaking={false} starting onToggle={() => {}} />);
+    expect(screen.getByRole("status").textContent).toBe("麥克風啟動中…");
+  });
+
   it("連續聆聽時上一句還在辨識：麥克風仍開著，按鈕也還能按", () => {
     const onToggle = vi.fn();
     render(<AsrButton supported listening speaking={false} transcribing onToggle={onToggle} />);
