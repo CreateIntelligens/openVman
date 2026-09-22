@@ -99,3 +99,17 @@ describe("ChatInput", () => {
   });
 
 });
+
+describe("ChatInput layout", () => {
+  it("keeps the toolbar out of the textarea instead of overlaying it", () => {
+    // 工具列疊在 textarea 上要靠 padding-bottom 預留高度；控制項一多（回覆深度、
+    // TTS、ASR 引擎、隱私）換行就會蓋住正在打的字，使用者回報過打不了字。
+    renderChatInput({ mode: "text" });
+    const textarea = screen.getByRole("textbox");
+    const toolbar = textarea.nextElementSibling as HTMLElement;
+
+    expect(toolbar).not.toBeNull();
+    expect(toolbar.className).not.toMatch(/\babsolute\b/);
+    expect(textarea.className).not.toMatch(/\bpb-12\b/);
+  });
+});

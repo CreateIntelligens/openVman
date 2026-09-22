@@ -233,11 +233,13 @@ export default function ChatInput(props: ChatInputProps) {
             disabled={inputDisabled}
             rows={1}
             placeholder={inputPlaceholder}
-            className="min-h-[3.5rem] w-full resize-none bg-transparent p-4 pb-12 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-subtle focus:outline-none"
+            className="min-h-[3.5rem] w-full resize-none bg-transparent p-4 pb-2 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-subtle focus:outline-none"
           />
 
-          <div className="absolute bottom-3 left-4 right-3 flex items-center justify-between pointer-events-none">
-            <div className="pointer-events-auto">
+          {/* 工具列放在正常流裡而不是疊在 textarea 上。疊上去要靠 textarea 的
+              padding-bottom 預留高度，控制項一多換行就會蓋住正在打的字。 */}
+          <div className="flex flex-wrap items-end justify-between gap-2 px-3 pb-3">
+            <div className="min-w-0 flex-1">
               {mode === "text" && (
                 <div className="flex flex-wrap items-center gap-2">
                   <ReplyModeControl value={replyMode} onChange={onReplyModeChange} />
@@ -263,7 +265,7 @@ export default function ChatInput(props: ChatInputProps) {
                 </div>
               )}
             </div>
-            <div className="flex gap-2 pointer-events-auto">
+            <div className="flex shrink-0 gap-2">
               {cameraAvailable && <button
                 type="button"
                 onClick={onLiveToggleCamera}
