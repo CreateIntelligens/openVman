@@ -6,6 +6,15 @@ import { dirname, resolve } from "node:path";
 import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const sharedSource = readFileSync(resolve(__dirname, "../../../../shared/speech/tts/pcm-stream.ts"), "utf8");
+const sharedCompiled = ts.transpileModule(sharedSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
+const sharedUrl = `data:text/javascript;base64,${Buffer.from(sharedCompiled).toString("base64")}`;
+
 const source = readFileSync(resolve(__dirname, "../useTtsStreamer.ts"), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
@@ -15,6 +24,9 @@ const compiled = ts.transpileModule(source, {
 }).outputText.replace(
   /import\s*\{\s*apiFetch\s*\}\s*from\s*['"][^'"]+['"];?/,
   "const apiFetch = (url, init) => fetch(url, { ...init, credentials: 'include' });",
+).replace(
+  /from\s*['"]@shared\/speech['"];?/,
+  `from "${sharedUrl}";`,
 );
 
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
@@ -224,6 +236,39 @@ test("gemini-tts's 24kHz raw PCM stream is resampled to 16kHz across chunk bound
     for (let i = 1; i < combined.length; i++) {
       assert.ok(combined[i] >= combined[i - 1], `sample ${i} decreased: ${combined[i - 1]} -> ${combined[i]}`);
     }
+  } finally {
+    fetchMock.restore();
+  }
+});
+
+test("TTS response with X-TTS-Fallback-Reason triggers onFallback with reason and provider", async () => {
+  let fallbackReported = null;
+  const fetchMock = installFetch(() => new Response(
+    new Uint8Array(44 + 4),
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "audio/wav",
+        "X-TTS-Fallback": "true",
+        "X-TTS-Provider": "edge",
+        "X-TTS-Fallback-Reason": "IndexTTS GPU node unreachable",
+      },
+    },
+  ));
+
+  try {
+    const streamer = useTtsStreamer({
+      onPcmChunk: () => {},
+      onFallback: (fb) => {
+        fallbackReported = fb;
+      },
+    });
+
+    await streamer.speak("你好", { provider: "indextts" });
+    assert.ok(fallbackReported, "fallback should have been reported");
+    assert.equal(fallbackReported.provider, "edge");
+    assert.equal(fallbackReported.reason, "IndexTTS GPU node unreachable");
+    assert.match(fallbackReported.message, /語音引擎已自動切換為 edge（原因：IndexTTS GPU node unreachable）/);
   } finally {
     fetchMock.restore();
   }

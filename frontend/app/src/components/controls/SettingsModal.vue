@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { DEFAULT_ASR_PROVIDER_LABEL } from '@shared/speech'
 import CustomSelect from './CustomSelect.vue'
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
@@ -266,7 +267,7 @@ const ttsProviderOptions = computed(() =>
 
 // 空字串是「沿用管理者設定的預設」，跟「選了某一家」要分得出來。
 const asrProviderOptions = computed(() => [
-  { value: '', label: '預設（依系統設定）' },
+  { value: '', label: DEFAULT_ASR_PROVIDER_LABEL },
   ...props.asrEngines.map((e) => ({ value: e.id, label: e.label })),
 ])
 

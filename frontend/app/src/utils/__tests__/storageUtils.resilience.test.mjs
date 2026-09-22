@@ -14,7 +14,19 @@ const modulePath = resolve(__dirname, "../storageUtils.ts");
  * 吞掉」，regex 看不出這件事。
  */
 async function loadStorageUtils(localStorage) {
-  const source = readFileSync(modulePath, "utf-8");
+  const sharedStoragePath = resolve(__dirname, "../../../../shared/speech/storage.ts");
+  const sharedStorageSource = readFileSync(sharedStoragePath, "utf-8");
+  const { code: sharedCode } = transformSync(sharedStorageSource, {
+    loader: "ts",
+    format: "esm",
+    target: "es2022",
+  });
+  const sharedStorageUrl = `data:text/javascript;base64,${Buffer.from(sharedCode).toString("base64")}`;
+
+  const source = readFileSync(modulePath, "utf-8").replace(
+    /from\s+["']@shared\/speech["'];?/,
+    `from "${sharedStorageUrl}";`,
+  );
   const { code } = transformSync(source, {
     loader: "ts",
     format: "esm",

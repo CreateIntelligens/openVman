@@ -10,9 +10,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(resolve(__dirname, "../..", p), "utf-8");
 const source = read("composables/useVadAsr.ts");
 const app = read("App.vue");
+const vadRecognizerSource = readFileSync(
+  resolve(__dirname, "../../../../shared/speech/asr/vad-recognizer.ts"),
+  "utf-8",
+);
 
 async function loadWav() {
-  const { code } = transformSync(read("utils/wav.ts"), { loader: "ts", format: "esm" });
+  const wavPath = resolve(__dirname, "../../../../shared/speech/audio/wav.ts");
+  const { code } = transformSync(readFileSync(wavPath, "utf-8"), { loader: "ts", format: "esm" });
   return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 }
 
@@ -39,53 +44,136 @@ test("encodeWav writes a header the backend's decoder will accept", async () => 
 });
 
 test("one press captures one sentence, then the microphone closes", () => {
-  // AI 回話時麥克風若還開著，會把喇叭的聲音再收進來。
-  const onSpeechEnd = source.slice(
-    source.indexOf("callbacks.onSpeechEnd = "),
-    source.indexOf("callbacks.onVADMisfire = "),
+  // App 端使用 per-utterance 模式，講完先關麥克風再送出，防止喇叭聲音回授。
+  assert.match(source, /commitMode:\s*['"]per-utterance['"]/);
+  const onSpeechEnd = vadRecognizerSource.slice(
+    vadRecognizerSource.indexOf("this.callbacks.onSpeechEnd = "),
+    vadRecognizerSource.indexOf("this.callbacks.onVADMisfire = "),
   );
-  assert.ok(onSpeechEnd.indexOf("stop()") < onSpeechEnd.indexOf("send(audio)"));
+  assert.ok(onSpeechEnd.indexOf("this.stop()") < onSpeechEnd.indexOf("this.send(audio)"));
 });
 
 test("the model is shared with the admin console instead of duplicated", () => {
-  assert.match(source, /VAD_ASSET_BASE = '\/admin\/vad\/'/);
+  assert.match(vadRecognizerSource, /VAD_ASSET_BASE = '\/admin\/vad\/'/);
 });
 
 test("a VAD that cannot load falls back to push-to-talk and starts recording", () => {
   // 模型或 WASM 載不到（內網連不到 CDN）時，使用者按了麥克風不能什麼都沒發生。
-  assert.match(source, /options\.onError\?\.\('vad-unavailable'\)/);
+  assert.match(vadRecognizerSource, /this\.emitError\('vad-unavailable'\)/);
   assert.match(app, /error === "vad-unavailable"[\s\S]{0,120}vadAvailable\.value = false;\s*void serverAsr\.start\(\);/);
 });
 
 test("a denied microphone is reported as such, not as a VAD failure", () => {
   // 權限被拒換引擎也沒用；當成 VAD 壞掉會白白退到按鍵錄音再被拒一次。
-  assert.match(source, /NotAllowedError/);
-  const denied = source.slice(source.indexOf("if (denied)"), source.indexOf("return false", source.indexOf("if (denied)")));
-  assert.ok(denied.indexOf("'not-allowed'") < denied.indexOf("isSupported.value = false"));
+  assert.match(vadRecognizerSource, /NotAllowedError/);
+  const denied = vadRecognizerSource.slice(
+    vadRecognizerSource.indexOf("if (denied)"),
+    vadRecognizerSource.indexOf("return false", vadRecognizerSource.indexOf("if (denied)")),
+  );
+  assert.ok(denied.indexOf("'not-allowed'") < denied.indexOf("this._supported = false"));
 });
 
 test("stopping while the model is still loading cancels the pending start", () => {
-  assert.match(source, /const mine = \+\+generation/);
+  assert.match(vadRecognizerSource, /const mine = \+\+this\.generation/);
   // 載完發現這一輪已經被停掉：pause 而不是開始收音。
-  assert.match(source, /await instance\.start\(\)\s*if \(mine !== generation\) \{\s*await instance\.pause\(\)/);
+  assert.match(vadRecognizerSource, /await instance\.start\(\)\s*if \(mine !== this\.generation/);
 });
 
 test("the VAD instance is built once and reused across presses", () => {
   // 每次按鍵都 destroy 再 new 的話，第一次一兩秒、之後幾百毫秒，開頭的字都漏掉。
-  assert.match(source, /if \(vadReady\) return vadReady/);
-  assert.match(source, /startOnLoad: false/);
-  const stopFn = source.slice(source.indexOf("function stop(): void"), source.indexOf("function pause(): void"));
+  assert.match(vadRecognizerSource, /if \(this\.vadReady\) return this\.vadReady/);
+  assert.match(vadRecognizerSource, /startOnLoad: false/);
+  const stopFn = vadRecognizerSource.slice(
+    vadRecognizerSource.indexOf("public stop(): void"),
+    vadRecognizerSource.indexOf("public pause(): void"),
+  );
   assert.match(stopFn, /current\?\.pause\(\)/);
   // 只比對程式碼，註解裡提到 destroy 沒關係。
   assert.doesNotMatch(stopFn.replace(/\/\/.*$/gm, ""), /destroy/);
   // 只有整個元件卸載才 destroy。
-  const unmount = source.slice(source.indexOf("onUnmounted("));
-  assert.match(unmount, /instance\.destroy\(\)/);
+  const disposeFn = vadRecognizerSource.slice(vadRecognizerSource.indexOf("public dispose(): void"));
+  assert.match(disposeFn, /instance\.destroy\(\)/);
 });
 
 test("starting is reported separately so the UI can say the mic is not live yet", () => {
   assert.match(source, /isStarting: readonly\(isStarting\)/);
-  const startFn = source.slice(source.indexOf("async function start()"), source.indexOf("function stop(): void"));
-  // isListening 要等 instance.start() 真的成功才變 true。
-  assert.ok(startFn.indexOf("await instance.start()") < startFn.indexOf("isListening.value = true"));
+  assert.match(source, /onStartingChange:\s*\(val\) => \{\s*isStarting\.value = val/);
+  const startFn = vadRecognizerSource.slice(
+    vadRecognizerSource.indexOf("public async start()"),
+    vadRecognizerSource.indexOf("public stop()"),
+  );
+  assert.ok(startFn.indexOf("await instance.start()") < startFn.indexOf("this.setListening(true)"));
+});
+
+test("useVadAsr reactive refs update on recognizer state changes", async () => {
+  let lastOptions = null;
+  class MockVadRecognizer {
+    constructor(options) {
+      lastOptions = options;
+      this.supported = true;
+    }
+    start() {
+      lastOptions?.onStartingChange?.(true);
+      lastOptions?.onStartingChange?.(false);
+      lastOptions?.onListeningChange?.(true);
+      return Promise.resolve(true);
+    }
+    stop() {
+      lastOptions?.onListeningChange?.(false);
+    }
+    pause() { this.stop(); }
+    resume() {}
+    dispose() {
+      lastOptions?.onListeningChange?.(false);
+      lastOptions?.onStartingChange?.(false);
+    }
+  }
+
+  const mockVue = {
+    ref: (init) => {
+      let val = init;
+      return {
+        get value() { return val; },
+        set value(v) { val = v; },
+      };
+    },
+    readonly: (r) => r,
+    onUnmounted: (fn) => { fn._unmount = true; },
+  };
+
+  const transformed = transformSync(source, {
+    loader: "ts",
+    format: "esm",
+  }).code;
+
+  const patched = transformed
+    .replace(/import\s+{[^}]*}\s+from\s+['"]vue['"];?/, `
+      const ref = globalThis.__mockVue.ref;
+      const readonly = globalThis.__mockVue.readonly;
+      const onUnmounted = globalThis.__mockVue.onUnmounted;
+    `)
+    .replace(/import\s+{[^}]*}\s+from\s+['"]@shared\/speech['"];?/, `
+      const VadRecognizer = globalThis.__MockVadRecognizer;
+    `)
+    .replace(/import\s+{[^}]*}\s+from\s+['"]\.\.\/api\/http['"];?/, `
+      const apiFetch = () => Promise.resolve(new Response("{}"));
+      const parseJson = () => Promise.resolve({});
+    `);
+
+  globalThis.__mockVue = mockVue;
+  globalThis.__MockVadRecognizer = MockVadRecognizer;
+
+  const dataUri = `data:text/javascript;base64,${Buffer.from(patched).toString("base64")}`;
+  const { useVadAsr } = await import(dataUri);
+
+  const asr = useVadAsr();
+  assert.equal(asr.isListening.value, false);
+  assert.equal(asr.isStarting.value, false);
+
+  await asr.start();
+  assert.equal(asr.isListening.value, true);
+  assert.equal(asr.isStarting.value, false);
+
+  asr.stop();
+  assert.equal(asr.isListening.value, false);
 });

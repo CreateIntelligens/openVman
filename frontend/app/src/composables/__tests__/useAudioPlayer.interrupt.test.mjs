@@ -7,6 +7,27 @@ import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../useAudioPlayer.ts"), "utf8");
+const schedulerSource = readFileSync(resolve(__dirname, "../../../../shared/speech/tts/scheduler.ts"), "utf8");
+const schedulerCompiled = ts.transpileModule(schedulerSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText.replace(
+  /import \{ rmsVolume \} from ['"]\.\.\/audio\/wav['"];?/,
+  [
+    "function rmsVolume(data) {",
+    "  let sum = 0;",
+    "  for (let i = 0; i < data.length; i++) {",
+    "    const v = (data[i] - 128) / 128;",
+    "    sum += v * v;",
+    "  }",
+    "  return Math.min(1, Math.sqrt(sum / data.length) * 3.4);",
+    "}",
+  ].join("\n"),
+);
+const schedulerUrl = `data:text/javascript;base64,${Buffer.from(schedulerCompiled).toString("base64")}`;
+
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ES2022,
@@ -19,6 +40,9 @@ const compiled = ts.transpileModule(source, {
     "const readonly = (value) => value;",
     "const onUnmounted = () => undefined;",
   ].join("\n"),
+).replace(
+  /from ['"]@shared\/speech['"];?/,
+  `from "${schedulerUrl}";`,
 );
 
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;

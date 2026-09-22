@@ -1,91 +1,70 @@
 /**
- * useAsr — Vue 3 composable wrapping the Web Speech API for speech recognition.
+ * useAsr — Vue 3 composable wrapping BrowserRecognizer for speech recognition.
  *
- * Returns reactive `isListening` state and methods to start/stop recognition.
- * The `onResult` callback receives finalized transcript strings.
+ * 薄層轉接：將 Vue 響應式狀態綁定到底層無框架的 BrowserRecognizer（一句一按模式）。
+ * 具備 speaking 訊號與即時 interim 支援能力。
  */
-import { ref, readonly, onUnmounted } from 'vue'
+import { onUnmounted, readonly, ref } from 'vue'
+import { BrowserRecognizer, type AsrErrorCode } from '@shared/speech'
 
 interface AsrOptions {
   /** Called with the final recognised transcript */
   onResult?: (transcript: string) => void
+  /** Called with interim transcript */
+  onInterim?: (transcript: string) => void
   /** Called on recognition error */
   onError?: (error: string) => void
   /** BCP-47 language tag (default: 'zh-TW') */
   lang?: string
 }
 
-// Web Speech API is not in TS's lib.dom yet; use a single cast here.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const win = window as any
-
 export function useAsr(options: AsrOptions = {}) {
   const isListening = ref(false)
-  const isSupported = ref(!!(win.SpeechRecognition ?? win.webkitSpeechRecognition))
+  const isSpeaking = ref(false)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let recognition: any = null
+  const recognizer = new BrowserRecognizer({
+    lang: options.lang ?? 'zh-TW',
+    continuous: false,
+    onResult: (text) => options.onResult?.(text),
+    onInterim: (text) => options.onInterim?.(text),
+    onError: (code: AsrErrorCode) => options.onError?.(code),
+    onListeningChange: (val) => {
+      isListening.value = val
+    },
+    onSpeakingChange: (val) => {
+      isSpeaking.value = val
+    },
+  })
 
-  function _build() {
-    const Ctor = win.SpeechRecognition ?? win.webkitSpeechRecognition
-    if (!Ctor) return null
-
-    const r = new Ctor()
-    r.lang = options.lang ?? 'zh-TW'
-    r.interimResults = false
-    r.maxAlternatives = 1
-    r.continuous = false
-
-    r.onresult = (e: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-      const transcript = (e.results[e.results.length - 1][0].transcript as string).trim()
-      if (transcript) options.onResult?.(transcript)
-    }
-
-    r.onerror = (e: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-      console.warn('[ASR] error:', e.error)
-      options.onError?.(e.error as string)
-      isListening.value = false
-    }
-
-    r.onend = () => { isListening.value = false }
-
-    return r
-  }
+  const isSupported = ref(recognizer.supported)
 
   function start(): boolean {
-    if (isListening.value) return true
-    recognition = _build()
-    if (!recognition) {
-      console.warn('[ASR] SpeechRecognition not supported')
-      options.onError?.('not-supported')
-      return false
-    }
-    isListening.value = true
-    try {
-      recognition.start()
-    } catch {
-      isListening.value = false
-      options.onError?.('start-failed')
-      return false
-    }
-    return true
+    const success = recognizer.start()
+    isSupported.value = recognizer.supported
+    return success
   }
 
   function stop(): void {
-    recognition?.stop()
-    isListening.value = false
+    recognizer.stop()
   }
 
-  function pause(): void { stop() }
-  function resume(): void { /* no-op: start is user-triggered */ }
+  function pause(): void {
+    recognizer.pause()
+  }
+
+  function resume(): void {
+    recognizer.resume()
+  }
 
   onUnmounted(() => {
-    recognition?.abort()
+    recognizer.dispose()
     isListening.value = false
+    isSpeaking.value = false
   })
 
   return {
     isListening: readonly(isListening),
+    isSpeaking: readonly(isSpeaking),
     isSupported: readonly(isSupported),
     start,
     stop,

@@ -16,6 +16,7 @@ import type { PersonaSummary } from '../components/controls/ControlBar.vue'
 import type { AvatarBackgroundSummary } from '../components/controls/SettingsModal.vue'
 import { useAuth } from './useAuth'
 import { useAvatarCatalog } from './useAvatarCatalog'
+import { resolveTtsVoiceSelection } from '@shared/speech'
 import type { TtsProvider } from './useTtsStreamer'
 import {
   toMascotOption,
@@ -115,14 +116,6 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
     return items.find((p) => p.persona_id === "default")?.persona_id
       ?? items[0]?.persona_id
       ?? DEFAULT_PERSONA.persona_id;
-  }
-
-  function pickProviderVoice(provider: TtsProvider | undefined): string {
-    if (!provider) return "";
-    if (provider.voices.includes(provider.default_voice)) {
-      return provider.default_voice;
-    }
-    return provider.voices[0] ?? "";
   }
 
   function resolveVrmAvatarOption(
@@ -275,33 +268,24 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       if (!res.ok) return;
       const items = await res.json() as TtsProvider[];
       ttsProviders.value = items;
-      // 引擎與聲音是一組：存的那一對仍然可用才整組沿用，否則整組退回帳號預設，
-      // 不要拼出「存的引擎 + 預設的聲音」這種使用者沒選過的組合。
       const savedPairValid = items.some(
         (item) => item.id === savedProvider && item.voices.includes(savedVoice),
       );
-      const preferredProvider = savedPairValid
-        ? savedProvider
-        : accountDefault("voice_provider", PREFERRED_VOICE_PROVIDER);
-      const preferredVoice = savedPairValid
-        ? savedVoice
-        : accountDefault("voice_id", PREFERRED_VOICE_ID);
-      const provider = items.find(
-        (item) => item.id === preferredProvider && item.voices.includes(preferredVoice),
-      );
-      const fallbackProvider = items.find((item) => item.voices.length > 0);
-      const selectedProvider = provider ?? fallbackProvider;
-      const selectedVoice = provider
-        ? preferredVoice
-        : pickProviderVoice(selectedProvider);
-      settings.ttsProvider = selectedProvider?.id ?? "";
-      settings.ttsVoice = selectedVoice;
-      if (selectedProvider && (selectedProvider.id !== preferredProvider || selectedVoice !== preferredVoice)) {
-        addSelectionNotice(
-          `預設聲音 ${preferredProvider}/${preferredVoice} 未獲授權，已改用 ${selectedProvider.id}/${selectedVoice}。`,
-        );
-      } else if (!selectedProvider) {
-        addSelectionNotice("目前沒有可用的語音");
+      const preferredProvider = savedPairValid ? savedProvider : accountDefault("voice_provider", PREFERRED_VOICE_PROVIDER);
+      const preferredVoice = savedPairValid ? savedVoice : accountDefault("voice_id", PREFERRED_VOICE_ID);
+      const resolved = resolveTtsVoiceSelection({
+        availableProviders: items,
+        savedProvider,
+        savedVoice,
+        accountDefaultProvider: preferredProvider,
+        accountDefaultVoice: preferredVoice,
+        defaultProviderFallback: PREFERRED_VOICE_PROVIDER,
+        defaultVoiceFallback: PREFERRED_VOICE_ID,
+      });
+      settings.ttsProvider = resolved.provider;
+      settings.ttsVoice = resolved.voice;
+      if (resolved.notice) {
+        addSelectionNotice(resolved.notice);
       }
     } catch {
       // silently keep empty — SettingsModal falls back to showing nothing

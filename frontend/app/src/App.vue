@@ -93,9 +93,10 @@
         :asr-listening="activeAsr.isListening.value || vadAsr.isStarting.value"
         :asr-supported="activeAsr.isSupported.value"
         :asr-transcribing="serverAsr.isTranscribing.value || vadAsr.isTranscribing.value"
-        :asr-speaking="vadAsr.isSpeaking.value"
+        :asr-speaking="asrSpeaking"
         :asr-starting="vadAsr.isStarting.value"
         :asr-input-mode="asrInputMode"
+        :asr-interim="asrInterim"
         :asr-error="asrError"
         :compact="immersive"
         @send="handleComposerSend"
@@ -179,7 +180,8 @@ import { useServerAsr } from "./composables/useServerAsr";
 import { useVadAsr } from "./composables/useVadAsr";
 import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
-import { BROWSER_ASR, fetchMyAsrProvider, setMyAsrProvider } from "./api/asr";
+import { fetchMyAsrProvider, setMyAsrProvider } from "./api/asr";
+import { BROWSER_ASR, ASR_ENGINE_LABELS, getAsrErrorMessage } from "@shared/speech";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
 import { leaveFullscreen, unlockKeyboard } from "./sessionCleanup";
 import { useTtsStreamer } from "./composables/useTtsStreamer";
@@ -360,6 +362,9 @@ const ttsStreamer = useTtsStreamer({
     console.error("[TTS] stream error:", err);
     typewriter.flush();
     isTyping.value = false;
+  },
+  onFallback: (fallback) => {
+    statusToastRef.value?.show(fallback.message);
   },
 });
 
@@ -605,17 +610,55 @@ async function handleFatalRetry(): Promise<void> {
   }
 }
 
+const ASR_IDLE_TIMEOUT_MS = 10_000;
+const SERVER_ASR_MAX_CLIP_MS = 60_000;
+
+const asrInterim = ref("");
+let asrIdleTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearAsrIdleTimer(): void {
+  if (asrIdleTimer) {
+    clearTimeout(asrIdleTimer);
+    asrIdleTimer = null;
+  }
+}
+
+function scheduleAsrIdleTimer(): void {
+  clearAsrIdleTimer();
+  const timeout = asrInputMode.value === "push-to-talk" ? SERVER_ASR_MAX_CLIP_MS : ASR_IDLE_TIMEOUT_MS;
+  asrIdleTimer = setTimeout(() => {
+    if (activeAsr.value.isListening.value) {
+      activeAsr.value.stop();
+    }
+    asrIdleTimer = null;
+  }, timeout);
+}
+
+function markAsrActivity(): void {
+  if (activeAsr.value.isListening.value) {
+    scheduleAsrIdleTimer();
+  }
+}
+
 const asr = useAsr({
   lang: 'zh-TW',
   onResult: (transcript) => {
     asrError.value = "";
+    asrInterim.value = "";
+    clearAsrIdleTimer();
     void handleSend(transcript).then((result) => {
       if (!result.accepted && result.message) {
         statusToastRef.value?.show(result.message);
       }
     });
   },
+  onInterim: (transcript) => {
+    asrInterim.value = transcript;
+    markAsrActivity();
+  },
   onError: (error) => {
+    asrInterim.value = "";
+    clearAsrIdleTimer();
     // 瀏覽器辨識當場失敗（沒權限、沒麥克風、服務被停用）就退回伺服器引擎，
     // 而不是叫使用者改用鍵盤：伺服器引擎在這些情況下仍然可用。
     if (BROWSER_FALLBACK_ERRORS.has(error) && myAsrProvider.value === BROWSER_ASR) {
@@ -628,28 +671,24 @@ const asr = useAsr({
 });
 function reportAsrError(error: string): void {
   console.warn('[ASR]', error);
-  const messages: Record<string, string> = {
-    "not-supported": "此瀏覽器不支援語音輸入，請改用鍵盤輸入。",
-    "not-allowed": "麥克風權限遭拒，請在瀏覽器設定中允許存取。",
-    "audio-capture": "找不到可用的麥克風。",
-    "network": "語音辨識服務目前無法連線。",
-    "no-speech": "沒有偵測到語音，請再試一次。",
-    "start-failed": "無法啟動語音輸入，請稍後再試。",
-    "transcribe-failed": "語音辨識失敗，請再試一次。",
-  };
-  asrError.value = messages[error] || "語音輸入發生錯誤，請再試一次。";
+  asrError.value = getAsrErrorMessage(error, "語音輸入發生錯誤，請再試一次。");
 }
 
 const serverAsr = useServerAsr({
   onResult: (transcript) => {
     asrError.value = "";
+    asrInterim.value = "";
+    clearAsrIdleTimer();
     void handleSend(transcript).then((result) => {
       if (!result.accepted && result.message) {
         statusToastRef.value?.show(result.message);
       }
     });
   },
-  onError: reportAsrError,
+  onError: (error) => {
+    clearAsrIdleTimer();
+    reportAsrError(error);
+  },
 });
 
 // 伺服器引擎優先走 VAD（講完自動送）。VAD 起不來——模型或 WASM 載不到，例如
@@ -659,6 +698,8 @@ const vadAvailable = ref(true);
 const vadAsr = useVadAsr({
   onResult: (transcript) => {
     asrError.value = "";
+    asrInterim.value = "";
+    clearAsrIdleTimer();
     void handleSend(transcript).then((result) => {
       if (!result.accepted && result.message) {
         statusToastRef.value?.show(result.message);
@@ -666,9 +707,11 @@ const vadAsr = useVadAsr({
     });
   },
   onError: (error) => {
+    clearAsrIdleTimer();
     if (error === "vad-unavailable") {
       vadAvailable.value = false;
       void serverAsr.start();
+      scheduleAsrIdleTimer();
       return;
     }
     reportAsrError(error);
@@ -680,14 +723,6 @@ const vadAsr = useVadAsr({
 const myAsrProvider = ref("");
 // 管理者在帳號頁授權了哪些引擎。空陣列代表這個帳號不能自選，設定裡不顯示。
 const asrEngines = ref<{ id: string; label: string }[]>([]);
-
-const ASR_ENGINE_LABELS: Record<string, string> = {
-  breeze: "Breeze-ASR-26",
-  xiaomi: "Xiaomi-CocktailASR-1",
-  sensevoice: "SenseVoice-Small",
-  openai: "OpenAI Whisper",
-  browser: "瀏覽器內建辨識",
-};
 
 function handleAsrProviderChange(provider: string): void {
   const previous = myAsrProvider.value;
@@ -732,10 +767,22 @@ const asrInputMode = computed<"continuous" | "push-to-talk">(
   () => (activeAsr.value === serverAsr ? "push-to-talk" : "continuous"),
 );
 
+const asrSpeaking = computed(() => {
+  if (useBrowserAsr.value) return asr.isSpeaking.value;
+  return vadAsr.isSpeaking.value;
+});
+
 function handleAsrToggle(): void {
   asrError.value = "";
+  asrInterim.value = "";
   const active = activeAsr.value;
-  if (active.isListening.value) active.stop(); else void active.start();
+  if (active.isListening.value) {
+    clearAsrIdleTimer();
+    active.stop();
+  } else {
+    scheduleAsrIdleTimer();
+    void active.start();
+  }
 }
 
 function handleCameraPreviewScaleChange(scale: number): void {
@@ -951,6 +998,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  clearAsrIdleTimer();
   window.removeEventListener("keydown", handleKeydown, true);
   document.removeEventListener("fullscreenchange", handleFullscreenChange);
 });

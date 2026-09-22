@@ -155,6 +155,7 @@ const props = withDefaults(defineProps<{
   asrSpeaking?: boolean
   /** VAD 還在載模型／要麥克風，這段期間說的話收不到。 */
   asrStarting?: boolean
+  asrInterim?: string
   asrError?: string
   compact?: boolean
 }>(), {
@@ -187,10 +188,11 @@ const asrStatusText = computed(() => {
   // 載模型、要麥克風那一兩秒說的話收不到，照實講，不能假裝已經在聽。
   if (props.asrStarting) return "麥克風啟動中…"
   if (!props.asrListening) return ""
+  if (props.asrInterim) return `辨識中：${props.asrInterim}`
   if (props.asrInputMode === "push-to-talk") return "收音中…講完請再按一次麥克風送出"
   return props.asrSpeaking ? "聆聽中…講完會自動送出" : "收音中…請直接說話"
 })
-const composerPlaceholder = computed(() => asrStatusText.value || props.placeholder)
+const composerPlaceholder = computed(() => props.asrInterim || asrStatusText.value || props.placeholder)
 const messagesRef = ref<HTMLDivElement>()
 const contentRef = ref<HTMLDivElement>()
 const inputRef = ref<HTMLInputElement>()

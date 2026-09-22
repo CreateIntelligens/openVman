@@ -6,6 +6,7 @@
  * forwards each chunk to the avatar WASM runtime for real-time lip-sync.
  */
 import { ref, readonly, onUnmounted } from 'vue'
+import { PcmScheduler } from '@shared/speech'
 
 interface AudioPlayerOptions {
        /** Callback to push PCM to WASM lip-sync engine */
@@ -27,179 +28,54 @@ interface AudioPlayerOptions {
 export function useAudioPlayer(options: AudioPlayerOptions = {}) {
        const isPlaying = ref(false)
 
-       let audioCtx: AudioContext | null = null
-       let nextStartTime = 0
-       let playbackGeneration = 0
-       const liveSources = new Set<AudioBufferSourceNode>()
-       let volumeAnalyser: AnalyserNode | null = null
-       let volumeData: Uint8Array<ArrayBuffer> | null = null
-       let volumeRaf: number | null = null
-
-       function ensureContext(): AudioContext {
-              if (!audioCtx) {
-                     audioCtx = new AudioContext({ sampleRate: 16000 })
-              }
-              return audioCtx
-       }
-
-       /** Resume AudioContext (must be called from user gesture on first use) */
-       async function resumeContext(): Promise<void> {
-              const ctx = ensureContext()
-              if (ctx.state === 'suspended') await ctx.resume()
-       }
-
-       function ensureVolumeAnalyser(ctx: AudioContext): AnalyserNode | null {
-              if (!options.onPlaybackVolume) return null
-              if (!volumeAnalyser) {
-                     volumeAnalyser = ctx.createAnalyser()
-                     volumeAnalyser.fftSize = 256
-                     volumeAnalyser.connect(ctx.destination)
-                     volumeData = new Uint8Array(volumeAnalyser.fftSize)
-              }
-              return volumeAnalyser
-       }
-
-       function stopVolumeMonitor(): void {
-              if (volumeRaf !== null) {
-                     cancelAnimationFrame(volumeRaf)
-                     volumeRaf = null
-              }
-       }
-
-       function disconnectVolumeAnalyser(): void {
-              stopVolumeMonitor()
-              try {
-                     volumeAnalyser?.disconnect()
-              } catch {
-                     void 0
-              }
-              volumeAnalyser = null
-              volumeData = null
-       }
-
-       function startVolumeMonitor(): void {
-              if (!options.onPlaybackVolume || volumeRaf !== null) return
-              if (typeof requestAnimationFrame !== 'function') return
-
-              const tick = () => {
-                     if (!volumeAnalyser || !volumeData || liveSources.size === 0) {
-                            volumeRaf = null
-                            return
-                     }
-
-                     volumeAnalyser.getByteTimeDomainData(volumeData)
-                     options.onPlaybackVolume?.(rmsVolume(volumeData))
-                     volumeRaf = requestAnimationFrame(tick)
-              }
-
-              volumeRaf = requestAnimationFrame(tick)
-       }
-
-       /**
-        * Queue a PCM chunk for playback.
-        * @param data  Raw PCM bytes (Int16, 16 kHz mono) or base64 string
-        */
-       async function playChunk(data: ArrayBuffer | string): Promise<void> {
-              const generation = playbackGeneration
-              const ctx = ensureContext()
-              if (ctx.state === 'suspended') await ctx.resume()
-              if (generation !== playbackGeneration || audioCtx !== ctx) return
-
-              try {
-                     // Decode input to Int16Array
-                     let raw: ArrayBuffer
-                     if (typeof data === 'string') {
-                            raw = base64ToArrayBuffer(data)
-                     } else {
-                            raw = data
-                     }
-
-                     const int16 = new Int16Array(raw)
-                     const float32 = new Float32Array(int16.length)
-                     for (let i = 0; i < int16.length; i++) {
-                            float32[i] = int16[i] / 32768.0
-                     }
-
-                     // Schedule gapless playback
-                     const buffer = ctx.createBuffer(1, float32.length, 16000)
-                     buffer.copyToChannel(float32, 0)
-                     const source = ctx.createBufferSource()
-                     source.buffer = buffer
-                     source.connect(ensureVolumeAnalyser(ctx) ?? ctx.destination)
-
-                     const now = ctx.currentTime
-                     if (nextStartTime < now) nextStartTime = now
-
-                     const startsPlayback = liveSources.size === 0
-                     source.start(nextStartTime)
+       const scheduler = new PcmScheduler({
+              sampleRate: 16000,
+              onPcmChunk: options.onPcmChunk,
+              onPlaybackVolume: options.onPlaybackVolume,
+              onPlaybackStart: () => {
                      isPlaying.value = true
-                     liveSources.add(source)
-                     if (startsPlayback) options.onPlaybackStart?.()
-                     startVolumeMonitor()
+                     options.onPlaybackStart?.()
+              },
+              onPlaybackEnd: () => {
+                     isPlaying.value = false
+                     options.onPlaybackEnd?.()
+              },
+              onPlaybackReset: () => {
+                     isPlaying.value = false
+                     options.onPlaybackReset?.()
+              },
+              onQueueEmpty: () => {
+                     isPlaying.value = false
+                     options.onQueueEmpty?.()
+              },
+              onChunkDropped: options.onChunkDropped,
+       })
 
-                     const duration = float32.length / 16000
-                     nextStartTime += duration
-
-                     source.onended = () => {
-                            liveSources.delete(source)
-                            // If nothing else is scheduled, mark playback as done
-                            if (ctx.currentTime >= nextStartTime - 0.01) {
-                                   stopVolumeMonitor()
-                                   isPlaying.value = false
-                                   options.onPlaybackEnd?.()
-                                   options.onQueueEmpty?.()
-                            }
-                     }
-
-                     // Forward to WASM lip-sync
-                     options.onPcmChunk?.(int16)
-              } catch (err) {
-                     const reason = err instanceof Error ? err.message : String(err)
-                     console.warn('[useAudioPlayer] dropping chunk:', reason)
-                     options.onChunkDropped?.(reason)
-                     return
-              }
+       async function playChunk(data: ArrayBuffer | string): Promise<void> {
+              await scheduler.playChunk(data)
+              isPlaying.value = scheduler.isPlaying
        }
 
-       /** Stop all audio and reset scheduling */
        function stopAll(): void {
-              playbackGeneration += 1
-              if (audioCtx) {
-                     audioCtx.close()
-                     audioCtx = null
-              }
-              disconnectVolumeAnalyser()
-              liveSources.clear()
-              nextStartTime = 0
+              scheduler.stopAll()
               isPlaying.value = false
-              options.onPlaybackReset?.()
        }
 
-       /** Reset scheduling without closing context (for new utterance) */
        function resetSchedule(): void {
-              nextStartTime = 0
+              scheduler.resetSchedule()
        }
 
-       /** Stop scheduled sources and reset playback state, keeping context alive */
        function flush(): void {
-              playbackGeneration += 1
-              for (const source of liveSources) {
-                     try {
-                            source.onended = null
-                            source.stop()
-                     } catch {
-                            void 0
-                     }
-              }
-              liveSources.clear()
-              disconnectVolumeAnalyser()
-              nextStartTime = 0
+              scheduler.flush()
               isPlaying.value = false
-              options.onPlaybackReset?.()
+       }
+
+       async function resumeContext(): Promise<void> {
+              await scheduler.resumeContext()
        }
 
        onUnmounted(() => {
-              stopAll()
+              scheduler.dispose()
        })
 
        return {
@@ -210,23 +86,4 @@ export function useAudioPlayer(options: AudioPlayerOptions = {}) {
               flush,
               resumeContext,
        }
-}
-
-// ── Helpers ──────────────────────────────────────────────
-function base64ToArrayBuffer(b64: string): ArrayBuffer {
-       const bin = atob(b64)
-       const bytes = new Uint8Array(bin.length)
-       for (let i = 0; i < bin.length; i++) {
-              bytes[i] = bin.charCodeAt(i)
-       }
-       return bytes.buffer
-}
-
-function rmsVolume(data: Uint8Array<ArrayBuffer>): number {
-       let sum = 0
-       for (let i = 0; i < data.length; i++) {
-              const v = (data[i] - 128) / 128
-              sum += v * v
-       }
-       return Math.min(1, Math.sqrt(sum / data.length) * 3.4)
 }

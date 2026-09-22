@@ -6,6 +6,15 @@ import { dirname, resolve } from "node:path";
 import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const sharedSource = readFileSync(resolve(__dirname, "../../../../shared/speech/tts/pcm-stream.ts"), "utf8");
+const sharedCompiled = ts.transpileModule(sharedSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ES2022,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
+const sharedUrl = `data:text/javascript;base64,${Buffer.from(sharedCompiled).toString("base64")}`;
+
 const source = readFileSync(resolve(__dirname, "../useTtsStreamer.ts"), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
@@ -15,6 +24,9 @@ const compiled = ts.transpileModule(source, {
 }).outputText.replace(
   /import\s*\{\s*apiFetch\s*\}\s*from\s*['"][^'"]+['"];?/,
   "const apiFetch = (url, init) => fetch(url, { ...init, credentials: 'include' });",
+).replace(
+  /from\s*['"]@shared\/speech['"];?/,
+  `from "${sharedUrl}";`,
 );
 
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`;
