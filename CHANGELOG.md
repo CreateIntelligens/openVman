@@ -10,6 +10,13 @@
 
 
 ### Changed
+- **虛擬人前端正式環境改送靜態檔**: `frontend/app` 的 image 原本 runner 跑
+  `pnpm dev`——每個使用者打開頁面都在讓 Vite 現場轉譯 TypeScript，掛著 HMR client
+  與 esbuild 常駐程序。改成在 builder 內 `pnpm build`，runner 換 `nginx:1.27-alpine`
+  只送 `dist/`。`index.html` 設 `Cache-Control: no-cache`（它記著當前版的 chunk
+  hash，被快取會讓舊分頁去要已不存在的 chunk 而白屏），`assets/` 永久快取。
+  admin 的 proxy 設定不變。開發熱重載改由 `docker-compose.dev.yml` 以
+  `build.target: builder` + `command: pnpm dev` 提供。
 - **前端共用語音核心抽取（ASR / VAD / TTS / 偏好儲存）**：將 `frontend/app`（Vue）與 `frontend/admin`（React）各自維護且漂移的語音辨識、VAD、語音合成與儲存邏輯統一抽取至無框架 TypeScript 模組庫 `frontend/shared/speech/`（`@shared/speech`）。
   - **純音訊工具**：統一 `wav.ts` 音訊編解碼、重採樣與 RMS 音量分析。
   - **ASR 與辨識核心**：統一 `browser-recognizer.ts`、`server-recorder.ts`、`vad-recognizer.ts` 與決策狀態機 `controller.ts`；錯誤訊息集中管理（D6），支援預設伺服器引擎（D1）、瀏覽器故障自動記憶體降級（D2）、閒置自動停止（D3）、VAD 模式（D4/D5）、預設系統設定選項（D7）與樂觀更新還原（D8）。
