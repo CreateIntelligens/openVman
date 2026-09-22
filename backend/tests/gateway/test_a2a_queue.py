@@ -84,11 +84,21 @@ def test_queue_outbound_idempotency(tmp_path: Path):
     )
     assert ok1 is True
 
-    # Duplicate idempotency key returns False (suppressed)
+    # PENDING 狀態允許重試（程序崩潰後重啟的 crash-recovery 場景）
     ok2 = q.record_outbound_task(
         task_id="out-2",
         idempotency_key="reply-task-1",
         target_agent_id="peer-1",
         message="Second reply attempt",
     )
-    assert ok2 is False
+    assert ok2 is True
+
+    # 標記為已送出後，重複 key 才真正被擋掉
+    q.mark_outbound_sent("reply-task-1")
+    ok3 = q.record_outbound_task(
+        task_id="out-3",
+        idempotency_key="reply-task-1",
+        target_agent_id="peer-1",
+        message="Third attempt after sent",
+    )
+    assert ok3 is False
