@@ -8,7 +8,7 @@ import {
   type SystemSetting,
 } from "../api/settings";
 import { preferredRecorderMimeType, rmsVolume } from "../utils/liveAudioUtils";
-import { describeAsrEngine as describe } from "./asrEngines";
+import { describeAsrEngine as describe } from "@shared/speech";
 import Select from "./Select";
 
 export default function AsrProviderPanel() {

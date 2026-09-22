@@ -1,9 +1,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { DEFAULT_ASR_PROVIDER_LABEL } from "@shared/speech";
 import { AsrControls } from "./AsrControls";
 
-afterEach(() => { cleanup(); });
+afterEach(() => {
+  cleanup();
+});
 
 describe("AsrControls", () => {
   it("只有一個引擎可選時不顯示", () => {
@@ -21,15 +24,32 @@ describe("AsrControls", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("顯示引擎的名稱而不是代號", () => {
+  it("value 為空字串時顯示預設（依系統設定）", () => {
     render(
       <AsrControls
-        provider={{ value: "sensevoice", effective: "sensevoice", allowed: ["breeze", "sensevoice"] }}
+        provider={{ value: "", effective: "breeze", allowed: ["breeze", "sensevoice"] }}
         onChange={() => {}}
       />,
     );
-    expect(screen.getByRole("combobox", { name: "語音辨識引擎" }).textContent)
-      .toContain("SenseVoice-Small");
+    expect(screen.getByRole("combobox", { name: "語音辨識引擎" }).textContent).toContain(
+      DEFAULT_ASR_PROVIDER_LABEL,
+    );
+  });
+
+  it("顯示引擎的名稱而不是代號", () => {
+    render(
+      <AsrControls
+        provider={{
+          value: "sensevoice",
+          effective: "sensevoice",
+          allowed: ["breeze", "sensevoice"],
+        }}
+        onChange={() => {}}
+      />,
+    );
+    expect(screen.getByRole("combobox", { name: "語音辨識引擎" }).textContent).toContain(
+      "SenseVoice-Small",
+    );
   });
 
   it("選過的引擎被收回授權時，顯示實際生效的那個", () => {
@@ -39,7 +59,8 @@ describe("AsrControls", () => {
         onChange={() => {}}
       />,
     );
-    expect(screen.getByRole("combobox", { name: "語音辨識引擎" }).textContent)
-      .toContain("Breeze-ASR-26");
+    expect(screen.getByRole("combobox", { name: "語音辨識引擎" }).textContent).toContain(
+      "Breeze-ASR-26",
+    );
   });
 });

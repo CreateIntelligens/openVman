@@ -151,4 +151,24 @@ describe("useVad", () => {
     unmount();
     await waitFor(() => expect(FakeMicVAD.created[0].destroy).toHaveBeenCalled());
   });
+
+  it("recovers and starts listening properly under React StrictMode (mount -> unmount -> remount)", async () => {
+    const onSpeechCommit = vi.fn();
+    const { unmount } = renderHook(
+      () => useVad({ enabled: true, onSpeechCommit }),
+    );
+    await waitFor(() => expect(FakeMicVAD.created.length).toBeGreaterThanOrEqual(1));
+    const firstInstance = FakeMicVAD.created[0];
+
+    unmount();
+    await waitFor(() => expect(firstInstance.destroy).toHaveBeenCalled());
+
+    const secondHook = renderHook(
+      () => useVad({ enabled: true, onSpeechCommit }),
+    );
+    await waitFor(() => expect(FakeMicVAD.created.length).toBeGreaterThanOrEqual(2));
+    const secondInstance = FakeMicVAD.created[1];
+    await waitFor(() => expect(secondInstance.start).toHaveBeenCalled());
+    expect(secondHook.result.current.supported).toBe(true);
+  });
 });

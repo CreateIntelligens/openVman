@@ -25,48 +25,22 @@ function createAudioContext(): AudioContext | null {
 const MASCOT_PCM_SAMPLE_RATE = 16000;
 const MASCOT_PCM_CHUNK_BYTES = 4096 * 2;
 
-const TTS_PROVIDER_STORAGE_KEY = "brain-tts-provider";
-const TTS_VOICE_STORAGE_KEY = "brain-tts-voice";
-const TTS_CACHE_MAX = 50;
+import {
+  parseTtsFallback,
+  resolveAutoTtsSelection as resolveTtsSelection,
+  resolveTtsVoiceSelection,
+  SPEECH_STORAGE_KEYS,
+  ttsCacheKey,
+  TtsLruCache,
+} from "@shared/speech";
+
+const TTS_PROVIDER_STORAGE_KEY = SPEECH_STORAGE_KEYS.TTS_PROVIDER;
+const TTS_VOICE_STORAGE_KEY = SPEECH_STORAGE_KEYS.TTS_VOICE;
 
 type CachedSpeech = {
        audio: ArrayBuffer;
        fallback?: string;
 };
-
-type TtsSelection = {
-       provider: string;
-       voice: string;
-};
-
-function resolveTtsSelection(provider: string, voice: string): TtsSelection {
-       if (provider === "auto") {
-              return { provider: "", voice: "" };
-       }
-       return { provider, voice };
-}
-
-async function ttsCacheKey(text: string, provider: string, voice: string): Promise<string> {
-       const raw = `${text}|${provider}|${voice}`;
-       const cryptoObj = globalThis.crypto;
-       if (!cryptoObj?.subtle) {
-              return raw;
-       }
-       const buf = await cryptoObj.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-       return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function setTtsCacheEntry(cache: Map<string, CachedSpeech>, key: string, value: CachedSpeech): void {
-       if (cache.has(key)) {
-              cache.delete(key);
-       } else if (cache.size >= TTS_CACHE_MAX) {
-              const oldest = cache.keys().next().value;
-              if (oldest !== undefined) {
-                     cache.delete(oldest);
-              }
-       }
-       cache.set(key, value);
-}
 
 export function useTts() {
        const [ttsProviders, setTtsProviders] = useState<TtsProvider[]>([]);
@@ -79,7 +53,7 @@ export function useTts() {
        const audioRef = useRef<HTMLAudioElement | null>(null);
        const ttsAbortRef = useRef<AbortController | null>(null);
        const streamStopRef = useRef<(() => void) | null>(null);
-       const ttsCacheRef = useRef<Map<string, CachedSpeech>>(new Map());
+       const ttsCacheRef = useRef<TtsLruCache<CachedSpeech>>(new TtsLruCache<CachedSpeech>());
        const ttsPrefetchAbortRef = useRef<AbortController | null>(null);
        const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
        const mascotAudioCtxRef = useRef<AudioContext | null>(null);
@@ -104,18 +78,43 @@ export function useTts() {
 
        const activeTtsProvider = ttsProviders.find((provider) => provider.id === ttsProvider);
 
-       useEffect(() => {
-              fetchTtsProviders()
-                     .then((providers) => {
-                            setTtsProviders(providers);
-                            const stored = readScoped(TTS_PROVIDER_STORAGE_KEY) || "auto";
-                            if (!providers.some((p) => p.id === stored)) {
-                                   setTtsProvider("auto");
-                                   writeScoped(TTS_PROVIDER_STORAGE_KEY, "auto");
-                            }
-                     })
-                     .catch((reason) => console.warn("Failed to load TTS providers:", reason));
-       }, []);
+        useEffect(() => {
+               fetchTtsProviders()
+                      .then((providers) => {
+                             setTtsProviders(providers);
+                             const storedProvider = readScoped(TTS_PROVIDER_STORAGE_KEY) || "auto";
+                             const storedVoice = readScoped(TTS_VOICE_STORAGE_KEY) || "";
+
+                             if (storedProvider === "auto") {
+                                    setTtsProvider("auto");
+                                    return;
+                             }
+
+                             const selection = resolveTtsVoiceSelection({
+                                    availableProviders: providers,
+                                    savedProvider: storedProvider,
+                                    savedVoice: storedVoice,
+                             });
+
+                             if (selection.changed) {
+                                    if (!selection.provider) {
+                                           setTtsProvider("auto");
+                                           setTtsVoice("");
+                                           writeScoped(TTS_PROVIDER_STORAGE_KEY, "auto");
+                                           writeScoped(TTS_VOICE_STORAGE_KEY, "");
+                                    } else {
+                                           setTtsProvider(selection.provider);
+                                           setTtsVoice(selection.voice);
+                                           writeScoped(TTS_PROVIDER_STORAGE_KEY, selection.provider);
+                                           writeScoped(TTS_VOICE_STORAGE_KEY, selection.voice);
+                                    }
+                             } else {
+                                    setTtsProvider(selection.provider);
+                                    setTtsVoice(selection.voice);
+                             }
+                      })
+                      .catch((reason) => console.warn("Failed to load TTS providers:", reason));
+        }, []);
 
        const clearTtsPrefetchState = useCallback(() => {
               ttsPrefetchAbortRef.current?.abort();
@@ -221,7 +220,7 @@ export function useTts() {
               streamStopRef.current = playback.stop;
               try {
                      const wav = await playback.done;
-                     setTtsCacheEntry(ttsCacheRef.current, cacheKey, { audio: wav, fallback });
+                     ttsCacheRef.current.set(cacheKey, { audio: wav, fallback });
               } finally {
                      if (streamStopRef.current === playback.stop) {
                             streamStopRef.current = null;
@@ -307,7 +306,7 @@ export function useTts() {
                             ...selection,
                             signal: controller.signal,
                      });
-                     setTtsCacheEntry(ttsCacheRef.current, key, { audio, fallback });
+                     ttsCacheRef.current.set(key, { audio, fallback });
               } catch (reason) {
                      if (!controller.signal.aborted) {
                             console.warn("TTS prefetch failed:", reason);
@@ -331,7 +330,6 @@ export function useTts() {
               const key = await ttsCacheKey(text, selection.provider, selection.voice);
               const cached = ttsCacheRef.current.get(key);
               if (cached) {
-                     setTtsCacheEntry(ttsCacheRef.current, key, cached);
                      await playAudioBuffer(cached.audio, cached.fallback);
                      return;
               }
@@ -346,7 +344,7 @@ export function useTts() {
                             const streamed = await playStreamedSpeech(
                                    response,
                                    key,
-                                   response.headers.get("X-TTS-Fallback-Reason") || undefined,
+                                   parseTtsFallback(response.headers)?.message || response.headers.get("X-TTS-Fallback-Reason") || undefined,
                             );
                             if (streamed) return;
                      }
@@ -354,7 +352,7 @@ export function useTts() {
                             ...selection,
                             signal: controller.signal,
                      });
-                     setTtsCacheEntry(ttsCacheRef.current, key, { audio, fallback });
+                     ttsCacheRef.current.set(key, { audio, fallback });
                      await playAudioBuffer(audio, fallback);
               } catch (reason) {
                      if (!controller.signal.aborted) {

@@ -71,6 +71,20 @@ function installSpeechRecognitionMock() {
   }).webkitSpeechRecognition = MockSpeechRecognition;
 }
 
+vi.mock("../api/common", () => ({
+  apiFetch: vi.fn().mockImplementation((url: string) => {
+    if (url.includes("asr-provider")) {
+      return Promise.resolve(new Response(JSON.stringify({
+        value: "browser",
+        effective: "browser",
+        allowed: ["browser"],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    }
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }),
+  parseErrorMessage: () => "error",
+}));
+
 vi.mock("../api", () => ({
   fetchChat: (...args: unknown[]) => fetchChatMock(...args),
   fetchChatHistory: (...args: unknown[]) => fetchChatHistoryMock(...args),
@@ -335,6 +349,9 @@ describe("useChatSession TTS prefetch", () => {
     installSpeechRecognitionMock();
 
     const { result } = renderHook(() => useChatSession());
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     await act(async () => {
       result.current.toggleAsr();
@@ -364,6 +381,9 @@ describe("useChatSession TTS prefetch", () => {
     });
 
     const { result } = renderHook(() => useChatSession());
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     act(() => {
       result.current.toggleAsr();
@@ -394,6 +414,9 @@ describe("useChatSession TTS prefetch", () => {
     installSpeechRecognitionMock();
 
     const { result } = renderHook(() => useChatSession());
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     await act(async () => {
       result.current.toggleAsr();

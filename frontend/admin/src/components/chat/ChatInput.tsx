@@ -30,6 +30,7 @@ interface ChatInputProps {
   /** VAD 還在載模型／要麥克風，這段期間說的話收不到。 */
   asrStarting?: boolean;
   asrInputMode?: "continuous" | "push-to-talk";
+  asrInterim?: string;
   asrProvider?: MyAsrProvider | null;
   onAsrProviderChange?: (value: string) => void;
   privacyWarningsVisible: boolean;
@@ -81,6 +82,7 @@ export default function ChatInput(props: ChatInputProps) {
     asrTranscribing,
     asrStarting,
     asrInputMode,
+    asrInterim,
     asrProvider,
     onAsrProviderChange,
     privacyWarningsVisible,
@@ -122,9 +124,10 @@ export default function ChatInput(props: ChatInputProps) {
   const livePlaceholder = liveConnected
     ? "Live 模式：輸入文字後按 Enter，或直接使用麥克風"
     : "Live 模式連線中，連線完成後可輸入文字或開啟麥克風";
+  const defaultPlaceholder = "向 Brain 發送訊息...（輸入 / 查看指令）";
   const inputPlaceholder = mode === "live"
     ? livePlaceholder
-    : "向 Brain 發送訊息...（輸入 / 查看指令）";
+    : (asrInterim || defaultPlaceholder);
   const liveMicLabel = liveMicActive ? "錄音中" : "麥克風";
   const liveMicTitle = liveMicActive ? "停止錄音" : "開始語音輸入";
   const liveCameraLabel = liveCameraActive ? "關鏡頭" : "開鏡頭";
@@ -238,6 +241,13 @@ export default function ChatInput(props: ChatInputProps) {
             placeholder={inputPlaceholder}
             className="min-h-[3.5rem] w-full resize-none bg-transparent p-4 pb-2 text-[0.9375rem] leading-relaxed text-content placeholder:text-content-subtle focus:outline-none"
           />
+
+          {asrInterim && (
+            <div className="flex items-center gap-1.5 px-4 pb-1 text-xs italic text-content-subtle">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+              <span>辨識中：{asrInterim}</span>
+            </div>
+          )}
 
           {/* 工具列放在正常流裡而不是疊在 textarea 上。疊上去要靠 textarea 的
               padding-bottom 預留高度，控制項一多換行就會蓋住正在打的字。 */}

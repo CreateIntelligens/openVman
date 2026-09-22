@@ -16,28 +16,23 @@ import {
   readPrivacyWarningsVisible,
   writePrivacyWarningsVisible,
 } from "../components/chat/privacyWarnings";
+import { apiFetch, parseErrorMessage } from "../api/common";
 import {
-  BROWSER_ASR,
-  fetchMyAsrProvider,
-  setMyAsrProvider,
+  createSpeechController,
+  getAsrErrorMessage,
   type MyAsrProvider,
-} from "../api/asr";
+  type SpeechController,
+  type SpeechControllerState,
+} from "@shared/speech";
 import { readReplyMode, writeReplyMode, type ReplyMode } from "../components/chat/replyMode";
 import { useTts } from "./useTts";
 import { useChatHistory } from "./useChatHistory";
 import { useSlashAutocomplete } from "./useSlashAutocomplete";
 import { useInputHistory } from "./useInputHistory";
 import { useStarterPrompts } from "./useStarterPrompts";
-import { useServerSpeechRecognition } from "./useServerSpeechRecognition";
-import { useVadSpeechRecognition } from "./useVadSpeechRecognition";
-import { useSpeechRecognition } from "./useSpeechRecognition";
 
 const STOP_REPLY_NOTICE = "已停止回覆";
 const STOP_REPLY_NOTICE_MS = 2500;
-const ASR_IDLE_TIMEOUT_MS = 10000;
-// 伺服器引擎錄音時沒有「有人在講話」的訊號可以重置計時，10 秒會把一句話講到
-// 一半切掉。這裡當成單段錄音的上限：到了就停止並送出，避免麥克風忘了關。
-const SERVER_ASR_MAX_CLIP_MS = 60000;
 
 type ChatResultPayload = {
   session_id: string;
@@ -253,140 +248,94 @@ export function useChatSession() {
     writePrivacyWarningsVisible(privacyWarningsVisible);
   }, [privacyWarningsVisible]);
 
-  // --- ASR ---
-  const [asrListening, setAsrListening] = useState(false);
-  const asrIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearAsrIdleTimer = useCallback(() => {
-    if (asrIdleTimerRef.current) {
-      clearTimeout(asrIdleTimerRef.current);
-      asrIdleTimerRef.current = null;
-    }
-  }, []);
-  // 依帳號生效的引擎決定行為：browser 走瀏覽器內建的連續聆聽，其餘走錄音上傳。
-  // 讀不到就沿用瀏覽器辨識（原本的行為），不該因此不能講話。
-  const [asrProvider, setAsrProviderState] = useState<MyAsrProvider | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetchMyAsrProvider()
-      .then((profile) => { if (!cancelled) setAsrProviderState(profile); })
-      .catch(() => { /* 沿用瀏覽器辨識 */ });
-    return () => { cancelled = true; };
-  }, []);
-  const asrEngine: "browser" | "server" =
-    asrProvider && asrProvider.effective !== BROWSER_ASR ? "server" : "browser";
+  // --- ASR (階段 5：狀態機接線) ---
+  const [asrInterim, setAsrInterim] = useState("");
+  const [asrState, setAsrState] = useState<SpeechControllerState>({
+    engine: "server",
+    inputMode: "continuous",
+    listening: false,
+    speaking: false,
+    starting: false,
+    transcribing: false,
+    supported: true,
+    uiState: "idle",
+    uiLabel: "語音輸入",
+  });
+  const [asrProvider, setAsrProviderState] = useState<MyAsrProvider>({
+    value: "",
+    effective: "",
+    allowed: [],
+  });
 
-  // 計時器建立的位置早於 asrInputMode 算出來的位置，所以用 ref 讀最新值。
-  const asrInputModeRef = useRef<"continuous" | "push-to-talk">("continuous");
-  const scheduleAsrIdleTimeout = useCallback(() => {
-    clearAsrIdleTimer();
-    asrIdleTimerRef.current = setTimeout(() => {
-      asrIdleTimerRef.current = null;
-      setAsrListening(false);
-    }, asrInputModeRef.current === "push-to-talk" ? SERVER_ASR_MAX_CLIP_MS : ASR_IDLE_TIMEOUT_MS);
-  }, [clearAsrIdleTimer]);
-  const markAsrActivity = useCallback(() => {
-    if (asrListening) scheduleAsrIdleTimeout();
-  }, [asrListening, scheduleAsrIdleTimeout]);
-
-  const toggleAsr = useCallback(() => {
-    setAsrListening((prev) => !prev);
-  }, []);
-
-  useEffect(() => {
-    if (!asrListening) {
-      clearAsrIdleTimer();
-      return;
-    }
-    scheduleAsrIdleTimeout();
-    return clearAsrIdleTimer;
-  }, [asrListening, scheduleAsrIdleTimeout, clearAsrIdleTimer]);
-
+  const controllerRef = useRef<SpeechController | null>(null);
   const inputRef = useRef(input);
   inputRef.current = input;
   const submitRef = useRef<(value?: string) => Promise<void>>();
 
   const handleFinalTranscript = useCallback((transcript: string) => {
     const text = transcript.trim();
+    setAsrInterim("");
     if (!text) return;
 
-    markAsrActivity();
+    controllerRef.current?.markActivity();
     const currentInput = inputRef.current.trim();
     const nextInput = currentInput ? `${currentInput} ${text}` : text;
     inputRef.current = nextInput;
     setInput(nextInput);
     void submitRef.current?.(nextInput);
-  }, [markAsrActivity]);
+  }, []);
 
-  const {
-    speaking: asrSpeaking,
-    supported: browserAsrSupported,
-  } = useSpeechRecognition({
-    enabled: asrListening && asrEngine === "browser",
-    onActivity: markAsrActivity,
-    onError: useCallback((message: string) => {
-      setError(message);
-      setAsrListening(false);
-    }, [setError]),
-    onFinalTranscript: handleFinalTranscript,
-  });
-
-  const handleServerAsrError = useCallback((message: string) => {
-    setError(message);
-    setAsrListening(false);
+  const handleAsrError = useCallback((err: string) => {
+    setError(getAsrErrorMessage(err));
   }, [setError]);
 
-  const [vadAvailable, setVadAvailable] = useState(true);
-  // 伺服器引擎優先用 VAD：開著一直聽、講完自動送，跟瀏覽器辨識同一種操作。
-  const {
-    speaking: vadSpeaking,
-    starting: asrStarting,
-    supported: vadSupported,
-    transcribing: vadTranscribing,
-  } = useVadSpeechRecognition({
-    // 已知 VAD 起不來就別再試，交給下面的按鍵錄音。
-    enabled: asrListening && asrEngine === "server" && vadAvailable,
-    onActivity: markAsrActivity,
-    onError: handleServerAsrError,
-    onFinalTranscript: handleFinalTranscript,
-  });
+  const handleInterim = useCallback((text: string) => {
+    setAsrInterim(text);
+  }, []);
 
-  // VAD 起不來（模型或 WASM 載不到，例如內網連不到 CDN）就退回按鍵錄音：
-  // 按一下收音、再按一下送出。
+  if (!controllerRef.current) {
+    controllerRef.current = createSpeechController({
+      http: {
+        request: (path, init) => apiFetch(path, init),
+        parseError: (res) => parseErrorMessage(res),
+      },
+      commitMode: "continuous",
+      onResult: handleFinalTranscript,
+      onInterim: handleInterim,
+      onError: handleAsrError,
+      onProviderChange: (p) => setAsrProviderState(p),
+      onStateChange: (state) => setAsrState(state),
+    });
+  }
+
   useEffect(() => {
-    if (!vadSupported) setVadAvailable(false);
-  }, [vadSupported]);
-  const asrInputMode: "continuous" | "push-to-talk" =
-    asrEngine === "server" && !vadAvailable ? "push-to-talk" : "continuous";
-  const {
-    supported: recorderSupported,
-    transcribing: recorderTranscribing,
-  } = useServerSpeechRecognition({
-    enabled: asrListening && asrInputMode === "push-to-talk",
-    onError: handleServerAsrError,
-    onFinalTranscript: handleFinalTranscript,
-  });
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+    ctrl.updateCallbacks({
+      onResult: handleFinalTranscript,
+      onInterim: handleInterim,
+      onError: handleAsrError,
+      onProviderChange: (p) => setAsrProviderState(p),
+      onStateChange: (state) => setAsrState(state),
+    });
+  }, [handleFinalTranscript, handleInterim, handleAsrError]);
 
-  asrInputModeRef.current = asrInputMode;
+  useEffect(() => {
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+    void ctrl.init();
+    return () => {
+      ctrl.dispose();
+    };
+  }, []);
 
-  const asrSupported = asrEngine === "browser"
-    ? browserAsrSupported
-    : vadAvailable || recorderSupported;
-  const asrTranscribing = vadTranscribing || recorderTranscribing;
-  const asrSpeakingNow = asrEngine === "browser" ? asrSpeaking : vadSpeaking;
+  const toggleAsr = useCallback(() => {
+    controllerRef.current?.toggleListening();
+  }, []);
 
   const changeAsrProvider = useCallback(async (value: string) => {
-    // 換引擎前先停掉收音，否則舊引擎的錄音會卡在半空中。
-    setAsrListening(false);
-    try {
-      setAsrProviderState(await setMyAsrProvider(value));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "無法變更語音辨識引擎。");
-    }
-  }, [setError]);
-
-  useEffect(() => {
-    if (asrListening && !asrSupported) setAsrListening(false);
-  }, [asrListening, asrSupported]);
+    await controllerRef.current?.setProvider(value);
+  }, []);
 
   // --- Coordination ---
   const conversationTitle = getConversationTitle(loadingHistory, sending);
@@ -585,15 +534,18 @@ export function useChatSession() {
     confirmDeleteSession,
     handleTtsProviderChange,
     handleTtsVoiceChange,
-    asrListening,
-    asrSupported,
-    asrInputMode,
-    asrStarting,
-    asrTranscribing,
+    asrListening: asrState.listening,
+    asrSupported: asrState.supported,
+    asrInputMode: asrState.inputMode,
+    asrStarting: asrState.starting,
+    asrTranscribing: asrState.transcribing,
     asrProvider,
     changeAsrProvider,
     toggleAsr,
-    asrSpeaking: asrSpeakingNow,
+    asrSpeaking: asrState.speaking,
+    asrInterim,
+    asrUiState: asrState.uiState,
+    asrUiLabel: asrState.uiLabel,
     handleActionConfirmed,
     handleActionCancelled,
     setMessages,

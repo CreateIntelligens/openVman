@@ -1,51 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-
-type SpeechRecognitionAlternativeLike = {
-  transcript?: string;
-};
-
-type SpeechRecognitionResultLike = {
-  isFinal: boolean;
-  [index: number]: SpeechRecognitionAlternativeLike | undefined;
-};
-
-type SpeechRecognitionResultListLike = {
-  length: number;
-  [index: number]: SpeechRecognitionResultLike | undefined;
-};
-
-type SpeechRecognitionEventLike = {
-  resultIndex?: number;
-  results: SpeechRecognitionResultListLike;
-};
-
-type SpeechRecognitionErrorEventLike = {
-  error?: string;
-  message?: string;
-};
-
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onspeechstart: (() => void) | null;
-  onspeechend: (() => void) | null;
-};
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-type SpeechRecognitionWindow = Window & {
-  SpeechRecognition?: SpeechRecognitionConstructor;
-  webkitSpeechRecognition?: SpeechRecognitionConstructor;
-};
+import { useEffect, useRef, useState } from "react";
+import { BrowserRecognizer, getAsrErrorMessage, type AsrErrorCode } from "@shared/speech";
 
 interface UseSpeechRecognitionOptions {
   enabled: boolean;
@@ -53,176 +7,78 @@ interface UseSpeechRecognitionOptions {
   onActivity?: () => void;
   onError?: (message: string) => void;
   onFinalTranscript: (transcript: string) => void;
+  onInterimTranscript?: (transcript: string) => void;
 }
 
-function getSpeechRecognitionCtor(): SpeechRecognitionConstructor | null {
-  const speechWindow = window as SpeechRecognitionWindow;
-  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
-}
-
-function readFinalTranscript(event: SpeechRecognitionEventLike): string {
-  const transcripts: string[] = [];
-  const startIndex = event.resultIndex ?? 0;
-
-  for (let index = startIndex; index < event.results.length; index += 1) {
-    const result = event.results[index];
-    if (result?.isFinal) {
-      const transcript = result[0]?.transcript?.trim();
-      if (transcript) transcripts.push(transcript);
-    }
-  }
-
-  return transcripts.join(" ");
-}
-
-function isTerminalSpeechError(error?: string): boolean {
-  return error === "audio-capture"
-    || error === "not-allowed"
-    || error === "service-not-allowed";
-}
-
+/**
+ * useSpeechRecognition — 薄層轉接：將 React 狀態綁定到底層無框架的 BrowserRecognizer。
+ *
+ * 支援 continuous 連續聆聽、自動重啟與即時 interimResults。
+ */
 export function useSpeechRecognition({
   enabled,
   lang = "zh-TW",
   onActivity,
   onError,
   onFinalTranscript,
+  onInterimTranscript,
 }: UseSpeechRecognitionOptions) {
-  const [supported, setSupported] = useState(() => getSpeechRecognitionCtor() !== null);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const enabledRef = useRef(enabled);
-  const onActivityRef = useRef(onActivity);
+  const [supported, setSupported] = useState(true);
+
+  const recognizerRef = useRef<BrowserRecognizer | null>(null);
   const onErrorRef = useRef(onError);
   const onFinalTranscriptRef = useRef(onFinalTranscript);
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const onInterimTranscriptRef = useRef(onInterimTranscript);
+  const onActivityRef = useRef(onActivity);
 
   useEffect(() => {
-    enabledRef.current = enabled;
-  }, [enabled]);
-
-  useEffect(() => {
-    onActivityRef.current = onActivity;
     onErrorRef.current = onError;
     onFinalTranscriptRef.current = onFinalTranscript;
-  }, [onActivity, onError, onFinalTranscript]);
+    onInterimTranscriptRef.current = onInterimTranscript;
+    onActivityRef.current = onActivity;
+  }, [onError, onFinalTranscript, onInterimTranscript, onActivity]);
 
-  const stopRecognition = useCallback(() => {
-    const recognition = recognitionRef.current;
-    recognitionRef.current = null;
-    if (!recognition) return;
-
-    recognition.onstart = null;
-    recognition.onend = null;
-    recognition.onerror = null;
-    recognition.onresult = null;
-    recognition.onspeechstart = null;
-    recognition.onspeechend = null;
-
-    try {
-      recognition.abort();
-    } catch {
-      recognition.stop();
-    }
-  }, []);
+  if (!recognizerRef.current) {
+    recognizerRef.current = new BrowserRecognizer({
+      lang,
+      continuous: true,
+      onResult: (text) => onFinalTranscriptRef.current(text),
+      onInterim: (text) => onInterimTranscriptRef.current?.(text),
+      onSpeechStart: () => onActivityRef.current?.(),
+      onError: (code: AsrErrorCode) => {
+        if (code === "audio-capture" || code === "not-allowed" || code === "service-not-allowed") {
+          setSupported(false);
+        }
+        onErrorRef.current?.(getAsrErrorMessage(code));
+      },
+      onListeningChange: (val) => setListening(val),
+      onSpeakingChange: (val) => setSpeaking(val),
+      onSupportedChange: (val) => setSupported(val),
+    });
+    setSupported(recognizerRef.current.supported);
+  }
 
   useEffect(() => {
-    if (!enabled) {
-      stopRecognition();
-      return;
+    const recognizer = recognizerRef.current;
+    if (!recognizer) return;
+    recognizer.updateOptions({ lang });
+
+    if (enabled) {
+      recognizer.start();
+      setSupported(recognizer.supported);
+    } else {
+      recognizer.stop();
     }
+  }, [enabled, lang]);
 
-    const RecognitionCtor = getSpeechRecognitionCtor();
-    if (!RecognitionCtor) {
-      setSupported(false);
-      setListening(false);
-      setSpeaking(false);
-      return;
-    }
-
-    setSupported(true);
-
-    let cancelled = false;
-    let shouldRestart = true;
-    const recognition = new RecognitionCtor();
-    recognitionRef.current = recognition;
-    recognition.lang = lang;
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    const startRecognition = (): void => {
-      if (cancelled || !enabledRef.current) return;
-
-      try {
-        recognition.start();
-      } catch {
-        shouldRestart = false;
-        setListening(false);
-        onErrorRef.current?.("語音輸入無法啟動");
-      }
-    };
-
-    recognition.onstart = () => {
-      if (cancelled) return;
-      setListening(true);
-      onActivityRef.current?.();
-    };
-
-    recognition.onspeechstart = () => {
-      if (cancelled) return;
-      setSpeaking(true);
-      onActivityRef.current?.();
-    };
-
-    recognition.onspeechend = () => {
-      if (cancelled) return;
-      setSpeaking(false);
-    };
-
-    recognition.onresult = (event) => {
-      if (cancelled) return;
-      onActivityRef.current?.();
-
-      const transcript = readFinalTranscript(event);
-      if (transcript) {
-        onFinalTranscriptRef.current(transcript);
-      }
-    };
-
-    recognition.onerror = (event) => {
-      if (cancelled) return;
-      setSpeaking(false);
-
-      if (isTerminalSpeechError(event.error)) {
-        shouldRestart = false;
-        setSupported(false);
-        onErrorRef.current?.("瀏覽器無法使用語音輸入");
-      } else if (event.error !== "aborted" && event.error !== "no-speech") {
-        onErrorRef.current?.("語音輸入中斷");
-      }
-    };
-
-    recognition.onend = () => {
-      if (cancelled) return;
-      setListening(false);
-      setSpeaking(false);
-
-      if (enabledRef.current && shouldRestart) {
-        window.setTimeout(startRecognition, 0);
-      }
-    };
-
-    startRecognition();
-
+  useEffect(() => {
     return () => {
-      cancelled = true;
-      shouldRestart = false;
-      stopRecognition();
-      setListening(false);
-      setSpeaking(false);
+      recognizerRef.current?.dispose();
+      recognizerRef.current = null;
     };
-  }, [enabled, lang, stopRecognition]);
+  }, []);
 
   return { listening, speaking, supported };
 }

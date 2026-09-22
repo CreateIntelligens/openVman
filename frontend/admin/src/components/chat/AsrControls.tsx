@@ -1,5 +1,5 @@
 import type { MyAsrProvider } from "../../api/asr";
-import { describeAsrEngine } from "../asrEngines";
+import { DEFAULT_ASR_PROVIDER_LABEL, describeAsrEngine } from "@shared/speech";
 import Select from "../Select";
 
 interface AsrControlsProps {
@@ -12,6 +12,7 @@ interface AsrControlsProps {
  *
  * 清單來自後端依帳號授權算出的 allowed；只有一個可選時不顯示——沒有選擇
  * 可做的選單只是雜訊。
+ * 遵循 D7：包含「預設（依系統設定）」選項，允許切換回跟隨全站預設。
  */
 export const AsrControls: React.FC<AsrControlsProps> = ({
   provider,
@@ -20,10 +21,11 @@ export const AsrControls: React.FC<AsrControlsProps> = ({
 }) => {
   if (!provider || provider.allowed.length <= 1) return null;
 
-  // 選過但被收回授權時 value 不在清單裡，這時顯示實際生效的那個。
-  const current = provider.allowed.includes(provider.value)
-    ? provider.value
-    : provider.effective;
+  // 選過但被收回授權時 value 不在清單裡，這時顯示實際生效的那個；空字串代表跟隨系統。
+  const current =
+    provider.value === "" || provider.allowed.includes(provider.value)
+      ? provider.value
+      : provider.effective;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -38,10 +40,13 @@ export const AsrControls: React.FC<AsrControlsProps> = ({
         onChange={onChange}
         disabled={disabled}
         ariaLabel="語音辨識引擎"
-        options={provider.allowed.map((id) => ({
-          value: id,
-          label: describeAsrEngine(id).label,
-        }))}
+        options={[
+          { value: "", label: DEFAULT_ASR_PROVIDER_LABEL },
+          ...provider.allowed.map((id) => ({
+            value: id,
+            label: describeAsrEngine(id).label,
+          })),
+        ]}
         className="w-[10rem] text-xs [&>button]:py-1 [&>button]:h-8"
       />
     </div>

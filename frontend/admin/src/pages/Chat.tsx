@@ -98,6 +98,7 @@ export default function Chat() {
     asrTranscribing,
     asrStarting,
     asrProvider,
+    asrInterim,
     changeAsrProvider,
     handleActionConfirmed,
     handleActionCancelled,
@@ -488,6 +489,7 @@ export default function Chat() {
             asrInputMode={asrInputMode}
             asrTranscribing={asrTranscribing}
             asrStarting={asrStarting}
+            asrInterim={asrInterim}
             asrProvider={asrProvider}
             onAsrProviderChange={changeAsrProvider}
             privacyWarningsVisible={privacyWarningsVisible}

@@ -133,6 +133,32 @@ describe("playPcmStream", () => {
     expect(new Uint8Array(wav.slice(44))).toEqual(raw);
   });
 
+  it("correctly detects 24000 Hz sample rate and avoids pitch shift when the first chunk is only 7 bytes", async () => {
+    const { context, started } = fakeContext();
+    // 建立 24000 Hz 的標準 WAV（44 bytes header + 4800 個 sample = 9600 bytes PCM）
+    const pcmData = new Uint8Array(new Int16Array(4800).fill(1500).buffer);
+    const wavBuffer = buildWavFile(pcmData, 24000);
+    const fullWavBytes = new Uint8Array(wavBuffer);
+
+    // 第一個 chunk 只有 7 bytes，其餘切為 15 bytes、22 bytes 等小片段
+    const chunk1 = fullWavBytes.slice(0, 7);
+    const chunk2 = fullWavBytes.slice(7, 22);
+    const chunk3 = fullWavBytes.slice(22, 44);
+    const rest = fullWavBytes.slice(44);
+
+    // Content-Type 沒有寫 rate=，以純 audio/wav 進入
+    const playback = playPcmStream(streamResponse([chunk1, chunk2, chunk3, rest], "audio/wav"), context, {
+      minChunkBytes: 1,
+    });
+    const wav = await playback.done;
+
+    // 播放的 buffer 取樣率必須為 24000，且重組的 WAV 取樣率必須為 24000
+    expect(started.length).toBeGreaterThan(0);
+    expect(started[0].buffer.sampleRate).toBe(24000);
+    const view = new DataView(wav);
+    expect(view.getUint32(24, true)).toBe(24000);
+  });
+
   it("stop() halts scheduled sources and settles the promise", async () => {
     const { context } = fakeContext();
     const body = new ReadableStream<Uint8Array>({ start() { /* never closes */ } });
