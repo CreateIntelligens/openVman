@@ -20,6 +20,11 @@ interface SelectProps {
   title?: string;
   placeholder?: string;
   ariaLabel?: string;
+  /**
+   * 欄位名稱。給了就顯示在觸發器內選中值的前面，省掉外面那行標題；
+   * 下拉打開時標題也會出現在選項清單上方。
+   */
+  label?: string;
 }
 
 export default function Select({
@@ -31,6 +36,7 @@ export default function Select({
   title,
   placeholder,
   ariaLabel,
+  label,
 }: SelectProps) {
   const getOptionClassName = (optionValue: string, index: number) => {
     if (optionValue === value) {
@@ -148,7 +154,12 @@ export default function Select({
         disabled={disabled}
         className="w-full flex items-center justify-between gap-2 bg-surface-raised text-content border border-border rounded-lg px-3 py-2 text-sm font-medium cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span className="truncate">{displayLabel}</span>
+        <span className="truncate">
+          {label && (
+            <span className="mr-1.5 text-content-subtle font-normal">{label}</span>
+          )}
+          {displayLabel}
+        </span>
         <span className={`material-symbols-outlined text-[1rem] text-content-subtle transition-transform duration-200 shrink-0 ${open ? "rotate-180" : ""}`}>
           expand_more
         </span>
@@ -162,6 +173,14 @@ export default function Select({
           aria-label={ariaLabel ?? title ?? placeholder ?? "選擇選項"}
           className={`absolute z-50 w-full min-w-[7.5rem] bg-surface-raised border border-border rounded-xl shadow-xl dark:shadow-[0_0.5rem_1.875rem_rgba(0,0,0,0.5)] overflow-y-auto max-h-[12.5rem] py-1 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"}`}
         >
+          {label && (
+            <div
+              aria-hidden="true"
+              className="px-3 pt-1 pb-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle"
+            >
+              {label}
+            </div>
+          )}
           {options.map((option, i) => (
             <div
               key={option.value}

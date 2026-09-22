@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { isAtLeastAdmin } from "../api/auth";
+import { listEmbedKeys, type EmbedKey } from "../api/embedKeys";
 import { fetchProjects, type ProjectSummary } from "../api/projects";
 import {
   fetchUsageEvents,
@@ -19,6 +21,7 @@ import {
 import Select from "../components/Select";
 import StatusAlert from "../components/StatusAlert";
 import UsageTrendChart from "../components/usage/UsageTrendChart";
+import { useAuth } from "../context/AuthContext";
 
 const EVENTS_LIMIT = 100;
 const ALL_PROJECTS = "__all__";
@@ -38,6 +41,15 @@ const BUCKET_OPTIONS: Array<{ value: UsageBucket; label: string }> = [
   { value: "hour", label: "每小時" },
   { value: "day", label: "每天" },
   { value: "month", label: "每月" },
+];
+
+/** 日期快捷區間；days 是往前推的天數（含今天），custom 才顯示兩個日期欄位。 */
+const RANGE_OPTIONS: Array<{ value: string; label: string; days?: number }> = [
+  { value: "7", label: "最近 7 天", days: 6 },
+  { value: "14", label: "最近 14 天", days: 13 },
+  { value: "30", label: "最近 30 天", days: 29 },
+  { value: "90", label: "最近 90 天", days: 89 },
+  { value: "custom", label: "自訂區間" },
 ];
 
 /** 分組維度 -> 該維度在彙總列裡的欄位名，用來取標籤。 */
@@ -300,13 +312,18 @@ function BreakdownTable({
 }
 
 export default function Usage() {
+  const { account } = useAuth();
+  const isAdmin = account ? isAtLeastAdmin(account.role) : false;
+
   const [dateFrom, setDateFrom] = useState(() => usageReportDate(undefined, 6));
   const [dateTo, setDateTo] = useState(() => usageReportDate());
+  const [range, setRange] = useState("7");
   const [projectId, setProjectId] = useState(ALL_PROJECTS);
   const [principalType, setPrincipalType] = useState<PrincipalTypeFilter>("");
   const [principalId, setPrincipalId] = useState("");
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [embedKeys, setEmbedKeys] = useState<EmbedKey[]>([]);
   const [groupBy, setGroupBy] = useState<UsageGroupBy | "">("model");
   const [bucket, setBucket] = useState<UsageBucket>("day");
   const [summary, setSummary] = useState<UsageSummaryResponse | null>(null);
@@ -372,6 +389,21 @@ export default function Usage() {
     })();
   }, []);
 
+  // 金鑰清單只有 admin 能讀；非 admin 靜默留空，改用手動輸入 ID。
+  useEffect(() => {
+    if (!isAdmin) {
+      setEmbedKeys([]);
+      return;
+    }
+    void (async () => {
+      try {
+        setEmbedKeys(await listEmbedKeys());
+      } catch {
+        setEmbedKeys([]);
+      }
+    })();
+  }, [isAdmin]);
+
   const totals = summary?.totals;
   const groups = summary?.groups ?? [];
   const callsPerTurn = useMemo(() => averageCallsPerTurn(events), [events]);
@@ -403,6 +435,33 @@ export default function Usage() {
       events: traceEvents,
     }));
   }, [events]);
+
+  /** 選快捷區間時直接算好起訖日；自訂則保留現值讓使用者自己挑。 */
+  const handleRangeChange = useCallback((value: string) => {
+    setRange(value);
+    const preset = RANGE_OPTIONS.find((option) => option.value === value);
+    if (preset?.days === undefined) return;
+    setDateFrom(usageReportDate(undefined, preset.days));
+    setDateTo(usageReportDate());
+  }, []);
+
+  /**
+   * 選了專案就只列該專案的金鑰（EmbedKeyRecord.project_id 是單一擁有者）。
+   * 帳號與金鑰之間沒有直接關聯，所以主體選「帳號」時不提供清單。
+   */
+  const embedKeyOptions = useMemo(() => {
+    const scoped =
+      projectId === ALL_PROJECTS
+        ? embedKeys
+        : embedKeys.filter((key) => key.project_id === projectId);
+    return [
+      { value: "", label: "全部金鑰" },
+      ...scoped.map((key) => ({
+        value: key.key_id,
+        label: key.label || key.key_id,
+      })),
+    ];
+  }, [embedKeys, projectId]);
 
   const hasData = Boolean(totals?.calls) || events.length > 0;
   const currentGroupLabel =
@@ -446,74 +505,85 @@ export default function Usage() {
             報表時區：Asia/Taipei（UTC+08:00）；日期篩選、趨勢與事件時間皆採台北時間。
           </p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
-                開始日期
-              </span>
-              <input
-                type="date"
-                className="input"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-              />
-            </label>
+            <Select
+              ariaLabel="期間"
+              label="期間"
+              value={range}
+              onChange={handleRangeChange}
+              options={RANGE_OPTIONS.map(({ value, label }) => ({ value, label }))}
+              className="w-full"
+            />
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
-                結束日期
-              </span>
-              <input
-                type="date"
-                className="input"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-              />
-            </label>
+            {range === "custom" && (
+              <>
+                <input
+                  type="date"
+                  aria-label="開始日期"
+                  className="input"
+                  value={dateFrom}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                />
+                <input
+                  type="date"
+                  aria-label="結束日期"
+                  className="input"
+                  value={dateTo}
+                  onChange={(event) => setDateTo(event.target.value)}
+                />
+              </>
+            )}
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
-                專案
-              </span>
+            <Select
+              ariaLabel="專案"
+              label="專案"
+              value={projectId}
+              onChange={(value) => {
+                setProjectId(value);
+                // 選中的金鑰可能不屬於新專案，換專案時一併清掉避免查無資料。
+                if (principalType === "embed_key") setPrincipalId("");
+              }}
+              options={[
+                { value: ALL_PROJECTS, label: "全部專案" },
+                ...projects.map((project) => ({
+                  value: project.project_id,
+                  label: project.label || project.project_id,
+                })),
+              ]}
+              className="w-full"
+            />
+
+            <Select
+              ariaLabel="主體類型"
+              label="主體"
+              value={principalType}
+              onChange={(value) => {
+                setPrincipalType(value as PrincipalTypeFilter);
+                // 換了主體類型，原本的 ID 多半不屬於新類型，一併清掉。
+                setPrincipalId("");
+              }}
+              options={PRINCIPAL_TYPE_OPTIONS}
+              className="w-full"
+            />
+
+            {principalType === "embed_key" && embedKeys.length > 0 ? (
               <Select
-                ariaLabel="專案"
-                value={projectId}
-                onChange={setProjectId}
-                options={[
-                  { value: ALL_PROJECTS, label: "全部專案" },
-                  ...projects.map((project) => ({
-                    value: project.project_id,
-                    label: project.label || project.project_id,
-                  })),
-                ]}
+                ariaLabel="主體 ID"
+                label="金鑰"
+                value={principalId}
+                onChange={setPrincipalId}
+                options={embedKeyOptions}
                 className="w-full"
               />
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
-                主體類型
-              </span>
-              <Select
-                ariaLabel="主體類型"
-                value={principalType}
-                onChange={(value) => setPrincipalType(value as PrincipalTypeFilter)}
-                options={PRINCIPAL_TYPE_OPTIONS}
-                className="w-full"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
-                主體 ID
-              </span>
+            ) : (
               <input
                 type="text"
+                aria-label="主體 ID"
                 className="input"
                 value={principalId}
                 onChange={(event) => setPrincipalId(event.target.value)}
-                placeholder="選填，帳號或金鑰 ID"
+                placeholder="主體 ID（選填）"
               />
-            </label>
+            )}
           </div>
         </section>
 
@@ -570,28 +640,20 @@ export default function Usage() {
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
-                      分組
-                    </span>
-                    <Select
-                      ariaLabel="分組"
-                      value={groupBy}
-                      onChange={(value) => setGroupBy(value as UsageGroupBy | "")}
-                      options={GROUP_BY_OPTIONS}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
-                      粒度
-                    </span>
-                    <Select
-                      ariaLabel="粒度"
-                      value={bucket}
-                      onChange={(value) => setBucket(value as UsageBucket)}
-                      options={BUCKET_OPTIONS}
-                    />
-                  </label>
+                  <Select
+                    ariaLabel="分組"
+                    label="分組"
+                    value={groupBy}
+                    onChange={(value) => setGroupBy(value as UsageGroupBy | "")}
+                    options={GROUP_BY_OPTIONS}
+                  />
+                  <Select
+                    ariaLabel="粒度"
+                    label="粒度"
+                    value={bucket}
+                    onChange={(value) => setBucket(value as UsageBucket)}
+                    options={BUCKET_OPTIONS}
+                  />
                 </div>
               </header>
               <div className="mt-5">

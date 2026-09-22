@@ -7,6 +7,7 @@ import {
   fetchUsageSummary,
   fetchUsageTimeseries,
 } from "../api/usage";
+import { listEmbedKeys } from "../api/embedKeys";
 import { fetchProjects } from "../api/projects";
 import type { UsageEvent } from "../api/usage";
 
@@ -24,6 +25,14 @@ vi.mock("../api/usage", async () => {
 
 vi.mock("../api/projects", () => ({
   fetchProjects: vi.fn(),
+}));
+
+vi.mock("../api/embedKeys", () => ({
+  listEmbedKeys: vi.fn(),
+}));
+
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: { role: "admin" } }),
 }));
 
 function event(overrides: Partial<UsageEvent> = {}): UsageEvent {
@@ -166,6 +175,7 @@ describe("Usage page", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(listEmbedKeys).mockResolvedValue([]);
     vi.mocked(fetchProjects).mockResolvedValue({
       project_count: 1,
       projects: [
@@ -193,6 +203,9 @@ describe("Usage page", () => {
       count: 1,
     });
     render(<Usage />);
+    // 預設走快捷區間，兩個日期欄位要切到「自訂區間」才會出現。
+    fireEvent.click(screen.getByRole("combobox", { name: "期間" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "自訂區間" }));
     expect((screen.getByLabelText("開始日期") as HTMLInputElement).value)
       .toBe("2026-09-04");
     expect((screen.getByLabelText("結束日期") as HTMLInputElement).value)
@@ -269,7 +282,7 @@ describe("Usage page", () => {
 
     await waitFor(() => expect(fetchUsageEvents).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByPlaceholderText("選填，帳號或金鑰 ID"), {
+    fireEvent.change(screen.getByLabelText("主體 ID"), {
       target: { value: "key-abc" },
     });
 
@@ -307,6 +320,50 @@ describe("Usage page", () => {
     await waitFor(() => expect(fetchUsageTimeseries).toHaveBeenCalledTimes(2));
     expect(vi.mocked(fetchUsageTimeseries).mock.calls[1][1]).toBe("project");
     expect(await screen.findByRole("table", { name: "依專案" })).toBeTruthy();
+  });
+
+  it("applies a preset range without opening the date fields", async () => {
+    render(<Usage />);
+    await waitFor(() => expect(fetchUsageSummary).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("combobox", { name: "期間" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "最近 30 天" }));
+
+    await waitFor(() => expect(fetchUsageSummary).toHaveBeenCalledTimes(2));
+    const filters = vi.mocked(fetchUsageSummary).mock.calls[1][1];
+    const days =
+      (Date.parse(`${filters?.dateTo}T00:00:00Z`) -
+        Date.parse(`${filters?.dateFrom}T00:00:00Z`)) /
+      86_400_000;
+    expect(days).toBe(29);
+    expect(screen.queryByLabelText("開始日期")).toBeNull();
+  });
+
+  it("narrows the key picker to the selected project", async () => {
+    vi.mocked(listEmbedKeys).mockResolvedValue([
+      { key_id: "key-a", label: "金鑰 A", project_id: "proj-1" },
+      { key_id: "key-b", label: "金鑰 B", project_id: "proj-2" },
+    ] as Awaited<ReturnType<typeof listEmbedKeys>>);
+    render(<Usage />);
+    await waitFor(() => expect(listEmbedKeys).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("combobox", { name: "主體類型" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "Embed 金鑰" }));
+
+    // 未選專案時兩把金鑰都在。
+    fireEvent.click(screen.getByRole("combobox", { name: "主體 ID" }));
+    expect(await screen.findByRole("option", { name: "金鑰 A" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "金鑰 B" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "主體 ID" }), {
+      key: "Escape",
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "專案" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "專案一" }));
+
+    fireEvent.click(screen.getByRole("combobox", { name: "主體 ID" }));
+    expect(await screen.findByRole("option", { name: "金鑰 A" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "金鑰 B" })).toBeNull();
   });
 
   it("changes the bucket without changing the grouping", async () => {

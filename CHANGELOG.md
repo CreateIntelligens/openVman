@@ -10,6 +10,10 @@
 
 
 ### Changed
+- **用量頁篩選器**: 日期改為快捷區間（最近 7／14／30／90 天、自訂），選快捷時直接
+  算好起訖日，不用開兩個日期欄位。Embed key 從手打 ID 改為下拉選單，清單只有
+  admin 能讀，非 admin 靜默留空改用手動輸入；選了專案會把金鑰清單縮到該專案。
+  `Select` 新增 `label` prop，欄位名稱顯示在觸發器內選中值前面，省掉外面那行標題。
 - **虛擬人前端正式環境改送靜態檔**: `frontend/app` 的 image 原本 runner 跑
   `pnpm dev`——每個使用者打開頁面都在讓 Vite 現場轉譯 TypeScript，掛著 HMR client
   與 esbuild 常駐程序。改成在 builder 內 `pnpm build`，runner 換 `nginx:1.27-alpine`
