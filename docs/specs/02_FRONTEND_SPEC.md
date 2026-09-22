@@ -125,32 +125,31 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 * 當 `onresult` 觸發，拿到 final 辨識結果後，透過 WebSocket 送出 `{"event": "user_speak", "text": "..."}`。
 * 在送出文字的同時，停止 ASR 聆聽，並發送 `client_interrupt`（如果當前正在播放聲音），立即清空播放佇列，狀態切換為 `THINKING`。
 
-> **現況更新（2026-07-01）**：行為精神相符，但實作分層不同：`useAsr.ts` 只負責瀏覽器語音辨識本身並透過 callback 回傳文字，實際送出訊息、interrupt、狀態切換是由 `useAvatarChat.ts` 的 `sendMessage()` / `stopActiveResponse()` 處理，並非單一模組完成。
+> **現況更新（2026-07-01）**：行為精神相符，但實作分層不同：實際送出訊息、interrupt、狀態切換是由 `useAvatarChat.ts` 的 `sendMessage()` / `stopActiveResponse()` 處理，並非單一模組完成。
 
-> **現況更新（2026-09-21）**：語音輸入有兩種引擎，由帳號生效的設定決定
-> （`GET /api/v1/settings/my-asr-provider` 的 `effective`），虛擬人聊天室與後台
-> 聊天室行為一致：
+> **現況更新（2026-09-22）**：語音核心（ASR / VAD / TTS / 音訊處理 / 偏好儲存）已統一抽取至無框架共用層 `frontend/shared/speech/`（路徑別名 `@shared/speech`），兩端（`frontend/app` Vue 與 `frontend/admin` React）僅保留薄層轉接，不再各自維護底層邏輯：
 >
-> | 引擎 | 實作 | 操作方式 |
-> |---|---|---|
-> | `browser` | Web Speech API（app `useAsr.ts`、admin `useSpeechRecognition.ts`） | 開著連續聆聽，講完自動送出 |
-> | 其餘（breeze / xiaomi / sensevoice / openai） | 本機 Silero VAD 切句（app `useVadAsr.ts`；admin `useVadSpeechRecognition.ts`，沿用 Live 模式的 `useVad.ts`），每句包成 16 kHz WAV 上傳 `POST /api/v1/asr/transcribe` | 講完自動送。admin 連續聆聽；app 一次按鍵收一句（AI 回話時麥克風若開著會收到喇叭聲）。VAD 起不來時退回下一列 |
-> | 上一列的退路 | MediaRecorder 錄音後整段上傳（app `useServerAsr.ts`、admin `useServerSpeechRecognition.ts`） | 按一下開始收音，再按一次才送出；沒有中途結果 |
+> 1. **核心架構**：
+>    * `audio/wav.ts`：音訊編解碼（`encodeWav`、`encodePcm16`、`downmixToMono`、`resamplePcm`、`rmsVolume`）。
+>    * `asr/`：無框架辨識單元與決策大腦：
+>      * `browser-recognizer.ts`：Web Speech API 包裝，支援 interim 與 speaking 狀態信號。
+>      * `server-recorder.ts`：MediaRecorder 按鍵錄音上傳。
+>      * `vad-recognizer.ts`：Silero VAD 本機端點切句上傳，支援 `per-utterance`（app）與 `continuous`（admin）模式。
+>      * `controller.ts`：統一狀態機 `SpeechController`，負責引擎判定、閒置超時、D2 降級、D8 樂觀更新與統一 UI 文案表。
+>      * `errors.ts`：統一錯誤碼與集中繁中錯誤訊息表。
+>      * `client.ts`：後端 ASR 端點通訊。
+>    * `tts/`：PCM 串流重採樣與排程：
+>      * `pcm-stream.ts`：WAV 標頭解析、跨 chunk 奇數 byte 拼接、串流線性插值重採樣至 16kHz。
+>      * `scheduler.ts`：無框架 PCM 排程播放器 `PcmScheduler`，整合 AudioContext 與 RMS 音量監聽。
+>      * `selection.ts`：語音引擎與聲音成對驗證（D9）。
+>      * `fallback.ts`：後端 `X-TTS-Fallback-Reason` 解析與提示組裝（D10）。
+>      * `cache.ts`：LRU + SHA-256 快取。
+>    * `storage.ts`：帳號作用域偏好儲存，統一使用 `speech.*` 鍵名並具備舊鍵向後相容遷移機制（D11）。
 >
-> 引擎由後端依帳號查，前端不指定——否則改個請求就能繞過授權。可選清單是
-> `allowed`（帳號頁授權的 `asr_engine` 資源），只有一個可選時不顯示選單。
+> 2. **收音狀態與視覺回饋**：
+>    按鈕狀態與 placeholder 引導文案統一取自 `ASR_UI_LABELS` 與 `ASR_PROMPT_LABELS`，保證兩端同狀態下文案與視覺體驗一致。
 >
-> **收音狀態必須看得到**：按鈕要反映「實際在收音的那個引擎」的狀態，收音中有
-> 動態與文字提示，伺服器引擎另有「辨識中」狀態（停止收音到出字之間有數秒
-> 空窗）。提示文字跟著引擎走，因為兩者送出的方式不同。後台伺服器引擎單段錄音
-> 上限 60 秒，到了自動停止並送出。
->
-> VAD 的模型檔在 `frontend/admin/public/vad/`，由後台 nginx 在 `/admin/vad/` 提供；
-> app 與 admin 同源，直接共用這一份。兩邊的 `@ricky0123/vad-web` 與 ORT WASM 版本
-> 要一起升。ONNX Runtime 的 WASM 從 jsdelivr
-> CDN 載入——連不到外網的部署 VAD 會初始化失敗，此時自動走按鍵錄音。
->
-> **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
+> 3. **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
 > 顯示（app 在 `App.vue`、admin 在 `useVisionAvailable.ts`）。三態：問到之前與
 > 401/403 都不顯示，`available: false` 不顯示，5xx 與網路錯誤 fail-open。不可用時
 > 是整個不出現，不是 disabled。

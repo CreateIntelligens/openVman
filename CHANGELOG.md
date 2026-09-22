@@ -8,7 +8,13 @@
 - 新增隔離的 SemIf 語意分流／語音打斷離線實驗，提供繁體中文合成案例、固定上游與模型版本、選項順序穩定性及延遲量測；不變更正式服務路由。
 
 
-### Added
+### Changed
+- **前端共用語音核心抽取（ASR / VAD / TTS / 偏好儲存）**：將 `frontend/app`（Vue）與 `frontend/admin`（React）各自維護且漂移的語音辨識、VAD、語音合成與儲存邏輯統一抽取至無框架 TypeScript 模組庫 `frontend/shared/speech/`（`@shared/speech`）。
+  - **純音訊工具**：統一 `wav.ts` 音訊編解碼、重採樣與 RMS 音量分析。
+  - **ASR 與辨識核心**：統一 `browser-recognizer.ts`、`server-recorder.ts`、`vad-recognizer.ts` 與決策狀態機 `controller.ts`；錯誤訊息集中管理（D6），支援預設伺服器引擎（D1）、瀏覽器故障自動記憶體降級（D2）、閒置自動停止（D3）、VAD 模式（D4/D5）、預設系統設定選項（D7）與樂觀更新還原（D8）。
+  - **TTS 串流與排程**：抽取 `pcm-stream.ts`、`scheduler.ts`、`selection.ts`（D9 成對驗證）、`fallback.ts`（D10 讀取並展示 `X-TTS-Fallback-Reason` 後端原因提示）與 `cache.ts`（LRU 快取）。
+  - **儲存與相容性**：提供 `storage.ts` 統一使用 `speech.*` 鍵名並具備舊鍵向後相容無縫遷移（D11，舊鍵讀取後遷移且保留不刪）。兩端前端改為純薄層轉接，並更新 Docker 與建置管線以保證兩端各自獨立 build、test 全綠。
+
 
 - **後台聊天室接上 ASR 引擎選擇**: 後台聊天室原本寫死瀏覽器內建辨識，跟帳號授權
   與「語音」頁的設定完全無關——per-account 授權上線時漏了這個介面。現在依帳號
