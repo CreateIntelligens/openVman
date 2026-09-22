@@ -162,6 +162,9 @@ REPORT 說費率待查。**接線前先查清楚**，並在 observer 加硬上�
   使用者感覺得到。而且 partial ASR 接線本來就不完整（見 [[latency-baseline-2026-09]]），
   先修那個。
 - 醫療安全熔斷不交給 Jev 單獨決定。可以當額外訊號，不能當閘門。
+- 影像不碰。Jev 只收文字 JSON（typesafe-sdk 0.7.1 的 `system_one(state: str | dict |
+  list)`，整個 SDK 沒有任何 image／vision 入口），鏡頭那條路它幫不上忙。要「看圖後
+  判斷」得先讓 VLM 把畫面描述成文字再送 Jev，多一次秒級推論——不如直接讓 VLM 判斷。
 - 多輪對話上下文選擇（那份排序的優先 3）：等 §2、§3 都有結果再說，現在沒有證據
   Jev 在這件事上比首尾截斷好。
 
