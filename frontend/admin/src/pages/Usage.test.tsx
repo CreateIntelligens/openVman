@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import Usage, { averageCallsPerTurn } from "./Usage";
+import Usage, { averageCallsPerTurn, formatDuration } from "./Usage";
 import {
   fetchUsageEvents,
   fetchUsageSummary,
@@ -69,7 +69,7 @@ const SUMMARY = {
     output_tokens: 200,
     total_tokens: 600,
     cached_tokens: 0,
-    reasoning_tokens: 0,
+    reasoning_tokens: 0, chars: 0, seconds: 0,
   },
   groups: [
     {
@@ -80,7 +80,7 @@ const SUMMARY = {
       output_tokens: 150,
       total_tokens: 450,
       cached_tokens: 0,
-      reasoning_tokens: 0,
+      reasoning_tokens: 0, chars: 0, seconds: 0,
     },
     {
       provider: "nen",
@@ -90,7 +90,7 @@ const SUMMARY = {
       output_tokens: 50,
       total_tokens: 150,
       cached_tokens: 0,
-      reasoning_tokens: 0,
+      reasoning_tokens: 0, chars: 0, seconds: 0,
     },
   ],
 };
@@ -111,7 +111,7 @@ const TIMESERIES = {
           output_tokens: 200,
           total_tokens: 600,
           cached_tokens: 0,
-          reasoning_tokens: 0,
+          reasoning_tokens: 0, chars: 0, seconds: 0,
         },
       ],
     },
@@ -397,7 +397,7 @@ describe("Usage page", () => {
         output_tokens: 0,
         total_tokens: 0,
         cached_tokens: 0,
-        reasoning_tokens: 0,
+        reasoning_tokens: 0, chars: 0, seconds: 0,
       },
       groups: [],
     });
@@ -422,5 +422,61 @@ describe("Usage page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "關閉提示" }));
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("formatDuration", () => {
+  it("keeps sub-minute audio in seconds", () => {
+    expect(formatDuration(0.5)).toBe("0.5 秒");
+    expect(formatDuration(59.4)).toBe("59.4 秒");
+  });
+
+  it("switches to minutes and hours as the audio gets longer", () => {
+    expect(formatDuration(92.4)).toBe("1 分 32 秒");
+    expect(formatDuration(3600)).toBe("1 小時 0 分");
+    expect(formatDuration(5432)).toBe("1 小時 30 分");
+  });
+
+  it("returns a dash for values that are not real durations", () => {
+    expect(formatDuration(Number.NaN)).toBe("—");
+    expect(formatDuration(-1)).toBe("—");
+  });
+});
+
+describe("Usage page non-token units", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(listEmbedKeys).mockResolvedValue([]);
+    vi.mocked(fetchProjects).mockResolvedValue({
+      project_count: 0,
+      projects: [],
+    });
+    vi.mocked(fetchUsageTimeseries).mockResolvedValue(TIMESERIES);
+    vi.mocked(fetchUsageEvents).mockResolvedValue({ events: EVENTS, count: 4 });
+  });
+
+  it("hides the TTS and Live tiles when there is no such usage", async () => {
+    vi.mocked(fetchUsageSummary).mockResolvedValue(SUMMARY);
+    render(<Usage />);
+    await screen.findByText("LLM 呼叫數");
+    expect(screen.queryByText("TTS 合成字元")).toBeNull();
+    expect(screen.queryByText("Live 音訊")).toBeNull();
+  });
+
+  it("shows characters and audio duration once those units appear", async () => {
+    vi.mocked(fetchUsageSummary).mockResolvedValue({
+      ...SUMMARY,
+      totals: { ...SUMMARY.totals, chars: 1920, seconds: 92.4 },
+    });
+    render(<Usage />);
+
+    const overview = within(
+      await screen.findByRole("region", { name: "用量總覽" }),
+    );
+    expect(overview.getByText("TTS 合成字元")).toBeTruthy();
+    expect(overview.getByText("1,920")).toBeTruthy();
+    expect(overview.getByText("Live 音訊")).toBeTruthy();
+    // 秒數要轉成看得懂的長度，不是丟一個 92.4 出來。
+    expect(overview.getByText("1 分 32 秒")).toBeTruthy();
   });
 });

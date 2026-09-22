@@ -18,6 +18,11 @@
     串流路徑（Gemini TTS、VoxCPM、Edge、IndexTTS proxy）不經過 fallback chain，
     在各自開啟串流後另外記一筆；串流一旦開啟上游就已開始計費，所以不等讀完，
     客戶端中途斷線仍然算數。快取命中在呼叫 provider 之前就返回，不計費。
+  - 彙總端點依單位分開加總：`summarize_usage()` 回傳 `chars` 與 `seconds` 兩個
+    欄位，而不是一個籠統的 `SUM(units)`——把字元數和秒數相加沒有意義。
+  - Admin 用量頁顯示這兩種單位：總覽新增「TTS 合成字元」與「Live 音訊」兩塊
+    （沒有該類用量時不顯示，避免整排零值佔版面），明細表新增「其他用量」欄。
+    秒數以 `formatDuration()` 轉成「1 分 32 秒」這類可讀長度，不直接丟 92.4。
   - 事件帶上歸屬：`SynthesizeRequest` 新增 `usage_scope`，由 `usage_scope_for()`
     從 `CurrentAccount` 產生。主體判定沿用 `brain_proxy` 既有的規則——帶 embed
     key 記成 `embed_key` 主體（保留 `user_id`），否則記成 `user`——這樣 TTS 與

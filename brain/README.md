@@ -423,6 +423,10 @@ Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
 查詢時要**依 `unit_type` 分開加總**——把字元數和 token 相加不具意義。舊資料
 在 migration 後一律是 `tokens`，既有的 token 欄位不受影響。
 
+`/brain/usage/summary` 的 `totals` 與每個 `groups` 列都會多出 `chars` 與
+`seconds` 兩個欄位（各自只加總對應 `unit_type` 的事件，其餘為 0），所以同一份
+回應可以同時呈現三種單位而不會互相污染。
+
 這些 Brain endpoint 只接受 `X-Internal-Token`。瀏覽器與外部客戶端應改用
 Backend 的 `/api/v1/usage/summary`、`/api/v1/usage/timeseries` 與 `/api/v1/usage/events`；Backend 允許正式管理員
 查詢指定帳號，其餘帳號固定只能查詢自己的資料。

@@ -45,6 +45,10 @@ export interface UsageTokenTotals {
   total_tokens: number;
   cached_tokens: number;
   reasoning_tokens: number;
+  /** TTS 合成的字元數；非 TTS 事件為 0。 */
+  chars: number;
+  /** Live 音訊秒數（輸入與輸出分別記錄後加總）；非 Live 事件為 0。 */
+  seconds: number;
 }
 
 /**

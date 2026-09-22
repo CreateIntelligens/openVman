@@ -35,6 +35,18 @@ _TOKEN_COLUMNS = (
     "reasoning_tokens",
 )
 
+#: 非 token 單位各自加總成獨立欄位。把 chars 和 seconds 加在一起沒有意義，
+#: 所以不做一個籠統的 SUM(units)，而是每種單位一欄。
+_UNIT_SUMS = (
+    ("chars", "chars"),
+    ("seconds", "seconds"),
+)
+_UNIT_SUM_SQL = ", ".join(
+    f"COALESCE(SUM(CASE WHEN unit_type = '{unit}' THEN units END), 0) AS {alias}"
+    for unit, alias in _UNIT_SUMS
+)
+_UNIT_SUM_KEYS = tuple(alias for _, alias in _UNIT_SUMS)
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS usage_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -251,6 +263,7 @@ def summarize_usage(*, group_by: str = "model", **filters: str) -> dict[str, Any
     sums = ", ".join(
         ["COUNT(*) AS calls"]
         + [f"SUM({column}) AS {column}" for column in _TOKEN_COLUMNS]
+        + [_UNIT_SUM_SQL]
     )
     with _LOCK, _connect() as conn:
         groups = [
@@ -269,6 +282,8 @@ def summarize_usage(*, group_by: str = "model", **filters: str) -> dict[str, Any
         )
     for key in _TOKEN_COLUMNS:
         totals[key] = int(totals.get(key) or 0)
+    for key in _UNIT_SUM_KEYS:
+        totals[key] = round(float(totals.get(key) or 0), 3)
     return {"group_by": group_by, "filters": params, "totals": totals, "groups": groups}
 
 

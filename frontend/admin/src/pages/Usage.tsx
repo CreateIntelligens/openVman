@@ -86,6 +86,18 @@ function formatDecimal(value: number, digits = 1): string {
   return value.toFixed(digits);
 }
 
+/** 音訊秒數轉人看得懂的長度：92.4 → 1 分 32 秒、5432 → 1 小時 30 分。 */
+export function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "—";
+  if (seconds < 60) return `${seconds.toFixed(1)} 秒`;
+
+  const whole = Math.round(seconds);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  if (hours) return `${hours} 小時 ${minutes} 分`;
+  return `${minutes} 分 ${whole % 60} 秒`;
+}
+
 function formatPercent(part: number, whole: number): string {
   if (!whole) return "—";
   return `${((part / whole) * 100).toFixed(1)}%`;
@@ -131,6 +143,10 @@ interface BreakdownRow {
   totalTokens: number;
   inputTokens: number;
   outputTokens: number;
+  /** TTS 字元數；沒有就是 0。 */
+  chars: number;
+  /** Live 音訊秒數；沒有就是 0。 */
+  seconds: number;
   avgLatencyMs: number;
 }
 
@@ -168,6 +184,8 @@ function modelRows(
       totalTokens: group.total_tokens,
       inputTokens: group.input_tokens,
       outputTokens: group.output_tokens,
+      chars: group.chars ?? 0,
+      seconds: group.seconds ?? 0,
       avgLatencyMs: latency.get(key) ?? NaN,
     };
   });
@@ -192,12 +210,16 @@ function providerRows(
       totalTokens: 0,
       inputTokens: 0,
       outputTokens: 0,
+      chars: 0,
+      seconds: 0,
       avgLatencyMs: latency.get(key) ?? NaN,
     };
     row.calls += group.calls;
     row.totalTokens += group.total_tokens;
     row.inputTokens += group.input_tokens;
     row.outputTokens += group.output_tokens;
+    row.chars += group.chars ?? 0;
+    row.seconds += group.seconds ?? 0;
     merged.set(key, row);
   }
   return [...merged.values()].sort((a, b) => b.totalTokens - a.totalTokens);
@@ -223,6 +245,8 @@ function groupRows(
         totalTokens: group.total_tokens,
         inputTokens: group.input_tokens,
         outputTokens: group.output_tokens,
+        chars: group.chars ?? 0,
+        seconds: group.seconds ?? 0,
         avgLatencyMs: NaN,
       };
     })
@@ -276,6 +300,7 @@ function BreakdownTable({
                 <th scope="col" className={headCell}>{columnLabel}</th>
                 <th scope="col" className={headNumericCell}>呼叫數</th>
                 <th scope="col" className={headNumericCell}>Tokens</th>
+                <th scope="col" className={headNumericCell}>其他用量</th>
                 <th scope="col" className={headNumericCell}>占比</th>
                 <th scope="col" className={headNumericCell}>平均延遲</th>
               </tr>
@@ -292,6 +317,13 @@ function BreakdownTable({
                     <span className="ml-2 text-xs text-content-subtle">
                       {formatNumber(row.inputTokens)} / {formatNumber(row.outputTokens)}
                     </span>
+                  </td>
+                  {/* TTS／Live 不是 token 計價，各自顯示自己的單位。 */}
+                  <td className={`${numericCell} text-content-muted`}>
+                    {row.chars ? `${formatNumber(row.chars)} 字` : ""}
+                    {row.chars && row.seconds ? " · " : ""}
+                    {row.seconds ? formatDuration(row.seconds) : ""}
+                    {!row.chars && !row.seconds ? "—" : ""}
                   </td>
                   <td className={`${numericCell} text-content-muted`}>
                     {formatPercent(row.totalTokens, totalTokens)}
@@ -627,6 +659,21 @@ export default function Usage() {
                   value={formatDecimal(callsPerTurn, 2)}
                   hint={`由最近 ${events.length} 筆事件視窗計算：呼叫數 ÷ 不重複 (session_id, trace_id) 回合數`}
                 />
+                {/* TTS 與 Live 不按 token 計價，沒有用量時不佔版面。 */}
+                {Boolean(totals?.chars) && (
+                  <Tile
+                    label="TTS 合成字元"
+                    value={formatNumber(totals?.chars ?? 0)}
+                    hint="送去語音合成的字元數；TTS 按字元計價，不是 token"
+                  />
+                )}
+                {Boolean(totals?.seconds) && (
+                  <Tile
+                    label="Live 音訊"
+                    value={formatDuration(totals?.seconds ?? 0)}
+                    hint="Gemini Live 的音訊秒數，輸入與輸出加總"
+                  />
+                )}
               </div>
             </section>
 

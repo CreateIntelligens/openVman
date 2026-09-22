@@ -17,7 +17,7 @@ function point(period: string, total: number): UsageSeriesPoint {
     output_tokens: 0,
     total_tokens: total,
     cached_tokens: 0,
-    reasoning_tokens: 0,
+    reasoning_tokens: 0, chars: 0, seconds: 0,
   };
 }
 
