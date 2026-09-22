@@ -52,7 +52,7 @@ Jev 在同一份合成案例上 **96/96 全對**，正反序均 100%，**零翻�
 - [逐筆預測](results/predictions.jsonl)
 - [統計摘要](results/summary.json)
 - [執行方式](README.md)
-- 案例檔案：[../semif/cases.jsonl](../semif/cases.jsonl)（SHA256 `a1c635c...`，與 SemIf 報告相同）
+- 案例檔案：[../semif-evidence/cases.jsonl](../semif-evidence/cases.jsonl)（SHA256 `a1c635c...`，與 SemIf 報告相同）
 
 模型版本：jev-1.13.0（`jev-latest` alias 解析結果）。
 SDK：typesafe-sdk 0.7.1。

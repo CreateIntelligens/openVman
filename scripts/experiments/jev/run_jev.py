@@ -1,6 +1,6 @@
 """Jev API evaluation adapter — same cases, options and statistics as SemIf.
 
-Reads cases.jsonl from the sibling semif/ directory, sends each to the
+Reads cases.jsonl from the sibling semif-evidence/ directory, sends each to the
 Jev POST /v1/systemone endpoint via the official typesafe-sdk, and
 records predictions with the same metrics (accuracy, balanced accuracy,
 confusion, order-flip count, latency).
@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from typesafe_sdk import TypeSafeClient
 
 ROOT = Path(__file__).resolve().parent
-SEMIF_ROOT = ROOT.parent / "semif"
+SEMIF_ROOT = ROOT.parent / "semif-evidence"
 MODEL = "jev-latest"
 
 OPTIONS = {

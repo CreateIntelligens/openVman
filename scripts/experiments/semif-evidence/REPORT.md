@@ -41,7 +41,9 @@
 
 ## 可重現證據
 
-- [執行方式](README.md)、[案例政策](README.fixture.md)、[基線方式](README.baseline.md)
+- [案例政策](README.fixture.md)。執行方式與基線方式的說明隨可執行的實驗一起退場
+  （2026-09-22，見 `docs/plans/jev-decision-layer.md` §4）；模型、revision、NF4 設定
+  與載入時間保留在 [環境與驗證](results/environment.json) 與各 `metadata.json`。
 - [初始摘要](results/summary.json)、[初始逐筆結果](results/predictions.jsonl)
 - [提示診斷摘要](results/prompt-v2/summary.json)、[診斷逐筆結果](results/prompt-v2/predictions.jsonl)
 - [Guard／embedding 基線](results/baselines.json)、[環境與驗證](results/environment.json)
@@ -89,7 +91,8 @@
 - [完整排程與環境](results/stability/metadata.json)
 - [逐筆評分](results/stability/predictions.jsonl)、[統計摘要](results/stability/summary.json)
 - [同分排除、位置分布與前次比較](results/stability/diagnostics.json)
-- [推論時程式快照](results/stability/runner_used.py)、[目前 runner](stability.py)
+- [推論時程式快照](results/stability/runner_used.py)——這是產生上述結果時實際執行的
+  程式，可重現用它；原 `stability.py` 已隨實驗退場。
 
 完整執行順序、每組三個不同 repeat、prompt hash、fixture／來源 hash 均已核對，另由獨立代理重新統計逐筆結果。七項摘要測試通過，涵蓋穩定基準、重跑翻轉與跨排列分開計算、資料缺漏、重複輪次、順序錯誤及 prompt 漂移。
 

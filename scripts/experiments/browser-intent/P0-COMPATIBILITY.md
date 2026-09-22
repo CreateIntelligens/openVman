@@ -7,7 +7,7 @@
 ## 判準
 
 SemIf 的 direct scoring 讀**指定答案 token 的 logits**（本 repo 的實作見
-`scripts/experiments/semif/stability.py`，存的欄位是 `option_logits` 與
+SemIf 的 `stability.py`（已退場，執行當時的副本保留在 `scripts/experiments/semif-evidence/results/stability/runner_used.py`），存的欄位是 `option_logits` 與
 `probabilities`）。因此 P0 的通過條件不是「模型能不能在瀏覽器跑」，而是：
 
 > **runtime 的 JS API 是否讓我們讀到指定候選 token 的分數？**
@@ -126,7 +126,7 @@ Gemma 4 E2B 以 P0 判準**不可行** —— 不是效能或大小問題，是 
 | 無 WebGPU 裝置 | 不受影響 | 無法運作，fallback 未記載 |
 | 準確率 | 64 題 81.25% | 32 題 41.93%，且全部順序敏感 |
 
-原始證據：[`scripts/experiments/semif/results/stability-0p8b/`](../semif/results/stability-0p8b/)
+原始證據：[`scripts/experiments/semif-evidence/results/stability-0p8b/`](../semif-evidence/results/stability-0p8b/)
 （metadata、逐筆 predictions、summary）。4B 的對照組在同層的 `stability/`，未覆寫。
 
 ## 若之後要重啟這條線

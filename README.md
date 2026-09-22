@@ -328,7 +328,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 
 ### 語意分流可行性實驗
 
-[SemIf 離線實驗](scripts/experiments/semif/README.md)使用隔離 Compose 容器評估 Brain 分流與語音打斷，包含繁體中文合成案例、既有 GuardAgent／embedding 基線及逐筆結果。這不是正式功能開關，不會改變既有聊天或授權流程。
+[Jev API 評估](scripts/experiments/jev/REPORT.md)在 48 筆繁體中文合成案例上驗證分流與語音打斷（96/96、零順序翻轉）。先前的 SemIf 本機模型實驗因選項順序敏感（21/32 題隨排列改答案）不採用，證據保留在 [`scripts/experiments/semif-evidence/`](scripts/experiments/semif-evidence/REPORT.md)。兩者都不是正式功能開關，不改變既有聊天或授權流程；接入計畫見 [Jev 決策層](docs/plans/jev-decision-layer.md)。
 
 
 ### 語音插話與停止控制

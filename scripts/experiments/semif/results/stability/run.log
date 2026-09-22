@@ -1,64 +1,0 @@
-Frozen schedule: 2304 predictions
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files:  50%|█████     | 1/2 [03:15<03:15, 195.82s/it]Fetching 2 files: 100%|██████████| 2/2 [04:00<00:00, 106.85s/it]Fetching 2 files: 100%|██████████| 2/2 [04:00<00:00, 120.20s/it]
-Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights:   0%|          | 1/426 [00:00<02:35,  2.73it/s]/tmp/semif-deps/bitsandbytes/backends/cuda/ops.py:213: FutureWarning: _check_is_size will be removed in a future PyTorch release along with guard_size_oblivious.     Use _check(i >= 0) instead.
-  torch._check_is_size(blocksize)
-Loading weights:   2%|▏         | 9/426 [00:00<00:17, 23.96it/s]Loading weights:   6%|▌         | 26/426 [00:00<00:06, 64.67it/s]Loading weights:  10%|▉         | 42/426 [00:00<00:04, 91.21it/s]Loading weights:  15%|█▌        | 64/426 [00:00<00:02, 127.29it/s]Loading weights:  19%|█▉        | 80/426 [00:00<00:02, 135.46it/s]Loading weights:  23%|██▎       | 98/426 [00:00<00:02, 145.32it/s]Loading weights:  28%|██▊       | 118/426 [00:01<00:01, 160.89it/s]Loading weights:  32%|███▏      | 138/426 [00:01<00:01, 172.24it/s]Loading weights:  37%|███▋      | 157/426 [00:01<00:01, 162.15it/s]Loading weights:  42%|████▏     | 181/426 [00:01<00:01, 181.27it/s]Loading weights:  47%|████▋     | 200/426 [00:01<00:01, 175.08it/s]Loading weights:  52%|█████▏    | 221/426 [00:01<00:01, 180.95it/s]Loading weights:  56%|█████▋    | 240/426 [00:01<00:01, 171.10it/s]Loading weights:  61%|██████    | 258/426 [00:01<00:01, 164.57it/s]Loading weights:  65%|██████▌   | 279/426 [00:02<00:00, 171.13it/s]Loading weights:  71%|███████   | 302/426 [00:02<00:00, 185.69it/s]Loading weights:  75%|███████▌  | 321/426 [00:02<00:00, 176.63it/s]Loading weights:  80%|████████  | 341/426 [00:02<00:00, 181.80it/s]Loading weights:  85%|████████▍ | 360/426 [00:02<00:00, 169.19it/s]Loading weights:  90%|████████▉ | 382/426 [00:02<00:00, 180.97it/s]Loading weights:  94%|█████████▍| 401/426 [00:02<00:00, 170.32it/s]Loading weights:  98%|█████████▊| 419/426 [00:02<00:00, 162.09it/s]Loading weights: 100%|██████████| 426/426 [00:02<00:00, 149.26it/s]
-Progress 64/2304
-Progress 128/2304
-Progress 192/2304
-Progress 256/2304
-Progress 320/2304
-Progress 384/2304
-Progress 448/2304
-Progress 512/2304
-Progress 576/2304
-Progress 640/2304
-Progress 704/2304
-Progress 768/2304
-Progress 832/2304
-Progress 896/2304
-Progress 960/2304
-Progress 1024/2304
-Progress 1088/2304
-Progress 1152/2304
-Progress 1216/2304
-Progress 1280/2304
-Progress 1344/2304
-Progress 1408/2304
-Progress 1472/2304
-Progress 1536/2304
-Progress 1600/2304
-Progress 1664/2304
-Progress 1728/2304
-Progress 1792/2304
-Progress 1856/2304
-Progress 1920/2304
-Progress 1984/2304
-Progress 2048/2304
-Progress 2112/2304
-Progress 2176/2304
-Progress 2240/2304
-Progress 2304/2304
-{
-  "count": 2304,
-  "correct": 1860,
-  "accuracy": 0.8072916666666666,
-  "identical_input_groups": 768,
-  "repeat_flip_groups": [],
-  "max_repeat_probability_delta": 0.0,
-  "max_repeat_logit_delta": 0.0,
-  "order_sensitive_cases": 21,
-  "always_correct_cases": 11,
-  "first_repeat_worst_order_correct": 20,
-  "first_repeat_best_order_correct": 31,
-  "winner_positions": {
-    "0": 390,
-    "3": 786,
-    "2": 591,
-    "1": 537
-  },
-  "tied_top_scores": 18,
-  "p50_ms": 374.0962138399482,
-  "p95_ms": 409.27127562463284
-}

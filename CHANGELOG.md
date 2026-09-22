@@ -32,6 +32,14 @@
     讓「誰擁有帳本」失去單一答案；因此 Backend 改用 HTTP 寫入，與它代理讀取
     `/brain/usage/summary` 的方向對稱。記帳失敗只留 warning，不影響合成結果。
 
+### Removed
+- **SemIf 本機語意分流實驗退場**: `scripts/experiments/semif/` 的 compose、runner 與
+  操作手冊刪除——它教的是怎麼跑一個結論已定（21/32 題隨選項順序改答案，不採用）的
+  實驗。逐筆結果、`cases.jsonl`（Jev 評估用同一份 fixture）、`runner_used.py`（產生
+  穩定性結果時的程式快照）與 REPORT 保留並改名至 `semif-evidence/`，因為
+  SemIf 報告本身與 `browser-intent/P0-COMPATIBILITY.md` 的結論都引用它們。
+  五處引用改指新路徑或 Jev 報告。
+
 ### Experiments
 - 新增隔離的 Jev 官方 API 分流／語音打斷離線實驗，沿用 SemIf 同一份 48 筆合成案例（fixture SHA256 相符）與統計方式，透過 `typesafe-sdk` 呼叫 `POST /v1/systemone` 的 Choice 問題類型；正反序各一輪共 96 次呼叫全數正確、零順序翻轉，p50 約 258–275 ms。憑證使用根目錄 `.env` 的 `TYPESAFE_API_KEY`，並在 `.env.example` 提供欄位；不變更正式服務路由。
 - 保存 A2A 隔離私有圈的真實 Hub／SSE／Brain 回覆證據；完成派工、durable enqueue、雙向 ACK 與約 9.55 秒往返，正式 A2A 開關保持關閉。

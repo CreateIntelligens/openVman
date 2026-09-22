@@ -1,6 +1,6 @@
 # Jev API 評分轉接器實驗
 
-沿用 SemIf 實驗的 48 筆 `cases.jsonl` 題庫（32 routing + 16 interrupt），
+沿用 SemIf 實驗留下的 48 筆 `cases.jsonl` 題庫（`../semif-evidence/`）（32 routing + 16 interrupt），
 透過 TypeSafe 官方 `typesafe-sdk` 呼叫 Jev `POST /v1/systemone` 的 Choice
 問題類型，取得每案分類結果。正反序各跑一輪，統計方式與 SemIf 完全相同。
 
