@@ -36,7 +36,7 @@
 - [Embedding 意圖影子模式計畫](plans/embedding-intent-shadow.md)
 - [兩個前端共用語音核心（ASR／VAD／TTS）](plans/shared-speech-core.md)
 - [OpenSpec 變更提案](../openspec/changes/)
-- [SemIf 可行性與穩定性實驗](../scripts/experiments/semif/README.md)
+- [Jev 決策層計畫](plans/jev-decision-layer.md)：意圖分流影子觀測 → RAG 證據判斷；SemIf 退場
 - [Jev API 分流／打斷評估](../scripts/experiments/jev/REPORT.md)：官方 Jev API 在 SemIf 同一份合成題庫上 96/96、零順序翻轉。
 - [意圖觀測實驗操作](../scripts/experiments/intent-shadow/OPERATIONS.md)：預設關閉的旁路觀測功能。
 - [BGE 意圖觀測評估](../scripts/experiments/intent-shadow/REPORT.md)

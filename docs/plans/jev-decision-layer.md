@@ -34,10 +34,10 @@ trace）：`search_knowledge` 387 ms，整輪 `/brain/chat` 4718 ms，**檢索�
 
 ### 0.3 SemIf 可以拿掉嗎？
 
-**可以，而且該拿。** 它在正式程式碼裡零接線（`git grep -i semif` 只命中
-`scripts/experiments/semif/` 與三處文件連結），只是一個 4.6 MB 的實驗目錄加一個
-要 GPU 的 compose。留著的唯一理由是「歷史證據」，但 REPORT.md 已經把結論寫死，
-目錄本身不必留。見 §4。
+**可執行的部分可以拿，證據要留。** 它在正式程式碼裡零接線（`git grep -i semif` 只
+命中 `scripts/experiments/semif/` 與三處文件連結）。但 `results/stability*/` 被兩個
+已寫進報告的結論引用，`cases.jsonl` 是 Jev 報告的 fixture——刪了結論就不可查證。
+所以是「刪 compose 與 runner、留 results 與 fixture」，見 §4。
 
 ## 1. 為什麼是 Jev、不是 BGE 影子
 
@@ -135,13 +135,25 @@ REPORT 說費率待查。**接線前先查清楚**，並在 observer 加硬上�
 
 ## 4. SemIf 退場
 
-- 刪 `scripts/experiments/semif/`。fixture（`cases.jsonl`）搬到
-  `scripts/experiments/jev/fixtures/`，因為 Jev 報告引用它。
-- `README.md:331`、`brain/README.md:739`、`docs/README.md:39` 三處連結改指 Jev
-  報告，並註明 SemIf 結論（順序敏感、不採用）一句話帶過。
-- CHANGELOG 一條 Removed。
-- **不刪** `scripts/experiments/browser-intent/`（那是另一個問題：瀏覽器端小模型，
-  結論獨立）。
+原本想整個目錄刪掉，盤了引用後改成「刪可執行的、留證據」：
+
+- `results/stability/` 與 `results/stability-0p8b/` 被**兩個獨立結論**引用——SemIf 自己的
+  「順序敏感」與 `browser-intent/P0-COMPATIBILITY.md` 的 0.8B 對比。裡面的
+  `metadata.json`（完整排程與 fixture hash）和 `runner_used.py` 是讓那 2,304 次結果可
+  重現的東西。刪了等於把已經寫進報告的結論變成不可查證。
+- `cases.jsonl` 是 Jev 報告的 fixture（同一個 SHA256），`run_jev.py:28` 直接讀
+  `../semif/cases.jsonl`。
+
+所以：
+
+| 動作 | 檔案 |
+|---|---|
+| **刪** | `compose.yaml`、`run.py`、`baseline.py`、`stability.py`、`test_stability.py`、`__pycache__/`、`README.baseline.md`、`results/run.log`、`results/prompt-v2.log` |
+| **留**（改名為 `scripts/experiments/semif-evidence/`） | `cases.jsonl`、`README.fixture.md`、`REPORT.md`、`results/**/*.json`、`results/**/predictions.jsonl`、`results/stability/runner_used.py` |
+| **改** | `run_jev.py:28` 指到新路徑；`browser-intent/P0-COMPATIBILITY.md` 兩處路徑；`README.md:331`、`brain/README.md:739`、`docs/README.md:39` 改指 Jev 報告，SemIf 一句話帶過並連到 evidence 目錄 |
+
+`semif/README.md`（操作手冊）刪掉——它教的是怎麼跑一個不再存在的實驗。REPORT.md 留，
+它是結論。CHANGELOG 一條 Removed。**不刪** `browser-intent/`，那是另一個問題。
 
 ## 5. 不做的事
 
