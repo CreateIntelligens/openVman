@@ -14,9 +14,14 @@ export default defineConfig({
   resolve: {
     alias: {
       "@contracts": resolve(rootDir, "../../contracts"),
+      "@shared": resolve(rootDir, "../shared"),
+      "@ricky0123/vad-web": resolve(rootDir, "node_modules/@ricky0123/vad-web"),
     },
   },
   server: {
+    fs: {
+      allow: ["..", "../../contracts"],
+    },
     host: true,
     port: 80,
     strictPort: true,

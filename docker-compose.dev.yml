@@ -38,6 +38,7 @@ services:
       - ./frontend/app:/app
       - avatar-node-modules:/app/node_modules
       - ./contracts:/contracts:ro
+      - ./frontend/shared:/shared:ro
 
   admin:
     build:
@@ -51,6 +52,7 @@ services:
       - ./frontend/admin/nginx/http.d:/etc/nginx/http.d:ro
       - ./infra/nginx/certs:/etc/nginx/certs
       - ./contracts:/contracts:ro
+      - ./frontend/shared:/shared:ro
 
   backend:
     labels:

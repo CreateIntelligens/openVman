@@ -17,6 +17,7 @@ RUN apk add --no-cache tzdata
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY contracts /contracts
+COPY frontend/shared /shared
 COPY frontend/app/ ./
 
 EXPOSE 80

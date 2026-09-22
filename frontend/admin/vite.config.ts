@@ -8,13 +8,19 @@ export default defineConfig({
   resolve: {
     alias: {
       "@contracts": path.resolve(__dirname, "../../contracts"),
+      "@shared": path.resolve(__dirname, "../shared"),
+      "@ricky0123/vad-web": path.resolve(__dirname, "node_modules/@ricky0123/vad-web"),
     },
   },
   test: {
     environment: "jsdom",
     globals: true,
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "../shared/**/*.{test,spec}.{ts,tsx}"],
   },
   server: {
+    fs: {
+      allow: ["..", "../../contracts"],
+    },
     host: "0.0.0.0",
     port: 5173,
     allowedHosts: true,

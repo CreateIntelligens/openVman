@@ -35,6 +35,7 @@ COPY frontend/admin/nginx/development.conf /etc/nginx/admin-routes.conf
 COPY frontend/admin/docker/ensure-https-cert.sh /usr/local/bin/ensure-https-cert
 COPY frontend/admin/supervisord.conf /etc/supervisord.conf
 COPY contracts /contracts
+COPY frontend/shared /shared
 COPY frontend/admin/ ./
 COPY --from=avatar-sdk-builder /sdk/dist/openvman-avatar-sdk.js /usr/share/nginx/html/openvman-avatar-sdk.js
 RUN chmod +x /usr/local/bin/ensure-https-cert \
@@ -47,6 +48,7 @@ CMD ["supervisord", "-c", "/etc/supervisord.conf"]
 FROM deps AS builder
 
 COPY contracts /contracts
+COPY frontend/shared /shared
 
 COPY frontend/admin/ ./
 RUN pnpm build

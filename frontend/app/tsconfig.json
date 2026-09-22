@@ -21,11 +21,22 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@contracts/*": ["../../contracts/*"],
+      "@shared/*": ["../shared/*"],
+      "@ricky0123/vad-web": ["node_modules/@ricky0123/vad-web"]
+    }
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.vue",
-    "env.d.ts"
+    "env.d.ts",
+    "../shared/**/*"
+  ],
+  "exclude": [
+    "../shared/**/*.test.ts",
+    "../shared/**/*.spec.ts"
   ]
 }

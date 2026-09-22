@@ -6,6 +6,7 @@ bug-report/
 .superpowers/
 # 環境變數（含 API Key，絕對不進 git）
 .env
+.env.local
 
 # Local TLS certificates for the nginx edge proxy
 infra/nginx/certs/*

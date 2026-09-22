@@ -15,6 +15,7 @@
 !frontend/admin
 !frontend/app
 !frontend/avatar-sdk
+!frontend/shared
 !contracts
 
 # Prune heavy/generated/unreadable subpaths even within the allowed dirs.
@@ -28,3 +29,4 @@ frontend/avatar-sdk/dist
 **/.git
 **/__pycache__
 **/*.pyc
+**/.env.local

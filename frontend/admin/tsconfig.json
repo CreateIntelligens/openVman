@@ -20,8 +20,14 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@contracts/*": ["../../contracts/*"]
+      "@contracts/*": ["../../contracts/*"],
+      "@shared/*": ["../shared/*"],
+      "@ricky0123/vad-web": ["node_modules/@ricky0123/vad-web"]
     }
   },
-  "include": ["src", "../../contracts/schemas/v1/**/*.json", "../../contracts/generated/typescript/**/*.d.ts"]
+  "include": ["src", "../../contracts/schemas/v1/**/*.json", "../../contracts/generated/typescript/**/*.d.ts", "../shared/**/*"],
+  "exclude": [
+    "../shared/**/*.test.ts",
+    "../shared/**/*.spec.ts"
+  ]
 }

@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@ricky0123/vad-web':
-        specifier: ^0.0.30
+        specifier: 0.0.30
         version: 0.0.30
       nanoid:
         specifier: ^5.1.7
