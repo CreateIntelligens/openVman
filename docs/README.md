@@ -34,8 +34,10 @@
 計畫保留原始狀態；Draft 不表示已確認完成。實驗腳本與逐筆資料維持在原目錄，避免報告與重現工具分離。
 
 - [Embedding 意圖影子模式計畫](plans/embedding-intent-shadow.md)
+- [兩個前端共用語音核心（ASR／VAD／TTS）](plans/shared-speech-core.md)
 - [OpenSpec 變更提案](../openspec/changes/)
 - [SemIf 可行性與穩定性實驗](../scripts/experiments/semif/README.md)
+- [Vercel AI Gateway 文字生成範例](../scripts/experiments/ai-gateway/README.md)
 - [意圖觀測實驗操作](../scripts/experiments/intent-shadow/OPERATIONS.md)：預設關閉的旁路觀測功能。
 - [BGE 意圖觀測評估](../scripts/experiments/intent-shadow/REPORT.md)
 - [瀏覽器小模型相容性與結案紀錄](../scripts/experiments/browser-intent/P0-COMPATIBILITY.md)：介面可行（WebLLM/MLC），但 Qwen3.5-0.8B 在 32 題上全部順序敏感，**不進 P1**。
