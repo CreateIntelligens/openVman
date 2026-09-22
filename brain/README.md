@@ -388,6 +388,10 @@ Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
 `/data/usage.db`。這是跨專案共用的 append-only SQLite ledger；事件仍保留
 `user_id`、`project_id`、`session_id`、`trace_id` 與呼叫類型，供查詢時篩選。
 
+除了 LLM，Gemini Live（按音訊秒數）與 Backend 的 TTS（按字元數）也記進同一本
+帳。帳本由 Brain 單一擁有：Backend 不直接開這個 SQLite 檔，而是 POST 到下面的
+`/brain/usage/events`，與它代理讀取的方向對稱。
+
 - `GET /brain/usage/summary`
   - 依 `model`、`user`、`project`、`kind` 或 `session` 彙總
 - `GET /brain/usage/events`
@@ -396,6 +400,24 @@ Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
   - `bucket=hour|day|month`、選填 `group_by`、`limit=1..50`（預設 8），支援與 summary 相同的資料篩選
   - `report_timezone=UTC|Asia/Taipei`（預設 UTC），先轉報表時區再分桶；不支援的值回傳 400
   - 回傳 `bucket`、`report_timezone`、`group_by`、`periods`、`series`、`points`；有分組時用 `series`，否則用 `points`，其餘低用量分組併成 `__other__`
+- `POST /brain/usage/events`
+  - 給其他服務寫入非 LLM 的用量事件；Backend 的 TTS 走這條路徑
+  - 必填 `provider`、`unit_type`、`units`；其餘歸屬欄位（`user_id`、`principal_type`、
+    `project_id`…）由呼叫端帶入，Brain 不自行推斷
+  - 成功回 201 `{"recorded": true}`；`provider` 空白或 `units` 為負回 400
+
+#### 計量單位（`unit_type` / `units`）
+
+不是所有用量都按 token 計價，所以帳本用 `unit_type` 標示單位，`units` 存數量：
+
+| `unit_type` | 誰在用 | `units` 的意義 |
+|---|---|---|
+| `tokens`（預設） | LLM 呼叫 | 0；實際數字在既有的 `input_tokens` / `output_tokens` / `total_tokens` |
+| `chars` | TTS | 送去合成的字元數 |
+| `seconds` | Gemini Live | 音訊秒數，輸入與輸出分開記（費率不同，合併就無法還原成本） |
+
+查詢時要**依 `unit_type` 分開加總**——把字元數和 token 相加不具意義。舊資料
+在 migration 後一律是 `tokens`，既有的 token 欄位不受影響。
 
 這些 Brain endpoint 只接受 `X-Internal-Token`。瀏覽器與外部客戶端應改用
 Backend 的 `/api/v1/usage/summary`、`/api/v1/usage/timeseries` 與 `/api/v1/usage/events`；Backend 允許正式管理員

@@ -136,6 +136,9 @@ class GeminiLiveSession:
         self._last_user_message: str = ""
         # 一個 turn 的回覆會拆成多個 chunk 送來，累積到 turnComplete 才寫入歷史。
         self._assistant_text_buf: list[str] = []
+        # Live 按音訊秒數計價，不是 token。逐 turn 累積、turnComplete 時記帳。
+        self._input_audio_seconds = 0.0
+        self._output_audio_seconds = 0.0
         self._chunk_counter = 0
         self._response_in_progress = False
         self._reconnecting = False
@@ -177,6 +180,13 @@ class GeminiLiveSession:
             logger.debug("dropping audio chunk while Gemini Live transport is unavailable")
             return
         await self.ensure_connected()
+        # 上行音訊同樣要計量；16-bit mono PCM，秒數 = bytes / (2 * rate)。
+        try:
+            self._input_audio_seconds += len(base64.b64decode(audio_b64)) / (
+                2 * _parse_sample_rate(mime_type)
+            )
+        except Exception:  # noqa: BLE001 - 計量失敗不該擋住音訊送出
+            pass
         await self._transport.send_json(
             {
                 "realtimeInput": {
@@ -279,6 +289,7 @@ class GeminiLiveSession:
                 if server_content.get("turnComplete"):
                     self._response_in_progress = False
                     await self._flush_assistant_turn()
+                    await self._record_audio_usage()
                     if not events or not events[-1].get("is_final"):
                         self._chunk_counter += 1
                         await self._emit(
@@ -372,6 +383,49 @@ class GeminiLiveSession:
             )
         except Exception as exc:
             logger.error("Failed to archive session turn in Gemini Live: %s", exc)
+
+    async def _record_audio_usage(self) -> None:
+        """Meter the audio exchanged this turn, in seconds.
+
+        Live 不是 token 計價，所以走 (unit_type, units)。輸入與輸出分兩筆，
+        因為兩者費率不同，合併記就沒辦法還原成本。
+        """
+        pending = (
+            ("input", self._input_audio_seconds),
+            ("output", self._output_audio_seconds),
+        )
+        self._input_audio_seconds = 0.0
+        self._output_audio_seconds = 0.0
+        for direction, seconds in pending:
+            if seconds <= 0:
+                continue
+            try:
+                from infra.usage_ledger import UNIT_SECONDS, record_usage_event
+
+                await asyncio.to_thread(
+                    record_usage_event,
+                    provider="gemini",
+                    model=self.config.live_gemini_model,
+                    usage=None,
+                    kind="live",
+                    scope=self._usage_scope(),
+                    unit_type=UNIT_SECONDS,
+                    units=seconds,
+                    raw={"direction": direction},
+                )
+            except Exception as exc:
+                logger.warning("Gemini Live usage ledger write failed: %s", exc)
+
+    def _usage_scope(self):
+        from core.usage import UsageScope
+
+        return UsageScope(
+            kind="live",
+            project_id=self.project_id,
+            session_id=self.session_id,
+            persona_id=self.persona_id,
+            channel="live",
+        )
 
     async def _emit_user_transcription(self, text: str) -> None:
         await self._emit(
@@ -706,6 +760,11 @@ class GeminiLiveSession:
             audio_bytes = base64.b64decode(encoded_audio)
             mime_type = str(inline.get("mimeType", ""))
             if mime_type.startswith("audio/pcm"):
+                # 16-bit mono，所以秒數 = bytes / (2 * rate)。要在轉成 WAV
+                # 之前算，否則 44 bytes 的檔頭會被算進音訊長度。
+                self._output_audio_seconds += len(audio_bytes) / (
+                    2 * _parse_sample_rate(mime_type)
+                )
                 audio_bytes = _pcm_to_wav(audio_bytes, _parse_sample_rate(mime_type))
 
             self._chunk_counter += 1

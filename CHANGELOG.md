@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Gemini Live 的用量記帳與非 token 計量欄位**：在此之前只有 LLM 呼叫進帳本，Live 與 TTS
+  完全沒有計量——`brain/api/live/` 與 TTS router 裡一行記錄都沒有，連「有沒有人
+  在用 Live」都得靠猜。
+  - 帳本新增 `unit_type` 與 `units` 兩個欄位。LLM 以外的用量不是 token 計價：
+    TTS 按字元、Live 按音訊秒數，混進 `input_tokens`／`output_tokens` 會讓
+    `total_tokens` 變成把不同單位相加的無意義數字。舊資料 migration 後一律是
+    `tokens`，既有欄位與統計不受影響。
+  - Gemini Live 逐 turn 累積上行與下行的音訊秒數，在 `turnComplete` 記帳。
+    輸入與輸出分兩筆，因為兩者費率不同，合併記就無法還原成本。
+  - 新增 `POST /brain/usage/events`（沿用既有的 `X-Internal-Token`）。TTS 在
+    Backend、帳本在 Brain，讓兩個服務同時寫同一個 SQLite 檔會有鎖競爭，也會
+    讓「誰擁有帳本」失去單一答案；因此 Backend 改用 HTTP 寫入，與它代理讀取
+    `/brain/usage/summary` 的方向對稱。記帳失敗只留 warning，不影響合成結果。
+
 ### Experiments
 - 新增隔離的 Jev 官方 API 分流／語音打斷離線實驗，沿用 SemIf 同一份 48 筆合成案例（fixture SHA256 相符）與統計方式，透過 `typesafe-sdk` 呼叫 `POST /v1/systemone` 的 Choice 問題類型；正反序各一輪共 96 次呼叫全數正確、零順序翻轉，p50 約 258–275 ms。憑證使用根目錄 `.env` 的 `TYPESAFE_API_KEY`，並在 `.env.example` 提供欄位；不變更正式服務路由。
 - 保存 A2A 隔離私有圈的真實 Hub／SSE／Brain 回覆證據；完成派工、durable enqueue、雙向 ACK 與約 9.55 秒往返，正式 A2A 開關保持關閉。

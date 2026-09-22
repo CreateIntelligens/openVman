@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS usage_events (
     total_tokens INTEGER NOT NULL DEFAULT 0,
     cached_tokens INTEGER NOT NULL DEFAULT 0,
     reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+    unit_type TEXT NOT NULL DEFAULT 'tokens',
+    units REAL NOT NULL DEFAULT 0,
     latency_ms REAL NOT NULL DEFAULT 0,
     raw TEXT
 );
@@ -73,7 +75,17 @@ ON usage_events(principal_type, principal_id, created_at)
 _ADDED_COLUMNS = (
     ("principal_type", "TEXT NOT NULL DEFAULT ''"),
     ("principal_id", "TEXT NOT NULL DEFAULT ''"),
+    # LLM 以外的用量不是 token 計價：TTS 按字元、Live 按音訊秒數。混進
+    # input/output_tokens 會讓 total_tokens 變成把不同單位相加的無意義數字，
+    # 所以另外用 (unit_type, units) 承接，查詢時依 unit_type 分開加總。
+    ("unit_type", "TEXT NOT NULL DEFAULT 'tokens'"),
+    ("units", "REAL NOT NULL DEFAULT 0"),
 )
+
+#: 計量單位。tokens 沿用既有的 *_tokens 欄位，其餘記在 units。
+UNIT_TOKENS = "tokens"
+UNIT_CHARS = "chars"
+UNIT_SECONDS = "seconds"
 
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
@@ -128,6 +140,8 @@ def record_usage_event(
     kind: str | None = None,
     scope: UsageScope | None = None,
     raw: dict[str, Any] | None = None,
+    unit_type: str = UNIT_TOKENS,
+    units: float = 0.0,
 ) -> dict[str, Any] | None:
     """Persist one usage event and mirror it into the active scope.
 
@@ -150,6 +164,8 @@ def record_usage_event(
         "provider": provider,
         "model": model,
         **counts,
+        "unit_type": unit_type or UNIT_TOKENS,
+        "units": round(float(units), 3),
         "latency_ms": round(float(latency_ms), 2),
         "raw": json.dumps(raw, ensure_ascii=False) if raw else None,
     }

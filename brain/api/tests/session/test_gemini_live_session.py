@@ -740,3 +740,49 @@ def test_thinking_level_is_dropped_for_models_that_reject_it():
     assert _setup_for("gemini-3.1-flash-live-preview")["generationConfig"][
         "thinkingConfig"
     ] == {"thinkingLevel": "high"}
+
+
+@pytest.mark.asyncio
+async def test_live_meters_audio_seconds_per_turn():
+    """Live 按音訊秒數計價，輸入與輸出分開記（兩者費率不同）。"""
+    module, fake_config = _load_module()
+    import sys as _sys
+    import types as _types
+
+    events: list[dict] = []
+    _saved_modules.setdefault("infra.usage_ledger", _sys.modules.get("infra.usage_ledger"))
+    _sys.modules["infra.usage_ledger"] = _types.SimpleNamespace(
+        UNIT_SECONDS="seconds",
+        record_usage_event=lambda **kw: events.append(kw),
+    )
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-meter",
+        client_id="client-meter",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+    )
+
+    # 24000 Hz、16-bit mono：48000 bytes = 1.0 秒。
+    session._output_audio_seconds = 0.0
+    session._events_from_server_content({
+        "modelTurn": {"parts": [{"inlineData": {
+            "mimeType": "audio/pcm;rate=24000",
+            "data": base64.b64encode(b"\x00" * 48000).decode("ascii"),
+        }}]},
+    })
+    assert session._output_audio_seconds == pytest.approx(1.0)
+
+    session._input_audio_seconds = 2.5
+    await session._record_audio_usage()
+
+    by_direction = {e["raw"]["direction"]: e for e in events}
+    assert set(by_direction) == {"input", "output"}
+    assert by_direction["input"]["units"] == pytest.approx(2.5)
+    assert by_direction["output"]["units"] == pytest.approx(1.0)
+    assert all(e["unit_type"] == "seconds" for e in events)
+    assert all(e["kind"] == "live" for e in events)
+
+    # 記完要歸零，否則下一輪會重複計費。
+    assert session._input_audio_seconds == 0.0
+    assert session._output_audio_seconds == 0.0
