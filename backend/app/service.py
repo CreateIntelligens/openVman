@@ -28,6 +28,7 @@ from app.providers.error_mapping import (
 )
 from app.providers.gcp_adapter import GCPTTSAdapter
 from app.providers.gemini_tts_adapter import GeminiTTSAdapter
+from app.usage_ledger_client import UNIT_CHARS, record_usage_event
 from app.providers.indextts_adapter import IndexTTSAdapter
 from app.providers.voxcpm_adapter import VoxCPMAdapter
 
@@ -138,6 +139,17 @@ class TTSRouterService:
                 target=target.target, result="success", latency_ms=latency_ms,
             )
             record_provider_request(provider=target.target, result="success")
+            # TTS 按合成的字元數計價，不是 token；失敗的 hop 不計費，所以只記成功的。
+            record_usage_event(
+                provider=result.provider or target.target,
+                model=request.voice_hint,
+                kind="tts",
+                unit_type=UNIT_CHARS,
+                units=len(request.text),
+                latency_ms=latency_ms,
+                scope=request.usage_scope,
+                raw={"route_target": target.target, "locale": request.locale},
+            )
             return result, "", ""
         except Exception as exc:
             latency_ms = (monotonic() - t0) * 1000

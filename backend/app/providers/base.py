@@ -14,6 +14,9 @@ class SynthesizeRequest:
     locale: str = "zh-TW"
     sample_rate: int = 24000
     voice_hint: str = ""
+    #: 帳本歸屬欄位（user_id、principal_type、project_id…）。由呼叫端填入，
+    #: adapter 不讀它；留空表示這次合成不記名（例如系統自己觸發的預熱）。
+    usage_scope: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

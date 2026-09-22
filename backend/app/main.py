@@ -80,6 +80,11 @@ from app.routes import static_assets as static_assets_routes
 from app.service import TTSRouterService
 from app.tts_cache import CachedTTSEntry, cache_get, cache_put, make_cache_key
 from app.tts_text import clean_for_tts, prepare_tts_text_async
+from app.usage_ledger_client import (
+    UNIT_CHARS,
+    record_usage_event,
+    usage_scope_for,
+)
 from app.utils.upload import (
     UploadTooLargeError,
     cleanup_temp_path,
@@ -409,7 +414,11 @@ async def create_speech(
     voice = authorized.runtime_key if authorized else body.voice
     svc = _get_service()
     cleaned_text = (await prepare_tts_text_async(body.input)) or ""
-    request = SynthesizeRequest(text=cleaned_text, voice_hint=voice)
+    request = SynthesizeRequest(
+        text=cleaned_text,
+        voice_hint=voice,
+        usage_scope=usage_scope_for(current, channel="http"),
+    )
     cache_key: str | None = None
 
     if cfg.tts_cache_enabled:
@@ -515,6 +524,23 @@ async def tts_stream_endpoint(
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
+    scope = usage_scope_for(current, channel="http")
+
+    def _meter_stream(stream_provider: str) -> None:
+        """串流路徑不經過 service 的 fallback chain，所以在這裡自行記帳。
+
+        串流一旦開啟就代表上游已接受並開始計費，因此以送出的字元數計量，
+        不等串流讀完（客戶端中途斷線仍然算數）。
+        """
+        record_usage_event(
+            provider=stream_provider,
+            model=voice,
+            kind="tts",
+            unit_type=UNIT_CHARS,
+            units=len(cleaned),
+            scope=scope,
+            raw={"streaming": True},
+        )
 
     # Gemini TTS Console 支援 stream=true，邊生成邊吐 raw PCM（24000Hz），
     # 避免等整段合成完的高延遲。content-type 帶 rate 讓前端知道要重採樣。
@@ -524,12 +550,13 @@ async def tts_stream_endpoint(
         if gemini.enabled:
             try:
                 stream = await gemini.open_stream(
-                    SynthesizeRequest(text=cleaned, voice_hint=voice)
+                    SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope)
                 )
             except GeminiTTSHTTPError as exc:
                 return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
             except RuntimeError as exc:
                 return JSONResponse(status_code=502, content={"error": str(exc)})
+            _meter_stream("gemini-tts")
             return StreamingResponse(stream, media_type=GEMINI_STREAM_CONTENT_TYPE)
 
     # provider 未指定（auto）且沒有 IndexTTS 時，VoxCPM 是 fallback 鏈的第一站，
@@ -543,8 +570,9 @@ async def tts_stream_endpoint(
         if voxcpm.enabled:
             try:
                 stream = await voxcpm.open_stream(
-                    SynthesizeRequest(text=cleaned, voice_hint=voice)
+                    SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope)
                 )
+                _meter_stream(VOXCPM_PROVIDER_NAME)
                 return StreamingResponse(stream, media_type=VOXCPM_STREAM_CONTENT_TYPE)
             except (VoxCPMHTTPError, RuntimeError) as exc:
                 # GPU 節點掛掉不該讓整個 TTS 失敗：記一筆後往下走 IndexTTS → Edge 的 fallback。
@@ -557,7 +585,9 @@ async def tts_stream_endpoint(
         svc = _get_service()
         try:
             output = svc.synthesize(
-                SynthesizeRequest(text=cleaned, voice_hint=voice or character),
+                SynthesizeRequest(
+                    text=cleaned, voice_hint=voice or character, usage_scope=scope,
+                ),
                 provider=provider,
             )
         except RuntimeError as exc:
@@ -576,6 +606,7 @@ async def tts_stream_endpoint(
             character=character,
         )
         if proxied is not None:
+            _meter_stream("indextts")
             return proxied
 
     svc = _get_service()
@@ -585,13 +616,18 @@ async def tts_stream_endpoint(
     # 名稱（例如 IndexTTS 角色名）退回自身預設 voice，這裡不需再清掉。
     edge = svc.edge_adapter
     if edge.enabled:
-        stream = edge.synthesize_stream(SynthesizeRequest(text=cleaned, voice_hint=voice))
+        stream = edge.synthesize_stream(
+            SynthesizeRequest(text=cleaned, voice_hint=voice, usage_scope=scope)
+        )
+        _meter_stream("edge-tts")
         return StreamingResponse(stream, media_type="audio/mpeg")
 
     # Fallback (buffered): 其餘 provider 仍走 service chain 一次性回傳。
     try:
         output = svc.synthesize(
-            SynthesizeRequest(text=cleaned, voice_hint=voice or character),
+            SynthesizeRequest(
+                text=cleaned, voice_hint=voice or character, usage_scope=scope,
+            ),
             provider=provider,
         )
     except RuntimeError as exc:

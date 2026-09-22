@@ -405,6 +405,10 @@ Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
   - 必填 `provider`、`unit_type`、`units`；其餘歸屬欄位（`user_id`、`principal_type`、
     `project_id`…）由呼叫端帶入，Brain 不自行推斷
   - 成功回 201 `{"recorded": true}`；`provider` 空白或 `units` 為負回 400
+  - Backend 端用 `usage_scope_for(current)` 產生歸屬欄位，主體判定與
+    `brain_proxy._trusted_upstream_headers()` 同一套規則：帶 embed key 的請求記成
+    `principal_type=embed_key`（`principal_id` 為金鑰 ID，`user_id` 仍保留），
+    其餘記成 `user`。所以 TTS 與 LLM 的用量可以用同一組維度彙總。
 
 #### 計量單位（`unit_type` / `units`）
 

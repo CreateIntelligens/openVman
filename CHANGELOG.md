@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Gemini Live 的用量記帳與非 token 計量欄位**：在此之前只有 LLM 呼叫進帳本，Live 與 TTS
+- **TTS 與 Gemini Live 的用量記帳**：在此之前只有 LLM 呼叫進帳本，Live 與 TTS
   完全沒有計量——`brain/api/live/` 與 TTS router 裡一行記錄都沒有，連「有沒有人
   在用 Live」都得靠猜。
   - 帳本新增 `unit_type` 與 `units` 兩個欄位。LLM 以外的用量不是 token 計價：
@@ -13,6 +13,15 @@
     `tokens`，既有欄位與統計不受影響。
   - Gemini Live 逐 turn 累積上行與下行的音訊秒數，在 `turnComplete` 記帳。
     輸入與輸出分兩筆，因為兩者費率不同，合併記就無法還原成本。
+  - TTS 記在 `_try_synthesize()`——fallback chain 的單一收斂點，所有 provider
+    與 targeted／chain 兩條路徑都經過它。只記成功的 hop，失敗的不計費。
+    串流路徑（Gemini TTS、VoxCPM、Edge、IndexTTS proxy）不經過 fallback chain，
+    在各自開啟串流後另外記一筆；串流一旦開啟上游就已開始計費，所以不等讀完，
+    客戶端中途斷線仍然算數。快取命中在呼叫 provider 之前就返回，不計費。
+  - 事件帶上歸屬：`SynthesizeRequest` 新增 `usage_scope`，由 `usage_scope_for()`
+    從 `CurrentAccount` 產生。主體判定沿用 `brain_proxy` 既有的規則——帶 embed
+    key 記成 `embed_key` 主體（保留 `user_id`），否則記成 `user`——這樣 TTS 與
+    LLM 的用量在 Usage 頁面可以用同一組維度彙總。
   - 新增 `POST /brain/usage/events`（沿用既有的 `X-Internal-Token`）。TTS 在
     Backend、帳本在 Brain，讓兩個服務同時寫同一個 SQLite 檔會有鎖競爭，也會
     讓「誰擁有帳本」失去單一答案；因此 Backend 改用 HTTP 寫入，與它代理讀取

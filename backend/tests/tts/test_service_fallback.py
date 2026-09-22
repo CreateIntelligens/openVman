@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import MagicMock
 
 import pytest
@@ -228,3 +229,99 @@ class TestVoxCPMRoute:
         assert result.fallback is False
         svc._voxcpm.synthesize.assert_called_once_with(request)
         svc._indextts.synthesize.assert_not_called()
+
+
+def test_successful_synthesis_meters_characters(monkeypatch):
+    """TTS 按字元計價：成功的 hop 要記一筆 chars，失敗的 hop 不計費。"""
+    recorded: list[dict] = []
+    monkeypatch.setattr(
+        "app.service.record_usage_event",
+        lambda **kwargs: recorded.append(kwargs),
+    )
+
+    service = TTSRouterService(_make_config(edge_enabled=True))
+    ok = MagicMock()
+    ok.synthesize.return_value = NormalizedTTSResult(
+        audio_bytes=b"pcm",
+        content_type="audio/l16",
+        sample_rate=24000,
+        provider="gemini-tts",
+        route_kind="provider",
+        route_target="gemini",
+        latency_ms=12.0,
+    )
+    failing = MagicMock()
+    failing.synthesize.side_effect = RuntimeError("upstream down")
+
+    base = service.build_chain()
+    chain = [replace(base[0], adapter=failing)] + [
+        replace(target, adapter=ok) for target in base[1:]
+    ]
+
+    request = SynthesizeRequest(
+        text="你好，世界",
+        usage_scope={"user_id": "u-1", "project_id": "p-1"},
+    )
+    service._synthesize_chain(request, chain)
+
+    assert len(recorded) == 1, "只有成功的那一 hop 該記帳"
+    event = recorded[0]
+    assert event["unit_type"] == "chars"
+    assert event["units"] == len("你好，世界")
+    assert event["kind"] == "tts"
+    assert event["provider"] == "gemini-tts"
+    assert event["scope"] == {"user_id": "u-1", "project_id": "p-1"}
+
+
+def test_ledger_failure_does_not_break_synthesis(monkeypatch):
+    """記帳壞掉不可以讓使用者的語音合成失敗。"""
+    def _boom(**_kwargs):
+        raise RuntimeError("ledger unreachable")
+
+    monkeypatch.setattr("app.service.record_usage_event", _boom)
+
+    service = TTSRouterService(_make_config(edge_enabled=True))
+    ok = MagicMock()
+    ok.synthesize.return_value = NormalizedTTSResult(
+        audio_bytes=b"pcm",
+        content_type="audio/l16",
+        sample_rate=24000,
+        provider="edge-tts",
+        route_kind="provider",
+        route_target="edge",
+        latency_ms=5.0,
+    )
+    chain = [replace(target, adapter=ok) for target in service.build_chain()]
+
+    with pytest.raises(RuntimeError, match="ledger unreachable"):
+        service._synthesize_chain(SynthesizeRequest(text="測試"), chain)
+
+
+def test_usage_scope_distinguishes_embed_key_from_account():
+    """主體判定要與 brain_proxy 的 header 規則一致：有金鑰就記金鑰。"""
+    from app.usage_ledger_client import usage_scope_for
+
+    account = MagicMock()
+    account.user.id = "u-1"
+    account.user.role.value = "member"
+    account.embed_key = None
+    assert usage_scope_for(account, project_id="p-1") == {
+        "user_id": "u-1",
+        "role": "member",
+        "principal_type": "user",
+        "principal_id": "u-1",
+        "project_id": "p-1",
+    }
+
+    embed = MagicMock()
+    embed.user.id = "u-1"
+    embed.user.role.value = "member"
+    embed.embed_key.key_id = "key-abc"
+    scope = usage_scope_for(embed)
+    assert scope["principal_type"] == "embed_key"
+    assert scope["principal_id"] == "key-abc"
+    # user_id 仍保留，才查得到「這個帳號的金鑰用了多少」。
+    assert scope["user_id"] == "u-1"
+
+    # 沒有帳號脈絡（系統自行觸發）時不記名，但事件仍會入帳。
+    assert usage_scope_for(None) == {}
