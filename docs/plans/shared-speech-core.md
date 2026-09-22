@@ -387,10 +387,9 @@ pause-not-destroy、卸載才 destroy、`starting` 狀態。
 
 ## 附錄 B：順帶發現、不在本計畫範圍
 
-- `frontend/app` 正式環境跑的是 `pnpm dev`（Vite dev server），不是 production
-  build（`frontend/app/Dockerfile` 最後一行）。HMR client 還在、無 minify。admin 有
-  `target: runner` 走 nginx，app 沒有。應該不是故意的，但改它會換掉整個服務的執行
-  方式，要另外決定。
+- ~~`frontend/app` 正式環境跑的是 `pnpm dev`~~ **已於 2026-09-22 處理**：runner
+  改為 nginx 送 `vite build` 產物，dev 的熱重載由 `docker-compose.dev.yml` 覆寫
+  `command` 提供。`index.html` 設 `no-cache`、`assets/` 永久快取。
 - 部署後開著舊分頁的使用者點到還沒載入的頁面會白屏（chunk hash 對不上），只在
   console 留一行 `Failed to fetch dynamically imported module`。標準做法是攔截
   這個錯誤自動重載一次。兩個前端都缺。

@@ -34,6 +34,11 @@ services:
   avatar:
     labels:
       com.centurylinklabs.watchtower.enable: "false"
+    # 正式 image 的 runner 是 nginx 送靜態檔；開發要熱重載，改用 builder stage
+    # 跑 dev server。source 由下面的 bind mount 提供。
+    build:
+      target: builder
+    command: ["corepack", "pnpm", "dev", "--", "--host", "0.0.0.0", "--port", "80"]
     volumes: !override
       - ./frontend/app:/app
       - avatar-node-modules:/app/node_modules
