@@ -122,6 +122,8 @@ class GeminiLiveSession:
         self._keepalive_task: asyncio.Task | None = None
         self._closed = False
         self._last_user_message: str = ""
+        # 一個 turn 的回覆會拆成多個 chunk 送來，累積到 turnComplete 才寫入歷史。
+        self._assistant_text_buf: list[str] = []
         self._chunk_counter = 0
         self._response_in_progress = False
         self._reconnecting = False
@@ -247,6 +249,8 @@ class GeminiLiveSession:
                     continue
 
                 if server_content.get("interrupted"):
+                    # 被打斷的回覆已經播出去一部分，使用者記得它，歷史也要留著。
+                    await self._flush_assistant_turn()
                     await self._emit(
                         {
                             "event": "server_stop_audio",
@@ -262,6 +266,7 @@ class GeminiLiveSession:
 
                 if server_content.get("turnComplete"):
                     self._response_in_progress = False
+                    await self._flush_assistant_turn()
                     if not events or not events[-1].get("is_final"):
                         self._chunk_counter += 1
                         await self._emit(
@@ -292,6 +297,8 @@ class GeminiLiveSession:
             return
 
         logger.info("Gemini Live user transcription (session %s): %s", self.session_id, text)
+        # 語音輸入也要記成本回合的使用者發言，否則 turn 歸檔會少掉問句。
+        self._last_user_message = text
         await self._save_input_transcription(text)
         await self._emit_user_transcription(text)
 
@@ -309,6 +316,50 @@ class GeminiLiveSession:
             )
         except Exception as exc:
             logger.error("Failed to save user speech in Gemini Live: %s", exc)
+
+    async def _flush_assistant_turn(self) -> None:
+        """Persist the accumulated reply, mirroring the text-mode turn archive.
+
+        Live 模式只存過使用者發言，模型回覆串完就丟，切回文字模式時整段歷史
+        看起來全是 user，模型會判定沒有脈絡。這裡補上 assistant 那一半。
+        """
+        full_text = "".join(self._assistant_text_buf).strip()
+        self._assistant_text_buf = []
+        if not full_text:
+            return
+
+        try:
+            from memory.memory import append_session_message
+
+            await asyncio.to_thread(
+                append_session_message,
+                self.session_id,
+                self.persona_id,
+                "assistant",
+                full_text,
+                project_id=self.project_id,
+            )
+        except Exception as exc:
+            logger.error("Failed to save assistant reply in Gemini Live: %s", exc)
+            return
+
+        user_text = self._last_user_message.strip()
+        self._last_user_message = ""
+        if not user_text:
+            return
+        try:
+            from memory.memory import archive_session_turn
+
+            await asyncio.to_thread(
+                archive_session_turn,
+                session_id=self.session_id,
+                user_message=user_text,
+                assistant_message=full_text,
+                persona_id=self.persona_id,
+                project_id=self.project_id,
+            )
+        except Exception as exc:
+            logger.error("Failed to archive session turn in Gemini Live: %s", exc)
 
     async def _emit_user_transcription(self, text: str) -> None:
         await self._emit(
@@ -619,6 +670,9 @@ class GeminiLiveSession:
         model_turn = server_content.get("modelTurn") or {}
         parts = model_turn.get("parts") or []
         text = self._extract_text(parts, server_content)
+        # 每則 serverContent 只累積一次；同一則裡的多個音訊 part 共用同一段文字。
+        if text:
+            self._assistant_text_buf.append(text)
         events: list[dict[str, Any]] = []
 
         for part in parts:

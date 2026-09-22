@@ -55,6 +55,17 @@
 
 ### Fixed
 
+- **Gemini Live 沒有保存模型回覆，切回文字模式後上下文斷掉**：
+  `live/gemini_live.py` 只在 `_save_input_transcription()` 存過使用者發言，模型
+  回覆抽出文字後只推給前端顯示就丟掉，整支檔案的 `append_session_message`
+  只被呼叫一次且 role 固定是 `user`。結果 Live 對話留在 session 的歷史全是
+  user 訊息、沒有半句 assistant，使用者切回文字模式再問「我剛問了幾題」時，
+  模型看不到可用脈絡，回答「這是我們在這段對話中的第一句」。
+  改成比照文字模式的 `_flush_assistant_turn()`：逐則 `serverContent` 累積回覆
+  文字，在 `turnComplete` 與 `interrupted`（已播出去的半句同樣要留）時併成
+  完整一句寫入 `assistant`，並補上 `archive_session_turn()` 的 turn 歸檔。
+  語音輸入也一併記錄 `_last_user_message`，否則語音回合歸檔時會少掉問句。
+
 - **Brain 對模型空回覆回 400**: 模型連續回空（`agent_loop` 已催過一次仍空）時，
   `ValueError("LLM 沒有回傳內容")` 被 `routes/chat.py` 當成 guardrail 擋下的壞
   請求：回 400 讓前端不重試、`guardrail_blocks_total` 誤計，且該路徑不記 log，

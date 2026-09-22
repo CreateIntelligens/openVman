@@ -29,7 +29,7 @@ def _load_module():
         live_gemini_thinking_level="",
         live_gemini_context_compression=True,
     )
-    for mod_name in ("config", "memory.embedder", "memory.retrieval"):
+    for mod_name in ("config", "memory.embedder", "memory.retrieval", "memory.memory"):
         _saved_modules.setdefault(mod_name, sys.modules.get(mod_name))
     sys.modules["config"] = types.SimpleNamespace(
         BrainSettings=object,
@@ -565,3 +565,154 @@ async def test_input_transcription_skips_visual_context():
 
     await session._handle_input_transcription({"text": "你好"})
     assert len(saved) == 1, "正常語音轉錄應被儲存"
+
+
+def _stub_memory() -> tuple[list[tuple], list[dict]]:
+    """Capture session-message and turn-archive writes from the live session."""
+    import sys as _sys
+    import types as _types
+
+    saved: list[tuple] = []
+    archived: list[dict] = []
+    _saved_modules.setdefault("memory.memory", _sys.modules.get("memory.memory"))
+    _sys.modules["memory.memory"] = _types.SimpleNamespace(
+        append_session_message=lambda *a, **kw: saved.append((a, kw)),
+        archive_session_turn=lambda **kw: archived.append(kw),
+    )
+    return saved, archived
+
+
+async def _wait_for(predicate, *, timeout: float = 2.0) -> None:
+    """Poll until the predicate holds.
+
+    flush 走 `asyncio.to_thread`，完成時機由執行緒排程決定，固定次數的
+    `sleep(0)` 會偶發性地在寫入前就往下跑，所以這裡等條件而不是等次數。
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        if predicate():
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("timed out waiting for the live session to persist its turn")
+
+
+def _server_content(text: str, *, turn_complete: bool) -> dict:
+    content: dict = {"modelTurn": {"parts": [{"text": text}]}}
+    if turn_complete:
+        content["turnComplete"] = True
+    return content
+
+
+@pytest.mark.asyncio
+async def test_live_persists_assistant_reply_on_turn_complete():
+    """回覆串完要存成 assistant，否則切回文字模式時歷史全是 user。
+
+    刻意走完整的 listener 迴圈而不是直接呼叫 flush，這樣「listener 沒接上
+    flush」這個真正的 bug 才會讓測試變紅。
+    """
+    module, fake_config = _load_module()
+    saved, archived = _stub_memory()
+    transport = FakeTransport()
+
+    async def _sink(_event: dict) -> None:
+        pass
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-persist",
+        client_id="client-persist",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=_sink,
+    )
+
+    await session.send_text_turn("你誰")
+    # 一個 turn 拆成兩段送來，最後一段帶 turnComplete。
+    transport._messages.put_nowait(
+        {"serverContent": _server_content("我是", turn_complete=False)}
+    )
+    transport._messages.put_nowait(
+        {"serverContent": _server_content("小鶴。", turn_complete=True)}
+    )
+    await _wait_for(lambda: bool(saved) and bool(archived))
+    await session.close()
+
+    roles = [args[2] for args, _ in saved]
+    assert roles == ["assistant"], f"應只寫一筆 assistant，實際 {roles}"
+    assert saved[0][0][3] == "我是小鶴。", "分段回覆要併成完整一句再存"
+    assert archived == [
+        {
+            "session_id": session.session_id,
+            "user_message": "你誰",
+            "assistant_message": "我是小鶴。",
+            "persona_id": session.persona_id,
+            "project_id": session.project_id,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_live_assistant_buffer_does_not_leak_across_turns():
+    """前一回合 flush 後緩衝要清空，否則下一回合會重複串到舊內容。"""
+    module, fake_config = _load_module()
+    saved, _ = _stub_memory()
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-two-turns",
+        client_id="client-two-turns",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+
+    session._events_from_server_content(_server_content("第一回合。", turn_complete=True))
+    await session._flush_assistant_turn()
+    session._events_from_server_content(_server_content("第二回合。", turn_complete=True))
+    await session._flush_assistant_turn()
+
+    texts = [args[3] for args, _ in saved]
+    assert texts == ["第一回合。", "第二回合。"]
+
+
+@pytest.mark.asyncio
+async def test_live_flush_is_noop_without_reply_text():
+    """沒有回覆文字就不該寫入空白訊息。"""
+    module, fake_config = _load_module()
+    saved, archived = _stub_memory()
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-empty",
+        client_id="client-empty",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+    session._last_user_message = "你誰"
+
+    await session._flush_assistant_turn()
+
+    assert saved == []
+    assert archived == []
+
+
+@pytest.mark.asyncio
+async def test_live_voice_turn_records_user_message_for_archive():
+    """語音輸入也要設 _last_user_message，turn 歸檔才有問句。"""
+    module, fake_config = _load_module()
+    _stub_memory()
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-voice",
+        client_id="client-voice",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+
+    await session._handle_input_transcription({"text": "我剛問了幾題"})
+    assert session._last_user_message == "我剛問了幾題"
+
+    # 視覺脈絡不是真實發言，不該覆蓋本回合的問句。
+    await session._handle_input_transcription({"text": "[視覺事件] 有人走近。"})
+    assert session._last_user_message == "我剛問了幾題"
+
