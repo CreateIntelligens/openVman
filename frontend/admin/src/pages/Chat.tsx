@@ -9,6 +9,7 @@ import ChatSidebar from "../components/chat/ChatSidebar";
 import { useProject } from "../context/ProjectContext";
 import { useMascot } from "../context/MascotContext";
 import { useChatSession } from "../hooks/useChatSession";
+import { useVisionAvailable } from "../hooks/useVisionAvailable";
 import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useLiveSession, type LiveMessage } from "../hooks/useLiveSession";
 import { DEFAULT_VOICE_SOURCE, type VoiceSource } from "../hooks/liveSessionProtocol";
@@ -93,7 +94,7 @@ export default function Chat() {
     asrSupported,
     toggleAsr,
     asrSpeaking,
-    asrEngine,
+    asrInputMode,
     asrTranscribing,
     asrProvider,
     changeAsrProvider,
@@ -104,6 +105,7 @@ export default function Chat() {
     setSearchQuery,
     resetSearch,
   } = useChatSession();
+  const visionAvailable = useVisionAvailable();
 
   const liveClientIdRef = useRef<string>("");
   if (!liveClientIdRef.current) {
@@ -482,7 +484,7 @@ export default function Chat() {
             asrListening={asrListening}
             asrSupported={asrSupported}
             asrSpeaking={asrSpeaking}
-            asrEngine={asrEngine}
+            asrInputMode={asrInputMode}
             asrTranscribing={asrTranscribing}
             asrProvider={asrProvider}
             onAsrProviderChange={changeAsrProvider}
@@ -505,6 +507,7 @@ export default function Chat() {
             liveWsState={liveSession.wsState}
             liveMicActive={liveSession.micActive}
             liveCameraActive={liveSession.cameraActive}
+            cameraAvailable={visionAvailable === true}
             onLiveToggleMic={handleLiveToggleMic}
             onLiveToggleCamera={handleLiveToggleCamera}
           />

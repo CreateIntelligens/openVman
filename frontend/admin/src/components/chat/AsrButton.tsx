@@ -7,10 +7,11 @@ interface AsrButtonProps {
   /** 伺服器引擎：音檔已送出、等後端回字。 */
   transcribing?: boolean;
   /**
-   * 兩種引擎的操作方式不同，提示文字也要跟著變：瀏覽器辨識是開著一直聽、
-   * 講完自動送；伺服器引擎是按一下錄、再按一下才送。
+   * 兩種操作方式的提示文字不同：continuous 是開著一直聽、講完自動送（瀏覽器
+   * 辨識，或伺服器引擎 + VAD）；push-to-talk 是按一下錄、再按一下才送（VAD
+   * 起不來時的退路）。
    */
-  engine?: "browser" | "server";
+  inputMode?: "continuous" | "push-to-talk";
   onToggle: () => void;
 }
 
@@ -27,7 +28,7 @@ export const AsrButton: React.FC<AsrButtonProps> = ({
   listening,
   speaking,
   transcribing = false,
-  engine = "browser",
+  inputMode = "continuous",
   onToggle,
 }) => {
   if (!supported) return null;
@@ -36,35 +37,39 @@ export const AsrButton: React.FC<AsrButtonProps> = ({
   let label = "";
   let title = "語音輸入";
 
-  if (transcribing) {
+  if (transcribing && !listening) {
     styles = BUSY_STYLES;
     label = "辨識中…";
     title = "辨識中";
-  } else if (listening && engine === "server") {
+  } else if (listening && inputMode === "push-to-talk") {
     // 錄音沒有「偵測到人聲」的訊號，開著就是在收音，一律用收音中的樣式。
     styles = `${LIVE_STYLES} animate-pulse`;
     label = "收音中 · 再按送出";
     title = "停止並送出";
   } else if (listening) {
     styles = speaking ? LIVE_STYLES : WAITING_STYLES;
-    label = speaking ? "聆聽中..." : "等待語音";
+    // 連續聆聽時上一句還在辨識，麥克風仍然開著——兩件事都要讓使用者知道。
+    label = speaking ? "聆聽中..." : transcribing ? "辨識中…" : "等待語音";
     title = "停止語音輸入";
   }
+
+  // 只有「沒在收音、純等結果」才換成轉圈；收音中要一直看得到麥克風。
+  const busy = transcribing && !listening;
 
   return (
     <button
       type="button"
       onClick={onToggle}
-      disabled={transcribing}
+      disabled={transcribing && !listening}
       aria-pressed={listening}
       aria-busy={transcribing}
       className={`h-8 flex items-center justify-center rounded-lg transition-colors shadow-sm ${styles}`}
       title={title}
     >
       <span
-        className={`material-symbols-outlined text-[1.125rem] ${transcribing ? "animate-spin" : ""}`}
+        className={`material-symbols-outlined text-[1.125rem] ${busy ? "animate-spin" : ""}`}
       >
-        {transcribing ? "progress_activity" : "mic"}
+        {busy ? "progress_activity" : "mic"}
       </span>
       {label && (
         <span

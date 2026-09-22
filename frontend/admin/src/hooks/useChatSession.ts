@@ -29,6 +29,7 @@ import { useSlashAutocomplete } from "./useSlashAutocomplete";
 import { useInputHistory } from "./useInputHistory";
 import { useStarterPrompts } from "./useStarterPrompts";
 import { useServerSpeechRecognition } from "./useServerSpeechRecognition";
+import { useVadSpeechRecognition } from "./useVadSpeechRecognition";
 import { useSpeechRecognition } from "./useSpeechRecognition";
 
 const STOP_REPLY_NOTICE = "已停止回覆";
@@ -274,13 +275,15 @@ export function useChatSession() {
   const asrEngine: "browser" | "server" =
     asrProvider && asrProvider.effective !== BROWSER_ASR ? "server" : "browser";
 
+  // 計時器建立的位置早於 asrInputMode 算出來的位置，所以用 ref 讀最新值。
+  const asrInputModeRef = useRef<"continuous" | "push-to-talk">("continuous");
   const scheduleAsrIdleTimeout = useCallback(() => {
     clearAsrIdleTimer();
     asrIdleTimerRef.current = setTimeout(() => {
       asrIdleTimerRef.current = null;
       setAsrListening(false);
-    }, asrEngine === "server" ? SERVER_ASR_MAX_CLIP_MS : ASR_IDLE_TIMEOUT_MS);
-  }, [asrEngine, clearAsrIdleTimer]);
+    }, asrInputModeRef.current === "push-to-talk" ? SERVER_ASR_MAX_CLIP_MS : ASR_IDLE_TIMEOUT_MS);
+  }, [clearAsrIdleTimer]);
   const markAsrActivity = useCallback(() => {
     if (asrListening) scheduleAsrIdleTimeout();
   }, [asrListening, scheduleAsrIdleTimeout]);
@@ -327,19 +330,48 @@ export function useChatSession() {
     onFinalTranscript: handleFinalTranscript,
   });
 
+  const handleServerAsrError = useCallback((message: string) => {
+    setError(message);
+    setAsrListening(false);
+  }, [setError]);
+
+  const [vadAvailable, setVadAvailable] = useState(true);
+  // 伺服器引擎優先用 VAD：開著一直聽、講完自動送，跟瀏覽器辨識同一種操作。
   const {
-    supported: serverAsrSupported,
-    transcribing: asrTranscribing,
-  } = useServerSpeechRecognition({
-    enabled: asrListening && asrEngine === "server",
-    onError: useCallback((message: string) => {
-      setError(message);
-      setAsrListening(false);
-    }, [setError]),
+    speaking: vadSpeaking,
+    supported: vadSupported,
+    transcribing: vadTranscribing,
+  } = useVadSpeechRecognition({
+    // 已知 VAD 起不來就別再試，交給下面的按鍵錄音。
+    enabled: asrListening && asrEngine === "server" && vadAvailable,
+    onActivity: markAsrActivity,
+    onError: handleServerAsrError,
     onFinalTranscript: handleFinalTranscript,
   });
 
-  const asrSupported = asrEngine === "server" ? serverAsrSupported : browserAsrSupported;
+  // VAD 起不來（模型或 WASM 載不到，例如內網連不到 CDN）就退回按鍵錄音：
+  // 按一下收音、再按一下送出。
+  useEffect(() => {
+    if (!vadSupported) setVadAvailable(false);
+  }, [vadSupported]);
+  const asrInputMode: "continuous" | "push-to-talk" =
+    asrEngine === "server" && !vadAvailable ? "push-to-talk" : "continuous";
+  const {
+    supported: recorderSupported,
+    transcribing: recorderTranscribing,
+  } = useServerSpeechRecognition({
+    enabled: asrListening && asrInputMode === "push-to-talk",
+    onError: handleServerAsrError,
+    onFinalTranscript: handleFinalTranscript,
+  });
+
+  asrInputModeRef.current = asrInputMode;
+
+  const asrSupported = asrEngine === "browser"
+    ? browserAsrSupported
+    : vadAvailable || recorderSupported;
+  const asrTranscribing = vadTranscribing || recorderTranscribing;
+  const asrSpeakingNow = asrEngine === "browser" ? asrSpeaking : vadSpeaking;
 
   const changeAsrProvider = useCallback(async (value: string) => {
     // 換引擎前先停掉收音，否則舊引擎的錄音會卡在半空中。
@@ -554,12 +586,12 @@ export function useChatSession() {
     handleTtsVoiceChange,
     asrListening,
     asrSupported,
-    asrEngine,
+    asrInputMode,
     asrTranscribing,
     asrProvider,
     changeAsrProvider,
     toggleAsr,
-    asrSpeaking,
+    asrSpeaking: asrSpeakingNow,
     handleActionConfirmed,
     handleActionCancelled,
     setMessages,

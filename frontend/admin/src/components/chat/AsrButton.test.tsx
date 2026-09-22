@@ -23,11 +23,20 @@ describe("AsrButton", () => {
     expect(screen.getByRole("status").textContent).toBe("聆聽中...");
   });
 
-  it("伺服器引擎：開著就是在收音，並提示要再按一次才會送出", () => {
+  it("連續聆聽時上一句還在辨識：麥克風仍開著，按鈕也還能按", () => {
+    const onToggle = vi.fn();
+    render(<AsrButton supported listening speaking={false} transcribing onToggle={onToggle} />);
+
+    expect(screen.getByRole("status").textContent).toBe("辨識中…");
+    fireEvent.click(screen.getByRole("button"));
+    expect(onToggle).toHaveBeenCalled();
+  });
+
+  it("按鍵錄音：開著就是在收音，並提示要再按一次才會送出", () => {
     // 錄音沒有「偵測到人聲」的訊號，沿用瀏覽器辨識的「等待語音」會讓人以為
     // 還沒開始收。
     render(
-      <AsrButton supported listening speaking={false} engine="server" onToggle={() => {}} />,
+      <AsrButton supported listening speaking={false} inputMode="push-to-talk" onToggle={() => {}} />,
     );
 
     expect(screen.getByRole("status").textContent).toBe("收音中 · 再按送出");
@@ -42,7 +51,7 @@ describe("AsrButton", () => {
         listening={false}
         speaking={false}
         transcribing
-        engine="server"
+        inputMode="push-to-talk"
         onToggle={onToggle}
       />,
     );

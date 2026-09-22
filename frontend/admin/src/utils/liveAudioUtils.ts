@@ -104,6 +104,35 @@ export function encodePcm16(samples: Float32Array): ArrayBuffer {
   return buffer;
 }
 
+/** 把單聲道 float 取樣包成 16-bit PCM 的 WAV 檔。
+ *
+ * VAD 交出來的是裸的 Float32 取樣，後端靠副檔名決定怎麼解，所以要補上 RIFF
+ * 標頭才是一個認得出來的音檔。
+ */
+export function encodeWav(samples: Float32Array, sampleRate: number): Blob {
+  const pcm = encodePcm16(samples);
+  const header = new DataView(new ArrayBuffer(44));
+  const writeTag = (offset: number, tag: string) => {
+    for (let index = 0; index < tag.length; index += 1) {
+      header.setUint8(offset + index, tag.charCodeAt(index));
+    }
+  };
+  writeTag(0, "RIFF");
+  header.setUint32(4, 36 + pcm.byteLength, true);
+  writeTag(8, "WAVE");
+  writeTag(12, "fmt ");
+  header.setUint32(16, 16, true);
+  header.setUint16(20, 1, true); // PCM
+  header.setUint16(22, 1, true); // mono
+  header.setUint32(24, sampleRate, true);
+  header.setUint32(28, sampleRate * PCM_BYTES_PER_SAMPLE, true);
+  header.setUint16(32, PCM_BYTES_PER_SAMPLE, true);
+  header.setUint16(34, 16, true);
+  writeTag(36, "data");
+  header.setUint32(40, pcm.byteLength, true);
+  return new Blob([header.buffer, pcm], { type: "audio/wav" });
+}
+
 export function chunkArrayBuffer(buffer: ArrayBuffer, chunkSize: number): ArrayBuffer[] {
   const chunks: ArrayBuffer[] = [];
   let offset = 0;

@@ -27,7 +27,7 @@ interface ChatInputProps {
   asrSupported: boolean;
   asrSpeaking: boolean;
   asrTranscribing?: boolean;
-  asrEngine?: "browser" | "server";
+  asrInputMode?: "continuous" | "push-to-talk";
   asrProvider?: MyAsrProvider | null;
   onAsrProviderChange?: (value: string) => void;
   privacyWarningsVisible: boolean;
@@ -53,6 +53,8 @@ interface ChatInputProps {
   liveWsState: "connecting" | "connected" | "disconnected";
   liveMicActive: boolean;
   liveCameraActive: boolean;
+  /** 視覺服務可用時才顯示鏡頭按鈕；沒開 VLM 就整個不出現，不是 disabled。 */
+  cameraAvailable?: boolean;
   onLiveToggleMic: () => void;
   onLiveToggleCamera: () => void;
 }
@@ -75,7 +77,7 @@ export default function ChatInput(props: ChatInputProps) {
     asrSupported,
     asrSpeaking,
     asrTranscribing,
-    asrEngine,
+    asrInputMode,
     asrProvider,
     onAsrProviderChange,
     privacyWarningsVisible,
@@ -97,6 +99,7 @@ export default function ChatInput(props: ChatInputProps) {
     liveWsState,
     liveMicActive,
     liveCameraActive,
+    cameraAvailable = false,
     onLiveToggleMic,
     onLiveToggleCamera,
   } = props;
@@ -261,7 +264,8 @@ export default function ChatInput(props: ChatInputProps) {
               )}
             </div>
             <div className="flex gap-2 pointer-events-auto">
-              <button
+              {cameraAvailable && <button
+                type="button"
                 onClick={onLiveToggleCamera}
                 aria-label={liveCameraLabel}
                 className={`flex h-8 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${liveCameraButtonClassName}`}
@@ -269,7 +273,7 @@ export default function ChatInput(props: ChatInputProps) {
               >
                 <span className="material-symbols-outlined text-[1.125rem]">{liveCameraIcon}</span>
                 <span className="whitespace-nowrap">{liveCameraLabel}</span>
-              </button>
+              </button>}
 
               {mode === "text" && (
                 <AsrButton
@@ -277,7 +281,7 @@ export default function ChatInput(props: ChatInputProps) {
                   listening={asrListening}
                   speaking={asrSpeaking}
                   transcribing={asrTranscribing}
-                  engine={asrEngine}
+                  inputMode={asrInputMode}
                   onToggle={onToggleAsr}
                 />
               )}

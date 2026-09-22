@@ -84,11 +84,18 @@ describe("ChatInput", () => {
   });
 
   it("renders the live camera toggle and forwards clicks", () => {
-    const props = renderChatInput({ mode: "live" });
+    const props = renderChatInput({ mode: "live", cameraAvailable: true });
 
     fireEvent.click(screen.getByRole("button", { name: "開鏡頭" }));
 
     expect(props.onLiveToggleCamera).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the camera toggle when the vision service is off", () => {
+    // 沒開 VLM 時按鈕整個不出現，不是 disabled——看得到卻點不了的按鈕只會
+    // 讓人一直問為什麼。沒傳 cameraAvailable（還沒問到結果）也一樣不顯示。
+    renderChatInput({ mode: "live", cameraAvailable: false });
+    expect(screen.queryByRole("button", { name: "開鏡頭" })).toBeNull();
   });
 
 });
