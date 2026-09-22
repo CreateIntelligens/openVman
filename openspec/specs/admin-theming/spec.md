@@ -3,7 +3,7 @@
 ## Purpose
 Enable users to switch between Light Mode and Dark Mode in the Admin Web interface to improve accessibility and user comfort.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Theme Selection state
 The system SHALL maintain a global theme state that can be toggled between "light" and "dark".
