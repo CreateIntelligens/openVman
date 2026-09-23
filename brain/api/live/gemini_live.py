@@ -259,17 +259,20 @@ class GeminiLiveSession:
                         continue
                     break
 
+                # Gemini 把收音轉錄放在 serverContent 裡；只看頂層的話使用者講的話
+                # 從來沒存進歷史（2026-09-23 抓原始訊息確認）。
+                server_content = message.get("serverContent")
                 input_transcription = message.get("inputTranscription")
+                if not isinstance(input_transcription, dict) and isinstance(server_content, dict):
+                    input_transcription = server_content.get("inputTranscription")
                 if isinstance(input_transcription, dict):
                     await self._handle_input_transcription(input_transcription)
-                    continue
 
                 tool_call = message.get("toolCall")
                 if isinstance(tool_call, dict):
                     await self._handle_tool_call(tool_call)
                     continue
 
-                server_content = message.get("serverContent")
                 if not isinstance(server_content, dict):
                     continue
 
@@ -807,12 +810,13 @@ class GeminiLiveSession:
             for part in parts
             if isinstance(part, dict) and isinstance(part.get("text"), str)
         ]
-        joined = "".join(text_parts).strip()
-        if joined:
+        # 轉錄是逐段送的，英西的字間空格落在段落頭尾；strip 會把字黏在一起。
+        joined = "".join(text_parts)
+        if joined.strip():
             return joined
         transcription = server_content.get("outputTranscription") or {}
         text = transcription.get("text", "")
-        return text.strip() if isinstance(text, str) else ""
+        return text if isinstance(text, str) and text.strip() else ""
 
 
 

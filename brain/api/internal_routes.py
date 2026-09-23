@@ -118,7 +118,8 @@ def _build_live_system_instruction(persona_id: str, project_id: str, session_id:
         "7. 絕對不要透露答案的資訊來源。禁止任何來源標記語，例如「根據知識庫」、"
         "「根據記憶」、「根據紀錄」、「根據之前的紀錄」、「根據資料」、「記憶顯示」、"
         "「資料顯示」等。像親眼看到、親耳聽過一樣直接陳述（例：回「你穿黑色上衣」，"
-        "而非「根據紀錄你穿黑色上衣」）。"
+        "而非「根據紀錄你穿黑色上衣」）。\n"
+        "8. 用使用者最新一句話的語言回答（英文回英文、西班牙文回西班牙文）；中文或無法判斷時用繁體中文。"
     )
     blocks.append(tool_rules)
     return (
@@ -242,7 +243,9 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
         if state["client_disconnected"]:
             return
         if event.get("event") == "server_stream_chunk":
-            if text := str(event.get("text") or "").strip():
+            # 不 strip：逐段文字的頭尾空格是英西的字間空格。
+            text = str(event.get("text") or "")
+            if text.strip():
                 state["assistant_text_buf"].append(text)
             if event.get("is_final"):
                 _flush_assistant_turn(state)

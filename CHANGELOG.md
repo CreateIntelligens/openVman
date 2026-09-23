@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **回覆語言跟著使用者**：文字對話回答規則（`core/prompt_templates.py`）與 Live 系統指令
+  （`internal_routes.py`）從「除非使用者要求，一律繁體中文」改成「用使用者最新一句話的語言回答，
+  中文或無法判斷時用繁體中文」。專案 SOUL.md 若寫死語言仍以 SOUL 為準。
+- **Live 收音轉錄從沒存進歷史**：Gemini 把 `inputTranscription` 包在 `serverContent` 裡，程式只看頂層，
+  語音模式下使用者講的話沒有 `user_transcription` 事件、也沒寫進對話紀錄（`live/gemini_live.py`）。
+- **Live 英西字幕黏字**：逐段輸出轉錄被 `strip()`，字間空格落在段落頭尾而被吃掉（"suciade"），
+  字幕、自訂語音送 TTS 的文字與存進歷史的回覆都受影響（`live/gemini_live.py`、`internal_routes.py`）。
+  實測小鶴 Live 3.8：中英西語音提問都以同語言回覆，講完到出聲 1.7–3.7 秒。
+- **正式環境設定 `WHISPER_API_KEY`**（沿用 OpenAI key）：openai 轉錄引擎可用，也會進所有專案的
+  ASR 備援鏈（本地引擎全掛時才用）。
+
 ### Added
 
 - **對話紀錄頁補齊 JTI 的歷史紀錄功能**（VH-388）：勾選後可「刪除已選」（新端點

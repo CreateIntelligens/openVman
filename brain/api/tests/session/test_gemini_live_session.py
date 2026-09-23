@@ -717,6 +717,65 @@ async def test_live_voice_turn_records_user_message_for_archive():
     assert session._last_user_message == "我剛問了幾題"
 
 
+@pytest.mark.asyncio
+async def test_live_reads_input_transcription_inside_server_content():
+    """Gemini 把收音轉錄包在 serverContent 裡；只看頂層時使用者的話從沒存進歷史。"""
+    module, fake_config = _load_module()
+    saved, _ = _stub_memory()
+    transport = FakeTransport()
+    events: list[dict] = []
+
+    async def _sink(event: dict) -> None:
+        events.append(event)
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-input",
+        client_id="client-input",
+        config=fake_config,
+        transport_factory=lambda _cfg: transport,
+        event_sink=_sink,
+    )
+    await session.ensure_connected()
+    transport._messages.put_nowait(
+        {"serverContent": {"inputTranscription": {"text": "Hola, ¿qué bomba me recomiendas?"}}}
+    )
+    await _wait_for(lambda: bool(saved))
+    await session.close()
+
+    assert saved[0][0][2:4] == ("user", "Hola, ¿qué bomba me recomiendas?")
+    assert [e["text"] for e in events if e["event"] == "user_transcription"] == [
+        "Hola, ¿qué bomba me recomiendas?"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_live_keeps_word_spacing_across_transcription_chunks():
+    """英西的字間空格落在逐段轉錄的頭尾，strip 會把字黏成 "suciade"。"""
+    module, fake_config = _load_module()
+    saved, _ = _stub_memory()
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-spacing",
+        client_id="client-spacing",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+    chunks = ["For draining dirty water ", "from a basement,", " I recommend HIPPO."]
+    texts = [
+        event["text"]
+        for chunk in chunks
+        for event in session._events_from_server_content(
+            {"outputTranscription": {"text": chunk}, "modelTurn": {"parts": [{"inlineData": {
+                "mimeType": "audio/pcm;rate=24000", "data": base64.b64encode(b"\0\0").decode()}}]}}
+        )
+    ]
+    await session._flush_assistant_turn()
+
+    assert "".join(texts) == "For draining dirty water from a basement, I recommend HIPPO."
+    assert saved[0][0][3] == "For draining dirty water from a basement, I recommend HIPPO."
+
+
 def test_thinking_level_is_dropped_for_models_that_reject_it():
     """3.8 起一般 live 模型不吃 thinkingLevel，帶了會被 API 拒絕。"""
     module, fake_config = _load_module()
