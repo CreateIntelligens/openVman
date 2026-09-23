@@ -165,6 +165,14 @@ class BrainSettings(BaseSettings):
     intent_shadow_sample_rate: float = Field(default=0.1, ge=0, le=1)
     intent_shadow_timeout_seconds: float = Field(default=0.5, gt=0, le=5)
     intent_shadow_cooldown_seconds: float = Field(default=30, ge=0, le=3600)
+    # Jev 影子：外部 API，有費用與資料外送，所以抽樣比 BGE 保守並有每日硬上限。
+    jev_shadow_enabled: bool = False
+    jev_shadow_sample_rate: float = Field(default=0.05, ge=0, le=1)
+    jev_shadow_timeout_seconds: float = Field(default=0.6, gt=0, le=5)
+    jev_shadow_cooldown_seconds: float = Field(default=60, ge=0, le=3600)
+    jev_shadow_daily_call_cap: int = Field(default=2000, ge=0)
+    jev_shadow_base_url: str = "https://api.typesafe.ai"
+    typesafe_api_key: str = ""
     # 第一輪平行查完後，最多再允許幾輪追加工具（例如補查一次網路或讀一頁），
     # 之後不帶工具只能作答；避免模型一輪一查拖到七、八次呼叫。
     chat_max_followup_tool_rounds: int = 1

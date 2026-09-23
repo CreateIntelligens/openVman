@@ -79,8 +79,12 @@ trace）：`search_knowledge` 387 ms，整輪 `/brain/chat` 4718 ms，**檢索�
 
 ### 2.3 費用閘門
 
-REPORT 說費率待查。**接線前先查清楚**，並在 observer 加硬上限
-`JEV_SHADOW_DAILY_CALL_CAP`（預設 2000），到了就靜默停到隔天。用量寫進既有的
+費率（2026-09-23 查，typesafe.ai 首頁與發表文）：輸入每百萬 token US$0.042，
+輸出不計費，官方自承可能是補貼價。實驗一次約 560 輸入 token，2000 次／日約
+US$0.05——**上限的用途不是省錢，是擋程式失控與限制外送量**。
+
+observer 加硬上限 `JEV_SHADOW_DAILY_CALL_CAP`（預設 2000，每 process 每 UTC 日），
+到了就停到隔天。用量寫進既有的
 `usage.db`（見 [[usage-credit-design]]），跟 LLM token 同一張表。
 
 ### 2.4 驗收

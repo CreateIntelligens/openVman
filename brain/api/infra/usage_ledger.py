@@ -428,3 +428,18 @@ def list_usage_events(*, limit: int = 100, **filters: str) -> list[dict[str, Any
                 pass
         events.append(event)
     return events
+
+
+def count_usage_events_since(*, provider: str, kind: str, since: str) -> int:
+    """Count events for one provider/kind; failures count as 0 so callers fail open."""
+    try:
+        with _LOCK, _connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM usage_events"
+                " WHERE provider = ? AND kind = ? AND created_at >= ?",
+                (provider, kind, since),
+            ).fetchone()
+    except Exception as exc:
+        logger.warning("usage ledger count failed provider=%s: %s", provider, exc)
+        return 0
+    return int(row[0])

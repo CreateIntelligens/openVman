@@ -4,6 +4,18 @@
 
 ### Added
 
+- **Jev 意圖影子觀測**（`brain/api/core/jev_shadow.py`，預設關閉）：與既有 BGE
+  影子並排，對 `/brain/chat` 的一般使用者回合抽樣呼叫 TypeSafe Jev，把
+  chat／knowledge／web／clarify 建議分類記進 log，不改路由、prompt 或工具選擇。
+  - 外送邊界寫死：只送當前訊息（最多 1024 字）與前一輪助手回覆前 200 字，
+    不送 session 其他歷史、工具結果、知識庫或帳號資料；測試直接檢查送出的
+    HTTP body。
+  - 抽樣 5%、timeout 600 ms 不重試、失敗冷卻 60 秒、每 process 每 UTC 日上限
+    2000 次（重啟時從帳本補回當日已用數）。
+  - 成功呼叫以 `provider=typesafe`、`kind=intent_shadow` 記進 `usage.db`。
+  - 新設定 `JEV_SHADOW_*` 與 `TYPESAFE_API_KEY`，見
+    `scripts/experiments/jev/OPERATIONS.md`。
+
 - **TTS 與 Gemini Live 的用量記帳**：在此之前只有 LLM 呼叫進帳本，Live 與 TTS
   完全沒有計量——`brain/api/live/` 與 TTS router 裡一行記錄都沒有，連「有沒有人
   在用 Live」都得靠猜。

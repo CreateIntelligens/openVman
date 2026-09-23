@@ -17,6 +17,7 @@ from core.agent_loop import (  # noqa: F401 (ToolPhaseError re-exported)
     run_agent_loop,
 )
 from core.intent_shadow import submit_intent_shadow
+from core.jev_shadow import submit_jev_shadow
 from core.llm_client import LLMEmptyReplyError, LLMReply, generate_chat_turn
 from core.pipeline import RouteDecision, route_message
 from core.prompt_builder import build_chat_messages
@@ -96,17 +97,22 @@ def prepare_generation(
     )
 
     if envelope.context.message_type == "user" and not route.forced_tool_name:
-        try:
-            submit_intent_shadow(
-                message=stored_user_message, history=prior_messages,
-                trace_id=envelope.context.trace_id, project_id=project_id,
-                actual_route=route.path,
-            )
-        except Exception as exc:
-            logger.warning(
-                "intent_shadow_schedule_failed error_type=%s",
-                type(exc).__name__,
-            )
+        # 兩個影子各自排程、各自失敗，同一筆訊息兩邊都記才比得出差異。
+        for name, submit in (
+            ("intent_shadow", submit_intent_shadow),
+            ("jev_shadow", submit_jev_shadow),
+        ):
+            try:
+                submit(
+                    message=stored_user_message, history=prior_messages,
+                    trace_id=envelope.context.trace_id, project_id=project_id,
+                    actual_route=route.path,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "%s_schedule_failed error_type=%s",
+                    name, type(exc).__name__,
+                )
 
     return GenerationContext(
         trace_id=envelope.context.trace_id,
