@@ -1,5 +1,7 @@
 # Embedding 意圖影子模式評估
 
+> **已退場（2026-09-23）**：dev 多輪對話實測 9/19，程式碼已移除，改由 Jev 影子觀測（見 `scripts/experiments/jev/OPERATIONS.md`）。以下為原始紀錄。
+
 日期：2026-09-20。結論：**保留為觀測，不用來跳過 RAG**。固定 64 筆獨立合成案例答對 52 筆（81.25%），包含一筆 knowledge→chat 錯誤。
 
 ## 方法與結果
@@ -54,6 +56,7 @@ cases.jsonl 與 results.json 記錄 fixture、classifier、prototype SHA-256、i
 在包含此版本來源碼及既有 embedding 設定的 api 容器內執行（路徑依容器來源碼位置調整）：
 
 ```bash
+# evaluate.py 與 core/intent_shadow.py 已於 2026-09-23 刪除，需從 a85248a 之前的 git 歷史取回
 PYTHONPATH=/app python /path/to/intent-shadow/evaluate.py   --module /app/core/intent_shadow.py
 ```
 

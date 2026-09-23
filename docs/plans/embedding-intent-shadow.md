@@ -1,5 +1,7 @@
 # Embedding 意圖偵測影子模式
 
+> **已退場（2026-09-23）**：dev 多輪對話實測 9/19，程式碼已移除，改由 Jev 影子觀測（見 `scripts/experiments/jev/OPERATIONS.md`）。以下為原始紀錄。
+
 狀態：Draft。範圍：普通 chat／SSE 進入 prepare_generation 後的旁路觀測；不改 RouteDecision、prompt、工具選擇或強制檢索。
 
 - 共用既有 embedding gateway，固定 chat／knowledge／web／clarify prototype centroid；分類結果只作觀測。

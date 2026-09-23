@@ -1,7 +1,7 @@
 """Jev (TypeSafe System One) intent shadow; observes only, never routes.
 
-與 BGE 影子並排跑，同一筆訊息兩邊用 trace_id 對得起來。Jev 是外部 API，
-所以比 BGE 影子多兩道閘：外送內容寫死在 jev_state()，不由設定放寬；每日
+結果只寫 log 與 usage.db，用 trace_id 對照實際走的路徑。Jev 是外部 API，
+所以有兩道閘：外送內容寫死在 jev_state()，不由設定放寬；每日
 呼叫數有硬上限，到了就停到隔天（UTC）。
 """
 

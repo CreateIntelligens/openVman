@@ -33,13 +33,13 @@
 
 計畫保留原始狀態；Draft 不表示已確認完成。實驗腳本與逐筆資料維持在原目錄，避免報告與重現工具分離。
 
-- [Embedding 意圖影子模式計畫](plans/embedding-intent-shadow.md)
+- [Embedding 意圖影子模式計畫](plans/embedding-intent-shadow.md)（已退場，改用 Jev）
 - [兩個前端共用語音核心（ASR／VAD／TTS）](plans/shared-speech-core.md)
 - [OpenSpec 變更提案](../openspec/changes/)
 - [Jev 決策層計畫](plans/jev-decision-layer.md)：意圖分流影子觀測 → RAG 證據判斷；SemIf 退場
 - [Jev API 分流／打斷評估](../scripts/experiments/jev/REPORT.md)：官方 Jev API 在 SemIf 同一份合成題庫上 96/96、零順序翻轉。
-- [意圖觀測實驗操作](../scripts/experiments/intent-shadow/OPERATIONS.md)：預設關閉的旁路觀測功能。
-- [BGE 意圖觀測評估](../scripts/experiments/intent-shadow/REPORT.md)
+- [Jev 意圖觀測操作](../scripts/experiments/jev/OPERATIONS.md)：預設關閉的旁路觀測功能。
+- [BGE 意圖觀測評估](../scripts/experiments/intent-shadow/REPORT.md)（已退場，只留證據）
 - [瀏覽器小模型相容性與結案紀錄](../scripts/experiments/browser-intent/P0-COMPATIBILITY.md)：介面可行（WebLLM/MLC），但 Qwen3.5-0.8B 在 32 題上全部順序敏感，**不進 P1**。
 - [A2A 真實往返紀錄](../scripts/experiments/a2a-live/README.md)
 

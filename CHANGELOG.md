@@ -45,6 +45,13 @@
     `/brain/usage/summary` 的方向對稱。記帳失敗只留 warning，不影響合成結果。
 
 ### Removed
+
+- **BGE embedding 意圖影子**（`core/intent_shadow.py`、`INTENT_SHADOW_*` 設定、
+  `scripts/experiments/intent-shadow/evaluate.py` 與 `OPERATIONS.md`）：用 centroid
+  相似度猜意圖，2026-09-23 dev 多輪對話實測只有 9/19，並有一筆知識庫問題誤判閒聊。
+  改由 Jev 影子觀測；排程測試移到 `test_jev_shadow.py`。評估報告與逐筆結果保留。
+  embedding 本身仍負責知識庫檢索，不受影響。舊 `.env` 留著 `INTENT_SHADOW_*` 不會出錯
+  （設定忽略未知欄位）。
 - **SemIf 本機語意分流實驗退場**: `scripts/experiments/semif/` 的 compose、runner 與
   操作手冊刪除——它教的是怎麼跑一個結論已定（21/32 題隨選項順序改答案，不採用）的
   實驗。逐筆結果、`cases.jsonl`（Jev 評估用同一份 fixture）、`runner_used.py`（產生

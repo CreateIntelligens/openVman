@@ -335,9 +335,9 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 
 停止操作不需要 ASR 文字即可中斷後端工作。帶辨識文字的插話以本地規則處理：「停」立即中斷，「不用停，繼續說」、附和與已識別的引用背景話不誤停；句中另有新問題或修正要求仍會中斷。此修正不引入 SemIf 或其他模型。行為與邊界見 [中斷機制](docs/specs/01_BACKEND_SPEC.md#8-打斷機制處理-interruption-handling)。
 
-### Embedding 意圖觀測
+### 意圖觀測
 
-[意圖影子模式](scripts/experiments/intent-shadow/OPERATIONS.md)可抽樣使用既有 BGE embedding 記錄建議分類，預設關閉，不影響正式 RAG 決策。[獨立案例評估](scripts/experiments/intent-shadow/REPORT.md)為 52/64 正確，目前僅適合觀測。
+[Jev 影子模式](scripts/experiments/jev/OPERATIONS.md)可抽樣呼叫 TypeSafe Jev 記錄建議分類，預設關閉，不影響正式 RAG 決策。先前的 BGE embedding 影子已移除（多輪對話只有 9/19，[評估保留](scripts/experiments/intent-shadow/REPORT.md)）。
 
 ### 前端小模型實驗
 

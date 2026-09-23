@@ -264,7 +264,7 @@ Brain 必須將每次 LLM 呼叫的 input、output、cached、reasoning 與 tota
 
 #### 9.1 路由模式 (Routing Modes)
 
-可選的 [Embedding 意圖影子模式](../../scripts/experiments/intent-shadow/OPERATIONS.md)在普通使用者回合的 prompt 組裝後提交背景分類。分類僅寫入觀測記錄，不回傳至路由決策，也不修改工具、prompt 或強制檢索。控制訊息與明確指定工具的回合不參與；抽樣、單筆容量、HTTP timeout 與失敗冷卻限制額外工作。
+可選的 [Jev 意圖影子模式](../../scripts/experiments/jev/OPERATIONS.md)在普通使用者回合的 prompt 組裝後提交背景分類。分類僅寫入觀測記錄，不回傳至路由決策，也不修改工具、prompt 或強制檢索。控制訊息與明確指定工具的回合不參與；抽樣、單筆容量、HTTP timeout 與失敗冷卻限制額外工作。
 
 
 `pipeline.py` 依請求種類分為三條路徑，目的是最小化每次呼叫的 prompt 體積與工具搜尋成本：

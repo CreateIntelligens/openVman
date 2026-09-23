@@ -744,13 +744,9 @@ API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gatew
 
 [Jev API 評估](../scripts/experiments/jev/REPORT.md)在 48 筆繁體中文合成案例上 96/96、零順序翻轉。先前的 SemIf 本機模型實驗因順序敏感不採用，結論與逐筆結果保留在 [`semif-evidence/`](../scripts/experiments/semif-evidence/REPORT.md)。兩者都尚未接入 Brain 正式路由，也不取代強制知識庫搜尋或權限判斷；接入計畫（影子觀測 → RAG 證據判斷）見 [docs/plans/jev-decision-layer.md](../docs/plans/jev-decision-layer.md)。
 
-Jev 影子觀測已實作、預設關閉（`JEV_SHADOW_ENABLED`）。它與下方 Embedding 影子並排跑，只記錄不改路由；會把當前訊息與正式流程同一份的使用者／助手對話歷史送到 TypeSafe API（不含 system prompt、工具結果與知識庫），抽樣 5%、每日上限 2000 次，用量記進 `usage.db`。設定、外送邊界與記錄格式見 [操作文件](../scripts/experiments/jev/OPERATIONS.md)。
+Jev 影子觀測已實作、預設關閉（`JEV_SHADOW_ENABLED`）。只記錄不改路由；會把當前訊息與正式流程同一份的使用者／助手對話歷史送到 TypeSafe API（不含 system prompt、工具結果與知識庫），抽樣 5%、每日上限 2000 次，用量記進 `usage.db`。設定、外送邊界與記錄格式見 [操作文件](../scripts/experiments/jev/OPERATIONS.md)。
 
-## Embedding 意圖影子模式
-
-普通 chat／SSE 可抽樣使用既有 BGE embedding 觀察 chat、knowledge、web、clarify 建議分類。預設關閉；背景結果不改路由、prompt 或強制知識庫檢索，每個 process 同時只處理一筆，不排隊。設定、記錄格式與故障行為見 [操作文件](../scripts/experiments/intent-shadow/OPERATIONS.md)，獨立 64 筆合成案例結果見 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。目前 52/64 正確，包含一筆知識庫問題誤判閒聊，不能用來跳過 RAG。
-
-實作將範例 centroid 初始化與 query 評分分開，文字截斷限制集中管理；這項整理不改變分類、背景排程或正式 RAG 行為。
+BGE embedding 意圖影子（用 centroid 相似度猜意圖）已移除：單句 64 筆 52/64，但 2026-09-23 dev 多輪對話實測只有 9/19，並有一筆知識庫問題誤判閒聊——embedding 相似度會被前一輪主題拉走，不適合做意圖判斷。embedding 本身仍負責知識庫檢索，不受影響。評估結果保留在 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。
 
 ## A2A 工具輸入驗證
 

@@ -161,11 +161,7 @@ class BrainSettings(BaseSettings):
     # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
     chat_answer_pass_excludes_knowledge_search: bool = True
 
-    intent_shadow_enabled: bool = False
-    intent_shadow_sample_rate: float = Field(default=0.1, ge=0, le=1)
-    intent_shadow_timeout_seconds: float = Field(default=0.5, gt=0, le=5)
-    intent_shadow_cooldown_seconds: float = Field(default=30, ge=0, le=3600)
-    # Jev 影子：外部 API，有費用與資料外送，所以抽樣比 BGE 保守並有每日硬上限。
+    # Jev 影子：外部 API，有費用與資料外送，所以抽樣保守並有每日硬上限。
     jev_shadow_enabled: bool = False
     jev_shadow_sample_rate: float = Field(default=0.05, ge=0, le=1)
     jev_shadow_timeout_seconds: float = Field(default=0.6, gt=0, le=5)

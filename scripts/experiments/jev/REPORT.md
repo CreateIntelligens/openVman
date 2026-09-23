@@ -56,3 +56,21 @@ Jev 在同一份合成案例上 **96/96 全對**，正反序均 100%，**零翻�
 
 模型版本：jev-1.13.0（`jev-latest` alias 解析結果）。
 SDK：typesafe-sdk 0.7.1。
+
+## 2026-09-23 補充：能取代哪些現有判斷
+
+`eval_replacements.py` 用 `replacement_cases.jsonl`（自寫 70 題）加 SemIf fixture 的 16 題打斷案例，
+同一題讓現行規則與 Jev 各判一次。逐題結果：`results/replacements.txt`。
+
+| 判斷 | n | 現行做法 | Jev |
+|---|---|---|---|
+| save_memory 是否明確要求記憶（`memory_tools.py`） | 20 | regex 5/20 | 20/20 |
+| prompt injection／越獄（`safety/guardrails.py`，4 條英文 regex） | 20 | 11/20 | 20/20 |
+| 語音打斷 STOP／IGNORE（`backend/app/guard_agent.py`） | 30 | 23/30 | 29/30 |
+| A2A 是否需要回覆（現在靠整輪 LLM 回 `[[A2A_NO_REPLY]]`） | 16 | — | 16/16 |
+
+- 單題呼叫 p50 約 350 ms；四題放同一次呼叫 p50 也約 350 ms（p95 兩次分別 381／742 ms），
+  所以每輪只需一次 Jev 呼叫就能同時拿路由、記憶、攻擊等判斷。平均輸入約 410 token。
+- **偏差**：題目是自己寫的，刻意放了規則會誤判的句子，規則分數被壓低；只說明 Jev 能處理規則
+  處理不了的類型，不代表正式流量準確率。打斷的原 16 題 fixture 兩邊都全對，差距全在新題。
+- 不適合：PII 偵測（目的是不外送，改外部 API 違背目的）、影像事件、需要長文生成的抽取。

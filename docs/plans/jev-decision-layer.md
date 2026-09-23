@@ -60,12 +60,12 @@ trace）：`search_knowledge` 387 ms，整輪 `/brain/chat` 4718 ms，**檢索�
 ### 2.1 不做什麼
 
 - 不改 `RouteDecision`、不改 prompt、不改工具選擇、不跳過任何檢索。
-- 不取代 BGE 影子；**兩個並排跑**，同一筆訊息兩邊都記，才比得出差異。
+- ~~不取代 BGE 影子；兩個並排跑~~。2026-09-23 dev 多輪實測 BGE 9/19、Jev 16–18/19，BGE 影子已移除，比較基準改為現況「一律強制查知識庫」。
 - 不在 SSE／即時語音路徑上呼叫（那條路延遲敏感，且已有 Guard）。
 
 ### 2.2 怎麼接
 
-沿用 `brain/api/core/intent_shadow.py` 的骨架（每 process 一個背景任務、不排隊、
+沿用（已移除的）`brain/api/core/intent_shadow.py` 的骨架（每 process 一個背景任務、不排隊、
 抽樣、短 timeout、失敗冷卻），加一個 `JevIntentObserver`：
 
 - 抽樣率獨立設定 `JEV_SHADOW_SAMPLE_RATE`，預設 **0.05**（BGE 是 0.1）。它有費用

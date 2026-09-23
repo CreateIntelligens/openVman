@@ -1,8 +1,8 @@
 """Jev shadow: outbound boundary, daily cap, failure isolation, usage ledger."""
 
+import importlib
 import json
 import sys
-from types import ModuleType
 
 import httpx
 import pytest
@@ -48,10 +48,11 @@ def cfg(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch, tmp_path):
-    # 其他測試會把 safety.observability 換成殘缺的 stub，這裡自備一個。
-    metrics = ModuleType("safety.observability")
-    metrics.get_metrics_store = lambda: Metrics()
-    monkeypatch.setitem(sys.modules, "safety.observability", metrics)
+    # 其他測試會把 safety.observability 換成殘缺的 stub；重新載入真的模組，
+    # 只把 metrics store 換掉。
+    monkeypatch.delitem(sys.modules, "safety.observability", raising=False)
+    observability = importlib.import_module("safety.observability")
+    monkeypatch.setattr(observability, "get_metrics_store", lambda: Metrics())
     usage_ledger.set_usage_db_path(tmp_path / "usage.db")
     monkeypatch.setattr(jev, "_observer", None)
     monkeypatch.setattr(jev, "_observer_key", None)
@@ -218,3 +219,51 @@ def test_settings_defaults_are_conservative():
     assert settings.jev_shadow_timeout_seconds == 0.6
     assert settings.jev_shadow_cooldown_seconds == 60
     assert settings.jev_shadow_daily_call_cap == 2000
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_prepare_schedules_shadow_without_touching_the_turn(monkeypatch, fails):
+    # 影子排程失敗（或成功）都不能改變路由、prompt 或回覆；控制訊息與
+    # slash 強制工具回合不送。
+    import copy
+    from unittest.mock import Mock
+
+    from conftest import make_fake_agent_loop, stub_chat_service_deps
+    from protocol.message_envelope import (
+        METADATA_ORIGINAL_USER_MESSAGE,
+        MessageEnvelope,
+        RequestContext,
+    )
+    stub_chat_service_deps(monkeypatch)
+    monkeypatch.setitem(sys.modules, "core.agent_loop", make_fake_agent_loop())
+    monkeypatch.delitem(sys.modules, "core.chat_service", raising=False)
+    service = importlib.import_module("core.chat_service")
+    monkeypatch.setattr(service, "enforce_guardrails", lambda *a: None)
+    monkeypatch.setattr(service, "enforce_session_limits", lambda *a: None)
+    prompt = [{"role": "user", "content": "公司流程"}]
+    monkeypatch.setattr(service, "build_chat_messages", lambda **kw: copy.deepcopy(prompt))
+    spy = Mock(side_effect=RuntimeError("PRIVATE TEXT") if fails else None, return_value=True)
+    monkeypatch.setattr(service, "submit_jev_shadow", spy)
+    ctx = RequestContext(trace_id="trace", session_id="session", message_type="user",
+        channel="web", locale="zh-TW", persona_id="default", project_id="proj",
+        client_ip="127.0.0.1", metadata={})
+
+    context = service.prepare_generation(MessageEnvelope(content="公司流程", context=ctx))
+    assert context.route.path == "tool"
+    assert not context.route.skip_rag and not context.route.skip_tools
+    assert context.prompt_messages == prompt
+    spy.assert_called_once()
+    assert service.run_agent_loop(context.prompt_messages).reply == "tool reply"
+
+    spy.reset_mock()
+    ctx.message_type = "control"
+    service.prepare_generation(MessageEnvelope(content="control", context=ctx))
+    spy.assert_not_called()
+
+    ctx.message_type = "user"
+    ctx.metadata = {METADATA_ORIGINAL_USER_MESSAGE: "/tool test"}
+    forced = service.prepare_generation(MessageEnvelope(
+        content="[系統指令] 請立即呼叫工具 `test`", context=ctx,
+    ))
+    assert forced.route.forced_tool_name == "test"
+    spy.assert_not_called()
