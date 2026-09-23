@@ -191,6 +191,17 @@ class SessionStore:
             )
         return state, message_id
 
+    def list_user_messages_without_language(self) -> list[tuple[int, str]]:
+        """Rows written before messages.language existed (for one-off backfill)."""
+        with self._lock:
+            with self._connect() as conn:
+                return [
+                    (int(row[0]), str(row[1]))
+                    for row in conn.execute(
+                        "SELECT id, content FROM messages WHERE role = 'user' AND language IS NULL ORDER BY id",
+                    ).fetchall()
+                ]
+
     def update_message_language(self, message_id: int, language: str) -> None:
         with self._lock:
             with self._connect() as conn:

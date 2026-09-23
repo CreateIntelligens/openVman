@@ -334,3 +334,19 @@ def test_stored_language_wins_over_rules(store: SessionStore, monkeypatch):
 
     refined[0][2]("es")
     assert store.list_sessions("default", language="es")[0]["session_id"] == "s1"
+
+
+def test_lists_only_user_messages_missing_language(store: SessionStore, monkeypatch):
+    from memory import session_store as store_module
+
+    monkeypatch.setattr(store_module, "refine_language_in_background", lambda *a, **kw: None)
+    store.get_or_create_session("s1", "default")
+    _, first = store.append_message("s1", "default", "user", "hello there")
+    store.append_message("s1", "default", "assistant", "hi")
+    with store._connect() as conn:
+        conn.execute("UPDATE messages SET language = NULL WHERE id = ?", (first,))
+        conn.commit()
+
+    assert store.list_user_messages_without_language() == [(first, "hello there")]
+    store.update_message_language(first, "en")
+    assert store.list_user_messages_without_language() == []

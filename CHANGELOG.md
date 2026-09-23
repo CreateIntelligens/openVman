@@ -12,6 +12,8 @@
 - **訊息存語言，Jev 背景校正**：`messages.language` 新欄位，使用者訊息寫入時先用規則判，再在背景問 Jev，
   結果不同才改寫（`JEV_LANGUAGE_ENABLED` 預設 true）。只分 zh／en／es，其他語言與判斷不出來的都算中文。
   36 句比較：Jev 36/36、規則 33/36、主對話 LLM 33/36（`scripts/experiments/lang-detect/`）。
+  舊訊息用 `brain/api/scripts/backfill_message_language.py` 逐則問 Jev 補齊（正式 136 則已補：Jev 改掉規則
+  判錯的 3 則，含中英混雜的 A2A 測試句與亂碼「su3cl」）。
 
 ### Changed
 
