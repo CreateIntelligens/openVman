@@ -381,6 +381,10 @@ user input
   - 取得完整回答（含 tool call 執行結果與本次模型呼叫的 `usage` 彙總）
 - `GET /brain/chat/history`
   - 讀取當前 session history
+- `GET /brain/sessions`、`GET /brain/sessions/export`
+  - 對話列表與匯出，可用 `language=zh|en|es` 篩選（語言取最後一則使用者訊息，規則即時判、Jev 背景校正）
+- `GET /brain/backups/sessions`、`POST /brain/backups/sessions`
+  - 對話備份列表與立即備份（`{"dry_run": true}` 只算數量）；每天 03:00 自動依語言分檔備份到 `/data/backups/sessions`。只收 internal token，對外經 Backend 限 ROOT
 
 ### Token Usage API
 

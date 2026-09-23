@@ -18,6 +18,7 @@ from internal_routes import router as internal_router
 from knowledge.workspace import ensure_workspace_scaffold
 from memory.embedder import get_embedder
 from memory.memory_governance import maybe_run_memory_maintenance
+from routes.backups import router as backups_router
 from routes.chat import router as chat_router
 from routes.health import router as health_router
 from routes.knowledge import router as knowledge_router
@@ -228,9 +229,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from memory.dreaming.scheduler import start_dreaming_scheduler
         await start_dreaming_scheduler(app)
 
+    from memory.session_backup import start_backup_scheduler
+    app.state.session_backup_task = start_backup_scheduler()
+
     logger.info("大腦層就緒")
     yield
     await asyncio.gather(
+        cancel_task(getattr(app.state, "session_backup_task", None)),
         cancel_task(getattr(app.state, "dreaming_task", None)),
         cancel_task(getattr(app.state, "warmup_task", None)),
     )
@@ -261,6 +266,7 @@ for router in (
     workspace_router,
     protocol_router,
     usage_router,
+    backups_router,
 ):
     app.include_router(router)
 

@@ -158,6 +158,14 @@ class BrainSettings(BaseSettings):
     dreaming_candidate_limit: int = 100
     dreaming_similarity_threshold: float = 0.90
 
+    # === 對話備份（VH-389）===
+    # 每天在 session_backup_hour 點（台北時間）把所有專案的對話依語言匯出成檔案，
+    # 只留最近 session_backup_keep 份。空的 session_backup_dir 表示 /data/backups/sessions。
+    session_backup_enabled: bool = True
+    session_backup_hour: int = Field(default=3, ge=0, le=23)
+    session_backup_keep: int = Field(default=30, ge=1)
+    session_backup_dir: str = ""
+
     # === Agent 設定 ===
     agent_loop_max_rounds: int = 6
     tool_call_timeout_seconds: int = 30
@@ -181,6 +189,9 @@ class BrainSettings(BaseSettings):
     typesafe_api_key: str = ""
     # save_memory 授權改由 Jev 判斷；沒設 key 或呼叫失敗時退回關鍵字規則。
     jev_memory_gate_enabled: bool = True
+    # 使用者訊息存進去時先用規則判語言，再在背景問 Jev 校正（36 句測試 Jev 36/36、
+    # 規則 33/36，見 scripts/experiments/lang-detect）。關掉就只用規則。
+    jev_language_enabled: bool = True
     jev_gate_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
     # 第一輪平行查完後，最多再允許幾輪追加工具（例如補查一次網路或讀一頁），
     # 之後不帶工具只能作答；避免模型一輪一查拖到七、八次呼叫。

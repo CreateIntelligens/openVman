@@ -313,3 +313,24 @@ def test_list_sessions_reports_and_filters_language(store: SessionStore):
     languages = {s["session_id"]: s["language"] for s in store.list_sessions("default")}
     assert languages == {"zh": "zh", "switch": "es"}
     assert [s["session_id"] for s in store.list_sessions("default", language="es")] == ["switch"]
+
+
+def test_stored_language_wins_over_rules(store: SessionStore, monkeypatch):
+    """背景 Jev 校正寫回欄位後，列表以存下的語言為準。"""
+    from memory import session_store as store_module
+
+    refined: list = []
+    monkeypatch.setattr(
+        store_module,
+        "refine_language_in_background",
+        lambda text, rule, on_change: refined.append((text, rule, on_change)),
+    )
+    store.get_or_create_session("s1", "default")
+    store.append_message("s1", "default", "user", "buenos dias")
+    store.append_message("s1", "default", "assistant", "¡Buenos días!")
+
+    assert [(t, r) for t, r, _ in refined] == [("buenos dias", "zh")]
+    assert store.list_sessions("default")[0]["language"] == "zh"
+
+    refined[0][2]("es")
+    assert store.list_sessions("default", language="es")[0]["session_id"] == "s1"

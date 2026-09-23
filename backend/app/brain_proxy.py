@@ -142,6 +142,8 @@ _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # 這些 Brain 路徑由 Backend 自己的路由（含帳號範圍限制）對外提供，
 # catch-all 直通會繞過那層限制，所以一律擋掉。
 _BACKEND_OWNED_PREFIXES = (
+    # 備份限 ROOT，由 routes/admin.py 轉發；catch-all 不得讓一般帳號直通。
+    "backups",
     "knowledge/raw/upload",
     "knowledge/upload",
     "usage",

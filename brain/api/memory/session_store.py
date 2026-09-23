@@ -15,7 +15,10 @@ from zoneinfo import ZoneInfo
 
 from config import get_settings
 from infra.datetime_utils import normalize_iso_timestamp, utc_now_iso
-from memory.language_detect import detect_language
+from memory.language_detect import (
+    detect_language,
+    refine_language_in_background,
+)
 from personas.personas import normalize_persona_id
 
 
@@ -152,14 +155,15 @@ class SessionStore:
         max_messages = max(cfg.max_session_rounds * 2, 20)
         persona_key = normalize_persona_id(persona_id)
         metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
+        language = detect_language(content) if role == "user" else None
 
         with self._lock:
             self._prune_expired_sessions_locked()
             with self._connect() as conn:
                 self._ensure_session_persona_locked(conn, session_id, persona_key, now)
                 cursor = conn.execute(
-                    "INSERT INTO messages(session_id, role, content, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
-                    (session_id, role, content, now, metadata_json),
+                    "INSERT INTO messages(session_id, role, content, created_at, metadata, language) VALUES (?, ?, ?, ?, ?, ?)",
+                    (session_id, role, content, now, metadata_json, language),
                 )
                 message_id = int(cursor.lastrowid or 0)
 
@@ -178,7 +182,23 @@ class SessionStore:
                         overflow_ids,
                     )
                 conn.commit()
-                return self._load_session_locked(conn, session_id), message_id
+                state = self._load_session_locked(conn, session_id)
+        if language is not None:
+            refine_language_in_background(
+                content,
+                language,
+                lambda refined: self.update_message_language(message_id, refined),
+            )
+        return state, message_id
+
+    def update_message_language(self, message_id: int, language: str) -> None:
+        with self._lock:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE messages SET language = ? WHERE id = ?",
+                    (language, message_id),
+                )
+                conn.commit()
 
     def update_message_metadata(
         self, message_id: int, metadata: dict[str, Any]
@@ -288,7 +308,8 @@ class SessionStore:
                         s.updated_at,
                         (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) AS message_count,
                         (SELECT m.content FROM messages m WHERE m.session_id = s.session_id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_preview,
-                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_message
+                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_message,
+                        (SELECT m.language FROM messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_language
                     FROM sessions s
                     WHERE EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
                 """
@@ -323,7 +344,7 @@ class SessionStore:
                         "updated_at": normalize_iso_timestamp(row[3]),
                         "message_count": row[4],
                         "last_message_preview": (row[5] or "")[:120],
-                        "language": detect_language(row[6] or ""),
+                        "language": row[7] or detect_language(row[6] or ""),
                     }
                     for row in conn.execute(base_sql, params).fetchall()
                 ]
@@ -479,6 +500,9 @@ class SessionStore:
             }
             if "metadata" not in message_columns:
                 conn.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")
+            # 只有使用者訊息有值；舊訊息留 NULL，列表時再用規則補算。
+            if "language" not in message_columns:
+                conn.execute("ALTER TABLE messages ADD COLUMN language TEXT")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_messages_session_created_at ON messages(session_id, created_at, id)"
             )

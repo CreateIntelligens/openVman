@@ -1,21 +1,27 @@
 """Guess which language a chat message is written in.
 
-對話紀錄要能依語言篩選（VH-388），但訊息沒有存語言：Live 轉錄只給文字，
-前台也不讓使用者先選語言。這裡用字元與常用字判斷，不呼叫模型，列表每筆
-session 都要算一次。只分辨我們真的有客戶用到的語言，其他一律歸「other」。
+對話紀錄依語言篩選與備份（VH-388／389）要用：Live 轉錄只給文字，前台也
+不讓使用者先選語言。寫入時先用字元與常用字規則判斷（即時、不外送），再在
+背景問 Jev 校正；規則錯在「ok」「buenos dias」這種沒有特徵字的短句。
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
+from typing import Callable
 
-LANGUAGES = ("zh", "en", "es", "ja", "ko", "other")
+logger = logging.getLogger(__name__)
 
-_HANGUL = re.compile(r"[가-힯ᄀ-ᇿ]")
-_KANA = re.compile(r"[぀-ヿ]")
-_HAN = re.compile(r"[一-鿿㐀-䶿]")
+# 客戶只用中英西；其他語言與判斷不出來的一律算中文（2026-09-23 使用者決定）。
+LANGUAGES = ("zh", "en", "es")
+DEFAULT_LANGUAGE = "zh"
+
 _LATIN_WORD = re.compile(r"[a-záéíóúüñ]+")
 _SPANISH_MARKS = re.compile(r"[¿¡ñ]")
+_HAN = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
 
 _EN_WORDS = frozenset(
     "the an is are was were do does did i you he she it we they my your "
@@ -33,27 +39,76 @@ _ES_WORDS = frozenset(
 
 
 def detect_language(text: str) -> str:
-    """Return one of LANGUAGES, or "" when there is nothing to judge."""
-    if not text or not text.strip():
-        return ""
-    if _HANGUL.search(text):
-        return "ko"
-    # 日文一定夾假名；只有漢字就當中文。
-    if _KANA.search(text):
-        return "ja"
-    if _HAN.search(text):
-        return "zh"
-
-    lowered = text.lower()
+    """Return "en" or "es" when the text is clearly one of them, else "zh"."""
+    lowered = (text or "").lower()
     words = _LATIN_WORD.findall(lowered)
     if not words:
-        return ""
+        return DEFAULT_LANGUAGE
     if _SPANISH_MARKS.search(lowered):
         return "es"
     en_hits = sum(word in _EN_WORDS for word in words)
     es_hits = sum(word in _ES_WORDS for word in words)
-    if es_hits > en_hits:
-        return "es"
-    if en_hits > es_hits:
-        return "en"
-    return "other"
+    if en_hits == es_hits:
+        return DEFAULT_LANGUAGE
+    # 中文句子夾英文型號（EUS、HP）很常見，漢字比拉丁字多就還是中文。
+    if len(_HAN.findall(text)) > len(words):
+        return DEFAULT_LANGUAGE
+    return "es" if es_hits > en_hits else "en"
+
+
+_JEV_QUESTIONS = {
+    "en": {
+        "instructions": "這句使用者訊息主要是用英文寫的嗎？",
+        "criteria": {
+            "true": "主要語言是英文",
+            "false": "主要語言是中文、西班牙文或其他語言，或只有型號數字",
+        },
+    },
+    "es": {
+        "instructions": "這句使用者訊息主要是用西班牙文寫的嗎？",
+        "criteria": {
+            "true": "主要語言是西班牙文",
+            "false": "主要語言是中文、英文或其他語言，或只有型號數字",
+        },
+    },
+}
+
+# Jev 呼叫約 0.5 秒；背景跑，不擋寫入。兩條 worker 足夠應付對話節奏。
+_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="jev-language")
+
+
+def detect_language_with_jev(text: str) -> str:
+    """Ask Jev whether ``text`` is English or Spanish; anything else is zh."""
+    from config import get_settings
+    from core.jev_client import jev_nouls
+
+    scores = jev_nouls(
+        text, _JEV_QUESTIONS, timeout=get_settings().jev_gate_timeout_seconds,
+    )
+    best = max(scores, key=scores.__getitem__)
+    return best if scores[best] >= 0.5 else DEFAULT_LANGUAGE
+
+
+def refine_language_in_background(
+    text: str, rule_language: str, on_change: Callable[[str], None],
+) -> None:
+    """Re-check ``text`` with Jev and call ``on_change`` if it disagrees."""
+    from config import get_settings
+    from core.jev_client import jev_available
+
+    if not text.strip() or not get_settings().jev_language_enabled or not jev_available():
+        return
+
+    def _run() -> None:
+        try:
+            language = detect_language_with_jev(text)
+        except Exception as exc:  # noqa: BLE001 - Jev 失敗就留規則的結果
+            # 例外訊息可能夾帶回應內容；只記型別。
+            logger.warning(json.dumps(
+                {"event": "language_jev_failed", "error_type": type(exc).__name__},
+            ))
+            return
+        if language != rule_language:
+            on_change(language)
+
+    _executor.submit(_run)

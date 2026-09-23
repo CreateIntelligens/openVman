@@ -1,5 +1,7 @@
 import { SESSION_LANGUAGE_LABELS, type SessionLanguage } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
+import SessionBackupPanel from "../components/sessions/SessionBackupPanel";
+import { useAuth } from "../context/AuthContext";
 import Select from "../components/Select";
 import { buildAdminPath } from "../components/app/navigation";
 import { formatRelativeTime } from "../components/chat/helpers";
@@ -93,6 +95,7 @@ export default function Sessions() {
     confirmDelete,
   } = useSessionBrowser();
 
+  const { account } = useAuth();
   const selectedCount = selectedSessionIds.size;
   const allSelected = sessions.length > 0 && selectedCount === sessions.length;
   const totalMessages = sessions.reduce(
@@ -149,6 +152,7 @@ export default function Sessions() {
       </header>
 
       <div className="space-y-6 p-8">
+        {account?.role === "root" && <SessionBackupPanel />}
         <section className="card p-5">
           <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <label className="flex flex-col gap-1.5">

@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- **對話備份依語言分檔**（VH-389）：Brain 每天 03:00 把所有專案的對話匯出到
+  `/data/backups/sessions/<時間>/<專案>/{zh,en,es}.jsonl`，保留最近 30 份，同時只跑一個、先寫暫存再改名。
+  後台「對話紀錄」頁對 ROOT 顯示備份區塊（預覽＝dry-run、立即備份、最近 5 份）；對外只有 Backend
+  `/api/v1/backups/sessions`（限 ROOT），catch-all 代理擋掉 `backups`。設定見 `.env.example` 的 `SESSION_BACKUP_*`。
+  備份與正式資料同一個資料卷，異地保存要另外同步。
+- **訊息存語言，Jev 背景校正**：`messages.language` 新欄位，使用者訊息寫入時先用規則判，再在背景問 Jev，
+  結果不同才改寫（`JEV_LANGUAGE_ENABLED` 預設 true）。只分 zh／en／es，其他語言與判斷不出來的都算中文。
+  36 句比較：Jev 36/36、規則 33/36、主對話 LLM 33/36（`scripts/experiments/lang-detect/`）。
+
 ### Changed
 
 - **回覆語言跟著使用者**：文字對話回答規則（`core/prompt_templates.py`）與 Live 系統指令

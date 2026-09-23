@@ -365,7 +365,17 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 `GET /brain/sessions/export` 依 `project_id`、`persona_id`、日期與關鍵字篩選 SQLite session，並可用逗號分隔的 `session_ids` 限定單筆或多筆。回應包含 session 摘要、依時間排序且移除內部 metadata 的訊息、匯出時間與總筆數。外部呼叫一律經 Backend `/api/sessions/export` 代理與專案讀取權限檢查。帶 `simple=true` 時每則訊息只留 `role`、`content`、`created_at`。
 
-`GET /brain/sessions` 與 `/brain/sessions/export` 的每筆摘要都帶 `language`（`zh`、`en`、`es`、`ja`、`ko`、`other`，判斷不出為空字串），以最後一則使用者訊息的文字規則判斷（`memory/language_detect.py`，不呼叫模型、不另存欄位，舊對話也適用）；兩者都可用 `language=<code>` 篩選。
+`GET /brain/sessions` 與 `/brain/sessions/export` 的每筆摘要都帶 `language`（`zh`、`en`、`es`；其他語言與判斷不出來的都算 `zh`），取最後一則使用者訊息的語言；兩者都可用 `language=<code>` 篩選。語言存在 `messages.language`（只有使用者訊息有值）：寫入時先用字元與常用字規則判斷，再在背景問 Jev 校正，Jev 結果不同才改寫（`memory/language_detect.py`，`JEV_LANGUAGE_ENABLED` 預設 true、需 `TYPESAFE_API_KEY`，失敗保留規則結果）。欄位是 NULL 的舊訊息在列表時用規則補算。36 句測試：Jev 36/36、規則 33/36、主對話 LLM 33/36（`scripts/experiments/lang-detect/REPORT.md`）。
+
+#### 11.2 對話備份（VH-389）
+
+`memory/session_backup.py` 每天 `SESSION_BACKUP_HOUR`（預設 3，台北時間）把所有已有 `sessions.db` 的專案匯出到 `SESSION_BACKUP_DIR`（預設 `/data/backups/sessions`）：每次一個 `YYYYMMDD-HHMMSS/` 目錄，內含 `manifest.json` 與 `<project_id>/{zh,en,es}.jsonl`，每行一個 session 摘要連同全部訊息（格式同匯出）。先寫 `.<id>.partial` 再改名，只保留最近 `SESSION_BACKUP_KEEP`（預設 30）份；同時只允許一個備份在跑。
+
+- `GET /brain/backups/sessions` → `{"backups": [manifest...], "running": bool}`（新到舊）。
+- `POST /brain/backups/sessions` 帶 `{"dry_run": true}` 只回各專案分語言的數量不寫檔；已有備份在跑回 409。
+- 兩者只收 internal token。對外只有 Backend `GET/POST /api/v1/backups/sessions`，限 ROOT；`backups` 列在 Backend 代理的 `_BACKEND_OWNED_PREFIXES`，catch-all 一律 404。後台「對話紀錄」頁只對 ROOT 顯示備份區塊（預覽、立即備份、最近 5 份）。
+
+備份與正式資料在同一個資料卷，防得了誤刪與程式寫壞，防不了整顆磁碟損壞；要異地保存需另外同步 `brain/data/backups/`。
 
 `POST /brain/sessions/batch-delete` 帶 `{"session_ids": [...]}`（1–500 筆）一次刪除多筆，去重並略過空白；回應 `deleted` 與 `missing` 兩個清單，部分不存在不會讓整批失敗。經 Backend 代理時需要 sessions 的編輯權限。
 

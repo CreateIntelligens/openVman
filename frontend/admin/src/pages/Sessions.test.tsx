@@ -39,6 +39,16 @@ const browserState = vi.hoisted(() => ({
   hasActiveFilters: false,
 }));
 
+const authState = vi.hoisted(() => ({ role: "admin" }));
+
+vi.mock("../context/AuthContext", () => ({
+  useAuth: () => ({ account: { id: "a", username: "a", role: authState.role } }),
+}));
+
+vi.mock("../components/sessions/SessionBackupPanel", () => ({
+  default: () => <div>對話備份區塊</div>,
+}));
+
 vi.mock("../hooks/useSessionBrowser", async () => {
   const actual = await vi.importActual<
     typeof import("../hooks/useSessionBrowser")
@@ -146,6 +156,18 @@ describe("Sessions", () => {
     expect(screen.getByText("第二則對話預覽")).toBeTruthy();
     expect(screen.getByText("共 2 筆對話 · 16 則訊息")).toBeTruthy();
     expect(screen.getByText("support")).toBeTruthy();
+  });
+
+  it("shows the backup panel only to root", () => {
+    authState.role = "admin";
+    const { unmount } = render(<Sessions />);
+    expect(screen.queryByText("對話備份區塊")).toBeNull();
+    unmount();
+
+    authState.role = "root";
+    render(<Sessions />);
+    expect(screen.getByText("對話備份區塊")).toBeTruthy();
+    authState.role = "admin";
   });
 
   it("labels each session with its detected language", () => {

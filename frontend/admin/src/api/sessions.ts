@@ -14,19 +14,17 @@ export interface SessionSummary {
   updated_at: string;
   message_count: number;
   last_message_preview: string;
-  /** 由最後一則使用者訊息判斷；空字串表示判斷不出來。 */
-  language?: SessionLanguage | "";
+  /** 最後一則使用者訊息的語言。 */
+  language?: SessionLanguage;
 }
 
-export type SessionLanguage = "zh" | "en" | "es" | "ja" | "ko" | "other";
+// 其他語言與判斷不出來的都歸中文（brain memory/language_detect.py）。
+export type SessionLanguage = "zh" | "en" | "es";
 
 export const SESSION_LANGUAGE_LABELS: Record<SessionLanguage, string> = {
   zh: "中文",
   en: "English",
   es: "Español",
-  ja: "日本語",
-  ko: "한국어",
-  other: "其他",
 };
 
 export interface SessionsListResponse {

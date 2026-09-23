@@ -8,7 +8,11 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.auth.dependencies import CurrentAccount, get_current_account
+from app.auth.dependencies import (
+    CurrentAccount,
+    get_current_account,
+    require_root,
+)
 from app.auth.models import (
     AccountType,
     ResourceRecord,
@@ -739,6 +743,52 @@ async def get_usage_events(
     current: CurrentAccount = Depends(get_current_account),
 ) -> JSONResponse:
     return await _forward_usage_query(request, current, "events")
+
+
+# 備份會讀遍所有專案的對話，大專案可能要十幾秒。
+_BACKUP_TIMEOUT_SECONDS = 120.0
+
+
+async def _forward_backup(method: str, body: dict | None = None) -> JSONResponse:
+    cfg = get_tts_config()
+    url = f"{cfg.brain_url.rstrip('/')}/brain/backups/sessions"
+    try:
+        response = await _health_http.get().request(
+            method,
+            url,
+            json=body,
+            headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
+            timeout=_BACKUP_TIMEOUT_SECONDS,
+        )
+        content = response.json()
+    except Exception as exc:
+        logger.warning("session backup call to brain failed: %s", exc)
+        return JSONResponse(status_code=502, content={"error": "brain unavailable"})
+    return JSONResponse(status_code=response.status_code, content=content)
+
+
+@router.get("/api/v1/backups/sessions", tags=["Backups"], summary="列出對話備份（ROOT）")
+async def get_session_backups(
+    _root: CurrentAccount = Depends(require_root),
+) -> JSONResponse:
+    return await _forward_backup("GET")
+
+
+@router.post("/api/v1/backups/sessions", tags=["Backups"], summary="立即備份對話（ROOT）")
+async def post_session_backup(
+    request: Request,
+    _root: CurrentAccount = Depends(require_root),
+) -> JSONResponse:
+    """全部專案的對話依語言匯出；帶 ``{"dry_run": true}`` 只回數量不寫檔。
+
+    限 ROOT：備份涵蓋每個專案的對話內容，跨專案權限只有 ROOT 有。
+    """
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    dry_run = bool(body.get("dry_run")) if isinstance(body, dict) else False
+    return await _forward_backup("POST", {"dry_run": dry_run})
 
 
 @router.get("/metrics", tags=["System"], summary="服務監控指標")

@@ -1395,3 +1395,59 @@ def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
     )
 
     assert response.status_code == 413
+
+
+def test_session_backup_routes_are_root_only(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    from app.auth.dependencies import require_root
+
+    routes = {
+        (route.path, method): route
+        for route in module.app.routes
+        if getattr(route, "path", "") == "/api/v1/backups/sessions"
+        for method in route.methods
+    }
+    assert set(routes) == {("/api/v1/backups/sessions", "GET"), ("/api/v1/backups/sessions", "POST")}
+    for route in routes.values():
+        assert require_root in [dep.call for dep in route.dependant.dependencies]
+
+
+def test_session_backup_forwards_dry_run_to_brain(monkeypatch):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"backup_id": "x", "dry_run": True}
+
+    class FakeAsyncClient:
+        async def request(self, method, url, json=None, headers=None, timeout=None):
+            captured.update(method=method, url=url, json=json, headers=dict(headers or {}))
+            return FakeResponse()
+
+    class FakeClient:
+        def get(self):
+            return FakeAsyncClient()
+
+    monkeypatch.setattr(module.admin_routes, "_health_http", FakeClient())
+    monkeypatch.setattr(
+        module.admin_routes,
+        "get_tts_config",
+        lambda: types.SimpleNamespace(brain_url="http://brain:8100/", gateway_internal_token="internal-secret"),
+    )
+
+    async def body():
+        return {"type": "http.request", "body": b'{"dry_run": true, "extra": 1}'}
+
+    request = Request({"type": "http", "method": "POST", "path": "/api/v1/backups/sessions", "headers": []}, body)
+    response = asyncio.run(module.admin_routes.post_session_backup(request, _root=None))
+
+    assert response.status_code == 200
+    assert captured == {
+        "method": "POST",
+        "url": "http://brain:8100/brain/backups/sessions",
+        "json": {"dry_run": True},
+        "headers": {"X-Internal-Token": "internal-secret"},
+    }

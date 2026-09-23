@@ -1,0 +1,704 @@
+{
+ "summary": {
+  "rules": {
+   "correct": "33/36",
+   "p50_ms": 0.0,
+   "p95_ms": 0.0,
+   "misses": [
+    [
+     "ok",
+     "en",
+     "zh"
+    ],
+    [
+     "cuanto cuesta",
+     "es",
+     "zh"
+    ],
+    [
+     "buenos dias",
+     "es",
+     "zh"
+    ]
+   ]
+  },
+  "jev": {
+   "correct": "36/36",
+   "p50_ms": 506.1,
+   "p95_ms": 595.0,
+   "misses": []
+  },
+  "llm": {
+   "correct": "33/36",
+   "p50_ms": 821.7,
+   "p95_ms": 967.4,
+   "misses": [
+    [
+     "ポンプを探しています",
+     "zh",
+     "es"
+    ],
+    [
+     "펌프 추천해 주세요",
+     "zh",
+     "en"
+    ],
+    [
+     "Guten Tag",
+     "zh",
+     "en"
+    ]
+   ]
+  }
+ },
+ "rows": [
+  {
+   "method": "rules",
+   "text": "你好，地下室要抽污水，你推薦哪一款泵浦？",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "EUS 系列 2HP 的揚程多少？",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "50EUBL 跟 HIPPO 差在哪",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "请问这个泵浦多少钱",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "好",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "謝謝",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "我要 OK 的那款",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "DIVA PRO 有 agitator 嗎",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "可以用 LINE 聯絡業務嗎",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "嗯嗯",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "Hi, which pump would you recommend for draining dirty water?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "What is the max head of the EUS series?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "thanks",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "ok",
+   "expected": "en",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "Can I talk to a sales engineer?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "How much is it",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "Do you ship to Mexico?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "hello",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "I need a pump for my basement",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "Is the DIVA PRO suitable for sludge",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "rules",
+   "text": "Hola, ¿qué bomba me recomiendas para sacar agua sucia?",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "quiero una bomba para el sotano",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "gracias",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "hola",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "cuanto cuesta",
+   "expected": "es",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "Necesito hablar con un ingeniero de ventas",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "La bomba EUS sirve para agua con lodo?",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "buenos dias",
+   "expected": "es",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "me pueden enviar el catalogo",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "Tienen distribuidores en Mexico",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "rules",
+   "text": "ポンプを探しています",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "펌프 추천해 주세요",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "Guten Tag",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "12345",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "...",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "rules",
+   "text": "EUS",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "你好，地下室要抽污水，你推薦哪一款泵浦？",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "EUS 系列 2HP 的揚程多少？",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "50EUBL 跟 HIPPO 差在哪",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "请问这个泵浦多少钱",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "好",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "謝謝",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "我要 OK 的那款",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "DIVA PRO 有 agitator 嗎",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "可以用 LINE 聯絡業務嗎",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "嗯嗯",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "Hi, which pump would you recommend for draining dirty water?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "What is the max head of the EUS series?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "thanks",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "ok",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "Can I talk to a sales engineer?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "How much is it",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "Do you ship to Mexico?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "hello",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "I need a pump for my basement",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "Is the DIVA PRO suitable for sludge",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "jev",
+   "text": "Hola, ¿qué bomba me recomiendas para sacar agua sucia?",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "quiero una bomba para el sotano",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "gracias",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "hola",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "cuanto cuesta",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "Necesito hablar con un ingeniero de ventas",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "La bomba EUS sirve para agua con lodo?",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "buenos dias",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "me pueden enviar el catalogo",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "Tienen distribuidores en Mexico",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "jev",
+   "text": "ポンプを探しています",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "펌프 추천해 주세요",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "Guten Tag",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "12345",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "...",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "jev",
+   "text": "EUS",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "你好，地下室要抽污水，你推薦哪一款泵浦？",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "EUS 系列 2HP 的揚程多少？",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "50EUBL 跟 HIPPO 差在哪",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "请问这个泵浦多少钱",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "好",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "謝謝",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "我要 OK 的那款",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "DIVA PRO 有 agitator 嗎",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "可以用 LINE 聯絡業務嗎",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "嗯嗯",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "Hi, which pump would you recommend for draining dirty water?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "What is the max head of the EUS series?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "thanks",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "ok",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "Can I talk to a sales engineer?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "How much is it",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "Do you ship to Mexico?",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "hello",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "I need a pump for my basement",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "Is the DIVA PRO suitable for sludge",
+   "expected": "en",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "Hola, ¿qué bomba me recomiendas para sacar agua sucia?",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "quiero una bomba para el sotano",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "gracias",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "hola",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "cuanto cuesta",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "Necesito hablar con un ingeniero de ventas",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "La bomba EUS sirve para agua con lodo?",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "buenos dias",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "me pueden enviar el catalogo",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "Tienen distribuidores en Mexico",
+   "expected": "es",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "ポンプを探しています",
+   "expected": "zh",
+   "got": "es"
+  },
+  {
+   "method": "llm",
+   "text": "펌프 추천해 주세요",
+   "expected": "zh",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "Guten Tag",
+   "expected": "zh",
+   "got": "en"
+  },
+  {
+   "method": "llm",
+   "text": "12345",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "...",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "method": "llm",
+   "text": "EUS",
+   "expected": "zh",
+   "got": "zh"
+  }
+ ]
+}

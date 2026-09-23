@@ -7,6 +7,7 @@ export * from "./personas";
 export * from "./memory";
 export * from "./tts";
 export * from "./sessions";
+export * from "./backups";
 export * from "./metrics";
 export * from "./avatar";
 export * from "./auth";

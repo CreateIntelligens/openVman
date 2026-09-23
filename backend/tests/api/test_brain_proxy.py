@@ -333,3 +333,15 @@ def test_catchall_proxy_blocks_backend_owned_usage_prefix() -> None:
     for path in ("usage", "usage/summary", "usage/events"):
         response = asyncio.run(proxy_to_brain(request, path, current=None))
         assert response.status_code == 404
+
+
+def test_catchall_proxy_blocks_backups_prefix() -> None:
+    """備份限 ROOT；一般帳號不能經 catch-all 直通 Brain 的備份端點。"""
+    import asyncio
+
+    from app.brain_proxy import proxy_to_brain
+
+    request = _request_with_headers([])
+    for path in ("backups", "backups/sessions"):
+        response = asyncio.run(proxy_to_brain(request, path, current=None))
+        assert response.status_code == 404
