@@ -1,8 +1,8 @@
 """Backend-to-brain live relay for gemini_live sessions.
 
-Pure passthrough: forwards LLM text events from the brain bridge to the
-client websocket untouched. TTS synthesis lives entirely on the frontend
-via the `/tts_stream` endpoint.
+Forwards brain bridge events to the client websocket. Gemini's own audio is
+kept only for ``voice_source="gemini"``; with ``"custom"`` the frontend
+synthesizes speech via `/tts_stream`, so upstream audio is stripped.
 """
 
 from __future__ import annotations
@@ -25,7 +25,6 @@ logger = logging.getLogger("backend.brain_live_relay")
 EventSink = Callable[[dict[str, Any]], Awaitable[None]]
 
 # Client-declared voice source values stored in session.metadata.
-# The relay does not branch on these — frontend decides TTS behavior.
 DEFAULT_VOICE_SOURCE = "gemini"
 CUSTOM_VOICE_SOURCE = "custom"
 INTERNAL_TOKEN_HEADER = "X-Internal-Token"
@@ -64,6 +63,11 @@ class BrainLiveRelay:
         self._closed = False
         self._connect_lock = asyncio.Lock()
         self._accumulated_text = ""
+
+    def _voice_source(self) -> str:
+        return _normalize_voice_source(
+            str(self.session.metadata.get("voice_source", DEFAULT_VOICE_SOURCE))
+        )
 
     async def ensure_connected(self) -> None:
         if self._ws is not None:
@@ -129,10 +133,15 @@ class BrainLiveRelay:
                 payload = json.loads(message)
                 if self._event_sink is None:
                     continue
-                # Strip upstream audio: the frontend synthesizes speech via
-                # /tts_stream after receiving the text. Forwarding the original
-                # Gemini audio would cause double playback.
-                if payload.get("event") == "server_stream_chunk" and payload.get("audio_base64"):
+                # custom：前端拿文字自己跑 /tts_stream，再轉發 Gemini 音訊會兩個聲音
+                # 疊在一起。gemini：前端（後台「Gemini 語音」）只播這份音訊，清掉就
+                # 完全無聲——2026-04 把 TTS 移到前端時不分來源一律清掉，後台 Live
+                # 因此一直沒聲音。
+                if (
+                    payload.get("event") == "server_stream_chunk"
+                    and payload.get("audio_base64")
+                    and self._voice_source() == CUSTOM_VOICE_SOURCE
+                ):
                     payload = {**payload, "audio_base64": ""}
 
                 if payload.get("event") == "server_stream_chunk":

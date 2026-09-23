@@ -39,9 +39,10 @@ class ConnectableFakeWebSocket:
 
 @pytest.mark.asyncio
 async def test_brain_live_relay_strips_audio_but_forwards_text():
-    """Backend must strip upstream audio so the frontend's /tts_stream is the
-    sole audio source (otherwise the user hears both voices)."""
+    """With a custom voice the frontend's /tts_stream is the sole audio source
+    (otherwise the user hears both voices)."""
     session = Session(client_id="client-1")
+    session.metadata["voice_source"] = "custom"
     emitted: list[dict[str, object]] = []
 
     async def sink(payload: dict[str, object]) -> None:
@@ -61,6 +62,33 @@ async def test_brain_live_relay_strips_audio_but_forwards_text():
     await relay._listen()
 
     assert emitted == [{**payload, "audio_base64": ""}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("metadata", [{"voice_source": "gemini"}, {}, {"voice_source": "bogus"}])
+async def test_brain_live_relay_keeps_gemini_audio_for_gemini_voice(metadata):
+    """後台「Gemini 語音」只播這份音訊；清掉就完全無聲。未指定或無效值視同 gemini。"""
+    session = Session(client_id="client-g")
+    session.metadata.update(metadata)
+    emitted: list[dict[str, object]] = []
+
+    async def sink(payload: dict[str, object]) -> None:
+        emitted.append(payload)
+
+    relay = BrainLiveRelay(session, event_sink=sink)
+    payload = {
+        "event": "server_stream_chunk",
+        "chunk_id": "chunk-g",
+        "session_id": session.session_id,
+        "text": "有聲音",
+        "audio_base64": "Z2VtaW5pLWF1ZGlv",
+        "is_final": True,
+    }
+    relay._ws = FakeWebSocket(relay, [json.dumps(payload)])
+
+    await relay._listen()
+
+    assert emitted == [payload]
 
 
 @pytest.mark.asyncio

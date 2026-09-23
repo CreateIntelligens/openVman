@@ -139,6 +139,12 @@
   這筆寫回對話歷史後，Gemini OpenAI 相容端點下一輪回 400 `INVALID_ARGUMENT`（dev 實測重現：
   只有空字串參數是這個錯）。`llm_client` 建 `LLMToolCall` 時把空參數統一成 `"{}"`，參數缺漏
   交給工具 schema 驗證回報。非串流與串流兩條路徑都處理。
+- **後台 Live 模式完全沒有聲音**：2026-04 把 TTS 從 relay 移到前端時，`brain_live_relay.py` 不分
+  `voice_source` 一律清掉 Gemini 音訊；avatar 送 `custom` 自己跑 `/tts_stream` 沒事，後台聊天頁的
+  「Gemini 語音」只播 relay 送來的音訊，就一直無聲。現在只有 `voice_source=custom` 才清。
+  後台「自訂語音」在 Live 下仍無聲（前端沒有接 TTS），另案處理。
+- **Gemini Live 重連時送訊息可能 AttributeError**：`ensure_connected()` 之後又讀 `self._transport`，
+  中間的 await 期間重連流程可能把它清成 None。改成 `ensure_connected()` 回傳這次的連線物件。
 - **Gemini Live 的 save_memory 沒有任何授權檢查**：文字模式有「使用者明確要求才寫」，Live 的
   `_save_memory` 直接寫入，模型想存就存。現在兩條路徑共用同一個閘門。
 - **embedding 批次峰值 VRAM 過高**：compose 預設 `EMBEDDING_BATCH_SIZE` 由 32 降到 8。32 段 8000 字

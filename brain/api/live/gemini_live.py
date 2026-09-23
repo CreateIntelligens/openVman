@@ -145,15 +145,17 @@ class GeminiLiveSession:
         self._unavailable = False
         self._connect_lock = asyncio.Lock()
 
-    async def ensure_connected(self) -> None:
+    async def ensure_connected(self) -> JsonTransport:
+        # 回傳這次拿到的連線；呼叫端在 await 之後再讀 self._transport 可能已被
+        # 重連流程清成 None。
         if self._transport is not None:
-            return
+            return self._transport
         if self._unavailable:
             raise RuntimeError("Gemini Live transport is unavailable")
 
         async with self._connect_lock:
             if self._transport is not None:
-                return
+                return self._transport
             if self._unavailable:
                 raise RuntimeError("Gemini Live transport is unavailable")
 
@@ -167,19 +169,20 @@ class GeminiLiveSession:
                 self._listener_task = asyncio.create_task(self._listen())
             if self._keepalive_task is None:
                 self._keepalive_task = asyncio.create_task(self._keepalive_loop())
+            return transport
 
     async def send_text_turn(self, user_text: str) -> None:
-        await self.ensure_connected()
+        transport = await self.ensure_connected()
         self._response_in_progress = True
         if user_text:
             self._last_user_message = user_text
-        await self._transport.send_json(self._build_user_turn_message(user_text))
+        await transport.send_json(self._build_user_turn_message(user_text))
 
     async def send_realtime_input(self, audio_b64: str, mime_type: str) -> None:
         if self._reconnecting or self._unavailable:
             logger.debug("dropping audio chunk while Gemini Live transport is unavailable")
             return
-        await self.ensure_connected()
+        transport = await self.ensure_connected()
         # 上行音訊同樣要計量；16-bit mono PCM，秒數 = bytes / (2 * rate)。
         try:
             self._input_audio_seconds += len(base64.b64decode(audio_b64)) / (
@@ -187,7 +190,7 @@ class GeminiLiveSession:
             )
         except Exception:  # noqa: BLE001 - 計量失敗不該擋住音訊送出
             pass
-        await self._transport.send_json(
+        await transport.send_json(
             {
                 "realtimeInput": {
                     "audio": {
@@ -199,9 +202,9 @@ class GeminiLiveSession:
         )
 
     async def send_turn_complete(self) -> None:
-        await self.ensure_connected()
+        transport = await self.ensure_connected()
         self._response_in_progress = True
-        await self._transport.send_json({"realtimeInput": {"audioStreamEnd": True}})
+        await transport.send_json({"realtimeInput": {"audioStreamEnd": True}})
 
     async def request_stop(self) -> None:
         if not self._response_in_progress:
