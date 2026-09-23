@@ -4,6 +4,13 @@
 
 ### Added
 
+- **記憶召回改由 Jev 篩相關記憶**（`memory/auto_recall.py`，`AUTO_RECALL_USE_JEV_FILTER` 預設 true）：
+  命中記憶在同一次呼叫逐筆問相關性，≥ 0.5 才條列給主對話，每輪省掉 LLM 摘要那次呼叫
+  （實打 535–722 ms）；失敗退回原本的 LLM 摘要。會把記憶原文送 Jev（使用者同意）。
+- **知識庫段落 Jev 篩選**（`search_knowledge`，`RAG_JEV_SCREEN_ENABLED` 預設 false）：逐段問能否當
+  答案依據與是否夾帶指令。EVAK 50 題離線：答案段落 54/54 保留、其他段落濾掉 143/196、每題平均剩
+  2.1 段；p50 520 ms。每輪強制檢索都會多這段延遲，所以預設關。
+
 - **後台 Live「自訂語音」接上前端 TTS**：relay 在 `custom` 下會清掉 Gemini 音訊，但後台沒有接 TTS，
   一直無聲。`useLiveSession` 新增 `onAssistantTurnComplete`，每輪 `is_final` 時交出整輪文字，
   聊天頁用既有的 `playTts()`（使用者選的 TTS 供應商與聲音）播放。

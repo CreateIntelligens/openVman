@@ -65,6 +65,13 @@ US$0.05；帶多輪歷史會多一些，仍在每日一美元以下。上限的�
 `JEV_MEMORY_GATE_ENABLED=false` 時退回原本的關鍵字 regex。記錄 `event=memory_gate`，
 `source` 為 `jev` 或 `regex_fallback`，不記原文。
 
+## 記憶召回與 RAG 段落
+
+- `AUTO_RECALL_USE_JEV_FILTER`（預設 true）：自動召回命中的記憶，同一次呼叫逐筆問相關性，≥ 0.5 才條列
+  給主對話，省掉 LLM 摘要；失敗退回 LLM 摘要。會送記憶原文。記錄 `event=auto_recall_jev`。
+- `RAG_JEV_SCREEN_ENABLED`（預設 false）：`search_knowledge` 後逐段問「能否當答案依據」（< 0.5 丟）與
+  「是否夾帶指令」（≥ 0.7 丟），失敗原樣放行。會送段落原文；每次檢索多約 0.5 秒。記錄 `event=rag_jev_screen`。
+
 ## backend 的兩個選用閘門（預設關）
 
 backend 另有 `app/jev_client.py`（與 brain 不共用 runtime），共用一條連線；暖連線實測 330–410 ms。

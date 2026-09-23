@@ -126,6 +126,14 @@ class BrainSettings(BaseSettings):
     auto_recall_cache_ttl_ms: int = 15000
     auto_recall_max_cache_entries: int = 1000
     auto_recall_use_llm_summarizer: bool = True
+    # 有 TYPESAFE_API_KEY 時先用 Jev 篩相關記憶並條列，省掉摘要那次 LLM 呼叫；
+    # Jev 失敗才退回 LLM 摘要。
+    auto_recall_use_jev_filter: bool = True
+    # 查知識庫後用 Jev 篩段落（能否當答案依據、是否夾帶指令）。每次檢索多約
+    # 0.5 秒且每輪都會強制檢索，預設關。
+    rag_jev_screen_enabled: bool = False
+    rag_jev_evidence_threshold: float = Field(default=0.5, ge=0, le=1)
+    rag_jev_injection_threshold: float = Field(default=0.7, ge=0, le=1)
     auto_recall_llm_model: str = ""
 
     # === Privacy Filter 設定 ===

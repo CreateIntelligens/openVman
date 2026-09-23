@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -158,6 +159,43 @@ def _llm_summarize(query: str, results: list[dict[str, Any]], config: Any) -> st
     return _truncate_text(summary, config.auto_recall_max_summary_chars)
 
 
+def _jev_filter(query: str, results: list[dict[str, Any]], config: Any) -> list[dict[str, Any]]:
+    """Keep only memories Jev judges relevant to the query (one call, one question each).
+
+    取代 LLM 摘要的「相關／NONE」判斷，每輪省一次 LLM 呼叫；不再改寫成摘要，
+    命中的記憶原文條列給主對話。會把記憶原文送到 Jev（2026-09-23 使用者同意）。
+    """
+    from core.jev_client import jev_nouls
+
+    memories = [
+        (f"m{i}", text, record)
+        for i, record in enumerate(results, 1)
+        if (text := str(record.get("text", "")).strip())
+    ]
+    if not memories:
+        return []
+    state = json.dumps(
+        {"query": query, "memories": [{"id": key, "text": text} for key, text, _ in memories]},
+        ensure_ascii=False,
+    )
+    questions = {
+        key: {
+            "instructions": f"記憶 {key} 是否與使用者這句話（query）相關，提供給助理能幫助回答或延續對話？",
+            "criteria": {
+                "true": "記憶內容和 query 的主題、人物、偏好或需求直接相關",
+                "false": "記憶和 query 無關，只是剛好字面相近",
+            },
+        }
+        for key, _, _ in memories
+    }
+    scores = jev_nouls(state, questions, timeout=config.jev_gate_timeout_seconds)
+    kept = {key for key, score in scores.items() if score >= 0.5}
+    logger.info(json.dumps(
+        {"event": "auto_recall_jev", "candidates": len(memories), "kept": len(kept)},
+    ))
+    return [record for key, _, record in memories if key in kept]
+
+
 # ------------------------------------------------------------------
 # 3.6 Core recall execution
 # ------------------------------------------------------------------
@@ -188,10 +226,26 @@ def _run_recall(
             elapsed_ms=(monotonic() - start) * 1000,
         )
 
-    if config.auto_recall_use_llm_summarizer:
+    from core.jev_client import jev_available
+
+    summary = None
+    source = "none"
+    if getattr(config, "auto_recall_use_jev_filter", False) and jev_available():
+        try:
+            relevant = _jev_filter(query, memory_results, config)
+            summary = _truncate_text(
+                _format_recall_results(relevant), config.auto_recall_max_summary_chars,
+            )
+            source = "jev"
+        except Exception as exc:
+            # 例外可能夾帶回應內容，只記型別；退回原本的 LLM 摘要。
+            logger.warning(json.dumps(
+                {"event": "auto_recall_jev_fallback", "error_type": type(exc).__name__},
+            ))
+    if summary is None and config.auto_recall_use_llm_summarizer:
         summary = _llm_summarize(query, memory_results, config)
         source = "llm"
-    else:
+    elif summary is None:
         summary = _truncate_text(
             _format_recall_results(memory_results),
             config.auto_recall_max_summary_chars,

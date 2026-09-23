@@ -746,6 +746,8 @@ API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gatew
 
 Jev 影子觀測已實作、預設關閉（`JEV_SHADOW_ENABLED`）。只記錄不改路由；會把當前訊息與正式流程同一份的使用者／助手對話歷史送到 TypeSafe API（不含 system prompt、工具結果與知識庫），抽樣 5%、每日上限 2000 次，用量記進 `usage.db`。設定、外送邊界與記錄格式見 [操作文件](../scripts/experiments/jev/OPERATIONS.md)。
 
+自動記憶召回預設改由 Jev 篩相關記憶（取代 LLM 摘要，每輪省一次 LLM 呼叫）；知識庫段落的 Jev 篩選（`RAG_JEV_SCREEN_ENABLED`）已實作但預設關。兩者細節同見操作文件。
+
 BGE embedding 意圖影子（用 centroid 相似度猜意圖）已移除：單句 64 筆 52/64，但 2026-09-23 dev 多輪對話實測只有 9/19，並有一筆知識庫問題誤判閒聊——embedding 相似度會被前一輪主題拉走，不適合做意圖判斷。embedding 本身仍負責知識庫檢索，不受影響。評估結果保留在 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。
 
 ## A2A 工具輸入驗證

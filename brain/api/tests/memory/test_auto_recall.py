@@ -301,3 +301,56 @@ class TestRunAutoRecall:
         assert first.status == "ok"
         assert second.status == "ok"
         assert mock_retrieve.call_count == 2
+
+
+class TestJevFilter:
+    def _bundle(self, memory_results):
+        return types.SimpleNamespace(knowledge_results=[], memory_results=memory_results, diagnostics={})
+
+    def _run(self, monkeypatch, memories, jev):
+        import memory.recall_cache as rc
+        from core import jev_client
+
+        rc._recall_cache = None
+        cfg = _FakeConfig()
+        cfg.auto_recall_use_jev_filter = True
+        cfg.auto_recall_use_llm_summarizer = True
+        cfg.jev_gate_timeout_seconds = 2.0
+        monkeypatch.setattr("memory.auto_recall.get_settings", lambda: cfg)
+        monkeypatch.setattr(jev_client, "jev_available", lambda: True)
+        monkeypatch.setattr(jev_client, "jev_nouls", jev)
+        llm = MagicMock(return_value="LLM 摘要")
+        monkeypatch.setattr("memory.auto_recall._llm_summarize", llm)
+        with patch("core.retrieval_service.retrieve_context", return_value=self._bundle(memories)):
+            return run_auto_recall([], "我想喝點東西", "default", "default"), llm
+
+    def test_keeps_only_relevant_and_skips_llm(self, monkeypatch):
+        seen = {}
+
+        def jev(state, questions, *, timeout):
+            seen["questions"] = list(questions)
+            return {"m1": 0.92, "m3": 0.1}
+
+        result, llm = self._run(monkeypatch, [
+            {"text": "使用者喜歡烏龍茶"}, {"text": "   "}, {"text": "使用者住台中"},
+        ], jev)
+        # 空白記憶不送也不讓後面的編號錯位。
+        assert seen["questions"] == ["m1", "m3"]
+        assert result.source == "jev"
+        assert "烏龍茶" in result.summary and "台中" not in result.summary
+        llm.assert_not_called()
+
+    def test_nothing_relevant_yields_empty(self, monkeypatch):
+        result, llm = self._run(monkeypatch, [{"text": "使用者住台中"}],
+                                lambda state, questions, *, timeout: {"m1": 0.05})
+        assert result.status == "empty"
+        llm.assert_not_called()
+
+    def test_jev_failure_falls_back_to_llm(self, monkeypatch):
+        def boom(state, questions, *, timeout):
+            raise RuntimeError("down")
+
+        result, llm = self._run(monkeypatch, [{"text": "使用者喜歡烏龍茶"}], boom)
+        assert result.source == "llm"
+        assert result.summary == "LLM 摘要"
+        llm.assert_called_once()
