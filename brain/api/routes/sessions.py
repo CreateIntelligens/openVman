@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from infra.datetime_utils import utc_now_iso
 from memory.memory import (
@@ -124,6 +124,7 @@ def export_sessions(
     date_to: str | None = None,
     search: str | None = None,
     session_ids: str | None = None,
+    simple: bool = False,
 ) -> dict[str, Any]:
     _validate_date_range(
         date_from, date_to,
@@ -158,6 +159,16 @@ def export_sessions(
                     persona_id=summary_persona_id,
                 )
             )
+            if simple:
+                # 給人看或匯入試算表用：只留誰、說了什麼、何時說。
+                messages = [
+                    {
+                        "role": message.get("role"),
+                        "content": message.get("content"),
+                        "created_at": message.get("created_at"),
+                    }
+                    for message in messages
+                ]
             total_messages += len(messages)
             exported_sessions.append(
                 {
@@ -186,6 +197,27 @@ async def delete_session(session_id: str, project_id: str = "default"):
         raise HTTPException(status_code=404, detail="Session 不存在")
     log_event("session_deleted", session_id=session_id, project_id=project_id)
     return {"status": "ok", "session_id": session_id}
+
+
+class BatchDeleteBody(BaseModel):
+    session_ids: list[str] = Field(..., min_length=1, max_length=500)
+
+
+@router.post("/sessions/batch-delete", summary="一次刪除多筆對話 Session")
+async def batch_delete_sessions(body: BatchDeleteBody, project_id: str = "default"):
+    # 逐筆刪、逐筆回報：部分不存在不該讓整批失敗，前端才能只移除真的刪掉的列。
+    deleted: list[str] = []
+    missing: list[str] = []
+    for session_id in dict.fromkeys(sid.strip() for sid in body.session_ids if sid.strip()):
+        if delete_session_for_project(project_id=project_id, session_id=session_id):
+            deleted.append(session_id)
+        else:
+            missing.append(session_id)
+    log_event(
+        "sessions_batch_deleted", project_id=project_id,
+        deleted=len(deleted), missing=len(missing),
+    )
+    return {"status": "ok", "deleted": deleted, "missing": missing}
 
 
 class RecallToggleBody(BaseModel):

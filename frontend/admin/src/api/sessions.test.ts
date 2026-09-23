@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setActiveProjectId } from "./common";
-import { fetchSessionExport } from "./sessions";
+import { batchDeleteSessions, fetchSessionExport } from "./sessions";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -33,5 +33,37 @@ describe("sessions api", () => {
       "/api/v1/sessions/export?project_id=project-a&persona_id=doctor&date_from=2026-08-01&date_to=2026-08-31&search=hello+world&session_ids=session-a%2Csession-b",
     );
     expect((init as RequestInit).credentials).toBe("include");
+  });
+
+  it("asks for the simple export format", async () => {
+    setActiveProjectId("project-a");
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ sessions: [], total_sessions: 0 }),
+      headers: new Headers({ "content-type": "application/json" }),
+    } as Response);
+
+    await fetchSessionExport(undefined, {}, undefined, { simple: true });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/sessions/export?project_id=project-a&simple=true");
+  });
+
+  it("deletes several sessions in one request", async () => {
+    setActiveProjectId("project-a");
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: "ok", deleted: ["a"], missing: ["b"] }),
+      headers: new Headers({ "content-type": "application/json" }),
+    } as Response);
+
+    const result = await batchDeleteSessions(["a", "b"]);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/v1/sessions/batch-delete?project_id=project-a");
+    expect((init as RequestInit).method).toBe("POST");
+    expect(JSON.parse(String((init as RequestInit).body))).toEqual({ session_ids: ["a", "b"] });
+    expect(result.missing).toEqual(["b"]);
   });
 });

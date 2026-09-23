@@ -363,7 +363,9 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 #### 11.1 對話紀錄匯出
 
-`GET /brain/sessions/export` 依 `project_id`、`persona_id`、日期與關鍵字篩選 SQLite session，並可用逗號分隔的 `session_ids` 限定單筆或多筆。回應包含 session 摘要、依時間排序且移除內部 metadata 的訊息、匯出時間與總筆數。外部呼叫一律經 Backend `/api/sessions/export` 代理與專案讀取權限檢查。
+`GET /brain/sessions/export` 依 `project_id`、`persona_id`、日期與關鍵字篩選 SQLite session，並可用逗號分隔的 `session_ids` 限定單筆或多筆。回應包含 session 摘要、依時間排序且移除內部 metadata 的訊息、匯出時間與總筆數。外部呼叫一律經 Backend `/api/sessions/export` 代理與專案讀取權限檢查。帶 `simple=true` 時每則訊息只留 `role`、`content`、`created_at`。
+
+`POST /brain/sessions/batch-delete` 帶 `{"session_ids": [...]}`（1–500 筆）一次刪除多筆，去重並略過空白；回應 `deleted` 與 `missing` 兩個清單，部分不存在不會讓整批失敗。經 Backend 代理時需要 sessions 的編輯權限。
 
 ### 12. 安全防護 (Guardrails)
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  batchDeleteSessions,
   deleteSession,
   fetchPersonas,
   fetchSessionExport,
@@ -19,6 +20,9 @@ import { readScoped } from "../utils/scopedStorage";
 export type SessionSortKey = "updated_at" | "created_at" | "message_count";
 
 export const ALL_PERSONAS = "__all__";
+
+// 摘要一次全抓（排序、篩選都在前端），只把畫面切頁；幾百列一次渲染才是慢的地方。
+export const SESSIONS_PAGE_SIZE = 50;
 
 function getSessionExportScope(sessionIds?: string[]): SessionExportScope {
   if (!sessionIds) {
@@ -62,6 +66,10 @@ export function useSessionBrowser() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SessionSortKey>("updated_at");
+  const [page, setPage] = useState(1);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [deletingSessions, setDeletingSessions] = useState(false);
+  const [simpleExport, setSimpleExport] = useState(false);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -90,6 +98,20 @@ export function useSessionBrowser() {
     () => [...sessions].sort((a, b) => compareSessions(a, b, sortKey)),
     [sessions, sortKey],
   );
+  const pageCount = Math.max(1, Math.ceil(sortedSessions.length / SESSIONS_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pagedSessions = useMemo(
+    () => sortedSessions.slice(
+      (currentPage - 1) * SESSIONS_PAGE_SIZE,
+      currentPage * SESSIONS_PAGE_SIZE,
+    ),
+    [currentPage, sortedSessions],
+  );
+
+  // 換了篩選或排序就回第一頁，免得停在一個已經不存在的頁碼。
+  useEffect(() => {
+    setPage(1);
+  }, [dateFrom, dateTo, debouncedSearchQuery, personaFilter, sortKey]);
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
@@ -132,6 +154,7 @@ export function useSessionBrowser() {
           personaFilter,
           { dateFrom, dateTo, search: debouncedSearchQuery },
           sessionIds,
+          { simple: simpleExport },
         );
         downloadSessionExport(payload, getSessionExportScope(sessionIds));
       } catch (reason) {
@@ -140,8 +163,23 @@ export function useSessionBrowser() {
         setExportingSessions(false);
       }
     },
-    [dateFrom, dateTo, debouncedSearchQuery, personaFilter],
+    [dateFrom, dateTo, debouncedSearchQuery, personaFilter, simpleExport],
   );
+
+  const confirmBulkDelete = useCallback(() => {
+    const ids = [...selectedSessionIds];
+    if (ids.length === 0) return;
+    setDeletingSessions(true);
+    setError("");
+    batchDeleteSessions(ids)
+      .then(() => {
+        setBulkDeleteOpen(false);
+        setSelectedSessionIds(new Set());
+        loadSessions();
+      })
+      .catch((reason) => setError(String(reason)))
+      .finally(() => setDeletingSessions(false));
+  }, [loadSessions, selectedSessionIds]);
 
   const confirmDelete = useCallback(() => {
     if (!deleteTarget) return;
@@ -199,6 +237,16 @@ export function useSessionBrowser() {
     setSelectedPersonaId,
     loadingPersonas,
     sessions: sortedSessions,
+    pagedSessions,
+    page: currentPage,
+    pageCount,
+    setPage,
+    bulkDeleteOpen,
+    setBulkDeleteOpen,
+    deletingSessions,
+    confirmBulkDelete,
+    simpleExport,
+    setSimpleExport,
     loadingSessions,
     exportingSessions,
     selectedSessionIds,

@@ -56,8 +56,11 @@ export async function fetchSessionExport(
   personaId?: string,
   { dateFrom, dateTo, search }: SessionFilters = {},
   sessionIds?: string[],
+  { simple = false }: { simple?: boolean } = {},
 ): Promise<SessionsExportResponse> {
   const params: QueryParams = {};
+  // 簡化格式每則訊息只留 role、content、created_at，方便給人看或丟進試算表。
+  if (simple) params.simple = "true";
   if (personaId) params.persona_id = personaId;
   if (dateFrom) params.date_from = dateFrom;
   if (dateTo) params.date_to = dateTo;
@@ -65,6 +68,23 @@ export async function fetchSessionExport(
   if (sessionIds) params.session_ids = sessionIds.join(",");
   return fetchJson<SessionsExportResponse>(
     projectUrl(`${SESSIONS_PATH}/export`, params),
+  );
+}
+
+export interface BatchDeleteResponse {
+  status: string;
+  deleted: string[];
+  missing: string[];
+}
+
+export async function batchDeleteSessions(sessionIds: string[]) {
+  return fetchJson<BatchDeleteResponse>(
+    projectUrl(`${SESSIONS_PATH}/batch-delete`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_ids: sessionIds }),
+    },
   );
 }
 

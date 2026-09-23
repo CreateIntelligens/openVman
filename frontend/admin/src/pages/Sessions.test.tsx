@@ -9,6 +9,13 @@ const browserState = vi.hoisted(() => ({
   toggleAllSessions: vi.fn(),
   setDeleteTarget: vi.fn(),
   resetFilters: vi.fn(),
+  setPage: vi.fn(),
+  setBulkDeleteOpen: vi.fn(),
+  confirmBulkDelete: vi.fn(),
+  setSimpleExport: vi.fn(),
+  bulkDeleteOpen: false,
+  page: 1,
+  pageCount: 1,
   selectedSessionIds: new Set<string>(),
   sessions: [
     {
@@ -43,6 +50,16 @@ vi.mock("../hooks/useSessionBrowser", async () => {
       setSelectedPersonaId: vi.fn(),
       loadingPersonas: false,
       sessions: browserState.sessions,
+      pagedSessions: browserState.sessions,
+      page: browserState.page,
+      pageCount: browserState.pageCount,
+      setPage: browserState.setPage,
+      bulkDeleteOpen: browserState.bulkDeleteOpen,
+      setBulkDeleteOpen: browserState.setBulkDeleteOpen,
+      deletingSessions: false,
+      confirmBulkDelete: browserState.confirmBulkDelete,
+      simpleExport: false,
+      setSimpleExport: browserState.setSimpleExport,
       loadingSessions: false,
       exportingSessions: false,
       selectedSessionIds: browserState.selectedSessionIds,
@@ -73,6 +90,50 @@ describe("Sessions", () => {
     vi.clearAllMocks();
     browserState.selectedSessionIds = new Set();
     browserState.hasActiveFilters = false;
+    browserState.bulkDeleteOpen = false;
+    browserState.page = 1;
+    browserState.pageCount = 1;
+  });
+
+  it("offers bulk delete only once sessions are selected", () => {
+    const { unmount } = render(<Sessions />);
+    expect(screen.queryByRole("button", { name: /刪除已選/ })).toBeNull();
+    unmount();
+
+    browserState.selectedSessionIds = new Set([browserState.sessions[0].session_id]);
+    render(<Sessions />);
+    fireEvent.click(screen.getByRole("button", { name: /刪除已選/ }));
+    expect(browserState.setBulkDeleteOpen).toHaveBeenCalledWith(true);
+  });
+
+  it("confirms bulk delete through the modal", () => {
+    browserState.selectedSessionIds = new Set(browserState.sessions.map((s) => s.session_id));
+    browserState.bulkDeleteOpen = true;
+    render(<Sessions />);
+    expect(screen.getByText(/確定要刪除已選的 2 筆對話/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "刪除" }));
+    expect(browserState.confirmBulkDelete).toHaveBeenCalled();
+  });
+
+  it("shows paging controls only when there is more than one page", () => {
+    const { unmount } = render(<Sessions />);
+    expect(screen.queryByRole("navigation", { name: "對話列表分頁" })).toBeNull();
+    unmount();
+
+    browserState.page = 2;
+    browserState.pageCount = 3;
+    render(<Sessions />);
+    expect(screen.getByText("第 2 / 3 頁")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /下一頁/ }));
+    expect(browserState.setPage).toHaveBeenCalledWith(3);
+    fireEvent.click(screen.getByRole("button", { name: /上一頁/ }));
+    expect(browserState.setPage).toHaveBeenCalledWith(1);
+  });
+
+  it("toggles the simple export format", () => {
+    render(<Sessions />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /簡化格式/ }));
+    expect(browserState.setSimpleExport).toHaveBeenCalledWith(true);
   });
 
   it("lists every session with its persona and message count", () => {

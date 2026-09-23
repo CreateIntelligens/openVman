@@ -93,3 +93,53 @@ def test_export_sessions_with_empty_selection_exports_none(tmp_path, monkeypatch
     assert response.status_code == 200
     assert response.json()["sessions"] == []
     assert response.json()["total_sessions"] == 0
+
+
+def test_simple_export_keeps_only_role_content_time(tmp_path, monkeypatch):
+    from routes import sessions as sessions_routes
+
+    store = SessionStore(db_path=str(tmp_path / "sessions.db"))
+    store.append_message("s1", "default", "user", "問題")
+    store.append_message(
+        "s1", "default", "assistant", "回答",
+        metadata={"response_time_s": 1.5, "tool_steps": [{"name": "search_knowledge"}]},
+    )
+    monkeypatch.setattr(sessions_routes, "get_session_store", lambda project_id="default": store)
+
+    with _client() as client:
+        response = client.get("/brain/sessions/export", params={"simple": "true"})
+
+    assert response.status_code == 200
+    messages = response.json()["sessions"][0]["messages"]
+    assert [set(m) for m in messages] == [{"role", "content", "created_at"}] * 2
+    assert [m["content"] for m in messages] == ["問題", "回答"]
+
+
+def test_batch_delete_reports_deleted_and_missing(monkeypatch):
+    from routes import sessions as sessions_routes
+
+    existing = {"a", "b"}
+    calls = []
+
+    def fake_delete(project_id="default", session_id=""):
+        calls.append((project_id, session_id))
+        return session_id in existing
+
+    monkeypatch.setattr(sessions_routes, "delete_session_for_project", fake_delete)
+
+    with _client() as client:
+        response = client.post(
+            "/brain/sessions/batch-delete",
+            params={"project_id": "p1"},
+            json={"session_ids": ["a", "ghost", "b", "a", " "]},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "deleted": ["a", "b"], "missing": ["ghost"]}
+    assert calls == [("p1", "a"), ("p1", "ghost"), ("p1", "b")]   # 去重、略過空白
+
+
+def test_batch_delete_rejects_empty_list():
+    with _client() as client:
+        response = client.post("/brain/sessions/batch-delete", json={"session_ids": []})
+    assert response.status_code == 422

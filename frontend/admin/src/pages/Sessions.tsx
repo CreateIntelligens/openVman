@@ -49,6 +49,16 @@ export default function Sessions() {
     setSelectedPersonaId,
     loadingPersonas,
     sessions,
+    pagedSessions,
+    page,
+    pageCount,
+    setPage,
+    bulkDeleteOpen,
+    setBulkDeleteOpen,
+    deletingSessions,
+    confirmBulkDelete,
+    simpleExport,
+    setSimpleExport,
     loadingSessions,
     exportingSessions,
     selectedSessionIds,
@@ -89,6 +99,18 @@ export default function Sessions() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <label
+            className="flex cursor-pointer items-center gap-2 text-sm text-content-muted"
+            title="每則訊息只留角色、內容與時間"
+          >
+            <input
+              type="checkbox"
+              checked={simpleExport}
+              onChange={(event) => setSimpleExport(event.target.checked)}
+              className="h-4 w-4 accent-primary"
+            />
+            簡化格式
+          </label>
           <button
             onClick={loadSessions}
             disabled={loadingSessions}
@@ -228,7 +250,19 @@ export default function Sessions() {
                 全選
               </label>
               {selectedCount > 0 && (
-                <span className="chip">已選 {selectedCount} 筆</span>
+                <>
+                  <span className="chip">已選 {selectedCount} 筆</span>
+                  <button
+                    onClick={() => setBulkDeleteOpen(true)}
+                    disabled={deletingSessions}
+                    className="btn btn-ghost px-2.5 py-1 text-xs text-danger hover:bg-danger/10"
+                  >
+                    <span className="material-symbols-outlined text-[1rem]">
+                      delete
+                    </span>
+                    刪除已選
+                  </button>
+                </>
               )}
             </div>
             <span className="text-sm text-content-subtle">
@@ -262,7 +296,7 @@ export default function Sessions() {
 
           {sessions.length > 0 && (
             <ul>
-              {sessions.map((session) => {
+              {pagedSessions.map((session) => {
                 const isSelected = selectedSessionIds.has(session.session_id);
                 return (
                   <li
@@ -347,6 +381,37 @@ export default function Sessions() {
               })}
             </ul>
           )}
+
+          {pageCount > 1 && (
+            <nav
+              className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm text-content-muted"
+              aria-label="對話列表分頁"
+            >
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page <= 1}
+                className="btn btn-ghost px-2.5 py-1 text-xs"
+              >
+                <span className="material-symbols-outlined text-[1rem]">
+                  chevron_left
+                </span>
+                上一頁
+              </button>
+              <span>
+                第 {page} / {pageCount} 頁
+              </span>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page >= pageCount}
+                className="btn btn-ghost px-2.5 py-1 text-xs"
+              >
+                下一頁
+                <span className="material-symbols-outlined text-[1rem]">
+                  chevron_right
+                </span>
+              </button>
+            </nav>
+          )}
         </section>
       </div>
 
@@ -362,6 +427,15 @@ export default function Sessions() {
         danger
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+      <ConfirmModal
+        open={bulkDeleteOpen}
+        title="刪除已選對話"
+        message={`確定要刪除已選的 ${selectedCount} 筆對話？此操作無法復原。`}
+        confirmLabel={deletingSessions ? "刪除中…" : "刪除"}
+        danger
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkDeleteOpen(false)}
       />
     </div>
   );
