@@ -72,8 +72,10 @@ trace）：`search_knowledge` 387 ms，整輪 `/brain/chat` 4718 ms，**檢索�
   與外送，起步要更保守。
 - timeout **600 ms**（p95 是 322 ms，留一倍餘裕），逾時就記 `timeout`，不重試。
 - 失敗冷卻 60 s：API 掛了不要每筆都打。
-- **只送當前訊息 + 前一輪助手回覆的前 200 字**。不送 session 全文、不送知識庫內容、
-  不送帳號資訊。這是外送邊界，寫死在 observer 裡，不由設定放寬。
+- **送當前訊息 + 與正式 LLM 相同的使用者／助手對話歷史**（`select_recent_messages()`）。
+  不送 system prompt、工具結果、知識庫內容、帳號資訊。這是外送邊界，寫死在 observer
+  裡，不由設定放寬。原本只送「助手上一句前 200 字」，2026-09-23 dev 多輪實測中使用者
+  上一句的網址因此看不到而判錯；正式流程本來就把對話送外部 LLM，使用者同意對齊。
 - 記錄：trace_id、project_id、Jev 分類、BGE 分類、實際走的 route、Jev 延遲、
   token 用量。**不記原文**（跟 BGE 影子一樣）。
 
@@ -175,7 +177,7 @@ observer 加硬上限 `JEV_SHADOW_DAILY_CALL_CAP`（預設 2000，每 process �
 ## 6. 風險
 
 - **資料外送**：§2.2 的邊界是唯一防線，要有測試釘住「observer 送出的 payload 不含
-  session 全文、不含知識庫段落」——§3 會送段落，那是另一個 observer，邊界分開寫。
+  system prompt、不含工具結果與知識庫段落」——§3 會送段落，那是另一個 observer，邊界分開寫。
 - **費用失控**：§2.3 的日上限是硬的，不是提醒。
 - **供應商依賴**：影子階段掛了沒事；若之後真的接管路由，要有 BGE 或規則的 fallback。
   現在不設計，但 §2 的 observer 介面要讓 §3 之後能換成同步呼叫。

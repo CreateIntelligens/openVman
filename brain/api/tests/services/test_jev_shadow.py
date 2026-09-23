@@ -18,11 +18,13 @@ HISTORY = [
     {"role": "tool", "content": "KNOWLEDGE_PASSAGE 內部規章全文"},
     {"role": "assistant", "content": "OLDER_ASSISTANT_REPLY"},
     {"role": "user", "content": "SECOND_USER_TURN"},
-    {"role": "assistant", "content": "上一輪回覆" + "長" * 400 + "TAIL_BEYOND_200"},
+    {"role": "assistant", "content": "上一輪回覆，網址是 https://example.org/"},
 ]
-FORBIDDEN = (
-    "SYSTEM_PROMPT_SECRET", "EARLIER_USER_TURN", "KNOWLEDGE_PASSAGE",
-    "OLDER_ASSISTANT_REPLY", "SECOND_USER_TURN", "TAIL_BEYOND_200",
+# 使用者與助手的對話照正式流程送出；這兩類與判斷意圖無關，一律不送。
+FORBIDDEN = ("SYSTEM_PROMPT_SECRET", "KNOWLEDGE_PASSAGE")
+DIALOGUE = (
+    "EARLIER_USER_TURN", "OLDER_ASSISTANT_REPLY", "SECOND_USER_TURN",
+    "https://example.org/",
 )
 REPLY = {
     "model": "jev-1.13.0",
@@ -106,12 +108,16 @@ def submit(message="門禁卡怎麼申請？", history=HISTORY):
     )
 
 
-def test_state_holds_only_message_and_previous_assistant_head():
+def test_state_uses_main_flow_dialogue_without_system_or_tools():
+    from infra.reflection import select_recent_messages
+
     state = jev.jev_state("現在的問題", HISTORY)
-    assert set(state) == {"message", "previous_assistant"}
+    assert set(state) == {"history", "message"}
     assert state["message"] == "現在的問題"
-    assert state["previous_assistant"] == HISTORY[-1]["content"][:200]
-    assert jev.jev_state("嗨", [])["previous_assistant"] == ""
+    dialogue = [r for r in HISTORY if r["role"] in {"user", "assistant"}]
+    assert state["history"] == select_recent_messages(dialogue)
+    assert {row["role"] for row in state["history"]} == {"user", "assistant"}
+    assert jev.jev_state("嗨", [])["history"] == []
 
 
 def test_outbound_request_never_carries_session_or_knowledge(cfg, sent):
@@ -121,9 +127,11 @@ def test_outbound_request_never_carries_session_or_knowledge(cfg, sent):
     raw = sent[0].content.decode("utf-8")
     for marker in FORBIDDEN:
         assert marker not in raw
+    for marker in DIALOGUE:
+        assert marker in raw
     body = json.loads(raw)
     assert set(body) == {"state", "model", "questions"}
-    assert set(json.loads(body["state"])) == {"message", "previous_assistant"}
+    assert set(json.loads(body["state"])) == {"history", "message"}
     assert sent[0].headers["authorization"] == "Bearer test-key"
     assert sent[0].url.path == "/v1/systemone"
 

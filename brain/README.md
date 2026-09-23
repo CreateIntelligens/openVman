@@ -744,7 +744,7 @@ API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gatew
 
 [Jev API 評估](../scripts/experiments/jev/REPORT.md)在 48 筆繁體中文合成案例上 96/96、零順序翻轉。先前的 SemIf 本機模型實驗因順序敏感不採用，結論與逐筆結果保留在 [`semif-evidence/`](../scripts/experiments/semif-evidence/REPORT.md)。兩者都尚未接入 Brain 正式路由，也不取代強制知識庫搜尋或權限判斷；接入計畫（影子觀測 → RAG 證據判斷）見 [docs/plans/jev-decision-layer.md](../docs/plans/jev-decision-layer.md)。
 
-Jev 影子觀測已實作、預設關閉（`JEV_SHADOW_ENABLED`）。它與下方 Embedding 影子並排跑，只記錄不改路由；會把當前訊息與前一輪助手回覆前 200 字送到 TypeSafe API，抽樣 5%、每日上限 2000 次，用量記進 `usage.db`。設定、外送邊界與記錄格式見 [操作文件](../scripts/experiments/jev/OPERATIONS.md)。
+Jev 影子觀測已實作、預設關閉（`JEV_SHADOW_ENABLED`）。它與下方 Embedding 影子並排跑，只記錄不改路由；會把當前訊息與正式流程同一份的使用者／助手對話歷史送到 TypeSafe API（不含 system prompt、工具結果與知識庫），抽樣 5%、每日上限 2000 次，用量記進 `usage.db`。設定、外送邊界與記錄格式見 [操作文件](../scripts/experiments/jev/OPERATIONS.md)。
 
 ## Embedding 意圖影子模式
 

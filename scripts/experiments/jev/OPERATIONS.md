@@ -26,13 +26,17 @@
 ## 外送邊界
 
 使用者訊息會送到外部服務，這是這個功能唯一需要特別許可的地方（2026-09-23 經
-使用者同意）。送出的 `state` 只有兩個欄位，寫死在 `core/jev_shadow.py` 的
+使用者同意）。送出的 `state` 有兩個欄位，寫死在 `core/jev_shadow.py` 的
 `jev_state()`，不由設定放寬：
 
 - `message`：當前使用者訊息，最多 1024 字元
-- `previous_assistant`：歷史中最後一則助手回覆的前 200 字元
+- `history`：與正式 LLM 看到的同一份對話歷史——`select_recent_messages()`，最近
+  `max(SHORT_TERM_MEMORY_ROUNDS × 2, 8)` 則、每則壓縮到 600 字、總長 15000 字內——
+  只留 user 與 assistant
 
-不送 session 其他歷史、system prompt、工具結果、知識庫段落、帳號或 metadata。
+不送 system prompt、工具結果、知識庫段落、帳號或 metadata。正式流程本來就把
+對話送到外部 LLM，這裡對齊它；最初只送「助手上一句前 200 字」，dev 多輪實測中
+使用者上一句提到的網址因此看不到而判錯，才改成與正式流程一致。
 `tests/services/test_jev_shadow.py` 直接檢查送上線的 HTTP body 釘住這條邊界。
 
 TypeSafe 條款（2026-09-23 查）：隱私政策承諾不以用戶資料訓練；DPA 保存期限只寫
@@ -48,8 +52,8 @@ chat、knowledge、web、clarify，題目與選項描述與 `run_jev.py` 的 rou
 ## 費用
 
 輸入每百萬 token US$0.042，輸出不計費（2026-09-23，typesafe.ai 首頁與發表文；
-官方自承可能是補貼價）。實驗中一次約 560 輸入 token，每日上限 2000 次約
-US$0.05。上限的用途是擋住程式失控與限制外送量，不是控制花費。
+官方自承可能是補貼價）。無歷史時一次約 560 輸入 token，每日上限 2000 次約
+US$0.05；帶多輪歷史會多一些，仍在每日一美元以下。上限的用途是擋住程式失控與限制外送量，不是控制花費。
 
 每次成功呼叫以 `provider=typesafe`、`kind=intent_shadow` 記進 `usage.db`，
 帶原請求的使用者、session、project、trace 歸屬。

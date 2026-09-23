@@ -1,7 +1,7 @@
 """Jev (TypeSafe System One) intent shadow; observes only, never routes.
 
 與 BGE 影子並排跑，同一筆訊息兩邊用 trace_id 對得起來。Jev 是外部 API，
-所以比 BGE 影子多兩道閘：外送邊界寫死在 jev_state()，不由設定放寬；每日
+所以比 BGE 影子多兩道閘：外送內容寫死在 jev_state()，不由設定放寬；每日
 呼叫數有硬上限，到了就停到隔天（UTC）。
 """
 
@@ -26,10 +26,9 @@ logger = logging.getLogger(__name__)
 PROVIDER = "typesafe"
 MODEL = "jev-latest"
 USAGE_KIND = "intent_shadow"
-# 外送邊界：只送當前訊息與前一輪助手回覆的開頭。session 全文、知識庫段落、
-# 帳號資訊一律不送。改這兩個數字等於改對外承諾，要先經使用者同意。
+# 外送邊界：當前訊息 + 與正式流程相同的使用者／助手對話歷史（2026-09-23 經
+# 使用者同意）。system prompt、工具結果、知識庫段落、帳號資訊一律不送。
 MAX_MESSAGE_CHARS = 1024
-MAX_ASSISTANT_CHARS = 200
 
 # 與 scripts/experiments/jev/run_jev.py 的 routing 題目一致，實驗結果才能對照。
 QUESTION = (
@@ -55,16 +54,17 @@ CRITERIA = {
 
 def jev_state(message: str, history: list[dict]) -> dict:
     """The complete outbound payload state. Nothing else leaves the process."""
-    previous = next(
-        (row for row in reversed(history) if row.get("role") == "assistant"),
-        None,
-    )
+    from infra.reflection import select_recent_messages
+
+    # 對話歷史與正式 LLM 看到的同一份（select_recent_messages 的則數與字數
+    # 上限），只留使用者與助手；system、工具結果與知識庫段落不送。
+    dialogue = [row for row in history if row.get("role") in {"user", "assistant"}]
     return {
+        "history": [
+            {"role": row["role"], "content": row["content"]}
+            for row in select_recent_messages(dialogue)
+        ],
         "message": message[:MAX_MESSAGE_CHARS],
-        "previous_assistant": (
-            str(previous.get("content", ""))[:MAX_ASSISTANT_CHARS]
-            if previous else ""
-        ),
     }
 
 
