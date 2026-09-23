@@ -228,7 +228,7 @@ class TestQueryExpansion:
     def test_expansion_term_results_are_fused(self, patched, monkeypatch):
         # 原文 vector 查到 base;擴展詞「退款流程」FTS 查到 expanded-hit
         monkeypatch.setattr(
-            retrieval, "encode_text", lambda text, version=None: [0.9, 0.9]
+            retrieval, "encode_text", lambda text, embedding_version=None: [0.9, 0.9]
         )
         patched(
             _FakeTable(
@@ -241,7 +241,7 @@ class TestQueryExpansion:
 
     def test_hit_across_original_and_expansion_ranks_first(self, patched, monkeypatch):
         monkeypatch.setattr(
-            retrieval, "encode_text", lambda text, version=None: [0.9, 0.9]
+            retrieval, "encode_text", lambda text, embedding_version=None: [0.9, 0.9]
         )
         patched(
             _FakeTable(
@@ -256,7 +256,7 @@ class TestQueryExpansion:
         assert results[0]["text"] == "both"
 
     def test_encode_failure_skips_term(self, patched, monkeypatch):
-        def boom(text, version=None):
+        def boom(text, embedding_version=None):
             raise RuntimeError("embedder down")
 
         monkeypatch.setattr(retrieval, "encode_text", boom)
