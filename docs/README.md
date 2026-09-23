@@ -40,6 +40,7 @@
 - [Jev API 分流／打斷評估](../scripts/experiments/jev/REPORT.md)：官方 Jev API 在 SemIf 同一份合成題庫上 96/96、零順序翻轉。
 - [Jev 意圖觀測操作](../scripts/experiments/jev/OPERATIONS.md)：預設關閉的旁路觀測功能。
 - [BGE 意圖觀測評估](../scripts/experiments/intent-shadow/REPORT.md)（已退場，只留證據）
+- [ASR 多語實測（中／英／西）](../scripts/experiments/asr-multilingual/REPORT.md)：自架三家處理不了西語長句；gpt-4o-mini-transcribe 與串流方案比較。
 - [瀏覽器小模型相容性與結案紀錄](../scripts/experiments/browser-intent/P0-COMPATIBILITY.md)：介面可行（WebLLM/MLC），但 Qwen3.5-0.8B 在 32 題上全部順序敏感，**不進 P1**。
 - [A2A 真實往返紀錄](../scripts/experiments/a2a-live/README.md)
 
