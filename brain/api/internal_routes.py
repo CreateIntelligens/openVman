@@ -234,24 +234,14 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
         "live_session": None,
         "args": {"client_id": relay_session_id, "persona_id": "default", "project_id": "default"},
         "session_id": relay_session_id,
-        "assistant_text_buf": [],
-        "user_text_buf": [],
         "client_disconnected": False,
     }
 
+    # 回覆與語音轉錄由 GeminiLiveSession 自己存與封存；這裡再存一次會讓每輪
+    # 回覆與記憶封存都重複（2026-09-22 起正式環境實際發生）。
     async def _event_sink(event: dict) -> None:
         if state["client_disconnected"]:
             return
-        if event.get("event") == "server_stream_chunk":
-            # 不 strip：逐段文字的頭尾空格是英西的字間空格。
-            text = str(event.get("text") or "")
-            if text.strip():
-                state["assistant_text_buf"].append(text)
-            if event.get("is_final"):
-                _flush_assistant_turn(state)
-        elif event.get("event") == "user_transcription":
-            if text := str(event.get("text") or "").strip():
-                state["user_text_buf"].append(text)
         try:
             await websocket.send_json(event)
         except (WebSocketDisconnect, RuntimeError):
@@ -268,7 +258,6 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
     except WebSocketDisconnect:
         pass
     finally:
-        _flush_assistant_turn(state)
         if state["live_session"]:
             await state["live_session"].close()
 
@@ -294,7 +283,6 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
         if payload.get("ephemeral"):
             await live.send_text_turn(text)
         else:
-            state["user_text_buf"].append(text)
             _save_user_message(state, text)
             await live.send_text_turn(text)
     elif event == "client_interrupt":
@@ -325,44 +313,9 @@ def _ensure_live_session(state: dict[str, Any], relay_session_id: str, event_sin
 
 
 def _save_user_message(state: dict[str, Any], text: str) -> None:
-    _flush_assistant_turn(state)
+    # 打字輸入只有這裡會存；語音輸入由 GeminiLiveSession 從轉錄存。
     args = state["args"]
     append_session_message(state["session_id"], args["persona_id"], "user", text, project_id=args["project_id"])
-
-
-def _consume_text_buffer(state: dict[str, Any], key: str) -> str:
-    text = "".join(state.get(key, [])).strip()
-    state[key] = []
-    return text
-
-
-def _archive_live_turn(state: dict[str, Any], user_text: str, assistant_text: str) -> None:
-    if not user_text:
-        return
-
-    args = state["args"]
-    try:
-        from memory.memory import archive_session_turn
-
-        archive_session_turn(
-            session_id=state["session_id"],
-            user_message=user_text,
-            assistant_message=assistant_text,
-            persona_id=args["persona_id"],
-            project_id=args["project_id"],
-        )
-    except Exception as exc:
-        logger.error("Failed to archive session turn in live mode: %s", exc)
-
-
-def _flush_assistant_turn(state: dict[str, Any]) -> None:
-    full_text = _consume_text_buffer(state, "assistant_text_buf")
-    if not full_text:
-        return
-
-    args = state["args"]
-    append_session_message(state["session_id"], args["persona_id"], "assistant", full_text, project_id=args["project_id"])
-    _archive_live_turn(state, _consume_text_buffer(state, "user_text_buf"), full_text)
 
 
 # ---------------------------------------------------------------------------

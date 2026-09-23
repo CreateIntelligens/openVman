@@ -214,3 +214,57 @@ async def test_internal_live_bridge_rejects_invalid_internal_token_before_accept
     assert websocket.accepted is False
     assert websocket.close_code == 1008
     assert websocket.close_reason == "invalid internal token"
+
+
+@pytest.mark.asyncio
+async def test_internal_live_bridge_leaves_reply_persistence_to_live_session(monkeypatch):
+    """回覆由 GeminiLiveSession 存；bridge 再存一次會讓每輪回覆重複一則。"""
+    import internal_routes
+
+    captured_sink = None
+    saved: list[tuple] = []
+    archived: list[dict] = []
+
+    class FakeWebSocket:
+        headers = _internal_headers()
+
+        def __init__(self) -> None:
+            self._messages = [{"event": "relay_init", "project_id": "project-1"}]
+
+        async def accept(self) -> None:
+            return None
+
+        async def receive_json(self) -> dict:
+            if self._messages:
+                return self._messages.pop(0)
+            await captured_sink({"event": "user_transcription", "text": "你好"})
+            await captured_sink({"event": "server_stream_chunk", "text": "今天", "is_final": False})
+            await captured_sink({"event": "server_stream_chunk", "text": "是星期三。", "is_final": True})
+            raise WebSocketDisconnect()
+
+        async def send_json(self, _payload: dict) -> None:
+            return None
+
+    class FakeLive:
+        async def close(self) -> None:
+            return None
+
+    def _fake_build_live_session(*_args, event_sink, **_kwargs):
+        nonlocal captured_sink
+        captured_sink = event_sink
+        return FakeLive()
+
+    monkeypatch.setattr(internal_routes, "_build_live_session", _fake_build_live_session)
+    monkeypatch.setattr(
+        internal_routes,
+        "get_or_create_session",
+        lambda *_args, **_kwargs: type("Session", (), {"session_id": "relay-once"})(),
+    )
+    monkeypatch.setattr(internal_routes, "append_session_message", lambda *a, **kw: saved.append(a))
+    import memory.memory as memory_module
+    monkeypatch.setattr(memory_module, "archive_session_turn", lambda **kw: archived.append(kw))
+
+    await internal_routes.internal_live_bridge(FakeWebSocket(), "relay-once")
+
+    assert saved == []
+    assert archived == []

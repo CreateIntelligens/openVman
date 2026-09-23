@@ -9,6 +9,9 @@
   中文或無法判斷時用繁體中文」。專案 SOUL.md 若寫死語言仍以 SOUL 為準。
 - **Live 收音轉錄從沒存進歷史**：Gemini 把 `inputTranscription` 包在 `serverContent` 裡，程式只看頂層，
   語音模式下使用者講的話沒有 `user_transcription` 事件、也沒寫進對話紀錄（`live/gemini_live.py`）。
+- **Live 回覆與記憶封存每輪重複**：f6d58a1（09-22）讓 `GeminiLiveSession` 自己存回覆與封存，但
+  `internal_routes` 的 Live bridge 原本就會再存一次；正式環境 7 組相鄰 assistant 有 6 組完全相同。
+  bridge 改成只存打字輸入的使用者訊息，其餘交給 `GeminiLiveSession`。既有重複資料未清。
 - **Live 英西字幕黏字**：逐段輸出轉錄被 `strip()`，字間空格落在段落頭尾而被吃掉（"suciade"），
   字幕、自訂語音送 TTS 的文字與存進歷史的回覆都受影響（`live/gemini_live.py`、`internal_routes.py`）。
   實測小鶴 Live 3.8：中英西語音提問都以同語言回覆，講完到出聲 1.7–3.7 秒。
