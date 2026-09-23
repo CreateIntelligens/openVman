@@ -160,6 +160,10 @@
   這筆寫回對話歷史後，Gemini OpenAI 相容端點下一輪回 400 `INVALID_ARGUMENT`（dev 實測重現：
   只有空字串參數是這個錯）。`llm_client` 建 `LLMToolCall` 時把空參數統一成 `"{}"`，參數缺漏
   交給工具 schema 驗證回報。非串流與串流兩條路徑都處理。
+- **OpenAI ASR 把英文、西語硬轉成中文**：`_transcribe_openai` 寫死 `whisper-1` 與 `language="zh"`，
+  西語句子被翻成中文且翻錯、中文是簡體；base URL 還誤讀 `VISION_LLM_BASE_URL`，設了 VLM 就把語音
+  送到 VLM 閘道。改成不指定語言、模型可設（`ASR_OPENAI_MODEL`，預設 `gpt-4o-mini-transcribe`，中文出
+  繁體、西語正確）、獨立的 `ASR_OPENAI_BASE_URL`。多語實測見 `scripts/experiments/asr-multilingual/REPORT.md`。
 - **Gemini Live 的中文轉錄是簡體**：`inputAudioTranscription`／`outputAudioTranscription` 帶
   `languageCodes`（新設定 `LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`，預設 `zh-TW`）後直接回繁體
   （2026-09-23 以 edge-tts 語音實測；單數 `languageCode` 會被 API 拒絕）。

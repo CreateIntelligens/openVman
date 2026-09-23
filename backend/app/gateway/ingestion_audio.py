@@ -23,18 +23,20 @@ _http = SharedAsyncClient(connect=5, read=120, write=30, pool=5)
 
 
 async def _transcribe_openai(file_path: str, trace_id: str) -> str:
-    """Transcribe audio using OpenAI Whisper API."""
+    """Transcribe audio with OpenAI, letting the model detect the language.
+
+    不帶 language：寫死 zh 會讓英文、西語被硬轉成中文（鶴記要中英西三語）。
+    """
     cfg = get_tts_config()
     client_kwargs: dict = {"api_key": cfg.whisper_api_key}
-    if cfg.vision_llm_base_url:
-        client_kwargs["base_url"] = cfg.vision_llm_base_url
+    if cfg.asr_openai_base_url:
+        client_kwargs["base_url"] = cfg.asr_openai_base_url
 
     client = AsyncOpenAI(**client_kwargs)
     with open(file_path, "rb") as audio_file:
         response = await client.audio.transcriptions.create(
-            model="whisper-1",
+            model=cfg.asr_openai_model,
             file=audio_file,
-            language="zh",
         )
     return response.text
 

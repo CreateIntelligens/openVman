@@ -215,6 +215,12 @@ class TTSRouterConfig(BaseSettings):
         validation_alias=AliasChoices("ASR_PROVIDER", "WHISPER_PROVIDER"),
     )
     whisper_api_key: str = ""
+    # OpenAI 轉錄模型。gpt-4o-mini-transcribe 不指定語言時自動判斷，中文直接出
+    # 繁體、長句西語也不會被改寫成中文（2026-09-23 實測；自架三家都會）。
+    asr_openai_model: str = Field(default="gpt-4o-mini-transcribe", validation_alias="ASR_OPENAI_MODEL")
+    # 空字串走 OpenAI 官方端點。以前誤用 VISION_LLM_BASE_URL，設了 VLM 就會把
+    # 語音送到 VLM 閘道。
+    asr_openai_base_url: str = Field(default="", validation_alias="ASR_OPENAI_BASE_URL")
     # Breeze-ASR-26（MediaTek Research）：POST /transcribe，multipart ``file``。
     asr_breeze_url: str = ""
     # SenseVoice-Small（阿里）：POST /api/v1/asr，multipart ``files`` + ``keys``。
