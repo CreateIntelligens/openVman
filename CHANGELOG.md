@@ -120,6 +120,14 @@
 
 ### Fixed
 
+- **embedding 服務的 VRAM 只漲不降**：bge-m3 權重約 2 GB，但 PyTorch 會把大批次
+  （`EMBEDDING_BATCH_SIZE=32` × `EMBEDDING_MAX_LENGTH=8192`）的峰值記憶體留在快取
+  裡不還，跑了幾天的容器常駐到約 4.7 GB，擠壓同卡的 VoxCPM。現在每次推論後、
+  仍持有 `EMBEDDING_MAX_CONCURRENCY` semaphore 時呼叫 `torch.cuda.empty_cache()`；
+  以前只在 OOM 重試時才釋放。CPU 裝置不受影響。每次釋放超過 64 MB 會記一行
+  `CUDA cache released texts=… reserved_mb=前->後 allocated_mb=…`，用來觀察常駐量
+  是否仍隨時間上漲。
+
 - **Gemini Live 沒有保存模型回覆，切回文字模式後上下文斷掉**：
   `live/gemini_live.py` 只在 `_save_input_transcription()` 存過使用者發言，模型
   回覆抽出文字後只推給前端顯示就丟掉，整支檔案的 `append_session_message`

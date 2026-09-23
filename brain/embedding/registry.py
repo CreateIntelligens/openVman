@@ -19,6 +19,7 @@ import httpx
 from identity import EmbeddingSpec, make_canonical_identity
 
 logger = logging.getLogger("embedding_gateway.registry")
+_RELEASE_LOG_THRESHOLD_BYTES = 64 * 2**20
 
 
 def _sanitize_url(url: str) -> str:
@@ -314,9 +315,38 @@ class BgeLocalProvider:
             return [list(x) for x in raw]
 
         async with self._semaphore:
-            vectors = await loop.run_in_executor(None, _do_encode)
+            try:
+                vectors = await loop.run_in_executor(None, _do_encode)
+            finally:
+                # PyTorch 會把大批次的峰值記憶體留在快取裡不還；一次長段落匯入
+                # 就能讓常駐 VRAM 從 2 GB 漲到近 5 GB，擠掉同卡的其他服務。
+                # 還在 semaphore 內，沒有別的請求在用，釋放是安全的。
+                await loop.run_in_executor(
+                    None, self._release_cuda_cache, len(texts),
+                )
 
         return _l2_normalize(vectors)
+
+    def _release_cuda_cache(self, text_count: int = 0) -> None:
+        if not str(self.device).startswith("cuda"):
+            return
+        try:
+            import torch
+
+            before = torch.cuda.memory_reserved()
+            torch.cuda.empty_cache()
+            after = torch.cuda.memory_reserved()
+        except Exception:
+            logger.debug("CUDA cache release failed", exc_info=True)
+            return
+        # 只記有實際釋放的大批次；一般查詢每次都記會洗版。留著這筆紀錄才看得出
+        # 常駐量是否仍隨時間上漲（例如權重以外還有東西在漏）。
+        if before - after >= _RELEASE_LOG_THRESHOLD_BYTES:
+            logger.info(
+                "CUDA cache released texts=%d reserved_mb=%.0f->%.0f allocated_mb=%.0f",
+                text_count, before / 2**20, after / 2**20,
+                torch.cuda.memory_allocated() / 2**20,
+            )
 
     async def shutdown(self) -> None:
         async with self._init_lock:

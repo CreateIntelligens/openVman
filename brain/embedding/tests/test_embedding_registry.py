@@ -321,3 +321,71 @@ async def test_gemini_provider_retries_429_and_succeeds():
     assert len(vectors[0]) == 768
     assert calls == 2
     assert provider._is_ready is True
+
+
+class _FakeEncodeModel:
+    def __init__(self, *, fail: bool = False):
+        self.fail = fail
+
+    def encode_dense(self, texts, **_kwargs):
+        if self.fail:
+            raise RuntimeError("boom")
+        return [[1.0, 0.0] for _ in texts]
+
+
+def _fake_torch(monkeypatch, reserved_mb=(100, 100)) -> list[str]:
+    calls: list[str] = []
+    readings = iter(reserved_mb)
+    torch_module = types.ModuleType("torch")
+    torch_module.cuda = types.SimpleNamespace(
+        empty_cache=lambda: calls.append("empty"),
+        memory_reserved=lambda: next(readings) * 2**20,
+        memory_allocated=lambda: 90 * 2**20,
+    )
+    monkeypatch.setitem(sys.modules, "torch", torch_module)
+    return calls
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fail", [False, True])
+async def test_bge_releases_cuda_cache_after_every_encode(monkeypatch, fail):
+    calls = _fake_torch(monkeypatch)
+    provider = BgeLocalProvider(device="cuda")
+    provider._model = _FakeEncodeModel(fail=fail)
+    provider._is_ready = True
+
+    if fail:
+        with pytest.raises(RuntimeError):
+            await provider.encode(["a"])
+    else:
+        assert await provider.encode(["a", "b"]) == [[1.0, 0.0], [1.0, 0.0]]
+    assert calls == ["empty"]
+
+
+@pytest.mark.asyncio
+async def test_bge_on_cpu_does_not_touch_cuda(monkeypatch):
+    calls = _fake_torch(monkeypatch)
+    provider = BgeLocalProvider(device="cpu")
+    provider._model = _FakeEncodeModel()
+    provider._is_ready = True
+
+    await provider.encode(["a"])
+    assert calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reserved_mb, logged", [((3000, 2100), True), ((2110, 2100), False)])
+async def test_bge_logs_only_meaningful_releases(monkeypatch, caplog, reserved_mb, logged):
+    _fake_torch(monkeypatch, reserved_mb)
+    provider = BgeLocalProvider(device="cuda")
+    provider._model = _FakeEncodeModel()
+    provider._is_ready = True
+    caplog.set_level("INFO", logger="embedding_gateway.registry")
+
+    await provider.encode(["a", "b", "c"])
+
+    released = [r.getMessage() for r in caplog.records if "CUDA cache released" in r.getMessage()]
+    if logged:
+        assert released == ["CUDA cache released texts=3 reserved_mb=3000->2100 allocated_mb=90"]
+    else:
+        assert released == []
