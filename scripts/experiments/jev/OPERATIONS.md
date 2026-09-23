@@ -65,6 +65,15 @@ US$0.05；帶多輪歷史會多一些，仍在每日一美元以下。上限的�
 `JEV_MEMORY_GATE_ENABLED=false` 時退回原本的關鍵字 regex。記錄 `event=memory_gate`，
 `source` 為 `jev` 或 `regex_fallback`，不記原文。
 
+## backend 的兩個選用閘門（預設關）
+
+backend 另有 `app/jev_client.py`（與 brain 不共用 runtime），共用一條連線；暖連線實測 330–410 ms。
+
+- `JEV_INTERRUPT_ENABLED`：`guard_agent` 規則判不出的長句（原本一律 STOP）改問 Jev STOP／IGNORE，
+  逾時 `JEV_INTERRUPT_TIMEOUT_SECONDS`（0.6）或失敗維持 STOP。記錄 `event=interrupt_jev`。只送那句 ASR 文字。
+- `A2A_JEV_PREFILTER_ENABLED`：對方訊息的 `no_reply` 機率 ≥ `A2A_JEV_NO_REPLY_THRESHOLD`（0.9）時，
+  直接記成 suppressed（reason=`jev`），不跑整輪 Brain；其他情況照舊交給 Brain 的 `[[A2A_NO_REPLY]]`。
+
 ## 記錄與排查
 
 `event=jev_shadow` 的 JSON 寫入 Brain logger：

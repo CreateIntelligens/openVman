@@ -38,6 +38,8 @@ type LiveSessionOptions = {
   voiceSource?: VoiceSource;
   chatSessionId?: string;
   initialMessages?: LiveMessage[];
+  /** 一輪助理回覆結束（is_final）時帶整輪文字呼叫；自訂語音靠它交給前端 TTS。 */
+  onAssistantTurnComplete?: (text: string) => void;
 };
 type LiveSessionResult = {
   wsState: LiveWsState;
@@ -86,6 +88,7 @@ export function useLiveSession({
   voiceSource = DEFAULT_VOICE_SOURCE,
   chatSessionId,
   initialMessages,
+  onAssistantTurnComplete,
 }: LiveSessionOptions): LiveSessionResult {
   const [wsState, setWsState] = useState<LiveWsState>("disconnected");
   const [micActive, setMicActive] = useState(false);
@@ -104,6 +107,10 @@ export function useLiveSession({
   isPlayingRef.current = isPlaying;
 
   const managerRef = useRef<LiveWebSocketManager | null>(null);
+  // 用 ref 接 callback，避免它每次 render 換新就讓串流處理函式跟著重建。
+  const onTurnCompleteRef = useRef(onAssistantTurnComplete);
+  onTurnCompleteRef.current = onAssistantTurnComplete;
+  const turnTextRef = useRef("");
   const initialVoiceSourceRef = useRef(voiceSource);
   const initialMessagesRef = useRef(initialMessages);
   const seededRef = useRef(false);
@@ -248,6 +255,12 @@ export function useLiveSession({
   }, [flushPendingText]);
   const handleStreamChunk = useCallback((chunk: ServerStreamChunkEvent) => {
     appendAssistantText(chunk.text);
+    turnTextRef.current += chunk.text || "";
+    if (chunk.is_final) {
+      const turnText = turnTextRef.current.trim();
+      turnTextRef.current = "";
+      if (turnText) onTurnCompleteRef.current?.(turnText);
+    }
     queueLiveAudioChunk(
       chunk,
       {
@@ -285,6 +298,7 @@ export function useLiveSession({
     }
     if (event.event === "server_stop_audio") {
       const stopEvent = event as ServerStopAudioEvent;
+      turnTextRef.current = "";
       stopPlayback();
       if (stopEvent.reason) console.log("Live audio stopped:", stopEvent.reason);
     }

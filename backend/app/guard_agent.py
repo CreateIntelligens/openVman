@@ -1,8 +1,26 @@
 """Deterministic guard for transcript-triggered interruptions."""
 
+import json
+import logging
 import re
 import unicodedata
 from typing import Literal
+
+logger = logging.getLogger(__name__)
+
+# 與 scripts/experiments/jev/eval_replacements.py 同一題。規則判不出的長句原本一律
+# STOP，附和、對旁人說話也會誤停（自寫 30 題規則 23/30、Jev 29/30）。
+_JEV_INTERRUPT_QUESTION = {
+    "type": "choice",
+    "instructions": (
+        "助理正在說話。這句 ASR 辨識文字是否表示使用者要中斷助理？"
+        "單字停止命令、修正、新問題都算；附和、對旁人說話、要求繼續不算。"
+    ),
+    "criteria": {
+        "STOP": "使用者對正在說話的助手提出停止、修正或新的問題，需要中斷當前回答。",
+        "IGNORE": "只是附和、背景對話、對別人說話，或明確要求助手繼續說，不應中斷。",
+    },
+}
 
 
 _QUOTED_TEXT = re.compile(
@@ -56,5 +74,32 @@ class GuardAgent:
             return "STOP"
 
         meaningful = "".join(char for char in remaining if char.isalnum())
-        # Preserve the existing conservative fallback for unknown long speech.
-        return "STOP" if len(meaningful) > 5 else "IGNORE"
+        if len(meaningful) <= 5:
+            return "IGNORE"
+        # Unknown long speech: ask Jev when enabled, else keep the
+        # conservative STOP. Any Jev failure also falls back to STOP.
+        return await _classify_ambiguous(normalized)
+
+
+async def _classify_ambiguous(text: str) -> Literal["STOP", "IGNORE"]:
+    from app.config import get_tts_config
+    from app.jev_client import jev_answer, jev_available
+
+    cfg = get_tts_config()
+    if not (cfg.jev_interrupt_enabled and jev_available()):
+        return "STOP"
+    try:
+        answer = await jev_answer(
+            text, _JEV_INTERRUPT_QUESTION,
+            timeout=cfg.jev_interrupt_timeout_seconds,
+        )
+    except Exception as exc:
+        logger.warning(json.dumps(
+            {"event": "interrupt_jev_fallback", "error_type": type(exc).__name__},
+        ))
+        return "STOP"
+    choice = answer.get("choice")
+    logger.info(json.dumps(
+        {"event": "interrupt_jev", "choice": choice, "confidence": answer.get("confidence")},
+    ))
+    return "IGNORE" if choice == "IGNORE" else "STOP"

@@ -786,3 +786,23 @@ async def test_live_meters_audio_seconds_per_turn():
     # 記完要歸零，否則下一輪會重複計費。
     assert session._input_audio_seconds == 0.0
     assert session._output_audio_seconds == 0.0
+
+
+@pytest.mark.parametrize("languages, expected", [
+    ("zh-TW", {"languageCodes": ["zh-TW"]}),
+    ("zh-TW, en-US", {"languageCodes": ["zh-TW", "en-US"]}),
+    ("", {}),
+])
+def test_transcription_language_codes_follow_config(languages, expected):
+    """不指定語言時 Gemini 的中文轉錄是簡體。"""
+    module, fake_config = _load_module()
+    fake_config.live_gemini_transcription_languages = languages
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-lang",
+        client_id="client-lang",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+    )
+    setup = session._build_setup_message()
+    assert setup["inputAudioTranscription"] == expected
+    assert setup["outputAudioTranscription"] == expected

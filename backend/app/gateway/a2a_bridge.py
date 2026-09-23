@@ -21,6 +21,14 @@ from app.gateway.redis_pool import get_redis
 logger = logging.getLogger("backend.gateway.a2a_bridge")
 
 _NO_REPLY_TOKEN = "[[A2A_NO_REPLY]]"
+_A2A_REPLY_QUESTION = {
+    "type": "choice",
+    "instructions": "這是另一個 AI 代理傳來的訊息。我方是否需要回覆？",
+    "criteria": {
+        "reply": "含有問題、請求、需要確認或需要我方採取行動",
+        "no_reply": "只是確認收到、道謝、結束對話或單純告知已完成",
+    },
+}
 _RENEW_LEASE_SCRIPT = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
   return redis.call('expire', KEYS[1], ARGV[2])
@@ -432,7 +440,14 @@ class A2ABridgeDaemon:
 
         self.queue.record_processing_start(event_id)
 
-        # 1. Forward all peer content to Brain; only Brain decides suppression.
+        # 0. Optional: skip the whole Brain turn when Jev is near-certain the
+        # peer only acknowledged or closed. Anything less goes to Brain.
+        if await self._jev_says_no_reply(message):
+            logger.info("Jev pre-filter: no reply needed for event %d", event_id)
+            self.queue.record_suppressed(event_id, "jev")
+            return
+
+        # 1. Forward peer content to Brain; Brain decides suppression.
         reply = await self._query_brain(
             message,
             requester_id=requester_id,
@@ -479,6 +494,28 @@ class A2ABridgeDaemon:
                 logger.info("Delivered A2A reply to %s for event %d", requester_id, event_id)
             except Exception as exc:
                 self.queue.record_failed(event_id, f"Hub send failed: {exc}")
+
+    async def _jev_says_no_reply(self, message: str) -> bool:
+        """True only when Jev's no_reply probability clears the threshold.
+
+        Any failure answers False so the message still reaches Brain：漏回一個
+        真問題比多跑一輪 LLM 糟。題目與 eval_replacements.py 一致（自寫 16 題 16/16）。
+        """
+        if not self.config.a2a_jev_prefilter_enabled or not self.config.typesafe_api_key:
+            return False
+        from app.jev_client import jev_answer
+
+        try:
+            answer = await jev_answer(message, _A2A_REPLY_QUESTION, timeout=2.0)
+        except Exception as exc:
+            logger.warning("A2A Jev pre-filter failed (%s); asking Brain", type(exc).__name__)
+            return False
+        no_reply = (answer.get("probabilities") or {}).get("no_reply", 0.0)
+        return (
+            answer.get("choice") == "no_reply"
+            and isinstance(no_reply, (int, float))
+            and no_reply >= self.config.a2a_jev_no_reply_threshold
+        )
 
     async def _query_brain(
         self,

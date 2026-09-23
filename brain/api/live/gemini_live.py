@@ -714,9 +714,19 @@ class GeminiLiveSession:
             setup["systemInstruction"] = {
                 "parts": [{"text": instruction}]
             }
+        # 不指定語言時中文轉錄回傳簡體；languageCodes 讓 Gemini 直接吐繁體
+        # （2026-09-23 實測；單數 languageCode 會被拒）。
+        transcription: dict[str, Any] = {}
+        languages = [
+            code.strip()
+            for code in str(getattr(self.config, "live_gemini_transcription_languages", "")).split(",")
+            if code.strip()
+        ]
+        if languages:
+            transcription["languageCodes"] = languages
         if self.config.live_gemini_output_audio_transcription:
-            setup["outputAudioTranscription"] = {}
-        setup["inputAudioTranscription"] = {}
+            setup["outputAudioTranscription"] = dict(transcription)
+        setup["inputAudioTranscription"] = dict(transcription)
         if self.config.live_gemini_tools_enabled:
             setup["tools"] = [{"functionDeclarations": build_gemini_tool_declarations()}]
 

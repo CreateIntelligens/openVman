@@ -118,6 +118,15 @@ export default function Chat() {
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role as "user" | "assistant", text: m.content, timestamp: m.created_at ? new Date(m.created_at).getTime() : 0 }));
   }, [messages]);
+  // 自訂語音：backend 會清掉 Gemini 音訊，改由前端拿整輪文字跑 TTS。每輪給
+  // 不同的負數 index，避免 playTts 把「同一個 index 再按一次」當成停止。
+  const liveTtsIndexRef = useRef(0);
+  const playTtsRef = useRef(playTts);
+  playTtsRef.current = playTts;
+  const handleLiveTurnComplete = useCallback((text: string) => {
+    liveTtsIndexRef.current -= 1;
+    void playTtsRef.current(text, liveTtsIndexRef.current);
+  }, []);
   const liveSession = useLiveSession({
     enabled: mode === "live",
     clientId: liveClientIdRef.current,
@@ -125,6 +134,7 @@ export default function Chat() {
     voiceSource,
     chatSessionId: sessionId,
     initialMessages: liveInitialMessages,
+    onAssistantTurnComplete: voiceSource === "custom" ? handleLiveTurnComplete : undefined,
   });
   const {
     clearError: liveClearError,

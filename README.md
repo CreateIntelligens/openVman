@@ -333,7 +333,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 
 ### 語音插話與停止控制
 
-停止操作不需要 ASR 文字即可中斷後端工作。帶辨識文字的插話以本地規則處理：「停」立即中斷，「不用停，繼續說」、附和與已識別的引用背景話不誤停；句中另有新問題或修正要求仍會中斷。此修正不引入 SemIf 或其他模型。行為與邊界見 [中斷機制](docs/specs/01_BACKEND_SPEC.md#8-打斷機制處理-interruption-handling)。
+停止操作不需要 ASR 文字即可中斷後端工作。帶辨識文字的插話以本地規則處理：「停」立即中斷，「不用停，繼續說」、附和與已識別的引用背景話不誤停；句中另有新問題或修正要求仍會中斷。規則判不出的長句原本一律中斷；設 `JEV_INTERRUPT_ENABLED=true` 後改問 Jev（逾時 600 ms 或失敗仍中斷），附和與對旁人說話不再誤停。行為與邊界見 [中斷機制](docs/specs/01_BACKEND_SPEC.md#8-打斷機制處理-interruption-handling)。
 
 ### 意圖觀測
 

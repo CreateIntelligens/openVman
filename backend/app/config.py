@@ -275,6 +275,22 @@ class TTSRouterConfig(BaseSettings):
         validation_alias="AUTH_SESSION_LIFETIME_SECONDS",
     )
 
+    # --- Jev (TypeSafe System One) ---
+    typesafe_api_key: str = Field(default="", repr=False, validation_alias="TYPESAFE_API_KEY")
+    jev_base_url: str = Field(default="https://api.typesafe.ai", validation_alias="JEV_BASE_URL")
+    # 語音打斷：規則判不出來、原本「超過 5 字就當打斷」的那一段改問 Jev。
+    # 即時路徑會多等最多 timeout，所以預設關；失敗或逾時維持 STOP。
+    jev_interrupt_enabled: bool = Field(default=False, validation_alias="JEV_INTERRUPT_ENABLED")
+    jev_interrupt_timeout_seconds: float = Field(
+        default=0.6, gt=0, le=5, validation_alias="JEV_INTERRUPT_TIMEOUT_SECONDS",
+    )
+    # A2A：Jev 很確定對方只是客套/結束語時，不再跑整輪 Brain。原設計是「只有
+    # Brain 能決定不回」，所以預設關、門檻保守。
+    a2a_jev_prefilter_enabled: bool = Field(default=False, validation_alias="A2A_JEV_PREFILTER_ENABLED")
+    a2a_jev_no_reply_threshold: float = Field(
+        default=0.9, gt=0, le=1, validation_alias="A2A_JEV_NO_REPLY_THRESHOLD",
+    )
+
     # --- 888a2a Agent-to-Agent Network ---
     a2a_enabled: bool = Field(
         default=False,

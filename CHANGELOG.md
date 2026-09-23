@@ -4,6 +4,14 @@
 
 ### Added
 
+- **後台 Live「自訂語音」接上前端 TTS**：relay 在 `custom` 下會清掉 Gemini 音訊，但後台沒有接 TTS，
+  一直無聲。`useLiveSession` 新增 `onAssistantTurnComplete`，每輪 `is_final` 時交出整輪文字，
+  聊天頁用既有的 `playTts()`（使用者選的 TTS 供應商與聲音）播放。
+- **語音打斷與 A2A 的 Jev 選用閘門**（backend `app/jev_client.py`，皆預設關）：
+  `JEV_INTERRUPT_ENABLED` 讓規則判不出的長句改問 Jev（自寫 30 題規則 23/30、Jev 29/30；逾時 0.6 秒
+  或失敗維持中斷）；`A2A_JEV_PREFILTER_ENABLED` 在 Jev 的 no_reply 機率 ≥ 0.9 時省掉整輪 Brain。
+  backend 共用一條 Jev 連線，暖連線 330–410 ms。
+
 - **save_memory 授權改由 Jev 判斷**（`core/jev_client.py`、`tools/builtin/memory_tools.py`）：
   原本的關鍵字 regex 看到「記」就放行、「幫我記下來」「把生日存起來」反而擋掉（自寫 20 題
   5/20，Jev 20/20，實打 Jev 0.89／0.06）。現在問 Jev「這句是否明確要求長期記住」，≥ 0.5 才寫；
@@ -139,6 +147,9 @@
   這筆寫回對話歷史後，Gemini OpenAI 相容端點下一輪回 400 `INVALID_ARGUMENT`（dev 實測重現：
   只有空字串參數是這個錯）。`llm_client` 建 `LLMToolCall` 時把空參數統一成 `"{}"`，參數缺漏
   交給工具 schema 驗證回報。非串流與串流兩條路徑都處理。
+- **Gemini Live 的中文轉錄是簡體**：`inputAudioTranscription`／`outputAudioTranscription` 帶
+  `languageCodes`（新設定 `LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`，預設 `zh-TW`）後直接回繁體
+  （2026-09-23 以 edge-tts 語音實測；單數 `languageCode` 會被 API 拒絕）。
 - **後台 Live 模式完全沒有聲音**：2026-04 把 TTS 從 relay 移到前端時，`brain_live_relay.py` 不分
   `voice_source` 一律清掉 Gemini 音訊；avatar 送 `custom` 自己跑 `/tts_stream` 沒事，後台聊天頁的
   「Gemini 語音」只播 relay 送來的音訊，就一直無聲。現在只有 `voice_source=custom` 才清。

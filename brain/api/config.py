@@ -65,6 +65,8 @@ class BrainSettings(BaseSettings):
     live_gemini_tools_enabled: bool = True
     live_gemini_thinking_level: str = ""
     live_gemini_context_compression: bool = True
+    # 逗號分隔；空字串表示不指定（Gemini 預設回簡體）。
+    live_gemini_transcription_languages: str = "zh-TW"
 
     # === Embedding 設定 ===
     embedding_active_version: str = "bge"
