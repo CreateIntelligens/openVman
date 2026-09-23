@@ -299,3 +299,17 @@ class _FakeSettings:
 
 def _fake_settings(**kwargs):
     return _FakeSettings(**kwargs)
+
+
+def test_list_sessions_reports_and_filters_language(store: SessionStore):
+    """語言以最後一則使用者訊息為準；助理回覆的語言不算。"""
+    store.get_or_create_session("zh", "default")
+    store.append_message("zh", "default", "user", "地下室要抽污水")
+    store.append_message("zh", "default", "assistant", "I recommend HIPPO.")
+    store.get_or_create_session("switch", "default")
+    store.append_message("switch", "default", "user", "你好")
+    store.append_message("switch", "default", "user", "¿Qué bomba me recomiendas?")
+
+    languages = {s["session_id"]: s["language"] for s in store.list_sessions("default")}
+    assert languages == {"zh": "zh", "switch": "es"}
+    assert [s["session_id"] for s in store.list_sessions("default", language="es")] == ["switch"]

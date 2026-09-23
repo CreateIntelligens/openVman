@@ -1,3 +1,4 @@
+import { SESSION_LANGUAGE_LABELS, type SessionLanguage } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
 import Select from "../components/Select";
 import { buildAdminPath } from "../components/app/navigation";
@@ -12,6 +13,14 @@ const SORT_OPTIONS: { value: SessionSortKey; label: string }[] = [
   { value: "updated_at", label: "最近更新" },
   { value: "created_at", label: "建立時間" },
   { value: "message_count", label: "訊息數" },
+];
+
+const LANGUAGE_OPTIONS = [
+  { value: "", label: "全部語言" },
+  ...Object.entries(SESSION_LANGUAGE_LABELS).map(([value, label]) => ({
+    value,
+    label,
+  })),
 ];
 
 function getExportButtonLabel(
@@ -73,6 +82,8 @@ export default function Sessions() {
     setDateTo,
     sortKey,
     setSortKey,
+    language,
+    setLanguage,
     hasActiveFilters,
     loadSessions,
     resetFilters,
@@ -193,7 +204,7 @@ export default function Sessions() {
             </label>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
             <label className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
                 起始時間
@@ -216,6 +227,20 @@ export default function Sessions() {
                 value={dateTo}
                 onChange={(event) => setDateTo(event.target.value)}
                 className="input"
+              />
+            </label>
+            <label
+              className="flex flex-col gap-1.5"
+              title="依最後一則使用者訊息判斷"
+            >
+              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-content-subtle">
+                語言
+              </span>
+              <Select
+                value={language}
+                onChange={(value) => setLanguage(value as SessionLanguage | "")}
+                options={LANGUAGE_OPTIONS}
+                className="w-full"
               />
             </label>
             {hasActiveFilters && (
@@ -322,6 +347,11 @@ export default function Sessions() {
                         <span className="chip">
                           {session.message_count} 則
                         </span>
+                        {session.language && (
+                          <span className="chip">
+                            {SESSION_LANGUAGE_LABELS[session.language]}
+                          </span>
+                        )}
                       </div>
                       {session.last_message_preview && (
                         <p className="line-clamp-2 text-sm text-content-muted">

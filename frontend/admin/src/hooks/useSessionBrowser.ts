@@ -7,6 +7,7 @@ import {
   fetchSessionExport,
   fetchSessions,
   type PersonaSummary,
+  type SessionLanguage,
   type SessionSummary,
 } from "../api";
 import { defaultPersona, getPersonaStorageKey } from "../components/chat/helpers";
@@ -66,6 +67,7 @@ export function useSessionBrowser() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sortKey, setSortKey] = useState<SessionSortKey>("updated_at");
+  const [language, setLanguage] = useState<SessionLanguage | "">("");
   const [page, setPage] = useState(1);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [deletingSessions, setDeletingSessions] = useState(false);
@@ -88,11 +90,12 @@ export function useSessionBrowser() {
       dateFrom,
       dateTo,
       search: debouncedSearchQuery,
+      language: language || undefined,
     })
       .then((response) => setSessions(response.sessions ?? []))
       .catch((reason) => setError(String(reason)))
       .finally(() => setLoadingSessions(false));
-  }, [dateFrom, dateTo, debouncedSearchQuery, personaFilter]);
+  }, [dateFrom, dateTo, debouncedSearchQuery, language, personaFilter]);
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => compareSessions(a, b, sortKey)),
@@ -111,17 +114,19 @@ export function useSessionBrowser() {
   // 換了篩選或排序就回第一頁，免得停在一個已經不存在的頁碼。
   useEffect(() => {
     setPage(1);
-  }, [dateFrom, dateTo, debouncedSearchQuery, personaFilter, sortKey]);
+  }, [dateFrom, dateTo, debouncedSearchQuery, language, personaFilter, sortKey]);
 
   const resetFilters = useCallback(() => {
     setSearchQuery("");
     setDateFrom("");
     setDateTo("");
+    setLanguage("");
     setSelectedPersonaId(ALL_PERSONAS);
   }, []);
 
   const hasActiveFilters = Boolean(
-    searchQuery || dateFrom || dateTo || selectedPersonaId !== ALL_PERSONAS,
+    searchQuery || dateFrom || dateTo || language
+      || selectedPersonaId !== ALL_PERSONAS,
   );
 
   const toggleSessionSelection = useCallback((targetSessionId: string) => {
@@ -152,7 +157,12 @@ export function useSessionBrowser() {
       try {
         const payload = await fetchSessionExport(
           personaFilter,
-          { dateFrom, dateTo, search: debouncedSearchQuery },
+          {
+            dateFrom,
+            dateTo,
+            search: debouncedSearchQuery,
+            language: language || undefined,
+          },
           sessionIds,
           { simple: simpleExport },
         );
@@ -163,7 +173,7 @@ export function useSessionBrowser() {
         setExportingSessions(false);
       }
     },
-    [dateFrom, dateTo, debouncedSearchQuery, personaFilter, simpleExport],
+    [dateFrom, dateTo, debouncedSearchQuery, language, personaFilter, simpleExport],
   );
 
   const confirmBulkDelete = useCallback(() => {
@@ -261,6 +271,8 @@ export function useSessionBrowser() {
     setDateTo,
     sortKey,
     setSortKey,
+    language,
+    setLanguage,
     hasActiveFilters,
     loadSessions,
     resetFilters,

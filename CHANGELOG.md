@@ -20,8 +20,10 @@
 - **對話紀錄頁補齊 JTI 的歷史紀錄功能**（VH-388）：勾選後可「刪除已選」（新端點
   `POST /brain/sessions/batch-delete`，逐筆回報 deleted／missing，部分不存在不讓整批失敗）；
   列表每頁 50 筆分頁（摘要仍一次抓、排序篩選在前端，只切畫面）；匯出可勾「簡化格式」
-  （`simple=true`，每則訊息只留 role、content、created_at）。JTI 的「依語言篩選」沒做：
-  session 沒有記錄語言。
+  （`simple=true`，每則訊息只留 role、content、created_at）。
+- **對話紀錄依語言篩選**（VH-388 最後一項）：session 摘要多 `language`，列表與匯出都可帶
+  `language=` 篩選，後台加「語言」下拉與每筆語言標籤。以最後一則使用者訊息的字元與常用字
+  判斷（中日韓看字元、英西看 ¿¡ñ 與常用字），不呼叫模型也不加欄位，舊對話直接可篩。
 
 - **記憶召回改由 Jev 篩相關記憶**（`memory/auto_recall.py`，`AUTO_RECALL_USE_JEV_FILTER` 預設 true）：
   命中記憶在同一次呼叫逐筆問相關性，≥ 0.5 才條列給主對話，每輪省掉 LLM 摘要那次呼叫

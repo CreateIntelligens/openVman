@@ -25,6 +25,7 @@ const browserState = vi.hoisted(() => ({
       updated_at: "2026-09-01T02:00:00+00:00",
       message_count: 12,
       last_message_preview: "第一則對話預覽",
+      language: "es" as const,
     },
     {
       session_id: "bbbbbbbb-1111-2222-3333-444444444444",
@@ -74,6 +75,8 @@ vi.mock("../hooks/useSessionBrowser", async () => {
       setDateTo: vi.fn(),
       sortKey: "updated_at" as const,
       setSortKey: vi.fn(),
+      language: "" as const,
+      setLanguage: vi.fn(),
       hasActiveFilters: browserState.hasActiveFilters,
       loadSessions: vi.fn(),
       resetFilters: browserState.resetFilters,
@@ -143,6 +146,13 @@ describe("Sessions", () => {
     expect(screen.getByText("第二則對話預覽")).toBeTruthy();
     expect(screen.getByText("共 2 筆對話 · 16 則訊息")).toBeTruthy();
     expect(screen.getByText("support")).toBeTruthy();
+  });
+
+  it("labels each session with its detected language", () => {
+    render(<Sessions />);
+
+    expect(screen.getByText("Español")).toBeTruthy();
+    expect(screen.getByText("全部語言")).toBeTruthy();
   });
 
   it("exports the filtered set when nothing is selected", () => {

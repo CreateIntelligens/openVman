@@ -210,6 +210,7 @@ def list_sessions_for_project(
     date_from: str | None = None,
     date_to: str | None = None,
     search: str | None = None,
+    language: str | None = None,
 ) -> list[dict[str, Any]]:
     """List all chat sessions for a project."""
     return get_session_store(project_id).list_sessions(
@@ -217,6 +218,7 @@ def list_sessions_for_project(
         date_from=date_from,
         date_to=date_to,
         search=search,
+        language=language,
     )
 
 

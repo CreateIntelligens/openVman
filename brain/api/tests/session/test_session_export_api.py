@@ -115,6 +115,22 @@ def test_simple_export_keeps_only_role_content_time(tmp_path, monkeypatch):
     assert [m["content"] for m in messages] == ["問題", "回答"]
 
 
+def test_export_filters_by_language(tmp_path, monkeypatch):
+    from routes import sessions as sessions_routes
+
+    store = SessionStore(db_path=str(tmp_path / "sessions.db"))
+    store.append_message("zh", "default", "user", "推薦哪一款泵浦")
+    store.append_message("es", "default", "user", "¿Qué bomba me recomiendas?")
+    monkeypatch.setattr(sessions_routes, "get_session_store", lambda project_id="default": store)
+
+    with _client() as client:
+        response = client.get("/brain/sessions/export", params={"language": "es"})
+
+    assert response.status_code == 200
+    sessions = response.json()["sessions"]
+    assert [(s["session_id"], s["language"]) for s in sessions] == [("es", "es")]
+
+
 def test_batch_delete_reports_deleted_and_missing(monkeypatch):
     from routes import sessions as sessions_routes
 

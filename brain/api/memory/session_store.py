@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 from config import get_settings
 from infra.datetime_utils import normalize_iso_timestamp, utc_now_iso
+from memory.language_detect import detect_language
 from personas.personas import normalize_persona_id
 
 
@@ -266,8 +267,13 @@ class SessionStore:
         date_from: str | None = None,
         date_to: str | None = None,
         search: str | None = None,
+        language: str | None = None,
     ) -> list[dict[str, object]]:
-        """List sessions that have at least one message, matching optional filters."""
+        """List sessions that have at least one message, matching optional filters.
+
+        ``language`` 以最後一則使用者訊息判斷（見 memory.language_detect），
+        使用者中途換語言時以最新的為準。
+        """
         utc_from = _local_date_to_utc_iso(date_from)
         utc_to = _local_date_to_utc_iso(date_to, end_of_day=True)
         search_text = search.strip() if search else ""
@@ -281,7 +287,8 @@ class SessionStore:
                         s.created_at,
                         s.updated_at,
                         (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.session_id) AS message_count,
-                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_preview
+                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message_preview,
+                        (SELECT m.content FROM messages m WHERE m.session_id = s.session_id AND m.role = 'user' ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_user_message
                     FROM sessions s
                     WHERE EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.session_id)
                 """
@@ -308,7 +315,7 @@ class SessionStore:
 
                 base_sql += " ORDER BY s.updated_at DESC"
 
-                return [
+                sessions = [
                     {
                         "session_id": row[0],
                         "persona_id": row[1],
@@ -316,9 +323,13 @@ class SessionStore:
                         "updated_at": normalize_iso_timestamp(row[3]),
                         "message_count": row[4],
                         "last_message_preview": (row[5] or "")[:120],
+                        "language": detect_language(row[6] or ""),
                     }
                     for row in conn.execute(base_sql, params).fetchall()
                 ]
+        if language:
+            sessions = [s for s in sessions if s["language"] == language]
+        return sessions
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session and its messages (CASCADE)."""

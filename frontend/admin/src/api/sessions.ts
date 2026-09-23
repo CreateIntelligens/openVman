@@ -14,7 +14,20 @@ export interface SessionSummary {
   updated_at: string;
   message_count: number;
   last_message_preview: string;
+  /** 由最後一則使用者訊息判斷；空字串表示判斷不出來。 */
+  language?: SessionLanguage | "";
 }
+
+export type SessionLanguage = "zh" | "en" | "es" | "ja" | "ko" | "other";
+
+export const SESSION_LANGUAGE_LABELS: Record<SessionLanguage, string> = {
+  zh: "中文",
+  en: "English",
+  es: "Español",
+  ja: "日本語",
+  ko: "한국어",
+  other: "其他",
+};
 
 export interface SessionsListResponse {
   sessions: SessionSummary[];
@@ -25,6 +38,7 @@ export interface SessionFilters {
   dateFrom?: string;
   dateTo?: string;
   search?: string;
+  language?: SessionLanguage;
 }
 
 export interface ExportedSession extends SessionSummary {
@@ -42,19 +56,20 @@ export interface SessionsExportResponse {
 
 export async function fetchSessions(
   personaId?: string,
-  { dateFrom, dateTo, search }: SessionFilters = {},
+  { dateFrom, dateTo, search, language }: SessionFilters = {},
 ) {
   const params: QueryParams = {};
   if (personaId) params.persona_id = personaId;
   if (dateFrom) params.date_from = dateFrom;
   if (dateTo) params.date_to = dateTo;
   if (search) params.search = search;
+  if (language) params.language = language;
   return fetchJson<SessionsListResponse>(projectUrl(SESSIONS_PATH, params));
 }
 
 export async function fetchSessionExport(
   personaId?: string,
-  { dateFrom, dateTo, search }: SessionFilters = {},
+  { dateFrom, dateTo, search, language }: SessionFilters = {},
   sessionIds?: string[],
   { simple = false }: { simple?: boolean } = {},
 ): Promise<SessionsExportResponse> {
@@ -65,6 +80,7 @@ export async function fetchSessionExport(
   if (dateFrom) params.date_from = dateFrom;
   if (dateTo) params.date_to = dateTo;
   if (search) params.search = search;
+  if (language) params.language = language;
   if (sessionIds) params.session_ids = sessionIds.join(",");
   return fetchJson<SessionsExportResponse>(
     projectUrl(`${SESSIONS_PATH}/export`, params),

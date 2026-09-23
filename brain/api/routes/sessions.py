@@ -86,6 +86,7 @@ async def list_sessions(
     date_from: str | None = None,
     date_to: str | None = None,
     search: str | None = None,
+    language: str | None = None,
 ):
     _validate_date_range(
         date_from, date_to,
@@ -99,6 +100,7 @@ async def list_sessions(
             date_from=date_from,
             date_to=date_to,
             search=search,
+            language=language,
         )
     except Exception as exc:
         log_exception("list_sessions_error", exc)
@@ -125,6 +127,7 @@ def export_sessions(
     search: str | None = None,
     session_ids: str | None = None,
     simple: bool = False,
+    language: str | None = None,
 ) -> dict[str, Any]:
     _validate_date_range(
         date_from, date_to,
@@ -140,6 +143,7 @@ def export_sessions(
             date_from=date_from,
             date_to=date_to,
             search=search,
+            language=language,
         )
         selected_ids = _parse_session_ids(session_ids)
         if selected_ids is not None:

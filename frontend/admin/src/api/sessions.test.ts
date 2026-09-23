@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { setActiveProjectId } from "./common";
-import { batchDeleteSessions, fetchSessionExport } from "./sessions";
+import { batchDeleteSessions, fetchSessionExport, fetchSessions } from "./sessions";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -47,6 +47,22 @@ describe("sessions api", () => {
     await fetchSessionExport(undefined, {}, undefined, { simple: true });
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/sessions/export?project_id=project-a&simple=true");
+  });
+
+  it("passes the language filter to list and export", async () => {
+    setActiveProjectId("project-a");
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ sessions: [], total_sessions: 0 }),
+      headers: new Headers({ "content-type": "application/json" }),
+    } as Response);
+
+    await fetchSessions(undefined, { language: "es" });
+    await fetchSessionExport(undefined, { language: "es" });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/sessions?project_id=project-a&language=es");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/sessions/export?project_id=project-a&language=es");
   });
 
   it("deletes several sessions in one request", async () => {
