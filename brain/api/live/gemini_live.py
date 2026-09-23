@@ -504,10 +504,14 @@ class GeminiLiveSession:
     def _save_memory(self, args: dict[str, Any]) -> dict[str, Any]:
         from memory.embedder import encode_text
         from memory.memory import add_memory
+        from tools.builtin.memory_tools import is_explicit_memory_request
 
         content = str(args.get("content", "")).strip()
         if not content:
             raise ValueError("content 不可為空")
+        # 文字模式早有這道檢查，Live 以前沒有，模型想存就存。
+        if not is_explicit_memory_request(self._last_user_message):
+            raise ValueError("只有使用者明確要求記憶時才能寫入長期記憶")
         vector = encode_text(content)
         add_memory(
             text=content,

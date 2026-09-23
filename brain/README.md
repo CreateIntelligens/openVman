@@ -15,7 +15,7 @@
 ## Security boundaries
 
 - Brain 的 project data 路由由 Backend 先做 project resource authorization；dreaming、session export/delete、memory mutation 等寫入性操作需要更高權限。
-- `search_knowledge`、`search_memory` 與其他工具的回傳值一律視為不可信資料，不能授權另一個工具執行；`save_memory` 需要目前使用者明確要求記憶。
+- `search_knowledge`、`search_memory` 與其他工具的回傳值一律視為不可信資料，不能授權另一個工具執行；`save_memory` 需要目前使用者明確要求記憶——由 Jev 判斷（沒設 `TYPESAFE_API_KEY` 或失敗時退回關鍵字規則），文字與 Gemini Live 兩條路徑都檢查。
 - `main.py` 是 operator-managed skill source，不能透過技能檔案 API 上傳或替換。生產環境的 shared/project skill source 應維持唯讀並走 code review。
 - `read_web_page` 只接受可解析到公開網路位址的 HTTP(S) URL；private、loopback、link-local、reserved、multicast、unspecified 位址會被拒絕。
 - 2md endpoint 預設順序由不可變的 `TWO_MD_BASE_URLS` 統一管理；同一 logical request 只會序列呼叫一個 endpoint，並共用整條 fallback chain 的 deadline。

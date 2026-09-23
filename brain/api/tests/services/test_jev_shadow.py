@@ -31,7 +31,7 @@ REPLY = {
     "answers": {"route": {
         "type": "choice", "choice": "knowledge",
         "probabilities": {"knowledge": 0.9, "chat": 0.1}, "confidence": 0.85,
-    }},
+    }, "injection": {"type": "noul", "noul": 0.03}},
     "usage": {"input_tokens": 560, "output_tokens": 47},
 }
 
@@ -267,3 +267,14 @@ def test_prepare_schedules_shadow_without_touching_the_turn(monkeypatch, fails):
     ))
     assert forced.route.forced_tool_name == "test"
     spy.assert_not_called()
+
+
+def test_injection_score_rides_the_same_call(cfg, sent, caplog):
+    caplog.set_level("INFO", logger=jev.__name__)
+    submit()
+    assert len(sent) == 1
+    body = json.loads(sent[0].content)
+    assert set(body["questions"]) == {"route", "injection"}
+    record = json.loads(caplog.records[-1].getMessage())
+    assert record["injection_score"] == 0.03
+    assert record["suggestion"] == "knowledge"

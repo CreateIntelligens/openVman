@@ -57,13 +57,25 @@ US$0.05；帶多輪歷史會多一些，仍在每日一美元以下。上限的�
 每次成功呼叫以 `provider=typesafe`、`kind=intent_shadow` 記進 `usage.db`，
 帶原請求的使用者、session、project、trace 歸屬。
 
+## save_memory 授權閘門
+
+與影子無關、預設開啟：`save_memory`（文字與 Gemini Live 兩條路徑）寫入前，以
+`core/jev_client.jev_noul()` 問 Jev「這句使用者訊息是否明確要求長期記住」，分數 ≥ 0.5 才寫。
+只送當前使用者訊息；逾時 `JEV_GATE_TIMEOUT_SECONDS`（預設 2 秒）、沒設 key 或
+`JEV_MEMORY_GATE_ENABLED=false` 時退回原本的關鍵字 regex。記錄 `event=memory_gate`，
+`source` 為 `jev` 或 `regex_fallback`，不記原文。
+
 ## 記錄與排查
 
 `event=jev_shadow` 的 JSON 寫入 Brain logger：
 
 - 共同欄位：`trace_id`、`project_id`、`actual_route`
-- `ok`：`suggestion`、`confidence`、`probabilities`、`model_version`、
+- `ok`：`suggestion`、`confidence`、`probabilities`、`injection_score`、`model_version`、
   `input_tokens`、`output_tokens`、`elapsed_ms`、`input_truncated`
+
+`injection_score` 是同一次呼叫多問的一題：最新使用者訊息是否試圖讓助理忽略或洩漏系統指示
+（0–1）。只記錄、不擋請求，用來觀察誤判率後再決定要不要取代 `safety/guardrails.py` 的
+4 條英文 regex。
 - `timeout`：`elapsed_ms`
 - `error`：`error_type`、`http_status`（非 HTTP 錯誤為 null），不記例外內容
 - `daily_cap`：當天已達上限

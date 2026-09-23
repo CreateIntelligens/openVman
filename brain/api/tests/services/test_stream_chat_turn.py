@@ -236,6 +236,32 @@ class TestStreamChatTurnToolCallResponse:
         assert tc.name == "search"
         assert tc.arguments == '{"q": "test"}'
 
+    @pytest.mark.parametrize("args", ["", "   "])
+    def test_empty_arguments_become_empty_object(self, monkeypatch: pytest.MonkeyPatch, args):
+        """Gemini 拒收歷史中 arguments 為空字串的 tool call，下一輪會整個 400。"""
+        llm_client = _stub_deps(monkeypatch)
+        _stub_config(monkeypatch, llm_client, model="m1")
+
+        with patch("core.llm_client.OpenAI") as mock_openai:
+            mock_client = MagicMock()
+            mock_client.chat.completions.create.return_value = iter(
+                _tool_chunks(name="search_web", args=args)
+            )
+            mock_openai.return_value = mock_client
+
+            reply = llm_client.stream_chat_turn(
+                [{"role": "user", "content": "查一下"}], trace_id="t-empty",
+            )
+
+        assert reply.tool_calls[0].arguments == "{}"
+
+    @pytest.mark.parametrize("raw, expected", [
+        (None, "{}"), ("", "{}"), (" \n", "{}"), ('{"q": 1}', '{"q": 1}'),
+    ])
+    def test_normalize_tool_arguments(self, monkeypatch: pytest.MonkeyPatch, raw, expected):
+        llm_client = _stub_deps(monkeypatch)
+        assert llm_client._normalize_tool_arguments(raw) == expected
+
 
 # ---------------------------------------------------------------------------
 # 3.3: Multiple tool calls

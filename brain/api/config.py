@@ -169,6 +169,9 @@ class BrainSettings(BaseSettings):
     jev_shadow_daily_call_cap: int = Field(default=2000, ge=0)
     jev_shadow_base_url: str = "https://api.typesafe.ai"
     typesafe_api_key: str = ""
+    # save_memory 授權改由 Jev 判斷；沒設 key 或呼叫失敗時退回關鍵字規則。
+    jev_memory_gate_enabled: bool = True
+    jev_gate_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
     # 第一輪平行查完後，最多再允許幾輪追加工具（例如補查一次網路或讀一頁），
     # 之後不帶工具只能作答；避免模型一輪一查拖到七、八次呼叫。
     chat_max_followup_tool_rounds: int = 1

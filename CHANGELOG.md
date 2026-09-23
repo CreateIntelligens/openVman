@@ -4,6 +4,14 @@
 
 ### Added
 
+- **save_memory 授權改由 Jev 判斷**（`core/jev_client.py`、`tools/builtin/memory_tools.py`）：
+  原本的關鍵字 regex 看到「記」就放行、「幫我記下來」「把生日存起來」反而擋掉（自寫 20 題
+  5/20，Jev 20/20，實打 Jev 0.89／0.06）。現在問 Jev「這句是否明確要求長期記住」，≥ 0.5 才寫；
+  只送當前使用者訊息，2 秒逾時、沒 key 或失敗退回 regex。`JEV_MEMORY_GATE_ENABLED`（預設
+  true）、`JEV_GATE_TIMEOUT_SECONDS`（預設 2）。
+- **Jev 影子多問一題 prompt injection**：同一次呼叫加 `injection` noul，log 多 `injection_score`，
+  只記不擋；現行 `guardrails.py` 只有 4 條英文 regex、中文攻擊全漏（自寫 20 題 11/20，Jev 20/20）。
+
 - **Jev 意圖影子觀測**（`brain/api/core/jev_shadow.py`，預設關閉）：與既有 BGE
   影子並排，對 `/brain/chat` 的一般使用者回合抽樣呼叫 TypeSafe Jev，把
   chat／knowledge／web／clarify 建議分類記進 log，不改路由、prompt 或工具選擇。
@@ -126,6 +134,15 @@
   supported for this model」。
 
 ### Fixed
+
+- **Gemini 在模型吐出空參數 tool call 後整輪 400**：模型偶爾呼叫工具卻不帶參數（`arguments=""`），
+  這筆寫回對話歷史後，Gemini OpenAI 相容端點下一輪回 400 `INVALID_ARGUMENT`（dev 實測重現：
+  只有空字串參數是這個錯）。`llm_client` 建 `LLMToolCall` 時把空參數統一成 `"{}"`，參數缺漏
+  交給工具 schema 驗證回報。非串流與串流兩條路徑都處理。
+- **Gemini Live 的 save_memory 沒有任何授權檢查**：文字模式有「使用者明確要求才寫」，Live 的
+  `_save_memory` 直接寫入，模型想存就存。現在兩條路徑共用同一個閘門。
+- **embedding 批次峰值 VRAM 過高**：compose 預設 `EMBEDDING_BATCH_SIZE` 由 32 降到 8。32 段 8000 字
+  實測峰值 5880→2810 MiB、耗時 8.5→5.5 秒；原本加上 VoxCPM 的 10 GB 幾乎吃滿 16 GB 的 A4000。
 
 - **embedding 服務的 VRAM 只漲不降**：bge-m3 權重約 2 GB，但 PyTorch 會把大批次
   （`EMBEDDING_BATCH_SIZE=32` × `EMBEDDING_MAX_LENGTH=8192`）的峰值記憶體留在快取

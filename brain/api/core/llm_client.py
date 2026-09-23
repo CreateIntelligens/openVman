@@ -155,7 +155,7 @@ def generate_chat_turn(
         LLMToolCall(
             id=tool_call.id,
             name=tool_call.function.name,
-            arguments=tool_call.function.arguments,
+            arguments=_normalize_tool_arguments(tool_call.function.arguments),
             extra_content=_extract_tool_call_extra_content(tool_call),
         )
         for tool_call in (message.tool_calls or [])
@@ -534,7 +534,7 @@ def _consume_stream(stream: Any, *, model: str) -> LLMReply:
             LLMToolCall(
                 id=tool_call_acc[idx]["id"],
                 name=tool_call_acc[idx]["name"],
-                arguments=tool_call_acc[idx]["arguments_buf"],
+                arguments=_normalize_tool_arguments(tool_call_acc[idx]["arguments_buf"]),
                 extra_content=(
                     {"thought_signature": tool_call_acc[idx]["thought_signature"]}
                     if tool_call_acc[idx].get("thought_signature")
@@ -607,6 +607,13 @@ def _build_create_kwargs(
 def _now_ms() -> float:
     """Return monotonic time in milliseconds."""
     return monotonic() * 1000
+
+
+def _normalize_tool_arguments(raw: str | None) -> str:
+    """Gemini 的 OpenAI 相容端點拒收歷史裡 arguments 為空字串的 tool call（400
+    INVALID_ARGUMENT），而模型偶爾會吐出不帶參數的呼叫；這筆一旦寫回對話歷史，
+    下一輪整個請求就失敗。統一成 "{}"，參數缺漏交給工具的 schema 驗證回報。"""
+    return raw if raw and raw.strip() else "{}"
 
 
 def _extract_thought_signature(obj: Any) -> str | None:
