@@ -288,8 +288,13 @@ class TestQueryExpansion:
 class TestLanguageRouting:
     LANGS = {"zh.md": "zh", "en.md": "en", "es.md": "es"}
 
+    ROUTES = ["zh", "en", "es"]
+
     @pytest.fixture()
     def table(self, patched, monkeypatch):
+        import knowledge.kb_settings as kb_settings
+
+        monkeypatch.setattr(kb_settings, "language_routes", lambda project_id="default": self.ROUTES)
         monkeypatch.setattr(
             retrieval,
             "resolve_document_languages",
@@ -321,3 +326,13 @@ class TestLanguageRouting:
     def test_no_language_keeps_everything(self, table):
         table(["zh.md", "en.md"])
         assert len(self._search(None)) == 2
+
+    def test_single_chinese_route_does_not_filter(self, table, monkeypatch):
+        monkeypatch.setattr(self, "ROUTES", ["zh"])
+        table(["zh.md", "en.md"])
+        assert len(self._search("en")) == 2
+
+    def test_language_outside_routes_is_treated_as_chinese(self, table, monkeypatch):
+        monkeypatch.setattr(self, "ROUTES", ["zh", "nan"])
+        table(["zh.md", "en.md"])
+        assert [r["text"] for r in self._search("en")] == ["chunk-zh.md"]

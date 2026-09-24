@@ -92,13 +92,23 @@ def detect_document_language(text: str) -> str:
 
 
 def project_has_taiwanese_route(project_id: str) -> bool:
-    """A project listens for Taiwanese only if its knowledge base has Taiwanese docs."""
-    from knowledge.doc_meta import load_doc_meta
+    """Taiwanese is a route only when the admin ticked it in knowledge settings."""
+    from knowledge.kb_settings import language_routes
 
-    return any(
-        entry.get("language") == TAIWANESE and entry.get("enabled", True)
-        for entry in load_doc_meta(project_id).values()
-    )
+    return TAIWANESE in language_routes(project_id)
+
+
+def route_language(language: str | None, project_id: str) -> str | None:
+    """Map a detected language onto the project's configured routes.
+
+    只有中文一條分流時回 None（不分流，所有文件都查）；語言不在分流裡就當中文。
+    """
+    from knowledge.kb_settings import language_routes
+
+    routes = language_routes(project_id)
+    if not language or routes == [DEFAULT_LANGUAGE]:
+        return None
+    return language if language in routes else DEFAULT_LANGUAGE
 
 
 _JEV_QUESTIONS = {

@@ -367,11 +367,14 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 `GET /brain/sessions` 與 `/brain/sessions/export` 的每筆摘要都帶 `language`（`zh`、`en`、`es`；其他語言與判斷不出來的都算 `zh`），取最後一則使用者訊息的語言；兩者都可用 `language=<code>` 篩選。語言存在 `messages.language`（只有使用者訊息有值）：寫入時先用字元與常用字規則判斷，再在背景問 Jev 校正，Jev 結果不同才改寫（`memory/language_detect.py`，`JEV_LANGUAGE_ENABLED` 預設 true、需 `TYPESAFE_API_KEY`，失敗保留規則結果）。欄位是 NULL 的舊訊息在列表時用規則補算。36 句測試：Jev 36/36、規則 33/36、主對話 LLM 33/36（`scripts/experiments/lang-detect/REPORT.md`）。
 
-#### 11.1b 台語分流（Live 聽聲音）
+#### 11.1b 語言分流設定與台語
 
-台語分流和中英西一樣由知識庫決定：專案裡有語言為 `nan` 的啟用文件，才有台語分流。文件語言自動判斷會認台羅（揚抑符、長音符、U+030D 聲調符號）與台語特有漢字（佇、袂、毋、阮、欲、予…，先排除「給予」「欲望」等華語詞，密度 ≥ 3% 且 ≥ 5 次），也可在後台手動標「台語」。
+分流由管理者在知識庫設定勾選，不看有哪些文件（醫院的文件可能只有中文，但仍要開台語分流）：`GET/PUT /brain/knowledge/settings`（`language_routes`，存在 workspace 的 `.kb_settings.json`；`zh` 一定保留，預設只有 `zh`）。後台知識庫標題列的「分流」按鈕勾選。
 
-有台語分流的專案，Live 每句使用者語音暫存（最多最後 20 秒）。轉錄到了先看文字：英西由文字規則／Jev 判定；轉錄是中文字（台語轉錄後也是中文字）才在背景把音訊送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）判斷，判成 nan 才覆寫訊息語言。Live 的 `search_knowledge` 最多等這個結果 3 秒：是台語就查台語文件，沒命中退回中文；等不到當中文查。回答本身不變（回覆語言與 TTS 另議）。實驗見 `scripts/experiments/taigi/REPORT.md`。
+- 只有中文一條分流：不做語言篩選，所有文件一起查（與分流功能出現前相同）。
+- 有其他分流：使用者語言在分流裡就只查該語言文件（沒命中退回中文）；不在分流裡的語言當中文。
+- 勾了台語（`nan`）：Live 每句使用者語音暫存（最多最後 20 秒），轉錄是中文字的句子才在背景送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）聽是不是台語，判成 nan 才覆寫訊息語言；英西看轉錄文字即可。Live 的 `search_knowledge` 最多等這個結果 3 秒，台語就查台語文件（沒有就退回中文）。回答本身不變（回覆語言與 TTS 另議）。
+- 文件語言自動判斷也認台語（台羅聲調符號、台語特有漢字密度 ≥ 3%，先排除「給予」「欲望」等華語詞），後台可手動標「台語」。實驗見 `scripts/experiments/taigi/REPORT.md`。
 
 #### 11.1a 知識庫依語言分流
 

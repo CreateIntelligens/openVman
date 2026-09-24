@@ -112,6 +112,20 @@ class KnowledgeDocumentMetaPatchRequest(BaseModel):
     language: str | None = Field(None, pattern="^(zh|en|es|nan|auto)$")
 
 
+class KnowledgeSettingsPutRequest(BaseModel):
+    project_id: str = "default"
+    # zh 一定會保留；nan（台語）勾了 Live 才會另外聽使用者是不是講台語。
+    language_routes: list[str] = Field(default_factory=lambda: ["zh"])
+
+    @field_validator("language_routes")
+    @classmethod
+    def _known_languages(cls, value: list[str]) -> list[str]:
+        unknown = set(value) - {"zh", "en", "es", "nan"}
+        if unknown:
+            raise ValueError(f"不支援的語言：{sorted(unknown)}")
+        return value
+
+
 class KnowledgeNoteCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, description="Note title")
     content: str = Field(..., min_length=1, description="Note content")

@@ -18,7 +18,10 @@ from knowledge.doc_meta import (
 from memory.dreaming.recall_tracker import record_trace
 from memory.embedder import encode_text
 from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
-from memory.language_detect import DEFAULT_LANGUAGE
+from memory.language_detect import (
+    DEFAULT_LANGUAGE,
+    route_language as route_language_for_project,
+)
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -78,7 +81,9 @@ def search_records(
     disabled_paths = (
         list_disabled_document_paths(project_id) if table_name == "knowledge" else set()
     )
-    route_language = language if table_name == "knowledge" else None
+    route_language = (
+        route_language_for_project(language, project_id) if table_name == "knowledge" else None
+    )
     # 語言篩選會丟掉其他語言的候選，多撈一些才不會篩完不夠 top_k。
     search_limit = top_k * 4 if disabled_paths or route_language else top_k * 2
 

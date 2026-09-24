@@ -719,6 +719,7 @@ export default function KnowledgeBase() {
         committing={committing}
         onReindex={handleReindex}
         reindexing={reindexing}
+        projectId={projectId}
       />
 
       {status && (

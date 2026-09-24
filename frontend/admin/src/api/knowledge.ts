@@ -341,6 +341,22 @@ export function updateKnowledgeDocumentMeta(
   );
 }
 
+export interface KnowledgeSettings {
+  // zh 一定在；只有 zh 時不分流。nan（台語）勾了 Live 才會另外聽使用者是不是講台語。
+  language_routes: KnowledgeLanguage[];
+}
+
+export function fetchKnowledgeSettings() {
+  return get<KnowledgeSettings>(knowledgePath("/settings"));
+}
+
+export function saveKnowledgeSettings(settings: KnowledgeSettings) {
+  return put<KnowledgeSettings>(knowledgePath("/settings"), {
+    project_id: getActiveProjectId(),
+    ...settings,
+  });
+}
+
 export type KnowledgeNoteFormat = "text" | "qa";
 
 export function createKnowledgeNote(

@@ -61,6 +61,7 @@ from protocol.schemas import (
     KnowledgeDocumentMoveRequest,
     KnowledgeDocumentPutRequest,
     KnowledgeNoteCreateRequest,
+    KnowledgeSettingsPutRequest,
 )
 from safety.internal_auth import require_internal_token
 from safety.observability import log_event, log_exception
@@ -168,6 +169,20 @@ async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
         sync_entries_for_source(payload.path, payload.project_id)
     schedule_reindex(payload.project_id)
     return {"status": "ok", "document": document}
+
+
+@router.get("/knowledge/settings", summary="取得知識庫設定（語言分流）")
+async def get_knowledge_settings_route(project_id: str = "default"):
+    from knowledge.kb_settings import load_kb_settings
+
+    return load_kb_settings(project_id)
+
+
+@router.put("/knowledge/settings", summary="更新知識庫設定（語言分流）")
+async def put_knowledge_settings_route(payload: KnowledgeSettingsPutRequest):
+    from knowledge.kb_settings import save_kb_settings
+
+    return save_kb_settings(payload.project_id, language_routes=payload.language_routes)
 
 
 @router.patch("/knowledge/document/meta", summary="更新文件中繼屬性")

@@ -1,5 +1,7 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 
+import LanguageRoutesButton from "./LanguageRoutesButton";
+
 interface KnowledgeHeaderProps {
   activeTab: "documents" | "graph";
   setActiveTab: (tab: "documents" | "graph") => void;
@@ -12,6 +14,7 @@ interface KnowledgeHeaderProps {
   committing: boolean;
   onReindex: () => void;
   reindexing: boolean;
+  projectId: string;
 }
 
 export default function KnowledgeHeader({
@@ -26,6 +29,7 @@ export default function KnowledgeHeader({
   committing,
   onReindex,
   reindexing,
+  projectId,
 }: KnowledgeHeaderProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-4">
@@ -72,6 +76,7 @@ export default function KnowledgeHeader({
       </div>
       {activeTab === "documents" && (
         <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+          <LanguageRoutesButton projectId={projectId} />
           <button
             onClick={onToggleSourcePanel}
             className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"

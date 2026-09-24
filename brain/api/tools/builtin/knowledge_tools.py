@@ -3,7 +3,7 @@ import logging
 from typing import Any
 
 from config import get_settings
-from memory.language_detect import detect_language
+from memory.language_detect import detect_language, route_language
 from tools.context import (
     active_persona_id,
     active_project_id,
@@ -101,7 +101,8 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     related: list[dict[str, Any]] = []
     if table_name == "knowledge":
         related = _expand_via_graph(merged, project_id, primary_vector)
-        if language:
+        # 有分流時相關段落也只留同語言；只有中文一條分流就不篩。
+        if route_language(language, project_id):
             related = _same_language_as(merged, related, project_id)
         merged, related = _jev_screen(queries[-1], merged, related)
 

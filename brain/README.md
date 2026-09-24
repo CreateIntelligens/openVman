@@ -383,6 +383,8 @@ user input
   - 讀取當前 session history
 - `GET /brain/sessions`、`GET /brain/sessions/export`
   - 對話列表與匯出，可用 `language=zh|en|es` 篩選（語言取最後一則使用者訊息，規則即時判、Jev 背景校正）
+- `GET/PUT /brain/knowledge/settings`
+  - 知識庫語言分流（`language_routes`：zh 必選、en、es、nan＝台語）；只有 zh 不分流，勾台語 Live 才聽台語
 - `PATCH /brain/knowledge/document/meta`
   - 文件啟用、來源與語言（`language=zh|en|es|auto`）。知識庫依使用者語言只查同語言文件，查不到退回中文
 - `GET /brain/backups/sessions`、`POST /brain/backups/sessions`
