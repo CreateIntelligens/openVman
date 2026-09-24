@@ -367,6 +367,10 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 `GET /brain/sessions` 與 `/brain/sessions/export` 的每筆摘要都帶 `language`（`zh`、`en`、`es`；其他語言與判斷不出來的都算 `zh`），取最後一則使用者訊息的語言；兩者都可用 `language=<code>` 篩選。語言存在 `messages.language`（只有使用者訊息有值）：寫入時先用字元與常用字規則判斷，再在背景問 Jev 校正，Jev 結果不同才改寫（`memory/language_detect.py`，`JEV_LANGUAGE_ENABLED` 預設 true、需 `TYPESAFE_API_KEY`，失敗保留規則結果）。欄位是 NULL 的舊訊息在列表時用規則補算。36 句測試：Jev 36/36、規則 33/36、主對話 LLM 33/36（`scripts/experiments/lang-detect/REPORT.md`）。
 
+#### 11.1b Live 音訊語言判斷（台語影子）
+
+`LIVE_AUDIO_LANGUAGE_ID_PROJECTS` 列出的專案（逗號分隔、`*` 全部、預設空白關閉），Live 每句使用者語音會暫存（最多最後 20 秒），轉錄到了就在背景把那句音訊送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.1-flash-lite）判斷 zh／nan／en／es，結果覆寫該則訊息的 `language`。只判斷、不影響回答；判斷失敗保留文字規則結果。台語（nan）轉錄後是中文字，只有這條路徑會產生 nan；知識庫沒有台語文件，查詢自動退回中文。實驗與數據見 `scripts/experiments/taigi/REPORT.md`（合成台語 8 句＋華英西 5 句：13/13，約 1.8 秒；Gemini Live 本身只聽懂 2/8、Breeze 8/8）。
+
 #### 11.1a 知識庫依語言分流
 
 同一份內容可準備中、英、西三個版本的文件（例如鶴記的型錄），使用者用哪種語言問就用那個版本的原文回答，不靠模型翻譯。

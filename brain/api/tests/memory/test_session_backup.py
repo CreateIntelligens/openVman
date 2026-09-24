@@ -66,8 +66,8 @@ def test_dry_run_counts_without_writing(projects):
 
     assert manifest["dry_run"] is True
     assert {p["project_id"]: p["sessions"] for p in manifest["projects"]} == {
-        "alpha": {"zh": 1, "en": 0, "es": 1},
-        "beta": {"zh": 0, "en": 1, "es": 0},
+        "alpha": {"zh": 1, "en": 0, "es": 1, "nan": 0},
+        "beta": {"zh": 0, "en": 1, "es": 0, "nan": 0},
     }
     assert not root.exists()
 

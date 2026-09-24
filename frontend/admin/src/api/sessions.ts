@@ -19,12 +19,14 @@ export interface SessionSummary {
 }
 
 // 其他語言與判斷不出來的都歸中文（brain memory/language_detect.py）。
-export type SessionLanguage = "zh" | "en" | "es";
+// 台語只能從聲音判斷，只有開了 Live 音訊語言判斷的專案會出現。
+export type SessionLanguage = "zh" | "en" | "es" | "nan";
 
 export const SESSION_LANGUAGE_LABELS: Record<SessionLanguage, string> = {
   zh: "中文",
   en: "English",
   es: "Español",
+  nan: "台語",
 };
 
 export interface SessionsListResponse {

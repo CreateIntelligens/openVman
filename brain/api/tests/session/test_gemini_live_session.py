@@ -865,3 +865,64 @@ def test_transcription_language_codes_follow_config(languages, expected):
     setup = session._build_setup_message()
     assert setup["inputAudioTranscription"] == expected
     assert setup["outputAudioTranscription"] == expected
+
+
+@pytest.mark.asyncio
+async def test_live_classifies_each_utterance_from_audio(monkeypatch):
+    """開了音訊語言判斷時，每句轉錄到了就拿那一句的音訊去判斷，結果寫回訊息語言。"""
+    module, fake_config = _load_module()
+    fake_config.live_audio_language_id_projects = "proj-hospital"
+    import sys as _sys
+    import types as _types
+
+    saved: list[tuple] = []
+    languages: list[tuple] = []
+    _saved_modules.setdefault("memory.memory", _sys.modules.get("memory.memory"))
+    _sys.modules["memory.memory"] = _types.SimpleNamespace(
+        append_session_message_with_id=lambda *a, **kw: (saved.append(a) or (None, 42)),
+        update_session_message_language=lambda mid, lang, pid: languages.append((mid, lang, pid)),
+    )
+    heard: list[bytes] = []
+    monkeypatch.setattr(module, "detect_audio_language", lambda wav: heard.append(wav) or "nan")
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-tw",
+        client_id="client-tw",
+        project_id="proj-hospital",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+    chunk = base64.b64encode(b"\x01\x00" * 1600).decode()
+    await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
+    await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
+    await session._handle_input_transcription({"text": "我現在頭殼很痛"})
+    await _wait_for(lambda: bool(languages))
+
+    assert languages == [(42, "nan", "proj-hospital")]
+    # 兩個 chunk 的 PCM 加 44 bytes WAV 檔頭。
+    assert len(heard[0]) == 2 * 3200 + 44
+    assert session._utterance_pcm == bytearray(), "判斷完要清空，下一句不能混到上一句"
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_live_skips_audio_language_for_other_projects(monkeypatch):
+    module, fake_config = _load_module()
+    fake_config.live_audio_language_id_projects = "proj-hospital"
+    monkeypatch.setattr(module, "detect_audio_language", lambda wav: pytest.fail("should not classify"))
+    _stub_memory()
+
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-zh",
+        client_id="client-zh",
+        project_id="proj-other",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+    await session.send_realtime_input(base64.b64encode(b"\x01\x00" * 1600).decode(), "audio/pcm;rate=16000")
+    await session._handle_input_transcription({"text": "你好"})
+    await asyncio.sleep(0.05)
+    assert session._utterance_pcm == bytearray()
+    await session.close()

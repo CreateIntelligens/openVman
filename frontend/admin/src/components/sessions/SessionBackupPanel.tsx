@@ -11,9 +11,11 @@ import {
 
 function describeCounts(manifest: SessionBackupManifest): string {
   const totals = sessionsByLanguage(manifest);
-  return (Object.keys(totals) as SessionLanguage[])
-    .map((language) => `${SESSION_LANGUAGE_LABELS[language]} ${totals[language]}`)
-    .join(" · ");
+  // 只列有對話的語言；台語只有開了音訊判斷的專案才會有，全列會一直顯示「台語 0」。
+  const parts = (Object.keys(totals) as SessionLanguage[])
+    .filter((language) => totals[language] > 0)
+    .map((language) => `${SESSION_LANGUAGE_LABELS[language]} ${totals[language]}`);
+  return parts.length ? parts.join(" · ") : "沒有對話";
 }
 
 function formatTime(iso: string): string {

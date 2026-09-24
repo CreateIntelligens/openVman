@@ -102,6 +102,14 @@ def append_session_message_with_id(
     )
 
 
+def update_session_message_language(
+    message_id: int,
+    language: str,
+    project_id: str = "default",
+) -> None:
+    get_session_store(project_id).update_message_language(message_id, language)
+
+
 def update_session_message_metadata(
     message_id: int,
     metadata: dict[str, Any],

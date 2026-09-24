@@ -37,7 +37,7 @@ export async function runSessionBackup(
 export function sessionsByLanguage(
   manifest: SessionBackupManifest,
 ): Record<SessionLanguage, number> {
-  const totals: Record<SessionLanguage, number> = { zh: 0, en: 0, es: 0 };
+  const totals: Record<SessionLanguage, number> = { zh: 0, en: 0, es: 0, nan: 0 };
   for (const project of manifest.projects) {
     for (const [language, count] of Object.entries(project.sessions)) {
       if (language in totals) totals[language as SessionLanguage] += count ?? 0;

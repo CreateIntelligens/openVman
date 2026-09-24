@@ -1,0 +1,86 @@
+{
+ "gemini-3.1-flash-lite": {
+  "t1": {
+   "language": "nan",
+   "mandarin": "這碗飯太硬了，給我倒一杯水。",
+   "sec": 1.87
+  },
+  "t2": {
+   "language": "nan",
+   "mandarin": "趕快把這張紅布的卡頭剪起來啊。",
+   "sec": 1.72
+  },
+  "t3": {
+   "language": "nan",
+   "mandarin": "這啊，愛吃餅乾，也是吃餅乾喔。",
+   "sec": 1.71
+  },
+  "t4": {
+   "language": "nan",
+   "mandarin": "宜蘭市，門禁開到幾點？",
+   "sec": 2.02
+  },
+  "t5": {
+   "language": "nan",
+   "mandarin": "這把鑰匙檢查會痛，要先檢查嗎？",
+   "sec": 1.77
+  },
+  "t6": {
+   "language": "nan",
+   "mandarin": "廈門給進底兜位？",
+   "sec": 1.9
+  },
+  "t7": {
+   "language": "nan",
+   "mandarin": "這首歌的歌詞是什麼？可以幫我翻譯這首歌嗎？",
+   "sec": 1.83
+  },
+  "t8": {
+   "language": "nan",
+   "mandarin": "你剛才講什麼？我沒聽見。",
+   "sec": 1.51
+  }
+ },
+ "gemini-3.5-flash": {
+  "t1": {
+   "language": "nan",
+   "mandarin": "我現在比較有在聽，我決定去上課",
+   "sec": 6.92
+  },
+  "t2": {
+   "language": "nan",
+   "mandarin": "鎖骨怎麼折斷的，骨頭有歪斜起來了啊",
+   "sec": 5.0
+  },
+  "t3": {
+   "language": "nan",
+   "mandarin": "呀，要吃飯前，還是吃飯後？",
+   "sec": 2.3
+  },
+  "t4": {
+   "language": "nan",
+   "mandarin": "醫生，門診開到幾點？",
+   "sec": 2.12
+  },
+  "t5": {
+   "language": "nan",
+   "mandarin": "媽媽，我今天肚子痛，要先禁食嗎？",
+   "sec": 182.4
+  },
+  "t6": {
+   "language": "nan",
+   "mandarin": "請問急診在哪裡",
+   "sec": 2.58
+  },
+  "t7": {
+   "language": "nan",
+   "mandarin": "我過敏，都睡不著，可以開藥給我嗎？",
+   "sec": 2.6
+  },
+  "t8": {
+   "language": "nan",
+   "mandarin": "說，看這樣，我聽不懂",
+   "sec": 3.48
+  }
+ }
+}

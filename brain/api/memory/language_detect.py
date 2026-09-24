@@ -16,7 +16,8 @@ from typing import Callable
 logger = logging.getLogger(__name__)
 
 # 客戶只用中英西；其他語言與判斷不出來的一律算中文（2026-09-23 使用者決定）。
-LANGUAGES = ("zh", "en", "es")
+# nan（台語）只能從聲音判斷：轉錄成文字後是中文字，文字規則永遠不會回 nan。
+LANGUAGES = ("zh", "en", "es", "nan")
 DEFAULT_LANGUAGE = "zh"
 
 _LATIN_WORD = re.compile(r"[a-záéíóúüñ]+")
@@ -112,3 +113,45 @@ def refine_language_in_background(
             on_change(language)
 
     _executor.submit(_run)
+
+
+_AUDIO_LANGUAGE_PROMPT = (
+    '這段語音是哪種語言？只能選 zh（華語）、nan（台語）、en、es、other。'
+    '只回 JSON：{"language": "..."}'
+)
+
+
+def audio_language_id_enabled(project_id: str) -> bool:
+    from config import get_settings
+
+    raw = str(getattr(get_settings(), "live_audio_language_id_projects", "") or "").strip()
+    if not raw:
+        return False
+    projects = {item.strip() for item in raw.split(",") if item.strip()}
+    return "*" in projects or project_id in projects
+
+
+def detect_audio_language(wav_bytes: bytes) -> str:
+    """Ask Gemini which language an utterance is in; other is folded into zh.
+
+    合成台語 8 句＋華英西 5 句實測 13/13、約 1.8 秒（scripts/experiments/taigi）。
+    """
+    from google import genai
+    from google.genai import types
+
+    from config import get_settings
+
+    cfg = get_settings()
+    client = genai.Client(api_key=cfg.gemini_api_key)
+    response = client.models.generate_content(
+        model=cfg.live_audio_language_id_model,
+        contents=[
+            types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
+            _AUDIO_LANGUAGE_PROMPT,
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json", temperature=0,
+        ),
+    )
+    language = str(json.loads(response.text or "{}").get("language", "")).strip()
+    return language if language in LANGUAGES else DEFAULT_LANGUAGE

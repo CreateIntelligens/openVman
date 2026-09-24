@@ -15,7 +15,11 @@ import websockets
 
 from config import BrainSettings, get_settings
 from memory.embedder import encode_query_with_fallback
-from memory.language_detect import detect_language
+from memory.language_detect import (
+    audio_language_id_enabled,
+    detect_audio_language,
+    detect_language,
+)
 from memory.retrieval import search_records
 from .gemini_tools import build_gemini_tool_declarations
 
@@ -145,6 +149,11 @@ class GeminiLiveSession:
         self._reconnecting = False
         self._unavailable = False
         self._connect_lock = asyncio.Lock()
+        # 每句使用者語音暫存起來，轉錄到了就拿去判斷語言（見 _classify_utterance）。
+        self._audio_language_id = audio_language_id_enabled(project_id)
+        self._utterance_pcm = bytearray()
+        self._utterance_rate = 16000
+        self._background_tasks: set[asyncio.Task] = set()
 
     async def ensure_connected(self) -> JsonTransport:
         # 回傳這次拿到的連線；呼叫端在 await 之後再讀 self._transport 可能已被
@@ -186,9 +195,11 @@ class GeminiLiveSession:
         transport = await self.ensure_connected()
         # 上行音訊同樣要計量；16-bit mono PCM，秒數 = bytes / (2 * rate)。
         try:
-            self._input_audio_seconds += len(base64.b64decode(audio_b64)) / (
-                2 * _parse_sample_rate(mime_type)
-            )
+            pcm = base64.b64decode(audio_b64)
+            rate = _parse_sample_rate(mime_type)
+            self._input_audio_seconds += len(pcm) / (2 * rate)
+            if self._audio_language_id:
+                self._buffer_utterance(pcm, rate)
         except Exception:  # noqa: BLE001 - 計量失敗不該擋住音訊送出
             pass
         await transport.send_json(
@@ -329,11 +340,29 @@ class GeminiLiveSession:
         logger.info("Gemini Live user transcription (session %s): %s", self.session_id, text)
         # 語音輸入也要記成本回合的使用者發言，否則 turn 歸檔會少掉問句。
         self._last_user_message = text
-        await self._save_input_transcription(text)
+        utterance = bytes(self._utterance_pcm)
+        self._utterance_pcm.clear()
+        message_id = await self._save_input_transcription(text)
         await self._emit_user_transcription(text)
+        if self._audio_language_id and utterance and message_id:
+            task = asyncio.create_task(self._classify_utterance(utterance, message_id))
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
-    async def _save_input_transcription(self, text: str) -> None:
+    async def _save_input_transcription(self, text: str) -> int | None:
         try:
+            if self._audio_language_id:
+                from memory.memory import append_session_message_with_id
+
+                _, message_id = await asyncio.to_thread(
+                    append_session_message_with_id,
+                    self.session_id,
+                    self.persona_id,
+                    "user",
+                    text,
+                    project_id=self.project_id,
+                )
+                return message_id
             from memory.memory import append_session_message
 
             await asyncio.to_thread(
@@ -346,6 +375,45 @@ class GeminiLiveSession:
             )
         except Exception as exc:
             logger.error("Failed to save user speech in Gemini Live: %s", exc)
+        return None
+
+    # 太長的句子只留最後這麼多秒；判斷語言不需要整段，也避免暫存無限長。
+    _UTTERANCE_MAX_SECONDS = 20
+
+    def _buffer_utterance(self, pcm: bytes, rate: int) -> None:
+        if rate != self._utterance_rate:
+            self._utterance_pcm.clear()
+            self._utterance_rate = rate
+        self._utterance_pcm.extend(pcm)
+        overflow = len(self._utterance_pcm) - self._UTTERANCE_MAX_SECONDS * 2 * rate
+        if overflow > 0:
+            del self._utterance_pcm[:overflow]
+
+    async def _classify_utterance(self, pcm: bytes, message_id: int) -> None:
+        """Replace the text-based language with one judged from the audio.
+
+        只寫訊息語言、不影響回答；判斷失敗就保留文字規則的結果。
+        """
+        try:
+            language = await asyncio.to_thread(
+                detect_audio_language, _pcm_to_wav(pcm, self._utterance_rate),
+            )
+            from memory.memory import update_session_message_language
+
+            await asyncio.to_thread(
+                update_session_message_language, message_id, language, self.project_id,
+            )
+            logger.info(json.dumps({
+                "event": "live_audio_language",
+                "session_id": self.session_id,
+                "project_id": self.project_id,
+                "language": language,
+                "seconds": round(len(pcm) / (2 * self._utterance_rate), 1),
+            }))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(json.dumps({
+                "event": "live_audio_language_failed", "error_type": type(exc).__name__,
+            }))
 
     async def _flush_assistant_turn(self) -> None:
         """Persist the accumulated reply, mirroring the text-mode turn archive.
