@@ -22,6 +22,7 @@ from .prompt_templates import (
     DEFAULT_TOOL_INSTRUCTIONS,
     NO_TOOLS_ANSWER_RULES,
     NO_TOOLS_INSTRUCTIONS,
+    primary_language_line,
 )
 
 
@@ -89,6 +90,7 @@ def build_chat_messages(
             _format_request_context(request_context),
             history_summary,
             answer_rules,
+            primary_language_line(project_id),
         ]
         if block
     )

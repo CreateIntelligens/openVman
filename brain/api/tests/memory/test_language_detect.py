@@ -52,7 +52,7 @@ def test_jev_overrides_rule_when_it_disagrees(jev, monkeypatch):
         "core.jev_client.jev_nouls", lambda *a, **kw: {"en": 0.02, "es": 0.97},
     )
     changes: list[str] = []
-    language_detect.refine_language_in_background("buenos dias", "zh", changes.append)
+    language_detect.refine_language_in_background("buenos dias amigo mio", "zh", changes.append)
     assert changes == ["es"]
 
 
@@ -99,3 +99,30 @@ def test_detect_document_language(text: str, expected: str):
 def test_long_chinese_document_with_a_stray_spanish_mark_stays_chinese():
     text = "竹東好玩的景點很多，推薦辣椒園與老街。" * 20 + " Peña "
     assert detect_language(text) == "zh"
+
+
+@pytest.mark.parametrize(
+    ("text", "default", "expected"),
+    [
+        # 一兩個字的招呼判斷不出語言，歸專案主要語言。
+        ("hi", "zh", "zh"),
+        ("hi", "en", "en"),
+        ("hola", "es", "es"),
+        ("ok thanks", "en", "en"),
+        # 有中文就是中文，不管主要語言是什麼。
+        ("EUS 多少", "en", "zh"),
+        ("hi 你好", "es", "zh"),
+        # 夠長就照內容判斷。
+        ("Which pump do you recommend?", "es", "en"),
+    ],
+)
+def test_short_or_unclear_text_falls_to_primary_language(text, default, expected):
+    assert detect_language(text, default) == expected
+
+
+def test_short_text_is_never_sent_to_jev(jev, monkeypatch):
+    def boom(*_a, **_kw):
+        raise AssertionError("short text should not reach Jev")
+
+    monkeypatch.setattr("core.jev_client.jev_nouls", boom)
+    language_detect.refine_language_in_background("hi", "zh", lambda _l: None)

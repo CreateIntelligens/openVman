@@ -38,10 +38,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
-  async function toggle(language: KnowledgeLanguage) {
-    const next = routes.includes(language)
-      ? routes.filter((item) => item !== language)
-      : [...routes, language];
+  async function save(next: KnowledgeLanguage[]) {
     setSaving(true);
     setError("");
     try {
@@ -53,9 +50,32 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
     }
   }
 
-  const summary = ROUTES.filter((route) => routes.includes(route.value))
-    .map((route) => route.label)
-    .join("、");
+  function toggle(language: KnowledgeLanguage) {
+    void save(
+      routes.includes(language)
+        ? routes.filter((item) => item !== language)
+        : [...routes, language],
+    );
+  }
+
+  /** 往前移一格；排第一的是主要語言。 */
+  function moveUp(language: KnowledgeLanguage) {
+    const index = routes.indexOf(language);
+    if (index <= 0) return;
+    const next = [...routes];
+    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    void save(next);
+  }
+
+  const labelOf = (value: KnowledgeLanguage) =>
+    ROUTES.find((route) => route.value === value)?.label ?? value;
+  // 已勾的照優先順序排在前面，沒勾的接在後面。
+  const ordered: KnowledgeLanguage[] = [
+    ...routes,
+    ...ROUTES.map((route) => route.value).filter((value) => !routes.includes(value)),
+  ];
+
+  const summary = routes.map(labelOf).join("、");
 
   return (
     <div className="relative" ref={panelRef}>
@@ -72,24 +92,42 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">
           <p className="mb-2 text-xs text-content-muted">
-            至少勾一個；只勾一個就不分流。
+            至少勾一個；只勾一個就不分流。排第一的是主要語言：短句（如 hi）、判斷不出來、查不到時都用它。
           </p>
           <ul className="flex flex-col gap-2">
-            {ROUTES.map((route) => (
-              <li key={route.value}>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-primary"
-                    checked={routes.includes(route.value)}
-                    // 最後一個不能取消：至少要有一條分流。
-                    disabled={saving || (routes.length === 1 && routes.includes(route.value))}
-                    onChange={() => void toggle(route.value)}
-                  />
-                  {route.label}
-                </label>
-              </li>
-            ))}
+            {ordered.map((value, index) => {
+              const checked = routes.includes(value);
+              return (
+                <li key={value} className="flex items-center justify-between gap-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={checked}
+                      // 最後一個不能取消：至少要有一條分流。
+                      disabled={saving || (routes.length === 1 && checked)}
+                      onChange={() => toggle(value)}
+                    />
+                    {labelOf(value)}
+                    {checked && index === 0 && (
+                      <span className="rounded px-1 text-[0.625rem] text-primary ring-1 ring-primary/40">主要</span>
+                    )}
+                  </label>
+                  {checked && index > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => moveUp(value)}
+                      disabled={saving}
+                      className="rounded p-0.5 text-content-subtle hover:bg-surface-sunken hover:text-primary"
+                      aria-label={`${labelOf(value)} 往前移`}
+                      title="往前移"
+                    >
+                      <span className="material-symbols-outlined text-[1rem]">arrow_upward</span>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
         </div>

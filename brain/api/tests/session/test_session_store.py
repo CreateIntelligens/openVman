@@ -396,5 +396,5 @@ def test_given_speech_language_is_stored_without_rules_or_jev(store: SessionStor
 
     # 不認得的值當作沒給，照常判斷。
     monkeypatch.setattr(store_module, "refine_language_in_background", lambda *a, **kw: None)
-    store.append_message("x", "default", "user", "hello there", language="fr")
+    store.append_message("x", "default", "user", "hello there my friend", language="fr")
     assert {s["session_id"]: s["language"] for s in store.list_sessions("default")}["x"] == "en"

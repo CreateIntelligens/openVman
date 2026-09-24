@@ -168,6 +168,7 @@ class SessionStore:
         content: str,
         metadata: dict[str, Any] | None = None,
         language: str | None = None,
+        default_language: str = "zh",
     ) -> tuple[SessionState, int]:
         cfg = get_settings()
         now = utc_now_iso()
@@ -176,7 +177,10 @@ class SessionStore:
         metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
         # 呼叫端（例如 ASR 聽出是台語）給了語言就直接用，不再規則判斷、不問 Jev。
         given_language = language if role == "user" and language in LANGUAGES else None
-        language = given_language or (detect_language(content) if role == "user" else None)
+        # default_language 是專案主要語言：「hi」這類判斷不出來的短句歸它。
+        language = given_language or (
+            detect_language(content, default_language) if role == "user" else None
+        )
 
         with self._lock:
             self._prune_expired_sessions_locked()

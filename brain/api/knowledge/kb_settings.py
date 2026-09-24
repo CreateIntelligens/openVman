@@ -2,8 +2,8 @@
 
 分流由管理者在知識庫設定勾選，不看有哪些文件：醫院的文件可能只有中文，但仍要
 開台語分流，才認得出使用者在講台語。至少一條、不一定要中文（純英文知識庫只勾
-English）。只有一條就不分流，行為與以前相同；多條時第一條（依 zh、en、es、nan
-順序）是其他語言查不到時的退路。
+English）。只有一條就不分流，行為與以前相同。清單順序是優先順序：第一條是主要
+語言，短句與判斷不出來的輸入、以及其他語言查不到時都歸它。
 """
 
 from __future__ import annotations
@@ -42,10 +42,18 @@ def language_routes(project_id: str = "default") -> list[str]:
 
 
 def _normalize_routes(value: Any) -> list[str]:
-    chosen = {str(item) for item in value} if isinstance(value, list) else set()
-    routes = [lang for lang in LANGUAGES if lang in chosen]
+    # 順序就是優先順序，由後台排：第一條是主要語言（短句、判斷不出來、查不到時都歸它）。
+    routes: list[str] = []
+    for item in value if isinstance(value, list) else []:
+        if str(item) in LANGUAGES and str(item) not in routes:
+            routes.append(str(item))
     # 至少一條；什麼都沒勾（或舊資料）就當只有中文。
     return routes or [DEFAULT_LANGUAGE]
+
+
+def primary_language(project_id: str = "default") -> str:
+    """The project's main language for short or unclear input and for replies."""
+    return language_routes(project_id)[0]
 
 
 def fallback_route(project_id: str = "default") -> str:

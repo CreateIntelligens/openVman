@@ -369,10 +369,11 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 #### 11.1b 語言分流設定與台語
 
-分流由管理者在知識庫設定勾選，不看有哪些文件（醫院的文件可能只有中文，但仍要開台語分流）：`GET/PUT /brain/knowledge/settings`（`language_routes`，存在 workspace 的 `.kb_settings.json`；至少一條、不一定是中文，預設只有 `zh`；多條時依 zh、en、es、nan 順序的第一條是退路）。後台知識庫標題列的「分流」按鈕勾選。
+分流由管理者在知識庫設定勾選，不看有哪些文件（醫院的文件可能只有中文，但仍要開台語分流）：`GET/PUT /brain/knowledge/settings`（`language_routes`，存在 workspace 的 `.kb_settings.json`；至少一條、不一定是中文，預設只有 `zh`。清單順序是優先順序、後台可調，排第一的是主要語言）。後台知識庫標題列的「分流」按鈕勾選。
 
 - 只有一條分流：不做語言篩選，所有文件一起查（與分流功能出現前相同）。
-- 多條分流：使用者語言在分流裡就只查該語言文件（沒命中退回第一條分流）；不在分流裡的語言走第一條分流。
+- 多條分流：使用者語言在分流裡就只查該語言文件（沒命中退回主要語言）；不在分流裡的語言走主要語言。
+- 語言判斷：有中文字就是中文；一兩個拉丁字的短句（hi、ok、hola）與判斷不出來的歸主要語言，不送 Jev。回答規則同步：短句與判斷不出來時用主要語言回答（system prompt 帶「本專案主要語言」；台語為主要語言時文字回覆用繁體中文）。
 - 勾了台語（`nan`）：Live 每句使用者語音暫存（最多最後 20 秒），轉錄是中文字的句子才在背景送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）聽是不是台語，判成 nan 才覆寫訊息語言；英西看轉錄文字即可。Live 的 `search_knowledge` 最多等這個結果 3 秒，台語就查台語文件（沒有就退回中文）。回答本身不變（回覆語言與 TTS 另議）。
 - 前台 app（虛擬人）的語音不走 Live 音訊通道：一律先錄音送 Backend `POST /api/v1/asr/transcribe`（Live 模式也是，轉成文字再 `user_speak`）。所以台語分流主要在這一步生效：
   - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，中文不能關）；上傳時帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。

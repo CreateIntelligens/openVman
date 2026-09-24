@@ -21,9 +21,10 @@ def test_defaults_to_chinese_only(kb):
 
 def test_chinese_is_optional_and_order_is_stable(kb):
     # 純英文知識庫可以只勾 English；多條時第一條是退路。
-    assert kb.save_kb_settings("p", language_routes=["nan", "en"]) == {"language_routes": ["en", "nan"]}
-    assert kb.language_routes("p") == ["en", "nan"]
-    assert kb.fallback_route("p") == "en"
+    # 順序由後台排，第一條是主要語言。
+    assert kb.save_kb_settings("p", language_routes=["nan", "en", "nan"]) == {"language_routes": ["nan", "en"]}
+    assert kb.language_routes("p") == ["nan", "en"]
+    assert kb.fallback_route("p") == kb.primary_language("p") == "nan"
 
 
 def test_empty_routes_fall_back_to_chinese(kb):

@@ -82,6 +82,7 @@ def append_session_message(
         content,
         metadata=metadata,
         language=language,
+        default_language=_primary_language(project_id),
     )
     return state
 
@@ -103,7 +104,18 @@ def append_session_message_with_id(
         content,
         metadata=metadata,
         language=language,
+        default_language=_primary_language(project_id),
     )
+
+
+def _primary_language(project_id: str) -> str:
+    # 「hi」這類判斷不出語言的短句歸專案主要語言（知識庫分流排第一的）。
+    try:
+        from knowledge.kb_settings import primary_language
+
+        return primary_language(project_id)
+    except Exception:  # noqa: BLE001 - 讀不到設定就當中文
+        return "zh"
 
 
 def update_session_message_language(

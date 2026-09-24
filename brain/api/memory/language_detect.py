@@ -40,22 +40,35 @@ _ES_WORDS = frozenset(
 )
 
 
-def detect_language(text: str) -> str:
-    """Return "en" or "es" when the text is clearly one of them, else "zh"."""
+# 「hi」「ok」「thanks」「hola」這種一兩個字的招呼或單字判斷不出語言，歸專案的主要語言
+# （知識庫分流排第一的；回答規則同步用主要語言），標籤與回覆才不會一個英文一個中文。
+_SHORT_TEXT_WORDS = 2
+
+
+def is_short_text(text: str) -> bool:
+    """Too short to tell a language: at most two Latin words and no Chinese."""
+    return not _HAN.search(text or "") and len(_LATIN_WORD.findall((text or "").lower())) <= _SHORT_TEXT_WORDS
+
+
+def detect_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
+    """Return zh when there is Chinese, en/es when clearly one of them, else ``default``.
+
+    ``default`` 是專案的主要語言（知識庫分流排第一的）；短句與判斷不出來的歸它。
+    """
     lowered = (text or "").lower()
     words = _LATIN_WORD.findall(lowered)
-    if not words:
-        return DEFAULT_LANGUAGE
-    # 中文夾英文型號（EUS、HP）或網址很常見，漢字比拉丁字多就是中文；要先於西語符號
-    # 檢查，否則長篇中文文件裡某處一個 ñ 就被判成西語（實際發生在旅遊節目腳本）。
-    if len(_HAN.findall(text)) > len(words):
-        return DEFAULT_LANGUAGE
+    # 使用者的話有中文就是中文（夾英文型號、網址也一樣）。長篇文件另看比例，見下。
+    han = len(_HAN.findall(text or ""))
+    if han and (han > len(words) or len(text or "") < 200):
+        return "zh"
+    if len(words) <= _SHORT_TEXT_WORDS:
+        return default
     if _SPANISH_MARKS.search(lowered):
         return "es"
     en_hits = sum(word in _EN_WORDS for word in words)
     es_hits = sum(word in _ES_WORDS for word in words)
     if en_hits == es_hits:
-        return DEFAULT_LANGUAGE
+        return default
     return "es" if es_hits > en_hits else "en"
 
 
@@ -137,6 +150,8 @@ def detect_language_with_jev(text: str) -> str:
     from config import get_settings
     from core.jev_client import jev_nouls
 
+    if is_short_text(text):
+        return DEFAULT_LANGUAGE
     scores = jev_nouls(
         text, _JEV_QUESTIONS, timeout=get_settings().jev_gate_timeout_seconds,
     )
@@ -151,7 +166,11 @@ def refine_language_in_background(
     from config import get_settings
     from core.jev_client import jev_available
 
-    if not text.strip() or not get_settings().jev_language_enabled or not jev_available():
+    if (
+        is_short_text(text)
+        or not get_settings().jev_language_enabled
+        or not jev_available()
+    ):
         return
 
     def _run() -> None:
