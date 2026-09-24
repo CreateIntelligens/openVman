@@ -16,6 +16,8 @@ import websockets
 from config import BrainSettings, get_settings
 from memory.embedder import encode_query_with_fallback
 from memory.language_detect import (
+    DEFAULT_LANGUAGE,
+    TAIWANESE,
     audio_language_id_enabled,
     detect_audio_language,
     detect_language,
@@ -344,7 +346,14 @@ class GeminiLiveSession:
         self._utterance_pcm.clear()
         message_id = await self._save_input_transcription(text)
         await self._emit_user_transcription(text)
-        if self._audio_language_id and utterance and message_id:
+        # 中英西看 Live 的轉錄文字就分得出來；只有轉成中文字的句子才可能是台語，
+        # 這種才送去聽。英西不送，也避開判斷模型把西語聽成華語的誤判。
+        if (
+            self._audio_language_id
+            and utterance
+            and message_id
+            and detect_language(text) == DEFAULT_LANGUAGE
+        ):
             task = asyncio.create_task(self._classify_utterance(utterance, message_id))
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
@@ -390,19 +399,20 @@ class GeminiLiveSession:
             del self._utterance_pcm[:overflow]
 
     async def _classify_utterance(self, pcm: bytes, message_id: int) -> None:
-        """Replace the text-based language with one judged from the audio.
+        """Mark a Chinese-looking utterance as Taiwanese if the audio says so.
 
-        只寫訊息語言、不影響回答；判斷失敗就保留文字規則的結果。
+        只寫訊息語言、不影響回答；判斷不是台語或失敗就保留文字判斷的結果。
         """
         try:
             language = await asyncio.to_thread(
                 detect_audio_language, _pcm_to_wav(pcm, self._utterance_rate),
             )
-            from memory.memory import update_session_message_language
+            if language == TAIWANESE:
+                from memory.memory import update_session_message_language
 
-            await asyncio.to_thread(
-                update_session_message_language, message_id, language, self.project_id,
-            )
+                await asyncio.to_thread(
+                    update_session_message_language, message_id, language, self.project_id,
+                )
             logger.info(json.dumps({
                 "event": "live_audio_language",
                 "session_id": self.session_id,

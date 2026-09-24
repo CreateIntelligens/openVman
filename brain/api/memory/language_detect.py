@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # nan（台語）只能從聲音判斷：轉錄成文字後是中文字，文字規則永遠不會回 nan。
 LANGUAGES = ("zh", "en", "es", "nan")
 DEFAULT_LANGUAGE = "zh"
+TAIWANESE = "nan"
 
 _LATIN_WORD = re.compile(r"[a-záéíóúüñ]+")
 _SPANISH_MARKS = re.compile(r"[¿¡ñ]")

@@ -903,6 +903,16 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
     # 兩個 chunk 的 PCM 加 44 bytes WAV 檔頭。
     assert len(heard[0]) == 2 * 3200 + 44
     assert session._utterance_pcm == bytearray(), "判斷完要清空，下一句不能混到上一句"
+
+    # 英西看轉錄文字就分得出來，不送去聽；判斷不是台語也不覆寫。
+    await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
+    await session._handle_input_transcription({"text": "Which pump do you recommend?"})
+    monkeypatch.setattr(module, "detect_audio_language", lambda wav: heard.append(wav) or "zh")
+    await session.send_realtime_input(chunk, "audio/pcm;rate=16000")
+    await session._handle_input_transcription({"text": "請問急診在哪裡"})
+    await _wait_for(lambda: len(heard) == 2)
+    await asyncio.sleep(0.05)
+    assert languages == [(42, "nan", "proj-hospital")]
     await session.close()
 
 
