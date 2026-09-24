@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **前台（/openvman/）白畫面**：589c303 把虛擬人前台改成靜態 build 後，index.html 以 `/assets/index-*.js` 載入，但主機 nginx 的根目錄轉發清單沒有 `assets`，CSS 回 HTML、JS 404。template 加上 `assets`；同時把主機上被直接改過、template 沒有的 `client_max_body_size 100m` 補回 template，免得部署時被拿掉又出 413。
 - **備份讀取不清除對話**：預覽與正式備份改用單一 SQLite 快照讀取摘要與訊息，不觸發聊天的 TTL 清理，保留尚在資料庫的過期對話。
 - **ASR 撤權後忽略舊偏好**：設定 API 與 worker 共用目前授權判定；正式／臨時帳號撤權後不再把舊引擎當 preferred，既有系統預設與 fallback 策略維持不變。
 - **錄音閒置與 fallback 狀態**：continuous 模式持續說話不會被 10 秒閒置計時停錄；VAD 啟動失敗後的舊回傳不再覆寫錄音器狀態與自動停止計時器。

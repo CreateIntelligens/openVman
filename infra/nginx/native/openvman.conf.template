@@ -44,6 +44,10 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+    # 後端 DOCUMENT_MAX_UPLOAD_BYTES 是 100MB、admin 容器 nginx 是 200m，
+    # 這裡不設就吃 nginx 預設的 1m，外圈把內圈全鎖死（ASR 試辨識上傳音檔 413）。
+    client_max_body_size 100m;
+
     location = /openvman {
         return 301 /openvman/;
     }
@@ -99,7 +103,9 @@ server {
     # and asset URLs. Keep those supporting paths on the same Docker edge.
     # The public SDK bundle and every served file now live under /static/,
     # so they no longer need their own root-level locations.
-    location ~ ^/(admin|api|v1|static|src|@vite|@id|node_modules|js|wasm|grafana|vendor)(/|$) {
+    # The avatar app is a static Vite build (589c303) whose index.html loads
+    # /assets/index-*.js root-relatively; without assets here the page is blank.
+    location ~ ^/(admin|api|v1|static|src|@vite|@id|node_modules|js|wasm|grafana|vendor|assets)(/|$) {
         proxy_pass https://${EDGE_UPSTREAM};
         proxy_ssl_verify off;
         proxy_http_version 1.1;
