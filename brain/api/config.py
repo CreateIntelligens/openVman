@@ -35,7 +35,7 @@ class BrainSettings(BaseSettings):
     llm_provider: str = "gemini"
     llm_api_key: str = ""
     llm_api_keys: str = ""
-    llm_model: str = "gemini-3.1-flash-lite"
+    llm_model: str = "gemini-3.5-flash-lite"
     llm_fallback_model: str = ""
     llm_base_url: str = ""
     llm_temperature: float = 0.3

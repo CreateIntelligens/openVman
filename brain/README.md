@@ -555,8 +555,8 @@ HTTPS_PORT=8787
 
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=
-LLM_MODEL=gemini-3.1-flash-lite
-LLM_FALLBACK_CHAIN=gemini:gemini-3.1-flash-lite,groq:llama-3.3-70b-versatile,nen:gemini-3.5-flash-lite
+LLM_MODEL=gemini-3.5-flash-lite
+LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b,nen:gemini-3.5-flash-lite
 GROQ_API_KEY=
 NEN_API_KEY=
 NEN_BASE_URL=https://nen.com.tw/v1

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **主模型預設改 gemini-3.5-flash-lite**：`config.py` 的 `llm_model` 與 `.env.example`、文件範例跟正式環境一致（正式本來就由 `.env` 設 3.5-flash-lite，行為不變）；文件裡的備援鏈範例也換成正式用的 gemini → openai → groq → nen。
+
 ### Added
 
 - **台語辨識實驗與 Live 音訊語言判斷**（`scripts/experiments/taigi/`）：合成醫院情境台語 8 句，Breeze 8/8 直接翻成
