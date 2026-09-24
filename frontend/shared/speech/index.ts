@@ -4,6 +4,7 @@ export * from "./asr/errors";
 export * from "./asr/client";
 export * from "./asr/server-recorder";
 export * from "./asr/vad-recognizer";
+export * from "./asr/stream-recognizer";
 export * from "./asr/browser-recognizer";
 export * from "./asr/controller";
 export * from "./tts";

@@ -1,4 +1,6 @@
 export const BROWSER_ASR = "browser";
+/** Gemini transcribe-live 串流辨識；台語分流時不用（Gemini 聽不懂台語）。 */
+export const GEMINI_STREAM_ASR = "gemini-live";
 
 /** ASR 引擎的顯示名稱與說明。後台「語音」頁、前端設定與聊天室的引擎選單共用。 */
 export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> = {
@@ -21,6 +23,10 @@ export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> =
   browser: {
     label: "瀏覽器內建辨識",
     note: "在使用者裝置上辨識，語音不會送到伺服器；部分瀏覽器不支援。",
+  },
+  "gemini-live": {
+    label: "Gemini 串流",
+    note: "邊講邊出字、講完約 0.5 秒定稿；語音送往 Google。台語分流時改用 Breeze。",
   },
 };
 

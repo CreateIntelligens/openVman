@@ -72,6 +72,7 @@ from app.providers.voxcpm_adapter import (
     VoxCPMHTTPError,
 )
 from app import language_routes as language_routes_mod
+from app.gateway import asr_stream as asr_stream_routes
 from app.routes import admin as admin_routes
 from app.routes import avatar as avatar_routes
 from app.routes import backgrounds as background_routes
@@ -274,6 +275,7 @@ app.include_router(mascot_routes.router)
 app.include_router(static_assets_routes.router)
 app.include_router(project_router)
 app.include_router(websocket_routes.router)
+app.include_router(asr_stream_routes.router)
 
 
 def _merge_brain_openapi(base_schema: dict, brain_schema: dict) -> dict:

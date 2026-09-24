@@ -14,6 +14,7 @@ export type AsrErrorCode =
   | 'start-failed'
   | 'transcribe-failed'
   | 'vad-unavailable'
+  | 'stream-unavailable'
 
 export const ASR_ERROR_MESSAGES: Record<AsrErrorCode, string> = {
   'not-supported': '此瀏覽器不支援錄音。',
@@ -24,6 +25,7 @@ export const ASR_ERROR_MESSAGES: Record<AsrErrorCode, string> = {
   'start-failed': '無法開始錄音。',
   'transcribe-failed': '語音辨識失敗，請再試一次。',
   'vad-unavailable': '無法載入語音偵測模型。',
+  'stream-unavailable': '串流辨識無法使用，已改用一般辨識。',
 }
 
 export function getAsrErrorMessage(

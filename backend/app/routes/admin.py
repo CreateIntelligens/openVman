@@ -215,6 +215,7 @@ _ASR_ENGINE_LABELS = {
     "sensevoice": "SenseVoice-Small（臺語漢字）",
     "openai": "OpenAI Whisper（語音送往外部服務）",
     "browser": "瀏覽器內建辨識（語音留在使用者裝置）",
+    "gemini-live": "Gemini 串流辨識（邊講邊出字，語音送往 Google）",
 }
 
 
