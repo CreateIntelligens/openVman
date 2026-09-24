@@ -19,16 +19,23 @@ describe("LanguageRoutesButton", () => {
     api.saveKnowledgeSettings.mockImplementation(async (settings) => settings);
   });
 
-  it("turns on the Taiwanese route and keeps Chinese locked", async () => {
+  it("keeps at least one route but Chinese is not required", async () => {
     render(<LanguageRoutesButton projectId="proj-hospital" />);
     fireEvent.click(await screen.findByText("分流：中文"));
 
-    expect((screen.getByLabelText(/中文/) as HTMLInputElement).disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText(/台語/));
-
+    // 只剩一條時不能取消。
+    expect((screen.getByLabelText("中文") as HTMLInputElement).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("English"));
     await waitFor(() =>
-      expect(api.saveKnowledgeSettings).toHaveBeenCalledWith({ language_routes: ["zh", "nan"] }),
+      expect(api.saveKnowledgeSettings).toHaveBeenCalledWith({ language_routes: ["zh", "en"] }),
     );
-    expect(await screen.findByText("分流：中文、台語")).toBeTruthy();
+
+    // 有兩條之後中文可以取消，只留英文。
+    await waitFor(() => expect((screen.getByLabelText("中文") as HTMLInputElement).disabled).toBe(false));
+    fireEvent.click(screen.getByLabelText("中文"));
+    await waitFor(() =>
+      expect(api.saveKnowledgeSettings).toHaveBeenLastCalledWith({ language_routes: ["en"] }),
+    );
+    expect(await screen.findByText("分流：English")).toBeTruthy();
   });
 });

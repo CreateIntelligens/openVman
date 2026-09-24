@@ -1,7 +1,9 @@
 """Per-project knowledge base settings (language routes).
 
 分流由管理者在知識庫設定勾選，不看有哪些文件：醫院的文件可能只有中文，但仍要
-開台語分流，才認得出使用者在講台語。只勾中文就完全不分流，行為與以前相同。
+開台語分流，才認得出使用者在講台語。至少一條、不一定要中文（純英文知識庫只勾
+English）。只有一條就不分流，行為與以前相同；多條時第一條（依 zh、en、es、nan
+順序）是其他語言查不到時的退路。
 """
 
 from __future__ import annotations
@@ -41,6 +43,11 @@ def language_routes(project_id: str = "default") -> list[str]:
 
 def _normalize_routes(value: Any) -> list[str]:
     chosen = {str(item) for item in value} if isinstance(value, list) else set()
-    # 中文永遠是一條分流，也是其他語言查不到時的退路。
-    chosen.add(DEFAULT_LANGUAGE)
-    return [lang for lang in LANGUAGES if lang in chosen]
+    routes = [lang for lang in LANGUAGES if lang in chosen]
+    # 至少一條；什麼都沒勾（或舊資料）就當只有中文。
+    return routes or [DEFAULT_LANGUAGE]
+
+
+def fallback_route(project_id: str = "default") -> str:
+    """The route other languages fall back to: the first ticked one."""
+    return language_routes(project_id)[0]

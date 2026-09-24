@@ -291,7 +291,7 @@ class TestQueryExpansion:
 
 
 class TestLanguageRouting:
-    LANGS = {"zh.md": "zh", "en.md": "en", "es.md": "es"}
+    LANGS = {"zh.md": "zh", "en.md": "en", "en-2.md": "en", "es.md": "es"}
 
     ROUTES = ["zh", "en", "es"]
 
@@ -300,6 +300,8 @@ class TestLanguageRouting:
         import knowledge.kb_settings as kb_settings
 
         monkeypatch.setattr(kb_settings, "language_routes", lambda project_id="default": self.ROUTES)
+        # retrieval 綁的是匯入時的函式；其他測試可能換掉 sys.modules 裡的模組物件。
+        monkeypatch.setattr(retrieval, "fallback_route", lambda project_id="default": self.ROUTES[0])
         monkeypatch.setattr(
             retrieval,
             "resolve_document_languages",
@@ -382,3 +384,14 @@ class TestLanguageRouting:
         monkeypatch.setattr(self, "ROUTES", ["zh", "nan"])
         table(["zh.md", "en.md"])
         assert [r["text"] for r in self._search("en")] == ["chunk-zh.md"]
+
+    def test_single_non_chinese_route_does_not_filter(self, table, monkeypatch):
+        monkeypatch.setattr(self, "ROUTES", ["en"])
+        table(["zh.md", "en.md"])
+        assert len(self._search("es")) == 2
+
+    def test_falls_back_to_first_route_when_chinese_is_not_ticked(self, table, monkeypatch):
+        monkeypatch.setattr(self, "ROUTES", ["en", "es"])
+        table(["zh.md", "en.md", "en-2.md"])
+        # 沒有西語文件：退回第一條分流（英文），不是中文。
+        assert [r["text"] for r in self._search("es")] == ["chunk-en.md", "chunk-en-2.md"]

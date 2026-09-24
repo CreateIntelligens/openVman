@@ -15,6 +15,7 @@ from knowledge.doc_meta import (
     list_disabled_document_paths,
     resolve_document_languages,
 )
+from knowledge.kb_settings import fallback_route
 from memory.dreaming.recall_tracker import record_trace
 from memory.embedder import encode_text
 from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
@@ -117,6 +118,7 @@ def search_records(
             # 其他語言可能佔滿候選窗；確認已查完才允許退回中文。
             visible = _route_by_language(
                 visible, route_language, project_id, fallback=exhausted,
+                fallback_language=fallback_route(project_id),
             )
         deduped = deduplicate(
             visible,
@@ -292,7 +294,7 @@ def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
 
 def _route_by_language(
     records: list[dict[str, Any]], language: str, project_id: str,
-    *, fallback: bool = True,
+    *, fallback: bool = True, fallback_language: str = DEFAULT_LANGUAGE,
 ) -> list[dict[str, Any]]:
     def path_of(record: dict[str, Any]) -> str:
         return str(parse_record_metadata(record).get("path", "")).strip()
@@ -308,9 +310,9 @@ def _route_by_language(
         ]
 
     same = pick(language)
-    if same or language == DEFAULT_LANGUAGE or not fallback:
+    if same or language == fallback_language or not fallback:
         return same
-    return pick(DEFAULT_LANGUAGE)
+    return pick(fallback_language)
 
 
 def _matches_disabled_knowledge_path(

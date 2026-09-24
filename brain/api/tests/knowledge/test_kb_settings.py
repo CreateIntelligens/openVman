@@ -19,9 +19,15 @@ def test_defaults_to_chinese_only(kb):
     assert kb.language_routes("p") == ["zh"]
 
 
-def test_chinese_is_always_kept_and_order_is_stable(kb):
-    assert kb.save_kb_settings("p", language_routes=["nan", "en"]) == {"language_routes": ["zh", "en", "nan"]}
-    assert kb.language_routes("p") == ["zh", "en", "nan"]
+def test_chinese_is_optional_and_order_is_stable(kb):
+    # 純英文知識庫可以只勾 English；多條時第一條是退路。
+    assert kb.save_kb_settings("p", language_routes=["nan", "en"]) == {"language_routes": ["en", "nan"]}
+    assert kb.language_routes("p") == ["en", "nan"]
+    assert kb.fallback_route("p") == "en"
+
+
+def test_empty_routes_fall_back_to_chinese(kb):
+    assert kb.save_kb_settings("p", language_routes=[]) == {"language_routes": ["zh"]}
 
 
 def test_taiwanese_route_follows_the_setting(kb, monkeypatch):

@@ -6,15 +6,11 @@ import {
   type KnowledgeLanguage,
 } from "../../api";
 
-const ROUTES: { value: KnowledgeLanguage; label: string; note: string }[] = [
-  { value: "zh", label: "中文", note: "一定開著；其他語言查不到時也退回中文。" },
-  { value: "en", label: "English", note: "英文提問只查英文文件。" },
-  { value: "es", label: "Español", note: "西語提問只查西語文件。" },
-  {
-    value: "nan",
-    label: "台語",
-    note: "Live 會另外聽使用者是不是講台語（轉成文字看不出來），有台語文件就查台語文件。",
-  },
+const ROUTES: { value: KnowledgeLanguage; label: string }[] = [
+  { value: "zh", label: "中文" },
+  { value: "en", label: "English" },
+  { value: "es", label: "Español" },
+  { value: "nan", label: "台語" },
 ];
 
 /** 知識庫的語言分流設定；由管理者勾選，不看有哪些文件。 */
@@ -76,23 +72,21 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">
           <p className="mb-2 text-xs text-content-muted">
-            勾選這個知識庫要分流的語言。只勾中文就不分流，所有文件一起查。
+            至少勾一個；只勾一個就不分流。
           </p>
           <ul className="flex flex-col gap-2">
             {ROUTES.map((route) => (
               <li key={route.value}>
-                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    className="mt-0.5 h-4 w-4 accent-primary"
+                    className="h-4 w-4 accent-primary"
                     checked={routes.includes(route.value)}
-                    disabled={route.value === "zh" || saving}
+                    // 最後一個不能取消：至少要有一條分流。
+                    disabled={saving || (routes.length === 1 && routes.includes(route.value))}
                     onChange={() => void toggle(route.value)}
                   />
-                  <span>
-                    <span className="font-semibold">{route.label}</span>
-                    <span className="block text-xs text-content-subtle">{route.note}</span>
-                  </span>
+                  {route.label}
                 </label>
               </li>
             ))}

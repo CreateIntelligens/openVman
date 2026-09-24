@@ -114,7 +114,7 @@ class KnowledgeDocumentMetaPatchRequest(BaseModel):
 
 class KnowledgeSettingsPutRequest(BaseModel):
     project_id: str = "default"
-    # zh 一定會保留；nan（台語）勾了 Live 才會另外聽使用者是不是講台語。
+    # 至少一條、不一定要中文；nan（台語）勾了才會另外聽使用者是不是講台語。
     language_routes: list[str] = Field(default_factory=lambda: ["zh"])
 
     @field_validator("language_routes")
@@ -123,6 +123,8 @@ class KnowledgeSettingsPutRequest(BaseModel):
         unknown = set(value) - {"zh", "en", "es", "nan"}
         if unknown:
             raise ValueError(f"不支援的語言：{sorted(unknown)}")
+        if not value:
+            raise ValueError("至少要勾一種語言")
         return value
 
 

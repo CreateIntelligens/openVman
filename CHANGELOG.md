@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **語言分流不必含中文**：後台「分流」拿掉各語言的說明文字；至少勾一條、不一定是中文（純英文知識庫只勾 English）。只有一條不分流；多條時第一條（zh、en、es、nan 順序）是查不到時的退路。前台臨時開關同樣至少留一條。
 - **台語分流不該每句都換 VoxCPM**：原本只要專案開了台語分流，打字、快速問答、講華語也全被換成 VoxCPM（同事選 Gemini TTS 卻聽到 VoxCPM）。改成這一輪是語音且 ASR 判成台語（`speech_language=nan`）才換；前台記住上一句是否為台語語音，後端同條件核對。
 - **前台（/openvman/）白畫面**：589c303 把虛擬人前台改成靜態 build 後，index.html 以 `/assets/index-*.js` 載入，但主機 nginx 的根目錄轉發清單沒有 `assets`，CSS 回 HTML、JS 404。template 加上 `assets`；同時把主機上被直接改過、template 沒有的 `client_max_body_size 100m` 補回 template，免得部署時被拿掉又出 413。
 - **備份讀取不清除對話**：預覽與正式備份改用單一 SQLite 快照讀取摘要與訊息，不觸發聊天的 TTL 清理，保留尚在資料庫的過期對話。

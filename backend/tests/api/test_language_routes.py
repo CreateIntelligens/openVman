@@ -34,8 +34,10 @@ def test_client_can_only_narrow_admin_routes(routes):
     assert run(lr.effective_routes(_account(), "proj-hekee", None)) == ["zh", "en", "es"]
     # 前台把西語關掉。
     assert run(lr.effective_routes(_account(), "proj-hekee", ["zh", "en"])) == ["zh", "en"]
-    # 前台想開後台沒有的台語：不給；中文就算沒勾也保留。
+    # 前台想開後台沒有的台語：不給；全部關掉時保留後台第一條。
     assert run(lr.effective_routes(_account(), "proj-hekee", ["nan"])) == ["zh"]
+    # 中文不是必選：只留英文也可以。
+    assert run(lr.effective_routes(_account(), "proj-hekee", ["en"])) == ["en"]
 
 
 def test_embed_key_uses_its_own_project(routes):

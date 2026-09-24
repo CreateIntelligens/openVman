@@ -773,7 +773,7 @@ async def get_language_routes(
     project_id: str = "",
     current: CurrentAccount = Depends(get_current_account),
 ) -> JSONResponse:
-    """前台據此列出可臨時開關的分流；中文永遠在、不能關。"""
+    """前台據此列出可臨時開關的分流；至少要留一條。"""
     project = language_routes_mod.resolve_project(current, project_id)
     return JSONResponse(content={
         "project_id": project,

@@ -542,14 +542,14 @@ function handleDialogClick(event: MouseEvent): void {
                   <input
                     type="checkbox"
                     :checked="languageRoutesActive?.includes(route)"
-                    :disabled="route === 'zh' || disabled"
+                    :disabled="disabled || ((languageRoutesActive?.length ?? 0) <= 1 && languageRoutesActive?.includes(route))"
                     @change="emit('languageRouteToggle', route)"
                   />
                   {{ LANGUAGE_ROUTE_LABELS[route] ?? route }}
                 </label>
               </div>
               <small class="field-card__hint">
-                只能關掉或勾回後台開的語言，立即生效。台語開著時語音辨識改用 Breeze，語音改用 VoxCPM。
+                至少留一個；只能在後台開的語言裡切換，立即生效。
               </small>
             </div>
 

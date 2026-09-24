@@ -1,8 +1,8 @@
 """Language routes for voice requests (ASR engine and TTS provider).
 
-分流由後台在知識庫設定勾選（存在 Brain：GET /brain/knowledge/settings）。前台可以
-在後台開的範圍內臨時取消或勾回，送請求時帶 language_routes；這裡取兩者交集，
-前台不能開出後台沒有的語言。有台語分流時：
+分流由後台在知識庫設定勾選（存在 Brain：GET /brain/knowledge/settings），至少一條、
+不一定是中文。前台可以在後台開的範圍內臨時取消或勾回，送請求時帶 language_routes；
+這裡取兩者交集，前台不能開出後台沒有的語言，也不能全部關掉。有台語分流時：
 
 - ASR 一律用 Breeze（台語直接翻成華語，華語也準），並另請 Brain 聽是不是台語。
 - TTS 原本不是 VoxCPM／CosyVoice 就改用 VoxCPM（快）；本來就是這兩家不動。
@@ -82,7 +82,7 @@ async def admin_routes(project_id: str | None) -> list[str]:
     except Exception as exc:  # noqa: BLE001 - Brain 查不到就當只有中文
         logger.warning("language routes lookup failed for %s: %s", project_id, exc)
         return [CHINESE]
-    routes = [CHINESE, *[route for route in routes if route != CHINESE]]
+    routes = routes or [CHINESE]
     _cache[project_id] = (time.monotonic(), routes)
     return routes
 
@@ -100,11 +100,12 @@ async def effective_routes(
     supplied_project_id: str,
     requested: list[str] | None,
 ) -> list[str]:
-    """Admin routes narrowed by the client's toggles; Chinese is always kept."""
+    """Admin routes narrowed by the client's toggles; never empty."""
     allowed = await admin_routes(resolve_project(current, supplied_project_id))
     if requested is None:
         return allowed
-    return [route for route in allowed if route == CHINESE or route in requested]
+    narrowed = [route for route in allowed if route in requested]
+    return narrowed or allowed[:1]
 
 
 def taiwanese_tts_provider(provider: str | None) -> str | None:

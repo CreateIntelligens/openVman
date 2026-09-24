@@ -3,7 +3,7 @@
  *
  * 後台在知識庫設定勾的分流是上限（GET /api/v1/language-routes）；前台只能在這個
  * 範圍內臨時關掉或勾回，存在這台瀏覽器、依專案分開。送 ASR／TTS／聊天時帶
- * 目前開著的分流，後端再跟後台設定取交集。中文永遠開著。
+ * 目前開著的分流，後端再跟後台設定取交集。至少要留一條。
  *
  * 台語分流開著時：ASR 由後端改用 Breeze、瀏覽器內建辨識停用（它聽不懂台語），
  * TTS 原本不是 VoxCPM／CosyVoice 就改用 VoxCPM。
@@ -32,6 +32,7 @@ function readOffMap(): Record<string, string[]> {
 }
 
 export function useLanguageRoutes(projectId: () => string) {
+  // 後台勾的分流，至少一條、不一定是中文。
   const available = ref<string[]>(['zh'])
   const offMap = ref<Record<string, string[]>>(readOffMap())
 
@@ -51,16 +52,19 @@ export function useLanguageRoutes(projectId: () => string) {
   watch(projectId, () => void load(), { immediate: true })
 
   const off = computed(() => new Set(offMap.value[projectId()] ?? []))
-  const active = computed(() =>
-    available.value.filter((route) => route === 'zh' || !off.value.has(route)),
-  )
+  const active = computed(() => {
+    const on = available.value.filter((route) => !off.value.has(route))
+    // 至少留一條；舊資料或後台改了設定導致全關時，退回後台第一條。
+    return on.length ? on : available.value.slice(0, 1)
+  })
   const taiwaneseOn = computed(() => active.value.includes(TAIWANESE_ROUTE))
 
   function toggle(route: string): void {
-    if (route === 'zh' || !available.value.includes(route)) return
+    if (!available.value.includes(route)) return
     const current = new Set(off.value)
     if (current.has(route)) current.delete(route)
-    else current.add(route)
+    else if (active.value.length > 1) current.add(route)
+    else return
     offMap.value = { ...offMap.value, [projectId()]: [...current] }
     writePref(STORAGE_KEYS.LANGUAGE_ROUTES_OFF, JSON.stringify(offMap.value))
   }

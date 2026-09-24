@@ -101,14 +101,14 @@ def project_has_taiwanese_route(project_id: str) -> bool:
 def route_language(language: str | None, project_id: str) -> str | None:
     """Map a detected language onto the project's configured routes.
 
-    只有中文一條分流時回 None（不分流，所有文件都查）；語言不在分流裡就當中文。
+    只有一條分流時回 None（不分流，所有文件都查）；語言不在分流裡就走第一條分流。
     """
     from knowledge.kb_settings import language_routes
 
     routes = language_routes(project_id)
-    if not language or routes == [DEFAULT_LANGUAGE]:
+    if not language or len(routes) <= 1:
         return None
-    return language if language in routes else DEFAULT_LANGUAGE
+    return language if language in routes else routes[0]
 
 
 _JEV_QUESTIONS = {
