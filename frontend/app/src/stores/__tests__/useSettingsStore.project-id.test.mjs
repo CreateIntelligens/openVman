@@ -12,7 +12,7 @@ const backgroundTypeSource = readFileSync(resolve(__dirname, "../../types/avatar
 test("avatar settings persist the selected project id", () => {
   assert.match(storageSource, /PROJECT_ID:\s*"avatar\.project_id"/);
   assert.match(storeSource, /projectId:\s*readPref\(STORAGE_KEYS\.PROJECT_ID,\s*"default"\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.projectId,\s*\(v\) => writePref\(STORAGE_KEYS\.PROJECT_ID,\s*v\)\)/);
+  assert.match(storeSource, /projectId: STORAGE_KEYS\.\w+/);
 });
 
 test("avatar settings default to Standard text chat mode", () => {
@@ -27,29 +27,35 @@ test("avatar settings persist stage background preferences", () => {
   assert.match(storeSource, /backgroundId:\s*normalizeAvatarBackgroundId\(readPref\(STORAGE_KEYS\.BACKGROUND_ID,\s*"dark"\)\)/);
   assert.match(storeSource, /backgroundUrl:\s*readPref\(STORAGE_KEYS\.BACKGROUND_URL,\s*""\)/);
   assert.match(storeSource, /backgroundFit:\s*normalizeAvatarBackgroundFit\(readPref\(STORAGE_KEYS\.BACKGROUND_FIT,\s*"cover"\)\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.backgroundId,\s*\(v\) => writePref\(STORAGE_KEYS\.BACKGROUND_ID,\s*v\)\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.backgroundUrl,\s*\(v\) => writePref\(STORAGE_KEYS\.BACKGROUND_URL,\s*v\)\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.backgroundFit,\s*\(v\) => writePref\(STORAGE_KEYS\.BACKGROUND_FIT,\s*v\)\)/);
+  assert.match(storeSource, /backgroundId: STORAGE_KEYS\.\w+/);
+  assert.match(storeSource, /backgroundUrl: STORAGE_KEYS\.\w+/);
+  assert.match(storeSource, /backgroundFit: STORAGE_KEYS\.\w+/);
 });
 
 test("avatar settings persist camera preview scale", () => {
   assert.match(storageSource, /CAMERA_PREVIEW_SCALE:\s*"avatar\.camera_preview_scale"/);
   assert.match(storeSource, /function normalizeCameraPreviewScale\(value: string\): number/);
   assert.match(storeSource, /cameraPreviewScale:\s*normalizeCameraPreviewScale\(readPref\(STORAGE_KEYS\.CAMERA_PREVIEW_SCALE,\s*"1"\)\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.cameraPreviewScale,\s*\(v\) => writePref\(STORAGE_KEYS\.CAMERA_PREVIEW_SCALE,\s*String\(v\)\)\)/);
+  assert.match(storeSource, /cameraPreviewScale: STORAGE_KEYS\.\w+/);
 });
 
 test("avatar settings persist the selected render mode", () => {
   assert.match(storageSource, /RENDER_MODE:\s*"avatar\.render_mode"/);
   assert.match(storeSource, /function normalizeAvatarRenderMode\(value: string\): '2d' \| '3d'/);
   assert.match(storeSource, /renderMode:\s*normalizeAvatarRenderMode\(readPref\(STORAGE_KEYS\.RENDER_MODE,\s*"2d"\)\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.renderMode,\s*\(v\) => writePref\(STORAGE_KEYS\.RENDER_MODE,\s*v\)\)/);
+  assert.match(storeSource, /renderMode: STORAGE_KEYS\.\w+/);
 });
 
 test("avatar settings persist the selected VRM avatar id", () => {
   assert.match(storageSource, /VRM_AVATAR_ID:\s*"avatar\.vrm_avatar_id"/);
   assert.match(storeSource, /vrmAvatarId:\s*readPref\(STORAGE_KEYS\.VRM_AVATAR_ID,\s*"qqman"\)/);
-  assert.match(storeSource, /watch\(\(\) => state\.vrmAvatarId,\s*\(v\) => writePref\(STORAGE_KEYS\.VRM_AVATAR_ID,\s*v\)\)/);
+  assert.match(storeSource, /vrmAvatarId: STORAGE_KEYS\.\w+/);
+});
+
+test("only saveSettings writes preferences; bootstrap choices stay in memory", () => {
+  // 以前每個欄位都有 watch 寫回，開場的清空與退回也被當成使用者的選擇存下去。
+  assert.doesNotMatch(storeSource, /\bwatch\(/);
+  assert.match(storeSource, /export function saveSettings\(patch: Partial<SettingsState>\): void/);
 });
 
 test("avatar settings accept uploaded background ids", () => {

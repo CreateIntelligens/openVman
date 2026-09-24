@@ -35,7 +35,8 @@ test("the chosen mode is read per request, not captured once", () => {
 
 test("the mode is persisted and offered in settings", () => {
   const store = read("stores/useSettingsStore.ts");
-  assert.match(store, /watch\(\(\) => state\.replyMode/);
+  assert.match(store, /replyMode: STORAGE_KEYS\.REPLY_MODE/);
+  assert.match(read("App.vue"), /saveSettings\(\{ replyMode: mode \}\)/);
 
   const modal = read("components/controls/SettingsModal.vue");
   assert.match(modal, /回覆深度/);

@@ -99,6 +99,18 @@ describe('selection (D9)', () => {
     expect(res.changed).toBe(true)
   })
 
+  it('存的是「自動」（沒有聲音清單、聲音為空）時整組沿用，不退回帳號預設', () => {
+    const res = resolveTtsVoiceSelection({
+      availableProviders: [{ id: 'auto', default_voice: '', voices: [] }, ...providers],
+      savedProvider: 'auto',
+      savedVoice: '',
+      accountDefaultProvider: 'indextts',
+      accountDefaultVoice: 'voice-a',
+    })
+
+    expect(res).toEqual({ provider: 'auto', voice: '', changed: false })
+  })
+
   it('resolveAutoTtsSelection 將 auto 轉為空字串交由後端自選', () => {
     expect(resolveAutoTtsSelection('auto', 'voice-1')).toEqual({ provider: '', voice: '' })
     expect(resolveAutoTtsSelection('gemini-tts', 'Puck')).toEqual({

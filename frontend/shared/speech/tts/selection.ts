@@ -61,9 +61,13 @@ export function resolveTtsVoiceSelection(
     }
   }
 
-  // 1. 檢查使用者已存的 provider + voice 是否整對合法
+  // 1. 檢查使用者已存的 provider + voice 是否整對合法。
+  //    「自動」（auto）沒有聲音清單、存的聲音是空字串，也是合法的一對；不這樣算，
+  //    選了自動的人每次重開都會被換成帳號預設。
   const savedPairValid = availableProviders.some(
-    (item) => item.id === savedProvider && item.voices.includes(savedVoice),
+    (item) =>
+      item.id === savedProvider &&
+      (item.voices.includes(savedVoice) || (item.voices.length === 0 && !savedVoice)),
   )
 
   if (savedPairValid) {

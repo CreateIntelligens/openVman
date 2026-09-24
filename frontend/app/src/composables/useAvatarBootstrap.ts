@@ -7,6 +7,10 @@
  * 每個 fetch 都成對出現「偏好值」與「退而求其次」兩條路：帳號的預設值可能
  * 已經被收回授權，那時要自動改選一個還能用的，並且留一則提示告訴使用者為
  * 什麼跟他設定的不一樣——靜靜換掉會讓人以為設定沒存到。
+ *
+ * 偏好值一律取 savedSettings()（使用者按套用存下的），這裡對 settings 的
+ * 賦值都只是這次的生效值，不會寫回瀏覽器：清單暫時載不到、或載入到一半就
+ * 重整，下次開啟仍會再試使用者存的那個。
  */
 import { computed, ref, watch } from 'vue'
 
@@ -23,7 +27,7 @@ import {
   type MascotApiRecord,
   type MascotOption,
 } from '../data/mascotCatalog'
-import { bindSettingsToAccount } from '../stores/useSettingsStore'
+import { bindSettingsToAccount, savedSettings } from '../stores/useSettingsStore'
 import { hasPref, STORAGE_KEYS } from '../utils/storageUtils'
 import {
   normalizeAvatarBackgroundId,
@@ -128,26 +132,26 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   }
 
   async function fetchVrmAvatars(): Promise<void> {
+    let items: MascotOption[];
     try {
       const res = await apiFetch("/api/v1/avatar/mascots");
       if (!res.ok) return;
       const data = (await res.json()) as VrmMascotsResponse;
-      const items = (data.mascots ?? [])
+      items = (data.mascots ?? [])
         .map(toMascotOption)
         .filter((mascot) => mascot.engine === "3d" && Boolean(mascot.vrmUrl));
-      vrmAvatarOptions.value = items;
     } catch {
-      vrmAvatarOptions.value = [];
-    } finally {
-      const preferred = preferSaved(
-        settings.vrmAvatarId,
-        (id) => vrmAvatarOptions.value.some((m) => m.id === id),
-        accountDefault("mascot_id", "") ?? "",
-      );
-      const preferredOption = vrmAvatarOptions.value.find((m) => m.id === preferred);
-      const selected = preferredOption ?? vrmAvatarOptions.value[0];
-      settings.vrmAvatarId = selected?.id ?? "";
+      // 清單沒拿到就不挑：拿空清單去挑，存的 VRM 會被當成失效換掉。
+      return;
     }
+    vrmAvatarOptions.value = items;
+    const preferred = preferSaved(
+      savedSettings().vrmAvatarId,
+      (id) => items.some((m) => m.id === id),
+      accountDefault("mascot_id", "") ?? "",
+    );
+    const selected = items.find((m) => m.id === preferred) ?? items[0];
+    settings.vrmAvatarId = selected?.id ?? "";
   }
 
   function stageBackgroundFitStyle(fit: AvatarBackgroundFit): Record<string, string> {
@@ -174,9 +178,8 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   }
 
   async function fetchProjects(): Promise<void> {
-    // 先記下還原回來的選擇再清空。下面那行會觸發 store 的 watch 把空字串寫回
-    // localStorage，不先留一份，存的值在清單回來之前就沒了。
-    const savedProjectId = settings.projectId;
+    // 清單回來前先不用任何專案；清空只影響這次，存的選擇在 savedSettings() 裡。
+    const savedProjectId = savedSettings().projectId;
     projects.value = [];
     settings.projectId = "";
     getChat().setProject("");
@@ -226,8 +229,8 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   ): Promise<void> {
     const targetProjectId = projectId;
     if (!targetProjectId) {
+      // 專案清單還沒到（或載入失敗）：只清人設清單，選到的人設留著，等專案確定再挑。
       personas.value = [];
-      settings.personaId = "";
       getChat().setPersona("");
       return;
     }
@@ -246,7 +249,10 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       const nextPersonas = items.length > 0 ? items : [DEFAULT_PERSONA];
       personas.value = nextPersonas;
       if (options.syncSelected ?? targetProjectId === settings.projectId) {
-        settings.personaId = pickFallbackPersonaId(nextPersonas, settings.personaId);
+        // 回到使用者存的專案時用他存的人設；專案被退回別的時才從目前的往下挑。
+        const saved = savedSettings();
+        const preferred = targetProjectId === saved.projectId ? saved.personaId : settings.personaId;
+        settings.personaId = pickFallbackPersonaId(nextPersonas, preferred);
         getChat().setPersona(settings.personaId);
       }
     } catch {
@@ -257,9 +263,7 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
   }
 
   async function fetchTtsProviders(): Promise<void> {
-    // 同 fetchProjects：清空會被寫回 localStorage，先留一份。
-    const savedProvider = settings.ttsProvider;
-    const savedVoice = settings.ttsVoice;
+    const { ttsProvider: savedProvider, ttsVoice: savedVoice } = savedSettings();
     ttsProviders.value = [];
     settings.ttsProvider = "";
     settings.ttsVoice = "";
@@ -268,17 +272,13 @@ export function useAvatarBootstrap({ settings, chat: getChat }: AvatarBootstrapO
       if (!res.ok) return;
       const items = await res.json() as TtsProvider[];
       ttsProviders.value = items;
-      const savedPairValid = items.some(
-        (item) => item.id === savedProvider && item.voices.includes(savedVoice),
-      );
-      const preferredProvider = savedPairValid ? savedProvider : accountDefault("voice_provider", PREFERRED_VOICE_PROVIDER);
-      const preferredVoice = savedPairValid ? savedVoice : accountDefault("voice_id", PREFERRED_VOICE_ID);
+      // 存的那一對合不合法由 resolveTtsVoiceSelection 判斷（含沒有聲音清單的「自動」）。
       const resolved = resolveTtsVoiceSelection({
         availableProviders: items,
         savedProvider,
         savedVoice,
-        accountDefaultProvider: preferredProvider,
-        accountDefaultVoice: preferredVoice,
+        accountDefaultProvider: accountDefault("voice_provider", PREFERRED_VOICE_PROVIDER),
+        accountDefaultVoice: accountDefault("voice_id", PREFERRED_VOICE_ID),
         defaultProviderFallback: PREFERRED_VOICE_PROVIDER,
         defaultVoiceFallback: PREFERRED_VOICE_ID,
       });

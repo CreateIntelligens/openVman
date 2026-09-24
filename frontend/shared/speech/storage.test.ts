@@ -54,6 +54,17 @@ describe('storage (D11)', () => {
     expect(localStorage.getItem('avatar.tts_engine::account_99')).toBe('indextts')
   })
 
+  it('帳號自己的舊鍵優先於未登入時遷出的 unscoped 新鍵', () => {
+    localStorage.setItem('avatar.tts_engine', 'voxcpm')
+    localStorage.setItem('avatar.tts_engine::acc_A', 'indextts')
+    // 模組在登入前載入：unscoped 舊值被遷成 unscoped 新鍵。
+    expect(readScoped(SPEECH_STORAGE_KEYS.TTS_PROVIDER)).toBe('voxcpm')
+
+    setStorageScope('acc_A')
+    expect(readScoped(SPEECH_STORAGE_KEYS.TTS_PROVIDER)).toBe('indextts')
+    expect(localStorage.getItem('speech.tts_provider::acc_A')).toBe('indextts')
+  })
+
   it('hasScoped 能正確偵測新鍵與舊鍵之存在', () => {
     expect(hasScoped(SPEECH_STORAGE_KEYS.TTS_VOICE)).toBe(false)
     localStorage.setItem('brain-tts-voice', 'Charon')

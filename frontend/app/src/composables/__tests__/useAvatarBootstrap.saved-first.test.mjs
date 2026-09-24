@@ -18,31 +18,12 @@ function body(source, signature) {
 // 使用者回報：重整之後知識庫、人物、語音引擎、聲音全部變回預設。根因是開場
 // 抓清單時直接套帳號預設，把 store 從 localStorage 還原的選擇蓋掉。
 
-test("the saved project is captured before the field is cleared", () => {
-  const fn = body(bootstrap, "async function fetchProjects()");
-  // 清空會觸發 store 的 watch 把空字串寫回 localStorage；不先留一份，存的值
-  // 在清單回來之前就沒了。
-  assert.ok(
-    fn.indexOf("const savedProjectId = settings.projectId") < fn.indexOf('settings.projectId = ""'),
-    "要先記下存的值再清空",
-  );
-  assert.match(fn, /preferSaved\(\s*savedProjectId,/);
-});
-
-test("the saved voice is kept only as a valid engine and voice pair", () => {
-  const fn = body(bootstrap, "async function fetchTtsProviders()");
-  assert.ok(
-    fn.indexOf("const savedProvider = settings.ttsProvider") < fn.indexOf('settings.ttsProvider = ""'),
-  );
-  // 不要拼出「存的引擎 + 預設的聲音」這種使用者沒選過的組合。
-  assert.match(fn, /item\.id === savedProvider && item\.voices\.includes\(savedVoice\)/);
-  assert.match(fn, /savedPairValid\s*\? savedProvider/);
-  assert.match(fn, /savedPairValid\s*\? savedVoice/);
-});
-
-test("mascot and character prefer the saved pick over the account default", () => {
-  assert.match(body(bootstrap, "async function fetchVrmAvatars()"), /preferSaved\(\s*settings\.vrmAvatarId,/);
-  assert.match(app, /preferSaved\(\s*settings\.characterId,/);
+test("bootstrap picks from what the user saved, not from the live field", () => {
+  // 開場會先把欄位清空；偏好一律取 savedSettings()，清空或退回都不會影響下次。
+  assert.match(body(bootstrap, "async function fetchProjects()"), /const savedProjectId = savedSettings\(\)\.projectId/);
+  assert.match(body(bootstrap, "async function fetchTtsProviders()"), /savedSettings\(\)/);
+  assert.match(body(bootstrap, "async function fetchVrmAvatars()"), /preferSaved\(\s*savedSettings\(\)\.vrmAvatarId,/);
+  assert.match(app, /preferSaved\(\s*savedSettings\(\)\.characterId,/);
 });
 
 test("a chosen background is not overwritten by the account default", () => {
@@ -60,7 +41,7 @@ test("a saved value that is no longer offered falls back instead of sticking", (
 
 test("no bootstrap path applies an account default without checking the saved value", () => {
   // 每個 accountDefault() 呼叫都要嘛包在 preferSaved 裡、要嘛前面有 hasPref
-  // 或 savedPairValid 把關。新增欄位時漏掉這件事，這個 bug 就會長回來。
+  // 或 resolveTtsVoiceSelection 先看存的那一對。新增欄位時漏掉這件事，這個 bug 就會長回來。
   const calls = [...(bootstrap + app).matchAll(/accountDefault\("(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     [...new Set(calls)].sort(),

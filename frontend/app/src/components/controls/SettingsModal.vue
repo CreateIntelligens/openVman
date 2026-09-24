@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { DEFAULT_ASR_PROVIDER_LABEL } from '@shared/speech'
 import CustomSelect from './CustomSelect.vue'
 import { LANGUAGE_ROUTE_LABELS } from "../../composables/useLanguageRoutes";
@@ -147,20 +147,62 @@ const backgroundOptions = computed<BackgroundOption[]>(() => [
   })),
 ])
 
-// Local draft state — doesn't commit until "套用"
-const draftProjectId = ref(props.currentProjectId)
-const draftPersonaId = ref(props.currentPersonaId)
-const draftCharId = ref(props.currentCharId ?? '')
-const draftVrmId = ref(props.currentVrmId)
-const draftTtsProvider = ref(props.ttsProvider)
-const draftAsrProvider = ref(props.asrProvider)
-const draftTtsVoice = ref(props.ttsVoice)
-const draftVoiceMode = ref<'live' | 'text'>(props.voiceMode ?? 'text')
-const draftReplyMode = ref<ReplyMode>(props.replyMode)
-const draftRenderMode = ref<AvatarRenderMode>(props.renderMode)
-const draftBackgroundId = ref<AvatarBackgroundId>(props.backgroundId)
-const draftBackgroundUrl = ref(props.backgroundUrl)
-const draftBackgroundFit = ref<AvatarBackgroundFit>(props.backgroundFit)
+type DraftFields = {
+  projectId: string
+  personaId: string
+  charId: string
+  vrmId: string
+  ttsProvider: string
+  ttsVoice: string
+  asrProvider: string
+  voiceMode: 'live' | 'text'
+  replyMode: ReplyMode
+  renderMode: AvatarRenderMode
+  backgroundId: AvatarBackgroundId
+  backgroundUrl: string
+  backgroundFit: AvatarBackgroundFit
+}
+
+/*
+ * 這次開啟裡使用者動過的欄位；沒動過的一律跟著目前的設定（props）走。
+ *
+ * 以前在打開那一刻把 props 拍成草稿：清單還在載入時打開，草稿就停在空字串或
+ * 預設值，清單回來也不會更新，按主按鈕就把它們當成使用者的選擇存下去。只記
+ * 「改了什麼」就沒有這個問題：晚到的值照樣顯示，套用只送出使用者真的改的。
+ */
+const edits = reactive<Partial<DraftFields>>({})
+
+function draftField<K extends keyof DraftFields>(key: K, current: () => DraftFields[K]) {
+  return computed<DraftFields[K]>({
+    get: () => (key in edits ? (edits[key] as DraftFields[K]) : current()),
+    set: (value) => {
+      edits[key] = value
+    },
+  })
+}
+
+function forget(...keys: (keyof DraftFields)[]): void {
+  for (const key of keys) delete edits[key]
+}
+
+const draftProjectId = draftField('projectId', () => props.currentProjectId)
+const draftCharId = draftField('charId', () => props.currentCharId ?? '')
+const draftVrmId = draftField('vrmId', () => props.currentVrmId)
+const draftTtsProvider = draftField('ttsProvider', () => props.ttsProvider)
+const draftAsrProvider = draftField('asrProvider', () => props.asrProvider)
+const draftTtsVoice = draftField('ttsVoice', () => props.ttsVoice)
+const draftVoiceMode = draftField('voiceMode', () => props.voiceMode ?? 'text')
+const draftReplyMode = draftField('replyMode', () => props.replyMode)
+const draftRenderMode = draftField('renderMode', () => props.renderMode)
+const draftBackgroundId = draftField('backgroundId', () => props.backgroundId)
+const draftBackgroundUrl = draftField('backgroundUrl', () => props.backgroundUrl)
+const draftBackgroundFit = draftField('backgroundFit', () => props.backgroundFit)
+// 換了專案就跟著新專案的清單挑（有同名的就留著，否則預設）；沒換就是目前的人設。
+const draftPersonaId = draftField('personaId', () =>
+  draftProjectId.value === props.currentProjectId
+    ? props.currentPersonaId
+    : pickPersonaId(props.currentPersonaId),
+)
 const dialogRef = ref<HTMLDialogElement | null>(null)
 let previouslyFocused: HTMLElement | null = null
 
@@ -188,27 +230,9 @@ function pickPersonaId(preferred: string): string {
     ?? 'default'
 }
 
-function pickVrmId(preferred: string): string {
-  if (props.vrmCharacters.some((v) => v.id === preferred)) return preferred
-  return props.vrmCharacters[0]?.id ?? preferred
-}
-
-// Sync draft when modal opens
 watch(() => props.open, async (open) => {
   if (open) {
-    draftProjectId.value = props.currentProjectId
-    draftPersonaId.value = props.currentPersonaId
-    draftCharId.value = props.currentCharId ?? ''
-    draftVrmId.value = pickVrmId(props.currentVrmId)
-    draftTtsProvider.value = props.ttsProvider
-    draftAsrProvider.value = props.asrProvider
-    draftTtsVoice.value = props.ttsVoice
-    draftVoiceMode.value = props.voiceMode ?? 'text'
-    draftReplyMode.value = props.replyMode
-    draftRenderMode.value = props.renderMode
-    draftBackgroundId.value = props.backgroundId
-    draftBackgroundUrl.value = props.backgroundUrl
-    draftBackgroundFit.value = props.backgroundFit
+    forget(...(Object.keys(edits) as (keyof DraftFields)[]))
     previouslyFocused = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null
@@ -225,19 +249,14 @@ watch(() => props.open, async (open) => {
   previouslyFocused = null
 })
 
-watch(() => props.personas, () => {
-  draftPersonaId.value = pickPersonaId(draftPersonaId.value)
-}, { deep: true })
-
-watch(() => props.vrmCharacters, () => {
-  draftVrmId.value = pickVrmId(draftVrmId.value)
-}, { deep: true })
-
-// When provider changes, reset voice to that provider's default
-watch(draftTtsProvider, (id) => {
-  const p = props.ttsProviders.find(x => x.id === id)
-  draftTtsVoice.value = p?.default_voice ?? ''
-})
+/** 使用者換了語音引擎：聲音改成那個引擎的預設；換回原本的引擎就回到原本的聲音。 */
+function handleTtsProviderDraftChange(id: string): void {
+  if (id === props.ttsProvider) {
+    forget('ttsProvider', 'ttsVoice')
+    return
+  }
+  draftTtsVoice.value = props.ttsProviders.find((x) => x.id === id)?.default_voice ?? ''
+}
 
 const activeTtsProvider = computed(() =>
   props.ttsProviders.find(p => p.id === draftTtsProvider.value)
@@ -320,7 +339,9 @@ const applyLabel = computed(() => {
 const resolvedDraftBackgroundUrl = computed(() => {
   if (draftBackgroundId.value === 'custom') return draftBackgroundUrl.value.trim()
   const option = backgroundOptions.value.find((item) => item.id === draftBackgroundId.value)
-  return option?.url ?? ''
+  if (option) return option.url
+  // 上傳的背景清單還沒載入（或載入失敗）：沒換背景就沿用目前的網址，不要當成空的。
+  return draftBackgroundId.value === props.backgroundId ? props.backgroundUrl.trim() : ''
 })
 
 function backgroundSwatchClass(option: BackgroundOption): string {
@@ -334,6 +355,9 @@ function backgroundSwatchStyle(option: BackgroundOption): Record<string, string>
 }
 
 function handleProjectDraftChange(): void {
+  // 換專案時人設跟著新專案重挑；切回原本的專案就整組回到目前的設定。
+  if (draftProjectId.value === props.currentProjectId) forget('projectId')
+  forget('personaId')
   emit('projectPreviewChange', draftProjectId.value)
 }
 
@@ -451,6 +475,7 @@ function handleDialogClick(event: MouseEvent): void {
                   v-model="draftTtsProvider"
                   :options="ttsProviderOptions"
                   :disabled="disabled"
+                  @change="handleTtsProviderDraftChange"
                 />
               </div>
 

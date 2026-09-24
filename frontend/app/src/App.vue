@@ -112,7 +112,7 @@
       v-model:open="showSettings"
       :characters="characters"
       :vrm-characters="vrmCharacterOptions"
-      :current-char-id="wasm.currentCharId.value"
+      :current-char-id="settings.characterId"
       :current-vrm-id="settings.vrmAvatarId"
       :tts-provider="settings.ttsProvider"
       :tts-voice="settings.ttsVoice"
@@ -193,7 +193,7 @@ import { useTtsStreamer } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useWebcamCapture } from "./composables/useWebcamCapture";
 import { buildMascotWidgetSrc, type MascotOption } from "./data/mascotCatalog";
-import { useSettingsStore } from "./stores/useSettingsStore";
+import { savedSettings, saveSettings, useSettingsStore } from "./stores/useSettingsStore";
 import {
   isUploadedAvatarBackgroundId,
   type AvatarBackgroundFit,
@@ -534,21 +534,28 @@ function handleComposerSend(
   void handleSend(text).then(done);
 }
 
+// 下面這些 handler 都是使用者在設定視窗按套用觸發的，才用 saveSettings() 存下來；
+// 開場挑選與退回只改 settings（見 useSettingsStore）。空字串代表清單還沒到，不存。
 async function handleCharChange(charId: string): Promise<void> {
+  if (!charId) return;
   wasm.clearAudio();
   wasm.resetSpeaking();
-  settings.characterId = charId;
+  saveSettings({ characterId: charId });
   if (wasm.isReady.value) {
     await wasm.loadCharacter(charId);
   }
 }
 
+// 引擎與聲音是一組，一律成對存：只存一半，另一個分頁存的另一半會跟它拼成
+// 不合法的組合，下次開啟就退回預設。
 function handleTtsChange(engine: string): void {
-  settings.ttsProvider = engine;
+  if (!engine) return;
+  saveSettings({ ttsProvider: engine, ttsVoice: settings.ttsVoice });
 }
 
 function handleTtsVoiceChange(voice: string): void {
-  settings.ttsVoice = voice;
+  if (!settings.ttsProvider) return;
+  saveSettings({ ttsProvider: settings.ttsProvider, ttsVoice: voice });
 }
 
 function handleProjectPreviewChange(projectId: string): void {
@@ -556,24 +563,26 @@ function handleProjectPreviewChange(projectId: string): void {
 }
 
 function handleProjectChange(projectId: string): void {
-  settings.projectId = projectId;
+  if (!projectId) return;
+  saveSettings({ projectId });
 }
 
 function handlePersonaChange(personaId: string): void {
-  settings.personaId = personaId;
+  if (!personaId) return;
+  saveSettings({ personaId });
 }
 
 function handleVoiceModeChange(mode: 'live' | 'text'): void {
-  settings.voiceMode = mode;
+  saveSettings({ voiceMode: mode });
 }
 
 function handleReplyModeChange(mode: ReplyMode): void {
-  settings.replyMode = mode;
+  saveSettings({ replyMode: mode });
 }
 
 function handleRenderModeChange(mode: '2d' | '3d'): void {
   if (settings.renderMode === mode) return;
-  settings.renderMode = mode;
+  saveSettings({ renderMode: mode });
   if (mode === "3d") {
     wasm.clearAudio();
     wasm.resetSpeaking();
@@ -587,7 +596,8 @@ function handleRenderModeChange(mode: '2d' | '3d'): void {
 }
 
 function handleVrmAvatarChange(vrmId: string): void {
-  settings.vrmAvatarId = resolveVrmAvatarOption(vrmId, vrmAvatarOptions.value)?.id ?? "";
+  const resolved = resolveVrmAvatarOption(vrmId, vrmAvatarOptions.value)?.id;
+  if (resolved) saveSettings({ vrmAvatarId: resolved });
 }
 
 function handleBackgroundChange(
@@ -595,9 +605,7 @@ function handleBackgroundChange(
   backgroundUrl: string,
   backgroundFit: AvatarBackgroundFit,
 ): void {
-  settings.backgroundId = backgroundId;
-  settings.backgroundUrl = backgroundUrl;
-  settings.backgroundFit = backgroundFit;
+  saveSettings({ backgroundId, backgroundUrl, backgroundFit });
 }
 
 async function handleSettingsApply(): Promise<void> {
@@ -855,7 +863,7 @@ function handleAsrToggle(): void {
 }
 
 function handleCameraPreviewScaleChange(scale: number): void {
-  settings.cameraPreviewScale = scale;
+  saveSettings({ cameraPreviewScale: scale });
 }
 
 const webcam = useWebcamCapture({
@@ -971,7 +979,7 @@ function handleFullscreenChange(): void {
 function pickInitialCharacter(): string {
   // 選過的人物優先，帳號預設只是還沒選過時的起點。
   const preferred = preferSaved(
-    settings.characterId,
+    savedSettings().characterId,
     (id) => characters.value.some((character) => character.id === id),
     accountDefault("character_id", PREFERRED_CHARACTER_ID),
   );
@@ -997,9 +1005,19 @@ async function bootstrapRenderer(vrmReady?: Promise<unknown>): Promise<void> {
       // 需要知道有沒有 VRM 才能判斷「沒有 2D 角色」是否為錯誤。
       vrmReady ?? Promise.resolve(),
     ]);
+    if (avatarCatalog.error.value) {
+      // 2D 清單暫時載不到：不拿空清單去挑人物（會把選擇當成失效），也不因此切到 3D。
+      // 本來就用 3D 的人不需要 2D 清單；用 2D 的人看錯誤畫面按重試。
+      if (settings.renderMode === "3d" && vrmAvatarOptions.value.length > 0) {
+        rendererBootstrapState.value = "ready";
+        return;
+      }
+      throw new Error(avatarCatalog.error.value);
+    }
     const characterId = pickInitialCharacter();
     if (!characterId) {
-      // 帳號可能只被授權 VRM。這種情況切到 3D 舞台，而不是視為載入失敗。
+      // 帳號可能只被授權 VRM。這種情況切到 3D 舞台，而不是視為載入失敗；
+      // 只改這次的生效值，不存——之後被授權 2D 時仍照使用者存的模式。
       if (vrmAvatarOptions.value.length > 0) {
         settings.renderMode = "3d";
         rendererBootstrapState.value = "ready";

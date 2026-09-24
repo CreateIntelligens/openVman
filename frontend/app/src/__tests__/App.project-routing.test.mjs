@@ -50,9 +50,7 @@ test("avatar stage background is wired through settings", () => {
   assert.match(source, /:background-url="settings\.backgroundUrl"/);
   assert.match(source, /@background-change="handleBackgroundChange"/);
   assert.match(source, /function handleBackgroundChange\(\s*backgroundId:\s*AvatarBackgroundId,\s*backgroundUrl:\s*string,\s*backgroundFit:\s*AvatarBackgroundFit,\s*\):\s*void/);
-  assert.match(source, /settings\.backgroundId = backgroundId/);
-  assert.match(source, /settings\.backgroundUrl = backgroundUrl/);
-  assert.match(source, /settings\.backgroundFit = backgroundFit/);
+  assert.match(source, /saveSettings\(\{ backgroundId, backgroundUrl, backgroundFit \}\)/);
 });
 
 test("avatar frontend loads uploaded backgrounds for settings", () => {

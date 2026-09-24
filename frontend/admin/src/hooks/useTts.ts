@@ -96,17 +96,15 @@ export function useTts() {
                                     savedVoice: storedVoice,
                              });
 
+                             // 退回的組合只用在這次，不寫回：這組鍵跟虛擬人前台共用（D11），
+                             // 某個 TTS 節點一時探測不到就寫回，會把兩邊存的選擇都蓋掉。
                              if (selection.changed) {
                                     if (!selection.provider) {
                                            setTtsProvider("auto");
                                            setTtsVoice("");
-                                           writeScoped(TTS_PROVIDER_STORAGE_KEY, "auto");
-                                           writeScoped(TTS_VOICE_STORAGE_KEY, "");
                                     } else {
                                            setTtsProvider(selection.provider);
                                            setTtsVoice(selection.voice);
-                                           writeScoped(TTS_PROVIDER_STORAGE_KEY, selection.provider);
-                                           writeScoped(TTS_VOICE_STORAGE_KEY, selection.voice);
                                     }
                              } else {
                                     setTtsProvider(selection.provider);

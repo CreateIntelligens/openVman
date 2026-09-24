@@ -79,46 +79,42 @@ function removeSafeItem(key: string): void {
  * 讀取帳號作用域值。
  * 遷移順序（D11）：
  * 1. 新鍵 scoped (key::scope)
- * 2. 新鍵 unscoped (key)
- * 3. 若有定義舊鍵（LEGACY_KEY_MAP）：
- *    a. 舊鍵 scoped (legacy::scope)
- *    b. 舊鍵 unscoped (legacy)
- *    一旦從舊鍵讀出，自動將值遷入新鍵 scoped（或 unscoped），但舊鍵「保留不刪」。
- * 4. 若皆無，回傳 fallback ?? null。
+ * 2. 舊鍵 scoped (legacy::scope)：帳號自己的舊選擇，比沒綁帳號時留下的值可靠
+ * 3. 新鍵 unscoped (key)
+ * 4. 舊鍵 unscoped (legacy)
+ * 從舊鍵讀出時遷入新鍵（有 scope 寫 scoped，沒有就寫 unscoped），舊鍵「保留不刪」。
+ * 第 2 步必須排在第 3 步前面：還沒登入時遷出的 unscoped 新鍵，會擋住每個帳號自己
+ * 的舊選擇。
+ * 5. 若皆無，回傳 fallback ?? null。
  */
 export function readScoped(key: string, fallback: string | null = null): string | null {
-  // 1. 新鍵 scoped
+  const legacyKeys = LEGACY_KEY_MAP[key] ?? []
+
   const scopedNewVal = getSafeItem(scopedKey(key))
   if (scopedNewVal !== null) {
     return scopedNewVal
   }
 
-  // 2. 新鍵 unscoped
+  if (activeScope) {
+    for (const legKey of legacyKeys) {
+      const scopedLegVal = getSafeItem(scopedKey(legKey))
+      if (scopedLegVal !== null) {
+        setSafeItem(scopedKey(key), scopedLegVal)
+        return scopedLegVal
+      }
+    }
+  }
+
   const unscopedNewVal = getSafeItem(key)
   if (unscopedNewVal !== null) {
     return unscopedNewVal
   }
 
-  // 3. 檢查舊鍵遷移
-  const legacyKeys = LEGACY_KEY_MAP[key]
-  if (legacyKeys && legacyKeys.length > 0) {
-    for (const legKey of legacyKeys) {
-      // 3a. 舊鍵 scoped
-      const scopedLegVal = getSafeItem(scopedKey(legKey))
-      if (scopedLegVal !== null) {
-        // 遷移至新鍵 scoped，保留舊鍵不刪 (D11)
-        setSafeItem(scopedKey(key), scopedLegVal)
-        return scopedLegVal
-      }
-
-      // 3b. 舊鍵 unscoped
-      const unscopedLegVal = getSafeItem(legKey)
-      if (unscopedLegVal !== null) {
-        // 遷移至新鍵（若有 activeScope 寫至 scopedKey，否則寫至 key），保留舊鍵不刪
-        const targetKey = activeScope ? scopedKey(key) : key
-        setSafeItem(targetKey, unscopedLegVal)
-        return unscopedLegVal
-      }
+  for (const legKey of legacyKeys) {
+    const unscopedLegVal = getSafeItem(legKey)
+    if (unscopedLegVal !== null) {
+      setSafeItem(scopedKey(key), unscopedLegVal)
+      return unscopedLegVal
     }
   }
 

@@ -29,7 +29,7 @@ test("the store rebinds when the account resolves after startup", () => {
   // store 是模組層級單例，在登入完成前就初始化了。
   const store = read("stores/useSettingsStore.ts");
   assert.match(store, /export function bindSettingsToAccount\(accountId: string\): void/);
-  assert.match(store, /Object\.assign\(state, loadState\(\)\)/);
+  assert.match(store, /saved = loadState\(\)\s*\n\s*Object\.assign\(state, saved\)/);
   // 同一個帳號重複綁定要短路，不要無謂地重讀。
   assert.match(store, /if \(currentPrefScope\(\) === \(accountId \|\| ""\)\) return/);
 
