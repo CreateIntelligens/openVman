@@ -8,6 +8,7 @@
   華語、Xiaomi 約 4/8、Gemini Live 3.8 只聽懂 2/8、OpenAI 約 1/8、SenseVoice 0/8（全吐日文假名）；gemini-3.1-flash-lite
   判斷語言 13/13（含華英西對照）。據此新增 `LIVE_AUDIO_LANGUAGE_ID_PROJECTS`：Live 每句語音在背景判斷 zh／nan／en／es
   並寫進訊息語言，不改變回答（影子）；對話紀錄與備份多「台語」。
+  判斷模型預設 gemini-3.5-flash-lite（台語 8/8、p50 1.4 s；3.5-flash 漏 1 句台語），呼叫逾時 30 秒。
 - **對話紀錄模糊搜尋**：搜尋框以空白分成多個關鍵字，每個都要出現在同一段對話但不管順序；繁簡與
   「污／汙」「後台／後臺」互通（OpenCC t2s，Brain 新增 `opencc-python-reimplemented`）。對話紀錄頁、
   匯出與聊天側欄都適用。

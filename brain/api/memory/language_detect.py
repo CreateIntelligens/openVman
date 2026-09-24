@@ -115,6 +115,8 @@ def refine_language_in_background(
     _executor.submit(_run)
 
 
+_AUDIO_LANGUAGE_TIMEOUT_MS = 30_000
+
 _AUDIO_LANGUAGE_PROMPT = (
     '這段語音是哪種語言？只能選 zh（華語）、nan（台語）、en、es、other。'
     '只回 JSON：{"language": "..."}'
@@ -134,7 +136,7 @@ def audio_language_id_enabled(project_id: str) -> bool:
 def detect_audio_language(wav_bytes: bytes) -> str:
     """Ask Gemini which language an utterance is in; other is folded into zh.
 
-    合成台語 8 句＋華英西 5 句實測 13/13、約 1.8 秒（scripts/experiments/taigi）。
+    合成台語 8 句＋華英西 5 句：3.5-flash-lite 12/13（台語全對）、p50 1.4 秒（scripts/experiments/taigi）。
     """
     from google import genai
     from google.genai import types
@@ -142,7 +144,11 @@ def detect_audio_language(wav_bytes: bytes) -> str:
     from config import get_settings
 
     cfg = get_settings()
-    client = genai.Client(api_key=cfg.gemini_api_key)
+    # 3.5-flash 實測有一次卡 182 秒；背景工作也要有上限，免得執行緒卡住。
+    client = genai.Client(
+        api_key=cfg.gemini_api_key,
+        http_options=types.HttpOptions(timeout=_AUDIO_LANGUAGE_TIMEOUT_MS),
+    )
     response = client.models.generate_content(
         model=cfg.live_audio_language_id_model,
         contents=[

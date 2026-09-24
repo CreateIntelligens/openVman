@@ -369,7 +369,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 #### 11.1b Live 音訊語言判斷（台語影子）
 
-`LIVE_AUDIO_LANGUAGE_ID_PROJECTS` 列出的專案（逗號分隔、`*` 全部、預設空白關閉），Live 每句使用者語音會暫存（最多最後 20 秒），轉錄到了就在背景把那句音訊送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.1-flash-lite）判斷 zh／nan／en／es，結果覆寫該則訊息的 `language`。只判斷、不影響回答；判斷失敗保留文字規則結果。台語（nan）轉錄後是中文字，只有這條路徑會產生 nan；知識庫沒有台語文件，查詢自動退回中文。實驗與數據見 `scripts/experiments/taigi/REPORT.md`（合成台語 8 句＋華英西 5 句：13/13，約 1.8 秒；Gemini Live 本身只聽懂 2/8、Breeze 8/8）。
+`LIVE_AUDIO_LANGUAGE_ID_PROJECTS` 列出的專案（逗號分隔、`*` 全部、預設空白關閉），Live 每句使用者語音會暫存（最多最後 20 秒），轉錄到了就在背景把那句音訊送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）判斷 zh／nan／en／es，結果覆寫該則訊息的 `language`。只判斷、不影響回答；判斷失敗保留文字規則結果。台語（nan）轉錄後是中文字，只有這條路徑會產生 nan；知識庫沒有台語文件，查詢自動退回中文。實驗與數據見 `scripts/experiments/taigi/REPORT.md`（合成台語 8 句＋華英西 5 句：13/13，約 1.8 秒；Gemini Live 本身只聽懂 2/8、Breeze 8/8）。
 
 #### 11.1a 知識庫依語言分流
 
