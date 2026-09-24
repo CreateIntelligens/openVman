@@ -350,3 +350,34 @@ def test_lists_only_user_messages_missing_language(store: SessionStore, monkeypa
     assert store.list_user_messages_without_language() == [(first, "hello there")]
     store.update_message_language(first, "en")
     assert store.list_user_messages_without_language() == []
+
+
+@pytest.mark.parametrize(
+    ("search", "expected"),
+    [
+        # 多關鍵字：每個都要出現，不管順序，也可以分在不同則訊息。
+        ("EUS 揚程", ["catalog"]),
+        ("揚程 EUS", ["catalog"]),
+        ("EUS 價格", []),
+        # 繁簡與異體字互通。
+        ("污水", ["sewage"]),
+        ("抽汙水", ["sewage"]),
+        ("后台", ["admin"]),
+        ("hippo", ["sewage"]),
+        # 萬用字元當一般字比對。
+        ("100%", ["admin"]),
+        ("a_b", []),
+    ],
+)
+def test_search_is_multi_term_and_script_insensitive(
+    store: SessionStore, search: str, expected: list[str], monkeypatch,
+):
+    from memory import session_store as store_module
+
+    monkeypatch.setattr(store_module, "refine_language_in_background", lambda *a, **kw: None)
+    store.append_message("catalog", "default", "user", "EUS 系列")
+    store.append_message("catalog", "default", "assistant", "最大揚程 12 公尺")
+    store.append_message("sewage", "default", "user", "地下室要抽汙水，HIPPO 可以嗎")
+    store.append_message("admin", "default", "user", "後臺進度 100% 了")
+
+    assert [s["session_id"] for s in store.list_sessions("default", search=search)] == expected

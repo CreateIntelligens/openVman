@@ -385,6 +385,8 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 備份與正式資料在同一個資料卷，防得了誤刪與程式寫壞，防不了整顆磁碟損壞；要異地保存需另外同步 `brain/data/backups/`。
 
+`search` 以空白切成多個關鍵字，每個都要出現在該 session 的任一則訊息（不限同一則、不管順序）；比對前兩邊都經 OpenCC `t2s` 轉簡體並轉小寫（SQLite 自訂函式 `search_fold`），所以繁簡與「污／汙」「後台／後臺」這類異體字互通，`%`、`_` 當一般字元。
+
 `POST /brain/sessions/batch-delete` 帶 `{"session_ids": [...]}`（1–500 筆）一次刪除多筆，去重並略過空白；回應 `deleted` 與 `missing` 兩個清單，部分不存在不會讓整批失敗。經 Backend 代理時需要 sessions 的編輯權限。
 
 ### 12. 安全防護 (Guardrails)

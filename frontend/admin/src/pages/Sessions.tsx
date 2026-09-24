@@ -167,7 +167,8 @@ export default function Sessions() {
                   type="text"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="搜尋對話內容…"
+                  placeholder="多個關鍵字用空白分開，繁簡通用"
+                  title="每個關鍵字都要出現在同一段對話裡，不管順序；繁體、簡體與異體字（污／汙）都找得到"
                   className="input pl-10"
                 />
               </div>

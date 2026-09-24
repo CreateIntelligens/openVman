@@ -22,6 +22,23 @@ from memory.language_detect import (
 from personas.personas import normalize_persona_id
 
 
+_to_simplified: Any = None
+
+
+def search_fold(text: str | None) -> str:
+    """Normalize text for history search: Simplified Chinese, lower case."""
+    global _to_simplified
+    if _to_simplified is None:
+        import opencc
+
+        _to_simplified = opencc.OpenCC("t2s")
+    return _to_simplified.convert(text or "").lower()
+
+
+def _escape_like(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _decode_metadata(raw: str | None) -> dict[str, Any] | None:
     """Decode a stored metadata JSON blob; return None if empty or invalid."""
     if raw is None or raw == "":
@@ -337,13 +354,15 @@ class SessionStore:
                     base_sql += " AND s.created_at <= ?"
                     params.append(utc_to)
 
-                if search_text:
+                # 空白分開的每個詞都要在這個 session 出現（不限同一則、不管順序），
+                # 兩邊都轉成簡體小寫再比，繁簡與「污／汙」「後台／後臺」這類異體字互通。
+                for term in search_text.split():
                     base_sql += """ AND EXISTS (
                         SELECT 1 FROM messages m
                         WHERE m.session_id = s.session_id
-                          AND m.content LIKE ?
+                          AND search_fold(m.content) LIKE ? ESCAPE '\\'
                     )"""
-                    params.append(f"%{search_text}%")
+                    params.append(f"%{_escape_like(search_fold(term))}%")
 
                 base_sql += " ORDER BY s.updated_at DESC"
 
@@ -522,6 +541,7 @@ class SessionStore:
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path, check_same_thread=False)
         conn.execute("PRAGMA foreign_keys = ON")
+        conn.create_function("search_fold", 1, search_fold, deterministic=True)
         return conn
 
     def _load_session_locked(
