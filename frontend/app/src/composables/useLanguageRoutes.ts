@@ -70,9 +70,19 @@ export function useLanguageRoutes(projectId: () => string) {
     return { project_id: projectId(), language_routes: active.value.join(',') }
   }
 
-  /** 台語分流時要用的 TTS provider；原本就是 VoxCPM／CosyVoice 則不動。 */
-  function ttsProviderFor(provider: string): { provider: string; switched: boolean } {
-    if (!taiwaneseOn.value || TAIWANESE_TTS_PROVIDERS.includes(provider)) {
+  /**
+   * 這一輪要用的 TTS provider：台語分流開著、而且使用者這句是語音被判成台語，
+   * 才換 VoxCPM；打字、快速問答、講華語都照原本選的。原本就是 VoxCPM／CosyVoice 不動。
+   */
+  function ttsProviderFor(
+    provider: string,
+    speechLanguage: string | null,
+  ): { provider: string; switched: boolean } {
+    if (
+      !taiwaneseOn.value
+      || speechLanguage !== TAIWANESE_ROUTE
+      || TAIWANESE_TTS_PROVIDERS.includes(provider)
+    ) {
       return { provider, switched: false }
     }
     return { provider: 'voxcpm', switched: true }

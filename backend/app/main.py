@@ -457,6 +457,9 @@ class TtsStreamRequest(BaseModel):
     project_id: str = ""
     # 逗號分隔字串或陣列都收。
     language_routes: list[str] | str | None = None
+    # 這一輪使用者語音被 ASR 判成的語言；只有 "nan"（真的講台語）才換 VoxCPM。
+    # 打字、快速問答、講華語都沒有這個值，照使用者選的 TTS。
+    speech_language: str = ""
 
 
 async def _proxy_indextts_stream(
@@ -523,6 +526,7 @@ async def tts_stream_endpoint(
     override = (
         language_routes_mod.taiwanese_tts_provider(body.provider)
         if language_routes_mod.TAIWANESE in routes
+        and body.speech_language == language_routes_mod.TAIWANESE
         else None
     )
     if override:

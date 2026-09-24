@@ -374,15 +374,22 @@ const ttsStreamer = useTtsStreamer({
 
 const languageRoutes = useLanguageRoutes(() => settings.projectId);
 
-/** TTS 參數：台語分流時原本不是 VoxCPM／CosyVoice 就改 VoxCPM，並讓後端再核對一次。 */
+// 上一句使用者輸入是語音時 ASR 判出的語言；打字、快速問答送出時清成 null。
+let lastSpeechLanguage: string | null = null;
+
+/** TTS 參數：使用者真的講台語（且有台語分流）才換 VoxCPM，後端會再核對一次。 */
 function languageRoutesSpeakOptions() {
-  const { provider, switched } = languageRoutes.ttsProviderFor(settings.ttsProvider);
+  const { provider, switched } = languageRoutes.ttsProviderFor(
+    settings.ttsProvider,
+    lastSpeechLanguage,
+  );
   return {
     provider,
     voice: switched ? "" : settings.ttsVoice,
     extraBody: {
       project_id: settings.projectId,
       language_routes: languageRoutes.active.value.join(","),
+      speech_language: lastSpeechLanguage ?? "",
     },
   };
 }
@@ -479,6 +486,7 @@ async function handleSend(
   referenceText?: string,
   speechLanguage?: string | null,
 ): Promise<ComposerSendResult> {
+  lastSpeechLanguage = speechLanguage ?? null;
   if (
     !isStarted.value
     || !chat.sessionId.value

@@ -377,7 +377,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 - 前台 app（虛擬人）的語音不走 Live 音訊通道：一律先錄音送 Backend `POST /api/v1/asr/transcribe`（Live 模式也是，轉成文字再 `user_speak`）。所以台語分流主要在這一步生效：
   - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，中文不能關）；上傳時帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。
   - 交集含台語：ASR 一律改用 Breeze（台語直接翻成華語、華語也準），同時把音訊轉 WAV 送 Brain `POST /brain/internal/audio-language` 聽是不是台語；回應多 `language`（台語時為 `nan`）。前台隨訊息送 `speech_language`（文字模式放 `metadata.speech_language`、Live 放 `user_speak.speech_language`），Brain 以它存訊息語言、並讓 `search_knowledge` 查台語文件。瀏覽器內建辨識在台語分流時停用。
-  - TTS（`POST /api/v1/tts/stream` 帶 `project_id`、`language_routes`）：交集含台語且原本不是 VoxCPM／CosyVoice 時改用 VoxCPM 部署預設聲音，並跳過帳號的聲音授權判斷（否則只開了別家聲音的帳號會被擋）；原本就是這兩家不動。回答文字仍是華語。
+  - TTS（`POST /api/v1/tts/stream` 帶 `project_id`、`language_routes`、`speech_language`）：交集含台語、且這一輪是語音被 ASR 判成台語（`speech_language=nan`）、原本又不是 VoxCPM／CosyVoice 時，才改用 VoxCPM 部署預設聲音；打字、快速問答、講華語一律照使用者選的 TTS，並跳過帳號的聲音授權判斷（否則只開了別家聲音的帳號會被擋）；原本就是這兩家不動。回答文字仍是華語。
 - 文件語言自動判斷也認台語（台羅聲調符號、台語特有漢字密度 ≥ 3%，先排除「給予」「欲望」等華語詞），後台可手動標「台語」。實驗見 `scripts/experiments/taigi/REPORT.md`。
 
 #### 11.1a 知識庫依語言分流

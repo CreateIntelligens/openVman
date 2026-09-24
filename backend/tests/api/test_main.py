@@ -1522,9 +1522,33 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
     monkeypatch.setattr(module, "record_usage_event", lambda **kw: None)
     monkeypatch.setattr(module, "usage_scope_for", lambda *a, **kw: {})
 
-    body = module.TtsStreamRequest(text="你好", provider="gemini-tts", voice="Kore", project_id="p", language_routes="zh,nan")
+    body = module.TtsStreamRequest(
+        text="你好", provider="gemini-tts", voice="Kore", project_id="p",
+        language_routes="zh,nan", speech_language="nan",
+    )
     current = types.SimpleNamespace(user=types.SimpleNamespace(id="u1"), embed_key=None)
     response = asyncio.run(module.tts_stream_endpoint(body, current=current))
 
     assert response.status_code == 200
     assert opened["voice"] == ""
+
+    # 打字、快速問答、講華語沒有 speech_language：照使用者選的 TTS，走一般授權。
+    authorized: list[str] = []
+
+    def record_authorization(*_a, requested_provider, **_kw):
+        authorized.append(requested_provider)
+        return None
+
+    monkeypatch.setattr(module.admin_routes, "resolve_tts_voice", record_authorization)
+    typed = module.TtsStreamRequest(
+        text="你好", provider="voxcpm", voice="", project_id="p", language_routes="zh,nan",
+    )
+    asyncio.run(module.tts_stream_endpoint(typed, current=current))
+    gemini = module.TtsStreamRequest(
+        text="你好", provider="gemini-tts", voice="Kore", project_id="p", language_routes="zh,nan",
+    )
+    try:
+        asyncio.run(module.tts_stream_endpoint(gemini, current=current))
+    except Exception:
+        pass  # 假服務沒有 gemini adapter；只看有沒有被換掉
+    assert authorized == ["voxcpm", "gemini-tts"]
