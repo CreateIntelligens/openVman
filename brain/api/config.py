@@ -67,9 +67,7 @@ class BrainSettings(BaseSettings):
     live_gemini_context_compression: bool = True
     # 逗號分隔；空字串表示不指定（Gemini 預設回簡體）。
     live_gemini_transcription_languages: str = "zh-TW"
-    # Live 每句使用者語音另送 Gemini 判斷語言（zh/nan/en/es），結果寫進訊息語言；只判斷、
-    # 不改變回答。台語轉錄後看起來像中文字，只能聽聲音分辨。逗號分隔專案 ID，* 為全部，空白關閉。
-    live_audio_language_id_projects: str = ""
+    # 知識庫有台語文件的專案，Live 會把轉錄成中文字的句子另送這個模型聽是不是台語。
     # 13 句（台語 8、華英西 5）：3.5-flash-lite 台語 8/8、西語誤判 1，p50 1.4 s；3.5-flash 漏 1 句台語、2.3 s。
     live_audio_language_id_model: str = "gemini-3.5-flash-lite"
 

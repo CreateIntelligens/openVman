@@ -12,6 +12,7 @@ const LANGUAGE_LABELS: Record<KnowledgeLanguage, string> = {
   zh: "中文",
   en: "English",
   es: "Español",
+  nan: "台語",
 };
 
 export default function FileView({
@@ -90,7 +91,7 @@ export default function FileView({
         <div className="flex w-full items-center justify-end gap-2 overflow-x-auto sm:w-auto">
           <SourceBadge sourceType={document.source_type} />
           {onChangeLanguage && document.is_indexable && (
-            <span title="使用者用哪種語言問，就只查同語言的文件；查不到退回中文">
+            <span title="使用者用哪種語言問，就只查同語言的文件；查不到退回中文。有台語文件的專案，Live 會另外聽使用者是不是講台語">
               <Select
                 value={document.language_source === "manual" ? document.language ?? "auto" : "auto"}
                 onChange={(value) => onChangeLanguage(document, value as KnowledgeLanguage | "auto")}
@@ -100,6 +101,7 @@ export default function FileView({
                   { value: "zh", label: "中文" },
                   { value: "en", label: "English" },
                   { value: "es", label: "Español" },
+                  { value: "nan", label: "台語" },
                 ]}
               />
             </span>

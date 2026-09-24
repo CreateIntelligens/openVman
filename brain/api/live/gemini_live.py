@@ -18,9 +18,9 @@ from memory.embedder import encode_query_with_fallback
 from memory.language_detect import (
     DEFAULT_LANGUAGE,
     TAIWANESE,
-    audio_language_id_enabled,
     detect_audio_language,
     detect_language,
+    project_has_taiwanese_route,
 )
 from memory.retrieval import search_records
 from .gemini_tools import build_gemini_tool_declarations
@@ -151,8 +151,13 @@ class GeminiLiveSession:
         self._reconnecting = False
         self._unavailable = False
         self._connect_lock = asyncio.Lock()
-        # 每句使用者語音暫存起來，轉錄到了就拿去判斷語言（見 _classify_utterance）。
-        self._audio_language_id = audio_language_id_enabled(project_id)
+        # 知識庫有台語文件才有台語分流；這時每句語音暫存起來，轉錄到了拿去聽是不是
+        # 台語（見 _classify_utterance）。沒有台語分流就不多花這次呼叫。
+        try:
+            self._audio_language_id = project_has_taiwanese_route(project_id)
+        except Exception:  # noqa: BLE001 - 讀不到文件設定就當沒有台語分流
+            self._audio_language_id = False
+        self._utterance_language: asyncio.Task | None = None
         self._utterance_pcm = bytearray()
         self._utterance_rate = 16000
         self._background_tasks: set[asyncio.Task] = set()
@@ -357,6 +362,9 @@ class GeminiLiveSession:
             task = asyncio.create_task(self._classify_utterance(utterance, message_id))
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
+            self._utterance_language = task
+        else:
+            self._utterance_language = None
 
     async def _save_input_transcription(self, text: str) -> int | None:
         try:
@@ -398,7 +406,7 @@ class GeminiLiveSession:
         if overflow > 0:
             del self._utterance_pcm[:overflow]
 
-    async def _classify_utterance(self, pcm: bytes, message_id: int) -> None:
+    async def _classify_utterance(self, pcm: bytes, message_id: int) -> str | None:
         """Mark a Chinese-looking utterance as Taiwanese if the audio says so.
 
         只寫訊息語言、不影響回答；判斷不是台語或失敗就保留文字判斷的結果。
@@ -420,10 +428,24 @@ class GeminiLiveSession:
                 "language": language,
                 "seconds": round(len(pcm) / (2 * self._utterance_rate), 1),
             }))
+            return language
         except Exception as exc:  # noqa: BLE001
             logger.warning(json.dumps({
                 "event": "live_audio_language_failed", "error_type": type(exc).__name__,
             }))
+            return None
+
+    # Live 常在轉錄一到就呼叫 search_knowledge，聽台語那次還沒回來；最多等這麼久。
+    _LANGUAGE_WAIT_SECONDS = 3.0
+
+    async def _utterance_language_for_search(self) -> str | None:
+        task = self._utterance_language
+        if task is None:
+            return None
+        try:
+            return await asyncio.wait_for(asyncio.shield(task), self._LANGUAGE_WAIT_SECONDS)
+        except (asyncio.TimeoutError, Exception):  # noqa: BLE001 - 等不到就當中文查
+            return None
 
     async def _flush_assistant_turn(self) -> None:
         """Persist the accumulated reply, mirroring the text-mode turn archive.
@@ -640,9 +662,12 @@ class GeminiLiveSession:
         return _publish_wiki(args)
 
     async def _search(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
-        return await asyncio.to_thread(self._search_sync, table, args)
+        heard = await self._utterance_language_for_search() if table == "knowledge" else None
+        return await asyncio.to_thread(self._search_sync, table, args, heard)
 
-    def _search_sync(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
+    def _search_sync(
+        self, table: str, args: dict[str, Any], heard_language: str | None = None,
+    ) -> dict[str, Any]:
         from tools.search_helpers import (
             build_citations,
             fused_limit,
@@ -660,6 +685,9 @@ class GeminiLiveSession:
         top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
         # Gemini 常把問題改寫成中英西多條查詢；語言要看使用者原話，不看查詢。
         language = detect_language(fallback) if table == "knowledge" and fallback else None
+        # 聽出是台語就查台語文件（沒有命中會在 search_records 退回中文）。
+        if heard_language == TAIWANESE:
+            language = TAIWANESE
         grouped: list[tuple[str, list[dict[str, Any]]]] = []
         embedding_versions: list[str] = []
         for query in queries:

@@ -869,9 +869,9 @@ def test_transcription_language_codes_follow_config(languages, expected):
 
 @pytest.mark.asyncio
 async def test_live_classifies_each_utterance_from_audio(monkeypatch):
-    """開了音訊語言判斷時，每句轉錄到了就拿那一句的音訊去判斷，結果寫回訊息語言。"""
+    """有台語分流時，中文字的轉錄句拿那一句的音訊去聽，判成台語才寫回訊息語言。"""
     module, fake_config = _load_module()
-    fake_config.live_audio_language_id_projects = "proj-hospital"
+    monkeypatch.setattr(module, "project_has_taiwanese_route", lambda pid: pid == "proj-hospital")
     import sys as _sys
     import types as _types
 
@@ -917,9 +917,9 @@ async def test_live_classifies_each_utterance_from_audio(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_live_skips_audio_language_for_other_projects(monkeypatch):
+async def test_live_skips_audio_language_without_taiwanese_route(monkeypatch):
     module, fake_config = _load_module()
-    fake_config.live_audio_language_id_projects = "proj-hospital"
+    monkeypatch.setattr(module, "project_has_taiwanese_route", lambda pid: pid == "proj-hospital")
     monkeypatch.setattr(module, "detect_audio_language", lambda wav: pytest.fail("should not classify"))
     _stub_memory()
 
@@ -935,4 +935,36 @@ async def test_live_skips_audio_language_for_other_projects(monkeypatch):
     await session._handle_input_transcription({"text": "你好"})
     await asyncio.sleep(0.05)
     assert session._utterance_pcm == bytearray()
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_live_knowledge_search_waits_for_taiwanese_verdict(monkeypatch):
+    """Live 轉錄一到就查知識庫；要等聽台語的結果，台語才會查台語文件。"""
+    module, fake_config = _load_module()
+    monkeypatch.setattr(module, "project_has_taiwanese_route", lambda pid: True)
+    _stub_memory()
+    captured: dict = {}
+
+    def fake_search_sync(self, table, args, heard_language=None):
+        captured["heard"] = heard_language
+        return {"results": []}
+
+    monkeypatch.setattr(module.GeminiLiveSession, "_search_sync", fake_search_sync)
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-wait",
+        client_id="client-wait",
+        project_id="proj-hospital",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+
+    async def slow_verdict():
+        await asyncio.sleep(0.05)
+        return "nan"
+
+    session._utterance_language = asyncio.create_task(slow_verdict())
+    await session._search("knowledge", {"queries": ["急診在哪裡"]})
+    assert captured["heard"] == "nan"
     await session.close()

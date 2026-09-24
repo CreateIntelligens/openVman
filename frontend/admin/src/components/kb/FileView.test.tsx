@@ -142,6 +142,6 @@ describe("FileView", () => {
     fireEvent.keyDown(trigger, { key: "End" });
     fireEvent.keyDown(trigger, { key: "Enter" });
 
-    expect(onChangeLanguage).toHaveBeenCalledWith(expect.objectContaining({ path: "knowledge/faq.md" }), "es");
+    expect(onChangeLanguage).toHaveBeenCalledWith(expect.objectContaining({ path: "knowledge/faq.md" }), "nan");
   });
 });

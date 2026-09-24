@@ -150,7 +150,7 @@ def resolve_document_languages(
     舊文件沒有語言欄位；第一次被用到時讀開頭判斷並存起來，之後就不用再讀檔。
     """
     from knowledge.workspace import get_workspace_root
-    from memory.language_detect import DEFAULT_LANGUAGE, detect_language
+    from memory.language_detect import DEFAULT_LANGUAGE, detect_document_language
 
     metadata = load_doc_meta(project_id)
     root = get_workspace_root(project_id)
@@ -170,7 +170,7 @@ def resolve_document_languages(
         except OSError:
             languages[relative_path] = DEFAULT_LANGUAGE
             continue
-        language = detect_language(sample)
+        language = detect_document_language(sample)
         metadata[relative_path] = {
             **entry, "language": language, "language_source": LANGUAGE_SOURCE_AUTO,
         }

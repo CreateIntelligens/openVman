@@ -46,16 +46,59 @@ def detect_language(text: str) -> str:
     words = _LATIN_WORD.findall(lowered)
     if not words:
         return DEFAULT_LANGUAGE
+    # 中文夾英文型號（EUS、HP）或網址很常見，漢字比拉丁字多就是中文；要先於西語符號
+    # 檢查，否則長篇中文文件裡某處一個 ñ 就被判成西語（實際發生在旅遊節目腳本）。
+    if len(_HAN.findall(text)) > len(words):
+        return DEFAULT_LANGUAGE
     if _SPANISH_MARKS.search(lowered):
         return "es"
     en_hits = sum(word in _EN_WORDS for word in words)
     es_hits = sum(word in _ES_WORDS for word in words)
     if en_hits == es_hits:
         return DEFAULT_LANGUAGE
-    # 中文句子夾英文型號（EUS、HP）很常見，漢字比拉丁字多就還是中文。
-    if len(_HAN.findall(text)) > len(words):
-        return DEFAULT_LANGUAGE
     return "es" if es_hits > en_hits else "en"
+
+
+# 台羅的聲調符號：揚抑符、長音符與第八聲的 U+030D；西語只有尖音符，不會撞到。
+_TAILO_TONE = re.compile(r"[âêîôûāēīōūǹ]|\u030d")
+# 台語漢字常用、華語很少單獨出現的字；比例夠高才算，免得「給予」「欲望」誤判。
+_TAIWANESE_HAN = set("佇袂毋阮恁欲予矣咧遮遐佗閣攏猶")
+_TAIWANESE_WORDS = ("啥物", "按怎", "無法度", "足濟", "抑是", "敢會")
+# 這些華語詞含上面的字，先拿掉再數，免得華語衛教文件被當成台語。
+_MANDARIN_COMPOUNDS = re.compile(
+    "給予|授予|賦予|予以|欲望|欲求|隨心所欲|內閣|樓閣|閣下|攏絡|遮蔽|遮住|遮擋|遮陽|咧嘴|猶豫|猶如|猶太"
+)
+
+
+def detect_document_language(text: str) -> str:
+    """Like detect_language, but also recognizes Taiwanese knowledge documents.
+
+    使用者的話轉成文字後，台語也是中文字，所以只有文件判斷會回 nan：台羅拼音，
+    或台語特有的漢字用得夠密。判錯可以在後台手動指定。
+    """
+    words = _LATIN_WORD.findall(text.lower())
+    tailo_words = [w for w in re.findall(r"\S+", text) if _TAILO_TONE.search(w)]
+    if len(tailo_words) >= 3 and len(tailo_words) >= 0.1 * max(len(words), 1):
+        return TAIWANESE
+    han = _HAN.findall(text)
+    if han:
+        stripped = _MANDARIN_COMPOUNDS.sub("", text)
+        markers = sum(ch in _TAIWANESE_HAN for ch in stripped) + 2 * sum(
+            stripped.count(word) for word in _TAIWANESE_WORDS
+        )
+        if markers >= 5 and markers >= 0.03 * len(han):
+            return TAIWANESE
+    return detect_language(text)
+
+
+def project_has_taiwanese_route(project_id: str) -> bool:
+    """A project listens for Taiwanese only if its knowledge base has Taiwanese docs."""
+    from knowledge.doc_meta import load_doc_meta
+
+    return any(
+        entry.get("language") == TAIWANESE and entry.get("enabled", True)
+        for entry in load_doc_meta(project_id).values()
+    )
 
 
 _JEV_QUESTIONS = {
@@ -122,16 +165,6 @@ _AUDIO_LANGUAGE_PROMPT = (
     '這段語音是哪種語言？只能選 zh（華語）、nan（台語）、en、es、other。'
     '只回 JSON：{"language": "..."}'
 )
-
-
-def audio_language_id_enabled(project_id: str) -> bool:
-    from config import get_settings
-
-    raw = str(getattr(get_settings(), "live_audio_language_id_projects", "") or "").strip()
-    if not raw:
-        return False
-    projects = {item.strip() for item in raw.split(",") if item.strip()}
-    return "*" in projects or project_id in projects
 
 
 def detect_audio_language(wav_bytes: bytes) -> str:

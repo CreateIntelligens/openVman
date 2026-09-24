@@ -79,3 +79,23 @@ def test_jev_disabled_never_calls(jev, monkeypatch):
 
     monkeypatch.setattr("core.jev_client.jev_nouls", boom)
     language_detect.refine_language_in_background("ok", "zh", lambda _l: None)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("請問急診佇佗位？阮阿母昨昏跋倒，跤頭趺腫起來矣。藥仔愛食飯前抑是食飯後？我欲去檢查血糖。", "nan"),
+        ("Guá tsit-má thâu-khak tsiok thiànn, ài kuà tó tsi̍t kho? Kin-á-ji̍t mn̂g-tsín khui kàu kuí tiám?", "nan"),
+        # 華語文件偶爾出現「給予」「欲望」不算台語。
+        ("衛教資訊：術後請給予病人充足休息，避免食慾不振與過度的欲望壓力。急診位於一樓。" * 3, "zh"),
+        ("Catálogo de bombas sumergibles. La serie EUS está disponible de 0.5 a 2 HP.", "es"),
+        ("EVAK submersible pump catalog for basement drainage.", "en"),
+    ],
+)
+def test_detect_document_language(text: str, expected: str):
+    assert language_detect.detect_document_language(text) == expected
+
+
+def test_long_chinese_document_with_a_stray_spanish_mark_stays_chinese():
+    text = "竹東好玩的景點很多，推薦辣椒園與老街。" * 20 + " Peña "
+    assert detect_language(text) == "zh"

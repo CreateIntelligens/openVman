@@ -425,7 +425,7 @@ export default function TreeView({
             {/* 中文是預設，只標出英西版本，免得整棵樹都是 ZH。 */}
             {node.doc.language && node.doc.language !== "zh" && (
               <span className="rounded px-1 text-[0.625rem] font-semibold uppercase text-content-subtle ring-1 ring-border">
-                {node.doc.language}
+                {node.doc.language === "nan" ? "台" : node.doc.language}
               </span>
             )}
             <StatusDot doc={node.doc} />

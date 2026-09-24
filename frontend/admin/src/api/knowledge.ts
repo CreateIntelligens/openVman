@@ -35,7 +35,8 @@ export interface KnowledgeDocumentSummary {
   qa_attached?: boolean;
 }
 
-export type KnowledgeLanguage = "zh" | "en" | "es";
+// nan＝台語；專案有台語文件才會在 Live 多聽一次判斷台語。
+export type KnowledgeLanguage = "zh" | "en" | "es" | "nan";
 
 export interface KnowledgeDocument extends KnowledgeDocumentSummary {
   content: string;
