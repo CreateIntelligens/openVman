@@ -128,4 +128,20 @@ describe("FileView", () => {
 
     expect(props.onOpenQaTree).toHaveBeenCalledTimes(1);
   });
+
+  it("shows the detected language and lets an admin pin it", () => {
+    const onChangeLanguage = vi.fn();
+    renderFileView({
+      document: { ...baseDocument, source_type: "upload", language: "en", language_source: "auto" },
+      onChangeLanguage,
+    });
+
+    const trigger = screen.getByRole("combobox", { name: "文件語言" });
+    expect(trigger.textContent).toContain("自動（English）");
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyDown(trigger, { key: "End" });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+
+    expect(onChangeLanguage).toHaveBeenCalledWith(expect.objectContaining({ path: "knowledge/faq.md" }), "es");
+  });
 });

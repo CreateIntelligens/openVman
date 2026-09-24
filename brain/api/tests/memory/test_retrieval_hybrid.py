@@ -278,3 +278,46 @@ class TestQueryExpansion:
         )
         results = _search(expansion_terms=[])
         assert [r["text"] for r in results] == ["near", "far"]
+
+
+# ------------------------------------------------------------------
+# Language routing（同一份知識庫準備中英西三個版本）
+# ------------------------------------------------------------------
+
+
+class TestLanguageRouting:
+    LANGS = {"zh.md": "zh", "en.md": "en", "es.md": "es"}
+
+    @pytest.fixture()
+    def table(self, patched, monkeypatch):
+        monkeypatch.setattr(
+            retrieval,
+            "resolve_document_languages",
+            lambda paths, project_id: {p: self.LANGS.get(p, "zh") for p in paths},
+        )
+
+        def use(paths):
+            patched(_FakeTable(vector_records=[
+                _rec(f"chunk-{p}", 0.1 + i / 100, metadata=json.dumps({"path": p}))
+                for i, p in enumerate(paths)
+            ]))
+        return use
+
+    def _search(self, language):
+        return retrieval.search_records(
+            "knowledge", query_vector=[0.1, 0.2], top_k=5,
+            query_text="pump", query_type="vector", language=language,
+        )
+
+    def test_keeps_only_the_users_language(self, table):
+        table(["zh.md", "en.md", "es.md"])
+        assert [r["text"] for r in self._search("es")] == ["chunk-es.md"]
+        assert [r["text"] for r in self._search("en")] == ["chunk-en.md"]
+
+    def test_falls_back_to_chinese_when_language_has_no_hit(self, table):
+        table(["zh.md", "zh-2.md"])
+        assert [r["text"] for r in self._search("es")] == ["chunk-zh.md", "chunk-zh-2.md"]
+
+    def test_no_language_keeps_everything(self, table):
+        table(["zh.md", "en.md"])
+        assert len(self._search(None)) == 2

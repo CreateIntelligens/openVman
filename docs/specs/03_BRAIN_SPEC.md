@@ -367,6 +367,14 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 `GET /brain/sessions` 與 `/brain/sessions/export` 的每筆摘要都帶 `language`（`zh`、`en`、`es`；其他語言與判斷不出來的都算 `zh`），取最後一則使用者訊息的語言；兩者都可用 `language=<code>` 篩選。語言存在 `messages.language`（只有使用者訊息有值）：寫入時先用字元與常用字規則判斷，再在背景問 Jev 校正，Jev 結果不同才改寫（`memory/language_detect.py`，`JEV_LANGUAGE_ENABLED` 預設 true、需 `TYPESAFE_API_KEY`，失敗保留規則結果）。欄位是 NULL 的舊訊息在列表時用規則補算。36 句測試：Jev 36/36、規則 33/36、主對話 LLM 33/36（`scripts/experiments/lang-detect/REPORT.md`）。
 
+#### 11.1a 知識庫依語言分流
+
+同一份內容可準備中、英、西三個版本的文件（例如鶴記的型錄），使用者用哪種語言問就用那個版本的原文回答，不靠模型翻譯。
+
+- 文件語言存在 `.doc_meta.json` 的 `language`／`language_source`：`auto` 由文件開頭 2 萬字以規則判斷（`memory/language_detect.py`），第一次被列表或查詢用到時判斷並存下，內容儲存後清掉重判；`manual` 是後台指定，永不覆蓋。`PATCH /brain/knowledge/document/meta` 帶 `language=zh|en|es` 指定、`auto` 取消指定；文件列表回傳 `language` 與 `language_source`。
+- 查詢時（文字 `search_knowledge` 與 Live 的 `_search_sync` 都經 `search_records(language=...)`）以使用者原話判斷語言（規則，不等 Jev；模型改寫成其他語言的查詢不影響），只留同語言文件的段落；一筆都沒有就退回中文文件。Graph RAG 帶出的相關段落也只留與命中段落同語言的。
+- 沒有英西文件的專案永遠退回中文，行為與原本相同，不需要開關。
+
 #### 11.2 對話備份（VH-389）
 
 `memory/session_backup.py` 每天 `SESSION_BACKUP_HOUR`（預設 3，台北時間）把所有已有 `sessions.db` 的專案匯出到 `SESSION_BACKUP_DIR`（預設 `/data/backups/sessions`）：每次一個 `YYYYMMDD-HHMMSS/` 目錄，內含 `manifest.json` 與 `<project_id>/{zh,en,es}.jsonl`，每行一個 session 摘要連同全部訊息（格式同匯出）。先寫 `.<id>.partial` 再改名，只保留最近 `SESSION_BACKUP_KEEP`（預設 30）份；同時只允許一個備份在跑。

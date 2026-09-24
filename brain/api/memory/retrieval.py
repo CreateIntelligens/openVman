@@ -11,10 +11,14 @@ from infra.db import (
     parse_record_metadata,
     vector_table_exists,
 )
-from knowledge.doc_meta import list_disabled_document_paths
+from knowledge.doc_meta import (
+    list_disabled_document_paths,
+    resolve_document_languages,
+)
 from memory.dreaming.recall_tracker import record_trace
 from memory.embedder import encode_text
 from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
+from memory.language_detect import DEFAULT_LANGUAGE
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -42,8 +46,13 @@ def search_records(
     embedding_version: str | None = None,
     distance_cutoff: float | None = None,
     expansion_terms: list[str] | None = None,
+    language: str | None = None,
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
+
+    *language*（只對 knowledge 有效）：只留同語言文件的段落；一筆都沒有時
+    退回中文文件。知識庫只有中文的專案因此行為不變，鶴記這種準備了英西
+    版本的專案則直接用該語言的原文回答，不靠模型翻譯。
 
     When *query_text* is provided, attempts hybrid search: vector 與 FTS
     各自檢索後以 RRF 融合,並輸出 min-max 正規化的 _score ∈ [0, 1]
@@ -69,7 +78,9 @@ def search_records(
     disabled_paths = (
         list_disabled_document_paths(project_id) if table_name == "knowledge" else set()
     )
-    search_limit = top_k * 4 if disabled_paths else top_k * 2
+    route_language = language if table_name == "knowledge" else None
+    # 語言篩選會丟掉其他語言的候選，多撈一些才不會篩完不夠 top_k。
+    search_limit = top_k * 4 if disabled_paths or route_language else top_k * 2
 
     raw_records = _safe_search(
         table,
@@ -93,6 +104,8 @@ def search_records(
             disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths)
         )
     ]
+    if route_language:
+        visible = _route_by_language(visible, route_language, project_id)
     deduped = deduplicate(
         visible,
         similarity_threshold=cfg.rag_dedup_similarity_threshold,
@@ -252,6 +265,28 @@ def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
     if url := str(meta.get("url") or meta.get("source_url") or "").strip():
         result["url"] = url
     return result
+
+
+def _route_by_language(
+    records: list[dict[str, Any]], language: str, project_id: str,
+) -> list[dict[str, Any]]:
+    def path_of(record: dict[str, Any]) -> str:
+        return str(parse_record_metadata(record).get("path", "")).strip()
+
+    languages = resolve_document_languages(
+        (path_of(record) for record in records), project_id,
+    )
+
+    def pick(target: str) -> list[dict[str, Any]]:
+        return [
+            record for record in records
+            if languages.get(path_of(record), DEFAULT_LANGUAGE) == target
+        ]
+
+    same = pick(language)
+    if same or language == DEFAULT_LANGUAGE:
+        return same
+    return pick(DEFAULT_LANGUAGE)
 
 
 def _matches_disabled_knowledge_path(

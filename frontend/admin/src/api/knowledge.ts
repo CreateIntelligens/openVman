@@ -28,9 +28,14 @@ export interface KnowledgeDocumentSummary {
   source_url: string | null;
   enabled: boolean;
   created_at: string;
+  // 知識庫依語言分流：使用者用哪種語言問，就只查同語言的文件（查不到退回中文）。
+  language?: KnowledgeLanguage | null;
+  language_source?: "auto" | "manual" | null;
   // source_type === "qa" 且被任一問答樹節點掛載時為 true
   qa_attached?: boolean;
 }
+
+export type KnowledgeLanguage = "zh" | "en" | "es";
 
 export interface KnowledgeDocument extends KnowledgeDocumentSummary {
   content: string;
@@ -68,6 +73,8 @@ export interface KnowledgeDocumentMetaResponse {
   enabled: boolean;
   source_type: "upload" | "web" | "manual" | "qa";
   source_url: string | null;
+  language?: KnowledgeLanguage | null;
+  language_source?: "auto" | "manual" | null;
 }
 
 export interface KnowledgeQaEntry {
@@ -323,6 +330,8 @@ export function updateKnowledgeDocumentMeta(
     enabled?: boolean;
     source_type?: "upload" | "web" | "manual" | "qa";
     source_url?: string | null;
+    // auto：取消手動指定，改回依內容判斷。
+    language?: KnowledgeLanguage | "auto";
   },
 ) {
   return patch<KnowledgeDocumentMetaResponse>(

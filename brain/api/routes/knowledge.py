@@ -179,6 +179,7 @@ async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatc
             enabled=payload.enabled,
             source_type=payload.source_type,
             source_url=payload.source_url,
+            language=payload.language,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -190,6 +191,8 @@ async def patch_knowledge_document_meta_route(payload: KnowledgeDocumentMetaPatc
         "enabled": document["enabled"],
         "source_type": document["source_type"],
         "source_url": document["source_url"],
+        "language": document["language"],
+        "language_source": document["language_source"],
     }
 
 

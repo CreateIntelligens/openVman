@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 from config import get_settings
+from memory.language_detect import detect_language
 from tools.context import (
     active_persona_id,
     active_project_id,
@@ -26,6 +27,7 @@ def _search_one(
     top_k: int,
     persona_id: str,
     project_id: str,
+    language: str | None = None,
 ) -> tuple[list[dict[str, Any]], str, list[float]]:
     from memory.embedder import encode_query_with_fallback
     from memory.retrieval import search_records
@@ -44,6 +46,7 @@ def _search_one(
         persona_id=persona_id,
         project_id=project_id,
         embedding_version=embedding_route.version,
+        language=language,
     )
     return results, embedding_route.version, embedding_route.vector
 
@@ -51,14 +54,16 @@ def _search_one(
 def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 1. Prepare queries: deduplicated list starting with explicit queries, falling back to user message
     queries = normalize_query_list(args)
-    if user_msg := active_user_message.get().strip():
-        if user_msg not in queries:
-            queries.append(user_msg)
+    user_msg = active_user_message.get().strip()
+    if user_msg and user_msg not in queries:
+        queries.append(user_msg)
     if not queries:
         raise ValueError("queries 不可為空")
 
     top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
     persona_id, project_id = active_persona_id.get(), active_project_id.get()
+    # 依使用者這句話的語言查同語言的知識庫（規則即時判斷；Jev 要 0.5 秒，查詢路徑等不起）。
+    language = detect_language(user_msg) if table_name == "knowledge" and user_msg else None
 
     # 2. Execute searches and collect unique embedding versions
     grouped: list[tuple[str, list[dict[str, Any]]]] = []
@@ -72,6 +77,7 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
                 top_k,
                 persona_id,
                 project_id,
+                language,
             )
             grouped.append((query, records))
             embedding_versions.add(version)
@@ -95,6 +101,8 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     related: list[dict[str, Any]] = []
     if table_name == "knowledge":
         related = _expand_via_graph(merged, project_id, primary_vector)
+        if language:
+            related = _same_language_as(merged, related, project_id)
         merged, related = _jev_screen(queries[-1], merged, related)
 
     # Preserve the result shape for clients while making the trust boundary
@@ -115,6 +123,21 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
         "related": marked_related,
         "citations": build_citations(marked_results + marked_related),
     }
+
+
+def _same_language_as(
+    hits: list[dict[str, Any]], related: list[dict[str, Any]], project_id: str,
+) -> list[dict[str, Any]]:
+    """Drop graph neighbours written in a language the hits were not.
+
+    概念圖會跨語言連到同主題的其他版本；英文問題不該夾帶中文版的段落。
+    """
+    from knowledge.doc_meta import resolve_document_languages
+
+    paths = [str(r.get("path", "")) for r in hits + related]
+    languages = resolve_document_languages(paths, project_id)
+    wanted = {languages.get(str(r.get("path", ""))) for r in hits}
+    return [r for r in related if languages.get(str(r.get("path", ""))) in wanted]
 
 
 _EVIDENCE_QUESTION = {

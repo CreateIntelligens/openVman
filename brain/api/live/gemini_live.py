@@ -15,6 +15,7 @@ import websockets
 
 from config import BrainSettings, get_settings
 from memory.embedder import encode_query_with_fallback
+from memory.language_detect import detect_language
 from memory.retrieval import search_records
 from .gemini_tools import build_gemini_tool_declarations
 
@@ -579,6 +580,8 @@ class GeminiLiveSession:
             raise ValueError("queries is required")
 
         top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
+        # Gemini 常把問題改寫成中英西多條查詢；語言要看使用者原話，不看查詢。
+        language = detect_language(fallback) if table == "knowledge" and fallback else None
         grouped: list[tuple[str, list[dict[str, Any]]]] = []
         embedding_versions: list[str] = []
         for query in queries:
@@ -597,6 +600,7 @@ class GeminiLiveSession:
                     persona_id=self.persona_id,
                     project_id=self.project_id,
                     embedding_version=embedding_route.version,
+                    language=language,
                 )
             except Exception as exc:
                 logger.warning(

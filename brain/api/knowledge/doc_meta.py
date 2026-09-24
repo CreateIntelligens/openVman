@@ -5,13 +5,18 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from knowledge.workspace import ensure_workspace_scaffold
 
 DOC_META_FILENAME = ".doc_meta.json"
 DEFAULT_SOURCE_TYPE = "upload"
 UNSET = object()
+# 文件語言：auto 由內容判斷、內容變了會重判；manual 是管理者指定，永遠不覆蓋。
+LANGUAGE_SOURCE_AUTO = "auto"
+LANGUAGE_SOURCE_MANUAL = "manual"
+# 判斷語言只看開頭這麼多字；整份型錄讀進來沒有必要。
+_LANGUAGE_SAMPLE_CHARS = 20000
 
 
 def get_doc_meta_path(project_id: str = "default") -> Path:
@@ -66,9 +71,21 @@ def upsert_document_meta(
     created_at: str | object = UNSET,
     origin_path: str | None | object = UNSET,
     origin_hash: str | None | object = UNSET,
+    language: str | None | object = UNSET,
+    language_source: str | object = UNSET,
 ) -> dict[str, Any]:
     metadata = load_doc_meta(project_id)
     current = dict(metadata.get(relative_path, {}))
+
+    if language is not UNSET:
+        if language:
+            current["language"] = str(language)
+            current["language_source"] = (
+                str(language_source) if language_source is not UNSET else LANGUAGE_SOURCE_MANUAL
+            )
+        else:
+            current.pop("language", None)
+            current.pop("language_source", None)
 
     if source_type is not UNSET:
         current["source_type"] = str(source_type).strip() or DEFAULT_SOURCE_TYPE
@@ -118,7 +135,50 @@ def upsert_document_meta(
 
 
 def touch_document_meta(relative_path: str, project_id: str = "default") -> dict[str, Any]:
-    return upsert_document_meta(relative_path, project_id)
+    """Record that the document changed; drop an auto language so it is re-detected."""
+    entry = load_doc_meta(project_id).get(relative_path, {})
+    if entry.get("language_source") == LANGUAGE_SOURCE_MANUAL:
+        return upsert_document_meta(relative_path, project_id)
+    return upsert_document_meta(relative_path, project_id, language=None)
+
+
+def resolve_document_languages(
+    relative_paths: Iterable[str], project_id: str = "default",
+) -> dict[str, str]:
+    """Return each document's language, detecting and saving any not yet known.
+
+    舊文件沒有語言欄位；第一次被用到時讀開頭判斷並存起來，之後就不用再讀檔。
+    """
+    from knowledge.workspace import get_workspace_root
+    from memory.language_detect import DEFAULT_LANGUAGE, detect_language
+
+    metadata = load_doc_meta(project_id)
+    root = get_workspace_root(project_id)
+    languages: dict[str, str] = {}
+    changed = False
+    for relative_path in set(relative_paths):
+        if not relative_path:
+            continue
+        entry = metadata.get(relative_path, {})
+        if entry.get("language"):
+            languages[relative_path] = entry["language"]
+            continue
+        path = root / relative_path
+        try:
+            with path.open("r", encoding="utf-8-sig", errors="replace") as fh:
+                sample = fh.read(_LANGUAGE_SAMPLE_CHARS)
+        except OSError:
+            languages[relative_path] = DEFAULT_LANGUAGE
+            continue
+        language = detect_language(sample)
+        metadata[relative_path] = {
+            **entry, "language": language, "language_source": LANGUAGE_SOURCE_AUTO,
+        }
+        languages[relative_path] = language
+        changed = True
+    if changed:
+        save_doc_meta(metadata, project_id)
+    return languages
 
 
 def delete_document_meta(relative_path: str, project_id: str = "default") -> None:
@@ -163,6 +223,13 @@ def _normalize_entry(value: dict[str, Any]) -> dict[str, Any]:
     origin_hash = value.get("origin_hash")
     if isinstance(origin_hash, str) and origin_hash.strip():
         entry["origin_hash"] = origin_hash.strip()
+    language = value.get("language")
+    if isinstance(language, str) and language.strip():
+        entry["language"] = language.strip()
+        source = str(value.get("language_source") or LANGUAGE_SOURCE_AUTO)
+        entry["language_source"] = (
+            source if source in {LANGUAGE_SOURCE_AUTO, LANGUAGE_SOURCE_MANUAL} else LANGUAGE_SOURCE_AUTO
+        )
     return entry
 
 
@@ -176,6 +243,8 @@ def _resolved_entry(value: dict[str, Any]) -> dict[str, Any]:
         "created_at": created_at,
         "origin_path": normalized.get("origin_path") or None,
         "origin_hash": normalized.get("origin_hash") or None,
+        "language": normalized.get("language") or None,
+        "language_source": normalized.get("language_source") or None,
     }
 
 

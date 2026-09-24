@@ -1,11 +1,18 @@
 import { useState } from "react";
 
-import type { KnowledgeDocument, KnowledgeDocumentSummary } from "../../api";
+import type { KnowledgeDocument, KnowledgeDocumentSummary, KnowledgeLanguage } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
+import Select from "../Select";
 import { formatSize, formatDate, isUploadDerivedKnowledgeFile } from "./helpers";
 import QaDocEditor from "./QaDocEditor";
 import StatusDot from "./StatusDot";
 import SourceBadge from "./SourceBadge";
+
+const LANGUAGE_LABELS: Record<KnowledgeLanguage, string> = {
+  zh: "中文",
+  en: "English",
+  es: "Español",
+};
 
 export default function FileView({
   document,
@@ -19,6 +26,7 @@ export default function FileView({
   onDelete,
   onMove,
   onToggleEnabled,
+  onChangeLanguage,
   onRenormalize,
   onOpenQaTree,
   renormalizing,
@@ -34,6 +42,7 @@ export default function FileView({
   onDelete: (path: string) => void;
   onMove: (path: string) => void;
   onToggleEnabled: (doc: KnowledgeDocumentSummary) => void;
+  onChangeLanguage?: (doc: KnowledgeDocumentSummary, language: KnowledgeLanguage | "auto") => void;
   onRenormalize?: (path: string) => void;
   onOpenQaTree?: () => void;
   renormalizing?: boolean;
@@ -80,6 +89,21 @@ export default function FileView({
         </div>
         <div className="flex w-full items-center justify-end gap-2 overflow-x-auto sm:w-auto">
           <SourceBadge sourceType={document.source_type} />
+          {onChangeLanguage && document.is_indexable && (
+            <span title="使用者用哪種語言問，就只查同語言的文件；查不到退回中文">
+              <Select
+                value={document.language_source === "manual" ? document.language ?? "auto" : "auto"}
+                onChange={(value) => onChangeLanguage(document, value as KnowledgeLanguage | "auto")}
+                ariaLabel="文件語言"
+                options={[
+                  { value: "auto", label: `自動（${LANGUAGE_LABELS[document.language ?? "zh"]}）` },
+                  { value: "zh", label: "中文" },
+                  { value: "en", label: "English" },
+                  { value: "es", label: "Español" },
+                ]}
+              />
+            </span>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onToggleEnabled(document); }}
             role="switch"

@@ -110,6 +110,7 @@ export default function KnowledgeBase() {
     handleDeleteConfirm,
     handleMove,
     handleToggleEnabled,
+    handleChangeLanguage,
     handleCreateNote,
     handleCreateFolderSubmit,
     cancelCreateFolder,
@@ -839,6 +840,7 @@ export default function KnowledgeBase() {
                   }
                   onMove={(path) => setMovingPath(path)}
                   onToggleEnabled={handleToggleEnabled}
+                  onChangeLanguage={handleChangeLanguage}
                   onRenormalize={handleRenormalize}
                   onOpenQaTree={
                     attachedNodeForOpenDocument

@@ -422,6 +422,12 @@ export default function TreeView({
         {/* Status indicator for files */}
         {node.type === "file" && node.doc && !node.virtual && (
           <div className="flex items-center gap-1 shrink-0 ml-1">
+            {/* 中文是預設，只標出英西版本，免得整棵樹都是 ZH。 */}
+            {node.doc.language && node.doc.language !== "zh" && (
+              <span className="rounded px-1 text-[0.625rem] font-semibold uppercase text-content-subtle ring-1 ring-border">
+                {node.doc.language}
+              </span>
+            )}
             <StatusDot doc={node.doc} />
           </div>
         )}

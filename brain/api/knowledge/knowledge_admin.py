@@ -83,7 +83,16 @@ def _list_document_summaries(paths: Iterable[Path], project_id: str) -> list[dic
 
 def list_knowledge_base_documents(project_id: str = "default") -> list[dict[str, Any]]:
     """Return documents under the workspace knowledge/ directory."""
-    return _list_document_summaries(iter_knowledge_documents(project_id), project_id)
+    from knowledge.doc_meta import resolve_document_languages
+
+    paths = list(iter_knowledge_documents(project_id))
+    root = ensure_workspace_scaffold(project_id)
+    # 列表要顯示每份文件的語言；還沒判斷過的在這裡判斷並存起來。
+    resolve_document_languages(
+        (path.relative_to(root).as_posix() for path in paths if is_indexable_document(path, project_id)),
+        project_id,
+    )
+    return _list_document_summaries(paths, project_id)
 
 
 def list_workspace_documents(project_id: str = "default") -> list[dict[str, Any]]:
@@ -227,6 +236,8 @@ def save_uploaded_document(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(decoded, encoding="utf-8")
     upsert_document_meta(relative_path_obj.as_posix(), project_id, source_type="upload")
+    # 覆蓋上傳可能換了語言版本；清掉自動判斷的語言讓它重判。
+    touch_document_meta(relative_path_obj.as_posix(), project_id)
     return _build_document_summary(path, project_id)
 
 
@@ -399,8 +410,12 @@ def update_workspace_document_meta(
     enabled: bool | None = None,
     source_type: str | None = None,
     source_url: str | None = None,
+    language: str | None = None,
 ) -> dict[str, Any]:
-    """Update persisted metadata for a workspace document."""
+    """Update persisted metadata for a workspace document.
+
+    ``language``：zh／en／es 為手動指定；``"auto"`` 清掉指定，下次用到時依內容重判。
+    """
     path = resolve_workspace_document(relative_path, project_id)
     if not path.exists():
         raise FileNotFoundError("找不到指定文件")
@@ -412,6 +427,8 @@ def update_workspace_document_meta(
         kwargs["source_type"] = source_type
     if source_url is not None:
         kwargs["source_url"] = source_url
+    if language is not None:
+        kwargs["language"] = None if language == "auto" else language
 
     upsert_document_meta(relative_path, project_id, **kwargs)
     return _build_document_summary(path, project_id)
@@ -491,6 +508,8 @@ def _build_document_summary(
         "source_url": document_meta["source_url"],
         "enabled": document_meta["enabled"],
         "created_at": document_meta["created_at"],
+        "language": document_meta["language"],
+        "language_source": document_meta["language_source"],
         "qa_attached": qa_attached,
     }
 
@@ -624,6 +643,7 @@ def commit_raw_documents(
             origin_path=archived_rel,
             origin_hash=origin_hash,
         )
+        touch_document_meta(target_rel.as_posix(), project_id)
         if is_qa:
             from knowledge.qa_nodes import create_node_for_source
 

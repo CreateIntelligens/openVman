@@ -19,6 +19,7 @@ import {
   type KnowledgeDocument,
   type KnowledgeNormalizationPreviewResponse,
   type KnowledgeDocumentSummary,
+  type KnowledgeLanguage,
   type KnowledgeNoteFormat,
 } from "../api";
 import {
@@ -555,6 +556,22 @@ export function useKnowledgeBase() {
     }
   }, [setErrorStatus]);
 
+  const handleChangeLanguage = useCallback(async (
+    document: KnowledgeDocumentSummary,
+    language: KnowledgeLanguage | "auto",
+  ) => {
+    setStatus(null);
+    try {
+      await updateKnowledgeDocumentMeta(document.path, { language });
+      // auto 要等下次列表才重判，重新載入拿判斷結果。
+      await loadDocuments();
+      if (openDocument?.path === document.path) await openFile(document.path);
+      setStatus({ type: "success", message: `${document.title || document.path} 的語言已更新` });
+    } catch (error) {
+      setErrorStatus(error);
+    }
+  }, [loadDocuments, openDocument, openFile, setErrorStatus]);
+
   const handleCreateNote = useCallback(async (
     title: string,
     content: string,
@@ -710,6 +727,7 @@ export function useKnowledgeBase() {
     handleDeleteConfirm,
     handleMove,
     handleToggleEnabled,
+    handleChangeLanguage,
     handleCreateNote,
     handleCreateFolderSubmit,
     cancelCreateFolder,

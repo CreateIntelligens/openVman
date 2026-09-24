@@ -108,6 +108,8 @@ class KnowledgeDocumentMetaPatchRequest(BaseModel):
     enabled: bool | None = None
     source_type: str | None = Field(None, pattern="^(upload|web|manual)$")
     source_url: str | None = None
+    # auto 代表取消手動指定，改回依內容判斷。
+    language: str | None = Field(None, pattern="^(zh|en|es|auto)$")
 
 
 class KnowledgeNoteCreateRequest(BaseModel):
