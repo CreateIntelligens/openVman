@@ -291,70 +291,81 @@ class TestQueryExpansion:
 
 
 class TestLanguageRouting:
-    LANGS = {"zh.md": "zh", "en.md": "en", "en-2.md": "en", "es.md": "es"}
+    LANGS = {"zh.md": "zh", "en.md": "en", "en-2.md": "en", "es.md": "es", "nan.md": "nan"}
 
     ROUTES = ["zh", "en", "es"]
 
     @pytest.fixture()
     def table(self, patched, monkeypatch):
-        import knowledge.kb_settings as kb_settings
-
-        monkeypatch.setattr(kb_settings, "language_routes", lambda project_id="default": self.ROUTES)
         # retrieval 綁的是匯入時的函式；其他測試可能換掉 sys.modules 裡的模組物件。
-        monkeypatch.setattr(retrieval, "fallback_route", lambda project_id="default": self.ROUTES[0])
+        monkeypatch.setattr(
+            retrieval, "project_language_routes", lambda project_id="default": self.ROUTES,
+        )
         monkeypatch.setattr(
             retrieval,
             "resolve_document_languages",
             lambda paths, project_id: {p: self.LANGS.get(p, "zh") for p in paths},
         )
+        counted = []
 
         def use(paths):
-            patched(_FakeTable(vector_records=[
+            fake = _FakeTable(vector_records=[
                 _rec(f"chunk-{p}", 0.1 + i / 100, metadata=json.dumps({"path": p}))
                 for i, p in enumerate(paths)
-            ]))
+            ])
+            original = fake.count_rows
+            fake.count_rows = lambda: counted.append(1) or original()
+            patched(fake)
+        use.counted = counted
         return use
 
-    def _search(self, language):
-        return retrieval.search_records(
-            "knowledge", query_vector=[0.1, 0.2], top_k=5,
-            query_text="pump", query_type="vector", language=language,
-        )
+    def _search(self, language, top_k=5):
+        return [
+            r["text"] for r in retrieval.search_records(
+                "knowledge", query_vector=[0.1, 0.2], top_k=top_k,
+                query_text="pump", query_type="vector", language=language,
+            )
+        ]
 
-    def test_keeps_only_the_users_language(self, table):
+    def test_users_language_comes_first_then_primary_then_others(self, table):
         table(["zh.md", "en.md", "es.md"])
-        assert [r["text"] for r in self._search("es")] == ["chunk-es.md"]
-        assert [r["text"] for r in self._search("en")] == ["chunk-en.md"]
+        # 每份都查得到，語言只決定先後：使用者語言 → 主要語言（中文）→ 其他。
+        assert self._search("es") == ["chunk-es.md", "chunk-zh.md", "chunk-en.md"]
+        assert self._search("en") == ["chunk-en.md", "chunk-zh.md", "chunk-es.md"]
 
-    def test_falls_back_to_chinese_when_language_has_no_hit(self, table):
+    def test_users_language_takes_the_top_k_slots_first(self, table):
+        table(["zh.md", "es.md", "en.md", "en-2.md"])
+        # 同語言夠填滿 top_k 時，其他語言的版本讓位。
+        assert self._search("en", top_k=2) == ["chunk-en.md", "chunk-en-2.md"]
+        assert self._search("es", top_k=2) == ["chunk-es.md", "chunk-zh.md"]
+
+    def test_other_languages_fill_in_when_users_language_has_no_hit(self, table):
         table(["zh.md", "zh-2.md"])
-        assert [r["text"] for r in self._search("es")] == ["chunk-zh.md", "chunk-zh-2.md"]
+        assert self._search("es") == ["chunk-zh.md", "chunk-zh-2.md"]
 
     @pytest.mark.parametrize("query_type", ["vector", "hybrid"])
     @pytest.mark.parametrize(
-        ("paths", "expected"),
+        ("paths", "first"),
         [
             (["es.md"] * 20 + ["en.md", "zh.md"], "chunk-en.md"),
             (["zh.md"] * 20 + ["en.md"], "chunk-en.md"),
             (["es.md"] * 20 + ["zh.md"], "chunk-zh.md"),
-            (["es.md"] * 20, None),
         ],
     )
-    def test_language_search_expands_before_fallback(
-        self, table, query_type, paths, expected,
+    def test_search_expands_to_reach_the_users_language(
+        self, table, query_type, paths, first,
     ):
+        # 其他語言佔滿第一輪候選窗時，要往後擴查才找得到同語言的原文。
         table(paths)
         results = retrieval.search_records(
             "knowledge", query_vector=[0.1, 0.2], top_k=5,
             query_text="pump", query_type=query_type, language="en",
         )
-        assert [r["text"] for r in results] == (
-            [expected] if expected else []
-        )
+        assert results[0]["text"] == first
 
-    def test_no_language_keeps_everything(self, table):
+    def test_no_language_keeps_relevance_order(self, table):
         table(["zh.md", "en.md"])
-        assert len(self._search(None)) == 2
+        assert self._search(None) == ["chunk-zh.md", "chunk-en.md"]
 
     def test_expanding_candidates_encodes_expansion_only_once(
         self, table, monkeypatch,
@@ -372,26 +383,30 @@ class TestLanguageRouting:
             query_text="pump", query_type="hybrid", language="en",
             expansion_terms=["water pump"],
         )
-        assert [r["text"] for r in results] == ["chunk-en.md"]
+        assert results[0]["text"] == "chunk-en.md"
         assert encoded == ["water pump"]
 
-    def test_single_chinese_route_does_not_filter(self, table, monkeypatch):
-        monkeypatch.setattr(self, "ROUTES", ["zh"])
-        table(["zh.md", "en.md"])
-        assert len(self._search("en")) == 2
-
-    def test_language_outside_routes_is_treated_as_chinese(self, table, monkeypatch):
-        monkeypatch.setattr(self, "ROUTES", ["zh", "nan"])
-        table(["zh.md", "en.md"])
-        assert [r["text"] for r in self._search("en")] == ["chunk-zh.md"]
-
-    def test_single_non_chinese_route_does_not_filter(self, table, monkeypatch):
+    def test_single_route_keeps_relevance_order(self, table, monkeypatch):
         monkeypatch.setattr(self, "ROUTES", ["en"])
         table(["zh.md", "en.md"])
-        assert len(self._search("es")) == 2
+        assert self._search("en") == ["chunk-zh.md", "chunk-en.md"]
 
-    def test_falls_back_to_first_route_when_chinese_is_not_ticked(self, table, monkeypatch):
+    def test_chinese_documents_found_without_a_chinese_route(self, table, monkeypatch):
         monkeypatch.setattr(self, "ROUTES", ["en", "es"])
-        table(["zh.md", "en.md", "en-2.md"])
-        # 沒有西語文件：退回第一條分流（英文），不是中文。
-        assert [r["text"] for r in self._search("es")] == ["chunk-en.md", "chunk-en-2.md"]
+        table(["es.md", "en.md", "zh.md"])
+        # 沒勾中文，中文提問也先拿中文文件，接著主要語言（英文），最後西語。
+        assert self._search("zh") == ["chunk-zh.md", "chunk-en.md", "chunk-es.md"]
+        # 沒有西語以外的差別：西語提問照樣查得到中文文件。
+        assert self._search("es") == ["chunk-es.md", "chunk-en.md", "chunk-zh.md"]
+
+    def test_unrouted_language_does_not_scan_the_whole_table(self, table, monkeypatch):
+        monkeypatch.setattr(self, "ROUTES", ["zh", "nan"])
+        table(["zh.md"] * 30 + ["en.md"])
+        # 英文沒勾：照第一輪候選窗排序即可，不為它逐次擴查到底。
+        assert self._search("en")[0] == "chunk-zh.md"
+        assert table.counted == []
+
+    def test_taiwanese_route_expands_before_falling_back(self, table, monkeypatch):
+        monkeypatch.setattr(self, "ROUTES", ["zh", "nan"])
+        table(["zh.md"] * 30 + ["nan.md"])
+        assert self._search("nan")[0] == "chunk-nan.md"

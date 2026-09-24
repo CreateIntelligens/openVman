@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from infra.db import (
     get_knowledge_table,
@@ -15,14 +15,11 @@ from knowledge.doc_meta import (
     list_disabled_document_paths,
     resolve_document_languages,
 )
-from knowledge.kb_settings import fallback_route
+from knowledge.kb_settings import language_routes as project_language_routes
 from memory.dreaming.recall_tracker import record_trace
 from memory.embedder import encode_text
 from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
-from memory.language_detect import (
-    DEFAULT_LANGUAGE,
-    route_language as route_language_for_project,
-)
+from memory.language_detect import DEFAULT_LANGUAGE
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -54,9 +51,10 @@ def search_records(
 ) -> list[dict[str, Any]]:
     """Execute search and return persona-filtered results.
 
-    *language*（只對 knowledge 有效）：只留同語言文件的段落；一筆都沒有時
-    退回中文文件。知識庫只有中文的專案因此行為不變，鶴記這種準備了英西
-    版本的專案則直接用該語言的原文回答，不靠模型翻譯。
+    *language*（只對 knowledge 有效、且知識庫勾了兩條以上分流）：每份文件都
+    查得到，語言只決定誰先進 top_k——使用者語言的文件優先，不夠再用主要語言
+    （分流排第一的）補，最後才是其他語言。鶴記這種準備了中英西版本的專案因此
+    用同語言的原文回答；只有別的語言寫到的內容也不會漏掉。只有一條分流不排序。
 
     When *query_text* is provided, attempts hybrid search: vector 與 FTS
     各自檢索後以 RRF 融合,並輸出 min-max 正規化的 _score ∈ [0, 1]
@@ -82,12 +80,14 @@ def search_records(
     disabled_paths = (
         list_disabled_document_paths(project_id) if table_name == "knowledge" else set()
     )
-    route_language = (
-        route_language_for_project(language, project_id) if table_name == "knowledge" else None
-    )
-    # 語言篩選會丟掉其他語言的候選，多撈一些才不會篩完不夠 top_k。
-    search_limit = limit * (4 if disabled_paths or route_language else 2)
-    record_count = table.count_rows() if route_language else 0
+    routes = project_language_routes(project_id) if table_name == "knowledge" else []
+    # 只有一條分流就不排語言，行為與分流功能出現前相同。
+    prefer = language if language and len(routes) > 1 else None
+    # 有勾的語言才往後擴查：其他語言的版本可能佔滿候選窗，把同語言的原文擠出去。
+    # 沒勾的語言（例如只勾英西時的中文提問）不值得為它掃完整個知識庫。
+    expand = prefer in routes
+    search_limit = limit * (4 if disabled_paths or prefer else 2)
+    record_count = table.count_rows() if expand else 0
     expansion_vectors: dict[str, list[float] | None] = {}
 
     while True:
@@ -114,17 +114,19 @@ def search_records(
         ]
         # RRF 會合併重複候選，輸出少於 limit 不代表底層已搜完。
         exhausted = search_limit >= record_count
-        if route_language:
-            # 其他語言可能佔滿候選窗；確認已查完才允許退回中文。
-            visible = _route_by_language(
-                visible, route_language, project_id, fallback=exhausted,
-                fallback_language=fallback_route(project_id),
-            )
+        rank = (
+            _language_rank(visible, prefer, routes[0], project_id) if prefer else None
+        )
+        if rank is not None:
+            # sorted 是穩定排序：同一語言內仍照相關度。去重留排前面的，所以
+            # 同一段內容的其他語言版本會讓給使用者語言的原文。
+            visible = sorted(visible, key=rank)
         deduped = deduplicate(
             visible,
             similarity_threshold=cfg.rag_dedup_similarity_threshold,
         )
-        if not route_language or exhausted or len(deduped) >= limit:
+        enough = rank is not None and sum(rank(r) == 0 for r in deduped) >= limit
+        if not expand or exhausted or enough:
             break
         search_limit = min(search_limit * 2, record_count)
     filtered = [_strip_vector(record) for record in deduped[:limit]]
@@ -292,27 +294,22 @@ def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _route_by_language(
-    records: list[dict[str, Any]], language: str, project_id: str,
-    *, fallback: bool = True, fallback_language: str = DEFAULT_LANGUAGE,
-) -> list[dict[str, Any]]:
+def _language_rank(
+    records: list[dict[str, Any]], language: str, primary: str, project_id: str,
+) -> Callable[[dict[str, Any]], int]:
+    """Rank a record 0 in the user's language, 1 in the primary language, else 2."""
     def path_of(record: dict[str, Any]) -> str:
         return str(parse_record_metadata(record).get("path", "")).strip()
 
     languages = resolve_document_languages(
         (path_of(record) for record in records), project_id,
     )
+    order = {primary: 1, language: 0}
 
-    def pick(target: str) -> list[dict[str, Any]]:
-        return [
-            record for record in records
-            if languages.get(path_of(record), DEFAULT_LANGUAGE) == target
-        ]
+    def rank(record: dict[str, Any]) -> int:
+        return order.get(languages.get(path_of(record), DEFAULT_LANGUAGE), 2)
 
-    same = pick(language)
-    if same or language == fallback_language or not fallback:
-        return same
-    return pick(fallback_language)
+    return rank
 
 
 def _matches_disabled_knowledge_path(

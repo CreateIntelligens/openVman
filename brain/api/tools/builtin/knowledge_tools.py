@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 from config import get_settings
+from knowledge.kb_settings import primary_language
 from memory.language_detect import detect_language, route_language
 from tools.context import (
     active_persona_id,
@@ -63,8 +64,13 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
 
     top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
     persona_id, project_id = active_persona_id.get(), active_project_id.get()
-    # 依使用者這句話的語言查同語言的知識庫（規則即時判斷；Jev 要 0.5 秒，查詢路徑等不起）。
-    language = detect_language(user_msg) if table_name == "knowledge" and user_msg else None
+    # 依使用者這句話的語言讓同語言文件優先（規則即時判斷；Jev 要 0.5 秒，查詢路徑等不起）。
+    # 「hi」這類判斷不出語言的短句歸專案主要語言，跟訊息標籤、回覆語言一致。
+    language = (
+        detect_language(user_msg, primary_language(project_id))
+        if table_name == "knowledge" and user_msg
+        else None
+    )
     # 前台 ASR 聽出是台語時，Breeze 已把它翻成華語文字；照聽到的語言查。
     if table_name == "knowledge" and active_speech_language.get() == "nan":
         language = "nan"
@@ -105,7 +111,7 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     related: list[dict[str, Any]] = []
     if table_name == "knowledge":
         related = _expand_via_graph(merged, project_id, primary_vector)
-        # 有分流時相關段落也只留同語言；只有中文一條分流就不篩。
+        # 有分流時相關段落只留命中段落有的語言；只有一條分流就不篩。
         if route_language(language, project_id):
             related = _same_language_as(merged, related, project_id)
         merged, related = _jev_screen(queries[-1], merged, related)

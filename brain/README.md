@@ -386,9 +386,9 @@ user input
 - `POST /brain/internal/audio-language`
   - body 是 WAV，回 `{"language": "nan"|"zh"|...|null}`；Backend ASR 在台語分流時呼叫（gemini-3.5-flash-lite 聽聲音）
 - `GET/PUT /brain/knowledge/settings`
-  - 知識庫語言分流（`language_routes`：zh 必選、en、es、nan＝台語）；只有 zh 不分流，勾台語 Live 才聽台語
+  - 知識庫語言分流（`language_routes`：zh、en、es、nan＝台語，至少一條、不必含 zh，順序＝優先順序、第一條是主要語言）；只有一條不分流；多條時所有文件都查得到，使用者語言的文件優先、不夠用主要語言再用其他語言補；勾台語才聽台語
 - `PATCH /brain/knowledge/document/meta`
-  - 文件啟用、來源與語言（`language=zh|en|es|auto`）。知識庫依使用者語言只查同語言文件，查不到退回中文
+  - 文件啟用、來源與語言（`language=zh|en|es|auto`）。知識庫依使用者語言讓同語言文件優先，不夠再用主要語言與其他語言補
 - `GET /brain/backups/sessions`、`POST /brain/backups/sessions`
   - 對話備份列表與立即備份（`{"dry_run": true}` 只算數量）；每天 03:00 自動依語言分檔備份到 `/data/backups/sessions`。只收 internal token，對外經 Backend 限 ROOT。預覽與備份以單一 SQLite 查詢讀取每個專案的摘要和訊息，不執行 TTL 清理；尚存於資料庫的過期對話也會保留在備份。
 
@@ -434,8 +434,8 @@ Live 秒數事件沿用 Backend 驗證後的 `user_id`、`role`、`principal_typ
 `principal_id`，因此帳號與 Embed key 篩選也涵蓋 Live。正常回合完成或連線關閉
 都會清算未記錄的音訊；取消 listener 時會等待已開始的入帳，不重複計算同一段。
 
-知識庫語言分流會逐次擴大檢索候選窗，直到同語言結果足夠或候選耗盡；只有後者
-且無同語言命中時才退回中文。擴展詞向量在同一次查詢內快取。語言尚未存成索引
+知識庫語言分流不過濾文件，只排先後：使用者語言的文件優先進 top_k，不夠再用主要語言、
+其他語言補。使用者語言有勾分流時會逐次擴大候選窗，直到同語言結果足夠或候選耗盡。擴展詞向量在同一次查詢內快取。語言尚未存成索引
 欄位，因此大型知識庫缺少目標語言時可能需檢查全部候選。Live 文字新回合會清除
 前一回合的語音語言判定，避免台語標記沿用到新的英文或中文文字提問。
 

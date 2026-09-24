@@ -32,3 +32,28 @@ def test_search_knowledge_passes_user_language(monkeypatch):
         active_project_id.reset(project)
 
     assert seen and set(seen) == {"es"}
+
+
+def test_short_greeting_searches_in_the_primary_language(monkeypatch):
+    embedder = importlib.import_module("memory.embedder")
+    retrieval = importlib.import_module("memory.retrieval")
+    seen: list[str | None] = []
+    monkeypatch.setattr(
+        embedder, "encode_query_with_fallback",
+        lambda *a, **kw: types.SimpleNamespace(vector=[0.1], version="bge"),
+    )
+    monkeypatch.setattr(retrieval, "search_records", lambda *a, **kw: seen.append(kw.get("language")) or [])
+    monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a: [])
+    monkeypatch.setattr(knowledge_tools, "_jev_screen", lambda q, merged, related: (merged, related))
+    monkeypatch.setattr(knowledge_tools, "primary_language", lambda project_id: "en")
+
+    token = active_user_message.set("hi")
+    project = active_project_id.set("proj-x")
+    try:
+        # 「hi」判斷不出語言：跟訊息標籤、回覆一樣歸主要語言，不是固定中文。
+        knowledge_tools._search_tool("knowledge", {"queries": ["hi"]})
+    finally:
+        active_user_message.reset(token)
+        active_project_id.reset(project)
+
+    assert seen and set(seen) == {"en"}

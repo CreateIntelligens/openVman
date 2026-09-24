@@ -1091,3 +1091,26 @@ async def test_text_turn_language_is_bound_to_its_own_turn(monkeypatch):
     await session.send_text_turn("Which pump do you recommend?")
     assert await session._utterance_language_for_search() is None
     await session.close()
+
+
+def test_live_short_greeting_searches_in_the_primary_language(monkeypatch):
+    module, fake_config = _load_module()
+    seen: list[str | None] = []
+    monkeypatch.setattr(
+        module, "search_records",
+        lambda *args, **kwargs: seen.append(kwargs.get("language")) or [],
+    )
+    monkeypatch.setattr(module, "primary_language", lambda project_id: "en")
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-hi",
+        client_id="client-hi",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=None,
+    )
+    session._last_user_message = "hi"
+
+    session._search_sync("knowledge", {"query": "greeting"})
+
+    # 「hi」判斷不出語言：歸主要語言，跟文字模式的 search_knowledge 一致。
+    assert seen and set(seen) == {"en"}

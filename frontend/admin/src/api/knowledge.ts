@@ -28,7 +28,7 @@ export interface KnowledgeDocumentSummary {
   source_url: string | null;
   enabled: boolean;
   created_at: string;
-  // 知識庫依語言分流：使用者用哪種語言問，就只查同語言的文件（查不到退回中文）。
+  // 知識庫依語言分流：使用者用哪種語言問，同語言的文件優先（不夠再用其他語言補）。
   language?: KnowledgeLanguage | null;
   language_source?: "auto" | "manual" | null;
   // source_type === "qa" 且被任一問答樹節點掛載時為 true

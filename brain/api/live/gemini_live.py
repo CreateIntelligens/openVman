@@ -14,6 +14,7 @@ from typing import Any, Awaitable, Callable, Protocol
 import websockets
 
 from config import BrainSettings, get_settings
+from knowledge.kb_settings import primary_language
 from memory.embedder import encode_query_with_fallback
 from memory.language_detect import (
     DEFAULT_LANGUAGE,
@@ -720,8 +721,13 @@ class GeminiLiveSession:
 
         top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
         # Gemini 常把問題改寫成中英西多條查詢；語言要看使用者原話，不看查詢。
-        language = detect_language(fallback) if table == "knowledge" and fallback else None
-        # 聽出是台語就查台語文件（沒有命中會在 search_records 退回中文）。
+        # 「hi」這類短句歸專案主要語言，跟訊息標籤、回覆語言一致。
+        language = (
+            detect_language(fallback, primary_language(self.project_id))
+            if table == "knowledge" and fallback
+            else None
+        )
+        # 聽出是台語就讓台語文件優先（沒有台語文件時 search_records 用其他語言補）。
         if heard_language == TAIWANESE:
             language = TAIWANESE
         grouped: list[tuple[str, list[dict[str, Any]]]] = []

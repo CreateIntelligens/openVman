@@ -372,11 +372,11 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 分流由管理者在知識庫設定勾選，不看有哪些文件（醫院的文件可能只有中文，但仍要開台語分流）：`GET/PUT /brain/knowledge/settings`（`language_routes`，存在 workspace 的 `.kb_settings.json`；至少一條、不一定是中文，預設只有 `zh`。清單順序是優先順序、後台可調，排第一的是主要語言）。後台知識庫標題列的「分流」按鈕勾選。
 
 - 只有一條分流：不做語言篩選，所有文件一起查（與分流功能出現前相同）。
-- 多條分流：使用者語言在分流裡就只查該語言文件（沒命中退回主要語言）；不在分流裡的語言走主要語言。
+- 多條分流：所有文件都查得到，語言只決定誰先進 top_k——使用者語言的文件優先，不夠再用主要語言補，最後才是其他語言（例如只勾英、西時，中文提問先拿中文文件、再英文、再西語）。使用者語言有勾時會逐次擴大候選窗找同語言的原文；沒勾就只在第一輪候選窗內排序。
 - 語言判斷：有中文字就是中文；一兩個拉丁字的短句（hi、ok、hola）與判斷不出來的歸主要語言，不送 Jev。回答規則同步：短句與判斷不出來時用主要語言回答（system prompt 帶「本專案主要語言」；台語為主要語言時文字回覆用繁體中文）。
-- 勾了台語（`nan`）：Live 每句使用者語音暫存（最多最後 20 秒），轉錄是中文字的句子才在背景送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）聽是不是台語，判成 nan 才覆寫訊息語言；英西看轉錄文字即可。Live 的 `search_knowledge` 最多等這個結果 3 秒，台語就查台語文件（沒有就退回中文）。回答本身不變（回覆語言與 TTS 另議）。
+- 勾了台語（`nan`）：Live 每句使用者語音暫存（最多最後 20 秒），轉錄是中文字的句子才在背景送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）聽是不是台語，判成 nan 才覆寫訊息語言；英西看轉錄文字即可。Live 的 `search_knowledge` 最多等這個結果 3 秒，台語就讓台語文件優先（沒有就用主要語言與其他語言的文件補）。回答本身不變（回覆語言與 TTS 另議）。
 - 前台 app（虛擬人）的語音不走 Live 音訊通道：一律先錄音送 Backend `POST /api/v1/asr/transcribe`（Live 模式也是，轉成文字再 `user_speak`）。所以台語分流主要在這一步生效：
-  - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，中文不能關）；上傳時帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。
+  - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，至少留一條）；上傳時帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。
   - 交集含台語：ASR 一律改用 Breeze（台語直接翻成華語、華語也準），同時把音訊轉 WAV 送 Brain `POST /brain/internal/audio-language` 聽是不是台語；回應多 `language`（台語時為 `nan`）。前台隨訊息送 `speech_language`（文字模式放 `metadata.speech_language`、Live 放 `user_speak.speech_language`），Brain 以它存訊息語言、並讓 `search_knowledge` 查台語文件。瀏覽器內建辨識在台語分流時停用。
   - TTS（`POST /api/v1/tts/stream` 帶 `project_id`、`language_routes`、`speech_language`）：交集含台語、且這一輪是語音被 ASR 判成台語（`speech_language=nan`）、原本又不是 VoxCPM／CosyVoice 時，才改用 VoxCPM 部署預設聲音；打字、快速問答、講華語一律照使用者選的 TTS，並跳過帳號的聲音授權判斷（否則只開了別家聲音的帳號會被擋）；原本就是這兩家不動。回答文字仍是華語。
 - 文件語言自動判斷也認台語（台羅聲調符號、台語特有漢字密度 ≥ 3%，先排除「給予」「欲望」等華語詞），後台可手動標「台語」。實驗見 `scripts/experiments/taigi/REPORT.md`。
@@ -386,11 +386,11 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 同一份內容可準備中、英、西三個版本的文件（例如鶴記的型錄），使用者用哪種語言問就用那個版本的原文回答，不靠模型翻譯。
 
 - 文件語言存在 `.doc_meta.json` 的 `language`／`language_source`：`auto` 由文件開頭 2 萬字以規則判斷（`memory/language_detect.py`），第一次被列表或查詢用到時判斷並存下，內容儲存後清掉重判；`manual` 是後台指定，永不覆蓋。`PATCH /brain/knowledge/document/meta` 帶 `language=zh|en|es` 指定、`auto` 取消指定；文件列表回傳 `language` 與 `language_source`。
-- 查詢時（文字 `search_knowledge` 與 Live 的 `_search_sync` 都經 `search_records(language=...)`）以使用者原話判斷語言（規則，不等 Jev；模型改寫成其他語言的查詢不影響），只留同語言文件的段落；一筆都沒有就退回中文文件。Graph RAG 帶出的相關段落也只留與命中段落同語言的。
-- 沒有英西文件的專案永遠退回中文，行為與原本相同，不需要開關。
+- 查詢時（文字 `search_knowledge` 與 Live 的 `_search_sync` 都經 `search_records(language=...)`）以使用者原話判斷語言（規則，不等 Jev；模型改寫成其他語言的查詢不影響），同語言文件的段落優先進 top_k，不夠再用主要語言（分流排第一的）、最後其他語言補；去重時留排前面的，所以同一段內容的其他語言版本會讓給同語言的原文。「hi」這類短句以主要語言查。Graph RAG 帶出的相關段落只留與命中段落同語言的（命中段落有哪些語言就留哪些）。
+- 沒有英西文件的專案拿到的都是中文文件，行為與原本相同，不需要開關。
 
-語言過濾前的候選窗不足時逐次擴查，達到同語言 top_k 或查完候選才停止；
-只有查完且沒有同語言結果才退回中文。擴展詞向量在單次搜尋內重用。
+使用者語言有勾分流時，候選窗不足會逐次擴查，達到同語言 top_k 或查完候選才停止，
+不足的部分再用主要語言與其他語言補。擴展詞向量在單次搜尋內重用。
 Live 每個文字新回合會清除前一句語音語言判定，不能沿用上一句的台語標記。
 
 #### 11.2 對話備份（VH-389）

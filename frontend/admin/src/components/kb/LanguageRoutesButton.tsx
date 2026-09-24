@@ -92,7 +92,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">
           <p className="mb-2 text-xs text-content-muted">
-            至少勾一個；只勾一個就不分流。排第一的是主要語言：短句（如 hi）、判斷不出來、查不到時都用它。
+            至少勾一個；只勾一個就不分流。所有文件都查得到，使用者語言的文件優先。排第一的是主要語言：短句（如 hi）、判斷不出來時用它，同語言不夠時也先用它補。
           </p>
           <ul className="flex flex-col gap-2">
             {ordered.map((value, index) => {
