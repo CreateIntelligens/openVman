@@ -1053,6 +1053,8 @@ watch(showSettings, () => {
 
 function handleKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
+    // 下拉清單開著時 Escape 只收清單（CustomSelect 自己處理），不要連視窗一起關。
+    if ((event.target as HTMLElement | null)?.closest?.(".custom-select--open")) return;
     if (showSettings.value || showQuickQa.value) {
       event.preventDefault();
       event.stopPropagation();
