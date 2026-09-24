@@ -7,6 +7,7 @@ from memory.language_detect import detect_language, route_language
 from tools.context import (
     active_persona_id,
     active_project_id,
+    active_speech_language,
     active_user_message,
     mode_settings,
 )
@@ -64,6 +65,9 @@ def _search_tool(table_name: str, args: dict[str, Any]) -> dict[str, Any]:
     persona_id, project_id = active_persona_id.get(), active_project_id.get()
     # 依使用者這句話的語言查同語言的知識庫（規則即時判斷；Jev 要 0.5 秒，查詢路徑等不起）。
     language = detect_language(user_msg) if table_name == "knowledge" and user_msg else None
+    # 前台 ASR 聽出是台語時，Breeze 已把它翻成華語文字；照聽到的語言查。
+    if table_name == "knowledge" and active_speech_language.get() == "nan":
+        language = "nan"
 
     # 2. Execute searches and collect unique embedding versions
     grouped: list[tuple[str, list[dict[str, Any]]]] = []

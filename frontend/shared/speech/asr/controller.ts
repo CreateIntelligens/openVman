@@ -114,6 +114,7 @@ export class SpeechController {
   private vadAvailable = true
   private browserFallbackActive = false
   private idleTimer: ReturnType<typeof setTimeout> | null = null
+  private startGeneration = 0
 
   constructor(options: SpeechControllerOptions) {
     this.http = options.http
@@ -245,6 +246,11 @@ export class SpeechController {
         : ASR_IDLE_TIMEOUT_MS
 
     this.idleTimer = setTimeout(() => {
+      // Continuous speech and model startup are not microphone inactivity.
+      if (this.inputMode === 'continuous' && (this.speaking || this.starting)) {
+        this.scheduleIdleTimer()
+        return
+      }
       this.stopListening()
     }, timeout)
   }
@@ -256,6 +262,7 @@ export class SpeechController {
   }
 
   public async startListening(): Promise<boolean> {
+    const generation = ++this.startGeneration
     if (!this.supported) {
       this.onError?.('not-supported')
       return false
@@ -271,6 +278,8 @@ export class SpeechController {
     this.notifyState()
 
     const result = await unit.start()
+    // A recognizer error may already have started a fallback while we awaited.
+    if (generation !== this.startGeneration) return false
     const success = result !== false
     if (!success) {
       this.userWantsListening = false
@@ -281,6 +290,7 @@ export class SpeechController {
   }
 
   public stopListening(): void {
+    this.startGeneration++
     this.userWantsListening = false
     this.clearIdleTimer()
     this.activeUnit.stop()
@@ -447,7 +457,10 @@ export function createSpeechController(
     onError: (err) => controller.handleRecognizerError(err),
     onSpeechStart: () => controller.markActivity(),
     onListeningChange: () => controller.notifyState(),
-    onSpeakingChange: () => controller.notifyState(),
+    onSpeakingChange: () => {
+      controller.markActivity()
+      controller.notifyState()
+    },
     onSupportedChange: () => controller.notifyState(),
   })
 
@@ -460,7 +473,10 @@ export function createSpeechController(
     onSpeechStart: () => controller.markActivity(),
     onStartingChange: () => controller.notifyState(),
     onListeningChange: () => controller.notifyState(),
-    onSpeakingChange: () => controller.notifyState(),
+    onSpeakingChange: () => {
+      controller.markActivity()
+      controller.notifyState()
+    },
     onTranscribingChange: () => controller.notifyState(),
   })
 

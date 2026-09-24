@@ -383,12 +383,14 @@ user input
   - 讀取當前 session history
 - `GET /brain/sessions`、`GET /brain/sessions/export`
   - 對話列表與匯出，可用 `language=zh|en|es` 篩選（語言取最後一則使用者訊息，規則即時判、Jev 背景校正）
+- `POST /brain/internal/audio-language`
+  - body 是 WAV，回 `{"language": "nan"|"zh"|...|null}`；Backend ASR 在台語分流時呼叫（gemini-3.5-flash-lite 聽聲音）
 - `GET/PUT /brain/knowledge/settings`
   - 知識庫語言分流（`language_routes`：zh 必選、en、es、nan＝台語）；只有 zh 不分流，勾台語 Live 才聽台語
 - `PATCH /brain/knowledge/document/meta`
   - 文件啟用、來源與語言（`language=zh|en|es|auto`）。知識庫依使用者語言只查同語言文件，查不到退回中文
 - `GET /brain/backups/sessions`、`POST /brain/backups/sessions`
-  - 對話備份列表與立即備份（`{"dry_run": true}` 只算數量）；每天 03:00 自動依語言分檔備份到 `/data/backups/sessions`。只收 internal token，對外經 Backend 限 ROOT
+  - 對話備份列表與立即備份（`{"dry_run": true}` 只算數量）；每天 03:00 自動依語言分檔備份到 `/data/backups/sessions`。只收 internal token，對外經 Backend 限 ROOT。預覽與備份以單一 SQLite 查詢讀取每個專案的摘要和訊息，不執行 TTL 清理；尚存於資料庫的過期對話也會保留在備份。
 
 ### Token Usage API
 
@@ -427,6 +429,15 @@ Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
 | `tokens`（預設） | LLM 呼叫 | 0；實際數字在既有的 `input_tokens` / `output_tokens` / `total_tokens` |
 | `chars` | TTS | 送去合成的字元數 |
 | `seconds` | Gemini Live | 音訊秒數，輸入與輸出分開記（費率不同，合併就無法還原成本） |
+
+Live 秒數事件沿用 Backend 驗證後的 `user_id`、`role`、`principal_type`、
+`principal_id`，因此帳號與 Embed key 篩選也涵蓋 Live。正常回合完成或連線關閉
+都會清算未記錄的音訊；取消 listener 時會等待已開始的入帳，不重複計算同一段。
+
+知識庫語言分流會逐次擴大檢索候選窗，直到同語言結果足夠或候選耗盡；只有後者
+且無同語言命中時才退回中文。擴展詞向量在同一次查詢內快取。語言尚未存成索引
+欄位，因此大型知識庫缺少目標語言時可能需檢查全部候選。Live 文字新回合會清除
+前一回合的語音語言判定，避免台語標記沿用到新的英文或中文文字提問。
 
 查詢時要**依 `unit_type` 分開加總**——把字元數和 token 相加不具意義。舊資料
 在 migration 後一律是 `tokens`，既有的 token 欄位不受影響。

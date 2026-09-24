@@ -133,6 +133,9 @@
       :backgrounds="backgrounds"
       :state="chat.state.value"
       :disabled="rendererDisabled"
+      :language-routes-available="languageRoutes.available.value"
+      :language-routes-active="languageRoutes.active.value"
+      @language-route-toggle="languageRoutes.toggle"
       @char-change="handleCharChange"
       @tts-provider-change="handleTtsChange"
       @asr-provider-change="handleAsrProviderChange"
@@ -178,6 +181,7 @@ import {
 import { useAsr } from "./composables/useAsr";
 import { useServerAsr } from "./composables/useServerAsr";
 import { useVadAsr } from "./composables/useVadAsr";
+import { useLanguageRoutes } from "./composables/useLanguageRoutes";
 import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { fetchMyAsrProvider, setMyAsrProvider } from "./api/asr";
@@ -368,6 +372,21 @@ const ttsStreamer = useTtsStreamer({
   },
 });
 
+const languageRoutes = useLanguageRoutes(() => settings.projectId);
+
+/** TTS 參數：台語分流時原本不是 VoxCPM／CosyVoice 就改 VoxCPM，並讓後端再核對一次。 */
+function languageRoutesSpeakOptions() {
+  const { provider, switched } = languageRoutes.ttsProviderFor(settings.ttsProvider);
+  return {
+    provider,
+    voice: switched ? "" : settings.ttsVoice,
+    extraBody: {
+      project_id: settings.projectId,
+      language_routes: languageRoutes.active.value.join(","),
+    },
+  };
+}
+
 const chat = useAvatarChat({
   projectId: settings.projectId,
   personaId: settings.personaId,
@@ -400,7 +419,7 @@ const chat = useAvatarChat({
     clearUnderrunTimer();
     audio.resetSchedule();
     pendingText = fullText;
-    void ttsStreamer.speak(fullText, { provider: settings.ttsProvider, voice: settings.ttsVoice });
+    void ttsStreamer.speak(fullText, languageRoutesSpeakOptions());
   },
   onServerError: (code, message, retryAfterMs) => {
     if (code === 'RATE_LIMITED' && typeof retryAfterMs === 'number' && retryAfterMs > 0) {
@@ -458,6 +477,7 @@ async function handleSend(
   text: string,
   sourcePath?: string,
   referenceText?: string,
+  speechLanguage?: string | null,
 ): Promise<ComposerSendResult> {
   if (
     !isStarted.value
@@ -486,6 +506,7 @@ async function handleSend(
     text,
     sourcePath,
     referenceText,
+    speechLanguage,
   );
   return result.accepted
     ? { accepted: true }
@@ -675,11 +696,12 @@ function reportAsrError(error: string): void {
 }
 
 const serverAsr = useServerAsr({
-  onResult: (transcript) => {
+  formFields: () => languageRoutes.asrFormFields(),
+  onResult: (transcript, meta) => {
     asrError.value = "";
     asrInterim.value = "";
     clearAsrIdleTimer();
-    void handleSend(transcript).then((result) => {
+    void handleSend(transcript, undefined, undefined, meta?.language).then((result) => {
       if (!result.accepted && result.message) {
         statusToastRef.value?.show(result.message);
       }
@@ -696,11 +718,12 @@ const serverAsr = useServerAsr({
 // 他按了麥克風卻什麼都沒發生。
 const vadAvailable = ref(true);
 const vadAsr = useVadAsr({
-  onResult: (transcript) => {
+  formFields: () => languageRoutes.asrFormFields(),
+  onResult: (transcript, meta) => {
     asrError.value = "";
     asrInterim.value = "";
     clearAsrIdleTimer();
-    void handleSend(transcript).then((result) => {
+    void handleSend(transcript, undefined, undefined, meta?.language).then((result) => {
       if (!result.accepted && result.message) {
         statusToastRef.value?.show(result.message);
       }
@@ -744,7 +767,8 @@ function handleAsrProviderChange(provider: string): void {
  * http:// 加內網 IP 測會拿到 false，換成 https 就有了。
  */
 const useBrowserAsr = computed(
-  () => myAsrProvider.value === BROWSER_ASR && asr.isSupported.value,
+  // 台語分流開著時一律走伺服器（Breeze）：瀏覽器內建辨識聽不懂台語。
+  () => myAsrProvider.value === BROWSER_ASR && asr.isSupported.value && !languageRoutes.taiwaneseOn.value,
 );
 
 void fetchMyAsrProvider()

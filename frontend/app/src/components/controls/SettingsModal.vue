@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { DEFAULT_ASR_PROVIDER_LABEL } from '@shared/speech'
 import CustomSelect from './CustomSelect.vue'
+import { LANGUAGE_ROUTE_LABELS } from "../../composables/useLanguageRoutes";
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
 import { REPLY_MODES, type ReplyMode } from "../../types/replyMode";
@@ -68,10 +69,15 @@ const props = defineProps<{
   backgrounds: AvatarBackgroundSummary[]
   state: AvatarState
   disabled?: boolean
+  /** 後台在知識庫設定開的語言分流；只有中文時不顯示開關。 */
+  languageRoutesAvailable?: string[]
+  /** 目前開著的分流（後台開的，扣掉前台臨時關掉的）。 */
+  languageRoutesActive?: string[]
 }>()
 
 const emit = defineEmits<{
   'update:open': [boolean]
+  languageRouteToggle: [route: string]
   charChange: [charId: string]
   ttsProviderChange: [provider: string]
   asrProviderChange: [provider: string]
@@ -520,6 +526,31 @@ function handleDialogClick(event: MouseEvent): void {
                   </span>
                 </label>
               </div>
+            </div>
+
+            <div
+              v-if="(languageRoutesAvailable?.length ?? 0) > 1"
+              class="field-card field-card--full"
+            >
+              <span class="field-card__label">語言分流</span>
+              <div class="route-toggles">
+                <label
+                  v-for="route in languageRoutesAvailable"
+                  :key="route"
+                  class="route-toggle"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="languageRoutesActive?.includes(route)"
+                    :disabled="route === 'zh' || disabled"
+                    @change="emit('languageRouteToggle', route)"
+                  />
+                  {{ LANGUAGE_ROUTE_LABELS[route] ?? route }}
+                </label>
+              </div>
+              <small class="field-card__hint">
+                只能關掉或勾回後台開的語言，立即生效。台語開著時語音辨識改用 Breeze，語音改用 VoxCPM。
+              </small>
             </div>
 
             <div class="field-card field-card--full">

@@ -1451,3 +1451,80 @@ def test_session_backup_forwards_dry_run_to_brain(monkeypatch):
         "json": {"dry_run": True},
         "headers": {"X-Internal-Token": "internal-secret"},
     }
+
+
+def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp_path):
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024 * 1024)
+    import app.gateway.ingestion_audio as ingestion_audio
+    import app.gateway.worker as worker
+
+    calls: dict[str, object] = {}
+
+    async def fake_transcribe(path, trace_id, preferred=None):
+        calls["preferred"] = preferred
+        return types.SimpleNamespace(content="我現在頭很痛")
+
+    async def fake_routes(current, project_id, requested):
+        calls["routes_args"] = (project_id, requested)
+        return ["zh", "nan"]
+
+    async def fake_detect(path):
+        return "nan"
+
+    monkeypatch.setattr(ingestion_audio, "transcribe", fake_transcribe)
+    monkeypatch.setattr(worker, "_account_asr_provider", lambda _: "xiaomi")
+    monkeypatch.setattr(module.language_routes_mod, "effective_routes", fake_routes)
+    monkeypatch.setattr(module.language_routes_mod, "detect_taiwanese", fake_detect)
+
+    from starlette.datastructures import UploadFile
+
+    upload = UploadFile(filename="clip.webm", file=__import__("io").BytesIO(b"fake-audio"))
+    account = types.SimpleNamespace(user=types.SimpleNamespace(id="u1"), embed_key=None)
+    response = asyncio.run(module.transcribe_for_account(
+        account=account, file=upload, project_id="proj-hospital", language_routes="zh,nan",
+    ))
+
+    body = json.loads(response.body)
+    assert calls["preferred"] == "breeze"
+    assert calls["routes_args"] == ("proj-hospital", ["zh", "nan"])
+    assert body["language"] == "nan" and body["provider"] == "breeze"
+    assert body["language_routes"] == ["zh", "nan"]
+
+
+def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
+    """台語分流：原本是別家就改 VoxCPM，而且不能先被帳號的聲音授權擋掉。"""
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    async def fake_routes(current, project_id, requested):
+        return ["zh", "nan"]
+
+    def must_not_authorize(*_a, **_kw):
+        raise AssertionError("voice authorization should be skipped when switching to VoxCPM")
+
+    opened: dict[str, object] = {}
+
+    class FakeVox:
+        enabled = True
+
+        async def open_stream(self, request):
+            opened["voice"] = request.voice_hint
+
+            async def _gen():
+                yield b"RIFF"
+            return _gen()
+
+    monkeypatch.setattr(module.language_routes_mod, "effective_routes", fake_routes)
+    monkeypatch.setattr(module.admin_routes, "resolve_tts_voice", must_not_authorize)
+    monkeypatch.setattr(module, "_get_service", lambda: types.SimpleNamespace(voxcpm_adapter=FakeVox()))
+    async def _clean(text):
+        return text
+    monkeypatch.setattr(module, "prepare_tts_text_async", _clean)
+    monkeypatch.setattr(module, "record_usage_event", lambda **kw: None)
+    monkeypatch.setattr(module, "usage_scope_for", lambda *a, **kw: {})
+
+    body = module.TtsStreamRequest(text="你好", provider="gemini-tts", voice="Kore", project_id="p", language_routes="zh,nan")
+    current = types.SimpleNamespace(user=types.SimpleNamespace(id="u1"), embed_key=None)
+    response = asyncio.run(module.tts_stream_endpoint(body, current=current))
+
+    assert response.status_code == 200
+    assert opened["voice"] == ""

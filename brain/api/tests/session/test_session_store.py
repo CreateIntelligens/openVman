@@ -381,3 +381,20 @@ def test_search_is_multi_term_and_script_insensitive(
     store.append_message("admin", "default", "user", "後臺進度 100% 了")
 
     assert [s["session_id"] for s in store.list_sessions("default", search=search)] == expected
+
+
+def test_given_speech_language_is_stored_without_rules_or_jev(store: SessionStore, monkeypatch):
+    """前台 ASR 聽出台語時帶 language；轉錄是中文字，規則會判成 zh，不能蓋掉。"""
+    from memory import session_store as store_module
+
+    monkeypatch.setattr(
+        store_module, "refine_language_in_background",
+        lambda *a, **kw: pytest.fail("should not ask Jev when language is given"),
+    )
+    store.append_message("tw", "default", "user", "我現在頭很痛，要掛哪一科", language="nan")
+    assert store.list_sessions("default")[0]["language"] == "nan"
+
+    # 不認得的值當作沒給，照常判斷。
+    monkeypatch.setattr(store_module, "refine_language_in_background", lambda *a, **kw: None)
+    store.append_message("x", "default", "user", "hello there", language="fr")
+    assert {s["session_id"]: s["language"] for s in store.list_sessions("default")}["x"] == "en"

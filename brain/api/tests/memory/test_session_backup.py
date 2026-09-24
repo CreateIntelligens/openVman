@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import types
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -79,6 +80,38 @@ def test_only_one_backup_runs_at_a_time(projects):
             session_backup.run_backup()
     finally:
         session_backup._lock.release()
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_backup_preserves_expired_sessions(projects, dry_run):
+    root, _ = projects
+    store = session_backup.get_session_store("alpha")
+    expired = (datetime.now(UTC) - timedelta(days=3650)).isoformat()
+    with store._connect() as conn:
+        conn.execute(
+            "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
+            (expired, "zh-1"),
+        )
+        conn.commit()
+        before = list(conn.iterdump())
+
+    manifest = session_backup.run_backup(dry_run=dry_run)
+
+    with store._connect() as conn:
+        assert list(conn.iterdump()) == before
+    assert manifest["total_sessions"] == 3
+    assert manifest["total_messages"] == 4
+    if dry_run:
+        assert not root.exists()
+    else:
+        sessions = _read_jsonl(
+            root / manifest["backup_id"] / "alpha" / "zh.jsonl",
+        )
+        assert sessions[0]["session_id"] == "zh-1"
+        assert sessions[0]["message_count"] == len(sessions[0]["messages"]) == 2
+        assert [message["content"] for message in sessions[0]["messages"]] == [
+            "地下室抽污水用哪款", "推薦 HIPPO。",
+        ]
 
 
 def test_keeps_only_the_newest_backups(projects):

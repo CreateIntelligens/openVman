@@ -447,6 +447,8 @@ export function useAvatarChat(options: ChatOptions = {}) {
               text: string,
               sourcePath?: string,
               sourcePathContent?: string,
+              /** ASR 聽出的語言（例如台語 "nan"）；轉錄文字看不出來，要一起送給 Brain 記錄。 */
+              speechLanguage?: string | null,
        ): SendMessageResult {
                const trimmed = text.trim()
                if (!trimmed) return { accepted: false, reason: 'empty' }
@@ -464,7 +466,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                activeImageId = undefined
                activeUrl = undefined
                if (currentMode === 'text') {
-                      void _sendMessageText(trimmed)
+                      void _sendMessageText(trimmed, speechLanguage)
                       return { accepted: true }
                }
 
@@ -474,11 +476,12 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       event: 'user_speak',
                       text: trimmed,
                       timestamp: Date.now(),
+                      ...(speechLanguage ? { speech_language: speechLanguage } : {}),
                })
                return { accepted: true }
        }
 
-       async function _sendMessageText(text: string): Promise<void> {
+       async function _sendMessageText(text: string, speechLanguage?: string | null): Promise<void> {
                const requestId = ++textRequestId
                const abort = new AbortController()
                textAbortController = abort
@@ -496,6 +499,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                                     project_id: currentProjectId,
                                     session_id: sessionId.value,
                                     mode: options.replyMode?.() ?? '',
+                                    ...(speechLanguage ? { metadata: { speech_language: speechLanguage } } : {}),
                              }),
                              signal: abort.signal,
                       })

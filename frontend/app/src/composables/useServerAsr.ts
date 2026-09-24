@@ -10,10 +10,14 @@ import {
   ServerRecorder,
   type AsrErrorCode,
   type HttpAdapter,
+  type TranscriptionMeta,
 } from '@shared/speech'
 
 interface ServerAsrOptions {
-  onResult?: (transcript: string) => void
+  /** meta.language：後端聽出的語言（台語分流時可能是 "nan"）。 */
+  onResult?: (transcript: string, meta?: TranscriptionMeta) => void
+  /** 每次上傳附加的表單欄位（專案與語言分流）。 */
+  formFields?: () => Record<string, string>
   onError?: (error: string) => void
 }
 
@@ -35,7 +39,8 @@ export function useServerAsr(options: ServerAsrOptions = {}) {
 
   const recorder = new ServerRecorder({
     http: appHttpAdapter,
-    onResult: (text) => options.onResult?.(text),
+    onResult: (text, meta) => options.onResult?.(text, meta),
+    formFields: () => options.formFields?.() ?? {},
     onError: (code: AsrErrorCode) => options.onError?.(code),
     onRecordingChange: (val) => {
       isListening.value = val

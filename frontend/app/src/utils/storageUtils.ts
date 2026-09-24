@@ -22,6 +22,8 @@ export const STORAGE_KEYS = {
   VRM_AVATAR_ID: "avatar.vrm_avatar_id",
   REPLY_MODE: "avatar.reply_mode",
   LOGIN_MODE: "avatar.login_mode",
+  // 前台臨時關掉的語言分流，依專案分開存：{"proj-x": ["es"]}。
+  LANGUAGE_ROUTES_OFF: "avatar.language_routes_off",
 } as const
 
 // 目前綁定的帳號。偏好是每個帳號各自一份，共用瀏覽器時才不會把上一個人的

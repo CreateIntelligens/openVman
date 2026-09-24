@@ -421,3 +421,36 @@ def test_ledger_row_has_no_timeline_columns(ledger):
         assert row is not None
         assert "started_at_ms" not in row
         assert scope.collected[0]["started_at_ms"] is not None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("principal_type,principal_id", [
+    ("user", "live-user"), ("embed_key", "live-key"),
+])
+async def test_live_close_usage_visible_only_to_its_owner(
+    ledger, monkeypatch, principal_type, principal_id,
+):
+    from types import SimpleNamespace
+
+    from live import gemini_live
+
+    monkeypatch.setattr(gemini_live, "project_has_taiwanese_route", lambda _: False)
+    session = gemini_live.GeminiLiveSession(
+        relay_session_id="relay-ledger", client_id="client-ledger",
+        user_id="live-user", principal_type=principal_type,
+        principal_id=principal_id,
+        config=SimpleNamespace(live_gemini_model="test-live"),
+    )
+    session._input_audio_seconds = 1.0
+    session._output_audio_seconds = 2.0
+    await session.close()
+    await session.close()
+
+    events = ledger.list_usage_events(
+        user_id="live-user", principal_type=principal_type, principal_id=principal_id,
+    )
+    assert len(events) == 2
+    assert sum(event["units"] for event in events) == 3.0
+    assert all(event["unit_type"] == "seconds" for event in events)
+    assert ledger.list_usage_events(user_id="someone-else") == []
+    assert ledger.list_usage_events(principal_id="another-key") == []

@@ -425,6 +425,11 @@ Backend 產生，呼叫端自帶的同名標頭會被濾掉。Brain 的 usage le
 `principal_type` / `principal_id` 兩個欄位記錄，`/api/v1/usage/*` 可用
 `principal_type`、`principal_id` 篩選，`group_by=principal` 可依金鑰彙總。
 
+Brain Live 的內部 WebSocket 也沿用這些身分標頭及 `X-OpenVMan-User-ID`、
+`X-OpenVMan-Role`；由 Backend 的已驗證帳號產生，`relay_init` payload 不可
+覆寫身分。Live 秒數於回合完成或關閉時入帳，關閉會等待已開始的計量寫入，
+不遺漏中途離開的回合，也不重複記錄已完成的回合。
+
 **管理介面。** `GET/POST /api/v1/embed-keys` 與
 `PATCH/DELETE /api/v1/embed-keys/{key_id}` 僅限管理員。建立時至少要有一個
 來源，格式必須是精確的 `scheme://host[:port]`（不接受 `*`、缺 scheme、或帶路徑），

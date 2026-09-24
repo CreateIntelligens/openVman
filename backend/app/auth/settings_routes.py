@@ -14,13 +14,16 @@ from pydantic import BaseModel, ConfigDict
 
 from app.config import get_tts_config
 
+from .asr_selection import (
+    asr_user_choices as _asr_user_choices,
+    permitted_asr_preference,
+)
 from .dependencies import (
     CurrentAccount,
     get_current_account,
     require_admin,
     require_root,
 )
-from .models import AccountRole, ResourceType, UserRecord
 from .runtime import AuthRuntime, get_auth_runtime
 from .settings_repository import (
     ASR_PROVIDER_KEY,
@@ -112,29 +115,6 @@ class UpdateMyAsrProviderRequest(_StrictModel):
     value: str
 
 
-def _asr_user_choices(runtime: AuthRuntime, account: UserRecord) -> list[str]:
-    """Which engines this account may pick.
-
-    跟 TTS 的聲音一樣看 resource_grants：管理者在帳號頁授權了哪些，這裡就
-    只列哪些。沒有授權任何一個就回空清單，聊天室不顯示選單，一律用預設值。
-
-    ROOT 例外：它在這個系統裡從不受 scope 限制（resolve_admin_scope 直接回
-    UNSCOPED_ADMIN），聲音與專案也都不必逐一授權。只看 grants 會讓 ROOT 反而
-    什麼都選不了。
-    """
-    if account.role is AccountRole.ROOT:
-        return sorted(
-            record.resource_id
-            for record in runtime.resources.list_by_type(ResourceType.ASR_ENGINE)
-        )
-    granted = [
-        grant.resource_id
-        for grant in runtime.account_access.list_grants(account.id)
-        if grant.resource_type is ResourceType.ASR_ENGINE
-    ]
-    return sorted(granted)
-
-
 @settings_router.get("/my-asr-provider", response_model=MyAsrProviderProfile)
 def get_my_asr_provider(
     account: CurrentAccount = Depends(get_current_account),
@@ -145,7 +125,7 @@ def get_my_asr_provider(
     stored = runtime.account_access.get_asr_provider(account.user.id)
     site_default = runtime.settings.get(ASR_PROVIDER_KEY) or ""
     # 選過但之後被管理者關閉的引擎不該繼續生效，否則關閉形同虛設。
-    effective = stored if stored in allowed else (site_default or "")
+    effective = permitted_asr_preference(runtime, account.user, stored) or site_default
     return MyAsrProviderProfile(
         value=stored, effective=effective, allowed=allowed,
     )

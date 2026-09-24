@@ -99,9 +99,15 @@ def _account_asr_provider(data: dict[str, Any]) -> str | None:
     if not user_id:
         return None
     try:
+        from app.auth.asr_selection import permitted_asr_preference
         from app.auth.runtime import get_auth_runtime
 
-        return get_auth_runtime().account_access.get_asr_provider(user_id) or None
+        runtime = get_auth_runtime()
+        account = runtime.users.get_by_id(user_id)
+        if account is None:
+            return None
+        stored = runtime.account_access.get_asr_provider(user_id)
+        return permitted_asr_preference(runtime, account, stored) or None
     except Exception as exc:
         logger.debug("account_asr_provider_unavailable err=%s", exc)
         return None

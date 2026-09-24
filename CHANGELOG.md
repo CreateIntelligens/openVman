@@ -2,8 +2,21 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **備份讀取不清除對話**：預覽與正式備份改用單一 SQLite 快照讀取摘要與訊息，不觸發聊天的 TTL 清理，保留尚在資料庫的過期對話。
+- **ASR 撤權後忽略舊偏好**：設定 API 與 worker 共用目前授權判定；正式／臨時帳號撤權後不再把舊引擎當 preferred，既有系統預設與 fallback 策略維持不變。
+- **錄音閒置與 fallback 狀態**：continuous 模式持續說話不會被 10 秒閒置計時停錄；VAD 啟動失敗後的舊回傳不再覆寫錄音器狀態與自動停止計時器。
+- **語言搜尋候選不足**：逐步擴大候選窗，確認完整候選後才退回中文；擴展詞向量在單次查詢內重用。Live 文字新回合清除前一句語音語言判定。
+- **Live 用量歸屬與關閉清算**：Backend 以已驗證的呼叫者產生帳號／金鑰身分標頭，Brain 將其寫入秒數事件；中途離開也清算剩餘音訊，listener 取消不會中斷已開始的入帳，正常完成後關閉不重複記錄。
+
 ### Changed
 
+- **台語分流接上前台語音**：前台 app 的語音一律先經 Backend ASR（Live 模式也是），所以台語分流改在這裡生效：
+  交集含台語時 ASR 改用 Breeze、另請 Brain 聽是不是台語（新 `POST /brain/internal/audio-language`），結果隨訊息
+  `speech_language` 存成訊息語言並讓知識庫查台語文件；TTS 原本不是 VoxCPM／CosyVoice 就改 VoxCPM（先於帳號聲音授權）。
+  前台設定視窗新增「語言分流」，只能在後台開的範圍內臨時關掉／勾回（`GET /api/v1/language-routes`，存在瀏覽器、依專案分開）。
+  Live 文字回合的語言判定綁定該回合：先清前一句，再套這一句帶的 `speech_language`。
 - **主模型預設改 gemini-3.5-flash-lite**：`config.py` 的 `llm_model` 與 `.env.example`、文件範例跟正式環境一致（正式本來就由 `.env` 設 3.5-flash-lite，行為不變）；文件裡的備援鏈範例也換成正式用的 gemini → openai → groq → nen。
 
 ### Added

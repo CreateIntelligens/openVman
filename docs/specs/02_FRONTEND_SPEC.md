@@ -148,6 +148,7 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 >
 > 2. **收音狀態與視覺回饋**：
 >    按鈕狀態與 placeholder 引導文案統一取自 `ASR_UI_LABELS` 與 `ASR_PROMPT_LABELS`，保證兩端同狀態下文案與視覺體驗一致。
+>    continuous 閒置倒數在說話結束後重設為 10 秒；說話中或啟動中不能因閒置計時停錄。VAD 啟動失敗後切換按鍵錄音時，舊啟動流程不得覆寫新收音狀態或清除 60 秒停止計時器。
 >
 > 3. **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
 > 顯示（app 在 `App.vue`、admin 在 `useVisionAvailable.ts`）。三態：問到之前與

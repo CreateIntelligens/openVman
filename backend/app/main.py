@@ -12,7 +12,7 @@ from time import monotonic
 
 import anydoc
 import httpx
-from fastapi import Depends, FastAPI, File, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Request, Response, UploadFile
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -71,6 +71,7 @@ from app.providers.voxcpm_adapter import (
     VOXCPM_STREAM_CONTENT_TYPE,
     VoxCPMHTTPError,
 )
+from app import language_routes as language_routes_mod
 from app.routes import admin as admin_routes
 from app.routes import avatar as avatar_routes
 from app.routes import backgrounds as background_routes
@@ -452,6 +453,10 @@ class TtsStreamRequest(BaseModel):
     character: str = ""
     provider: str = ""
     voice: str = ""
+    # 語言分流：有台語分流時 TTS 原本不是 VoxCPM／CosyVoice 就改用 VoxCPM。
+    project_id: str = ""
+    # 逗號分隔字串或陣列都收。
+    language_routes: list[str] | str | None = None
 
 
 async def _proxy_indextts_stream(
@@ -512,15 +517,28 @@ async def tts_stream_endpoint(
     current: CurrentAccount = Depends(get_current_account),
 ) -> Response:
     cfg = get_tts_config()
-    authorized = admin_routes.resolve_tts_voice(
-        current,
-        get_auth_runtime(),
-        requested_provider=body.provider,
-        requested_voice=body.voice or body.character,
+    routes = await language_routes_mod.effective_routes(
+        current, body.project_id, language_routes_mod.parse_requested(body.language_routes),
     )
-    provider = authorized.provider if authorized else body.provider
-    character = authorized.runtime_key if authorized else (body.character or cfg.tts_indextts_default_character)
-    voice = authorized.runtime_key if authorized else body.voice
+    override = (
+        language_routes_mod.taiwanese_tts_provider(body.provider)
+        if language_routes_mod.TAIWANESE in routes
+        else None
+    )
+    if override:
+        # 台語分流：原本不是 VoxCPM／CosyVoice 就改用 VoxCPM 的部署預設聲音。先於帳號的
+        # 聲音授權判斷，否則只開了別家聲音的帳號會在換家前就被擋下。
+        provider, voice, character = override, "", ""
+    else:
+        authorized = admin_routes.resolve_tts_voice(
+            current,
+            get_auth_runtime(),
+            requested_provider=body.provider,
+            requested_voice=body.voice or body.character,
+        )
+        provider = authorized.provider if authorized else body.provider
+        character = authorized.runtime_key if authorized else (body.character or cfg.tts_indextts_default_character)
+        voice = authorized.runtime_key if authorized else body.voice
     cleaned = (await prepare_tts_text_async(body.text.strip())) or ""
     if not cleaned:
         return JSONResponse(status_code=400, content={"error": "empty text"})
@@ -682,6 +700,8 @@ async def convert(file: UploadFile = File(...)) -> JSONResponse:
 async def transcribe_for_account(
     account: CurrentAccount = Depends(get_current_account),
     file: UploadFile = File(...),
+    project_id: str = Form(""),
+    language_routes: str | None = Form(None),
 ) -> JSONResponse:
     """Transcribe a clip for an ordinary signed-in user.
 
@@ -703,12 +723,28 @@ async def transcribe_for_account(
         from app.gateway.ingestion_audio import transcribe
 
         preferred = _account_asr_provider({"owner_user_id": account.user.id})
+        routes = await language_routes_mod.effective_routes(
+            account, project_id, language_routes_mod.parse_requested(language_routes),
+        )
         started = monotonic()
-        result = await transcribe(tmp_path, "asr-chat", preferred)
+        speech_language: str | None = None
+        if language_routes_mod.TAIWANESE in routes:
+            # 台語分流：Breeze 把台語直接翻成華語（華語也準），同時請 Brain 聽是不是台語，
+            # 轉錄出來的華語文字看不出原本講的是台語。
+            preferred = language_routes_mod.TAIWANESE_ASR_ENGINE
+            result, heard = await asyncio.gather(
+                transcribe(tmp_path, "asr-chat", preferred),
+                language_routes_mod.detect_taiwanese(tmp_path),
+            )
+            speech_language = heard if heard == language_routes_mod.TAIWANESE else None
+        else:
+            result = await transcribe(tmp_path, "asr-chat", preferred)
         return JSONResponse(content={
             "text": result.content,
             "provider": preferred or "",
             "elapsed_seconds": round(monotonic() - started, 2),
+            "language": speech_language,
+            "language_routes": routes,
         })
     except UploadTooLargeError as exc:
         limit_mb = exc.limit_bytes / (1024 * 1024)
@@ -722,6 +758,23 @@ async def transcribe_for_account(
     finally:
         await file.close()
         cleanup_temp_path(tmp_path)
+
+
+@app.get(
+    "/api/v1/language-routes",
+    tags=["Settings"],
+    summary="這個專案後台開了哪些語言分流",
+)
+async def get_language_routes(
+    project_id: str = "",
+    current: CurrentAccount = Depends(get_current_account),
+) -> JSONResponse:
+    """前台據此列出可臨時開關的分流；中文永遠在、不能關。"""
+    project = language_routes_mod.resolve_project(current, project_id)
+    return JSONResponse(content={
+        "project_id": project,
+        "available": await language_routes_mod.admin_routes(project),
+    })
 
 
 @app.post(

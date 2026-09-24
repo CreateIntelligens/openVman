@@ -49,6 +49,11 @@ class _FakeTable:
             return _FakeSearchResult(self.vector_records.get(tuple(query), []))
         return _FakeSearchResult(self.vector_records)
 
+    def count_rows(self):
+        if isinstance(self.vector_records, dict):
+            return sum(len(rows) for rows in self.vector_records.values())
+        return len(self.vector_records)
+
 
 class _FakeConfig:
     rag_distance_cutoff = 0.85
@@ -323,9 +328,50 @@ class TestLanguageRouting:
         table(["zh.md", "zh-2.md"])
         assert [r["text"] for r in self._search("es")] == ["chunk-zh.md", "chunk-zh-2.md"]
 
+    @pytest.mark.parametrize("query_type", ["vector", "hybrid"])
+    @pytest.mark.parametrize(
+        ("paths", "expected"),
+        [
+            (["es.md"] * 20 + ["en.md", "zh.md"], "chunk-en.md"),
+            (["zh.md"] * 20 + ["en.md"], "chunk-en.md"),
+            (["es.md"] * 20 + ["zh.md"], "chunk-zh.md"),
+            (["es.md"] * 20, None),
+        ],
+    )
+    def test_language_search_expands_before_fallback(
+        self, table, query_type, paths, expected,
+    ):
+        table(paths)
+        results = retrieval.search_records(
+            "knowledge", query_vector=[0.1, 0.2], top_k=5,
+            query_text="pump", query_type=query_type, language="en",
+        )
+        assert [r["text"] for r in results] == (
+            [expected] if expected else []
+        )
+
     def test_no_language_keeps_everything(self, table):
         table(["zh.md", "en.md"])
         assert len(self._search(None)) == 2
+
+    def test_expanding_candidates_encodes_expansion_only_once(
+        self, table, monkeypatch,
+    ):
+        table(["es.md"] * 20 + ["en.md"])
+        encoded = []
+
+        def encode(term, version):
+            encoded.append(term)
+            return [0.1, 0.2]
+
+        monkeypatch.setattr(retrieval, "_try_encode", encode)
+        results = retrieval.search_records(
+            "knowledge", query_vector=[0.1, 0.2], top_k=5,
+            query_text="pump", query_type="hybrid", language="en",
+            expansion_terms=["water pump"],
+        )
+        assert [r["text"] for r in results] == ["chunk-en.md"]
+        assert encoded == ["water pump"]
 
     def test_single_chinese_route_does_not_filter(self, table, monkeypatch):
         monkeypatch.setattr(self, "ROUTES", ["zh"])

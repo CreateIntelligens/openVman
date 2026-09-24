@@ -79,7 +79,7 @@ describe('ServerRecorder (shared core)', () => {
     expect(recorder.recording).toBe(false)
 
     // 等待非同步上傳完畢
-    await vi.waitFor(() => expect(onResult).toHaveBeenCalledWith('你好'))
+    await vi.waitFor(() => expect(onResult).toHaveBeenCalledWith('你好', { language: null }))
     expect(stopTrack).toHaveBeenCalled()
     expect(mockRequest).toHaveBeenCalledTimes(1)
 
@@ -234,5 +234,28 @@ describe('ServerRecorder (shared core)', () => {
     await new Promise((r) => setTimeout(r, 10))
     expect(onResult).not.toHaveBeenCalled()
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('上傳時附帶專案與語言分流，並把後端聽出的語言交給 onResult', async () => {
+    mockRequest.mockResolvedValueOnce(
+      new Response(JSON.stringify({ text: '我現在頭很痛', provider: 'breeze', language: 'nan' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const onResult = vi.fn()
+    const recorder = new ServerRecorder({
+      http,
+      onResult,
+      formFields: () => ({ project_id: 'proj-hospital', language_routes: 'zh,nan' }),
+    })
+
+    await recorder.start()
+    recorder.stop()
+
+    await vi.waitFor(() => expect(onResult).toHaveBeenCalledWith('我現在頭很痛', { language: 'nan' }))
+    const form = mockRequest.mock.calls[0][1].body as FormData
+    expect(form.get('project_id')).toBe('proj-hospital')
+    expect(form.get('language_routes')).toBe('zh,nan')
   })
 })

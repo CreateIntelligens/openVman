@@ -85,36 +85,46 @@ def search_records(
         route_language_for_project(language, project_id) if table_name == "knowledge" else None
     )
     # 語言篩選會丟掉其他語言的候選，多撈一些才不會篩完不夠 top_k。
-    search_limit = top_k * 4 if disabled_paths or route_language else top_k * 2
+    search_limit = limit * (4 if disabled_paths or route_language else 2)
+    record_count = table.count_rows() if route_language else 0
+    expansion_vectors: dict[str, list[float] | None] = {}
 
-    raw_records = _safe_search(
-        table,
-        query_vector,
-        query_text=query_text or "",
-        query_type=query_type,
-        limit=search_limit,
-        rrf_k=cfg.rag_rrf_k,
-        expansion_terms=expansion_terms or [],
-        embedding_version=embedding_version,
-    )
-
-    # 先過濾再去重:省去對淘汰紀錄的餘弦比對,也避免被過濾掉的
-    # 紀錄壓掉 persona 看得到的近似紀錄
-    visible = [
-        record
-        for record in raw_records
-        if _passes_relevance_cutoff(record, cutoff)
-        and _matches_persona(record, normalized_persona)
-        and not (
-            disabled_paths and _matches_disabled_knowledge_path(record, disabled_paths)
+    while True:
+        raw_records = _safe_search(
+            table,
+            query_vector,
+            query_text=query_text or "",
+            query_type=query_type,
+            limit=search_limit,
+            rrf_k=cfg.rag_rrf_k,
+            expansion_terms=expansion_terms or [],
+            embedding_version=embedding_version,
+            expansion_vectors=expansion_vectors,
         )
-    ]
-    if route_language:
-        visible = _route_by_language(visible, route_language, project_id)
-    deduped = deduplicate(
-        visible,
-        similarity_threshold=cfg.rag_dedup_similarity_threshold,
-    )
+        visible = [
+            record
+            for record in raw_records
+            if _passes_relevance_cutoff(record, cutoff)
+            and _matches_persona(record, normalized_persona)
+            and not (
+                disabled_paths
+                and _matches_disabled_knowledge_path(record, disabled_paths)
+            )
+        ]
+        # RRF 會合併重複候選，輸出少於 limit 不代表底層已搜完。
+        exhausted = search_limit >= record_count
+        if route_language:
+            # 其他語言可能佔滿候選窗；確認已查完才允許退回中文。
+            visible = _route_by_language(
+                visible, route_language, project_id, fallback=exhausted,
+            )
+        deduped = deduplicate(
+            visible,
+            similarity_threshold=cfg.rag_dedup_similarity_threshold,
+        )
+        if not route_language or exhausted or len(deduped) >= limit:
+            break
+        search_limit = min(search_limit * 2, record_count)
     filtered = [_strip_vector(record) for record in deduped[:limit]]
 
     if filtered:
@@ -141,6 +151,7 @@ def _safe_search(
     rrf_k: int = 60,
     expansion_terms: list[str] | None = None,
     embedding_version: str | None = None,
+    expansion_vectors: dict[str, list[float] | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Execute search with fallback and error handling."""
     try:
@@ -153,6 +164,7 @@ def _safe_search(
                 rrf_k,
                 expansion_terms or [],
                 embedding_version,
+                expansion_vectors,
             )
         return _normalize_vector_results(
             _search_to_records(table.search(query_vector).limit(limit))
@@ -170,6 +182,7 @@ def _hybrid_search(
     rrf_k: int,
     expansion_terms: list[str],
     embedding_version: str | None,
+    expansion_vectors: dict[str, list[float] | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Hybrid search:原文與擴展詞各跑 vector + FTS,所有名次表一次 RRF 融合。
 
@@ -181,8 +194,13 @@ def _hybrid_search(
     if fts_records := _try_fts_search(table, query_text, limit):
         ranked_lists.append(fts_records)
 
+    if expansion_vectors is None:
+        expansion_vectors = {}
     for term in expansion_terms:
-        if term_vector := _try_encode(term, embedding_version):
+        # 擴大候選窗只重查排名，不重送同一個語意擴展詞去編碼。
+        if term not in expansion_vectors:
+            expansion_vectors[term] = _try_encode(term, embedding_version)
+        if term_vector := expansion_vectors[term]:
             if term_records := _search_to_records(
                 table.search(term_vector).limit(limit)
             ):
@@ -274,6 +292,7 @@ def _strip_vector(record: dict[str, Any]) -> dict[str, Any]:
 
 def _route_by_language(
     records: list[dict[str, Any]], language: str, project_id: str,
+    *, fallback: bool = True,
 ) -> list[dict[str, Any]]:
     def path_of(record: dict[str, Any]) -> str:
         return str(parse_record_metadata(record).get("path", "")).strip()
@@ -289,7 +308,7 @@ def _route_by_language(
         ]
 
     same = pick(language)
-    if same or language == DEFAULT_LANGUAGE:
+    if same or language == DEFAULT_LANGUAGE or not fallback:
         return same
     return pick(DEFAULT_LANGUAGE)
 

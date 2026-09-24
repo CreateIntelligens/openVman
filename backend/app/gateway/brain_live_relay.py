@@ -19,6 +19,7 @@ import websockets
 
 from app.config import TTSRouterConfig, get_tts_config
 from app.session_manager import Session
+from app.usage_ledger_client import usage_scope_for
 
 logger = logging.getLogger("backend.brain_live_relay")
 
@@ -80,6 +81,7 @@ class BrainLiveRelay:
                 self.config.brain_url,
                 self.session.session_id,
             )
+            caller = usage_scope_for(self.session.metadata.get("_current_account"))
             self._ws = await self._websocket_factory(
                 url,
                 additional_headers={
@@ -93,6 +95,8 @@ class BrainLiveRelay:
                     "X-OpenVMan-Project-ID": str(
                         self.session.metadata.get("project_id", "")
                     ),
+                    "X-Principal-Type": str(caller.get("principal_type", "")),
+                    "X-Principal-Id": str(caller.get("principal_id", "")),
                 },
                 open_timeout=10,
                 max_size=4 * 1024 * 1024,

@@ -30,8 +30,9 @@ class FakeLiveSession:
         self.stop_calls = 0
         self.close_calls = 0
 
-    async def send_text_turn(self, text: str) -> None:
+    async def send_text_turn(self, text: str, speech_language: str | None = None) -> None:
         self.text_turns.append(text)
+        self.speech_languages = [*getattr(self, "speech_languages", []), speech_language]
 
     async def request_stop(self) -> None:
         self.stop_calls += 1
@@ -46,7 +47,10 @@ class FakeLiveSession:
         self.close_calls += 1
 
 
-def test_internal_live_bridge_routes_text_audio_and_close():
+@pytest.mark.parametrize("principal_type,principal_id", [
+    ("user", "account-1"), ("embed_key", "key-1"),
+])
+def test_internal_live_bridge_routes_text_audio_and_close(principal_type, principal_id):
     fake_session = FakeLiveSession()
 
     with (
@@ -60,7 +64,13 @@ def test_internal_live_bridge_routes_text_audio_and_close():
         with _client() as client:
             with client.websocket_connect(
                 "/brain/internal/live/relay-1",
-                headers=_internal_headers(),
+                headers={
+                    **_internal_headers(),
+                    "X-OpenVMan-User-ID": "account-1",
+                    "X-OpenVMan-Role": "user",
+                    "X-Principal-Type": principal_type,
+                    "X-Principal-Id": principal_id,
+                },
             ) as websocket:
                 websocket.send_json(
                     {
@@ -68,6 +78,8 @@ def test_internal_live_bridge_routes_text_audio_and_close():
                         "client_id": "client-1",
                         "persona_id": "persona-1",
                         "project_id": "project-1",
+                        "user_id": "spoofed",
+                        "principal_id": "spoofed",
                     }
                 )
                 websocket.send_json({"event": "user_speak", "text": "你好"})
@@ -82,6 +94,9 @@ def test_internal_live_bridge_routes_text_audio_and_close():
                 websocket.send_json({"event": "client_interrupt"})
 
     build_live_session.assert_called_once()
+    assert build_live_session.call_args.kwargs["user_id"] == "account-1"
+    assert build_live_session.call_args.kwargs["principal_type"] == principal_type
+    assert build_live_session.call_args.kwargs["principal_id"] == principal_id
     assert fake_session.text_turns == ["你好"]
     assert fake_session.audio_chunks == [("YWJj", "audio/pcm;rate=16000")]
     assert fake_session.turn_complete_calls == 1
@@ -268,3 +283,45 @@ async def test_internal_live_bridge_leaves_reply_persistence_to_live_session(mon
 
     assert saved == []
     assert archived == []
+
+
+def test_audio_language_endpoint_returns_verdict_and_survives_failure(monkeypatch):
+    import memory.language_detect as language_detect
+
+    monkeypatch.setattr(language_detect, "detect_audio_language", lambda wav: "nan")
+    with _client() as client:
+        ok = client.post("/brain/internal/audio-language", content=b"RIFFfake", headers=_internal_headers())
+    assert ok.json() == {"language": "nan"}
+
+    def boom(_wav):
+        raise RuntimeError("gemini down")
+
+    monkeypatch.setattr(language_detect, "detect_audio_language", boom)
+    with _client() as client:
+        failed = client.post("/brain/internal/audio-language", content=b"RIFFfake", headers=_internal_headers())
+    assert failed.json() == {"language": None}
+
+
+def test_internal_live_bridge_passes_speech_language_to_history_and_live():
+    """前台 ASR 聽出台語時帶 speech_language：存進訊息語言，也交給 Live 查台語文件。"""
+    fake_session = FakeLiveSession()
+
+    with (
+        patch("internal_routes._build_live_session", return_value=fake_session),
+        patch(
+            "internal_routes.get_or_create_session",
+            return_value=type("Session", (), {"session_id": "relay-1"})(),
+        ),
+        patch("internal_routes.append_session_message") as append_msg,
+    ):
+        with _client() as client:
+            with client.websocket_connect(
+                "/brain/internal/live/relay-1", headers=_internal_headers(),
+            ) as websocket:
+                websocket.send_json({"event": "relay_init", "project_id": "proj-hospital"})
+                websocket.send_json(
+                    {"event": "user_speak", "text": "我現在頭很痛", "speech_language": "nan"}
+                )
+
+    assert fake_session.speech_languages == ["nan"]
+    assert append_msg.call_args.kwargs["language"] == "nan"

@@ -56,13 +56,9 @@ def _project_ids() -> list[str]:
 def _collect(project_id: str) -> dict[str, list[dict[str, Any]]]:
     store = get_session_store(project_id)
     by_language: dict[str, list[dict[str, Any]]] = {lang: [] for lang in LANGUAGES}
-    for summary in store.list_sessions():
-        messages = serialize_history_messages(
-            store.list_messages(
-                str(summary["session_id"]), persona_id=str(summary["persona_id"]),
-            )
-        )
-        by_language.setdefault(str(summary["language"]), []).append({**summary, "messages": messages})
+    for session in store.snapshot_sessions():
+        session["messages"] = serialize_history_messages(session["messages"])
+        by_language.setdefault(str(session["language"]), []).append(session)
     return by_language
 
 

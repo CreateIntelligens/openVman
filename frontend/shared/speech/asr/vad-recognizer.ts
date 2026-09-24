@@ -18,7 +18,7 @@
 
 import { encodeWav } from '../audio/wav'
 import type { HttpAdapter } from '../http'
-import { transcribeOnServer } from './client'
+import { transcribeOnServer, type TranscribeFormFields, type TranscriptionMeta } from './client'
 import type { AsrErrorCode } from './errors'
 
 export const VAD_ASSET_BASE = '/admin/vad/'
@@ -44,7 +44,9 @@ export interface VadRecognizerOptions {
   http?: HttpAdapter
   commitMode?: VadCommitMode
   silenceTimeoutMs?: number
-  onResult?: (transcript: string) => void
+  onResult?: (transcript: string, meta?: TranscriptionMeta) => void
+  /** 每次上傳附加的表單欄位，例如專案與語言分流。 */
+  formFields?: TranscribeFormFields
   onError?: (error: AsrErrorCode) => void
   onSpeechStart?: () => void
   onSpeechEnd?: (audio: Float32Array) => void
@@ -65,7 +67,8 @@ export class VadRecognizer {
   private http?: HttpAdapter
   private commitMode: VadCommitMode
   private silenceTimeoutMs?: number
-  private onResult?: (transcript: string) => void
+  private onResult?: (transcript: string, meta?: TranscriptionMeta) => void
+  private formFields?: TranscribeFormFields
   private onError?: (error: AsrErrorCode) => void
   private onSpeechStart?: () => void
   private onSpeechEnd?: (audio: Float32Array) => void
@@ -104,6 +107,7 @@ export class VadRecognizer {
     this.commitMode = options.commitMode ?? 'continuous'
     this.silenceTimeoutMs = options.silenceTimeoutMs
     this.onResult = options.onResult
+    this.formFields = options.formFields
     this.onError = options.onError
     this.onSpeechStart = options.onSpeechStart
     this.onSpeechEnd = options.onSpeechEnd
@@ -123,6 +127,7 @@ export class VadRecognizer {
     if (options.commitMode !== undefined) this.commitMode = options.commitMode
     if (options.silenceTimeoutMs !== undefined) this.silenceTimeoutMs = options.silenceTimeoutMs
     if (options.onResult !== undefined) this.onResult = options.onResult
+    if (options.formFields !== undefined) this.formFields = options.formFields
     if (options.onError !== undefined) this.onError = options.onError
     if (options.onSpeechStart !== undefined) this.onSpeechStart = options.onSpeechStart
     if (options.onSpeechEnd !== undefined) this.onSpeechEnd = options.onSpeechEnd
@@ -344,7 +349,7 @@ export class VadRecognizer {
     this.incrementPending()
     try {
       const clip = encodeWav(samples, VAD_SAMPLE_RATE)
-      const result = await transcribeOnServer(this.http, clip, 'speech.wav')
+      const result = await transcribeOnServer(this.http, clip, 'speech.wav', this.formFields)
       if (!this.alive) return
 
       const text = result.text.trim()
@@ -355,7 +360,7 @@ export class VadRecognizer {
         return
       }
 
-      this.onResult?.(text)
+      this.onResult?.(text, { language: result.language ?? null })
     } catch {
       if (this.alive) {
         this.emitError('transcribe-failed')

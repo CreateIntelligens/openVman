@@ -72,6 +72,7 @@ def append_session_message(
     content: str,
     project_id: str = "default",
     metadata: dict[str, Any] | None = None,
+    language: str | None = None,
 ) -> SessionState:
     """Append a message to the session and enforce max rounds."""
     state, _ = get_session_store(project_id).append_message(
@@ -80,6 +81,7 @@ def append_session_message(
         role,
         content,
         metadata=metadata,
+        language=language,
     )
     return state
 
@@ -91,6 +93,7 @@ def append_session_message_with_id(
     content: str,
     project_id: str = "default",
     metadata: dict[str, Any] | None = None,
+    language: str | None = None,
 ) -> tuple[SessionState, int]:
     """Append and return the new message's row id for later metadata patches."""
     return get_session_store(project_id).append_message(
@@ -99,6 +102,7 @@ def append_session_message_with_id(
         role,
         content,
         metadata=metadata,
+        language=language,
     )
 
 

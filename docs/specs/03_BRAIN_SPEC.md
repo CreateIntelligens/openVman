@@ -374,6 +374,10 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 - 只有中文一條分流：不做語言篩選，所有文件一起查（與分流功能出現前相同）。
 - 有其他分流：使用者語言在分流裡就只查該語言文件（沒命中退回中文）；不在分流裡的語言當中文。
 - 勾了台語（`nan`）：Live 每句使用者語音暫存（最多最後 20 秒），轉錄是中文字的句子才在背景送 `LIVE_AUDIO_LANGUAGE_ID_MODEL`（預設 gemini-3.5-flash-lite，逾時 30 秒）聽是不是台語，判成 nan 才覆寫訊息語言；英西看轉錄文字即可。Live 的 `search_knowledge` 最多等這個結果 3 秒，台語就查台語文件（沒有就退回中文）。回答本身不變（回覆語言與 TTS 另議）。
+- 前台 app（虛擬人）的語音不走 Live 音訊通道：一律先錄音送 Backend `POST /api/v1/asr/transcribe`（Live 模式也是，轉成文字再 `user_speak`）。所以台語分流主要在這一步生效：
+  - 前台先 `GET /api/v1/language-routes?project_id=` 取後台開的分流，設定視窗可在這範圍內臨時關掉／勾回（存在瀏覽器、依專案分開，中文不能關）；上傳時帶 `project_id`、`language_routes`，Backend 取與後台設定的交集（嵌入金鑰一律用金鑰綁定的專案，前台不能開出後台沒有的語言）。
+  - 交集含台語：ASR 一律改用 Breeze（台語直接翻成華語、華語也準），同時把音訊轉 WAV 送 Brain `POST /brain/internal/audio-language` 聽是不是台語；回應多 `language`（台語時為 `nan`）。前台隨訊息送 `speech_language`（文字模式放 `metadata.speech_language`、Live 放 `user_speak.speech_language`），Brain 以它存訊息語言、並讓 `search_knowledge` 查台語文件。瀏覽器內建辨識在台語分流時停用。
+  - TTS（`POST /api/v1/tts/stream` 帶 `project_id`、`language_routes`）：交集含台語且原本不是 VoxCPM／CosyVoice 時改用 VoxCPM 部署預設聲音，並跳過帳號的聲音授權判斷（否則只開了別家聲音的帳號會被擋）；原本就是這兩家不動。回答文字仍是華語。
 - 文件語言自動判斷也認台語（台羅聲調符號、台語特有漢字密度 ≥ 3%，先排除「給予」「欲望」等華語詞），後台可手動標「台語」。實驗見 `scripts/experiments/taigi/REPORT.md`。
 
 #### 11.1a 知識庫依語言分流
@@ -384,12 +388,17 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 - 查詢時（文字 `search_knowledge` 與 Live 的 `_search_sync` 都經 `search_records(language=...)`）以使用者原話判斷語言（規則，不等 Jev；模型改寫成其他語言的查詢不影響），只留同語言文件的段落；一筆都沒有就退回中文文件。Graph RAG 帶出的相關段落也只留與命中段落同語言的。
 - 沒有英西文件的專案永遠退回中文，行為與原本相同，不需要開關。
 
+語言過濾前的候選窗不足時逐次擴查，達到同語言 top_k 或查完候選才停止；
+只有查完且沒有同語言結果才退回中文。擴展詞向量在單次搜尋內重用。
+Live 每個文字新回合會清除前一句語音語言判定，不能沿用上一句的台語標記。
+
 #### 11.2 對話備份（VH-389）
 
 `memory/session_backup.py` 每天 `SESSION_BACKUP_HOUR`（預設 3，台北時間）把所有已有 `sessions.db` 的專案匯出到 `SESSION_BACKUP_DIR`（預設 `/data/backups/sessions`）：每次一個 `YYYYMMDD-HHMMSS/` 目錄，內含 `manifest.json` 與 `<project_id>/{zh,en,es}.jsonl`，每行一個 session 摘要連同全部訊息（格式同匯出）。先寫 `.<id>.partial` 再改名，只保留最近 `SESSION_BACKUP_KEEP`（預設 30）份；同時只允許一個備份在跑。
 
 - `GET /brain/backups/sessions` → `{"backups": [manifest...], "running": bool}`（新到舊）。
 - `POST /brain/backups/sessions` 帶 `{"dry_run": true}` 只回各專案分語言的數量不寫檔；已有備份在跑回 409。
+- 預覽與正式備份以單一 SQLite SELECT 讀取每個專案的摘要及訊息快照，不執行 TTL 清理；仍存在資料庫中的過期對話也會匯出。備份讀取不得修改或刪除來源資料。
 - 兩者只收 internal token。對外只有 Backend `GET/POST /api/v1/backups/sessions`，限 ROOT；`backups` 列在 Backend 代理的 `_BACKEND_OWNED_PREFIXES`，catch-all 一律 404。後台「對話紀錄」頁只對 ROOT 顯示備份區塊（預覽、立即備份、最近 5 份）。
 
 備份與正式資料在同一個資料卷，防得了誤刪與程式寫壞，防不了整顆磁碟損壞；要異地保存需另外同步 `brain/data/backups/`。

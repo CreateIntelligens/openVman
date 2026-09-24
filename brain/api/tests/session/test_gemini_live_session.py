@@ -802,7 +802,10 @@ def test_thinking_level_is_dropped_for_models_that_reject_it():
 
 
 @pytest.mark.asyncio
-async def test_live_meters_audio_seconds_per_turn():
+@pytest.mark.parametrize("principal_type,principal_id", [
+    ("user", "account-1"), ("embed_key", "key-1"),
+])
+async def test_live_meters_audio_seconds_per_turn(principal_type, principal_id):
     """Live 按音訊秒數計價，輸入與輸出分開記（兩者費率不同）。"""
     module, fake_config = _load_module()
     import sys as _sys
@@ -818,6 +821,10 @@ async def test_live_meters_audio_seconds_per_turn():
     session = module.GeminiLiveSession(
         relay_session_id="relay-meter",
         client_id="client-meter",
+        user_id="account-1",
+        role="user",
+        principal_type=principal_type,
+        principal_id=principal_id,
         config=fake_config,
         transport_factory=lambda _cfg: FakeTransport(),
     )
@@ -841,10 +848,70 @@ async def test_live_meters_audio_seconds_per_turn():
     assert by_direction["output"]["units"] == pytest.approx(1.0)
     assert all(e["unit_type"] == "seconds" for e in events)
     assert all(e["kind"] == "live" for e in events)
+    assert all(e["scope"].user_id == "account-1" for e in events)
+    assert all(e["scope"].principal_type == principal_type for e in events)
+    assert all(e["scope"].principal_id == principal_id for e in events)
 
     # 記完要歸零，否則下一輪會重複計費。
     assert session._input_audio_seconds == 0.0
     assert session._output_audio_seconds == 0.0
+    await session.close()
+    assert len(events) == 2
+
+
+@pytest.mark.asyncio
+async def test_live_close_flushes_unfinished_audio_once():
+    module, fake_config = _load_module()
+    events = []
+    _saved_modules.setdefault("infra.usage_ledger", sys.modules.get("infra.usage_ledger"))
+    sys.modules["infra.usage_ledger"] = types.SimpleNamespace(
+        UNIT_SECONDS="seconds", record_usage_event=lambda **kw: events.append(kw),
+    )
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-close", client_id="client-close",
+        config=fake_config, transport_factory=lambda _cfg: FakeTransport(),
+    )
+    await session.send_realtime_input(
+        base64.b64encode(b"\x00" * 32000).decode(), "audio/pcm;rate=16000",
+    )
+    session._events_from_server_content({
+        "modelTurn": {"parts": [{"inlineData": {
+            "mimeType": "audio/pcm;rate=24000",
+            "data": base64.b64encode(b"\x00" * 96000).decode(),
+        }}]},
+    })
+    await session.close()
+    await session.close()
+    assert [(e["raw"]["direction"], e["units"]) for e in events] == [
+        ("input", 1.0), ("output", 2.0),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_live_close_waits_for_cancelled_listener_ledger_write(monkeypatch):
+    module, fake_config = _load_module()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-race", client_id="client-race", config=fake_config,
+    )
+    entered, release = asyncio.Event(), asyncio.Event()
+    recorded = []
+
+    async def persist(pending):
+        entered.set()
+        await release.wait()
+        recorded.extend(pending)
+
+    monkeypatch.setattr(session, "_persist_audio_usage", persist)
+    session._input_audio_seconds = 1.0
+    session._output_audio_seconds = 2.0
+    session._listener_task = asyncio.create_task(session._record_audio_usage())
+    await entered.wait()
+    closing = asyncio.create_task(session.close())
+    await asyncio.sleep(0)
+    assert not closing.done()
+    release.set()
+    await closing
+    assert recorded == [("input", 1.0), ("output", 2.0)]
 
 
 @pytest.mark.parametrize("languages, expected", [
@@ -967,4 +1034,60 @@ async def test_live_knowledge_search_waits_for_taiwanese_verdict(monkeypatch):
     session._utterance_language = asyncio.create_task(slow_verdict())
     await session._search("knowledge", {"queries": ["急診在哪裡"]})
     assert captured["heard"] == "nan"
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_text_turn_does_not_reuse_previous_audio_language(monkeypatch):
+    module, fake_config = _load_module()
+    monkeypatch.setattr(module, "project_has_taiwanese_route", lambda pid: True)
+    _stub_memory()
+    captured = []
+
+    def search_sync(self, table, args, heard_language=None):
+        captured.append(heard_language)
+        return {"results": []}
+
+    monkeypatch.setattr(module.GeminiLiveSession, "_search_sync", search_sync)
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-language-reset",
+        client_id="client-language-reset",
+        project_id="proj-hospital",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+
+    async def verdict():
+        return "nan"
+
+    session._utterance_language = asyncio.create_task(verdict())
+    await session._utterance_language
+    await session._search("knowledge", {"queries": ["急診在哪裡"]})
+    await session.send_text_turn("Which pump do you recommend?")
+    await session._search("knowledge", {"queries": ["pump"]})
+    assert captured == ["nan", None]
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_text_turn_language_is_bound_to_its_own_turn(monkeypatch):
+    """前台 ASR 帶台語的回合要查台語；下一句沒帶就不能沿用上一句的台語判定。"""
+    module, fake_config = _load_module()
+    monkeypatch.setattr(module, "project_has_taiwanese_route", lambda pid: True)
+    _stub_memory()
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-turns",
+        client_id="client-turns",
+        project_id="proj-hospital",
+        config=fake_config,
+        transport_factory=lambda _cfg: FakeTransport(),
+        event_sink=lambda _event: asyncio.sleep(0),
+    )
+
+    await session.send_text_turn("我現在頭很痛", speech_language="nan")
+    assert await session._utterance_language_for_search() == "nan"
+
+    await session.send_text_turn("Which pump do you recommend?")
+    assert await session._utterance_language_for_search() is None
     await session.close()

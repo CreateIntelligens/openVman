@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 from config import get_settings
 from infra.datetime_utils import normalize_iso_timestamp, utc_now_iso
 from memory.language_detect import (
+    LANGUAGES,
     detect_language,
     refine_language_in_background,
 )
@@ -166,13 +167,16 @@ class SessionStore:
         role: str,
         content: str,
         metadata: dict[str, Any] | None = None,
+        language: str | None = None,
     ) -> tuple[SessionState, int]:
         cfg = get_settings()
         now = utc_now_iso()
         max_messages = max(cfg.max_session_rounds * 2, 20)
         persona_key = normalize_persona_id(persona_id)
         metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
-        language = detect_language(content) if role == "user" else None
+        # 呼叫端（例如 ASR 聽出是台語）給了語言就直接用，不再規則判斷、不問 Jev。
+        given_language = language if role == "user" and language in LANGUAGES else None
+        language = given_language or (detect_language(content) if role == "user" else None)
 
         with self._lock:
             self._prune_expired_sessions_locked()
@@ -200,7 +204,7 @@ class SessionStore:
                     )
                 conn.commit()
                 state = self._load_session_locked(conn, session_id)
-        if language is not None:
+        if language is not None and given_language is None:
             refine_language_in_background(
                 content,
                 language,
@@ -287,6 +291,49 @@ class SessionStore:
                     )
                     for row in rows
                 ]
+
+    def snapshot_sessions(self) -> list[dict[str, Any]]:
+        """Read backup summaries and messages from one SQLite snapshot.
+
+        Backup reads must not run the chat history's expiry cleanup. One SELECT
+        also keeps message counts and contents consistent with concurrent writes.
+        """
+        with self._lock:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT s.session_id, s.persona_id, s.created_at, s.updated_at,
+                           m.role, m.content, m.created_at, m.metadata, m.language
+                    FROM sessions s
+                    JOIN messages m ON m.session_id = s.session_id
+                    ORDER BY s.updated_at DESC, s.session_id,
+                             m.created_at ASC, m.id ASC
+                    """
+                ).fetchall()
+
+        sessions: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            session = sessions.setdefault(row[0], {
+                "session_id": row[0],
+                "persona_id": row[1],
+                "created_at": normalize_iso_timestamp(row[2]),
+                "updated_at": normalize_iso_timestamp(row[3]),
+                "message_count": 0,
+                "last_message_preview": "",
+                "language": detect_language(""),
+                "messages": [],
+            })
+            session["messages"].append(asdict(SessionMessage(
+                role=row[4],
+                content=row[5],
+                created_at=normalize_iso_timestamp(row[6]),
+                metadata=_decode_metadata(row[7]),
+            )))
+            session["message_count"] += 1
+            session["last_message_preview"] = (row[5] or "")[:120]
+            if row[4] == "user":
+                session["language"] = row[8] or detect_language(row[5] or "")
+        return list(sessions.values())
 
     def get_session_updated_at(
         self,

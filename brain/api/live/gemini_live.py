@@ -122,6 +122,10 @@ class GeminiLiveSession:
         persona_id: str = "default",
         project_id: str = "default",
         session_id: str = "",
+        user_id: str = "",
+        role: str = "",
+        principal_type: str = "",
+        principal_id: str = "",
         system_instruction: str = "",
         config: BrainSettings | None = None,
         transport_factory: Any | None = None,
@@ -132,6 +136,10 @@ class GeminiLiveSession:
         self.persona_id = persona_id
         self.project_id = project_id
         self.session_id = session_id or relay_session_id
+        self.user_id = user_id
+        self.role = role
+        self.principal_type = principal_type
+        self.principal_id = principal_id
         self._system_instruction = system_instruction
         self.config = config or get_settings()
         self._transport_factory = transport_factory or (lambda cfg: GeminiLiveWebSocketTransport(cfg))
@@ -146,6 +154,7 @@ class GeminiLiveSession:
         # Live 按音訊秒數計價，不是 token。逐 turn 累積、turnComplete 時記帳。
         self._input_audio_seconds = 0.0
         self._output_audio_seconds = 0.0
+        self._usage_tasks: set[asyncio.Task] = set()
         self._chunk_counter = 0
         self._response_in_progress = False
         self._reconnecting = False
@@ -188,11 +197,18 @@ class GeminiLiveSession:
                 self._keepalive_task = asyncio.create_task(self._keepalive_loop())
             return transport
 
-    async def send_text_turn(self, user_text: str) -> None:
+    async def send_text_turn(self, user_text: str, speech_language: str | None = None) -> None:
         transport = await self.ensure_connected()
         self._response_in_progress = True
         if user_text:
             self._last_user_message = user_text
+            # 語言判定綁定回合：先清掉前一句（可能是台語）的判定，再套這一句自己的。
+            # 前台 ASR 聽出台語時帶 speech_language，這一輪 search_knowledge 照它查台語文件。
+            self._utterance_language = None
+            if speech_language == TAIWANESE:
+                verdict = asyncio.get_running_loop().create_future()
+                verdict.set_result(TAIWANESE)
+                self._utterance_language = verdict
         await transport.send_json(self._build_user_turn_message(user_text))
 
     async def send_realtime_input(self, audio_b64: str, mime_type: str) -> None:
@@ -254,9 +270,15 @@ class GeminiLiveSession:
             except asyncio.CancelledError:
                 pass
             self._keepalive_task = None
-        if self._transport is not None:
-            await self._transport.close()
-            self._transport = None
+        try:
+            if self._transport is not None:
+                await self._transport.close()
+                self._transport = None
+        finally:
+            # Cancelling the listener must not cancel an in-progress ledger write.
+            if self._usage_tasks:
+                await asyncio.gather(*tuple(self._usage_tasks))
+            await self._record_audio_usage()
 
     async def _listen(self) -> None:
         transport: JsonTransport | None = None
@@ -503,6 +525,16 @@ class GeminiLiveSession:
         )
         self._input_audio_seconds = 0.0
         self._output_audio_seconds = 0.0
+        if not any(seconds > 0 for _, seconds in pending):
+            return
+        task = asyncio.create_task(self._persist_audio_usage(pending))
+        self._usage_tasks.add(task)
+        task.add_done_callback(self._usage_tasks.discard)
+        await asyncio.shield(task)
+
+    async def _persist_audio_usage(
+        self, pending: tuple[tuple[str, float], ...],
+    ) -> None:
         for direction, seconds in pending:
             if seconds <= 0:
                 continue
@@ -528,6 +560,10 @@ class GeminiLiveSession:
 
         return UsageScope(
             kind="live",
+            user_id=self.user_id,
+            role=self.role,
+            principal_type=self.principal_type,
+            principal_id=self.principal_id,
             project_id=self.project_id,
             session_id=self.session_id,
             persona_id=self.persona_id,

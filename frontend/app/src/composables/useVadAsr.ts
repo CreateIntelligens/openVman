@@ -11,10 +11,14 @@ import {
   VadRecognizer,
   type AsrErrorCode,
   type HttpAdapter,
+  type TranscriptionMeta,
 } from '@shared/speech'
 
 interface VadAsrOptions {
-  onResult?: (transcript: string) => void
+  /** meta.language：後端聽出的語言（台語分流時可能是 "nan"）。 */
+  onResult?: (transcript: string, meta?: TranscriptionMeta) => void
+  /** 每次上傳附加的表單欄位（專案與語言分流）。 */
+  formFields?: () => Record<string, string>
   onError?: (error: string) => void
 }
 
@@ -39,7 +43,8 @@ export function useVadAsr(options: VadAsrOptions = {}) {
   const recognizer = new VadRecognizer({
     http: appHttpAdapter,
     commitMode: 'per-utterance',
-    onResult: (text) => options.onResult?.(text),
+    onResult: (text, meta) => options.onResult?.(text, meta),
+    formFields: () => options.formFields?.() ?? {},
     onError: (code: AsrErrorCode) => options.onError?.(code),
     onListeningChange: (val) => {
       isListening.value = val

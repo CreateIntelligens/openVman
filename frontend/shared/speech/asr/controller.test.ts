@@ -140,6 +140,41 @@ describe('SpeechController (shared state machine)', () => {
     expect(recorder.stop).toHaveBeenCalled()
   })
 
+  it('持續說話超過閒置門檻仍收音，停止說話後才開始閒置計時', async () => {
+    const controller = new SpeechController({
+      http, browserRecognizer: browser, vadRecognizer: vad, serverRecorder: recorder,
+    })
+    await controller.startListening()
+    vad.speaking = true
+    controller.markActivity()
+    vi.advanceTimersByTime(ASR_IDLE_TIMEOUT_MS * 3)
+    expect(controller.listening).toBe(true)
+    expect(vad.stop).not.toHaveBeenCalled()
+    vad.speaking = false
+    controller.markActivity()
+    vi.advanceTimersByTime(ASR_IDLE_TIMEOUT_MS - 1)
+    expect(controller.listening).toBe(true)
+    vi.advanceTimersByTime(1)
+    expect(controller.listening).toBe(false)
+  })
+
+  it('VAD 啟動中失敗的舊回傳不會清掉 fallback 收音狀態和計時器', async () => {
+    const controller = new SpeechController({
+      http, browserRecognizer: browser, vadRecognizer: vad, serverRecorder: recorder,
+    })
+    vad.start.mockImplementation(() => {
+      controller.handleRecognizerError('vad-unavailable')
+      return false
+    })
+    await controller.startListening()
+    expect(recorder.listening).toBe(true)
+    expect(controller.listening).toBe(true)
+    expect(controller.uiState).toBe('push-to-talk-recording')
+    vi.advanceTimersByTime(SERVER_ASR_MAX_CLIP_MS)
+    expect(recorder.listening).toBe(false)
+    expect(controller.listening).toBe(false)
+  })
+
   it('VAD 失敗 (vad-unavailable) -> 改為 push-to-talk 並立即開始錄音', async () => {
     const controller = new SpeechController({
       http,

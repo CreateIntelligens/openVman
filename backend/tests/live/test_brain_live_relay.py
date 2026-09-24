@@ -1,5 +1,6 @@
 import asyncio
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -132,8 +133,17 @@ async def test_brain_live_relay_stops_when_client_event_sink_is_closed():
 
 
 @pytest.mark.asyncio
-async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send():
+@pytest.mark.parametrize("key_id", [None, "key-1"])
+async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send(key_id):
     session = Session(client_id="client-concurrent")
+    session.metadata.update({
+        "user_id": "account-1",
+        "user_role": "user",
+        "_current_account": SimpleNamespace(
+            user=SimpleNamespace(id="account-1", role="user"),
+            embed_key=SimpleNamespace(key_id=key_id) if key_id else None,
+        ),
+    })
     websocket = ConnectableFakeWebSocket()
     connect_calls = 0
 
@@ -171,9 +181,11 @@ async def test_brain_live_relay_serializes_initial_connect_under_concurrent_send
     assert connect_kwargs is not None
     assert connect_kwargs["additional_headers"] == {
         "X-Internal-Token": "internal-secret",
-        "X-OpenVMan-User-ID": "",
-        "X-OpenVMan-Role": "",
+        "X-OpenVMan-User-ID": "account-1",
+        "X-OpenVMan-Role": "user",
         "X-OpenVMan-Project-ID": "",
+        "X-Principal-Type": "embed_key" if key_id else "user",
+        "X-Principal-Id": key_id or "account-1",
     }
     assert [payload["event"] for payload in websocket.sent_messages] == [
         "relay_init",

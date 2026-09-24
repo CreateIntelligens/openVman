@@ -31,7 +31,13 @@ const SPEECH_ENDPOINT = "/v1/audio/speech";
 const DEFAULT_CHARACTER = "hayley";
 const PCM_SAMPLE_RATE = 16000;
 
-type SpeakOptions = { character?: string; provider?: string; voice?: string };
+type SpeakOptions = {
+  character?: string;
+  provider?: string;
+  voice?: string;
+  /** 併入串流請求的欄位，例如 project_id、language_routes（台語分流時後端改用 VoxCPM）。 */
+  extraBody?: Record<string, string>;
+};
 type TtsBodyBuilder = (text: string, opts: SpeakOptions) => Record<string, string>;
 
 export interface TtsProvider {
@@ -166,7 +172,7 @@ export function useTtsStreamer(options: TtsStreamerOptions) {
           headers: requestHeaders(),
           body: JSON.stringify(
             useStream
-              ? buildStreamBody(trimmed, opts)
+              ? { ...buildStreamBody(trimmed, opts), ...(opts.extraBody ?? {}) }
               : buildSpeechBody(trimmed, opts, provider),
           ),
           signal: abort.signal,

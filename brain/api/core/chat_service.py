@@ -41,6 +41,7 @@ from protocol.message_envelope import (
     serialize_context,
 )
 from safety.guardrails import enforce_guardrails, enforce_session_limits
+from tools.context import active_speech_language
 
 _pii_writeback_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pii-writeback")
 
@@ -276,9 +277,12 @@ def finalize_generation(
         user_pii_future = _pii_writeback_executor.submit(
             _scan_reply_pii, context.user_message, context.trace_id,
         )
+        # 前台語音經 ASR 時會帶 speech_language（例如聽出是台語），轉錄文字看不出來。
+        speech_language = context.request_context.get("metadata", {}).get("speech_language")
         _, user_message_id = append_session_message_with_id(
             context.session_id, context.persona_id, "user", context.user_message,
             project_id=context.project_id,
+            language=speech_language if isinstance(speech_language, str) else None,
         )
         _pii_writeback_executor.submit(
             _patch_reply_pii_metadata,
@@ -392,6 +396,10 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             trace_id=trace_id,
         )
         return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=[])
+    speech_language = context.request_context.get("metadata", {}).get("speech_language")
+    speech_token = active_speech_language.set(
+        speech_language if isinstance(speech_language, str) else "",
+    )
     try:
         return run_agent_loop(
             context.prompt_messages,
@@ -413,6 +421,8 @@ def execute_generation(context: GenerationContext) -> AgentLoopResult:
             trace_id=trace_id,
         )
         return AgentLoopResult(reply=_reply_from_turn(turn), tool_steps=exc.partial_steps)
+    finally:
+        active_speech_language.reset(speech_token)
 
 
 def record_generation_failure(area: str, message: str, detail: str = "") -> None:

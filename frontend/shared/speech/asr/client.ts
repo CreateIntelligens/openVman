@@ -24,7 +24,19 @@ export interface ServerTranscription {
   text: string
   provider: string
   elapsed_seconds?: number
+  /** 後端聽出的語言；目前只有台語分流開著時會回 "nan"。轉錄文字看不出台語。 */
+  language?: string | null
+  /** 實際生效的語言分流（後台設定與 language_routes 的交集）。 */
+  language_routes?: string[]
 }
+
+/** 轉錄結果附帶的資訊，交給 onResult 的第二個參數。 */
+export interface TranscriptionMeta {
+  language?: string | null
+}
+
+/** 每次上傳時附加的表單欄位（例如 project_id、language_routes）。 */
+export type TranscribeFormFields = () => Record<string, string>
 
 async function checkOk(res: Response, http: HttpAdapter): Promise<void> {
   if (!res.ok) {
@@ -69,9 +81,13 @@ export async function transcribeOnServer(
   http: HttpAdapter,
   clip: Blob,
   filename: string,
+  formFields?: TranscribeFormFields,
 ): Promise<ServerTranscription> {
   const form = new FormData()
   form.append('file', clip, filename)
+  for (const [key, value] of Object.entries(formFields?.() ?? {})) {
+    form.append(key, value)
+  }
   const res = await http.request(TRANSCRIBE_PATH, {
     method: 'POST',
     body: form,

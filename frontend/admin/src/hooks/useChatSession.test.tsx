@@ -28,6 +28,7 @@ let latestSpeechRecognition: {
   onstart?: () => void;
   onend?: () => void;
   onspeechstart?: () => void;
+  onspeechend?: () => void;
   onresult?: (event: {
     resultIndex: number;
     results: Array<{
@@ -45,6 +46,7 @@ class MockSpeechRecognition {
   onstart?: () => void;
   onend?: () => void;
   onspeechstart?: () => void;
+  onspeechend?: () => void;
   onresult?: (event: {
     resultIndex: number;
     results: Array<{
@@ -433,6 +435,16 @@ describe("useChatSession TTS prefetch", () => {
     });
     expect(result.current.asrListening).toBe(true);
 
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.asrListening).toBe(true);
+
+    act(() => {
+      latestSpeechRecognition?.onspeechend?.();
+      vi.advanceTimersByTime(9999);
+    });
+    expect(result.current.asrListening).toBe(true);
     act(() => {
       vi.advanceTimersByTime(1);
     });

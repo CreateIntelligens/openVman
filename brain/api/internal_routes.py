@@ -11,6 +11,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -42,10 +43,13 @@ def append_session_message(
     role: str,
     content: str,
     project_id: str = "default",
+    language: str | None = None,
 ):
     from memory.memory import append_session_message as _append_session_message
 
-    return _append_session_message(session_id, persona_id, role, content, project_id=project_id)
+    return _append_session_message(
+        session_id, persona_id, role, content, project_id=project_id, language=language,
+    )
 
 
 def log_event(name: str, **kwargs: Any) -> None:
@@ -67,6 +71,10 @@ def _build_live_session(
     persona_id: str,
     project_id: str,
     session_id: str = "",
+    user_id: str = "",
+    role: str = "",
+    principal_type: str = "",
+    principal_id: str = "",
     event_sink,
 ):
     from live.gemini_live import GeminiLiveSession
@@ -77,6 +85,10 @@ def _build_live_session(
         persona_id=persona_id,
         project_id=project_id,
         session_id=session_id,
+        user_id=user_id,
+        role=role,
+        principal_type=principal_type,
+        principal_id=principal_id,
         system_instruction=_build_live_system_instruction(persona_id, project_id, session_id=session_id),
         event_sink=event_sink,
     )
@@ -199,6 +211,25 @@ def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, An
 
 
 @router.post(
+    "/brain/internal/audio-language",
+    summary="判斷一段語音是不是台語",
+    description="Backend 的 ASR 在專案開了台語分流時呼叫；body 是 WAV。台語轉錄後是中文字，只能聽聲音分辨。",
+)
+async def internal_audio_language(request: Request):
+    from memory.language_detect import detect_audio_language
+
+    wav = await request.body()
+    if not wav:
+        raise HTTPException(status_code=400, detail="empty audio")
+    try:
+        language = await asyncio.to_thread(detect_audio_language, wav)
+    except Exception as exc:  # noqa: BLE001 - 判斷失敗不能讓 ASR 失敗
+        logger.warning(json.dumps({"event": "audio_language_failed", "error_type": type(exc).__name__}))
+        return {"language": None}
+    return {"language": language}
+
+
+@router.post(
     "/internal/enrich",
     summary="內部對話豐富化",
     description="接收來自其他微服務的外部內容並作為系統訊息存入指定 Session 中。",
@@ -232,7 +263,15 @@ async def internal_live_bridge(websocket: WebSocket, relay_session_id: str):
     await websocket.accept()
     state: dict[str, Any] = {
         "live_session": None,
-        "args": {"client_id": relay_session_id, "persona_id": "default", "project_id": "default"},
+        "args": {
+            "client_id": relay_session_id,
+            "persona_id": "default",
+            "project_id": "default",
+            "user_id": websocket.headers.get("X-OpenVMan-User-ID", ""),
+            "role": websocket.headers.get("X-OpenVMan-Role", ""),
+            "principal_type": websocket.headers.get("X-Principal-Type", ""),
+            "principal_id": websocket.headers.get("X-Principal-Id", ""),
+        },
         "session_id": relay_session_id,
         "client_disconnected": False,
     }
@@ -283,8 +322,10 @@ async def _dispatch_live_event(state: dict, relay_id: str, sink, payload: dict) 
         if payload.get("ephemeral"):
             await live.send_text_turn(text)
         else:
-            _save_user_message(state, text)
-            await live.send_text_turn(text)
+            speech_language = payload.get("speech_language")
+            speech_language = speech_language if isinstance(speech_language, str) else None
+            _save_user_message(state, text, speech_language)
+            await live.send_text_turn(text, speech_language)
     elif event == "client_interrupt":
         await live.request_stop()
     elif event == "client_audio_chunk" and (audio := str(payload.get("audio_base64", "")).strip()):
@@ -312,10 +353,14 @@ def _ensure_live_session(state: dict[str, Any], relay_session_id: str, event_sin
     )
 
 
-def _save_user_message(state: dict[str, Any], text: str) -> None:
-    # 打字輸入只有這裡會存；語音輸入由 GeminiLiveSession 從轉錄存。
+def _save_user_message(state: dict[str, Any], text: str, language: str | None = None) -> None:
+    # 前台送來的文字（打字或前台 ASR 的結果）在這裡存；Live 音訊由 GeminiLiveSession
+    # 從轉錄存。language 是前台 ASR 聽出來的語言（例如台語）。
     args = state["args"]
-    append_session_message(state["session_id"], args["persona_id"], "user", text, project_id=args["project_id"])
+    append_session_message(
+        state["session_id"], args["persona_id"], "user", text,
+        project_id=args["project_id"], language=language,
+    )
 
 
 # ---------------------------------------------------------------------------

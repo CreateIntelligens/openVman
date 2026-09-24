@@ -11,13 +11,15 @@
  */
 
 import type { HttpAdapter } from '../http'
-import { transcribeOnServer } from './client'
+import { transcribeOnServer, type TranscribeFormFields, type TranscriptionMeta } from './client'
 import { MIME_SUFFIXES, suffixFor } from './engines'
 import type { AsrErrorCode } from './errors'
 
 export interface ServerRecorderOptions {
   http: HttpAdapter
-  onResult?: (transcript: string) => void
+  onResult?: (transcript: string, meta?: TranscriptionMeta) => void
+  /** 每次上傳附加的表單欄位，例如專案與語言分流。 */
+  formFields?: TranscribeFormFields
   onError?: (error: AsrErrorCode) => void
   onRecordingChange?: (recording: boolean) => void
   onTranscribingChange?: (transcribing: boolean) => void
@@ -26,7 +28,8 @@ export interface ServerRecorderOptions {
 
 export class ServerRecorder {
   private http: HttpAdapter
-  private onResult?: (transcript: string) => void
+  private onResult?: (transcript: string, meta?: TranscriptionMeta) => void
+  private formFields?: TranscribeFormFields
   private onError?: (error: AsrErrorCode) => void
   private onRecordingChange?: (recording: boolean) => void
   private onTranscribingChange?: (transcribing: boolean) => void
@@ -42,6 +45,7 @@ export class ServerRecorder {
   constructor(options: ServerRecorderOptions) {
     this.http = options.http
     this.onResult = options.onResult
+    this.formFields = options.formFields
     this.onError = options.onError
     this.onRecordingChange = options.onRecordingChange
     this.onTranscribingChange = options.onTranscribingChange
@@ -51,6 +55,7 @@ export class ServerRecorder {
   public updateOptions(options: Partial<ServerRecorderOptions>): void {
     if (options.http !== undefined) this.http = options.http
     if (options.onResult !== undefined) this.onResult = options.onResult
+    if (options.formFields !== undefined) this.formFields = options.formFields
     if (options.onError !== undefined) this.onError = options.onError
     if (options.onRecordingChange !== undefined) this.onRecordingChange = options.onRecordingChange
     if (options.onTranscribingChange !== undefined) this.onTranscribingChange = options.onTranscribingChange
@@ -200,14 +205,14 @@ export class ServerRecorder {
     this.setTranscribing(true)
     try {
       const filename = `speech${suffixFor(mimeType)}`
-      const result = await transcribeOnServer(this.http, clip, filename)
+      const result = await transcribeOnServer(this.http, clip, filename, this.formFields)
       if (!this.alive) return
       const text = result.text.trim()
       if (!text || text.includes('轉錄失敗')) {
         this.emitError('transcribe-failed')
         return
       }
-      this.onResult?.(text)
+      this.onResult?.(text, { language: result.language ?? null })
     } catch {
       if (this.alive) {
         this.emitError('transcribe-failed')
