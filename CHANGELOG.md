@@ -4,7 +4,8 @@
 
 ### Changed
 
-- **虛擬人前台暫時藏起「即時」對話模式**：設定視窗的「對話模式」（即時＝Gemini Live 當對話模型／標準＝一般 Brain）整塊隱藏，一律用標準模式。原因是「Gemini Live 即時語音」容易跟 ASR 選單的「Gemini Live」辨識搞混，實際也沒在用。以前存成即時的帳號與瀏覽器開啟時當成標準。程式保留，`frontend/app/src/types/voiceMode.ts` 的 `LIVE_VOICE_MODE_AVAILABLE` 改回 `true` 即恢復。後台 Chat 的 Live 不受影響。
+- **虛擬人前台暫時藏起「即時」對話模式**：設定視窗的「對話模式」（即時＝Gemini Live 當對話模型／標準＝一般 Brain）整塊隱藏，一律用標準模式。原因是「Gemini Live 即時語音」容易跟 ASR 選單的「Gemini Live」辨識搞混，實際也沒在用。以前存成即時的帳號與瀏覽器開啟時當成標準。程式保留，`frontend/app/src/types/voiceMode.ts` 的 `LIVE_VOICE_MODE_AVAILABLE` 改回 `true` 即恢復。
+- **後台 Chat 也藏起 Live 模式**：標題列的 Text／Live 切換拿掉，一律用 Text（一般 Brain 回答），同樣是沒人在用、名稱又跟 ASR 的「Gemini Live」辨識撞名。存過 live 的瀏覽器開啟時退回 Text。程式保留，`frontend/admin/src/pages/Chat.tsx` 的 `LIVE_CHAT_AVAILABLE` 改回 `true` 即恢復。
 - **ASR 選單的「Gemini 串流」改名為「Gemini Live」**：只改顯示名稱，引擎代號（`gemini-live`）與行為不變。
 - **拔掉後台的「全站預設 ASR 引擎」**：原本 ROOT 可在後台「語音」頁替所有沒選過引擎的人指定引擎（正式環境被設成 xiaomi，蓋過 `.env` 的 breeze），前台與後台 Chat 的選單也有一個看不出是哪家的「預設（依系統設定）」。現在沒選過的人一律用部署設定 `ASR_PROVIDER`，選單直接顯示實際在用的引擎（沒授權給該帳號也列出來）；移除 `GET/PUT/DELETE /api/v1/settings/asr-provider`，auth 資料庫 migration 14 刪掉殘留的設定。試辨識改為 `POST /api/v1/asr/preview`（限 admin），可帶 `provider` 指定引擎、只影響這一次，回傳實際辨識的引擎（備援接手時看得出來）。正式環境沒選過引擎的帳號會從 xiaomi 換成 breeze。
 - **前台下拉選單改成自己畫的清單**：虛擬人前台的下拉原本是原生 `<select>`，收起來的框有套樣式，點開的選項清單卻由作業系統畫（白底、系統字型、藍色選取條），CSS 管不到。`CustomSelect.vue` 改成按鈕加 HTML 選項清單，外觀與操作對齊後台 `Select.tsx`：主題色標示選中項、滑過變色、方向鍵／Home／End／Enter／Esc／打字跳選、點外面收起、下方空間不夠往上開。清單以 `position: fixed` 擺放，不會被設定視窗的捲動區裁掉；Esc 只收清單、不關設定視窗。所有下拉共用這個元件，用法（`v-model`、`change`）不變。

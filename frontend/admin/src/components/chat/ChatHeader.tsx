@@ -3,7 +3,8 @@ interface ChatHeaderProps {
   conversationStatus: string;
   sessionId: string;
   mode: "text" | "live";
-  onModeChange: (mode: "text" | "live") => void;
+  /** 不給就不顯示 Text／Live 切換（只剩一種模式時）。 */
+  onModeChange?: (mode: "text" | "live") => void;
   onOpenSessions: () => void;
   onOpenQuickQa: () => void;
 }
@@ -43,30 +44,32 @@ export default function ChatHeader({
           <span className="hidden sm:inline">快速問答</span>
         </button>
 
-        <div className="inline-flex rounded-md border border-border bg-surface-sunken p-0.5">
-          <button
-            type="button"
-            onClick={() => onModeChange("text")}
-            className={`rounded-sm px-3 py-1 text-xs font-medium transition-colors ${
-              mode === "text"
-                ? "bg-surface-raised text-content shadow-xs"
-                : "text-content-muted hover:text-content"
-            }`}
-          >
-            Text
-          </button>
-          <button
-            type="button"
-            onClick={() => onModeChange("live")}
-            className={`rounded-sm px-3 py-1 text-xs font-medium transition-colors ${
-              mode === "live"
-                ? "bg-primary text-content-inverse"
-                : "text-content-muted hover:text-content"
-            }`}
-          >
-            Live
-          </button>
-        </div>
+        {onModeChange && (
+          <div className="inline-flex rounded-md border border-border bg-surface-sunken p-0.5">
+            <button
+              type="button"
+              onClick={() => onModeChange("text")}
+              className={`rounded-sm px-3 py-1 text-xs font-medium transition-colors ${
+                mode === "text"
+                  ? "bg-surface-raised text-content shadow-xs"
+                  : "text-content-muted hover:text-content"
+              }`}
+            >
+              Text
+            </button>
+            <button
+              type="button"
+              onClick={() => onModeChange("live")}
+              className={`rounded-sm px-3 py-1 text-xs font-medium transition-colors ${
+                mode === "live"
+                  ? "bg-primary text-content-inverse"
+                  : "text-content-muted hover:text-content"
+              }`}
+            >
+              Live
+            </button>
+          </div>
+        )}
 
         {sessionId && (
           <span className="hidden rounded-md border border-border bg-surface-sunken px-2 py-1 font-mono text-[0.6875rem] text-content-subtle sm:inline-block">

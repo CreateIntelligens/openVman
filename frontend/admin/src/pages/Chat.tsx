@@ -14,8 +14,12 @@ import { useLocalStorageState } from "../hooks/useLocalStorageState";
 import { useLiveSession, type LiveMessage } from "../hooks/useLiveSession";
 import { DEFAULT_VOICE_SOURCE, type VoiceSource } from "../hooks/liveSessionProtocol";
 
-const CHAT_MODES = ["text", "live"] as const;
-type ChatMode = (typeof CHAT_MODES)[number];
+type ChatMode = "text" | "live";
+// Live（Gemini Live 聽完直接回答）先藏起來（2026-09-29）：沒人在用，名稱又跟 ASR 的
+// 「Gemini Live」辨識撞在一起。存過 live 的瀏覽器因為不在允許清單裡，會退回 text。
+// 程式留著，改回 true 就恢復；前台的同一個開關在 frontend/app 的 types/voiceMode.ts。
+const LIVE_CHAT_AVAILABLE = false;
+const CHAT_MODES: readonly ChatMode[] = LIVE_CHAT_AVAILABLE ? ["text", "live"] : ["text"];
 const VOICE_SOURCES = ["gemini", "custom"] as const satisfies readonly VoiceSource[];
 const VOICE_SOURCE_OPTIONS: ReadonlyArray<{ value: VoiceSource; label: string }> = [
   { value: "gemini", label: "Gemini 語音" },
@@ -329,7 +333,7 @@ export default function Chat() {
             conversationStatus={headerStatus}
             sessionId={activeSessionId}
             mode={mode}
-            onModeChange={handleModeChange}
+            onModeChange={LIVE_CHAT_AVAILABLE ? handleModeChange : undefined}
             onOpenSessions={() => setSessionsOpen(true)}
             onOpenQuickQa={() => setQuickQaOpen(true)}
           />
