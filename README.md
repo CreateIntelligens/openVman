@@ -339,7 +339,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 舊引擎偏好，改用部署設定的 `ASR_PROVIDER` 與既有 fallback 鏈。後台沒有「全站預設
 引擎」可以改：沒選過引擎的人一律用 `ASR_PROVIDER`，每個人在聊天室或前台設定自己選
 （能選哪些由帳號頁授權）；後台「語音」頁的試辨識可指定引擎比較，不影響任何人。
-開了台語分流的專案一律改用 Breeze 批次辨識（Gemini 串流聽不懂台語），並同時判斷是不是台語；
+開了台語分流的專案一律改用 Breeze 批次辨識（Gemini Live 辨識聽不懂台語），並同時判斷是不是台語；
 判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時當不是台語，細節見 `docs/specs/03_BRAIN_SPEC.md`。
 
 ### 前台設定跟著帳號
@@ -365,7 +365,7 @@ API 見 `docs/specs/01_BACKEND_SPEC.md`「前台設定跟著帳號」。
 
 `durations_ms` 已算好分段：`asr`（講完到辨識回來）、`send`、`brain`、`tts_first_audio`、
 `to_playback`、`total`（講完話到開始播放；打字是送出到開始播放）。`outcome` 為
-`played`／`interrupted`／`error`／`superseded`。按鍵錄音與 Gemini 串流辨識沒有講完的時間點，
+`played`／`interrupted`／`error`／`superseded`。按鍵錄音與 Gemini Live 辨識沒有講完的時間點，
 `total` 改從送出算。
 
 ```bash

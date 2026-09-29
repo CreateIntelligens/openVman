@@ -31,7 +31,7 @@ export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> =
     note: "在使用者裝置上辨識，語音不會送到伺服器；部分瀏覽器不支援。",
   },
   "gemini-live": {
-    label: "Gemini 串流",
+    label: "Gemini Live",
     note: "邊講邊出字、講完約 0.5 秒定稿；語音送往 Google。台語分流時改用 Breeze。",
   },
 };
