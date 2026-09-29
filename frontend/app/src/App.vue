@@ -368,11 +368,15 @@ const typewriter = useTypewriter({
 
 // pendingText holds the text between onUtteranceComplete and onFirstAudio
 let pendingText = "";
+// 回覆已到、TTS 還在合成第一段聲音（約 2 秒）：這段空檔也算在回答，否則講完自動
+// 恢復收音會在開口前就打開麥克風，收到虛擬人自己的聲音。
+const ttsPending = ref(false);
 
 const ttsStreamer = useTtsStreamer({
   ttsProviders: () => ttsProviders.value,
   onFirstAudio: () => {
     turnTiming.mark("first_audio");
+    ttsPending.value = false;
     typewriter.start(pendingText);
     pendingText = "";
   },
@@ -386,6 +390,7 @@ const ttsStreamer = useTtsStreamer({
   // 打字機（約 22 字／秒）本來就比語音快，讓它自己跑完；出錯、停止播放才一次顯示。
   onEnd: () => {},
   onError: (err) => {
+    ttsPending.value = false;
     console.error("[TTS] stream error:", err);
     turnTiming.finish("error");
     typewriter.flush();
@@ -440,6 +445,7 @@ const chat = useAvatarChat({
   },
   onStopAudio: () => {
     turnTiming.interrupted();
+    ttsPending.value = false;
     ttsStreamer.cancel();
     audio.flush();
     wasm.clearAudio();
@@ -457,8 +463,11 @@ const chat = useAvatarChat({
     pendingText = fullText;
     turnTiming.mark("reply_done");
     turnTiming.replyText(fullText);
+    ttsPending.value = true;
     turnTiming.mark("tts_start");
-    void ttsStreamer.speak(fullText, languageRoutesSpeakOptions());
+    void ttsStreamer.speak(fullText, languageRoutesSpeakOptions()).finally(() => {
+      ttsPending.value = false;
+    });
   },
   onServerError: (code, message, retryAfterMs) => {
     turnTiming.finish("error");
@@ -488,6 +497,7 @@ const avatarResponding = computed(() =>
   chat.state.value === "THINKING"
   || chat.state.value === "SPEAKING"
   || isTyping.value
+  || ttsPending.value
   || audio.isPlaying.value,
 );
 
@@ -697,10 +707,14 @@ async function handleFatalRetry(): Promise<void> {
 }
 
 const ASR_IDLE_TIMEOUT_MS = 10_000;
+// 虛擬人講完自動恢復收音後，這麼久沒開口就關麥克風（比剛按下時短：使用者已經在對話中）。
+const ASR_RESUME_IDLE_TIMEOUT_MS = 6_000;
 const SERVER_ASR_MAX_CLIP_MS = 60_000;
 
 const asrInterim = ref("");
 let asrIdleTimer: ReturnType<typeof setTimeout> | null = null;
+// 虛擬人在想、在講時停止收音，免得收到自己的聲音；講完自動恢復，使用者不必每輪重按麥克風。
+let resumeAsrAfterReply = false;
 
 function clearAsrIdleTimer(): void {
   if (asrIdleTimer) {
@@ -709,9 +723,9 @@ function clearAsrIdleTimer(): void {
   }
 }
 
-function scheduleAsrIdleTimer(): void {
+function scheduleAsrIdleTimer(idleMs: number = ASR_IDLE_TIMEOUT_MS): void {
   clearAsrIdleTimer();
-  const timeout = asrInputMode.value === "push-to-talk" ? SERVER_ASR_MAX_CLIP_MS : ASR_IDLE_TIMEOUT_MS;
+  const timeout = asrInputMode.value === "push-to-talk" ? SERVER_ASR_MAX_CLIP_MS : idleMs;
   asrIdleTimer = setTimeout(() => {
     if (activeAsr.value.isListening.value) {
       activeAsr.value.stop();
@@ -790,6 +804,8 @@ const streamAsr = useStreamAsr({
   query: () => languageRoutes.asrFormFields(),
   onInterim: (text) => {
     asrInterim.value = text;
+    // 一句話講超過閒置時間還沒停頓時，不能講到一半被關掉。
+    markAsrActivity();
   },
   onResult: (transcript) => {
     turnTiming.asrDone();
@@ -924,6 +940,8 @@ function handleAsrToggle(): void {
   const active = activeAsr.value;
   if (active.isListening.value) {
     clearAsrIdleTimer();
+    // 使用者自己關掉麥克風：講完不要又自動打開。
+    resumeAsrAfterReply = false;
     active.stop();
   } else {
     scheduleAsrIdleTimer();
@@ -1106,13 +1124,27 @@ async function bootstrapRenderer(vrmReady?: Promise<unknown>): Promise<void> {
   }
 }
 
-// Pause ASR during THINKING/SPEAKING to avoid feedback loops
 watch(() => chat.state.value, (newState) => {
   if (newState === 'THINKING') triggerStageAvatarGesture("thinking-hand");
   if (newState === 'SPEAKING') triggerStageAvatarGesture("explain-open-hand");
   if ((newState === 'THINKING' || newState === 'SPEAKING') && activeAsr.value.isListening.value) {
-    activeAsr.value.pause();
+    resumeAsrAfterReply = true;
+    // 回答期間不倒數；講完再重新計時。
+    clearAsrIdleTimer();
+    // 串流連線閒著可能被 Gemini 斷掉，斷線會被當成「串流不可用」而一直退回批次，
+    // 所以先正常關掉、講完再連；其他引擎暫停即可。
+    if (activeAsr.value === streamAsr) activeAsr.value.stop();
+    else activeAsr.value.pause();
   }
+});
+
+watch(avatarResponding, (responding) => {
+  if (responding || !resumeAsrAfterReply) return;
+  resumeAsrAfterReply = false;
+  const active = activeAsr.value;
+  if (active.isListening.value) active.resume();
+  else void active.start();
+  scheduleAsrIdleTimer(ASR_RESUME_IDLE_TIMEOUT_MS);
 });
 
 watch(showSettings, () => {
