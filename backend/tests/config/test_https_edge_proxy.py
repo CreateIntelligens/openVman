@@ -134,14 +134,10 @@ def test_native_vhost_matches_its_template():
     ):
         rendered = rendered.replace(placeholder, value)
 
-    # 範本開頭多一段說明用的註解，比對時逐行去掉。
-    lines = rendered.splitlines()
-    while lines and (lines[0].startswith("#") or not lines[0].strip()):
-        lines.pop(0)
-    body = "\n".join(lines)
-
-    assert "${" not in body, "template still has unsubstituted placeholders"
-    assert body.strip() == current.strip()
+    # render-native-nginx.sh 用 envsubst 展開整份範本，開頭的說明註解也會留在
+    # 裝上去的檔案裡，所以整份比對，不去掉註解。
+    assert "${" not in rendered, "template still has unsubstituted placeholders"
+    assert rendered.strip() == current.strip()
 
 
 def test_public_https_setup_wraps_initial_certificate_nginx_and_cron(tmp_path):
