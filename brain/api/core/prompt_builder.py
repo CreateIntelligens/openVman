@@ -22,7 +22,7 @@ from .prompt_templates import (
     DEFAULT_TOOL_INSTRUCTIONS,
     NO_TOOLS_ANSWER_RULES,
     NO_TOOLS_INSTRUCTIONS,
-    primary_language_line,
+    reply_language_line,
 )
 
 
@@ -37,6 +37,12 @@ _WORKSPACE_BLOCK_CONFIG: list[tuple[str, str]] = [
     ("LEARNINGS", "prompt_learnings_char_budget"),
     ("ERRORS",    "prompt_errors_char_budget"),
 ]
+
+
+def _speech_language(request_context: dict[str, Any]) -> str:
+    metadata = request_context.get("metadata")
+    value = metadata.get("speech_language") if isinstance(metadata, dict) else ""
+    return value if isinstance(value, str) else ""
 
 
 def build_chat_messages(
@@ -90,7 +96,9 @@ def build_chat_messages(
             _format_request_context(request_context),
             history_summary,
             answer_rules,
-            primary_language_line(project_id),
+            reply_language_line(
+                project_id, user_message, _speech_language(request_context),
+            ),
         ]
         if block
     )

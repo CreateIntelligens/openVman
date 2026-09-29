@@ -131,7 +131,7 @@ def _build_live_system_instruction(persona_id: str, project_id: str, session_id:
         "「根據記憶」、「根據紀錄」、「根據之前的紀錄」、「根據資料」、「記憶顯示」、"
         "「資料顯示」等。像親眼看到、親耳聽過一樣直接陳述（例：回「你穿黑色上衣」，"
         "而非「根據紀錄你穿黑色上衣」）。\n"
-        "8. 用使用者最新一句話的語言回答（中文用繁體、英文回英文、西班牙文回西班牙文）；無法判斷或只是很短的招呼或單字（例如 hi、ok、hola）時用本專案主要語言。"
+        "8. 用使用者最新一句話的語言回答（中文用繁體、英文回英文、西班牙文回西班牙文），整段不要夾雜其他語言；無法判斷或只是很短的招呼或單字（例如 hi、ok、hola）時用最下方的預設語言。知識庫與人設裡的中文固定說法也要翻成回答語言，產品型號與專有名詞照原文。"
     )
     blocks.append(tool_rules)
     from core.prompt_templates import primary_language_line
