@@ -282,3 +282,10 @@ test("a broken preferences endpoint still opens with this browser's settings", a
   await boot.fetchInitialProjectData();
   assert.equal(settings.projectId, "proj-B");
 });
+
+test("someone saved on the hidden live mode opens in standard mode", async () => {
+  // 即時模式從設定視窗藏起來了；存著 live 的人要能回到標準模式，不能卡住。
+  const storage = savedStorage({ "avatar.voice_mode": "live" });
+  const { settings } = await openApp(storage);
+  assert.equal(settings.voiceMode, "text");
+});

@@ -5,6 +5,7 @@ import {
   normalizeAvatarBackgroundId,
 } from "../types/avatarBackground"
 import { normalizeReplyMode } from "../types/replyMode"
+import { normalizeVoiceMode } from "../types/voiceMode"
 import {
   STORAGE_KEYS,
   currentPrefScope,
@@ -30,7 +31,7 @@ function loadState() {
     characterId: readPref(STORAGE_KEYS.CHARACTER_ID, ""),
     projectId: readPref(STORAGE_KEYS.PROJECT_ID, "default"),
     personaId: readPref(STORAGE_KEYS.PERSONA_ID, "default"),
-    voiceMode: readPref(STORAGE_KEYS.VOICE_MODE, "text") as 'live' | 'text',
+    voiceMode: normalizeVoiceMode(readPref(STORAGE_KEYS.VOICE_MODE, "text")),
     ttsVoice: readPref(STORAGE_KEYS.TTS_VOICE, ""),
     backgroundId: normalizeAvatarBackgroundId(readPref(STORAGE_KEYS.BACKGROUND_ID, "dark")),
     backgroundUrl: readPref(STORAGE_KEYS.BACKGROUND_URL, ""),

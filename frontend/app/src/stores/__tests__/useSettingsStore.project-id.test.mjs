@@ -16,7 +16,7 @@ test("avatar settings persist the selected project id", () => {
 });
 
 test("avatar settings default to Standard text chat mode", () => {
-  assert.match(storeSource, /voiceMode:\s*readPref\(STORAGE_KEYS\.VOICE_MODE,\s*"text"\) as 'live' \| 'text'/);
+  assert.match(storeSource, /voiceMode:\s*normalizeVoiceMode\(readPref\(STORAGE_KEYS\.VOICE_MODE,\s*"text"\)\)/);
   assert.doesNotMatch(storeSource, /voiceMode:\s*readPref\(STORAGE_KEYS\.VOICE_MODE,\s*"live"\)/);
 });
 

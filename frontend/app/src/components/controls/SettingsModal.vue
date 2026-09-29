@@ -6,6 +6,7 @@ import { LANGUAGE_ROUTE_LABELS } from "../../composables/useLanguageRoutes";
 import type { AvatarState } from "../../composables/useAvatarChat";
 import type { TtsProvider } from "../../composables/useTtsStreamer";
 import { REPLY_MODES, type ReplyMode } from "../../types/replyMode";
+import { LIVE_VOICE_MODE_AVAILABLE } from "../../types/voiceMode";
 import {
   isUploadedAvatarBackgroundId,
   type AvatarBackgroundFit,
@@ -581,7 +582,7 @@ function handleDialogClick(event: MouseEvent): void {
               </small>
             </div>
 
-            <div class="field-card field-card--full">
+            <div v-if="LIVE_VOICE_MODE_AVAILABLE" class="field-card field-card--full">
               <span class="field-card__label">對話模式</span>
               <div class="mode-toggle">
                 <label class="mode-option" :class="{ 'mode-option--active': draftVoiceMode === 'live' }">
