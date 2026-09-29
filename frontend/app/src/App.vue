@@ -239,6 +239,7 @@ function clearUnderrunTimer(): void {
 }
 
 function onAudioQueueEmpty(): void {
+  clearUnderrunTimer();
   if (!isFinalReceived) {
     // Queue drained before final — start 3s watchdog
     underrunTimer = setTimeout(() => {
@@ -358,6 +359,9 @@ const typewriter = useTypewriter({
   onChar: (char) => {
     chat.appendAssistantText(char);
   },
+  onDone: () => {
+    isTyping.value = false;
+  },
 });
 
 // pendingText holds the text between onUtteranceComplete and onFirstAudio
@@ -371,13 +375,14 @@ const ttsStreamer = useTtsStreamer({
     pendingText = "";
   },
   onPcmChunk: (pcm) => {
+    // 聲音又來了：句與句之間的短暫斷音不算卡住，取消欠載看門狗。
+    clearUnderrunTimer();
     const copy = new Int16Array(pcm);
     void audio.playChunk(copy.buffer);
   },
-  onEnd: () => {
-    typewriter.flush();
-    isTyping.value = false;
-  },
+  // TTS 下載完不代表播完：這時把字幕倒完，長回覆會在講到一半時整段跳出來。
+  // 打字機（約 22 字／秒）本來就比語音快，讓它自己跑完；出錯、停止播放才一次顯示。
+  onEnd: () => {},
   onError: (err) => {
     console.error("[TTS] stream error:", err);
     turnTiming.finish("error");

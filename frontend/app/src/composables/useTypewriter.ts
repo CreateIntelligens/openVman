@@ -12,6 +12,8 @@ export interface TypewriterOptions {
   onBegin: () => void
   /** Called for each character revealed. */
   onChar: (char: string) => void
+  /** Called once all buffered text has been revealed. */
+  onDone?: () => void
 }
 
 export function useTypewriter(options: TypewriterOptions) {
@@ -32,6 +34,7 @@ export function useTypewriter(options: TypewriterOptions) {
       options.onChar(pendingText)
       pendingText = ""
     }
+    options.onDone?.()
   }
 
   /**
@@ -51,13 +54,13 @@ export function useTypewriter(options: TypewriterOptions) {
       return
     }
     timer = setInterval(() => {
-      if (!pendingText) {
-        stop()
-        return
-      }
       const next = pendingText[0]
       pendingText = pendingText.slice(1)
       options.onChar(next)
+      if (!pendingText) {
+        stop()
+        options.onDone?.()
+      }
     }, TYPEWRITER_INTERVAL_MS)
   }
 
