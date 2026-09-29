@@ -325,3 +325,21 @@ def test_internal_live_bridge_passes_speech_language_to_history_and_live():
 
     assert fake_session.speech_languages == ["nan"]
     assert append_msg.call_args.kwargs["language"] == "nan"
+
+
+def test_asr_judge_endpoint_returns_the_chosen_transcript(monkeypatch):
+    import memory.asr_judge as asr_judge
+
+    monkeypatch.setattr(
+        asr_judge, "choose_transcript",
+        lambda project_id, interim, final: asr_judge.Verdict(interim, "interim", {"interim": 0.6, "final": 0.1}, "jev"),
+    )
+    with _client() as client:
+        ok = client.post(
+            "/brain/internal/asr-judge",
+            json={"project_id": "p", "interim": "who am i", "final": "OMI"},
+            headers=_internal_headers(),
+        )
+        denied = client.post("/brain/internal/asr-judge", json={"final": "OMI"})
+    assert ok.json()["text"] == "who am i" and ok.json()["chosen"] == "interim"
+    assert denied.status_code == 403

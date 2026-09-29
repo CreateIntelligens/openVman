@@ -90,6 +90,14 @@ class ChatRequest(BaseModel):
     mode: str = Field("", description="Reply depth mode: fast, standard or deep")
 
 
+class InternalAsrJudgeRequest(BaseModel):
+    """Backend 串流辨識定稿時問 Brain：送最後的暫定字幕還是定稿。"""
+
+    project_id: str = "default"
+    interim: str = Field("", max_length=2000)
+    final: str = Field(..., max_length=2000)
+
+
 class KnowledgeDocumentPutRequest(BaseModel):
     path: str = Field(..., description="Relative path in workspace")
     content: str = Field(..., description="Full text content")

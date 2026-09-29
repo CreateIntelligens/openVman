@@ -1,0 +1,482 @@
+[
+ {
+  "interim": "who am i",
+  "final": "OMI",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.52,
+   "two": 0.1
+  },
+  "chosen": "interim",
+  "seconds": 0.466
+ },
+ {
+  "interim": "who am i",
+  "final": "OMI",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.11,
+   "two": 0.55
+  },
+  "chosen": "interim",
+  "seconds": 0.354
+ },
+ {
+  "interim": "你是誰",
+  "final": "你是水",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.79,
+   "two": 0.26
+  },
+  "chosen": "interim",
+  "seconds": 0.28
+ },
+ {
+  "interim": "你是誰",
+  "final": "你是水",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.29,
+   "two": 0.78
+  },
+  "chosen": "interim",
+  "seconds": 0.324
+ },
+ {
+  "interim": "EUBL 的馬力多少",
+  "final": "一步的馬力多少",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.16,
+   "two": 0.29
+  },
+  "chosen": "final",
+  "seconds": 0.303
+ },
+ {
+  "interim": "EUBL 的馬力多少",
+  "final": "一步的馬力多少",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.28,
+   "two": 0.19
+  },
+  "chosen": "final",
+  "seconds": 0.316
+ },
+ {
+  "interim": "hola, ¿cómo estás?",
+  "final": "올라 코모 에스타스",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.88,
+   "two": 0.17
+  },
+  "chosen": "interim",
+  "seconds": 0.308
+ },
+ {
+  "interim": "hola, ¿cómo estás?",
+  "final": "올라 코모 에스타스",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.17,
+   "two": 0.89
+  },
+  "chosen": "interim",
+  "seconds": 0.323
+ },
+ {
+  "interim": "What is the flow rate of HIPPO",
+  "final": "What is the floor rate of hippo",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.56,
+   "two": 0.16
+  },
+  "chosen": "interim",
+  "seconds": 0.338
+ },
+ {
+  "interim": "What is the flow rate of HIPPO",
+  "final": "What is the floor rate of hippo",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.16,
+   "two": 0.56
+  },
+  "chosen": "interim",
+  "seconds": 0.299
+ },
+ {
+  "interim": "請問 DIVA 有攪拌器嗎",
+  "final": "請問低瓦有攪拌器嗎",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.44,
+   "two": 0.33
+  },
+  "chosen": "final",
+  "seconds": 0.274
+ },
+ {
+  "interim": "請問 DIVA 有攪拌器嗎",
+  "final": "請問低瓦有攪拌器嗎",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.29,
+   "two": 0.55
+  },
+  "chosen": "interim",
+  "seconds": 0.253
+ },
+ {
+  "interim": "Can you speak English",
+  "final": "肯你死逼英格利許",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.88,
+   "two": 0.09
+  },
+  "chosen": "interim",
+  "seconds": 0.26
+ },
+ {
+  "interim": "Can you speak English",
+  "final": "肯你死逼英格利許",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.09,
+   "two": 0.9
+  },
+  "chosen": "interim",
+  "seconds": 0.291
+ },
+ {
+  "interim": "我想問沉水泵",
+  "final": "我想問陳水扁",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.86,
+   "two": 0.39
+  },
+  "chosen": "interim",
+  "seconds": 0.339
+ },
+ {
+  "interim": "我想問沉水泵",
+  "final": "我想問陳水扁",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.39,
+   "two": 0.85
+  },
+  "chosen": "interim",
+  "seconds": 0.263
+ },
+ {
+  "interim": "水溫限制是幾度",
+  "final": "수온 제한은 몇 도",
+  "truth": "interim",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.82,
+   "two": 0.06
+  },
+  "chosen": "interim",
+  "seconds": 0.255
+ },
+ {
+  "interim": "水溫限制是幾度",
+  "final": "수온 제한은 몇 도",
+  "truth": "interim",
+  "order": "final_first",
+  "scores": {
+   "one": 0.06,
+   "two": 0.82
+  },
+  "chosen": "interim",
+  "seconds": 0.247
+ },
+ {
+  "interim": "O and I",
+  "final": "who am i",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.19,
+   "two": 0.54
+  },
+  "chosen": "final",
+  "seconds": 0.331
+ },
+ {
+  "interim": "O and I",
+  "final": "who am i",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.52,
+   "two": 0.19
+  },
+  "chosen": "final",
+  "seconds": 0.282
+ },
+ {
+  "interim": "who am",
+  "final": "Who am I?",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.18,
+   "two": 0.52
+  },
+  "chosen": "final",
+  "seconds": 0.301
+ },
+ {
+  "interim": "who am",
+  "final": "Who am I?",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.51,
+   "two": 0.19
+  },
+  "chosen": "final",
+  "seconds": 0.259
+ },
+ {
+  "interim": "污泥 泵 有 幾 馬",
+  "final": "污泥泵有幾匹馬力？",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.55,
+   "two": 0.76
+  },
+  "chosen": "final",
+  "seconds": 0.34
+ },
+ {
+  "interim": "污泥 泵 有 幾 馬",
+  "final": "污泥泵有幾匹馬力？",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.78,
+   "two": 0.51
+  },
+  "chosen": "final",
+  "seconds": 0.281
+ },
+ {
+  "interim": "What's the the max head of",
+  "final": "What's the max head of the DIVA pump?",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.22,
+   "two": 0.8
+  },
+  "chosen": "final",
+  "seconds": 0.276
+ },
+ {
+  "interim": "What's the the max head of",
+  "final": "What's the max head of the DIVA pump?",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.82,
+   "two": 0.22
+  },
+  "chosen": "final",
+  "seconds": 0.284
+ },
+ {
+  "interim": "¿Qué modelo tiene agi",
+  "final": "¿Qué modelo tiene agitador?",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.15,
+   "two": 0.85
+  },
+  "chosen": "final",
+  "seconds": 0.348
+ },
+ {
+  "interim": "¿Qué modelo tiene agi",
+  "final": "¿Qué modelo tiene agitador?",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.86,
+   "two": 0.15
+  },
+  "chosen": "final",
+  "seconds": 0.271
+ },
+ {
+  "interim": "你們電話幾號 嗯 嗯",
+  "final": "你們電話幾號？",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.59,
+   "two": 0.65
+  },
+  "chosen": "final",
+  "seconds": 0.364
+ },
+ {
+  "interim": "你們電話幾號 嗯 嗯",
+  "final": "你們電話幾號？",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.61,
+   "two": 0.59
+  },
+  "chosen": "final",
+  "seconds": 0.243
+ },
+ {
+  "interim": "我要找 50 E U B L",
+  "final": "我要找 50EUBL",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.18,
+   "two": 0.7
+  },
+  "chosen": "final",
+  "seconds": 0.344
+ },
+ {
+  "interim": "我要找 50 E U B L",
+  "final": "我要找 50EUBL",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.65,
+   "two": 0.19
+  },
+  "chosen": "final",
+  "seconds": 0.353
+ },
+ {
+  "interim": "안녕하세요 펌프",
+  "final": "你好，泵浦",
+  "truth": "final",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.1,
+   "two": 0.59
+  },
+  "chosen": "final",
+  "seconds": 0.35
+ },
+ {
+  "interim": "안녕하세요 펌프",
+  "final": "你好，泵浦",
+  "truth": "final",
+  "order": "final_first",
+  "scores": {
+   "one": 0.59,
+   "two": 0.09
+  },
+  "chosen": "final",
+  "seconds": 0.286
+ },
+ {
+  "interim": "eubl horse power",
+  "final": "EUBL horsepower?",
+  "truth": "either",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.13,
+   "two": 0.16
+  },
+  "chosen": "final",
+  "seconds": 0.365
+ },
+ {
+  "interim": "eubl horse power",
+  "final": "EUBL horsepower?",
+  "truth": "either",
+  "order": "final_first",
+  "scores": {
+   "one": 0.16,
+   "two": 0.13
+  },
+  "chosen": "final",
+  "seconds": 0.313
+ },
+ {
+  "interim": "¿Cuánto cuesta la bomba?",
+  "final": "Cuanto cuesta la bomba",
+  "truth": "either",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.91,
+   "two": 0.87
+  },
+  "chosen": "final",
+  "seconds": 0.323
+ },
+ {
+  "interim": "¿Cuánto cuesta la bomba?",
+  "final": "Cuanto cuesta la bomba",
+  "truth": "either",
+  "order": "final_first",
+  "scores": {
+   "one": 0.86,
+   "two": 0.9
+  },
+  "chosen": "final",
+  "seconds": 0.278
+ },
+ {
+  "interim": "ok thanks bye",
+  "final": "OK, thanks, bye.",
+  "truth": "either",
+  "order": "interim_first",
+  "scores": {
+   "one": 0.82,
+   "two": 0.83
+  },
+  "chosen": "final",
+  "seconds": 0.301
+ },
+ {
+  "interim": "ok thanks bye",
+  "final": "OK, thanks, bye.",
+  "truth": "either",
+  "order": "final_first",
+  "scores": {
+   "one": 0.82,
+   "two": 0.81
+  },
+  "chosen": "final",
+  "seconds": 0.292
+ }
+]

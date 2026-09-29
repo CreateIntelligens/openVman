@@ -9,6 +9,12 @@ gemini-3.5-transcribe-live，把轉錄推回前台：
   不用前台送結束訊號，同一條連線可以連續講好幾句。
 - ``{"type": "error", "code": ...}``：無法使用，前台退回批次 ASR。
 
+語言提示依專案的語言分流產生（前台帶 ``project_id``、``language_routes``），以後開日韓
+專案不用改這裡。定稿偶爾比講話中的暫定字幕還差（「who am i」定稿成「OMI」、定稿成
+韓文）：兩者不同時問 Brain（Jev）送哪個，逾時或失敗照定稿；每次都在
+``backend/logs/asr_final_judge.jsonl`` 記一行，之後拿真實資料驗證準度（正式環境
+docker logs 看不到 logger.info，所以寫檔，跟 turn_timing 一樣）。
+
 跟瀏覽器內建辨識一樣是前台直接驅動的引擎，不進 transcribe() 的 fallback chain；
 帳號要被授權 ``gemini-live`` 才能用。台語分流時前台不走這裡（Gemini 聽不懂台語），
 改用 Breeze 批次。
@@ -21,7 +27,10 @@ import base64
 import json
 import logging
 import os
+import threading
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import websockets
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -29,6 +38,9 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from app.auth.asr_selection import permitted_asr_preference
 from app.auth.dependencies import authenticate_websocket
 from app.auth.runtime import get_auth_runtime
+from app.config import get_tts_config
+from app.http_client import SharedAsyncClient
+from app import language_routes as language_routes_mod
 from app.usage_ledger_client import UNIT_SECONDS, record_usage_event, usage_scope_for
 
 logger = logging.getLogger("gateway.asr_stream")
@@ -40,6 +52,32 @@ _GEMINI_LIVE_URL = (
     "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
 )
 _SAMPLE_RATE = 16000
+# 分流代碼 → Gemini languageCodes。台語分流時前台不走串流（Gemini 聽不懂），不必對應。
+_GEMINI_LANGUAGE_CODES = {
+    "zh": "zh-TW",
+    "en": "en-US",
+    "es": "es-ES",
+    "ja": "ja-JP",
+    "ko": "ko-KR",
+}
+# Brain 那邊 Jev 最多等 1 秒；這裡多留一點往返時間。使用者在等這句送出。
+_JUDGE_TIMEOUT_SECONDS = 1.5
+_INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+_http = SharedAsyncClient(connect=2, read=_JUDGE_TIMEOUT_SECONDS)
+_JUDGE_LOG_DEFAULT = Path(__file__).resolve().parents[2] / "logs" / "asr_final_judge.jsonl"
+_judge_log_lock = threading.Lock()
+
+
+def _append_judge_log(record: dict) -> None:
+    configured = os.environ.get("ASR_FINAL_JUDGE_LOG", "").strip()
+    path = Path(configured) if configured else _JUDGE_LOG_DEFAULT
+    try:
+        with _judge_log_lock:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        logger.warning("asr_final_judge_log_failed err=%s", exc)
 
 
 def _model() -> str:
@@ -50,6 +88,53 @@ def _languages() -> list[str]:
     # 不指定時中文會出簡體；帶 zh-TW 出繁體，英西不受影響（2026-09-23 實測）。
     raw = os.environ.get("ASR_GEMINI_STREAM_LANGUAGES", "zh-TW,en-US,es-ES")
     return [code.strip() for code in raw.split(",") if code.strip()]
+
+
+def _gemini_languages(routes: list[str]) -> list[str]:
+    codes = [_GEMINI_LANGUAGE_CODES[route] for route in routes if route in _GEMINI_LANGUAGE_CODES]
+    return codes or _languages()
+
+
+async def _project_languages(current, project_id: str, requested: str | None) -> list[str]:
+    if not project_id:
+        return _languages()
+    try:
+        routes = await language_routes_mod.effective_routes(
+            current, project_id, language_routes_mod.parse_requested(requested),
+        )
+    except Exception as exc:  # noqa: BLE001 - 查不到分流就用部署預設，不擋收音
+        logger.warning("asr stream language routes failed: %s", exc)
+        return _languages()
+    return _gemini_languages(routes)
+
+
+async def _judge_final(project_id: str, interim: str, final: str) -> str:
+    """Ask Brain whether the last interim beats the final; the final on any doubt."""
+    cfg = get_tts_config()
+    started = time.monotonic()
+    try:
+        response = await _http.get().post(
+            f"{cfg.brain_url.rstrip('/')}/brain/internal/asr-judge",
+            json={"project_id": project_id or "default", "interim": interim, "final": final},
+            headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
+            timeout=_JUDGE_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        verdict = response.json()
+    except Exception as exc:  # noqa: BLE001 - 判斷不了就照定稿
+        verdict = {"text": final, "chosen": "final", "reason": f"error:{type(exc).__name__}"}
+    text = str(verdict.get("text") or final).strip()
+    _append_judge_log({
+        "at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        "project_id": project_id,
+        "interim": interim,
+        "final": final,
+        "chosen": verdict.get("chosen"),
+        "scores": verdict.get("scores"),
+        "reason": verdict.get("reason"),
+        "ms": round((time.monotonic() - started) * 1000),
+    })
+    return text
 
 
 def _allowed(current) -> bool:
@@ -76,6 +161,10 @@ async def asr_stream(websocket: WebSocket) -> None:
         await websocket.close()
         return
 
+    project_id = websocket.query_params.get("project_id", "")
+    languages = await _project_languages(
+        current, project_id, websocket.query_params.get("language_routes"),
+    )
     audio_bytes = 0
     started = time.monotonic()
     try:
@@ -87,7 +176,7 @@ async def asr_stream(websocket: WebSocket) -> None:
         ) as upstream:
             await upstream.send(json.dumps({"setup": {
                 "model": f"models/{_model()}",
-                "inputAudioTranscription": {"languageCodes": _languages()},
+                "inputAudioTranscription": {"languageCodes": languages},
             }}))
             first = json.loads(await asyncio.wait_for(upstream.recv(), 10))
             if "setupComplete" not in first:
@@ -111,12 +200,18 @@ async def asr_stream(websocket: WebSocket) -> None:
                         await upstream.send(json.dumps({"realtimeInput": {"audioStreamEnd": True}}))
 
             async def gemini_to_client() -> None:
+                last_interim = ""
                 async for raw in upstream:
                     content = json.loads(raw).get("serverContent") or {}
                     if text := (content.get("interimInputTranscription") or {}).get("text"):
+                        last_interim = text
                         await websocket.send_json({"type": "interim", "text": text})
                     if text := (content.get("inputTranscription") or {}).get("text"):
-                        await websocket.send_json({"type": "final", "text": text.strip()})
+                        final = text.strip()
+                        if last_interim.strip() and last_interim.strip() != final:
+                            final = await _judge_final(project_id, last_interim.strip(), final)
+                        last_interim = ""
+                        await websocket.send_json({"type": "final", "text": final})
 
             tasks = [
                 asyncio.create_task(client_to_gemini()),

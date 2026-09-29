@@ -9,14 +9,19 @@ import { onUnmounted, readonly, ref } from 'vue'
 import { StreamRecognizer, type AsrErrorCode } from '@shared/speech'
 
 interface StreamAsrOptions {
+  /** 帶在網址上的專案與語言分流；後端依它產生 Gemini 的語言提示、判斷定稿。 */
+  query?: () => Record<string, string>
   onResult?: (transcript: string) => void
   onInterim?: (transcript: string) => void
   onError?: (error: string) => void
 }
 
-function streamUrl(): string {
+export function streamUrl(query: Record<string, string> = {}): string {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${window.location.host}/api/v1/asr/stream`
+  const params = new URLSearchParams(
+    Object.entries(query).filter(([, value]) => value),
+  ).toString()
+  return `${protocol}://${window.location.host}/api/v1/asr/stream${params ? `?${params}` : ''}`
 }
 
 export function useStreamAsr(options: StreamAsrOptions = {}) {
@@ -24,7 +29,7 @@ export function useStreamAsr(options: StreamAsrOptions = {}) {
   const isStarting = ref(false)
 
   const recognizer = new StreamRecognizer({
-    url: streamUrl,
+    url: () => streamUrl(options.query?.() ?? {}),
     onResult: (text) => options.onResult?.(text),
     onInterim: (text) => options.onInterim?.(text),
     onError: (code: AsrErrorCode) => options.onError?.(code),

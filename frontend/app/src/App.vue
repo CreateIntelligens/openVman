@@ -787,6 +787,7 @@ const vadAvailable = ref(true);
 // Gemini 串流辨識：邊講邊出字。連不上或未授權就標記不可用，退回 VAD＋批次辨識。
 const streamAvailable = ref(true);
 const streamAsr = useStreamAsr({
+  query: () => languageRoutes.asrFormFields(),
   onInterim: (text) => {
     asrInterim.value = text;
   },

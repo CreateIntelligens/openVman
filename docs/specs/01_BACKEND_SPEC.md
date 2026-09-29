@@ -164,6 +164,8 @@ ws.send(JSON.stringify(payload));
 
 前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。
 
+前台連線時帶 `project_id`、`language_routes`（query string）：`languageCodes` 依該專案的語言分流產生（zh→zh-TW、en→en-US、es→es-ES、ja→ja-JP、ko→ko-KR），沒帶專案才用 `ASR_GEMINI_STREAM_LANGUAGES`。Gemini 的定稿偶爾比最後的暫定字幕還差（「who am i」定稿成「OMI」、定稿成韓文）：兩者不同時 Backend 呼叫 Brain `POST /brain/internal/asr-judge`（Jev 判斷，最多等 1.5 秒），回傳的文字當 `final` 送給前台；逾時或失敗照定稿。每次判斷在 `backend/logs/asr_final_judge.jsonl` 記一行（時間、專案、兩段文字、選擇、分數、毫秒），用來拿真實資料驗證準度。
+
 `client_interrupt` 分成兩種情況：未附帶 `partial_asr`，或內容為空白時，代表明確的停止控制（例如主頁停止操作），直接中斷；帶有辨識文字時，先由 `GuardAgent` 的本地規則判斷。非字串的辨識欄位會被忽略，不中斷或關閉連線。
 
 辨識文字中的單字「停」、stop、等一下、新問題及修正要求可觸發停止；已識別的附和、繼續／否定停止語句和帶引號的背景話不單獨觸發停止。規則僅移除已識別的非中斷片語，因此「不用停，繼續說。請問明天幾點開門？」仍會因新問題中斷。未知長句保留原有保守停止策略；這是確定性啟發式規則，不是完整語意理解，也不載入模型。

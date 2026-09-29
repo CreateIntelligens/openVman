@@ -16,7 +16,7 @@ from fastapi import (
     WebSocketDisconnect,
 )
 
-from protocol.schemas import InternalEnrichRequest
+from protocol.schemas import InternalAsrJudgeRequest, InternalEnrichRequest
 from safety.internal_auth import INTERNAL_TOKEN_HEADER, require_internal_token
 
 logger = logging.getLogger("brain.internal_routes")
@@ -211,6 +211,20 @@ def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, An
     if media_paths := [str(r.get("path", "")).strip() for r in media_refs if str(r.get("path", "")).strip()]:
         lines.append(f"media_refs: {', '.join(media_paths)}")
     return "\n".join(lines)
+
+
+@router.post(
+    "/brain/internal/asr-judge",
+    summary="串流辨識定稿與暫定字幕二選一",
+    description="Backend 的 Gemini 串流辨識定稿跟最後的暫定字幕不同時呼叫；Jev 明顯偏好暫定字幕才換，否則照定稿。",
+)
+async def internal_asr_judge(payload: InternalAsrJudgeRequest):
+    from memory.asr_judge import choose_transcript
+
+    verdict = await asyncio.to_thread(
+        choose_transcript, payload.project_id, payload.interim, payload.final,
+    )
+    return {"text": verdict.text, "chosen": verdict.chosen, "scores": verdict.scores, "reason": verdict.reason}
 
 
 @router.post(

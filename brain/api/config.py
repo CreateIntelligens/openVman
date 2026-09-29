@@ -203,6 +203,10 @@ class BrainSettings(BaseSettings):
     # 規則 33/36，見 scripts/experiments/lang-detect）。關掉就只用規則。
     jev_language_enabled: bool = True
     jev_gate_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
+    # 串流辨識的定稿跟最後暫定字幕不同時，問 Jev 送哪一個（memory/asr_judge.py）。
+    # 使用者在等這句送出，逾時就照定稿；Jev p50 約 0.3 秒。
+    asr_final_judge_enabled: bool = True
+    asr_final_judge_timeout_seconds: float = Field(default=1.0, gt=0, le=5)
     # 第一輪平行查完後，最多再允許幾輪追加工具（例如補查一次網路或讀一頁），
     # 之後不帶工具只能作答；避免模型一輪一查拖到七、八次呼叫。
     chat_max_followup_tool_rounds: int = 1
