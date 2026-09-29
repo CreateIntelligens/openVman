@@ -99,8 +99,10 @@
         :asr-interim="asrInterim"
         :asr-error="asrError"
         :compact="immersive"
+        :responding="avatarResponding"
         @send="handleComposerSend"
         @asr-toggle="handleAsrToggle"
+        @stop="handleStopResponse"
       />
     </main>
 
@@ -480,6 +482,19 @@ const chat = useAvatarChat({
     statusToastRef.value?.show(text, { persistent: status === 'degraded' });
   },
 });
+// 虛擬人在想、在講或字幕還在跑：這時送出鈕變成「停止」，Esc 也能停。
+// 標準模式回覆一到 state 就回 IDLE，聲音還在播，所以要一併看播放與打字機。
+const avatarResponding = computed(() =>
+  chat.state.value === "THINKING"
+  || chat.state.value === "SPEAKING"
+  || isTyping.value
+  || audio.isPlaying.value,
+);
+
+function handleStopResponse(): void {
+  chat.interrupt();
+}
+
 const canSend = computed(() =>
   !rendererDisabled.value
   && Boolean(settings.projectId)
@@ -1113,6 +1128,11 @@ function handleKeydown(event: KeyboardEvent): void {
       event.stopPropagation();
       showSettings.value = false;
       showQuickQa.value = false;
+    } else if (avatarResponding.value) {
+      // 先停講話，再按一次才離開沉浸模式。
+      event.preventDefault();
+      event.stopPropagation();
+      handleStopResponse();
     } else if (immersive.value || document.fullscreenElement) {
       event.preventDefault();
       event.stopPropagation();

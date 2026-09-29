@@ -112,7 +112,17 @@
           @keydown.enter="handleSend"
         />
       </label>
+      <!-- 回覆中且沒打字時，送出鈕變成停止；打了字直接送出也會先停掉目前的回答。 -->
       <button
+        v-if="responding && !inputText.trim()"
+        class="chat-send-btn chat-stop-btn"
+        aria-label="停止回答"
+        @click="emit('stop')"
+      >
+        停止
+      </button>
+      <button
+        v-else
         class="chat-send-btn"
         :disabled="!canSend || !inputText.trim()"
         @click="handleSend"
@@ -157,6 +167,8 @@ const props = withDefaults(defineProps<{
   asrStarting?: boolean
   asrInterim?: string
   asrError?: string
+  /** 虛擬人正在想或在講；送出鈕換成停止。 */
+  responding?: boolean
   compact?: boolean
 }>(), {
   canSend: true,
@@ -171,6 +183,7 @@ interface ComposerSendResult {
 const emit = defineEmits<{
   send: [text: string, done: (result: ComposerSendResult) => void]
   'asr-toggle': []
+  stop: []
 }>()
 
 const inputText = ref("")
@@ -651,6 +664,18 @@ useStickToBottom(messagesRef, contentRef)
 @media (hover: hover) {
   .chat-send-btn:hover:not(:disabled) {
     background: var(--primary-hover);
+  }
+}
+
+.chat-stop-btn {
+  background: var(--ov-color-surface-raised);
+  color: var(--ov-color-danger);
+  box-shadow: inset 0 0 0 1px var(--ov-color-danger);
+}
+
+@media (hover: hover) {
+  .chat-stop-btn:hover {
+    background: color-mix(in srgb, var(--ov-color-danger) 10%, var(--ov-color-surface-raised));
   }
 }
 
