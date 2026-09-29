@@ -749,7 +749,8 @@ async def transcribe_for_account(
             result = await transcribe(tmp_path, "asr-chat", preferred)
         return JSONResponse(content={
             "text": result.content,
-            "provider": preferred or "",
+            # 實際辨識的引擎：偏好的掛掉由備援接手時不是同一個；全掛時是空字串。
+            "provider": result.provider or "",
             "elapsed_seconds": round(monotonic() - started, 2),
             "language": speech_language,
             "language_routes": routes,

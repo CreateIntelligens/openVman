@@ -1344,8 +1344,9 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
     module, _ = _load_main(monkeypatch)
 
     async def _transcribe(path, trace_id, preferred=None):
+        # 偏好的引擎掛了、由 sensevoice 接手。
         return types.SimpleNamespace(
-            content_type="audio_transcription", content="你好",
+            content_type="audio_transcription", content="你好", provider="sensevoice",
         )
 
     import app.gateway.ingestion_audio as ingestion_audio
@@ -1364,6 +1365,8 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["text"] == "你好"
+    # 回報實際辨識的引擎，不是一開始偏好的那個。
+    assert response.json()["provider"] == "sensevoice"
 
 
 def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
@@ -1377,7 +1380,7 @@ def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
     async def _transcribe(path, trace_id, preferred=None):
         seen["preferred"] = preferred
         return types.SimpleNamespace(
-            content_type="audio_transcription", content="你好",
+            content_type="audio_transcription", content="你好", provider="breeze",
         )
 
     import app.gateway.ingestion_audio as ingestion_audio
@@ -1481,7 +1484,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
 
     async def fake_transcribe(path, trace_id, preferred=None):
         calls["preferred"] = preferred
-        return types.SimpleNamespace(content="我現在頭很痛")
+        return types.SimpleNamespace(content="我現在頭很痛", provider="breeze")
 
     async def fake_routes(current, project_id, requested):
         calls["routes_args"] = (project_id, requested)
