@@ -129,8 +129,18 @@ def _to_wav_bytes(file_path: str) -> bytes:
 
 
 async def detect_taiwanese(file_path: str) -> str | None:
-    """Ask Brain whether the clip is Taiwanese; None when it cannot tell."""
+    """Ask Brain whether the clip is Taiwanese; None when it cannot tell in time."""
     cfg = get_tts_config()
+    limit = cfg.asr_language_check_timeout_seconds
+    try:
+        return await asyncio.wait_for(_ask_brain_language(file_path, cfg), timeout=limit)
+    except asyncio.TimeoutError:
+        # 使用者在等這句的回答；判斷不出來就當不是台語，不能讓整輪卡住。
+        logger.warning("audio language check timed out after %.1fs", limit)
+        return None
+
+
+async def _ask_brain_language(file_path: str, cfg) -> str | None:
     try:
         wav_bytes = await asyncio.to_thread(_to_wav_bytes, file_path)
         response = await _http.get().post(

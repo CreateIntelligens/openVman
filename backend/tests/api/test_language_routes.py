@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import types
 
 import pytest
@@ -55,3 +56,32 @@ def test_parse_requested():
     assert lr.parse_requested(None) is None
     assert lr.parse_requested("zh, nan,") == ["zh", "nan"]
     assert lr.parse_requested([]) == []
+
+
+def _language_check_limit(monkeypatch, seconds: float):
+    cfg = lr.get_tts_config().model_copy(update={"asr_language_check_timeout_seconds": seconds})
+    monkeypatch.setattr(lr, "get_tts_config", lambda: cfg)
+
+
+def test_slow_language_check_gives_up_instead_of_holding_the_turn(monkeypatch):
+    """真人語料有一句判斷拖到 22.7 秒；使用者在等回答，逾時就當不是台語。"""
+    _language_check_limit(monkeypatch, 0.05)
+
+    async def hangs(file_path, cfg):
+        await asyncio.sleep(5)
+        return "nan"
+
+    monkeypatch.setattr(lr, "_ask_brain_language", hangs)
+    started = time.monotonic()
+    assert asyncio.run(lr.detect_taiwanese("clip.wav")) is None
+    assert time.monotonic() - started < 1
+
+
+def test_language_check_within_limit_is_used(monkeypatch):
+    _language_check_limit(monkeypatch, 1.0)
+
+    async def answers(file_path, cfg):
+        return "nan"
+
+    monkeypatch.setattr(lr, "_ask_brain_language", answers)
+    assert asyncio.run(lr.detect_taiwanese("clip.wav")) == "nan"

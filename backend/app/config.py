@@ -228,6 +228,9 @@ class TTSRouterConfig(BaseSettings):
     # Xiaomi-CocktailASR-1：POST /transcribe，multipart ``target`` + ``ref``。
     # 目標語者模型，我們把同一個音檔同時當 target 與 ref 送出。輸出簡體。
     asr_xiaomi_url: str = ""
+    # 台語分流時 ASR 要等「是不是台語」的判斷才回，這是判斷的等待上限。真人 95 句
+    # p50 1.9 秒、p90 2.2 秒，但有一句拖到 22.7 秒；逾時就當不是台語，照原本的 TTS。
+    asr_language_check_timeout_seconds: float = 2.5
 
     # --- Camera ---
     camera_snapshot_interval_sec: int = 5

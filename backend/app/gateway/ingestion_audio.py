@@ -127,7 +127,34 @@ async def _transcribe_breeze(file_path: str, trace_id: str) -> str:
         if scratch:
             Path(scratch).unlink(missing_ok=True)
     response.raise_for_status()
-    return str(response.json().get("text", "")).strip()
+    return collapse_repeated_transcript(str(response.json().get("text", "")).strip())
+
+
+# 太短的片段（「好 好」「對對」）可能真的是這樣講，不收。
+_MIN_REPEATED_UNIT_CHARS = 4
+
+
+def collapse_repeated_transcript(text: str) -> str:
+    """Return one copy when the whole transcript is the same sentence repeated.
+
+    Breeze 偶爾把整句吐兩三次（真人台語朗讀 20 句有 3 句），原樣送進 Brain
+    等於使用者講了三遍。只處理「整段剛好是同一句重複」，不動部分重複。
+    """
+    tokens = text.split()
+    for size in range(1, len(tokens) // 2 + 1):
+        unit = tokens[:size]
+        if (
+            len(tokens) % size == 0
+            and tokens == unit * (len(tokens) // size)
+            and len("".join(unit)) >= _MIN_REPEATED_UNIT_CHARS
+        ):
+            return " ".join(unit)
+    if len(tokens) == 1:
+        # 沒有空白分隔時看整串是不是同一段字重複。
+        for size in range(_MIN_REPEATED_UNIT_CHARS, len(text) // 2 + 1):
+            if len(text) % size == 0 and text == text[:size] * (len(text) // size):
+                return text[:size]
+    return text
 
 
 async def _transcribe_xiaomi(file_path: str, trace_id: str) -> str:
