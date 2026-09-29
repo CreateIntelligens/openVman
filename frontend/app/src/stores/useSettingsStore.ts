@@ -1,4 +1,5 @@
 import { reactive } from "vue"
+import { apiFetch } from "../api/http"
 import {
   normalizeAvatarBackgroundFit,
   normalizeAvatarBackgroundId,
@@ -7,6 +8,7 @@ import { normalizeReplyMode } from "../types/replyMode"
 import {
   STORAGE_KEYS,
   currentPrefScope,
+  hasPref,
   readPref,
   setPrefScope,
   writePref,
@@ -75,12 +77,67 @@ let saved: SettingsState = initial
  * Rebind preferences to an account and reload them.
  *
  * store 是模組層級單例，在登入完成前就初始化了，所以帳號 id 到手時要重讀一次。
+ * 先用這台瀏覽器存的值立刻開場，再向後端拿帳號存的設定（換電腦也在）；
+ * 開場挑專案、聲音之前要等 settingsReady()，不然會先用到舊的。
  */
 export function bindSettingsToAccount(accountId: string): void {
   if (currentPrefScope() === (accountId || "")) return
   setPrefScope(accountId)
   saved = loadState()
   Object.assign(state, saved)
+  remoteLoad = accountId ? pullAccountSettings(accountId) : Promise.resolve()
+}
+
+const PREFERENCES_PATH = "/api/v1/settings/my-preferences"
+// 後端慢或掛掉時最多等這麼久就用瀏覽器存的值開場，不能讓整個前台卡住。
+const REMOTE_WAIT_MS = 3000
+let remoteLoad: Promise<void> = Promise.resolve()
+
+/** Resolves once the account's saved settings are in (or given up on). */
+export function settingsReady(): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const giveUp = new Promise<void>((resolve) => { timer = setTimeout(resolve, REMOTE_WAIT_MS) })
+  return Promise.race([remoteLoad, giveUp]).finally(() => clearTimeout(timer))
+}
+
+async function pullAccountSettings(accountId: string): Promise<void> {
+  let values: Record<string, string>
+  try {
+    const res = await apiFetch(PREFERENCES_PATH)
+    if (!res.ok) return
+    values = ((await res.json()) as { values?: Record<string, string> }).values ?? {}
+  } catch {
+    return
+  }
+  // 等回應期間換了帳號，這份就不是現在這個人的。
+  if (currentPrefScope() !== accountId) return
+  const fields = (Object.keys(values) as (keyof SettingsState)[]).filter((f) => f in PREF_KEYS)
+  if (fields.length === 0) {
+    // 帳號還沒存過：把這台瀏覽器以前存的帶上去，換台電腦才接得到。
+    const local = (Object.keys(PREF_KEYS) as (keyof SettingsState)[]).filter((f) => hasPref(PREF_KEYS[f]))
+    if (local.length) void pushAccountSettings(Object.fromEntries(local.map((f) => [f, saved[f]])))
+    return
+  }
+  // 寫進瀏覽器當快取再重讀，正規化（範圍、預設值）與本機讀取走同一條路。
+  for (const field of fields) writePref(PREF_KEYS[field], values[field])
+  saved = loadState()
+  Object.assign(state, saved)
+}
+
+async function pushAccountSettings(patch: Partial<SettingsState>): Promise<void> {
+  if (!currentPrefScope()) return
+  const values = Object.fromEntries(
+    Object.entries(patch).map(([field, value]) => [field, String(value)]),
+  )
+  try {
+    await apiFetch(PREFERENCES_PATH, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values }),
+    })
+  } catch {
+    // 存不到後端就只留在這台；下次按套用會再送一次。
+  }
 }
 
 /** Apply settings the user chose and remember them for next time. */
@@ -90,6 +147,7 @@ export function saveSettings(patch: Partial<SettingsState>): void {
   for (const field of Object.keys(patch) as (keyof SettingsState)[]) {
     writePref(PREF_KEYS[field], String(patch[field]))
   }
+  void pushAccountSettings(patch)
 }
 
 /** What the user last saved; bootstrap prefers these over account defaults. */

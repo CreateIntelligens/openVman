@@ -150,6 +150,14 @@ ws.send(JSON.stringify(payload));
 
 *(註：viseme 資料已廢除，前端由 DINet/Wav2Lip AI 根據音訊生成嘴型)*
 
+### 前台設定跟著帳號（`GET/PUT /api/v1/settings/my-preferences`）
+
+虛擬人前台設定視窗按「套用」的欄位存在 auth 資料庫 `account_preferences`（migration 15，每帳號一列 JSON），換電腦、換瀏覽器也在。
+`GET` 回 `{"values": {...}}`；`PUT` 送 `{"values": {欄位: 字串}}`，只合併送來的欄位（兩台裝置各改各的不互蓋），回合併後的結果。
+只收白名單欄位（`settings_routes.PREFERENCE_KEYS`，對應前台 `SettingsState`：專案、人設、角色、語音引擎與聲音、模式、回覆深度、背景、VRM、鏡頭預覽大小），
+其他欄位或單值超過 2048 字回 422。嵌入金鑰是訪客共用帳號，`GET` 一律回空、`PUT` 不存（不回 403，前台遇 403 會整頁換成權限不足）。
+前台開場先等這個（最多 3 秒）再挑專案與聲音；帳號沒存過時把這台瀏覽器存的上傳一次；後端失敗就用瀏覽器存的值。ASR 引擎另存於 `/my-asr-provider`。
+
 ### 8. 打斷機制處理 (Interruption Handling)
 
 ### 串流 ASR（`GET /api/v1/asr/stream`，WebSocket）

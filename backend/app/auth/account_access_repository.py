@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterable
 
@@ -146,6 +147,49 @@ class AccountAccessRepository:
                 """,
                 (user_id, provider),
             )
+
+    def get_preferences(self, user_id: str) -> dict[str, str]:
+        """Return this account's saved front-end settings; {} when none."""
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                "SELECT preferences_json FROM account_preferences WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if row is None:
+            return {}
+        try:
+            stored = json.loads(row["preferences_json"])
+        except ValueError:
+            return {}
+        return stored if isinstance(stored, dict) else {}
+
+    def merge_preferences(self, user_id: str, patch: dict[str, str]) -> dict[str, str]:
+        """Merge ``patch`` into the saved settings and return the result.
+
+        前台每次只送使用者這次按套用改到的欄位，所以是合併不是整份覆蓋；
+        讀改寫在同一個交易裡，兩台裝置同時存不會互相吃掉對方的欄位。
+        """
+        with self.database.transaction(write=True) as connection:
+            row = connection.execute(
+                "SELECT preferences_json FROM account_preferences WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            try:
+                current = json.loads(row["preferences_json"]) if row is not None else {}
+            except ValueError:
+                current = {}
+            merged = {**(current if isinstance(current, dict) else {}), **patch}
+            connection.execute(
+                """
+                INSERT INTO account_preferences(user_id, preferences_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    preferences_json = excluded.preferences_json,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, json.dumps(merged, ensure_ascii=False), now_iso()),
+            )
+        return merged
 
     def list_grants(self, user_id: str) -> tuple[ResourceGrantRecord, ...]:
         with self.database.transaction() as connection:

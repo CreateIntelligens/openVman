@@ -17,7 +17,7 @@ const appRoot = resolve(__dirname, "../../..");
 
 const entry = `
 export { useAvatarBootstrap } from "./src/composables/useAvatarBootstrap";
-export { saveSettings, savedSettings, useSettingsStore } from "./src/stores/useSettingsStore";
+export { saveSettings, savedSettings, settingsReady, useSettingsStore } from "./src/stores/useSettingsStore";
 export { useAuth } from "./src/composables/useAuth";
 export { nextTick } from "vue";
 `;
@@ -82,10 +82,10 @@ async function openApp(storage, api = {}) {
     location: { pathname: "/", search: "" },
     history: { replaceState() {} },
   };
-  globalThis.fetch = async (input) => {
+  globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
     const path = url.split("?")[0];
-    if (api[path]) return api[path](url);
+    if (api[path]) return api[path](url, init);
     if (path.endsWith("/api/v1/auth/me")) {
       return json({ id: ACCOUNT, role: "user", username: "u", defaults: DEFAULTS });
     }
@@ -222,4 +222,63 @@ test("only saveSettings writes, and engine and voice are written as a pair", asy
   assert.equal(storage.get(key("speech.tts_provider")), "voxcpm");
   assert.equal(storage.get(key("speech.tts_voice")), "v1");
   assert.equal(m.savedSettings().ttsVoice, "v1");
+});
+
+const PREFS = "/api/v1/settings/my-preferences";
+
+test("settings saved on another device win over this browser", async () => {
+  const storage = savedStorage({ "avatar.project_id": "proj-A", "avatar.persona_id": "default" });
+  const { m, settings, boot } = await openApp(storage, {
+    [PREFS]: async () => {
+      await sleep(20);
+      return json({ values: { projectId: "proj-B", personaId: "pB", replyMode: "deep" } });
+    },
+  });
+  // App.vue 在 onMounted 先等這個，才開始挑專案。
+  await m.settingsReady();
+  await boot.fetchInitialProjectData();
+  assert.equal(settings.projectId, "proj-B");
+  assert.equal(settings.personaId, "pB");
+  assert.equal(settings.replyMode, "deep");
+  // 也寫回這台當快取，下次後端暫時連不到仍是新的選擇。
+  assert.equal(storage.get(key("avatar.project_id")), "proj-B");
+});
+
+test("an account with nothing saved uploads what this browser had", async () => {
+  const storage = savedStorage({ "avatar.project_id": "proj-B", "avatar.reply_mode": "deep" });
+  const sent = [];
+  const { m } = await openApp(storage, {
+    [PREFS]: (_url, init) => {
+      if (init.method === "PUT") {
+        sent.push(JSON.parse(init.body).values);
+        return json({ values: {} });
+      }
+      return json({ values: {} });
+    },
+  });
+  await m.settingsReady();
+  await sleep(5);
+  assert.deepEqual(sent, [{ projectId: "proj-B", replyMode: "deep" }]);
+});
+
+test("applying settings saves them to the account", async () => {
+  const sent = [];
+  const { m } = await openApp(new Map(), {
+    [PREFS]: (_url, init) => {
+      if (init.method === "PUT") sent.push(JSON.parse(init.body).values);
+      return json({ values: {} });
+    },
+  });
+  await m.settingsReady();
+  m.saveSettings({ ttsProvider: "voxcpm", ttsVoice: "v1", cameraPreviewScale: 1.2 });
+  await sleep(5);
+  assert.deepEqual(sent.at(-1), { ttsProvider: "voxcpm", ttsVoice: "v1", cameraPreviewScale: "1.2" });
+});
+
+test("a broken preferences endpoint still opens with this browser's settings", async () => {
+  const storage = savedStorage({ "avatar.project_id": "proj-B" });
+  const { m, settings, boot } = await openApp(storage, { [PREFS]: () => json({ error: "x" }, 502) });
+  await m.settingsReady();
+  await boot.fetchInitialProjectData();
+  assert.equal(settings.projectId, "proj-B");
 });

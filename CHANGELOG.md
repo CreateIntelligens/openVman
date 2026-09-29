@@ -11,6 +11,7 @@
 
 ### Added
 
+- **前台設定跟著帳號走**：虛擬人前台設定視窗按「套用」的專案、人設、角色、語音引擎與聲音、標準／即時模式、回覆深度、背景、VRM、鏡頭預覽大小，原本只存在瀏覽器，換電腦或清掉瀏覽器資料就回到預設。現在同時存到帳號（新端點 `GET/PUT /api/v1/settings/my-preferences`，auth 資料庫 migration 15 `account_preferences`），開場先拿帳號存的設定（最多等 3 秒）再挑專案與聲音；帳號還沒存過時，把這台瀏覽器之前存的上傳。只合併這次改到的欄位，兩台裝置各改各的不會互蓋。嵌入金鑰（訪客共用）不存。
 - **整輪延遲量測**：前台每一輪記下開始講話、講完、ASR 回來、送出、Brain 回完、TTS 第一段聲音、開始播放的時間點，送到新端點 `POST /api/v1/metrics/turn`（需登入），每輪一行 JSON 寫進 `backend/logs/turn_timing.jsonl`（主機掛載，部署不會清掉），附分段 `durations_ms`（asr／send／brain／tts_first_audio／to_playback／total）與專案、ASR 引擎、TTS 等資訊；用 `jq` 撈法見 README「整輪延遲量測」。
 - **Gemini 串流語音辨識**：前台 ASR 選單新增「Gemini 串流」（`gemini-live`），經新 WebSocket `/api/v1/asr/stream` 邊錄邊送 16 kHz PCM 給 gemini-3.5-transcribe-live：講話中顯示暫定字幕，停頓約 0.5 秒後定稿（實測中英兩句都在講完 0.5–0.7 秒內定稿），同一連線可連續多句，不需前端偵測靜音。帳號要在帳號頁被授權；連不上或未授權自動退回 VAD＋批次辨識；台語分流時改用 Breeze 批次。用量以音訊秒數記帳。
 

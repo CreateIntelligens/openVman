@@ -342,6 +342,12 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 開了台語分流的專案一律改用 Breeze 批次辨識（Gemini 串流聽不懂台語），並同時判斷是不是台語；
 判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時當不是台語，細節見 `docs/specs/03_BRAIN_SPEC.md`。
 
+### 前台設定跟著帳號
+
+虛擬人前台設定視窗按「套用」的選擇（專案、人設、聲音、模式、背景、VRM 等）存在帳號裡，
+換電腦登入同一個帳號會沿用；瀏覽器也留一份，後端暫時連不到時照用。嵌入金鑰不存。
+API 見 `docs/specs/01_BACKEND_SPEC.md`「前台設定跟著帳號」。
+
 ### 整輪延遲量測
 
 前台每一輪對話記下時間點，開始播放（或被打斷、出錯）時送到 Backend

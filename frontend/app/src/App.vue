@@ -194,7 +194,7 @@ import { useTtsStreamer } from "./composables/useTtsStreamer";
 import { useTypewriter } from "./composables/useTypewriter";
 import { useWebcamCapture } from "./composables/useWebcamCapture";
 import { buildMascotWidgetSrc, type MascotOption } from "./data/mascotCatalog";
-import { savedSettings, saveSettings, useSettingsStore } from "./stores/useSettingsStore";
+import { savedSettings, saveSettings, settingsReady, useSettingsStore } from "./stores/useSettingsStore";
 import {
   isUploadedAvatarBackgroundId,
   type AvatarBackgroundFit,
@@ -1120,9 +1120,11 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener("keydown", handleKeydown, true);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
+  // 帳號存的設定（別台電腦按過套用的）要先到，挑專案、聲音、VRM 才會用對。
+  await settingsReady();
   const vrmReady = fetchVrmAvatars();
   void Promise.allSettled([
     vrmReady,

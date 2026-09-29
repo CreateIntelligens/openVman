@@ -319,6 +319,21 @@ _MIGRATIONS = (
         "drop_site_asr_provider_setting",
         ("DELETE FROM system_settings WHERE key = 'asr_provider'",),
     ),
+    # 前台設定（專案、人設、聲音、背景…）原本只存在瀏覽器，換電腦就沒了；改跟著帳號走。
+    # 存 JSON 而不是一欄一個：前台加欄位時不必每次加 migration，白名單在 API 那層把關。
+    (
+        15,
+        "account_preferences",
+        (
+            """
+            CREATE TABLE IF NOT EXISTS account_preferences (
+                user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                preferences_json TEXT NOT NULL DEFAULT '{}',
+                updated_at TEXT NOT NULL
+            )
+            """,
+        ),
+    ),
 )
 
 
