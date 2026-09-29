@@ -104,7 +104,10 @@ class BrainSettings(BaseSettings):
     rag_knowledge_top_k: int = 5
     rag_memory_top_k: int = 3
     rag_rerank_candidate_multiplier: int = 4
-    rag_distance_cutoff: float = 0.85
+    # 2026-09-29 由 0.85 放寬：鶴記中英西 36 題相關提問 0.85 命中 34、1.0 全中，
+    # 跨語言或短問句的正確段落常落在 0.86–1.0；無關閒聊多帶幾段由模型自己判斷
+    # 不採用，top_k 仍是上限（scripts/experiments/kb-cutoff/）。
+    rag_distance_cutoff: float = 1.0
     # 關鍵字（FTS）命中的段落放寬距離門檻，但不是無條件：知識庫有西語文件後，
     # 「qué」這種常見字會讓任何西語問題都命中。實測（鶴記，bge-m3 l2）相關的
     # 跨語言型號命中約 0.94，無關的 1.15 以上。

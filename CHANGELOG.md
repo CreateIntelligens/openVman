@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **知識庫距離門檻 0.85 → 1.0**：鶴記中英西各 12 題相關提問，0.85 只命中 34 題（「絕緣等級是什麼」「著脫座要怎麼選」的正確段落在 0.89–0.90 被擋掉），1.0 全部命中；西語、英文不少題的正確段落落在 0.86–1.05。代價是閒聊題會多帶幾段不相關的知識庫內容（醫院 4 題閒聊從 2 段變 9 段，鶴記 9 題閒聊仍是 0 段），由模型判斷不採用，top_k 上限不變。評估腳本與結果在 `scripts/experiments/kb-cutoff/`。
 - **虛擬人前台暫時藏起「即時」對話模式**：設定視窗的「對話模式」（即時＝Gemini Live 當對話模型／標準＝一般 Brain）整塊隱藏，一律用標準模式。原因是「Gemini Live 即時語音」容易跟 ASR 選單的「Gemini Live」辨識搞混，實際也沒在用。以前存成即時的帳號與瀏覽器開啟時當成標準。程式保留，`frontend/app/src/types/voiceMode.ts` 的 `LIVE_VOICE_MODE_AVAILABLE` 改回 `true` 即恢復。
 - **後台 Chat 也藏起 Live 模式**：標題列的 Text／Live 切換拿掉，一律用 Text（一般 Brain 回答），同樣是沒人在用、名稱又跟 ASR 的「Gemini Live」辨識撞名。存過 live 的瀏覽器開啟時退回 Text。程式保留，`frontend/admin/src/pages/Chat.tsx` 的 `LIVE_CHAT_AVAILABLE` 改回 `true` 即恢復。
 - **ASR 選單的「Gemini 串流」改名為「Gemini Live」**：只改顯示名稱，引擎代號（`gemini-live`）與行為不變。
