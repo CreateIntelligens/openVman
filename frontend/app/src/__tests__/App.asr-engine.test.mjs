@@ -77,3 +77,16 @@ test("vision availability starts unknown so the button does not flicker", () => 
   assert.match(source, /visionAvailable = ref<boolean \| null>\(null\)/);
   assert.match(source, /visionAvailable === true/);
 });
+
+test("every voice turn is timed from speech to playback", () => {
+  // 要從 log 撈整個流程多久（backend/logs/turn_timing.jsonl），缺一個點那段就量不到。
+  assert.equal((source.match(/turnTiming\.asrDone\(\);/g) ?? []).length, 4, "四種 ASR 都要記辨識完成");
+  assert.match(source, /if \(speaking\) turnTiming\.speechStarted\(\);\s*else turnTiming\.speechEnded\(\);/);
+  assert.match(source, /turnTiming\.begin\(\);/);
+  assert.match(source, /turnTiming\.mark\("sent"\);\s*const result: SendMessageResult = chat\.sendMessage\(/);
+  assert.match(source, /turnTiming\.mark\("reply_done"\);/);
+  assert.match(source, /turnTiming\.mark\("tts_start"\);\s*void ttsStreamer\.speak\(/);
+  assert.match(source, /onFirstAudio: \(\) => \{\s*turnTiming\.mark\("first_audio"\);/);
+  assert.match(source, /onPlaybackStart: \(\) => \{[\s\S]{0,120}turnTiming\.playbackStarted\(\);/);
+  assert.match(source, /onStopAudio: \(\) => \{\s*turnTiming\.interrupted\(\);/);
+});

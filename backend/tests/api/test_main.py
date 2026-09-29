@@ -1571,3 +1571,55 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
     except Exception:
         pass  # 假服務沒有 gemini adapter；只看有沒有被換掉
     assert authorized == ["voxcpm", "gemini-tts"]
+
+
+def _turn_payload(**overrides):
+    payload = {
+        "turn_id": "t-1",
+        "input": "voice",
+        "outcome": "played",
+        "started_at": "2026-09-29T04:00:00.000Z",
+        "marks_ms": {"speech_start": 0, "speech_end": 1800, "asr_done": 3100, "playback_start": 7400},
+        "durations_ms": {"asr": 1300, "total": 5600},
+        "project_id": "proj-x",
+        "asr_engine": "breeze",
+        "tts_provider": "voxcpm",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_turn_timing_is_appended_as_one_json_line(monkeypatch, tmp_path):
+    """整個流程多久要能從 log 撈：每輪一行 JSON，寫在部署重建也不會消失的地方。"""
+    module, _ = _load_main(monkeypatch)
+    log = tmp_path / "turn_timing.jsonl"
+    monkeypatch.setenv("TURN_TIMING_LOG", str(log))
+    client, _ = _authenticated_client(module, admin=False)
+
+    assert client.post("/api/v1/metrics/turn", json=_turn_payload()).status_code == 204
+    assert client.post("/api/v1/metrics/turn", json=_turn_payload(turn_id="t-2")).status_code == 204
+
+    lines = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert [line["turn_id"] for line in lines] == ["t-1", "t-2"]
+    assert lines[0]["username"] == "test-user"
+    assert lines[0]["durations_ms"]["total"] == 5600
+    assert "received_at" in lines[0]
+
+
+def test_turn_timing_rejects_unknown_marks(monkeypatch, tmp_path):
+    module, _ = _load_main(monkeypatch)
+    monkeypatch.setenv("TURN_TIMING_LOG", str(tmp_path / "turn_timing.jsonl"))
+    client, _ = _authenticated_client(module, admin=False)
+
+    response = client.post(
+        "/api/v1/metrics/turn", json=_turn_payload(marks_ms={"whatever": 1}),
+    )
+    assert response.status_code == 422
+    assert not (tmp_path / "turn_timing.jsonl").exists()
+
+
+def test_turn_timing_needs_a_signed_in_account(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    from fastapi.testclient import TestClient
+
+    assert TestClient(module.app).post("/api/v1/metrics/turn", json=_turn_payload()).status_code == 401

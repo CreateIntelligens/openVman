@@ -340,6 +340,36 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 引擎」可以改：沒選過引擎的人一律用 `ASR_PROVIDER`，每個人在聊天室或前台設定自己選
 （能選哪些由帳號頁授權）；後台「語音」頁的試辨識可指定引擎比較，不影響任何人。
 
+### 整輪延遲量測
+
+前台每一輪對話記下時間點，開始播放（或被打斷、出錯）時送到 Backend
+`POST /api/v1/metrics/turn`，每輪一行 JSON 寫進 `backend/logs/turn_timing.jsonl`
+（主機掛載目錄，部署重建容器也不會消失；可用 `TURN_TIMING_LOG` 改路徑）。
+
+| 時間點 | 意思 |
+|---|---|
+| `speech_start`／`speech_end` | VAD 或瀏覽器辨識偵測到開始講話／講完 |
+| `asr_done` | 辨識文字回到前台 |
+| `sent` | 送出給 Brain（要先建連線時與 `asr_done` 會有差距） |
+| `reply_done` | Brain 回覆完整文字 |
+| `tts_start`／`first_audio` | 送出 TTS／收到第一段聲音（Live 模式是 Gemini 的第一段聲音） |
+| `playback_start` | 真的開始播放 |
+
+`durations_ms` 已算好分段：`asr`（講完到辨識回來）、`send`、`brain`、`tts_first_audio`、
+`to_playback`、`total`（講完話到開始播放；打字是送出到開始播放）。`outcome` 為
+`played`／`interrupted`／`error`／`superseded`。按鍵錄音與 Gemini 串流辨識沒有講完的時間點，
+`total` 改從送出算。
+
+```bash
+# 最近 20 輪語音：分段與總等待（毫秒）
+jq -c 'select(.input=="voice" and .outcome=="played")
+  | {started_at, asr_engine, tts_provider, reply_chars, d: .durations_ms}' \
+  backend/logs/turn_timing.jsonl | tail -20
+# 平均總等待
+jq -s '[.[] | select(.outcome=="played") | .durations_ms.total] | add / length' \
+  backend/logs/turn_timing.jsonl
+```
+
 Live 用量會帶上已驗證帳號／Embed key 的歸屬，中途關閉也清算音訊秒數。
 對話備份與預覽不會觸發 TTL 刪除；詳細行為見 [Brain 文件](brain/README.md)。
 

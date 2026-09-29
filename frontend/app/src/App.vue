@@ -183,6 +183,7 @@ import { useServerAsr } from "./composables/useServerAsr";
 import { useVadAsr } from "./composables/useVadAsr";
 import { useStreamAsr } from "./composables/useStreamAsr";
 import { useLanguageRoutes } from "./composables/useLanguageRoutes";
+import { useTurnTiming } from "./composables/useTurnTiming";
 import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { fetchMyAsrProvider, setMyAsrProvider } from "./api/asr";
@@ -251,6 +252,18 @@ function onAudioQueueEmpty(): void {
 }
 
 const settings = useSettingsStore();
+// 每一輪從講話到開口的時間點，寫進後端 logs/turn_timing.jsonl。context 用
+// getter：chat 與 ASR 引擎這些在下面才建立。
+const turnTiming = useTurnTiming({
+  context: () => ({
+    project_id: settings.projectId,
+    session_id: chat.sessionId.value ?? "",
+    voice_mode: settings.voiceMode,
+    asr_engine: useBrowserAsr.value ? BROWSER_ASR : asrProviderShown.value,
+    tts_provider: settings.ttsProvider,
+    tts_voice: settings.ttsVoice,
+  }),
+});
 const selectedVrmAvatar = computed(() =>
   resolveVrmAvatarOption(settings.vrmAvatarId, vrmAvatarOptions.value),
 );
@@ -326,6 +339,7 @@ const audio = useAudioPlayer({
   onPlaybackVolume: driveStageAvatarMouth,
   onPlaybackStart: () => {
     if (settings.renderMode === "2d") wasm.beginSpeaking();
+    turnTiming.playbackStarted();
   },
   onPlaybackReset: wasm.resetSpeaking,
   onPlaybackEnd: () => {
@@ -352,6 +366,7 @@ let pendingText = "";
 const ttsStreamer = useTtsStreamer({
   ttsProviders: () => ttsProviders.value,
   onFirstAudio: () => {
+    turnTiming.mark("first_audio");
     typewriter.start(pendingText);
     pendingText = "";
   },
@@ -365,6 +380,7 @@ const ttsStreamer = useTtsStreamer({
   },
   onError: (err) => {
     console.error("[TTS] stream error:", err);
+    turnTiming.finish("error");
     typewriter.flush();
     isTyping.value = false;
   },
@@ -400,7 +416,11 @@ const chat = useAvatarChat({
   personaId: settings.personaId,
   mode: settings.voiceMode,
   replyMode: () => settings.replyMode,
-  onAudioChunk: (data) => audio.playChunk(data),
+  onAudioChunk: (data) => {
+    // Live 模式由 Gemini 直接出聲音，沒有另外的 TTS。
+    turnTiming.mark("first_audio");
+    return audio.playChunk(data);
+  },
   onDisconnect: () => {
     isStarted.value = false;
     audio.flush();
@@ -412,6 +432,7 @@ const chat = useAvatarChat({
     );
   },
   onStopAudio: () => {
+    turnTiming.interrupted();
     ttsStreamer.cancel();
     audio.flush();
     wasm.clearAudio();
@@ -427,9 +448,13 @@ const chat = useAvatarChat({
     clearUnderrunTimer();
     audio.resetSchedule();
     pendingText = fullText;
+    turnTiming.mark("reply_done");
+    turnTiming.replyText(fullText);
+    turnTiming.mark("tts_start");
     void ttsStreamer.speak(fullText, languageRoutesSpeakOptions());
   },
   onServerError: (code, message, retryAfterMs) => {
+    turnTiming.finish("error");
     if (code === 'RATE_LIMITED' && typeof retryAfterMs === 'number' && retryAfterMs > 0) {
       statusToastRef.value?.showCountdown('已達上限，請等待', retryAfterMs);
       return;
@@ -488,6 +513,7 @@ async function handleSend(
   speechLanguage?: string | null,
 ): Promise<ComposerSendResult> {
   lastSpeechLanguage = speechLanguage ?? null;
+  turnTiming.begin();
   if (
     !isStarted.value
     || !chat.sessionId.value
@@ -505,12 +531,14 @@ async function handleSend(
       isStarted.value = true;
     } catch (e) {
       console.error("[App] Initial connection failed:", e);
+      turnTiming.finish("error");
       return {
         accepted: false,
         message: "目前無法建立連線，內容已保留，請稍後再試。",
       };
     }
   }
+  turnTiming.mark("sent");
   const result: SendMessageResult = chat.sendMessage(
     text,
     sourcePath,
@@ -681,6 +709,7 @@ function markAsrActivity(): void {
 const asr = useAsr({
   lang: 'zh-TW',
   onResult: (transcript) => {
+    turnTiming.asrDone();
     asrError.value = "";
     asrInterim.value = "";
     clearAsrIdleTimer();
@@ -715,6 +744,7 @@ function reportAsrError(error: string): void {
 const serverAsr = useServerAsr({
   formFields: () => languageRoutes.asrFormFields(),
   onResult: (transcript, meta) => {
+    turnTiming.asrDone();
     asrError.value = "";
     asrInterim.value = "";
     clearAsrIdleTimer();
@@ -741,6 +771,7 @@ const streamAsr = useStreamAsr({
     asrInterim.value = text;
   },
   onResult: (transcript) => {
+    turnTiming.asrDone();
     asrError.value = "";
     asrInterim.value = "";
     clearAsrIdleTimer();
@@ -765,6 +796,7 @@ const streamAsr = useStreamAsr({
 const vadAsr = useVadAsr({
   formFields: () => languageRoutes.asrFormFields(),
   onResult: (transcript, meta) => {
+    turnTiming.asrDone();
     asrError.value = "";
     asrInterim.value = "";
     clearAsrIdleTimer();
@@ -858,6 +890,11 @@ const asrInputMode = computed<"continuous" | "push-to-talk">(
 const asrSpeaking = computed(() => {
   if (useBrowserAsr.value) return asr.isSpeaking.value;
   return vadAsr.isSpeaking.value;
+});
+
+watch(asrSpeaking, (speaking) => {
+  if (speaking) turnTiming.speechStarted();
+  else turnTiming.speechEnded();
 });
 
 function handleAsrToggle(): void {
