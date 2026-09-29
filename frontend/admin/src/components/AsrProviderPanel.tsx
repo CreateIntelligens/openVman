@@ -1,25 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 
-import {
-  clearAsrProvider,
-  fetchAsrProvider,
-  previewAsr,
-  setAsrProvider,
-  type SystemSetting,
-} from "../api/settings";
+import { previewAsr } from "../api/settings";
 import { preferredRecorderMimeType, rmsVolume } from "../utils/liveAudioUtils";
-import { describeAsrEngine as describe } from "@shared/speech";
+import { SERVER_ASR_ENGINES, describeAsrEngine as describe } from "@shared/speech";
 import Select from "./Select";
 
+/**
+ * 後台「語音」頁的 ASR 分頁：試辨識，用同一段音檔比較各家引擎。
+ *
+ * 以前這裡還有「全站預設引擎」，2026-09-24 拔掉：沒選過的人一律用部署設定的
+ * ASR_PROVIDER，每個人要換就在聊天室或前台自己選，能選哪些由帳號頁授權。這裡
+ * 選的引擎只影響這一次試辨識。
+ */
 export default function AsrProviderPanel() {
-  const [setting, setSetting] = useState<SystemSetting | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [engine, setEngine] = useState<string>(SERVER_ASR_ENGINES[0]);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [answeredBy, setAnsweredBy] = useState("");
   const [elapsed, setElapsed] = useState<number | null>(null);
   const [level, setLevel] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -27,36 +26,14 @@ export default function AsrProviderPanel() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const meterFrameRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    let disposed = false;
-    fetchAsrProvider()
-      .then((value) => { if (!disposed) setSetting(value); })
-      .catch(() => { if (!disposed) setError("無法載入語音辨識設定。"); })
-      .finally(() => { if (!disposed) setLoading(false); });
-    return () => { disposed = true; };
-  }, []);
-
-  async function apply(action: () => Promise<SystemSetting>, done: string) {
-    setBusy(true);
-    setError("");
-    setStatus("");
-    try {
-      setSetting(await action());
-      setStatus(done);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "設定失敗，請重試。");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function sendForTranscription(clip: Blob, filename?: string) {
     setTranscribing(true);
     setError("");
     setElapsed(null);
     try {
-      const preview = await previewAsr(clip, filename);
+      const preview = await previewAsr(clip, filename, engine);
       setTranscript(preview.text);
+      setAnsweredBy(preview.provider);
       setElapsed(preview.elapsed_seconds ?? null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "辨識失敗，請重試。");
@@ -141,64 +118,28 @@ export default function AsrProviderPanel() {
 
   useEffect(() => stopTracks, []);
 
-  if (loading) {
-    return <p role="status" className="text-sm text-content-muted">載入語音辨識設定中…</p>;
-  }
-  if (!setting) {
-    return <p role="alert" className="text-sm text-danger">{error || "無法載入語音辨識設定。"}</p>;
-  }
-
-  const active = describe(setting.effective);
+  const selected = describe(engine);
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">預設語音辨識引擎</h2>
-        <p className="text-xs leading-5 text-content-muted">
-          使用者沒有自己選的時候用這個。變更立即生效，不需重新啟動；所選引擎無法
-          使用時，系統會自動改用其他已設定的引擎，不會讓辨識中斷。
-          要讓某個帳號能自己換引擎，到「帳號」頁授權給他。
-        </p>
-        <Select
-          value={setting.effective}
-          disabled={busy}
-          ariaLabel="語音辨識引擎"
-          options={setting.options.map((id) => ({ value: id, label: describe(id).label }))}
-          onChange={(next) => {
-            if (next === setting.effective) return;
-            void apply(() => setAsrProvider(next), `預設已改為 ${describe(next).label}。`);
-          }}
-        />
-        {active.note && (
-          <p className="text-xs leading-5 text-content-muted">{active.note}</p>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-content-muted">
-          {setting.overridden
-            ? "預設值由後台指定，已覆寫部署設定。"
-            : "預設值沿用部署設定（.env）。"}
-        </span>
-        {setting.overridden && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={busy}
-            onClick={() => void apply(clearAsrProvider, "預設已改回部署設定。")}
-          >
-            改回部署設定
-          </button>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-3 border-t border-border pt-6">
+      <div className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold">試辨識</h2>
         <p className="text-xs leading-5 text-content-muted">
-          錄一段話或上傳音檔，看目前的引擎辨識成什麼。走的是正式對話用的同一
-          條路徑，所以結果就是實際會發生的行為。用同一個檔案切換引擎再試一次，
-          就能直接比較兩家的差異。
+          選一個引擎，錄一段話或上傳音檔，看它辨識成什麼。走的是正式對話用的同一
+          條路徑，所以結果就是實際會發生的行為。用同一個檔案換引擎再試一次，就能
+          直接比較。這裡選的只影響這次試辨識；每個人用哪個引擎由他自己在聊天室或
+          前台選，能選哪些到「帳號」頁授權，沒選過的人用部署設定。
         </p>
+        <Select
+          value={engine}
+          disabled={recording || transcribing}
+          ariaLabel="試辨識的引擎"
+          options={SERVER_ASR_ENGINES.map((id) => ({ value: id, label: describe(id).label }))}
+          onChange={setEngine}
+        />
+        {selected.note && (
+          <p className="text-xs leading-5 text-content-muted">{selected.note}</p>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -250,6 +191,12 @@ export default function AsrProviderPanel() {
             <p className="rounded-md border border-border bg-surface px-4 py-3 text-sm">
               {transcript}
             </p>
+            {answeredBy && answeredBy !== engine && (
+              // 指定的引擎沒回應時會由備援接手，不講清楚會以為是選的那家辨識的。
+              <p className="text-xs text-content-muted">
+                {describe(engine).label} 沒有回應，這次由 {describe(answeredBy).label} 辨識。
+              </p>
+            )}
             {elapsed !== null && (
               // 這是這一次實測到的耗時，不是對引擎的效能承諾：同一個引擎會隨
               // 音檔長度與 GPU 當下負載變動，拿它跨次比較要留意這點。
@@ -261,7 +208,6 @@ export default function AsrProviderPanel() {
         )}
       </div>
 
-      {status && <p role="status" className="text-sm text-content-muted">{status}</p>}
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
     </div>
   );

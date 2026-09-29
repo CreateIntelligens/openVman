@@ -45,19 +45,21 @@ test("a one-off failure does not switch the engine away", () => {
 test("the account's engine is read from the backend, not assumed", () => {
   assert.match(source, /fetchMyAsrProvider/);
   // 讀不到偏好不該讓使用者不能講話。
-  assert.match(source, /fetchMyAsrProvider\(\)[\s\S]{0,200}\.catch\(/);
+  assert.match(source, /fetchMyAsrProvider\(\)[\s\S]{0,400}\.catch\(/);
 });
 
 test("the settings modal gets the engines this account may pick", () => {
   // 之前只做了切換邏輯卻沒有選單，使用者在聊天室根本看不到這個功能。
   assert.match(source, /:asr-engines="asrEngines"/);
-  assert.match(source, /:asr-provider="myAsrProvider"/);
+  // 沒選過（或選的被收回授權）時顯示實際在用的引擎，不再有「預設」選項。
+  assert.match(source, /:asr-provider="asrProviderShown"/);
+  assert.match(source, /myAsrEffective\.value = profile\.effective/);
   assert.match(source, /@asr-provider-change="handleAsrProviderChange"/);
 });
 
 test("a failed save rolls the selection back", () => {
   // 存不起來卻留著新選擇，畫面會顯示一個其實沒生效的引擎。
-  assert.match(source, /setMyAsrProvider\(provider\)\.catch/);
+  assert.match(source, /setMyAsrProvider\(provider\)[\s\S]{0,200}\.catch/);
   assert.match(source, /myAsrProvider\.value = previous/);
 });
 

@@ -2,11 +2,17 @@ export const BROWSER_ASR = "browser";
 /** Gemini transcribe-live 串流辨識；台語分流時不用（Gemini 聽不懂台語）。 */
 export const GEMINI_STREAM_ASR = "gemini-live";
 
+/**
+ * 在伺服器上跑、音檔要上傳的引擎（跟後端 SERVER_ASR_PROVIDERS 同一組）。沒選過
+ * 引擎的人用部署設定的 ASR_PROVIDER，後台已經沒有「全站預設」可以改。
+ */
+export const SERVER_ASR_ENGINES = ["breeze", "xiaomi", "sensevoice", "openai"] as const;
+
 /** ASR 引擎的顯示名稱與說明。後台「語音」頁、前端設定與聊天室的引擎選單共用。 */
 export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> = {
   breeze: {
     label: "Breeze-ASR-26",
-    note: "臺語會轉寫成華語：語意保留、用字不保留。預設用這個。",
+    note: "臺語會轉寫成華語：語意保留、用字不保留。部署預設用這個。",
   },
   xiaomi: {
     label: "Xiaomi-CocktailASR-1",

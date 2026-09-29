@@ -16,7 +16,11 @@ def runtime(monkeypatch):
         users=Mock(), account_access=Mock(), resources=Mock(), settings=Mock(),
     )
     runtime.account_access.get_asr_provider.return_value = "openai"
-    runtime.settings.get.return_value = "sensevoice"
+    # 選過的引擎被收回授權後，退回部署設定的 ASR_PROVIDER（不再有後台全站預設）。
+    monkeypatch.setattr(
+        "app.auth.settings_routes.get_tts_config",
+        lambda: SimpleNamespace(asr_provider="sensevoice"),
+    )
     runtime.resources.list_by_type.return_value = [
         SimpleNamespace(resource_id="openai"),
     ]

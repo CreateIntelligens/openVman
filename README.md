@@ -336,7 +336,9 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 一般聊天的共用語音控制器以「停止說話後 10 秒」判定 continuous 模式閒置，
 持續說話不會被截斷；VAD 無法啟動時會切換按鍵錄音，保留正確收音狀態與
 60 秒錄音上限。ASR worker 與設定 API 共用授權判定，撤權後不再採用帳號的
-舊引擎偏好，系統預設與既有 fallback 鏈仍適用。
+舊引擎偏好，改用部署設定的 `ASR_PROVIDER` 與既有 fallback 鏈。後台沒有「全站預設
+引擎」可以改：沒選過引擎的人一律用 `ASR_PROVIDER`，每個人在聊天室或前台設定自己選
+（能選哪些由帳號頁授權）；後台「語音」頁的試辨識可指定引擎比較，不影響任何人。
 
 Live 用量會帶上已驗證帳號／Embed key 的歸屬，中途關閉也清算音訊秒數。
 對話備份與預覽不會觸發 TTL 刪除；詳細行為見 [Brain 文件](brain/README.md)。

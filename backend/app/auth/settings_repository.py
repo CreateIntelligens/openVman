@@ -17,8 +17,7 @@ class InvalidSettingValueError(RepositoryError):
 
 
 # key → 允許的值。白名單而不是自由字串：這些設定會直接改變每個使用者的
-# 行為，打錯一個字母就整站沒有語音辨識，而且要到下一次有人講話才發現。
-ASR_PROVIDER_KEY = "asr_provider"
+# 行為，打錯一個字就沒人能選引擎，而且要到下一次有人講話才發現。
 
 # 瀏覽器內建的 Web Speech API。它跟其他幾個不同類：辨識在使用者的裝置上
 # 發生，音檔不會送到後端，所以 _TRANSCRIBERS 裡沒有對應的函式，也不參與
@@ -38,7 +37,6 @@ ASR_USER_CHOICES_KEY = "asr_user_choices"
 
 _ASR_PROVIDERS = SERVER_ASR_PROVIDERS | {BROWSER_ASR_PROVIDER, GEMINI_STREAM_ASR_PROVIDER}
 _ALLOWED_VALUES: dict[str, frozenset[str]] = {
-    ASR_PROVIDER_KEY: SERVER_ASR_PROVIDERS,
     ASR_USER_CHOICES_KEY: _ASR_PROVIDERS,
 }
 
@@ -179,7 +177,6 @@ def _append_settings_audit(
 
 
 __all__ = [
-    "ASR_PROVIDER_KEY",
     "ASR_USER_CHOICES_KEY",
     "BROWSER_ASR_PROVIDER",
     "SERVER_ASR_PROVIDERS",

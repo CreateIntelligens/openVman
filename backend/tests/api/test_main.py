@@ -1282,25 +1282,24 @@ def test_voxcpm_voice_list_drops_excluded_ids(monkeypatch):
     assert [voice_id for voice_id, _ in voices] == ["voxcpm2-cosy-young-female-01"]
 
 
-def test_asr_preview_returns_the_transcript_and_active_engine(monkeypatch):
-    """切換引擎卻沒辦法驗證結果，等於要人憑說明文字選。
+def test_asr_preview_returns_the_transcript_and_the_engine_that_answered(monkeypatch):
+    """試辨識要走正式對話用的同一條 transcribe()，並回報實際辨識的引擎。
 
-    這個端點必須走正式對話用的同一條 transcribe()，否則試辨識看到的行為
-    和實際發生的可能不同——包含 fallback 換了引擎這件事。
+    指定的那家掛掉時是備援答的，回傳要看得出來；指定引擎只影響這一次。
     """
     module, _ = _load_main(monkeypatch)
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id):
+    async def _transcribe(path, trace_id, preferred=None):
         seen["trace_id"] = trace_id
+        seen["preferred"] = preferred
         return types.SimpleNamespace(
-            content_type="audio_transcription", content="今仔日天氣袂䆀",
+            content_type="audio_transcription", content="今仔日天氣袂䆀", provider="breeze",
         )
 
     import app.gateway.ingestion_audio as ingestion_audio
 
     monkeypatch.setattr(ingestion_audio, "transcribe", _transcribe)
-    monkeypatch.setattr(ingestion_audio, "_active_provider", lambda cfg: "sensevoice")
     monkeypatch.setattr(
         module, "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=1024 * 1024),
@@ -1308,16 +1307,36 @@ def test_asr_preview_returns_the_transcript_and_active_engine(monkeypatch):
 
     client, _ = _authenticated_client(module)
     response = client.post(
-        "/api/v1/settings/asr-provider/preview",
+        "/api/v1/asr/preview",
         files={"file": ("preview.webm", b"fake-audio-bytes", "audio/webm")},
+        data={"provider": "sensevoice"},
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["text"] == "今仔日天氣袂䆀"
-    assert body["provider"] == "sensevoice"
+    assert body["provider"] == "breeze"
+    assert seen["preferred"] == "sensevoice"
     # 操作者要能比較兩家引擎誰快，所以回傳這一次實測到的耗時。
     assert isinstance(body["elapsed_seconds"], (int, float))
+
+
+def test_asr_preview_refuses_an_unknown_engine(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/asr/preview",
+        files={"file": ("preview.webm", b"x", "audio/webm")},
+        data={"provider": "browser"},
+    )
+    assert response.status_code == 422
+
+
+def test_the_site_asr_default_endpoints_are_gone(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    paths = {getattr(route, "path", "") for route in module.app.routes}
+    assert "/api/v1/settings/asr-provider" not in paths
+    assert "/api/v1/settings/asr-provider/preview" not in paths
 
 
 def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
@@ -1390,7 +1409,7 @@ def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
 
     client, _ = _authenticated_client(module)
     response = client.post(
-        "/api/v1/settings/asr-provider/preview",
+        "/api/v1/asr/preview",
         files={"file": ("preview.webm", b"x" * 64, "audio/webm")},
     )
 

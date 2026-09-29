@@ -47,7 +47,6 @@ from .repositories import (
 from .resources import resolve_admin_scope
 from .runtime import AuthRuntime, get_auth_runtime
 from .settings_repository import (
-    ASR_PROVIDER_KEY,
     ASR_USER_CHOICES_KEY,
     BROWSER_ASR_PROVIDER,
     SERVER_ASR_PROVIDERS,

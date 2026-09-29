@@ -169,7 +169,7 @@ async def _transcribe_xiaomi(file_path: str, trace_id: str) -> str:
 
 
 # provider 名稱 → 轉寫函式。
-# 順序就是 fallback 順序（設定選的那個會被提到最前面）。預設把輸出華語的
+# 順序就是 fallback 順序（使用者選的、部署預設 ASR_PROVIDER 會被提到最前面）。預設把輸出華語的
 # 排在前面：使用者要的是華語逐字稿，臺語漢字只在全都掛掉時才聊勝於無。
 _TRANSCRIBERS: dict[str, object] = {
     "breeze": _transcribe_breeze,
@@ -177,24 +177,6 @@ _TRANSCRIBERS: dict[str, object] = {
     "sensevoice": _transcribe_sensevoice,
     "openai": _transcribe_openai,
 }
-
-
-def _active_provider(cfg) -> str:
-    """The operator's stored choice, or the environment default.
-
-    設定表只存「被人改過」的項目：沒有紀錄就用 .env，所以新部署不必先寫一
-    輪設定才能啟動。讀失敗（資料庫還沒 migrate、或整個 auth runtime 沒起來）
-    也回退到 .env——語音辨識不該因為一張設定表而停擺。
-    """
-    try:
-        from app.auth.runtime import get_auth_runtime
-        from app.auth.settings_repository import ASR_PROVIDER_KEY
-
-        stored = get_auth_runtime().settings.get(ASR_PROVIDER_KEY)
-    except Exception as exc:
-        logger.debug("asr_provider_setting_unavailable err=%s", exc)
-        return cfg.asr_provider
-    return stored or cfg.asr_provider
 
 
 def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
@@ -210,7 +192,7 @@ def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
     它根本不會走到這裡，音檔不會送上來。
     """
     configured = [
-        name for name in (preferred, _active_provider(cfg), *_TRANSCRIBERS)
+        name for name in (preferred, cfg.asr_provider, *_TRANSCRIBERS)
         if name in _TRANSCRIBERS
     ]
     ordered: list[str] = []
@@ -242,7 +224,7 @@ async def transcribe(
     chain = _resolve_chain(cfg, preferred)
     logger.info(
         "transcribe trace_id=%s provider=%s preferred=%s chain=%s",
-        trace_id, _active_provider(cfg), preferred or "-", ",".join(chain),
+        trace_id, cfg.asr_provider, preferred or "-", ",".join(chain),
     )
 
     for name in chain:
@@ -260,7 +242,9 @@ async def transcribe(
             "transcription_ok trace_id=%s provider=%s chars=%d",
             trace_id, name, len(content),
         )
-        return IngestionResult(content_type="audio_transcription", content=content)
+        return IngestionResult(
+            content_type="audio_transcription", content=content, provider=name,
+        )
 
     logger.error("transcription_failed trace_id=%s tried=%s", trace_id, ",".join(chain))
     return IngestionResult(

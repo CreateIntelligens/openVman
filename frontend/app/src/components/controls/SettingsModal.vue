@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { DEFAULT_ASR_PROVIDER_LABEL } from '@shared/speech'
+import { ASR_ENGINE_LABELS } from '@shared/speech'
 import CustomSelect from './CustomSelect.vue'
 import { LANGUAGE_ROUTE_LABELS } from "../../composables/useLanguageRoutes";
 import type { AvatarState } from "../../composables/useAvatarChat";
@@ -290,11 +290,14 @@ const ttsProviderOptions = computed(() =>
   props.ttsProviders.map((p) => ({ value: p.id, label: p.name }))
 )
 
-// 空字串是「沿用管理者設定的預設」，跟「選了某一家」要分得出來。
-const asrProviderOptions = computed(() => [
-  { value: '', label: DEFAULT_ASR_PROVIDER_LABEL },
-  ...props.asrEngines.map((e) => ({ value: e.id, label: e.label })),
-])
+// 不再有「預設（依系統設定）」選項：後台的全站預設拔掉了（2026-09-24），沒選過的人
+// 直接顯示實際在用的引擎。在用的那個沒授權給這個帳號時也列出來，選單才不會空白。
+const asrProviderOptions = computed(() => {
+  const options = props.asrEngines.map((e) => ({ value: e.id, label: e.label }))
+  const current = props.asrProvider
+  if (!current || options.some((o) => o.value === current)) return options
+  return [{ value: current, label: ASR_ENGINE_LABELS[current] ?? current }, ...options]
+})
 
 const ttsVoiceOptions = computed(() => {
   if (!activeTtsProvider.value) return []

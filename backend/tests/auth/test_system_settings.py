@@ -11,7 +11,7 @@ from app.auth.models import AccountRole
 from app.auth.passwords import hash_password
 from app.auth.repositories import UserRepository
 from app.auth.settings_repository import (
-    ASR_PROVIDER_KEY,
+    ASR_USER_CHOICES_KEY,
     InvalidSettingValueError,
     SystemSettingsRepository,
     UnknownSettingError,
@@ -40,33 +40,33 @@ def env(tmp_path: Path):
 
 def test_no_override_reads_as_absent(env):
     """沒有紀錄要回 None，呼叫端才知道該用環境變數的預設。"""
-    assert env["settings"].get(ASR_PROVIDER_KEY) is None
+    assert env["settings"].get(ASR_USER_CHOICES_KEY) is None
     assert env["settings"].all() == {}
 
 
 def test_set_then_get_round_trips(env):
-    env["settings"].set(ASR_PROVIDER_KEY, "breeze", actor_id=env["root"].id)
-    assert env["settings"].get(ASR_PROVIDER_KEY) == "breeze"
+    env["settings"].set(ASR_USER_CHOICES_KEY, "breeze", actor_id=env["root"].id)
+    assert env["settings"].get(ASR_USER_CHOICES_KEY) == "breeze"
 
 
 def test_set_overwrites_rather_than_duplicating(env):
-    env["settings"].set(ASR_PROVIDER_KEY, "breeze", actor_id=env["root"].id)
-    env["settings"].set(ASR_PROVIDER_KEY, "sensevoice", actor_id=env["root"].id)
-    assert env["settings"].get(ASR_PROVIDER_KEY) == "sensevoice"
-    assert env["settings"].all() == {ASR_PROVIDER_KEY: "sensevoice"}
+    env["settings"].set(ASR_USER_CHOICES_KEY, "breeze", actor_id=env["root"].id)
+    env["settings"].set(ASR_USER_CHOICES_KEY, "sensevoice", actor_id=env["root"].id)
+    assert env["settings"].get(ASR_USER_CHOICES_KEY) == "sensevoice"
+    assert env["settings"].all() == {ASR_USER_CHOICES_KEY: "sensevoice"}
 
 
 def test_clear_restores_the_environment_default(env):
-    env["settings"].set(ASR_PROVIDER_KEY, "breeze", actor_id=env["root"].id)
-    env["settings"].clear(ASR_PROVIDER_KEY, actor_id=env["root"].id)
-    assert env["settings"].get(ASR_PROVIDER_KEY) is None
+    env["settings"].set(ASR_USER_CHOICES_KEY, "breeze", actor_id=env["root"].id)
+    env["settings"].clear(ASR_USER_CHOICES_KEY, actor_id=env["root"].id)
+    assert env["settings"].get(ASR_USER_CHOICES_KEY) is None
 
 
 def test_value_outside_the_allowed_set_is_refused(env):
-    """打錯一個字母就整站沒有語音辨識，而且要到下次有人講話才發現。"""
+    """打錯一個字就沒人能選這個引擎，而且要到下次有人講話才發現。"""
     with pytest.raises(InvalidSettingValueError):
-        env["settings"].set(ASR_PROVIDER_KEY, "sensevoic", actor_id=env["root"].id)
-    assert env["settings"].get(ASR_PROVIDER_KEY) is None
+        env["settings"].set(ASR_USER_CHOICES_KEY, "sensevoic", actor_id=env["root"].id)
+    assert env["settings"].get(ASR_USER_CHOICES_KEY) is None
 
 
 def test_unknown_key_is_refused(env):
@@ -76,7 +76,7 @@ def test_unknown_key_is_refused(env):
 
 def test_every_change_is_attributed_in_the_audit_log(env):
     """這些設定影響每個使用者，出事要查得到是誰在什麼時候動的。"""
-    env["settings"].set(ASR_PROVIDER_KEY, "breeze", actor_id=env["root"].id)
+    env["settings"].set(ASR_USER_CHOICES_KEY, "breeze", actor_id=env["root"].id)
 
     with env["database"].transaction() as connection:
         rows = connection.execute(
@@ -90,8 +90,8 @@ def test_every_change_is_attributed_in_the_audit_log(env):
 
 
 def test_clearing_is_audited_too(env):
-    env["settings"].set(ASR_PROVIDER_KEY, "breeze", actor_id=env["root"].id)
-    env["settings"].clear(ASR_PROVIDER_KEY, actor_id=env["admin"].id)
+    env["settings"].set(ASR_USER_CHOICES_KEY, "breeze", actor_id=env["root"].id)
+    env["settings"].clear(ASR_USER_CHOICES_KEY, actor_id=env["admin"].id)
 
     with env["database"].transaction() as connection:
         rows = connection.execute(
@@ -130,3 +130,32 @@ def test_root_may_pick_any_asr_engine_without_grants(env):
     assert _asr_user_choices(runtime, env["root"]) == ["breeze", "browser"]
     # 一般帳號沒授權就是空的，授權才有。
     assert _asr_user_choices(runtime, env["admin"]) == []
+
+
+def test_the_removed_site_asr_default_is_dropped_on_upgrade(env):
+    """後台的全站 ASR 預設拔掉了；舊資料庫留著那筆會讓人以為它還有作用。"""
+    with env["database"].transaction(write=True) as connection:
+        connection.execute(
+            "INSERT INTO system_settings(key, value, updated_by, updated_at) "
+            "VALUES ('asr_provider', 'xiaomi', ?, '2026-09-01T00:00:00Z')",
+            (env["root"].id,),
+        )
+        connection.execute("DELETE FROM schema_migrations WHERE version = 14")
+
+    env["database"].initialize()
+
+    assert env["settings"].get("asr_provider") is None
+
+
+def test_frontend_engine_list_matches_the_backend():
+    """後台試辨識的引擎選單寫死在前端共用模組；兩邊各改各的，選單就會出現後端不收的引擎。"""
+    import re
+
+    from app.auth.settings_repository import SERVER_ASR_PROVIDERS
+
+    source = (
+        Path(__file__).resolve().parents[3] / "frontend" / "shared" / "speech" / "asr" / "engines.ts"
+    ).read_text(encoding="utf-8")
+    match = re.search(r"SERVER_ASR_ENGINES = \[([^\]]*)\]", source)
+    assert match, "SERVER_ASR_ENGINES not found in engines.ts"
+    assert set(re.findall(r'"([^"]+)"', match.group(1))) == set(SERVER_ASR_PROVIDERS)

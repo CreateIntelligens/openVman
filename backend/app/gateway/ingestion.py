@@ -264,6 +264,8 @@ class IngestionResult:
     content_type: str  # "document_content"
     content: str
     page_count: int | None = None
+    # 語音轉寫實際用到的引擎；有 fallback 時可能不是一開始指定的那個。
+    provider: str | None = None
 
 
 def _to_ingestion_result(content: str, *, page_count: int | None = None) -> IngestionResult:

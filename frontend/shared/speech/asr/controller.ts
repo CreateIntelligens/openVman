@@ -34,7 +34,6 @@ import { VadRecognizer, type VadCommitMode } from './vad-recognizer'
 
 export const ASR_IDLE_TIMEOUT_MS = 10_000
 export const SERVER_ASR_MAX_CLIP_MS = 60_000
-export const DEFAULT_ASR_PROVIDER_LABEL = '預設（依系統設定）'
 
 export type AsrUiState =
   | 'starting'

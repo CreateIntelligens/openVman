@@ -144,7 +144,7 @@ _ACCOUNT_DEFAULTS_MASCOT_BACKGROUND_STATEMENTS = (
 
 _ACCOUNT_ASR_PROVIDER_SCHEMA_VERSION = 12
 _ACCOUNT_ASR_PROVIDER_MIGRATION_NAME = "account_defaults_asr_provider"
-# 空字串代表「沒選過」，沿用全站設定。用空字串而不是 NULL，跟這張表其他
+# 空字串代表「沒選過」，用部署設定的 ASR_PROVIDER。用空字串而不是 NULL，跟這張表其他
 # 欄位一致，讀取端也不必到處判斷 None。
 _ACCOUNT_ASR_PROVIDER_STATEMENTS = (
     """
@@ -311,6 +311,13 @@ _MIGRATIONS = (
         _ACCOUNT_ASR_PROVIDER_SCHEMA_VERSION,
         _ACCOUNT_ASR_PROVIDER_MIGRATION_NAME,
         _ACCOUNT_ASR_PROVIDER_STATEMENTS,
+    ),
+    # 後台的「全站預設 ASR 引擎」拔掉了（2026-09-24），沒選過的人一律用部署設定的
+    # ASR_PROVIDER。留著這筆不會有程式讀，但會讓看資料庫的人以為它還有作用。
+    (
+        14,
+        "drop_site_asr_provider_setting",
+        ("DELETE FROM system_settings WHERE key = 'asr_provider'",),
     ),
 )
 

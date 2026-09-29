@@ -341,34 +341,27 @@ class TestProviderFallbackChain:
 
 
 
-class TestStoredProviderOverride:
-    """後台改過的 provider 要蓋掉 .env，但讀不到設定時不能讓辨識停擺。"""
+class TestDeploymentDefault:
+    """沒選過引擎的人用 .env 的 ASR_PROVIDER；後台的全站預設已拔掉（2026-09-24）。"""
 
-    def test_stored_override_takes_precedence_over_the_environment(self):
+    def test_environment_default_leads_the_chain(self):
         cfg = _asr_cfg(
-            "openai",
-            whisper_api_key="sk-test",
+            "sensevoice",
             asr_sensevoice_url="http://asr:50002",
+            asr_breeze_url="http://asr:8801",
         )
+        assert ingestion_audio._resolve_chain(cfg)[0] == "sensevoice"
+
+    def test_a_leftover_site_setting_is_ignored(self):
+        """舊資料庫殘留的 asr_provider 設定不能再蓋過 .env。"""
+        cfg = _asr_cfg("breeze", asr_breeze_url="http://asr:8801", asr_sensevoice_url="http://asr:50002")
         stored = MagicMock(settings=MagicMock(get=MagicMock(return_value="sensevoice")))
         with patch("app.auth.runtime.get_auth_runtime", return_value=stored):
-            assert ingestion_audio._active_provider(cfg) == "sensevoice"
-            assert ingestion_audio._resolve_chain(cfg)[0] == "sensevoice"
+            assert ingestion_audio._resolve_chain(cfg)[0] == "breeze"
 
-    def test_absent_override_falls_back_to_the_environment(self):
-        cfg = _asr_cfg("breeze", asr_breeze_url="http://asr:8801")
-        stored = MagicMock(settings=MagicMock(get=MagicMock(return_value=None)))
-        with patch("app.auth.runtime.get_auth_runtime", return_value=stored):
-            assert ingestion_audio._active_provider(cfg) == "breeze"
-
-    def test_unreadable_settings_still_transcribe(self):
-        """資料庫還沒 migrate 或 auth runtime 沒起來時，照 .env 走就好。"""
-        cfg = _asr_cfg("sensevoice", asr_sensevoice_url="http://asr:50002")
-        with patch(
-            "app.auth.runtime.get_auth_runtime",
-            side_effect=RuntimeError("no such table: system_settings"),
-        ):
-            assert ingestion_audio._active_provider(cfg) == "sensevoice"
+    def test_the_user_choice_still_comes_first(self):
+        cfg = _asr_cfg("breeze", asr_breeze_url="http://asr:8801", asr_sensevoice_url="http://asr:50002")
+        assert ingestion_audio._resolve_chain(cfg, "sensevoice")[:2] == ["sensevoice", "breeze"]
 
 
 class TestAudioConversion:

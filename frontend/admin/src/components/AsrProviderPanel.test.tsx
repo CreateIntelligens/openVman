@@ -1,80 +1,67 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  clearAsrProvider,
-  fetchAsrProvider,
-  previewAsr,
-  setAsrProvider,
-  type SystemSetting,
-} from "../api/settings";
+import { previewAsr } from "../api/settings";
 import AsrProviderPanel from "./AsrProviderPanel";
 
 vi.mock("../api/settings", () => ({
-  fetchAsrProvider: vi.fn(),
-  setAsrProvider: vi.fn(),
-  clearAsrProvider: vi.fn(),
   previewAsr: vi.fn(),
 }));
 
-const OPTIONS = ["breeze", "browser", "openai", "sensevoice", "xiaomi"];
-
-function setting(overrides: Partial<SystemSetting> = {}): SystemSetting {
-  return {
-    key: "asr_provider",
-    value: "",
-    effective: "sensevoice",
-    overridden: false,
-    options: OPTIONS,
-    ...overrides,
-  };
-}
-
 beforeEach(() => {
-  vi.mocked(fetchAsrProvider).mockReset().mockResolvedValue(setting());
-  vi.mocked(setAsrProvider).mockReset();
-  vi.mocked(clearAsrProvider).mockReset();
   vi.mocked(previewAsr).mockReset();
 });
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+function upload(name = "clip.wav") {
+  const clip = new File(["audio"], name, { type: "audio/wav" });
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  fireEvent.change(input, { target: { files: [clip] } });
+  return clip;
+}
+
 describe("AsrProviderPanel", () => {
-  it("顯示目前生效的引擎與它的實測差異", async () => {
+  it("沒有全站預設引擎可以改，只剩試辨識", () => {
     render(<AsrProviderPanel />);
 
-    expect((await screen.findAllByText(/SenseVoice-Small/)).length).toBeGreaterThan(0);
+    expect(screen.queryByText("預設語音辨識引擎")).toBeNull();
+    expect(screen.queryByRole("button", { name: "改回部署設定" })).toBeNull();
+    expect(screen.getByText("試辨識")).toBeTruthy();
+  });
+
+  it("選單列出伺服器引擎並顯示說明", async () => {
+    render(<AsrProviderPanel />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "試辨識的引擎" }));
+    const labels = (await screen.findAllByRole("option")).map((o) => o.textContent);
+    expect(labels).toEqual([
+      "Breeze-ASR-26", "Xiaomi-CocktailASR-1", "SenseVoice-Small", "OpenAI Whisper",
+    ]);
     // 選單上只有引擎代號的話，使用者無從判斷該選哪個。
+    fireEvent.mouseDown(screen.getByRole("option", { name: /SenseVoice-Small/ }));
     expect(screen.getAllByText(/臺語漢字輸出/).length).toBeGreaterThan(0);
   });
 
-  it("新加的引擎也要有說明，不能只出現代號", async () => {
-    vi.mocked(fetchAsrProvider).mockResolvedValue(setting({ effective: "xiaomi" }));
+  it("用選的引擎試辨識", async () => {
+    vi.mocked(previewAsr).mockResolvedValue({ text: "今仔日天氣袂歹", provider: "sensevoice" });
     render(<AsrProviderPanel />);
 
-    expect((await screen.findAllByText(/Xiaomi-CocktailASR-1/)).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/自動轉繁/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("combobox", { name: "試辨識的引擎" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /SenseVoice-Small/ }));
+    const clip = upload();
+
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.wav", "sensevoice"));
+    expect(await screen.findByText("今仔日天氣袂歹")).toBeTruthy();
+    expect(screen.queryByText(/這次由/)).toBeNull();
   });
 
-  it("沿用部署設定時不顯示還原按鈕", async () => {
+  it("指定的引擎沒回應、由備援辨識時講清楚", async () => {
+    vi.mocked(previewAsr).mockResolvedValue({ text: "有聽到", provider: "xiaomi" });
     render(<AsrProviderPanel />);
+    upload();
 
-    expect(await screen.findByText(/沿用部署設定/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "改回部署設定" })).toBeNull();
-  });
-
-  it("被覆寫時才顯示還原按鈕，並能改回部署設定", async () => {
-    vi.mocked(fetchAsrProvider).mockResolvedValue(
-      setting({ value: "breeze", effective: "breeze", overridden: true }),
-    );
-    vi.mocked(clearAsrProvider).mockResolvedValue(setting());
-    render(<AsrProviderPanel />);
-
-    const restore = await screen.findByRole("button", { name: "改回部署設定" });
-    fireEvent.click(restore);
-
-    await waitFor(() => expect(clearAsrProvider).toHaveBeenCalled());
-    expect(await screen.findByText(/已改回部署設定/)).toBeTruthy();
+    expect(await screen.findByText(/Breeze-ASR-26 沒有回應，這次由 Xiaomi-CocktailASR-1 辨識/)).toBeTruthy();
   });
 
   it("上傳音檔就送辨識，不必先錄音", async () => {
@@ -83,14 +70,13 @@ describe("AsrProviderPanel", () => {
       text: "今仔日天氣袂歹", provider: "sensevoice",
     });
     render(<AsrProviderPanel />);
-    await screen.findAllByText(/SenseVoice-Small/);
 
     const clip = new File(["audio"], "clip.wav", { type: "audio/wav" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [clip] } });
 
     // 檔名要一起送：後端拿副檔名決定怎麼解這個檔，mp3 冠上 .webm 會轉檔失敗。
-    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.wav"));
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.wav", "breeze"));
     expect(await screen.findByText("今仔日天氣袂歹")).toBeTruthy();
   });
 
@@ -99,7 +85,6 @@ describe("AsrProviderPanel", () => {
     // 先清再讀就永遠讀不到檔案，畫面只會說「未選擇任何檔案」。
     vi.mocked(previewAsr).mockResolvedValue({ text: "有聽到", provider: "breeze" });
     render(<AsrProviderPanel />);
-    await screen.findAllByText(/SenseVoice-Small/);
 
     const clip = new File(["audio"], "clip.mp3", { type: "audio/mpeg" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -112,13 +97,12 @@ describe("AsrProviderPanel", () => {
     });
     fireEvent.change(input);
 
-    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.mp3"));
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.mp3", "breeze"));
   });
 
   it("上傳辨識失敗時顯示錯誤", async () => {
     vi.mocked(previewAsr).mockRejectedValue(new Error("音檔超過大小限制"));
     render(<AsrProviderPanel />);
-    await screen.findAllByText(/SenseVoice-Small/);
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, {
@@ -130,38 +114,4 @@ describe("AsrProviderPanel", () => {
     ).toContain("音檔超過大小限制"));
   });
 
-  it("載入失敗時說明原因，不是留一個空面板", async () => {
-    vi.mocked(fetchAsrProvider).mockRejectedValue(new Error("boom"));
-    render(<AsrProviderPanel />);
-
-    expect(await screen.findByRole("alert")).toHaveProperty(
-      "textContent",
-      expect.stringContaining("無法載入"),
-    );
-  });
-
-  it("選了另一個引擎就送出，不用再按儲存", async () => {
-    vi.mocked(setAsrProvider).mockResolvedValue(
-      setting({ value: "breeze", effective: "breeze", overridden: true }),
-    );
-    render(<AsrProviderPanel />);
-    await screen.findAllByText(/SenseVoice-Small/);
-
-    fireEvent.click(screen.getByRole("combobox"));
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /Breeze-ASR-26/ }));
-
-    await waitFor(() => expect(setAsrProvider).toHaveBeenCalledWith("breeze"));
-    expect(await screen.findByText(/預設已改為 Breeze-ASR-26/)).toBeTruthy();
-  });
-
-  it("儲存失敗時顯示後端的訊息", async () => {
-    vi.mocked(setAsrProvider).mockRejectedValue(new Error("不是允許的值"));
-    render(<AsrProviderPanel />);
-    await screen.findAllByText(/SenseVoice-Small/);
-
-    fireEvent.click(screen.getByRole("combobox"));
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /Breeze-ASR-26/ }));
-
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("不是允許的值"));
-  });
 });

@@ -784,19 +784,28 @@ async def get_language_routes(
 
 
 @app.post(
-    "/api/v1/settings/asr-provider/preview",
-    tags=["Settings"],
-    summary="以目前設定的引擎試辨識一段語音",
+    "/api/v1/asr/preview",
+    tags=["ASR"],
+    summary="用指定的引擎試辨識一段語音",
 )
 async def preview_asr(
     _admin: CurrentAccount = Depends(require_admin),
     file: UploadFile = File(...),
+    provider: str = Form(""),
 ) -> JSONResponse:
-    """Transcribe an uploaded clip so an operator can hear-test the engine.
+    """Transcribe an uploaded clip so an operator can hear-test an engine.
 
-    切換引擎卻沒辦法驗證結果，等於要人憑說明文字選。這個端點走的是正式對話
-    用的同一條 transcribe()，所以看到的就是實際會發生的行為，包含 fallback。
+    走正式對話用的同一條 transcribe()，所以看到的就是實際會發生的行為，包含
+    fallback；回傳實際辨識的引擎，指定的那家掛掉時看得出是備援答的。只影響這
+    一次，不會改到任何人的設定。沒指定就用部署預設。
     """
+    from app.auth.settings_repository import SERVER_ASR_PROVIDERS
+
+    if provider and provider not in SERVER_ASR_PROVIDERS:
+        return upload_failed_response(
+            status_code=422,
+            error=f"provider must be one of: {', '.join(sorted(SERVER_ASR_PROVIDERS))}",
+        )
     suffix = os.path.splitext(file.filename or "")[1] or ".wav"
     tmp_path: str | None = None
     cfg = get_tts_config()
@@ -806,16 +815,16 @@ async def preview_asr(
             suffix=suffix,
             max_bytes=cfg.document_max_upload_bytes,
         )
-        from app.gateway.ingestion_audio import _active_provider, transcribe
+        from app.gateway.ingestion_audio import transcribe
 
         # 只量轉寫本身，不含上傳與轉檔：操作者要比的是引擎誰快，把網路時間
         # 算進去會讓同一個引擎在不同網路下看起來像兩回事。
         started = monotonic()
-        result = await transcribe(tmp_path, "asr-preview")
+        result = await transcribe(tmp_path, "asr-preview", preferred=provider or None)
         elapsed = monotonic() - started
         return JSONResponse(content={
             "text": result.content,
-            "provider": _active_provider(cfg),
+            "provider": result.provider or "",
             "elapsed_seconds": round(elapsed, 2),
         })
     except UploadTooLargeError as exc:

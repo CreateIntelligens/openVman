@@ -4,12 +4,11 @@ import type { HttpAdapter } from '../http'
 import {
   ASR_IDLE_TIMEOUT_MS,
   ASR_UI_LABELS,
-  DEFAULT_ASR_PROVIDER_LABEL,
   SERVER_ASR_MAX_CLIP_MS,
   SpeechController,
   type SpeechRecognizerUnit,
 } from './controller'
-import { BROWSER_ASR } from './engines'
+import { BROWSER_ASR, SERVER_ASR_ENGINES } from './engines'
 
 class MockUnit implements SpeechRecognizerUnit {
   start = vi.fn(() => {
@@ -258,7 +257,7 @@ describe('SpeechController (shared state machine)', () => {
     expect(controller.uiLabel).toBe('辨識中…')
   })
 
-  it('D7: 提供預設（依系統設定）標籤常數', () => {
-    expect(DEFAULT_ASR_PROVIDER_LABEL).toBe('預設（依系統設定）')
+  it('伺服器引擎清單跟後端 SERVER_ASR_PROVIDERS 同一組（取代 D7 的「預設」選項）', () => {
+    expect([...SERVER_ASR_ENGINES].sort()).toEqual(['breeze', 'openai', 'sensevoice', 'xiaomi'])
   })
 })
