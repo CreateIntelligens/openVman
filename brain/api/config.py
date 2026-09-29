@@ -105,6 +105,10 @@ class BrainSettings(BaseSettings):
     rag_memory_top_k: int = 3
     rag_rerank_candidate_multiplier: int = 4
     rag_distance_cutoff: float = 0.85
+    # 關鍵字（FTS）命中的段落放寬距離門檻，但不是無條件：知識庫有西語文件後，
+    # 「qué」這種常見字會讓任何西語問題都命中。實測（鶴記，bge-m3 l2）相關的
+    # 跨語言型號命中約 0.94，無關的 1.15 以上。
+    rag_fts_distance_cutoff: float = 1.1
     rag_memory_distance_bonus: float = 0.02
     rag_rrf_k: int = 60
     rag_dedup_similarity_threshold: float = 0.95

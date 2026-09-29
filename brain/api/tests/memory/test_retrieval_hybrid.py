@@ -57,6 +57,7 @@ class _FakeTable:
 
 class _FakeConfig:
     rag_distance_cutoff = 0.85
+    rag_fts_distance_cutoff = 1.1
     rag_rrf_k = 60
     rag_dedup_similarity_threshold = 0.95
 
@@ -159,6 +160,23 @@ class TestHybridRrf:
         )
         results = _search()
         assert [r["text"] for r in results] == ["keyword-hit"]
+
+    def test_fts_only_hit_far_from_the_query_is_dropped(self, patched):
+        """西語常見字（qué）字面命中、意思無關的段落不能無條件放行。"""
+        patched(
+            _FakeTable(
+                vector_records=[_rec("v", 0.2)],
+                fts_records=[
+                    # 與查詢 [0.1, 0.2] 的平方距離 0.25：型號這類字面命中 → 留
+                    _rec("model-number", vector=[0.6, 0.2]),
+                    # 平方距離 1.25：只撞到常見字 → 丟
+                    _rec("common-word", vector=[1.1, -0.3]),
+                ],
+            )
+        )
+        texts = [r["text"] for r in _search()]
+        assert "model-number" in texts
+        assert "common-word" not in texts
 
     def test_vector_hit_over_cutoff_is_dropped(self, patched):
         patched(

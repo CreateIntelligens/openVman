@@ -383,6 +383,9 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 #### 11.1a 知識庫依語言分流
 
+- 檢索門檻：向量距離（LanceDB l2，即平方歐氏距離）超過 `rag_distance_cutoff`（0.85）的段落丟掉；關鍵字（FTS）命中的段落補算與查詢的距離，放寬到 `rag_fts_distance_cutoff`（1.1）。以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落。
+- 跨語言提問靠同一份內容的多語版本（例如鶴記型錄中英西三版，翻譯版手動標語言），不在查詢時翻譯：bge-m3 跨語言距離比同語言高約 0.25，西語問中文型錄會被 0.85 門檻全擋掉；有西語版後西語提問 0.65–0.79 查到正確頁。
+
 同一份內容可準備中、英、西三個版本的文件（例如鶴記的型錄），使用者用哪種語言問就用那個版本的原文回答，不靠模型翻譯。
 
 - 文件語言存在 `.doc_meta.json` 的 `language`／`language_source`：`auto` 由文件開頭 2 萬字以規則判斷（`memory/language_detect.py`），第一次被列表或查詢用到時判斷並存下，內容儲存後清掉重判；`manual` 是後台指定，永不覆蓋。`PATCH /brain/knowledge/document/meta` 帶 `language=zh|en|es` 指定、`auto` 取消指定；文件列表回傳 `language` 與 `language_source`。

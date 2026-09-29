@@ -48,6 +48,7 @@ _cfg_mock.dreaming_candidate_limit = 100
 _cfg_mock.dreaming_similarity_threshold = 0.90
 _cfg_mock.max_session_ttl_minutes = 30 * 24 * 60
 _cfg_mock.rag_distance_cutoff = 1.2
+_cfg_mock.rag_fts_distance_cutoff = 1.2
 _cfg_mock.gateway_internal_token = "test-internal-token"
 
 for mod_name, stub in _STUBS.items():

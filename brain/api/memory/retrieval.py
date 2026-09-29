@@ -71,6 +71,7 @@ def search_records(
 
     cfg = get_settings()
     cutoff = distance_cutoff if distance_cutoff is not None else cfg.rag_distance_cutoff
+    fts_cutoff = max(cutoff, cfg.rag_fts_distance_cutoff)
 
     normalized_persona = normalize_persona_id(persona_id)
     limit = max(top_k, 1)
@@ -105,7 +106,7 @@ def search_records(
         visible = [
             record
             for record in raw_records
-            if _passes_relevance_cutoff(record, cutoff)
+            if _passes_relevance_cutoff(record, cutoff, fts_cutoff)
             and _matches_persona(record, normalized_persona)
             and not (
                 disabled_paths
@@ -195,7 +196,7 @@ def _hybrid_search(
     vector_records = _search_to_records(table.search(query_vector).limit(limit))
 
     ranked_lists: list[list[dict[str, Any]]] = [vector_records]
-    if fts_records := _try_fts_search(table, query_text, limit):
+    if fts_records := _try_fts_search(table, query_text, limit, query_vector):
         ranked_lists.append(fts_records)
 
     if expansion_vectors is None:
@@ -209,7 +210,7 @@ def _hybrid_search(
                 table.search(term_vector).limit(limit)
             ):
                 ranked_lists.append(term_records)
-        if term_fts := _try_fts_search(table, term, limit):
+        if term_fts := _try_fts_search(table, term, limit, query_vector):
             ranked_lists.append(term_fts)
 
     if len(ranked_lists) == 1:
@@ -221,14 +222,23 @@ def _hybrid_search(
     ]
 
 
-def _try_fts_search(table: Any, query_text: str, limit: int) -> list[dict[str, Any]]:
-    """FTS 檢索;index 不存在或失敗時回空 list。"""
+def _try_fts_search(
+    table: Any,
+    query_text: str,
+    limit: int,
+    query_vector: list[float] | None = None,
+) -> list[dict[str, Any]]:
+    """FTS 檢索;index 不存在或失敗時回空 list。
+
+    FTS 結果沒有 _distance；有向量就補上與原查詢的距離，讓門檻判斷得了
+    「字面命中但意思無關」的段落。
+    """
     if not query_text:
         return []
     try:
         # 需要先建立 FTS index(infra.db.ensure_fts_index)
         return [
-            {**record, "_fts_match": True}
+            _with_query_distance({**record, "_fts_match": True}, query_vector)
             for record in _search_to_records(
                 table.search(query_text, query_type="fts").limit(limit)
             )
@@ -236,6 +246,21 @@ def _try_fts_search(table: Any, query_text: str, limit: int) -> list[dict[str, A
     except Exception as exc:
         logger.debug("FTS search failed or unavailable for %r: %s", query_text, exc)
         return []
+
+
+def _with_query_distance(
+    record: dict[str, Any], query_vector: list[float] | None
+) -> dict[str, Any]:
+    vector = record.get("vector")
+    if "_distance" in record or query_vector is None or vector is None:
+        return record
+    if len(vector) != len(query_vector):
+        return record
+    # 跟 LanceDB 的 l2 一致：平方歐氏距離（正規化向量下 = 2 - 2cos）。
+    record["_distance"] = float(
+        sum((float(a) - float(b)) ** 2 for a, b in zip(vector, query_vector))
+    )
+    return record
 
 
 def _try_encode(term: str, embedding_version: str | None) -> list[float] | None:
@@ -254,10 +279,14 @@ def _normalize_vector_results(records: list[dict[str, Any]]) -> list[dict[str, A
     )
 
 
-def _passes_relevance_cutoff(record: dict[str, Any], cutoff: float) -> bool:
+def _passes_relevance_cutoff(
+    record: dict[str, Any], cutoff: float, fts_cutoff: float
+) -> bool:
+    distance = record.get("_distance")
     if record.get("_fts_match") is True:
-        return True
-    return record.get("_distance", 0.0) <= cutoff
+        # 字面命中（型號、專有名詞）語意距離常偏遠，所以門檻放寬；算不出距離時照舊放行。
+        return distance is None or distance <= fts_cutoff
+    return (distance or 0.0) <= cutoff
 
 
 def _search_to_records(search_result: Any) -> list[dict[str, Any]]:
