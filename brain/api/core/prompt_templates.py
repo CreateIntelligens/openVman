@@ -99,6 +99,16 @@ def reply_language_line(
         return (
             "這一輪的回答語言：看使用者這句話是用哪種語言寫的就用哪種（英文字句用英文、"
             f"西班牙文字句用西班牙文），只有型號、數字這類看不出語言的輸入才用{name}。"
+            + _FOREIGN_LENGTH_LINE
         )
     name = PRIMARY_LANGUAGE_NAMES.get(code, "繁體中文")
-    return f"這一輪的回答語言：{name}。整段回答都用{name}，不要夾雜其他語言。"
+    line = f"這一輪的回答語言：{name}。整段回答都用{name}，不要夾雜其他語言。"
+    return line if code == "zh" else line + _FOREIGN_LENGTH_LINE
+
+
+# 虛擬人會把回答念出來。同一句拒答，中文 67–89 字約 15 秒，西語 330–400 字元要講
+# 25–30 秒（鶴記 2026-09-29）：模型把人設的中文固定句翻過去時會順手加長。
+_FOREIGN_LENGTH_LINE = (
+    "英文、西班牙文回答的資訊量跟中文回答一樣，不要因為換語言而多加說明或客套："
+    "以 2 到 3 句、約 40 個單字以內為原則，使用者要求列出詳細規格時才寫長。"
+)

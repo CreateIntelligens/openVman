@@ -74,3 +74,13 @@ def test_chat_prompt_ends_with_the_reply_language(monkeypatch):
     )
     assert "這一輪的回答語言：Español。" in messages[0]["content"]
     assert "本專案主要語言：" not in messages[0]["content"]
+
+
+def test_foreign_replies_are_kept_as_short_as_chinese():
+    """虛擬人會念出來：西語拒答 330–400 字元講 25–30 秒，中文同一句 15 秒。"""
+    spanish = prompt_templates.reply_language_line("p", "¿Cuántos caballos tiene la bomba de lodos?")
+    english = prompt_templates.reply_language_line("p", "How much horsepower does the sludge pump have?")
+    chinese = prompt_templates.reply_language_line("p", "污泥泵有幾匹馬力？")
+    assert "約 40 個單字以內" in spanish
+    assert "約 40 個單字以內" in english
+    assert "單字" not in chinese
