@@ -157,9 +157,31 @@ def _warmup_retrieval_path(project_id: str = "default") -> None:
             )
 
 
+def _warmup_audio_language() -> None:
+    """Import google-genai, build the shared client and open its connection.
+
+    台語判斷只能等 2.5 秒；部署重啟後第一句要付載入套件、建 client、跟 Gemini
+    建連線，實測 2.5 秒（之後 1.2 秒），第一個講台語的人會被當成講華語。
+    models.get 不花 token。
+    """
+    cfg = get_settings()
+    if not cfg.gemini_api_key:
+        return
+    from memory.language_detect import _audio_language_client
+
+    try:
+        _audio_language_client(cfg.gemini_api_key).models.get(
+            model=cfg.live_audio_language_id_model,
+        )
+    except Exception as exc:  # noqa: BLE001 - 預熱失敗只是第一句慢，不擋啟動
+        logger.warning("台語判斷預熱失敗（不影響啟動）: %s", type(exc).__name__)
+
+
 async def warmup_resources() -> None:
     """背景預熱 remote embedding 與資料路徑。"""
     logger.info("背景預熱開始...")
+    # 最先做：部署後第一句台語可能在其他預熱跑完前就到。
+    await asyncio.to_thread(_warmup_audio_language)
     try:
         project_ids = _warmup_project_ids()
         await asyncio.to_thread(get_embedder)

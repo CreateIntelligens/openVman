@@ -701,7 +701,7 @@ curl -s -X POST http://127.0.0.1:8787/brain/chat \
 
 ### 1. Embedding gateway 是必要相依服務
 
-API 啟動後會背景呼叫 remote embedding gateway 並預熱資料表。gateway 不可達、回傳未授權 identity 或向量規格不相容時，Brain 會 fail closed，不會在 API process 內重建 provider fallback 或載入 BGE。
+API 啟動後會背景預熱，最先做台語判斷：載入 google-genai、建好共用的 Gemini client，並呼叫一次 `models.get`（不花 token）。這一步只在設定了 `GEMINI_API_KEY` 時做，失敗只記 warning。部署重啟後的第一句台語原本要多等約 1.4 秒（載入套件 1.2 秒、建 client 0.17 秒），會超過 Backend 的 2.5 秒上限。接著呼叫 remote embedding gateway 並預熱資料表。gateway 不可達、回傳未授權 identity 或向量規格不相容時，Brain 會 fail closed，不會在 API process 內重建 provider fallback 或載入 BGE。
 
 可使用下列端點區分 process liveness 與 dependency readiness：
 

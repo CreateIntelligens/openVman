@@ -16,6 +16,13 @@ def _reset_warmup_state():
     warmup_state.reset_warmup_state()
 
 
+@pytest.fixture(autouse=True)
+def _no_gemini_warmup(monkeypatch, request):
+    """其他預熱測試不該真的連 Gemini；測台語判斷預熱的測試自己換掉 client。"""
+    if "audio_language" not in request.node.name:
+        monkeypatch.setattr(_load_main(), "_warmup_audio_language", lambda: None)
+
+
 def test_warmup_project_ids_include_projects_with_knowledge_state(monkeypatch):
     main = _load_main()
 
@@ -175,3 +182,72 @@ def test_readiness_pending_until_warmup_done(monkeypatch):
     ready = health_payload.build_readiness_payload()
     assert ready["status"] == "ready"
     assert ready["warmup"] == "done"
+
+
+def _audio_settings(monkeypatch, main, key="k1"):
+    import types
+
+    monkeypatch.setattr(main, "get_settings", lambda: types.SimpleNamespace(
+        gemini_api_key=key, live_audio_language_id_model="gemini-3.5-flash-lite",
+    ))
+
+
+def test_warmup_audio_language_opens_the_shared_client(monkeypatch):
+    import types
+
+    import memory.language_detect as language_detect
+
+    main = _load_main()
+    _audio_settings(monkeypatch, main)
+    asked: list[tuple[str, str]] = []
+    monkeypatch.setattr(language_detect, "_audio_language_client", lambda key: types.SimpleNamespace(
+        models=types.SimpleNamespace(get=lambda model: asked.append((key, model))),
+    ))
+
+    main._warmup_audio_language()
+
+    assert asked == [("k1", "gemini-3.5-flash-lite")]
+
+
+def test_warmup_audio_language_skips_without_a_key(monkeypatch):
+    import memory.language_detect as language_detect
+
+    main = _load_main()
+    _audio_settings(monkeypatch, main, key="")
+    monkeypatch.setattr(language_detect, "_audio_language_client",
+                        lambda key: pytest.fail("no key, no client"))
+
+    main._warmup_audio_language()
+
+
+def test_warmup_audio_language_failure_does_not_raise(monkeypatch, caplog):
+    import memory.language_detect as language_detect
+
+    main = _load_main()
+    _audio_settings(monkeypatch, main)
+
+    def boom(key):
+        raise ConnectionError("gemini down")
+
+    monkeypatch.setattr(language_detect, "_audio_language_client", boom)
+
+    main._warmup_audio_language()
+
+    assert "ConnectionError" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_audio_language_warmup_runs_before_retrieval_warmup(monkeypatch):
+    main = _load_main()
+    order: list[str] = []
+    monkeypatch.setattr(main, "_warmup_audio_language", lambda: order.append("audio"))
+    monkeypatch.setattr(main, "_warmup_project_ids", lambda: ["default"])
+    monkeypatch.setattr(main, "ensure_workspace_scaffold", lambda project_id: None)
+    monkeypatch.setattr(main, "get_embedder", lambda: order.append("embedder"))
+    monkeypatch.setattr(main, "ensure_tables", lambda project_id: None)
+    monkeypatch.setattr(main, "_warmup_retrieval_path", lambda project_id: None)
+    monkeypatch.setattr(main, "maybe_run_memory_maintenance", lambda force, project_id: None)
+
+    await main.warmup_resources()
+
+    assert order[:2] == ["audio", "embedder"]
