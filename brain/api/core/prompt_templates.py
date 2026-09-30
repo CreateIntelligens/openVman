@@ -53,7 +53,14 @@ NO_TOOLS_ANSWER_RULES = (
 
 
 # 知識庫分流排第一的語言；台語沒有通行的書寫，文字回覆用繁體中文。
-PRIMARY_LANGUAGE_NAMES = {"zh": "繁體中文", "en": "English", "es": "Español", "nan": "繁體中文"}
+PRIMARY_LANGUAGE_NAMES = {
+    "zh": "繁體中文",
+    "en": "English",
+    "es": "Español",
+    "nan": "繁體中文",
+    "ja": "日本語",
+    "ko": "한국어",
+}
 
 
 def _primary_language(project_id: str) -> str:
@@ -98,11 +105,14 @@ def reply_language_line(
         # 就用主要語言」，實測模型會直接挑主要語言（2026-09-24）。
         return (
             "這一輪的回答語言：看使用者這句話是用哪種語言寫的就用哪種（英文字句用英文、"
-            f"西班牙文字句用西班牙文），只有型號、數字這類看不出語言的輸入才用{name}。"
+            "西班牙文字句用西班牙文、日文用日文、韓文用韓文），"
+            f"只有型號、數字這類看不出語言的輸入才用{name}。"
             + _FOREIGN_LENGTH_LINE
         )
     name = PRIMARY_LANGUAGE_NAMES.get(code, "繁體中文")
     line = f"這一輪的回答語言：{name}。整段回答都用{name}，不要夾雜其他語言。"
+    if code in ("ja", "ko"):
+        return line + _CJK_LENGTH_LINE
     return line if code == "zh" else line + _FOREIGN_LENGTH_LINE
 
 
@@ -111,4 +121,9 @@ def reply_language_line(
 _FOREIGN_LENGTH_LINE = (
     "英文、西班牙文回答的資訊量跟中文回答一樣，不要因為換語言而多加說明或客套："
     "以 2 到 3 句、約 40 個單字以內為原則，使用者要求列出詳細規格時才寫長。"
+)
+# 日韓不是用單字數；跟中文一樣看句數與字數。
+_CJK_LENGTH_LINE = (
+    "回答的資訊量跟中文回答一樣，不要因為換語言而多加說明或客套："
+    "以 2 到 3 句為原則，使用者要求列出詳細規格時才寫長。"
 )

@@ -142,6 +142,7 @@ describe("FileView", () => {
     fireEvent.keyDown(trigger, { key: "End" });
     fireEvent.keyDown(trigger, { key: "Enter" });
 
-    expect(onChangeLanguage).toHaveBeenCalledWith(expect.objectContaining({ path: "knowledge/faq.md" }), "nan");
+    // End 選到清單最後一個語言（2026-09-30 起是韓文）。
+    expect(onChangeLanguage).toHaveBeenCalledWith(expect.objectContaining({ path: "knowledge/faq.md" }), "ko");
   });
 });

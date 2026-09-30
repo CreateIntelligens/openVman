@@ -13,6 +13,8 @@ const LANGUAGE_LABELS: Record<KnowledgeLanguage, string> = {
   en: "English",
   es: "Español",
   nan: "台語",
+  ja: "日本語",
+  ko: "한국어",
 };
 
 export default function FileView({
@@ -102,6 +104,8 @@ export default function FileView({
                   { value: "en", label: "English" },
                   { value: "es", label: "Español" },
                   { value: "nan", label: "台語" },
+                  { value: "ja", label: "日本語" },
+                  { value: "ko", label: "한국어" },
                 ]}
               />
             </span>

@@ -369,7 +369,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 #### 11.1b 語言分流設定與台語
 
-分流由管理者在知識庫設定勾選，不看有哪些文件（醫院的文件可能只有中文，但仍要開台語分流）：`GET/PUT /brain/knowledge/settings`（`language_routes`，存在 workspace 的 `.kb_settings.json`；至少一條、不一定是中文，預設只有 `zh`。清單順序是優先順序、後台可調，排第一的是主要語言）。後台知識庫標題列的「分流」按鈕勾選。
+分流由管理者在知識庫設定勾選，不看有哪些文件（醫院的文件可能只有中文，但仍要開台語分流）：`GET/PUT /brain/knowledge/settings`（`language_routes`，存在 workspace 的 `.kb_settings.json`；可選 zh、en、es、nan（台語）、ja、ko，至少一條、不一定是中文，預設只有 `zh`。日文、韓文靠假名、諺文判斷，實測見 `scripts/experiments/ja-ko/`。清單順序是優先順序、後台可調，排第一的是主要語言）。後台知識庫標題列的「分流」按鈕勾選。
 
 - 只有一條分流：不做語言篩選，所有文件一起查（與分流功能出現前相同）。
 - 多條分流：所有文件都查得到，語言只決定誰先進 top_k——使用者語言的文件優先，不夠再用主要語言補，最後才是其他語言（例如只勾英、西時，中文提問先拿中文文件、再英文、再西語）。使用者語言有勾時會逐次擴大候選窗找同語言的原文；沒勾就只在第一輪候選窗內排序。
@@ -382,6 +382,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 - 文件語言自動判斷也認台語（台羅聲調符號、台語特有漢字密度 ≥ 3%，先排除「給予」「欲望」等華語詞），後台可手動標「台語」。實驗見 `scripts/experiments/taigi/REPORT.md`。
 
 #### 11.1a 知識庫依語言分流
+
 
 - 檢索門檻：向量距離（LanceDB l2，即平方歐氏距離）超過 `rag_distance_cutoff`（1.0；2026-09-29 由 0.85 放寬，見 `scripts/experiments/kb-cutoff/`）的段落丟掉；關鍵字（FTS）命中的段落補算與查詢的距離，放寬到 `rag_fts_distance_cutoff`（1.1）。以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落。
 - 跨語言提問靠同一份內容的多語版本（例如鶴記型錄中英西三版，翻譯版手動標語言），不在查詢時翻譯：bge-m3 跨語言距離比同語言高約 0.25，西語問中文型錄會被當時的 0.85 門檻全擋掉；有西語版後西語提問 0.65–0.79 查到正確頁。

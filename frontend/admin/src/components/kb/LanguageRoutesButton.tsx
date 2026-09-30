@@ -11,6 +11,8 @@ const ROUTES: { value: KnowledgeLanguage; label: string }[] = [
   { value: "en", label: "English" },
   { value: "es", label: "Español" },
   { value: "nan", label: "台語" },
+  { value: "ja", label: "日本語" },
+  { value: "ko", label: "한국어" },
 ];
 
 /** 知識庫的語言分流設定；由管理者勾選，不看有哪些文件。 */

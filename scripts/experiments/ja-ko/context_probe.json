@@ -1,0 +1,254 @@
+[
+ {
+  "text": "這台泵浦的馬力是多少？",
+  "setting": "none",
+  "rep": 0,
+  "heard": "這臺奔騰的馬力是多少？",
+  "cer": 0.2
+ },
+ {
+  "text": "這台泵浦的馬力是多少？",
+  "setting": "none",
+  "rep": 1,
+  "heard": "這臺奔騰的馬力是多少？",
+  "cer": 0.2
+ },
+ {
+  "text": "這台泵浦的馬力是多少？",
+  "setting": "context",
+  "rep": 0,
+  "heard": "這臺奔騰的馬力是多少？",
+  "cer": 0.2
+ },
+ {
+  "text": "這台泵浦的馬力是多少？",
+  "setting": "context",
+  "rep": 1,
+  "heard": "這臺奔騰的馬力是多少？",
+  "cer": 0.2
+ },
+ {
+  "text": "污泥泵有幾種型號？",
+  "setting": "none",
+  "rep": 0,
+  "heard": "UNI 本有幾種型號？",
+  "cer": 0.5
+ },
+ {
+  "text": "污泥泵有幾種型號？",
+  "setting": "none",
+  "rep": 1,
+  "heard": "UNI 本有幾種型號？",
+  "cer": 0.5
+ },
+ {
+  "text": "污泥泵有幾種型號？",
+  "setting": "context",
+  "rep": 0,
+  "heard": "UNI 本有幾種型號？",
+  "cer": 0.5
+ },
+ {
+  "text": "污泥泵有幾種型號？",
+  "setting": "context",
+  "rep": 1,
+  "heard": "UNI 本有幾種型號？",
+  "cer": 0.5
+ },
+ {
+  "text": "沉水泵最深可以放多深？",
+  "setting": "none",
+  "rep": 0,
+  "heard": "沉睡泵最深可以放多深？",
+  "cer": 0.1
+ },
+ {
+  "text": "沉水泵最深可以放多深？",
+  "setting": "none",
+  "rep": 1,
+  "heard": "沉睡泵最深可以放多深？",
+  "cer": 0.1
+ },
+ {
+  "text": "沉水泵最深可以放多深？",
+  "setting": "context",
+  "rep": 0,
+  "heard": "沉睡泵最深可以放多深？",
+  "cer": 0.1
+ },
+ {
+  "text": "沉水泵最深可以放多深？",
+  "setting": "context",
+  "rep": 1,
+  "heard": "沉睡泵最深可以放多深？",
+  "cer": 0.1
+ },
+ {
+  "text": "我想找一台排水泵，揚程要二十米。",
+  "setting": "none",
+  "rep": 0,
+  "heard": "我想找一臺排水泵，揚程要 20 米。",
+  "cer": 0.14
+ },
+ {
+  "text": "我想找一台排水泵，揚程要二十米。",
+  "setting": "none",
+  "rep": 1,
+  "heard": "我想找一臺排水泵，揚程要 20 米。",
+  "cer": 0.14
+ },
+ {
+  "text": "我想找一台排水泵，揚程要二十米。",
+  "setting": "context",
+  "rep": 0,
+  "heard": "我想找一臺排水泵，揚程要 20 米。",
+  "cer": 0.14
+ },
+ {
+  "text": "我想找一台排水泵，揚程要二十米。",
+  "setting": "context",
+  "rep": 1,
+  "heard": "我想找一臺排水泵，揚程要 20 米。",
+  "cer": 0.14
+ },
+ {
+  "text": "EUBL 跟 DIVA 差在哪裡？",
+  "setting": "none",
+  "rep": 0,
+  "heard": "UBL 和 DBX 在哪裡？",
+  "cer": 0.46
+ },
+ {
+  "text": "EUBL 跟 DIVA 差在哪裡？",
+  "setting": "none",
+  "rep": 1,
+  "heard": "UBL 和 DBX 在哪裡？",
+  "cer": 0.46
+ },
+ {
+  "text": "EUBL 跟 DIVA 差在哪裡？",
+  "setting": "context",
+  "rep": 0,
+  "heard": "UBL 和 DBX 在哪裡？",
+  "cer": 0.46
+ },
+ {
+  "text": "EUBL 跟 DIVA 差在哪裡？",
+  "setting": "context",
+  "rep": 1,
+  "heard": "UBL 和 DBX 在哪裡？",
+  "cer": 0.46
+ },
+ {
+  "text": "你好，請問你是誰？",
+  "setting": "none",
+  "rep": 0,
+  "heard": "你好，請問你是誰？",
+  "cer": 0.0
+ },
+ {
+  "text": "你好，請問你是誰？",
+  "setting": "none",
+  "rep": 1,
+  "heard": "你好，請問你是誰？",
+  "cer": 0.0
+ },
+ {
+  "text": "你好，請問你是誰？",
+  "setting": "context",
+  "rep": 0,
+  "heard": "你好，請問你是誰？",
+  "cer": 0.0
+ },
+ {
+  "text": "你好，請問你是誰？",
+  "setting": "context",
+  "rep": 1,
+  "heard": "你好，請問你是誰？",
+  "cer": 0.0
+ },
+ {
+  "text": "今天天氣很好。",
+  "setting": "none",
+  "rep": 0,
+  "heard": "今天天氣很好。",
+  "cer": 0.0
+ },
+ {
+  "text": "今天天氣很好。",
+  "setting": "none",
+  "rep": 1,
+  "heard": "今天天氣很好。",
+  "cer": 0.0
+ },
+ {
+  "text": "今天天氣很好。",
+  "setting": "context",
+  "rep": 0,
+  "heard": "今天天氣很好。",
+  "cer": 0.0
+ },
+ {
+  "text": "今天天氣很好。",
+  "setting": "context",
+  "rep": 1,
+  "heard": "今天天氣很好。",
+  "cer": 0.0
+ },
+ {
+  "text": "Who am I?",
+  "setting": "none",
+  "rep": 0,
+  "heard": "Who am I?",
+  "cer": 0.0
+ },
+ {
+  "text": "Who am I?",
+  "setting": "none",
+  "rep": 1,
+  "heard": "Who am I?",
+  "cer": 0.0
+ },
+ {
+  "text": "Who am I?",
+  "setting": "context",
+  "rep": 0,
+  "heard": "Who am I?",
+  "cer": 0.0
+ },
+ {
+  "text": "Who am I?",
+  "setting": "context",
+  "rep": 1,
+  "heard": "Who am I?",
+  "cer": 0.0
+ },
+ {
+  "text": "¿Cuántos caballos tiene la bomba de lodos?",
+  "setting": "none",
+  "rep": 0,
+  "heard": "¿Cuántos caballos tiene la bomba de lodos?",
+  "cer": 0.0
+ },
+ {
+  "text": "¿Cuántos caballos tiene la bomba de lodos?",
+  "setting": "none",
+  "rep": 1,
+  "heard": "¿Cuántos caballos tiene la bomba de lodos?",
+  "cer": 0.0
+ },
+ {
+  "text": "¿Cuántos caballos tiene la bomba de lodos?",
+  "setting": "context",
+  "rep": 0,
+  "heard": "¿Cuántos caballos tiene la bomba de lodos?",
+  "cer": 0.0
+ },
+ {
+  "text": "¿Cuántos caballos tiene la bomba de lodos?",
+  "setting": "context",
+  "rep": 1,
+  "heard": "¿Cuántos caballos tiene la bomba de lodos?",
+  "cer": 0.0
+ }
+]

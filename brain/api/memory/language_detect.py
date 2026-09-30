@@ -15,15 +15,18 @@ from typing import Callable
 
 logger = logging.getLogger(__name__)
 
-# 客戶只用中英西；其他語言與判斷不出來的一律算中文（2026-09-23 使用者決定）。
+# 判斷不出來的一律算主要語言（預設中文）。日文、韓文 2026-09-30 加入，給之後的日韓專案；
+# 靠假名、諺文判斷，不必外送。
 # nan（台語）只能從聲音判斷：轉錄成文字後是中文字，文字規則永遠不會回 nan。
-LANGUAGES = ("zh", "en", "es", "nan")
+LANGUAGES = ("zh", "en", "es", "nan", "ja", "ko")
 DEFAULT_LANGUAGE = "zh"
 TAIWANESE = "nan"
 
 _LATIN_WORD = re.compile(r"[a-záéíóúüñ]+")
 _SPANISH_MARKS = re.compile(r"[¿¡ñ]")
 _HAN = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
+_KANA = re.compile(r"[\u3040-\u30ff]")
+_HANGUL = re.compile(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]")
 
 _EN_WORDS = frozenset(
     "the an is are was were do does did i you he she it we they my your "
@@ -46,8 +49,24 @@ _SHORT_TEXT_WORDS = 2
 
 
 def is_short_text(text: str) -> bool:
-    """Too short to tell a language: at most two Latin words and no Chinese."""
-    return not _HAN.search(text or "") and len(_LATIN_WORD.findall((text or "").lower())) <= _SHORT_TEXT_WORDS
+    """Too short to tell a language: at most two Latin words and no CJK script."""
+    text = text or ""
+    if _HAN.search(text) or _KANA.search(text) or _HANGUL.search(text):
+        return False
+    return len(_LATIN_WORD.findall(text.lower())) <= _SHORT_TEXT_WORDS
+
+
+def _cjk_language(text: str) -> str | None:
+    """Japanese or Korean by script; kana and hangul never appear in Chinese."""
+    kana = len(_KANA.findall(text))
+    hangul = len(_HANGUL.findall(text))
+    han = len(_HAN.findall(text))
+    # 日文夾漢字、韓文偶爾夾漢字；用比例，免得中文文件引了一個日文品牌就整份變日文。
+    if hangul and hangul >= 0.3 * (hangul + han + kana):
+        return "ko"
+    if kana and kana >= 0.1 * (kana + han):
+        return "ja"
+    return None
 
 
 def detect_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
@@ -57,6 +76,8 @@ def detect_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
     """
     lowered = (text or "").lower()
     words = _LATIN_WORD.findall(lowered)
+    if cjk := _cjk_language(text or ""):
+        return cjk
     # 使用者的話有中文就是中文（夾英文型號、網址也一樣）。長篇文件另看比例，見下。
     han = len(_HAN.findall(text or ""))
     if han and (han > len(words) or len(text or "") < 200):
@@ -168,6 +189,8 @@ def refine_language_in_background(
 
     if (
         is_short_text(text)
+        # 日韓靠文字系統判斷就準；Jev 只問中英西，問了反而會被校回中文。
+        or rule_language in ("ja", "ko")
         or not get_settings().jev_language_enabled
         or not jev_available()
     ):

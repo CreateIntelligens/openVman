@@ -26,7 +26,7 @@ logger = logging.getLogger("language_routes")
 
 CHINESE = "zh"
 TAIWANESE = "nan"
-KNOWN_ROUTES = ("zh", "en", "es", "nan")
+KNOWN_ROUTES = ("zh", "en", "es", "nan", "ja", "ko")
 TAIWANESE_ASR_ENGINE = "breeze"
 TAIWANESE_TTS_PROVIDERS = ("voxcpm", "cosyvoice")
 

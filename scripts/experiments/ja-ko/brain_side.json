@@ -1,0 +1,223 @@
+{
+ "detect": [
+  {
+   "q": "このポンプの馬力はいくつですか？",
+   "expected": "ja",
+   "got": "ja"
+  },
+  {
+   "q": "50EUBLの固形物通過径は何ミリですか？",
+   "expected": "ja",
+   "got": "ja"
+  },
+  {
+   "q": "DIVA PROには攪拌機がありますか？",
+   "expected": "ja",
+   "got": "ja"
+  },
+  {
+   "q": "水温の制限は何度ですか？",
+   "expected": "ja",
+   "got": "ja"
+  },
+  {
+   "q": "이 펌프의 마력은 얼마입니까?",
+   "expected": "ko",
+   "got": "ko"
+  },
+  {
+   "q": "50EUBL의 고형물 통과 크기는 몇 mm입니까?",
+   "expected": "ko",
+   "got": "ko"
+  },
+  {
+   "q": "DIVA PRO에는 교반기가 있습니까?",
+   "expected": "ko",
+   "got": "ko"
+  },
+  {
+   "q": "수온 제한은 몇 도입니까?",
+   "expected": "ko",
+   "got": "ko"
+  },
+  {
+   "q": "污泥泵有幾匹馬力？",
+   "expected": "zh",
+   "got": "zh"
+  },
+  {
+   "q": "¿Cuántos caballos tiene la bomba?",
+   "expected": "es",
+   "got": "es"
+  }
+ ],
+ "retrieval": [
+  {
+   "q": "このポンプの馬力はいくつですか？",
+   "best": 0.7526496648788452,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/EVAK_CATALOG.en.md",
+    "knowledge/EVAK_CATALOG.md",
+    "knowledge/EVAK_CATALOG.md"
+   ]
+  },
+  {
+   "q": "50EUBLの固形物通過径は何ミリですか？",
+   "best": 0.5870705842971802,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/qa/evak_qa.csv",
+    "knowledge/qa/evak_qa.csv",
+    "knowledge/EVAK_CATALOG.md"
+   ]
+  },
+  {
+   "q": "DIVA PROには攪拌機がありますか？",
+   "best": 0.6220513582229614,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/qa/evak_qa.csv",
+    "knowledge/EVAK_CATALOG.md",
+    "knowledge/EVAK_QA.en.md"
+   ]
+  },
+  {
+   "q": "水温の制限は何度ですか？",
+   "best": 0.7642824649810791,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/EVAK_CATALOG.en.md",
+    "knowledge/EVAK_CATALOG.md",
+    "knowledge/EVAK_CATALOG.en.md"
+   ]
+  },
+  {
+   "q": "이 펌프의 마력은 얼마입니까?",
+   "best": 0.7429730296134949,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/EVAK_CATALOG.en.md",
+    "knowledge/EVAK_CATALOG.md",
+    "knowledge/EVAK_CATALOG.md"
+   ]
+  },
+  {
+   "q": "50EUBL의 고형물 통과 크기는 몇 mm입니까?",
+   "best": 0.639114499092102,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/qa/evak_qa.csv",
+    "knowledge/EVAK_CATALOG.md",
+    "knowledge/qa/evak_qa.csv"
+   ]
+  },
+  {
+   "q": "DIVA PRO에는 교반기가 있습니까?",
+   "best": 0.8279995918273926,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/qa/evak_qa.csv",
+    "knowledge/qa/evak_qa.csv",
+    "knowledge/qa/evak_qa.csv"
+   ]
+  },
+  {
+   "q": "수온 제한은 몇 도입니까?",
+   "best": 0.8205681443214417,
+   "n": 3,
+   "hit": true,
+   "paths": [
+    "knowledge/EVAK_CATALOG.en.md",
+    "knowledge/EVAK_CATALOG.es.md",
+    "knowledge/EVAK_CATALOG.en.md"
+   ]
+  }
+ ],
+ "jev": [
+  {
+   "lang": "ja",
+   "interim": "汚泥用のポンプはありますか？",
+   "final": "おでん用のポンプはありますか？",
+   "truth": "interim",
+   "scores": {
+    "interim": 0.88,
+    "final": 0.86
+   },
+   "chosen": "final"
+  },
+  {
+   "lang": "ja",
+   "interim": "こんにちは、あなたは誰ですか？",
+   "final": "こんにちは、あなたはダレですか",
+   "truth": "either",
+   "scores": {
+    "interim": 0.9,
+    "final": 0.88
+   },
+   "chosen": "final"
+  },
+  {
+   "lang": "ja",
+   "interim": "このポンプの馬",
+   "final": "このポンプの馬力はいくつですか？",
+   "truth": "final",
+   "scores": {
+    "interim": 0.19,
+    "final": 0.87
+   },
+   "chosen": "final"
+  },
+  {
+   "lang": "ja",
+   "interim": "水温の制限は何度ですか",
+   "final": "水溫限制是幾度",
+   "truth": "interim",
+   "scores": {
+    "interim": 0.81,
+    "final": 0.85
+   },
+   "chosen": "final"
+  },
+  {
+   "lang": "ko",
+   "interim": "이 펌프의 마력은 얼마입니까?",
+   "final": "이 泵의 마력은 얼마입니까?",
+   "truth": "interim",
+   "scores": {
+    "interim": 0.67,
+    "final": 0.39
+   },
+   "chosen": "interim"
+  },
+  {
+   "lang": "ko",
+   "interim": "안녕하세요 당신은",
+   "final": "안녕하세요, 당신은 누구입니까?",
+   "truth": "final",
+   "scores": {
+    "interim": 0.43,
+    "final": 0.8
+   },
+   "chosen": "final"
+  },
+  {
+   "lang": "ko",
+   "interim": "감사합니다",
+   "final": "看撒哈姆尼達",
+   "truth": "interim",
+   "scores": {
+    "interim": 0.92,
+    "final": 0.16
+   },
+   "chosen": "interim"
+  }
+ ]
+}

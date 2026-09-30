@@ -18,6 +18,8 @@ export const LANGUAGE_ROUTE_LABELS: Record<string, string> = {
   en: 'English',
   es: 'Español',
   nan: '台語',
+  ja: '日本語',
+  ko: '한국어',
 }
 export const TAIWANESE_ROUTE = 'nan'
 const TAIWANESE_TTS_PROVIDERS = ['voxcpm', 'cosyvoice']

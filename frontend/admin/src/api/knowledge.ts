@@ -36,7 +36,7 @@ export interface KnowledgeDocumentSummary {
 }
 
 // nan＝台語；專案有台語文件才會在 Live 多聽一次判斷台語。
-export type KnowledgeLanguage = "zh" | "en" | "es" | "nan";
+export type KnowledgeLanguage = "zh" | "en" | "es" | "nan" | "ja" | "ko";
 
 export interface KnowledgeDocument extends KnowledgeDocumentSummary {
   content: string;

@@ -1,0 +1,107 @@
+[
+ {
+  "heard": "這臺奔騰的馬力是多少？",
+  "expected": "這台泵浦的馬力是多少？",
+  "fixed": "這臺奔騰的馬力是多少？",
+  "ok": false,
+  "ms": 2648
+ },
+ {
+  "heard": "UNI 本有幾種型號？",
+  "expected": "污泥泵有幾種型號？",
+  "fixed": "UNI 本有幾種型號？",
+  "ok": false,
+  "ms": 848
+ },
+ {
+  "heard": "烏尼本有幾種型號?",
+  "expected": "污泥泵有幾種型號？",
+  "fixed": "烏尼本有幾種型號?",
+  "ok": false,
+  "ms": 755
+ },
+ {
+  "heard": "沉睡泵最深可以放多深？",
+  "expected": "沉水泵最深可以放多深？",
+  "fixed": "沉水泵最深可以放多深？",
+  "ok": true,
+  "ms": 1130
+ },
+ {
+  "heard": "沉睡笨最深可以放多深？",
+  "expected": "沉水泵最深可以放多深？",
+  "fixed": "沉水泵最深可以放多深？",
+  "ok": true,
+  "ms": 872
+ },
+ {
+  "heard": "UBL 和 DBX 在哪裡？",
+  "expected": "EUBL 跟 DIVA 差在哪裡？",
+  "fixed": "EUBL 和 DIVA 在哪裡？",
+  "ok": false,
+  "ms": 770
+ },
+ {
+  "heard": "一步的馬力多少",
+  "expected": "EUBL 的馬力多少",
+  "fixed": "一步的馬力多少",
+  "ok": false,
+  "ms": 745
+ },
+ {
+  "heard": "請問低瓦有攪拌器嗎",
+  "expected": "請問 DIVA 有攪拌器嗎",
+  "fixed": "請問DIVA有攪拌器嗎",
+  "ok": false,
+  "ms": 744
+ },
+ {
+  "heard": "你好，請問你是誰？",
+  "expected": "你好，請問你是誰？",
+  "fixed": "你好，請問你是誰？",
+  "ok": true,
+  "ms": 957
+ },
+ {
+  "heard": "今天天氣很好。",
+  "expected": "今天天氣很好。",
+  "fixed": "今天天氣很好。",
+  "ok": true,
+  "ms": 856
+ },
+ {
+  "heard": "Who am I?",
+  "expected": "Who am I?",
+  "fixed": "Who am I?",
+  "ok": true,
+  "ms": 1153
+ },
+ {
+  "heard": "¿Cuántos caballos tiene la bomba de lodos?",
+  "expected": "¿Cuántos caballos tiene la bomba de lodos?",
+  "fixed": "¿Cuántos caballos tiene la bomba de lodos?",
+  "ok": true,
+  "ms": 673
+ },
+ {
+  "heard": "我想找一臺排水泵，揚程要 20 米。",
+  "expected": "我想找一臺排水泵，揚程要 20 米。",
+  "fixed": "我想找一臺排水泵，揚程要 20 米。",
+  "ok": true,
+  "ms": 770
+ },
+ {
+  "heard": "奔騰電腦現在還有在賣嗎？",
+  "expected": "奔騰電腦現在還有在賣嗎？",
+  "fixed": "奔騰電腦現在還有在賣嗎？",
+  "ok": true,
+  "ms": 953
+ },
+ {
+  "heard": "이 펌프의 마력은 얼마입니까?",
+  "expected": "이 펌프의 마력은 얼마입니까?",
+  "fixed": "이 펌프의 마력은 얼마입니까?",
+  "ok": true,
+  "ms": 674
+ }
+]

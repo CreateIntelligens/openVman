@@ -384,11 +384,11 @@ user input
 - `GET /brain/sessions`、`GET /brain/sessions/export`
   - 對話列表與匯出，可用 `language=zh|en|es` 篩選（語言取最後一則使用者訊息，規則即時判、Jev 背景校正）
 - `POST /brain/internal/asr-judge`
-  - body `{"project_id", "interim", "final"}`，回 `{"text", "chosen": "interim"|"final", "scores", "reason"}`；Backend 的 Gemini Live 串流辨識定稿跟最後暫定字幕不同時呼叫。兩段文字各自問 Jev「像不像正確辨識的一句話」（情境帶專案名稱與語言分流），暫定字幕高出 0.2 以上才換，否則、Jev 關閉或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`；離線驗證見 `scripts/experiments/asr-final-judge/`）
+  - body `{"project_id", "languages", "interim", "final"}`（`languages` 是這條連線實際生效的分流，前台臨時關掉的語言不算；沒給用後台設定），回 `{"text", "chosen": "interim"|"final", "scores", "reason"}`；Backend 的 Gemini Live 串流辨識定稿跟最後暫定字幕不同時呼叫。兩段文字各自問 Jev「像不像正確辨識的一句話」（情境帶專案名稱與語言分流），暫定字幕高出 0.2 以上才換，否則、Jev 關閉或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`；離線驗證見 `scripts/experiments/asr-final-judge/`）
 - `POST /brain/internal/audio-language`
   - body 是 WAV，回 `{"language": "nan"|"zh"|...|null}`；Backend ASR 在台語分流時呼叫（gemini-3.5-flash-lite 聽聲音）
 - `GET/PUT /brain/knowledge/settings`
-  - 知識庫語言分流（`language_routes`：zh、en、es、nan＝台語，至少一條、不必含 zh，順序＝優先順序、第一條是主要語言）；只有一條不分流；多條時所有文件都查得到，使用者語言的文件優先、不夠用主要語言再用其他語言補；勾台語才聽台語
+  - 知識庫語言分流（`language_routes`：zh、en、es、nan＝台語、ja、ko，至少一條、不必含 zh，順序＝優先順序、第一條是主要語言）；只有一條不分流；多條時所有文件都查得到，使用者語言的文件優先、不夠用主要語言再用其他語言補；勾台語才聽台語
 - `PATCH /brain/knowledge/document/meta`
   - 文件啟用、來源與語言（`language=zh|en|es|auto`）。知識庫依使用者語言讓同語言文件優先，不夠再用主要語言與其他語言補
 - `GET /brain/backups/sessions`、`POST /brain/backups/sessions`

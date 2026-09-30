@@ -1,0 +1,832 @@
+{
+ "coexist": [
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "interim": "이 펌프의 마력은 얼마입니까?",
+   "final": "이 泵의 마력은 얼마입니까?",
+   "sent": "이 泵의 마력은 얼마입니까?",
+   "cer_final": 0.167,
+   "cer_sent": 0.167,
+   "judge": {
+    "text": "이 泵의 마력은 얼마입니까?",
+    "chosen": "final",
+    "scores": {
+     "interim": 0.1,
+     "final": 0.11
+    },
+    "reason": "jev"
+   }
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "interim": "이 펌프의 마력은 얼마입니까?",
+   "final": "이 泵의 마력은 얼마입니까?",
+   "sent": "이 泵의 마력은 얼마입니까?",
+   "cer_final": 0.167,
+   "cer_sent": 0.167,
+   "judge": {
+    "text": "이 泵의 마력은 얼마입니까?",
+    "chosen": "final",
+    "scores": {
+     "interim": 0.11,
+     "final": 0.1
+    },
+    "reason": "jev"
+   }
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "interim": "수중 펌프의 최대 양정을 알려주세요.",
+   "final": "수중 펌프의 최대 양정을 알려주세요.",
+   "sent": "수중 펌프의 최대 양정을 알려주세요.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "interim": "수중 펌프의 최대 양정을 알려주세요.",
+   "final": "수중 펌프의 최대 양정을 알려주세요.",
+   "sent": "수중 펌프의 최대 양정을 알려주세요.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "오수용 펌프가 있나요?",
+   "interim": "오수용 펌프가 있나요?",
+   "final": "오수용 펌프가 있나요?",
+   "sent": "오수용 펌프가 있나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "오수용 펌프가 있나요?",
+   "interim": "오수용 펌프가 있나요?",
+   "final": "오수용 펌프가 있나요?",
+   "sent": "오수용 펌프가 있나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "보증 기간은 얼마나 되나요?",
+   "interim": "보증 기간은 얼마나 되나요?",
+   "final": "보증 기간은 얼마나 되나요?",
+   "sent": "보증 기간은 얼마나 되나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "보증 기간은 얼마나 되나요?",
+   "interim": "보증 기간은 얼마나 되나요?",
+   "final": "보증 기간은 얼마나 되나요?",
+   "sent": "보증 기간은 얼마나 되나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "안녕하세요, 당신은 누구입니까?",
+   "interim": "안녕하세요. 당신은 누구입니까?",
+   "final": "안녕하세요, 당신은 누구입니까?",
+   "sent": "안녕하세요, 당신은 누구입니까?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "안녕하세요, 당신은 누구입니까?",
+   "interim": "안녕하세요. 당신은 누구입니까?",
+   "final": "안녕하세요, 당신은 누구입니까?",
+   "sent": "안녕하세요, 당신은 누구입니까?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "감사합니다.",
+   "interim": "감사합니다.",
+   "final": "감사합니다.",
+   "sent": "감사합니다.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "감사합니다.",
+   "interim": "감사합니다.",
+   "final": "감사합니다.",
+   "sent": "감사합니다.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "배수 펌프 가격이 궁금합니다.",
+   "interim": "배수 펌프 가격이 궁금합니다.",
+   "final": "배수 펌프 가격이 궁금합니다.",
+   "sent": "배수 펌프 가격이 궁금합니다.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "배수 펌프 가격이 궁금합니다.",
+   "interim": "배수 펌프 가격이 궁금합니다.",
+   "final": "배수 펌프 가격이 궁금합니다.",
+   "sent": "배수 펌프 가격이 궁금합니다.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "모터가 과열되면 어떻게 하나요?",
+   "interim": "모터가 과열되면 어떻게 하나요?",
+   "final": "모터가 과열되면 어떻게 하나요?",
+   "sent": "모터가 과열되면 어떻게 하나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "모터가 과열되면 어떻게 하나요?",
+   "interim": "모터가 과열되면 어떻게 하나요?",
+   "final": "모터가 과열되면 어떻게 하나요?",
+   "sent": "모터가 과열되면 어떻게 하나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "이 제품은 한국에서 구매할 수 있나요?",
+   "interim": "이 제품은 한국에서 구매할 수 있나요?",
+   "final": "이 제품은 한국에서 구매할 수 있나요?",
+   "sent": "이 제품은 한국에서 구매할 수 있나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "이 제품은 한국에서 구매할 수 있나요?",
+   "interim": "이 제품은 한국에서 구매할 수 있나요?",
+   "final": "이 제품은 한국에서 구매할 수 있나요?",
+   "sent": "이 제품은 한국에서 구매할 수 있나요?",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "설치 방법을 설명해 주세요.",
+   "interim": "설치 방법을 설명해 주세요.",
+   "final": "설치 방법을 설명해 주세요.",
+   "sent": "설치 방법을 설명해 주세요.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "ko",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "설치 방법을 설명해 주세요.",
+   "interim": "설치 방법을 설명해 주세요.",
+   "final": "설치 방법을 설명해 주세요.",
+   "sent": "설치 방법을 설명해 주세요.",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "這台泵浦的馬力是多少？",
+   "interim": "這臺笨譜的 馬力是多少?",
+   "final": "這臺奔騰的馬力是多少？",
+   "sent": "這臺奔騰的馬力是多少？",
+   "cer_final": 0.3,
+   "cer_sent": 0.3,
+   "judge": {
+    "text": "這臺奔騰的馬力是多少？",
+    "chosen": "final",
+    "scores": {
+     "interim": 0.26,
+     "final": 0.56
+    },
+    "reason": "jev"
+   }
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "這台泵浦的馬力是多少？",
+   "interim": "這臺笨譜的 馬力是多少?",
+   "final": "這臺奔騰的馬力是多少？",
+   "sent": "這臺奔騰的馬力是多少？",
+   "cer_final": 0.3,
+   "cer_sent": 0.3,
+   "judge": {
+    "text": "這臺奔騰的馬力是多少？",
+    "chosen": "final",
+    "scores": {
+     "interim": 0.23,
+     "final": 0.61
+    },
+    "reason": "jev"
+   }
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "污泥泵有幾種型號？",
+   "interim": "烏尼本有幾種型號?",
+   "final": "UNI 本有幾種型號？",
+   "sent": "UNI 本有幾種型號？",
+   "cer_final": 0.5,
+   "cer_sent": 0.5,
+   "judge": {
+    "text": "UNI 本有幾種型號？",
+    "chosen": "final",
+    "scores": {
+     "interim": 0.48,
+     "final": 0.6
+    },
+    "reason": "jev"
+   }
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "污泥泵有幾種型號？",
+   "interim": "烏尼本有幾種型號?",
+   "final": "UNI 本有幾種型號？",
+   "sent": "UNI 本有幾種型號？",
+   "cer_final": 0.5,
+   "cer_sent": 0.5,
+   "judge": {
+    "text": "UNI 本有幾種型號？",
+    "chosen": "final",
+    "scores": {
+     "interim": 0.51,
+     "final": 0.6
+    },
+    "reason": "jev"
+   }
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "保固期間多久？",
+   "interim": "保固期間多久?",
+   "final": "保固期間多久？",
+   "sent": "保固期間多久？",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "保固期間多久？",
+   "interim": "保固期間多久?",
+   "final": "保固期間多久？",
+   "sent": "保固期間多久？",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "你好，請問你是誰？",
+   "interim": "你好, 請問你是 誰?",
+   "final": "你好，請問你是誰？",
+   "sent": "你好，請問你是誰？",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "你好，請問你是誰？",
+   "interim": "你好, 請問你是 誰?",
+   "final": "你好，請問你是誰？",
+   "sent": "你好，請問你是誰？",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "謝謝你的說明。",
+   "interim": "謝謝你的說明。",
+   "final": "謝謝你的說明。",
+   "sent": "謝謝你的說明。",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "謝謝你的說明。",
+   "interim": "謝謝你的說明。",
+   "final": "謝謝你的說明。",
+   "sent": "謝謝你的說明。",
+   "cer_final": 0.0,
+   "cer_sent": 0.0,
+   "judge": null
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "ko-KR",
+    "zh-TW"
+   ],
+   "ref": "沉水泵最深可以放多深？",
+   "interim": "沉睡泵最 深可以放多深?",
+   "final": "沉睡蹦最深可以放多深？",
+   "sent": "沉睡泵最 深可以放多深?",
+   "cer_final": 0.2,
+   "cer_sent": 0.1,
+   "judge": {
+    "text": "沉睡泵最 深可以放多深?",
+    "chosen": "interim",
+    "scores": {
+     "interim": 0.59,
+     "final": 0.34
+    },
+    "reason": "jev"
+   }
+  },
+  {
+   "lang": "zh",
+   "hints": [
+    "zh-TW",
+    "ko-KR"
+   ],
+   "ref": "沉水泵最深可以放多深？",
+   "interim": "沉睡泵最 深可以放多深?",
+   "final": "沉睡蹦最深可以放多深？",
+   "sent": "沉睡泵最 深可以放多深?",
+   "cer_final": 0.2,
+   "cer_sent": 0.1,
+   "judge": {
+    "text": "沉睡泵最 深可以放多深?",
+    "chosen": "interim",
+    "scores": {
+     "interim": 0.53,
+     "final": 0.33
+    },
+    "reason": "jev"
+   }
+  }
+ ],
+ "tts": [
+  {
+   "provider": "gemini",
+   "lang": "ja",
+   "ref": "このポンプの馬力はいくつですか？",
+   "heard": "このポンプの馬力はいくつですか？",
+   "cer": 0.0,
+   "seconds": 10.1
+  },
+  {
+   "provider": "gemini",
+   "lang": "ja",
+   "ref": "保証期間はどのくらいですか？",
+   "heard": "保証期間はどのくらいですか？",
+   "cer": 0.0,
+   "seconds": 10.6
+  },
+  {
+   "provider": "gemini",
+   "lang": "ja",
+   "ref": "ありがとうございました。",
+   "heard": "ありがとうございました。",
+   "cer": 0.0,
+   "seconds": 8.6
+  },
+  {
+   "provider": "gemini",
+   "lang": "ko",
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "heard": "이 펌프의 마력은 얼마입니까?",
+   "cer": 0.0,
+   "seconds": 10.8
+  },
+  {
+   "provider": "gemini",
+   "lang": "ko",
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "heard": "수중 펌프의 최대 양정을 알려주세요.",
+   "cer": 0.0,
+   "seconds": 10.6
+  },
+  {
+   "provider": "gemini",
+   "lang": "ko",
+   "ref": "오수용 펌프가 있나요?",
+   "heard": "오수용 펌프가 있나요?",
+   "cer": 0.0,
+   "seconds": 10.3
+  },
+  {
+   "provider": "gemini",
+   "lang": "zh",
+   "ref": "這台泵浦的馬力是多少？",
+   "heard": "這臺泵浦的馬力是多少？",
+   "cer": 0.1,
+   "seconds": 10.6
+  },
+  {
+   "provider": "indextts",
+   "lang": "ja",
+   "ref": "このポンプの馬力はいくつですか？",
+   "heard": "飞飞飞飞飞飞飞玛丽飞",
+   "cer": 1.0,
+   "seconds": 11.8
+  },
+  {
+   "provider": "indextts",
+   "lang": "ja",
+   "ref": "保証期間はどのくらいですか？",
+   "heard": "保真期间肥肥肥肥肥肥肥肥肥。",
+   "cer": 0.846,
+   "seconds": 9.1
+  },
+  {
+   "provider": "indextts",
+   "lang": "ja",
+   "ref": "ありがとうございました。",
+   "heard": "フェイ",
+   "cer": 1.0,
+   "seconds": 9.2
+  },
+  {
+   "provider": "indextts",
+   "lang": "ko",
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "heard": "페",
+   "cer": 1.0,
+   "seconds": 9.9
+  },
+  {
+   "provider": "indextts",
+   "lang": "ko",
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "heard": "페 페",
+   "cer": 1.0,
+   "seconds": 12.6
+  },
+  {
+   "provider": "indextts",
+   "lang": "ko",
+   "ref": "오수용 펌프가 있나요?",
+   "heard": "飞",
+   "cer": 1.0,
+   "seconds": 11.1
+  },
+  {
+   "provider": "indextts",
+   "lang": "zh",
+   "ref": "這台泵浦的馬力是多少？",
+   "heard": "這臺泵浦的馬力是多少？",
+   "cer": 0.1,
+   "seconds": 7.6
+  },
+  {
+   "provider": "voxcpm",
+   "lang": "ja",
+   "ref": "このポンプの馬力はいくつですか？",
+   "heard": "このポンプのバリはいくつですか？",
+   "cer": 0.133,
+   "seconds": 10.2
+  },
+  {
+   "provider": "voxcpm",
+   "lang": "ja",
+   "ref": "保証期間はどのくらいですか？",
+   "heard": "募集期間はどのくらいでした？",
+   "cer": 0.308,
+   "seconds": 10.6
+  },
+  {
+   "provider": "voxcpm",
+   "lang": "ja",
+   "ref": "ありがとうございました。",
+   "heard": "ありがとうございました。",
+   "cer": 0.0,
+   "seconds": 7.2
+  },
+  {
+   "provider": "voxcpm",
+   "lang": "ko",
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "heard": "이 펌프의 마력은 얼마입니까?",
+   "cer": 0.0,
+   "seconds": 9.2
+  },
+  {
+   "provider": "voxcpm",
+   "lang": "ko",
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "heard": "수중 펌프의 최대 양정을 알려주세요.",
+   "cer": 0.0,
+   "seconds": 11.5
+  },
+  {
+   "provider": "voxcpm",
+   "lang": "ko",
+   "ref": "오수용 펌프가 있나요?",
+   "heard": "有游泳泵可以來有。",
+   "cer": 1.0,
+   "seconds": 9.8
+  },
+  {
+   "provider": "voxcpm",
+   "lang": "zh",
+   "ref": "這台泵浦的馬力是多少？",
+   "heard": "期待爆破的魔力是無解。",
+   "cer": 0.7,
+   "seconds": 9.7
+  },
+  {
+   "provider": "cosyvoice",
+   "lang": "ja",
+   "ref": "このポンプの馬力はいくつですか？",
+   "heard": "このポンコツのピライ口ですか？",
+   "cer": 0.533,
+   "seconds": 12.6
+  },
+  {
+   "provider": "cosyvoice",
+   "lang": "ja",
+   "ref": "保証期間はどのくらいですか？",
+   "heard": "貿易期間はどのくらいですか？",
+   "cer": 0.154,
+   "seconds": 8.9
+  },
+  {
+   "provider": "cosyvoice",
+   "lang": "ja",
+   "ref": "ありがとうございました。",
+   "heard": "アイカクス",
+   "cer": 1.0,
+   "seconds": 6.4
+  },
+  {
+   "provider": "cosyvoice",
+   "lang": "ko",
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "heard": "이 펌프의 마력은 얼마입니까?",
+   "cer": 0.0,
+   "seconds": 8.6
+  },
+  {
+   "provider": "cosyvoice",
+   "lang": "ko",
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "heard": "수중 펌프의 최대 양정고 알려주세요.",
+   "cer": 0.067,
+   "seconds": 11.1
+  },
+  {
+   "provider": "cosyvoice",
+   "lang": "ko",
+   "ref": "오수용 펌프가 있나요?",
+   "heard": "어수영 반복해야나요?",
+   "cer": 0.667,
+   "seconds": 7.9
+  },
+  {
+   "provider": "cosyvoice",
+   "lang": "zh",
+   "ref": "這台泵浦的馬力是多少？",
+   "heard": "這臺磅秤的價錢是多少？",
+   "cer": 0.5,
+   "seconds": 8.5
+  },
+  {
+   "provider": "edge-default",
+   "lang": "ja",
+   "ref": "このポンプの馬力はいくつですか？",
+   "heard": "マリー",
+   "cer": 1.0,
+   "seconds": 6.4
+  },
+  {
+   "provider": "edge-default",
+   "lang": "ja",
+   "ref": "保証期間はどのくらいですか？",
+   "heard": "保証期間",
+   "cer": 0.692,
+   "seconds": 6.5
+  },
+  {
+   "provider": "edge-default",
+   "lang": "ja",
+   "ref": "ありがとうございました。",
+   "error": "NoAudioReceived: No audio was received. Please verify that your parameters are correct."
+  },
+  {
+   "provider": "edge-default",
+   "lang": "ko",
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "error": "NoAudioReceived: No audio was received. Please verify that your parameters are correct."
+  },
+  {
+   "provider": "edge-default",
+   "lang": "ko",
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "error": "NoAudioReceived: No audio was received. Please verify that your parameters are correct."
+  },
+  {
+   "provider": "edge-default",
+   "lang": "ko",
+   "ref": "오수용 펌프가 있나요?",
+   "error": "NoAudioReceived: No audio was received. Please verify that your parameters are correct."
+  },
+  {
+   "provider": "edge-default",
+   "lang": "zh",
+   "ref": "這台泵浦的馬力是多少？",
+   "heard": "這臺奔騰的馬力是多少？",
+   "cer": 0.3,
+   "seconds": 7.5
+  },
+  {
+   "provider": "edge-native",
+   "lang": "ja",
+   "ref": "このポンプの馬力はいくつですか？",
+   "heard": "このポンプの馬力はいくつですか？",
+   "cer": 0.0
+  },
+  {
+   "provider": "edge-native",
+   "lang": "ja",
+   "ref": "保証期間はどのくらいですか？",
+   "heard": "保証期間はどのくらいですか？",
+   "cer": 0.0
+  },
+  {
+   "provider": "edge-native",
+   "lang": "ja",
+   "ref": "ありがとうございました。",
+   "heard": "ありがとうございました。",
+   "cer": 0.0
+  },
+  {
+   "provider": "edge-native",
+   "lang": "ko",
+   "ref": "이 펌프의 마력은 얼마입니까?",
+   "heard": "이 펌프의 마력은 얼마입니까?",
+   "cer": 0.0
+  },
+  {
+   "provider": "edge-native",
+   "lang": "ko",
+   "ref": "수중 펌프의 최대 양정을 알려 주세요.",
+   "heard": "수중 펌프의 최대 양정을 알려주세요.",
+   "cer": 0.0
+  },
+  {
+   "provider": "edge-native",
+   "lang": "ko",
+   "ref": "오수용 펌프가 있나요?",
+   "heard": "오수용 펌프가 있나요?",
+   "cer": 0.0
+  }
+ ]
+}

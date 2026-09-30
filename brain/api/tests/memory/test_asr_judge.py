@@ -15,7 +15,7 @@ def jev(monkeypatch):
     cfg = types.SimpleNamespace(asr_final_judge_enabled=True, asr_final_judge_timeout_seconds=1.0)
     monkeypatch.setattr("config.get_settings", lambda: cfg)
     monkeypatch.setattr(jev_client, "jev_available", lambda: True)
-    monkeypatch.setattr(asr_judge, "_project_context", lambda project_id: "這個專案的使用者可能說：繁體中文、英文、西班牙文。")
+    monkeypatch.setattr(asr_judge, "_project_context", lambda project_id, languages=None: "這個專案的使用者可能說：繁體中文、英文、西班牙文。")
     calls: list[dict] = []
 
     def answer(scores):
@@ -73,3 +73,29 @@ def test_context_lists_the_project_languages(monkeypatch):
     context = asr_judge._project_context("p")
     # 以後的日韓專案：韓文是正常結果，要寫進情境裡。
     assert "繁體中文、韓文" in context
+
+
+def test_context_uses_this_turns_languages_over_the_admin_list(monkeypatch):
+    monkeypatch.setattr("knowledge.kb_settings.language_routes", lambda project_id: ["zh", "en", "es"])
+    monkeypatch.setattr("infra.project_context.resolve_project_context", lambda project_id: (_ for _ in ()).throw(RuntimeError()))
+    # 前台把英西關掉、只留日文與中文：Jev 的情境要跟著變。
+    assert "日文、繁體中文" in asr_judge._project_context("p", ["ja", "zh"])
+    assert "英文" not in asr_judge._project_context("p", ["ja", "zh"])
+
+
+@pytest.mark.parametrize(
+    ("interim", "final", "expected"),
+    [
+        # 實測（2026-09-30，提示 ko-KR＋zh-TW）：韓文句子定稿夾了中文字。
+        ("이 펌프의 마력은 얼마입니까?", "이 泵의 마력은 얼마입니까?", "interim"),
+        ("這台泵浦的馬力", "這台펌프的馬力", "interim"),
+        ("這台泵浦的馬力", "這台ポンプの馬力", "interim"),
+        # 日文定稿把假名轉成漢字是正常的，不能當成夾字。
+        ("ほしょうきかんはどのくらいですか", "保証期間はどのくらいですか", "final"),
+        # 暫定字幕本來就有漢字的韓文（少見的漢字詞）不動。
+        ("大韓民國 만세", "大韓民國 만세!", "final"),
+    ],
+)
+def test_a_foreign_script_slipped_into_the_final_keeps_the_interim(jev, interim, final, expected):
+    jev.answer({"interim": 0.5, "final": 0.5})
+    assert asr_judge.choose_transcript("p", interim, final).chosen == expected

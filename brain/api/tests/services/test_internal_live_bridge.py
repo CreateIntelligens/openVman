@@ -332,7 +332,7 @@ def test_asr_judge_endpoint_returns_the_chosen_transcript(monkeypatch):
 
     monkeypatch.setattr(
         asr_judge, "choose_transcript",
-        lambda project_id, interim, final: asr_judge.Verdict(interim, "interim", {"interim": 0.6, "final": 0.1}, "jev"),
+        lambda project_id, interim, final, languages=None: asr_judge.Verdict(interim, "interim", {"interim": 0.6, "final": 0.1}, "jev"),
     )
     with _client() as client:
         ok = client.post(

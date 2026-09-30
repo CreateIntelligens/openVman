@@ -8,7 +8,7 @@ import pytest
 
 import core.jev_client  # noqa: F401 - 先載入，免得綁到 fixture 換掉的 get_settings
 from memory import language_detect
-from memory.language_detect import detect_language
+from memory.language_detect import detect_language, is_short_text
 
 
 @pytest.mark.parametrize(
@@ -21,9 +21,9 @@ from memory.language_detect import detect_language
         ("Hi, which pump would you recommend for draining dirty water?", "en"),
         ("Hola, ¿qué bomba me recomiendas para sacar agua sucia?", "es"),
         ("quiero una bomba para el sotano", "es"),
-        # 其他語言與判斷不出來的都算中文。
-        ("ポンプを探しています", "zh"),
-        ("펌프 추천해 주세요", "zh"),
+        # 日韓 2026-09-30 起各自成一種語言（見下方 test_japanese_and_korean_are_recognized_by_script）。
+        ("ポンプを探しています", "ja"),
+        ("펌프 추천해 주세요", "ko"),
         ("Guten Tag", "zh"),
         ("", "zh"),
         ("12345 ???", "zh"),
@@ -126,3 +126,35 @@ def test_short_text_is_never_sent_to_jev(jev, monkeypatch):
 
     monkeypatch.setattr("core.jev_client.jev_nouls", boom)
     language_detect.refine_language_in_background("hi", "zh", lambda _l: None)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("このポンプの馬力はいくつですか？", "ja"),
+        ("水中ポンプ", "ja"),
+        ("ありがとう", "ja"),
+        ("이 펌프의 마력은 얼마입니까?", "ko"),
+        ("감사합니다", "ko"),
+        # 中文句子引了一個日文品牌，不能整句變日文。
+        ("我們的沉水泵搭配了新しい馬達控制器，請問保固多久", "zh"),
+        ("50EUBL 的馬力是多少？", "zh"),
+    ],
+)
+def test_japanese_and_korean_are_recognized_by_script(text, expected):
+    assert detect_language(text) == expected
+
+
+def test_short_japanese_and_korean_are_not_treated_as_unknown():
+    # 「hi」「ok」會歸主要語言；「はい」「네」是看得出語言的。
+    assert not is_short_text("はい")
+    assert not is_short_text("네")
+
+
+def test_jev_does_not_pull_japanese_back_to_chinese(monkeypatch):
+    import memory.language_detect as ld
+
+    called = []
+    monkeypatch.setattr(ld, "_executor", type("E", (), {"submit": lambda self, fn: called.append(fn)})())
+    ld.refine_language_in_background("このポンプの馬力はいくつですか？", "ja", lambda lang: None)
+    assert called == []

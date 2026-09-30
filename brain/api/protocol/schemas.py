@@ -94,6 +94,8 @@ class InternalAsrJudgeRequest(BaseModel):
     """Backend 串流辨識定稿時問 Brain：送最後的暫定字幕還是定稿。"""
 
     project_id: str = "default"
+    # 這一輪實際生效的分流（前台可臨時關掉某個語言）；沒給就用後台設定。
+    languages: list[str] | None = Field(None, max_length=8)
     interim: str = Field("", max_length=2000)
     final: str = Field(..., max_length=2000)
 
@@ -117,7 +119,7 @@ class KnowledgeDocumentMetaPatchRequest(BaseModel):
     source_type: str | None = Field(None, pattern="^(upload|web|manual)$")
     source_url: str | None = None
     # auto 代表取消手動指定，改回依內容判斷。
-    language: str | None = Field(None, pattern="^(zh|en|es|nan|auto)$")
+    language: str | None = Field(None, pattern="^(zh|en|es|nan|ja|ko|auto)$")
 
 
 class KnowledgeSettingsPutRequest(BaseModel):
@@ -128,7 +130,9 @@ class KnowledgeSettingsPutRequest(BaseModel):
     @field_validator("language_routes")
     @classmethod
     def _known_languages(cls, value: list[str]) -> list[str]:
-        unknown = set(value) - {"zh", "en", "es", "nan"}
+        from memory.language_detect import LANGUAGES
+
+        unknown = set(value) - set(LANGUAGES)
         if unknown:
             raise ValueError(f"不支援的語言：{sorted(unknown)}")
         if not value:

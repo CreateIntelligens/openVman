@@ -70,7 +70,7 @@ def _client(monkeypatch, *, allowed=True, embed=False, judge=None):
     monkeypatch.setattr(asr_stream, "usage_scope_for", lambda *a, **kw: {})
     judged: list[tuple] = []
 
-    async def fake_judge(project_id, interim, final):
+    async def fake_judge(project_id, routes, interim, final):
         judged.append((project_id, interim, final))
         return judge(interim, final) if judge else final
 
@@ -145,6 +145,7 @@ def test_a_garbled_final_is_replaced_by_the_judged_interim(monkeypatch):
         (["zh", "en", "es"], ["zh-TW", "en-US", "es-ES"]),
         (["ko", "zh"], ["ko-KR", "zh-TW"]),
         (["nan"], ["zh-TW", "en-US", "es-ES"]),
+        (["ja", "ko"], ["ja-JP", "ko-KR"]),
     ],
 )
 def test_language_hints_follow_the_project_routes(monkeypatch, routes, codes):
@@ -175,9 +176,34 @@ def test_judge_failure_keeps_the_final_and_logs_it(monkeypatch, tmp_path):
             raise ConnectionError("brain down")
 
     monkeypatch.setattr(asr_stream._http, "get", lambda: Down())
-    text = asyncio.run(asr_stream._judge_final("p", "who am i", "OMI"))
+    text = asyncio.run(asr_stream._judge_final("p", ["zh", "en"], "who am i", "OMI"))
 
     assert text == "OMI"
     record = json.loads(log.read_text(encoding="utf-8"))
     assert record["interim"] == "who am i" and record["final"] == "OMI"
     assert record["chosen"] == "final" and record["reason"].startswith("error:")
+    assert record["languages"] == ["zh", "en"]
+
+
+def test_judge_sends_the_connection_routes_to_brain(monkeypatch, tmp_path):
+    monkeypatch.setenv("ASR_FINAL_JUDGE_LOG", str(tmp_path / "judge.jsonl"))
+    sent = {}
+
+    class Brain:
+        async def post(self, url, json, headers, timeout):
+            sent.update(json)
+
+            class Reply:
+                def raise_for_status(self):
+                    pass
+
+                def json(self):
+                    return {"text": "who am i", "chosen": "interim", "scores": {}, "reason": "jev"}
+
+            return Reply()
+
+    monkeypatch.setattr(asr_stream._http, "get", lambda: Brain())
+    text = asyncio.run(asr_stream._judge_final("p", ["ja", "zh"], "who am i", "OMI"))
+    assert text == "who am i"
+    # 前台臨時關掉的語言不該出現在 Jev 的情境裡。
+    assert sent["languages"] == ["ja", "zh"]

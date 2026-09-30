@@ -222,7 +222,7 @@ async def internal_asr_judge(payload: InternalAsrJudgeRequest):
     from memory.asr_judge import choose_transcript
 
     verdict = await asyncio.to_thread(
-        choose_transcript, payload.project_id, payload.interim, payload.final,
+        choose_transcript, payload.project_id, payload.interim, payload.final, payload.languages,
     )
     return {"text": verdict.text, "chosen": verdict.chosen, "scores": verdict.scores, "reason": verdict.reason}
 

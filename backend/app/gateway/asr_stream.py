@@ -95,27 +95,33 @@ def _gemini_languages(routes: list[str]) -> list[str]:
     return codes or _languages()
 
 
-async def _project_languages(current, project_id: str, requested: str | None) -> list[str]:
+async def _project_routes(current, project_id: str, requested: str | None) -> list[str]:
+    """This connection's routes: the admin's, narrowed by the client's toggles; [] if unknown."""
     if not project_id:
-        return _languages()
+        return []
     try:
-        routes = await language_routes_mod.effective_routes(
+        return await language_routes_mod.effective_routes(
             current, project_id, language_routes_mod.parse_requested(requested),
         )
     except Exception as exc:  # noqa: BLE001 - 查不到分流就用部署預設，不擋收音
         logger.warning("asr stream language routes failed: %s", exc)
-        return _languages()
-    return _gemini_languages(routes)
+        return []
 
 
-async def _judge_final(project_id: str, interim: str, final: str) -> str:
+async def _judge_final(project_id: str, routes: list[str], interim: str, final: str) -> str:
     """Ask Brain whether the last interim beats the final; the final on any doubt."""
     cfg = get_tts_config()
     started = time.monotonic()
     try:
         response = await _http.get().post(
             f"{cfg.brain_url.rstrip('/')}/brain/internal/asr-judge",
-            json={"project_id": project_id or "default", "interim": interim, "final": final},
+            # 語言跟著這條連線實際生效的分流走（前台可以臨時關掉某個語言），不是只看後台設定。
+            json={
+                "project_id": project_id or "default",
+                "languages": routes or None,
+                "interim": interim,
+                "final": final,
+            },
             headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
             timeout=_JUDGE_TIMEOUT_SECONDS,
         )
@@ -127,6 +133,7 @@ async def _judge_final(project_id: str, interim: str, final: str) -> str:
     _append_judge_log({
         "at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
         "project_id": project_id,
+        "languages": routes,
         "interim": interim,
         "final": final,
         "chosen": verdict.get("chosen"),
@@ -162,9 +169,10 @@ async def asr_stream(websocket: WebSocket) -> None:
         return
 
     project_id = websocket.query_params.get("project_id", "")
-    languages = await _project_languages(
+    routes = await _project_routes(
         current, project_id, websocket.query_params.get("language_routes"),
     )
+    languages = _gemini_languages(routes)
     audio_bytes = 0
     started = time.monotonic()
     try:
@@ -209,7 +217,7 @@ async def asr_stream(websocket: WebSocket) -> None:
                     if text := (content.get("inputTranscription") or {}).get("text"):
                         final = text.strip()
                         if last_interim.strip() and last_interim.strip() != final:
-                            final = await _judge_final(project_id, last_interim.strip(), final)
+                            final = await _judge_final(project_id, routes, last_interim.strip(), final)
                         last_interim = ""
                         await websocket.send_json({"type": "final", "text": final})
 
