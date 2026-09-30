@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QUICK_QA_TREE_PATH, qaTreeNodePath, type TreeNode } from "../components/kb/helpers";
 import KnowledgeBase from "./KnowledgeBase";
 
+const navigationMocks = vi.hoisted(() => ({ currentSubView: undefined as string | undefined, navigateTo: vi.fn() }));
+
 const knowledgeBaseMocks = vi.hoisted(() => ({
   closeFileView: vi.fn(),
   handleTreeSelect: vi.fn(),
@@ -106,7 +108,7 @@ let documentTree = makeDocumentTree();
 
 vi.mock("../context/NavigationContext", () => ({
   useNavigation: () => ({
-    currentSubView: undefined,
+    ...navigationMocks,
   }),
 }));
 
@@ -211,6 +213,7 @@ vi.mock("../components/kb/qa/ManualQaModal", () => ({ default: () => null }));
 describe("KnowledgeBase merged tree", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigationMocks.currentSubView = undefined;
     vi.spyOn(Date, "now").mockReturnValue(1234567890);
     documentTree = makeDocumentTree();
     knowledgeBaseMocks.showSourcePanel = false;
@@ -335,5 +338,14 @@ describe("KnowledgeBase merged tree", () => {
 
     expect(knowledgeBaseMocks.setShowNoteComposer).toHaveBeenCalledWith(true);
     expect(knowledgeBaseMocks.setShowSourcePanel).toHaveBeenCalledWith(true);
+  });
+});
+
+
+describe("KnowledgeBase route views", () => {
+  it("navigates the graph tab through the shared router", () => {
+    render(<KnowledgeBase />);
+    fireEvent.click(screen.getByRole("button", { name: "圖譜" }));
+    expect(navigationMocks.navigateTo).toHaveBeenCalledWith("KnowledgeBase", "graph");
   });
 });

@@ -1,6 +1,6 @@
 import AsrProviderPanel from "../components/AsrProviderPanel";
 import TtsPreviewPanel from "../components/TtsPreviewPanel";
-import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { useAdminSubView } from "../hooks/useAdminSubView";
 
 type Tab = "tts" | "asr";
 
@@ -12,7 +12,7 @@ const TABS: { id: Tab; label: string }[] = [
 const TAB_IDS = TABS.map((entry) => entry.id);
 
 export default function Voice() {
-  const [tab, setTab] = useLocalStorageState<Tab>("admin.tts.active_tab", "tts", TAB_IDS);
+  const [tab, setTab] = useAdminSubView<Tab>("Tts", "tts", TAB_IDS);
 
   return (
     <div className="page-scroll p-6 lg:p-8">

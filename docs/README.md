@@ -27,6 +27,10 @@
 
 ## 整合指南
 
+- [後台 Canonical Routes 現況](guides/admin-canonical-routes.md)
+- [前台費茨法則評估](guides/frontend-fitts-law-audit.md)
+- [紅色供應鏈與替代方案評估](guides/red-supply-chain-assessment.md)
+
 - [Avatar JavaScript SDK](guides/avatar-embed/README.md)
 - [工業型錄 PDF 轉 QA SOP](guides/PDF_CATALOG_TO_QA_SOP.md)
 

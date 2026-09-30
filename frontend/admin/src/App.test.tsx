@@ -121,6 +121,35 @@ describe("App tab mounting", () => {
     });
   });
 
+  it("keeps pending session deep links while lazy chat is loading", async () => {
+    window.history.replaceState(null, "", "/admin/chat?session=s1&persona=p1");
+    render(<App />);
+    await screen.findByTestId("tab-chat");
+    expect(window.location.search).toBe("?session=s1&persona=p1");
+  });
+
+  it("uses the URL default project instead of a saved project for direct links", async () => {
+    window.localStorage.setItem("brain-active-project", "saved");
+    vi.mocked(fetchProjects).mockResolvedValue({ project_count: 2, projects: [
+      { project_id: "default", label: "Default", document_count: 0, persona_count: 0 },
+      { project_id: "saved", label: "Saved", document_count: 0, persona_count: 0 },
+    ] });
+    window.history.replaceState(null, "", "/admin/health");
+    render(<App />);
+    await screen.findByTestId("tab-health");
+    expect(window.location.search).toBe("");
+    expect(await screen.findByRole("button", { name: "目前專案：Default" })).toBeTruthy();
+  });
+
+  it("restores page and project on browser history navigation", async () => {
+    render(<App />);
+    await screen.findByTestId("tab-chat");
+    window.history.pushState(null, "", "/admin/health?project=default");
+    fireEvent.popState(window);
+    await screen.findByTestId("tab-health");
+    expect(window.location.pathname + window.location.search).toBe("/admin/health");
+  });
+
   it("mounts only the active tab content", async () => {
     window.localStorage.setItem("brain-active-tab", "Chat");
 
@@ -141,7 +170,7 @@ describe("App tab mounting", () => {
     const { unmount } = render(<App />);
 
     await waitFor(() => {
-      expect(window.location.search).toContain("view=graph");
+      expect(window.location.pathname).toBe("/admin/knowledge/graph");
     });
 
     unmount();
@@ -182,7 +211,7 @@ describe("App tab mounting", () => {
 
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Workspace" }));
-    fireEvent.click(screen.getAllByRole("button", { name: /對話$/ })[0]);
+    fireEvent.click(screen.getAllByRole("link", { name: /對話$/ })[0]);
 
     expect(await screen.findByTestId("tab-chat")).toBeTruthy();
     expect(window.location.pathname).toBe("/admin/chat");
@@ -201,7 +230,7 @@ describe("App tab mounting", () => {
     expect(document.activeElement).toBe(knowledge);
     expect(screen.getAllByRole("button", { name: "Knowledge" }).every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
     fireEvent.click(within(drawer).getByRole("button", { name: "System" }));
-    fireEvent.click(within(drawer).getByRole("button", { name: /系統健康/ }));
+    fireEvent.click(within(drawer).getByRole("link", { name: /系統健康/ }));
     expect(await screen.findByTestId("tab-health")).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "主要導覽" })).toBeNull();
   });
@@ -304,7 +333,7 @@ describe("App tab mounting", () => {
 
     expect(await screen.findByTestId("tab-accounts")).toBeTruthy();
     expect(
-      screen.getAllByRole("button", { name: /帳號管理/ }).length,
+      screen.getAllByRole("link", { name: /帳號管理/ }).length,
     ).toBeGreaterThan(0);
     expect(screen.queryByText("權限不足")).toBeNull();
   });

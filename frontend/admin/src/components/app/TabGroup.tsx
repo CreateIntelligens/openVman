@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-import type { Tab, TabConfig } from "./navigation";
+import { buildAdminPath, type Tab, type TabConfig } from "./navigation";
 
 interface TabGroupProps {
   label: string;
@@ -22,6 +22,7 @@ export default function TabGroup({
   onToggle,
 }: TabGroupProps) {
   const itemsId = useId();
+  const projectId = typeof window === "undefined" ? "default" : new URLSearchParams(window.location.search).get("project") || "default";
   const containsActive = tabs.some((tab) => tab.key === active);
   if (!tabs.length) return null;
 
@@ -49,11 +50,15 @@ export default function TabGroup({
         {tabs.map((tab) => {
           const isActive = active === tab.key;
           return (
-            <button
+            <a
               key={tab.key}
-              type="button"
+              href={buildAdminPath(tab.key, projectId)}
               aria-current={isActive ? "page" : undefined}
-              onClick={() => onSelect(tab.key)}
+              onClick={(event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                onSelect(tab.key);
+              }}
               title={tab.label}
               className={`group/tab relative flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors ${
                 isActive
@@ -72,7 +77,7 @@ export default function TabGroup({
               >
                 {tab.label}
               </span>
-            </button>
+            </a>
           );
         })}
       </div>

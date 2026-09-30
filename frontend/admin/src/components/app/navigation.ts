@@ -87,6 +87,25 @@ const tabsByPathSegment = Object.fromEntries(
   Object.entries(tabPathSegments).map(([tab, segment]) => [segment, tab]),
 ) as Record<string, Tab>;
 
+/** First view is the page default; non-default views have their own URL. */
+export const adminSubViews: Partial<Record<Tab, readonly string[]>> = {
+  Tts: ["tts", "asr"],
+  KnowledgeBase: ["documents", "graph"],
+  Avatar: ["characters", "backgrounds", "mascots"],
+  Memory: ["browse", "add"],
+  Accounts: ["create", "temporary", "manage"],
+};
+
+export function normalizeAdminRoute(route: AdminRoute): AdminRoute {
+  const views = adminSubViews[route.tab];
+  const view = route.tab === "KnowledgeBase" && route.subView === "qa_node_tree"
+    ? "documents"
+    : route.subView;
+  return views?.includes(view ?? "") && view !== views[0]
+    ? { tab: route.tab, subView: view }
+    : { tab: route.tab };
+}
+
 export interface AdminRoute {
   tab: Tab;
   subView?: string;
@@ -125,18 +144,19 @@ export function parseAdminRoute(
   const normalizedPath = pathname.startsWith(`${PUBLIC_OPENVMAN_PREFIX}/`)
     ? pathname.slice(PUBLIC_OPENVMAN_PREFIX.length)
     : pathname;
-  const match = normalizedPath.match(/^\/admin\/?([^/]*)\/?$/);
-  if (!match?.[1]) {
-    return null;
-  }
+  const match = normalizedPath.match(/^\/admin\/([^/]+)(?:\/([^/]+))?\/?$/);
+  if (!match) return null;
 
-  const tab = tabsByPathSegment[match[1]];
-  if (!tab) {
-    return null;
-  }
+  const tab = Object.prototype.hasOwnProperty.call(tabsByPathSegment, match[1])
+    ? tabsByPathSegment[match[1]]
+    : undefined;
+  if (!tab) return null;
 
-  const subView = new URLSearchParams(search).get("view") || undefined;
-  return { tab, subView };
+  // Path wins over legacy ?view=. Unknown nested paths are not page routes.
+  const pathView = match[2];
+  if (pathView && !adminSubViews[tab]?.includes(pathView)) return null;
+  const subView = pathView || new URLSearchParams(search).get("view") || undefined;
+  return normalizeAdminRoute({ tab, subView });
 }
 
 export function buildAdminPath(
@@ -149,16 +169,22 @@ export function buildAdminPath(
   if (projectId && projectId !== "default") {
     params.set("project", projectId);
   }
-  if (subView) {
-    params.set("view", subView);
-  }
+  const route = normalizeAdminRoute({ tab, subView });
   if (deepLink) {
     params.set("session", deepLink.sessionId);
     params.set("persona", deepLink.personaId);
   }
 
   const query = params.toString();
-  return publicAdminPath(`/admin/${tabPathSegments[tab]}${query ? `?${query}` : ""}`);
+  return publicAdminPath(`/admin/${tabPathSegments[tab]}${route.subView ? `/${route.subView}` : ""}${query ? `?${query}` : ""}`);
+}
+
+/** Preserve a pending deep link until the lazy Chat page can consume it. */
+export function readChatDeepLink(search: string): ChatDeepLink | null {
+  const params = new URLSearchParams(search);
+  const sessionId = params.get("session");
+  const personaId = params.get("persona");
+  return sessionId && personaId ? { sessionId, personaId } : null;
 }
 
 /**

@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildAdminPath,
   consumeChatDeepLink,
   parseAdminRoute,
 } from "./navigation";
+
+beforeEach(() => window.history.replaceState(null, "", "/admin/chat"));
 
 describe("admin navigation routes", () => {
   it("exposes standalone TTS preview under the public prefix", () => {
@@ -18,7 +20,7 @@ describe("admin navigation routes", () => {
     const path = buildAdminPath("KnowledgeBase", "demo", "graph");
     const url = new URL(path, "https://openvman.test");
 
-    expect(path).toBe("/admin/knowledge?project=demo&view=graph");
+    expect(path).toBe("/admin/knowledge/graph?project=demo");
     expect(parseAdminRoute(url.pathname, url.search)).toEqual({
       tab: "KnowledgeBase",
       subView: "graph",
@@ -67,5 +69,29 @@ describe("admin navigation routes", () => {
 
     expect(parseAdminRoute(window.location.pathname)).toEqual({ tab: "Chat" });
     expect(buildAdminPath("Chat")).toBe("/openvman/admin/chat");
+  });
+});
+
+
+describe("canonical subpage routes", () => {
+  it("opens subpages directly without depending on saved browser state", () => {
+    expect(parseAdminRoute("/admin/tts/asr")).toEqual({ tab: "Tts", subView: "asr" });
+    expect(parseAdminRoute("/admin/accounts/temporary")).toEqual({ tab: "Accounts", subView: "temporary" });
+    expect(parseAdminRoute("/openvman/admin/avatar/mascots/")).toEqual({ tab: "Avatar", subView: "mascots" });
+  });
+
+  it("accepts legacy query views and emits a single canonical path", () => {
+    const route = parseAdminRoute("/admin/knowledge", "?view=graph");
+    expect(buildAdminPath(route!.tab, "demo", route!.subView)).toBe("/admin/knowledge/graph?project=demo");
+    expect(buildAdminPath("KnowledgeBase", "default", "documents")).toBe("/admin/knowledge");
+    expect(buildAdminPath("KnowledgeBase", "default", "qa_node_tree")).toBe("/admin/knowledge");
+  });
+
+  it("rejects unknown nested pages and malformed page separators", () => {
+    expect(parseAdminRoute("/adminchat")).toBeNull();
+    expect(parseAdminRoute("/admin/tts/not-a-view")).toBeNull();
+    expect(parseAdminRoute("/admin/chat/asr")).toBeNull();
+    expect(parseAdminRoute("/admin/tts/asr/extra")).toBeNull();
+    expect(parseAdminRoute("/admin/tts", "?view=unknown")).toEqual({ tab: "Tts" });
   });
 });

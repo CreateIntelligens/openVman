@@ -22,6 +22,8 @@ import {
   isTab,
   pageComponents,
   parseAdminRoute,
+  normalizeAdminRoute,
+  readChatDeepLink,
   publicAdminPath,
   type AdminRoute,
   type Tab,
@@ -53,9 +55,7 @@ function initialRoute(): AdminRoute {
   // 子視圖跟著分頁一起記。只記分頁的話，從沒帶路由的網址進來（登入後轉址就是）
   // 會還原分頁卻掉回該頁預設視圖。存的是「這個分頁上次停在哪」，換分頁就不適用。
   const savedSubView = readScoped("brain-active-sub-view");
-  return savedSubView
-    ? { tab: saved, subView: savedSubView }
-    : { tab: saved };
+  return normalizeAdminRoute({ tab: saved, subView: savedSubView || undefined });
 }
 
 function AppContent() {
@@ -94,7 +94,7 @@ function AppContent() {
         nextProjectId,
         nextRoute.subView,
       );
-      setRoute(nextRoute);
+      setRoute(normalizeAdminRoute(nextRoute));
       if (nextProjectId !== projectId) {
         setProjectId(nextProjectId);
       }
@@ -113,6 +113,7 @@ function AppContent() {
       route.tab,
       projectId,
       route.subView,
+      route.tab === "Chat" ? readChatDeepLink(window.location.search) ?? undefined : undefined,
     );
     // 記住落腳處。寫在這裡而不是 applyRoute，因為從網址直接進來的路由不會經過
     // applyRoute——寫在那邊的話，切到沒有子視圖的分頁時舊值會殘留下來。
@@ -164,13 +165,11 @@ function AppContent() {
 
   const switchTab = useCallback(
     (tab: Tab, subView?: string) => {
-      if (
-        tab === route.tab &&
-        (subView === undefined || subView === route.subView)
-      ) {
+      const nextRoute = normalizeAdminRoute({ tab, subView });
+      if (nextRoute.tab === route.tab && nextRoute.subView === route.subView) {
         return;
       }
-      requestNavigation(() => applyRoute({ tab, subView }, projectId));
+      requestNavigation(() => applyRoute(nextRoute, projectId));
       setMobileNavOpen(false);
     },
     [applyRoute, projectId, requestNavigation, route],

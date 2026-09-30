@@ -7,7 +7,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type SetStateAction,
 } from "react";
-import { useNavigation } from "../context/NavigationContext";
 import { useUnsavedChanges } from "../context/NavigationGuardContext";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
@@ -41,7 +40,7 @@ import QaNodeModals, { type QaNodeDialog } from "../components/kb/qa/QaNodeModal
 import VisibilityOrderModal from "../components/kb/qa/VisibilityOrderModal";
 import type { KnowledgeNoteFormat } from "../api";
 import { useKnowledgeBase } from "../hooks/useKnowledgeBase";
-import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { useAdminSubView } from "../hooks/useAdminSubView";
 import { type QaNode, useQaNodes } from "../hooks/useQaNodes";
 import { readScoped, removeScoped, writeScoped } from "../utils/scopedStorage";
 
@@ -129,24 +128,10 @@ export default function KnowledgeBase() {
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const mobileTreeOpenerRef = useRef<HTMLButtonElement | null>(null);
   const mobileTreePanelRef = useRef<HTMLElement | null>(null);
-  const [activeTab, setActiveTab] = useLocalStorageState<KnowledgeTab>(
-    "admin.knowledge.active_tab",
-    "documents",
-    KNOWLEDGE_TABS,
+  const [activeTab, setActiveTab] = useAdminSubView<KnowledgeTab>(
+    "KnowledgeBase", "documents", KNOWLEDGE_TABS,
   );
-  const { currentSubView } = useNavigation();
   useUnsavedChanges("knowledge-base-editor", editorDirty, "知識庫文件");
-
-  useEffect(() => {
-    if (currentSubView === "graph") {
-      setActiveTab("graph");
-    } else if (
-      currentSubView === "documents" ||
-      currentSubView === "qa_node_tree"
-    ) {
-      setActiveTab("documents");
-    }
-  }, [currentSubView, setActiveTab]);
 
   const {
     nodesTree,

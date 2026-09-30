@@ -18,6 +18,9 @@ import AdminScopePanel from "../components/accounts/AdminScopePanel";
 import FormalAccountAccessPanel from "../components/accounts/FormalAccountAccessPanel";
 import TemporaryBatchPanel from "../components/accounts/TemporaryBatchPanel";
 import { useAuth } from "../context/AuthContext";
+import { useAdminSubView } from "../hooks/useAdminSubView";
+
+const ACCOUNT_VIEWS = ["create", "temporary", "manage"] as const;
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -55,10 +58,12 @@ export default function Accounts() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AssignableAccountRole>("user");
-  const [mainTab, setMainTab] = useState<"create" | "manage">("create");
-  const [creationMode, setCreationMode] = useState<"formal" | "temporary">(
-    "formal",
-  );
+  const [view, setView] = useAdminSubView("Accounts", "create", ACCOUNT_VIEWS);
+  const mainTab = view === "manage" ? "manage" : "create";
+  const creationMode = view === "temporary" ? "temporary" : "formal";
+  const setMainTab = (next: "create" | "manage") => setView(next);
+  const setCreationMode = (next: "formal" | "temporary") =>
+    setView(next === "temporary" ? "temporary" : "create");
   const [hasOpenedBatches, setHasOpenedBatches] = useState(false);
   const [createdNotice, setCreatedNotice] = useState<string | null>(null);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);

@@ -12,14 +12,15 @@ describe("collapsible navigation group", () => {
     const toggle = screen.getByRole("button", { name: "Workspace" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(document.getElementById(toggle.getAttribute("aria-controls")!)?.hidden).toBe(true);
-    expect(screen.queryByRole("button", { name: /語音$/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /語音$/ })).toBeNull();
     fireEvent.click(toggle);
     expect(onToggle).toHaveBeenCalledOnce();
     rerender(<TabGroup {...props} isCollapsed={false} />);
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("button", { name: /對話$/ }).getAttribute("aria-current")).toBe("page");
-    fireEvent.click(screen.getByRole("button", { name: /語音$/ }));
+    expect(screen.getByRole("link", { name: /對話$/ }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("link", { name: /語音$/ }));
     expect(props.onSelect).toHaveBeenCalledWith("Tts");
+    expect(screen.getByRole("link", { name: /語音$/ }).getAttribute("href")).toBe("/admin/tts");
   });
 
   it("keeps the group reachable in the narrow icon sidebar", () => {
@@ -37,4 +38,13 @@ describe("collapsible navigation group", () => {
       isExpanded isCollapsed={false} onToggle={vi.fn()} />);
     expect(screen.queryByRole("navigation")).toBeNull();
   });
+});
+
+
+it("preserves the public prefix and project for links opened in a new tab", () => {
+  window.history.replaceState(null, "", "/openvman/admin/chat?project=demo");
+  render(<TabGroup label="Workspace" tabs={workspaceTabs} active="Chat" onSelect={vi.fn()}
+    isExpanded isCollapsed={false} onToggle={vi.fn()} />);
+  expect(screen.getByRole("link", { name: /語音$/ }).getAttribute("href")).toBe("/openvman/admin/tts?project=demo");
+  window.history.replaceState(null, "", "/admin/chat");
 });

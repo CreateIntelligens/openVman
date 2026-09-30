@@ -16,6 +16,8 @@ import {
 import { errorMessage } from "../utils/errorMessage";
 import { readScoped, writeScoped } from "../utils/scopedStorage";
 
+import { parseAdminRoute } from "../components/app/navigation";
+
 const PROJECT_STORAGE_KEY = "brain-active-project";
 
 interface ProjectContextType {
@@ -34,10 +36,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const routeProject = new URLSearchParams(window.location.search).get(
       "project",
     );
-    const id =
-      routeProject ||
-      readScoped(PROJECT_STORAGE_KEY) ||
-      "default";
+    const directRoute = parseAdminRoute(window.location.pathname, window.location.search);
+    const id = routeProject || (directRoute ? "default" : readScoped(PROJECT_STORAGE_KEY)) || "default";
     setActiveProjectId(id);
     return id;
   });

@@ -208,7 +208,7 @@ export default function ChatSidebar({
             </div>
 
             <a
-              href={buildAdminPath("Sessions")}
+              href={buildAdminPath("Sessions", new URLSearchParams(window.location.search).get("project") || "default")}
               className="mt-2 flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2 py-2 text-[0.6875rem] text-content-muted transition-colors hover:bg-surface-raised hover:text-content"
             >
               <span className="material-symbols-outlined text-[0.875rem]">forum</span>

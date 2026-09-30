@@ -7,7 +7,7 @@
 > 重點落差：
 > - 第 1、2、4、5、8、14 節描述的「三引擎插拔渲染架構」（`LipSyncManager` / `Wav2LipStrategy` / `DinetStrategy` / `WebGLStrategy` / `manifest.json`）**未曾實作**，實際前端採用單一的 DHLiveMini2 WASM engine（見 `frontend/app/src/composables/useMatesX.ts`、`components/avatar/AvatarCanvas.vue`）。
 > - 第 13 節描述的媒體上傳走 HTTP multipart POST，但實作走的是 **WebSocket 傳 base64**（`useAvatarChat.ts` 的 `sendVisualInput` / `client_video_frame`），方向相反。
-> - 第 12 節提到的 `/admin/knowledge` 是**概念性描述**，實際 `frontend/admin` 沒有路由系統，是靠 tab 狀態 + localStorage 切換頁面。
+> - 第 12 節的管理介面目前已補齊 Canonical Routes：`navigation.ts` 統一路徑，`App.tsx` 用 History API 同步頁面、專案與子視圖；支援 `/admin/knowledge` 與公開 `/openvman` 前綴。詳見[後台路由現況](../guides/admin-canonical-routes.md)（2026-09-30 核對）。
 > - 第 6、7、9、10、11、12.5 節與現況大致相符，僅部分細節有出入，各節內文已個別註記。
 
 ### 1. 技術棧與核心目標 (Tech Stack & Goals)
@@ -308,7 +308,7 @@ ws.onclose = () => { reconnect(); };
 #### 12.4 知識圖譜視圖 (Graph View)
 知識庫頁面新增 **Graph** 分頁，呼叫 Brain `/graph` endpoint 取得由 `graphify` skill 產出的節點/關係資料，在 Admin UI 中以互動式圖形呈現實體與關聯。此視圖與檔案/紀錄分頁並列，作為非結構化知識的視覺化檢索入口。
 
-> **現況更新（2026-07-01）**：`frontend/admin/src/pages/KnowledgeBase.tsx`（Tree + FileView）與 `components/kb/GraphView.tsx`（呼叫 `/graph/status`、`/graph/rebuild`）都已實作，12.1-12.4 的功能點大致到位。但 **`/admin/knowledge` 這個 URL 路徑實際不存在**——`frontend/admin` 沒有路由套件，頁面切換是靠 `components/app/navigation.ts` 的 tab 狀態 + localStorage，而非規格暗示的獨立路由頁面。
+> **現況更新（2026-07-01）**：`frontend/admin/src/pages/KnowledgeBase.tsx`（Tree + FileView）與 `components/kb/GraphView.tsx`（呼叫 `/graph/status`、`/graph/rebuild`）都已實作，12.1-12.4 的功能點大致到位。路由現況已於 **2026-09-30** 核對：`/admin/knowledge` 是固定頁面路徑，`components/app/navigation.ts` 提供路徑解析與產生，`App.tsx` 使用 History API 同步網址並處理 `popstate`；專案以 `project` query 表示，子視圖使用固定子路徑（如 `/admin/knowledge/graph`），舊 `view` query 會正規化。詳見[後台 Canonical Routes 現況](../guides/admin-canonical-routes.md)。
 
 ### 12.5 Admin 對話控制台 (Admin Chat Console)
 

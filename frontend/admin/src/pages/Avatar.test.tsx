@@ -1,9 +1,29 @@
+import { useEffect, useState, type ReactElement } from "react";
+import { NavigationProvider } from "../context/NavigationContext";
+import { buildAdminPath, parseAdminRoute } from "../components/app/navigation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render as renderComponent, screen, waitFor } from "@testing-library/react";
 import Avatar from "./Avatar";
 import * as api from "../api";
 
+function render(element: ReactElement) {
+  function RouteHarness() {
+    const [view, setView] = useState(() => parseAdminRoute(window.location.pathname, window.location.search)?.subView);
+    useEffect(() => {
+      const update = () => setView(parseAdminRoute(window.location.pathname, window.location.search)?.subView);
+      window.addEventListener("popstate", update);
+      return () => window.removeEventListener("popstate", update);
+    }, []);
+    return <NavigationProvider currentTab="Avatar" currentSubView={view} onSelectTab={(tab, next) => {
+      window.history.pushState(null, "", buildAdminPath(tab, "default", next));
+      setView(next);
+    }}>{element}</NavigationProvider>;
+  }
+  return renderComponent(<RouteHarness />);
+}
+
 beforeEach(() => {
+  window.history.replaceState(null, "", "/admin/avatar");
   window.localStorage.clear();
 });
 
@@ -13,6 +33,28 @@ afterEach(() => {
 });
 
 describe("Avatar page", () => {
+  it("uses the default URL view instead of a stored background view", async () => {
+    window.localStorage.setItem("admin.avatar.assets_tab", "backgrounds");
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    render(<Avatar />);
+    expect(await screen.findByText(/no characters yet/i)).toBeTruthy();
+  });
+
+  it("updates the visible asset panel when history restores a route", async () => {
+    vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
+    vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({ backgrounds: [] });
+    render(<Avatar />);
+    await screen.findByText(/no characters yet/i);
+    fireEvent.click(screen.getByRole("button", { name: "Backgrounds" }));
+    expect(window.location.pathname).toBe("/admin/avatar/backgrounds");
+    window.history.replaceState(null, "", "/admin/avatar");
+    fireEvent(window, new PopStateEvent("popstate"));
+    expect(await screen.findByText(/no characters yet/i)).toBeTruthy();
+    window.history.replaceState(null, "", "/admin/avatar/backgrounds");
+    fireEvent(window, new PopStateEvent("popstate"));
+    expect(screen.queryByText(/no characters yet/i)).toBeNull();
+  });
+
   it("renders character list", async () => {
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({
       characters: [
@@ -127,10 +169,12 @@ describe("Avatar page", () => {
 
     expect(await screen.findByText("診間背景")).toBeTruthy();
     expect(api.fetchAvatarBackgrounds).toHaveBeenCalledOnce();
+    expect(window.location.pathname).toBe("/admin/avatar/backgrounds");
   });
 
-  it("restores the persisted background tab and loads backgrounds", async () => {
-    window.localStorage.setItem("admin.avatar.assets_tab", "backgrounds");
+  it("opens the background route despite a stale stored character tab", async () => {
+    window.history.replaceState(null, "", "/admin/avatar/backgrounds");
+    window.localStorage.setItem("admin.avatar.assets_tab", "characters");
     vi.spyOn(api, "fetchAvatarCharacters").mockResolvedValue({ characters: [] });
     vi.spyOn(api, "fetchAvatarBackgrounds").mockResolvedValue({
       backgrounds: [

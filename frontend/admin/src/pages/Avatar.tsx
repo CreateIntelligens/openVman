@@ -25,7 +25,7 @@ import {
   buildMascotWidgetSrc,
   toMascotOption,
 } from "../data/mascotCatalog";
-import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { useAdminSubView } from "../hooks/useAdminSubView";
 import BackgroundsPanel from "../components/avatar/BackgroundsPanel";
 import CharactersPanel from "../components/avatar/CharactersPanel";
 import MascotsPanel from "../components/avatar/MascotsPanel";
@@ -86,8 +86,8 @@ function renameTargetLabel(target: RenameTarget | null): string {
 
 export default function Avatar() {
   const { selectedMascotId, setMascotOptions, setSelectedMascotId } = useMascot();
-  const [activeTab, setActiveTab] = useLocalStorageState<AssetTab>(
-    "admin.avatar.assets_tab",
+  const [activeTab, setActiveTab] = useAdminSubView<AssetTab>(
+    "Avatar",
     "characters",
     ASSET_TABS,
   );

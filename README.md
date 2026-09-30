@@ -34,6 +34,10 @@ Admin 也可將已上傳且素材完整的影片角色登記為右下角小助�
 
 管理介面的 Workspace、Knowledge、System 群組可點擊標題展開／收合，桌面側欄與手機選單共用狀態，並依登入帳號記住偏好。首次只展開目前頁面的群組；重新載入或切換頁面時會展開目的群組。側欄縮成窄版時，仍可透過 W／K／S 群組標題操作。
 
+### 管理介面網址
+
+管理介面具備 [Canonical Routes](docs/guides/admin-canonical-routes.md)：每頁與子頁有固定網址（例如 `/admin/tts/asr`、`/admin/knowledge/graph`、`/admin/avatar/mascots`、`/admin/accounts/temporary`），支援重新整理、上一頁／下一頁與 `/openvman` 公開前綴。`?project=demo` 指定專案，省略時採用 default；舊 `?view=` 網址自動正規化，側欄連結可開新分頁。
+
 ### TTS 試聽
 
 管理介面側欄的「TTS 試聽」（`/admin/tts`，公開子路徑為 `/openvman/admin/tts`）可選擇帳號已授權的供應商與聲音，輸入最多 1000 字後直接播放。可停止請求／播放，並以播放器重播；若瀏覽器未允許自動播放，按播放器的播放鍵即可。此功能不建立對話紀錄，也不修改對話頁的聲音偏好。若後端改用備援供應商，頁面會標示實際供應商。

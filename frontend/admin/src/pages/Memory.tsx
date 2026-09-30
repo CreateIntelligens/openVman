@@ -16,7 +16,7 @@ import MaintenancePanel from "../components/memory/MaintenancePanel";
 import MemoryPagination from "../components/memory/MemoryPagination";
 import MemoryRecordCard from "../components/memory/MemoryRecordCard";
 import { useProject } from "../context/ProjectContext";
-import { useLocalStorageState } from "../hooks/useLocalStorageState";
+import { useAdminSubView } from "../hooks/useAdminSubView";
 
 const MEMORY_TABS = ["browse", "add"] as const;
 type Tab = (typeof MEMORY_TABS)[number];
@@ -24,8 +24,8 @@ type Status = { type: "success" | "error"; message: string } | null;
 
 export default function Memory() {
   const { projectId } = useProject();
-  const [activeTab, setActiveTab] = useLocalStorageState<Tab>(
-    "admin.memory.active_tab",
+  const [activeTab, setActiveTab] = useAdminSubView<Tab>(
+    "Memory",
     "browse",
     MEMORY_TABS,
   );

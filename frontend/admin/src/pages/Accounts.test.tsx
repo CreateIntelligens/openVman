@@ -1,4 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useEffect, useState, type ReactElement } from "react";
+import { NavigationProvider } from "../context/NavigationContext";
+import { buildAdminPath, parseAdminRoute } from "../components/app/navigation";
+import { fireEvent, render as renderComponent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Accounts from "./Accounts";
@@ -45,8 +48,25 @@ vi.mock("../components/accounts/TemporaryBatchPanel", () => ({
   ),
 }));
 
+function render(element: ReactElement) {
+  function RouteHarness() {
+    const [view, setView] = useState(() => parseAdminRoute(window.location.pathname, window.location.search)?.subView);
+    useEffect(() => {
+      const update = () => setView(parseAdminRoute(window.location.pathname, window.location.search)?.subView);
+      window.addEventListener("popstate", update);
+      return () => window.removeEventListener("popstate", update);
+    }, []);
+    return <NavigationProvider currentTab="Accounts" currentSubView={view} onSelectTab={(tab, next) => {
+      window.history.pushState(null, "", buildAdminPath(tab, "default", next));
+      setView(next);
+    }}>{element}</NavigationProvider>;
+  }
+  return renderComponent(<RouteHarness />);
+}
+
 describe("Accounts", () => {
   beforeEach(() => {
+  window.history.replaceState(null, "", "/admin/accounts");
     vi.clearAllMocks();
     authState.account = {
       id: "admin-a",
@@ -69,6 +89,24 @@ describe("Accounts", () => {
       disabled: false,
       created_at: "2026-08-18T00:00:00Z",
     });
+  });
+
+  it("opens management directly from its URL", async () => {
+    window.history.replaceState(null, "", "/admin/accounts/manage");
+    render(<Accounts />);
+    expect(screen.getByRole("tab", { name: "編輯／管理" }).getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByText("批次紀錄")).toBeTruthy();
+  });
+
+  it("opens temporary creation directly and synchronizes mode changes", async () => {
+    window.history.replaceState(null, "", "/admin/accounts/temporary");
+    render(<Accounts />);
+    expect(await screen.findByText("臨時帳號批次")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "臨時帳號" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "正式帳號" }));
+    expect(window.location.pathname).toBe("/admin/accounts");
+    fireEvent.click(screen.getByRole("button", { name: "臨時帳號" }));
+    expect(window.location.pathname).toBe("/admin/accounts/temporary");
   });
 
   it("selects access before creating a formal user", async () => {
