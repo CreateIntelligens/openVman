@@ -1,0 +1,459 @@
+{
+ "description": "台語連續劇對白真人錄音（/srv/818data，這台機器上才有），text 是華語字幕（意譯，錯字率會偏高）。只測批次辨識：台語分流時前台不走串流。看 Breeze 轉寫與台語判斷，不問 Brain 時加 --steps \"\"。",
+ "project_id": "proj-b85afb8bb6",
+ "asr": [
+  "batch"
+ ],
+ "cases": [
+  {
+   "id": "drama-000001",
+   "text": "帝君保佑",
+   "audio": "/srv/818data/001_001_000001_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000006",
+   "text": "沒有啦 現在是在說什麼 男子漢大丈夫言出必行 既然我答應了 我就不可能反悔 是啦 勝強哥",
+   "audio": "/srv/818data/001_001_000006_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000007",
+   "text": "從現在開始 我跟進輝的命就交給你了 我相信你絕對",
+   "audio": "/srv/818data/001_001_000007_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000008",
+   "text": "不會讓我們失望",
+   "audio": "/srv/818data/001_001_000008_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000011",
+   "text": "子維都笑咪咪的",
+   "audio": "/srv/818data/001_001_000011_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000012",
+   "text": "沒錯 子維",
+   "audio": "/srv/818data/001_001_000012_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000015",
+   "text": "碧玉你要知道 我們結婚只有登記",
+   "audio": "/srv/818data/001_001_000015_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000019",
+   "text": "我當然知道你不會 不過我會 我會埋怨我自己",
+   "audio": "/srv/818data/001_001_000019_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000020",
+   "text": "一個男人的責任 既然現在有這麼好的 賺錢機會 我當然要好好把握 不過進輝 你連出國要做什麼生意",
+   "audio": "/srv/818data/001_001_000020_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000022",
+   "text": "你相信我嗎 我當然相信你",
+   "audio": "/srv/818data/001_001_000022_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000024",
+   "text": "既然你相信我 那我希望你能永遠記得",
+   "audio": "/srv/818data/001_001_000024_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000025",
+   "text": "我的這裡 這裡永遠都有 你們母子倆的位置",
+   "audio": "/srv/818data/001_001_000025_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000026",
+   "text": "你們母子倆的位置",
+   "audio": "/srv/818data/001_001_000026_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000027",
+   "text": "都是希望能夠盡到一個 為人丈夫和父親的責任",
+   "audio": "/srv/818data/001_001_000027_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000029",
+   "text": "我不是跟你說過了 這次我是跟我結拜兄弟 一起出門",
+   "audio": "/srv/818data/001_001_000029_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000030",
+   "text": "一起出門 他們是我最信任的人 大家互相扶持 互相照顧 絕對不會有問題",
+   "audio": "/srv/818data/001_001_000030_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000031",
+   "text": "好啦 乖 不要哭",
+   "audio": "/srv/818data/001_001_000031_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000032",
+   "text": "你就乖乖等我回來好不好",
+   "audio": "/srv/818data/001_001_000032_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000036",
+   "text": "之前跟人打架留下來的紀念",
+   "audio": "/srv/818data/001_001_000036_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000037",
+   "text": "人這麼斯文 你也有抓狂的時候 那是沒踩到他的底線",
+   "audio": "/srv/818data/001_001_000037_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000039",
+   "text": "我請教一下 我們這次如果賺到錢",
+   "audio": "/srv/818data/001_001_000039_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000040",
+   "text": "我的願望就是 去我那個無緣的他家對面 蓋一棟豪宅 然後裝潢得很奢華",
+   "audio": "/srv/818data/001_001_000040_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000041",
+   "text": "閃到讓他們眼睛都睜不開 看他們是不是還敢看不起我 你這個人就是有仇必報 誰惹到你 誰就倒楣",
+   "audio": "/srv/818data/001_001_000041_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000042",
+   "text": "如果賺到錢之後 你們兩個第一個願望是什麼 我的願望是",
+   "audio": "/srv/818data/001_001_000042_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000045",
+   "text": "我的願望",
+   "audio": "/srv/818data/001_001_000045_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000047",
+   "text": "這樣看起來 你太太應該長得很漂亮 你才會這麼疼惜他 保護到把他藏起來 不讓我們看  對 進輝",
+   "audio": "/srv/818data/001_001_000047_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000051",
+   "text": "來 先給你們看一下 我跟你們說 這次我們要出門前",
+   "audio": "/srv/818data/001_001_000051_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000052",
+   "text": "這次我們要出門前 我還帶他去拍全家福",
+   "audio": "/srv/818data/001_001_000052_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000055",
+   "text": "我們才剛認識 互相看不順眼 想不到現在 我們三個竟然會結拜",
+   "audio": "/srv/818data/001_001_000055_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000056",
+   "text": "我們三個竟然會結拜 一起做生意 打拚賺錢",
+   "audio": "/srv/818data/001_001_000056_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000058",
+   "text": "人無橫財不富 我們如果想要有錢",
+   "audio": "/srv/818data/001_001_000058_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000059",
+   "text": "就要付出代價 所以不要埋怨 等我們這次  任務完成之後",
+   "audio": "/srv/818data/001_001_000059_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000061",
+   "text": "一定要參加我的婚禮 那當然 對了 你講半天",
+   "audio": "/srv/818data/001_001_000061_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000081",
+   "text": "不會啦 大哥 反正我們現在任務 已經完成了 你不要自尋煩惱 這麼緊張好不好 那是因為大哥他有說過 他一定要把我們平安帶回去",
+   "audio": "/srv/818data/001_001_000081_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000082",
+   "text": "他才會這麼有壓力",
+   "audio": "/srv/818data/001_001_000082_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000099",
+   "text": "怎麼流那麼多血 大哥",
+   "audio": "/srv/818data/001_001_000099_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000100",
+   "text": "我是不是會死在這裡 別亂說話 我一定會把你平安帶回去",
+   "audio": "/srv/818data/001_001_000100_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000101",
+   "text": "我一定會把你平安帶回去 耀武",
+   "audio": "/srv/818data/001_001_000101_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000103",
+   "text": "進輝  不是 進輝 早就叫你要小心 你看你現在搞成這樣",
+   "audio": "/srv/818data/001_001_000103_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000105",
+   "text": "大哥 有狗在叫 糟了 他們放狗來找我們了",
+   "audio": "/srv/818data/001_001_000105_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000109",
+   "text": "你絕對不能放棄 聽到了沒有",
+   "audio": "/srv/818data/001_001_000109_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000111",
+   "text": "大哥 他們好像快找過來了 我們快走 再不走就來不及了 我背你 耀武 來幫我 來",
+   "audio": "/srv/818data/001_001_000111_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000114",
+   "text": "進輝的血這樣一直流 那些狗聞到味道 一定很快就找過來了",
+   "audio": "/srv/818data/001_001_000114_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000116",
+   "text": "幸好 不然這山崖這麼高 海一定很深 摔下去絕對死定了",
+   "audio": "/srv/818data/001_001_000116_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000118",
+   "text": "我們快點走 走啦",
+   "audio": "/srv/818data/001_001_000118_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000123",
+   "text": "誰要拿錢回去救你媽",
+   "audio": "/srv/818data/001_001_000123_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000124",
+   "text": "大哥  你不是說會把我平安帶回去",
+   "audio": "/srv/818data/001_001_000124_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000125",
+   "text": "你不是說會把我平安帶回去",
+   "audio": "/srv/818data/001_001_000125_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000126",
+   "text": "二哥 你不是說你會跟大哥  一起來參加我的婚禮",
+   "audio": "/srv/818data/001_001_000126_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000128",
+   "text": "方耀武  枉費我把你當成兄弟 你現在講這種話還是人嗎",
+   "audio": "/srv/818data/001_001_000128_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000130",
+   "text": "大哥你呢",
+   "audio": "/srv/818data/001_001_000130_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000131",
+   "text": "自生自滅嗎",
+   "audio": "/srv/818data/001_001_000131_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000169",
+   "text": "我是見死不救 但我如果不這麼做 我們現在有可能活命嗎",
+   "audio": "/srv/818data/001_001_000169_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000175",
+   "text": "去啊 你去找進輝 讓你媽等死 你去啊",
+   "audio": "/srv/818data/001_001_000175_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000176",
+   "text": "要我眼睜睜 看我的兄弟摔下去 我心裡也很難受",
+   "audio": "/srv/818data/001_001_000176_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000177",
+   "text": "如果要怪 就怪進輝的命不好",
+   "audio": "/srv/818data/001_001_000177_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000180",
+   "text": "也沒有心臟替你媽媽換了 周先生 我們現在只能盡人事了 醫生 我拜託你",
+   "audio": "/srv/818data/001_001_000180_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000184",
+   "text": "那位是周先生 他媽媽錯過換心臟的機會 你先起來 你不要這樣",
+   "audio": "/srv/818data/001_001_000184_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000187",
+   "text": "我拜託你 你先起來 你不要這樣 這裡是醫院 你去想辦法",
+   "audio": "/srv/818data/001_001_000187_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000192",
+   "text": "請你 請你不要亂摸 這個東西很貴 我怕你賠不起",
+   "audio": "/srv/818data/001_001_000192_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000193",
+   "text": "所以現在你是看不起我 你是怕我沒錢 買你們的豪宅是不是",
+   "audio": "/srv/818data/001_001_000193_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000194",
+   "text": "看到沒有 你跟我說 你們這豪宅多少錢 看這些現金夠不夠 現金夠不夠",
+   "audio": "/srv/818data/001_001_000194_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000195",
+   "text": "什麼沒有 錢最多",
+   "audio": "/srv/818data/001_001_000195_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000196",
+   "text": "看到沒有 我什麼沒有 錢最多",
+   "audio": "/srv/818data/001_001_000196_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000262",
+   "text": "不過我比較好奇的是 我們的保全這麼森嚴 他是怎麼進來這裡的",
+   "audio": "/srv/818data/001_001_000262_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000439",
+   "text": "周董事長 周夫人 歡迎 理事長你好",
+   "audio": "/srv/818data/001_001_000439_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000442",
+   "text": "是啦 周董事長我真的很羨慕你 有一位這麼開明的媽媽 還有一位 這麼賢慧孝順的漂亮老婆",
+   "audio": "/srv/818data/001_001_000442_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000443",
+   "text": "你看他們婆媳關係這麼好 周董事長 你真的是最有福氣的人 我也是這麼想",
+   "audio": "/srv/818data/001_001_000443_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000445",
+   "text": "是啦 各位 我看時間不早了 我們趕快進去會場 來 這邊請 來 請",
+   "audio": "/srv/818data/001_001_000445_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000523",
+   "text": "董事長 我先去開車 你留在公司就好",
+   "audio": "/srv/818data/001_001_000523_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000557",
+   "text": "不能只貪圖自己便利就好 影響交通 謝謝 你們這些警察",
+   "audio": "/srv/818data/001_001_000557_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000581",
+   "text": "才結婚沒多久 孩子才剛滿週歲 對了 你現在住在哪裡",
+   "audio": "/srv/818data/001_001_000581_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000582",
+   "text": "對了 你現在住在哪裡",
+   "audio": "/srv/818data/001_001_000582_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000595",
+   "text": "你們扣下這期的應付帳款 不給我們 請問什麼意思 你欠一些包商幾個月的錢",
+   "audio": "/srv/818data/001_001_000595_000001.wav",
+   "speech_language": "nan"
+  },
+  {
+   "id": "drama-000597",
+   "text": "在你的心目中 真的是那種自私自利 不講情義的人嗎 你就想方設法 找一些有的沒的理由 把你這個結拜兄弟 一腳踢開嗎",
+   "audio": "/srv/818data/001_001_000597_000001.wav",
+   "speech_language": "nan"
+  }
+ ]
+}

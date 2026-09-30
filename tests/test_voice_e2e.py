@@ -49,6 +49,21 @@ class ScoringTest(unittest.TestCase):
         self.assertEqual(by_path["stream"]["asr_ms"], 900)
         self.assertEqual(by_path["batch"]["failed"], 1)
 
+    def test_summary_pairs_terms_with_the_right_case_after_a_failure(self):
+        ok = {"text": "x", "cer": 0.0, "terms_ok": True, "asr_ms": 1}
+        rows = [
+            {"voice": "v", "terms": ["DIVA"], "batch": {"error": "HTTP 500"}},
+            {"voice": "v", "terms": [], "batch": ok},
+        ]
+        self.assertEqual(summarize(rows)[0]["terms_ok"], "0/0")
+
+    def test_summary_counts_language_judgements(self):
+        rows = [
+            {"voice": "recording", "terms": [], "batch": {"cer": 0.1, "terms_ok": True, "language_ok": ok}}
+            for ok in (True, True, False)
+        ]
+        self.assertEqual(summarize(rows)[0]["language_ok"], "2/3")
+
 
 class CaseFilesTest(unittest.TestCase):
     def test_every_case_file_loads_with_unique_ids(self):

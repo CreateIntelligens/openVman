@@ -66,10 +66,11 @@ print(runtime.tokens.issue(user, now=now, expires_at=now + timedelta(minutes=int
 class Case:
     id: str
     text: str
-    lang: str = "zh"
     terms: list[str] = field(default_factory=list)
     reply_any: list[str] = field(default_factory=list)
     audio: str = ""
+    # 批次辨識該判成什麼語言："nan" 是台語，"zh" 是不該被判成台語。
+    speech_language: str = ""
 
 
 # 異體字不算聽錯：Breeze 常寫「汙水泵」、Gemini 寫「臺」。
@@ -136,9 +137,11 @@ def summarize(rows: list[dict]) -> list[dict]:
                 groups.setdefault((row["voice"], path), []).append(row)
     summary = []
     for (voice, path), members in sorted(groups.items()):
-        asr = [m[path] for m in members if "error" not in m[path]]
-        with_terms = [a for a, m in zip(asr, members) if m["terms"]]
+        pairs = [(m, m[path]) for m in members if "error" not in m[path]]
+        asr = [a for _, a in pairs]
+        with_terms = [a for m, a in pairs if m["terms"]]
         replies = [a["reply_ok"] for a in asr if a.get("reply_ok") is not None]
+        languages = [a["language_ok"] for a in asr if a.get("language_ok") is not None]
 
         def mean(values: list[float]) -> float | None:
             return round(sum(values) / len(values), 3) if values else None
@@ -151,6 +154,7 @@ def summarize(rows: list[dict]) -> list[dict]:
             "mean_cer": mean([a["cer"] for a in asr]),
             "terms_ok": f"{sum(a['terms_ok'] for a in with_terms)}/{len(with_terms)}",
             "reply_ok": f"{sum(replies)}/{len(replies)}" if replies else "-",
+            "language_ok": f"{sum(languages)}/{len(languages)}" if languages else "-",
             "asr_ms": mean([a["asr_ms"] for a in asr if a.get("asr_ms") is not None]),
             "chat_ms": mean([a["chat_ms"] for a in asr if a.get("chat_ms") is not None]),
         })
@@ -260,6 +264,7 @@ class Harness:
             "text": body.get("text", ""),
             "provider": body.get("provider"),
             "language": body.get("language"),
+            "routes": body.get("language_routes"),
             "asr_ms": round((time.monotonic() - started) * 1000),
         }
 
@@ -311,6 +316,9 @@ class Harness:
         asr["cer"] = round(cer(case.text, asr["text"]), 3)
         asr["terms_heard"] = terms_heard(case.terms, asr["text"])
         asr["terms_ok"] = len(asr["terms_heard"]) == len(case.terms)
+        if case.speech_language and path == "batch":
+            # 串流不判台語（台語分流時前台不走串流），只有批次回 language。
+            asr["language_ok"] = (asr.get("language") == "nan") == (case.speech_language == "nan")
         steps = self.args.steps
         speech_language = asr.get("language") if asr.get("language") == "nan" else None
         if "chat" in steps and asr["text"]:
@@ -340,9 +348,10 @@ class Harness:
                 if "error" in result:
                     print(f"  ✗ {case.id} [{row['voice']}] {path}: {result['error']}", flush=True)
                     continue
-                mark = "✓" if result["terms_ok"] else "✗"
+                mark = "✓" if result["terms_ok"] and result.get("language_ok", True) else "✗"
                 reply = result.get("reply", "")[:40].replace("\n", " ")
-                print(f"  {mark} {case.id} [{row['voice']}] {path} cer={result['cer']:.2f} "
+                language = f" lang={result.get('language') or '-'}" if case.speech_language else ""
+                print(f"  {mark} {case.id} [{row['voice']}] {path} cer={result['cer']:.2f}{language} "
                       f"heard={result['text']!r} reply={reply!r}", flush=True)
             return row
 
@@ -387,8 +396,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--verify-tls", action="store_true", help="驗 TLS 憑證")
     parser.add_argument("--project", help="專案 ID；預設用題庫的 project_id")
     parser.add_argument("--routes", default="", help="語言分流，例如 zh,en；預設用後台設定")
-    parser.add_argument("--asr", default="stream,batch", type=lambda s: s.split(","),
-                        help="stream、batch 或兩個都跑")
+    parser.add_argument("--asr", type=lambda s: s.split(","),
+                        help="stream、batch 或兩個都跑；預設用題庫的 asr，沒寫就兩個都跑")
     parser.add_argument("--steps", default="chat", type=lambda s: set(s.split(",")) - {""},
                         help="辨識後還要做的：chat、tts（逗號分隔；空字串只測辨識）")
     parser.add_argument("--voices", type=lambda s: s.split(","),
@@ -407,6 +416,7 @@ async def main(argv: list[str] | None = None) -> int:
     cases, data = load_cases(args.cases, args.only)
     args.project = args.project or data.get("project_id", "default")
     voices = args.voices or data.get("voices", ["edge-tts:zh-TW-HsiaoChenNeural"])
+    args.asr = args.asr or data.get("asr", ["stream", "batch"])
     if not args.token and not args.user:
         sys.exit("要給 --user（簽 token）或 --token")
     token = args.token or mint_token(args.user, 60)
@@ -428,11 +438,11 @@ async def main(argv: list[str] | None = None) -> int:
                                         for k, v in vars(args).items() if k != "token"},
                                "summary": summary, "rows": rows}, ensure_ascii=False, indent=1),
                    encoding="utf-8")
-    print("\n聲音 × 辨識路徑          題數 失敗 平均錯字率 專有名詞 回答命中 辨識ms  回答ms")
+    print("\n聲音 × 辨識路徑          題數 失敗 平均錯字率 專有名詞 語言判斷 回答命中 辨識ms  回答ms")
     for s in summary:
         print(f"{s['voice'][:22]:22} {s['path']:6} {s['cases']:4} {s['failed']:4} "
               f"{s['mean_cer'] if s['mean_cer'] is not None else '-':>9} {s['terms_ok']:>8} "
-              f"{s['reply_ok']:>8} {s['asr_ms'] or '-':>7} {s['chat_ms'] or '-':>7}")
+              f"{s['language_ok']:>8} {s['reply_ok']:>8} {s['asr_ms'] or '-':>7} {s['chat_ms'] or '-':>7}")
     print(f"\n逐題結果：{out.relative_to(ROOT)}")
     return 0
 

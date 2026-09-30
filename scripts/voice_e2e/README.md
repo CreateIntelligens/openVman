@@ -38,7 +38,7 @@ python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 
 | `--user` | 用這個帳號跑。腳本在 backend 容器裡替它簽一個 60 分鐘的 session token，不需要密碼 |
 | `--token` | 直接給 Bearer token（例如打遠端環境時） |
 | `--base-url` | 預設 `https://localhost:8787`（nginx）。打 localhost 時不驗憑證；打正式網域請加 `--verify-tls` |
-| `--asr` | `stream`、`batch`，或兩個都跑（預設） |
+| `--asr` | `stream`、`batch`，或兩個都跑；預設用題庫的 `asr`，沒寫就兩個都跑 |
 | `--steps` | 辨識完之後要做的步驟：`chat`（預設）、`chat,tts`；空字串代表只測辨識 |
 | `--voices` | `provider:voice`，逗號分隔；預設用題庫的 `voices` |
 | `--routes` | 語言分流，例如 `zh,en`；預設用後台設定 |
@@ -66,6 +66,15 @@ python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 
 - `terms`：辨識結果裡要出現的詞，寫成 `A|B` 代表兩種寫法都算對。
 - `reply_any`：回答裡提到其中任何一個字就算命中。
 - `audio`：有給就用這個錄音，路徑相對於 repo 根目錄，ffmpeg 讀得了的格式都可以；這時 `text` 是正確答案。沒給就用 `voices` 裡的每個聲音各念一次。
+- `speech_language`：批次辨識應該判成的語言。`nan` 表示應判成台語，`zh` 表示不該被判成台語；彙總表的「語言判斷」欄統計判對的題數。串流辨識不判台語，所以不計入。
+- 題庫最外層可以寫 `asr`，例如 `["batch"]`，當作預設的辨識路徑。
+
+現有題庫：
+
+| 題庫 | 內容 |
+|------|------|
+| `heji.json` | 鶴記型錄 10 題（型號、泵浦專有名詞、閒聊），合成語音 4 種聲音，串流與批次都跑 |
+| `taigi-drama.json` | 台語連續劇對白真人錄音 75 句（`/srv/818data`，只有這台機器有），`text` 是華語字幕（意譯，所以錯字率偏高），只跑批次。用來看 Breeze 轉寫和台語判斷；只測辨識時加 `--steps ""`。同時跑多句會讓台語判斷超過 2.5 秒逾時，要量判斷準度時加 `--concurrency 1` |
 
 ## 副作用與限制
 
