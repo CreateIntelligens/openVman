@@ -7,7 +7,7 @@ import { workspaceTabs } from "./navigation";
 describe("collapsible navigation group", () => {
   it("hides collapsed links and exposes a disclosure controlling the group", () => {
     const onToggle = vi.fn();
-    const props = { label: "Workspace", tabs: workspaceTabs, active: "Chat" as const, onSelect: vi.fn(), isExpanded: true, onToggle };
+    const props = { label: "Workspace", tabs: workspaceTabs, active: "Chat" as const, projectId: "default", onSelect: vi.fn(), isExpanded: true, onToggle };
     const { rerender } = render(<TabGroup {...props} isCollapsed />);
     const toggle = screen.getByRole("button", { name: "Workspace" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
@@ -25,7 +25,7 @@ describe("collapsible navigation group", () => {
 
   it("keeps the group reachable in the narrow icon sidebar", () => {
     const onToggle = vi.fn();
-    render(<TabGroup label="Workspace" tabs={workspaceTabs} active="Chat" onSelect={vi.fn()}
+    render(<TabGroup label="Workspace" tabs={workspaceTabs} active="Chat" projectId="default" onSelect={vi.fn()}
       isExpanded={false} isCollapsed onToggle={onToggle} />);
     const toggle = screen.getByRole("button", { name: "Workspace" });
     expect(toggle.textContent).toBe("W");
@@ -34,16 +34,16 @@ describe("collapsible navigation group", () => {
   });
 
   it("omits a group when all of its tabs are unavailable", () => {
-    render(<TabGroup label="Workspace" tabs={[]} active="Chat" onSelect={vi.fn()}
+    render(<TabGroup label="Workspace" tabs={[]} active="Chat" projectId="default" onSelect={vi.fn()}
       isExpanded isCollapsed={false} onToggle={vi.fn()} />);
     expect(screen.queryByRole("navigation")).toBeNull();
   });
 });
 
 
-it("preserves the public prefix and project for links opened in a new tab", () => {
-  window.history.replaceState(null, "", "/openvman/admin/chat?project=demo");
-  render(<TabGroup label="Workspace" tabs={workspaceTabs} active="Chat" onSelect={vi.fn()}
+it("uses the active project and public prefix for links opened in a new tab", () => {
+  window.history.replaceState(null, "", "/openvman/admin/chat");
+  render(<TabGroup label="Workspace" tabs={workspaceTabs} active="Chat" projectId="demo" onSelect={vi.fn()}
     isExpanded isCollapsed={false} onToggle={vi.fn()} />);
   expect(screen.getByRole("link", { name: /語音$/ }).getAttribute("href")).toBe("/openvman/admin/tts?project=demo");
   window.history.replaceState(null, "", "/admin/chat");

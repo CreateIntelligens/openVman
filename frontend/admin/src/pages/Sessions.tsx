@@ -2,6 +2,7 @@ import { SESSION_LANGUAGE_LABELS, type SessionLanguage } from "../api";
 import ConfirmModal from "../components/ConfirmModal";
 import SessionBackupPanel from "../components/sessions/SessionBackupPanel";
 import { useAuth } from "../context/AuthContext";
+import { useProject } from "../context/ProjectContext";
 import Select from "../components/Select";
 import { buildAdminPath } from "../components/app/navigation";
 import { formatRelativeTime } from "../components/chat/helpers";
@@ -96,6 +97,7 @@ export default function Sessions() {
   } = useSessionBrowser();
 
   const { account } = useAuth();
+  const { projectId } = useProject();
   const selectedCount = selectedSessionIds.size;
   const allSelected = sessions.length > 0 && selectedCount === sessions.length;
   const totalMessages = sessions.reduce(
@@ -375,7 +377,7 @@ export default function Sessions() {
 
                     <div className="flex shrink-0 items-center gap-1">
                       <a
-                        href={buildAdminPath("Chat", undefined, undefined, {
+                        href={buildAdminPath("Chat", projectId, undefined, {
                           sessionId: session.session_id,
                           personaId: session.persona_id,
                         })}

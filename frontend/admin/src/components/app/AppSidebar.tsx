@@ -5,6 +5,7 @@ import { isTabVisible, tabGroups, type NavigationGroup, type Tab } from "./navig
 
 interface AppSidebarProps {
   active: Tab;
+  projectId: string;
   isPinned: boolean;
   isAdmin: boolean;
   onSelectTab: (tab: Tab) => void;
@@ -15,6 +16,7 @@ interface AppSidebarProps {
 
 export default function AppSidebar({
   active,
+  projectId,
   isPinned,
   isAdmin,
   onSelectTab,
@@ -61,6 +63,7 @@ export default function AppSidebar({
               label={group.label}
               tabs={group.tabs.filter((tab) => isTabVisible(tab, isAdmin))}
               active={active}
+              projectId={projectId}
               onSelect={onSelectTab}
               isExpanded={isExpanded}
               isCollapsed={collapsedGroups[group.label]}

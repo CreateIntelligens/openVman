@@ -308,6 +308,7 @@ export default function Chat() {
       <h1 className="page-title sr-only">對話</h1>
       <ChatSidebar
         open={sessionsOpen}
+        projectId={projectId}
         onClose={() => setSessionsOpen(false)}
         personas={personas}
         selectedPersonaId={selectedPersonaId}

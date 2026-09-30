@@ -40,9 +40,14 @@ const browserState = vi.hoisted(() => ({
 }));
 
 const authState = vi.hoisted(() => ({ role: "admin" }));
+const projectState = vi.hoisted(() => ({ projectId: "default" }));
 
 vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({ account: { id: "a", username: "a", role: authState.role } }),
+}));
+
+vi.mock("../context/ProjectContext", () => ({
+  useProject: () => ({ projectId: projectState.projectId }),
 }));
 
 vi.mock("../components/sessions/SessionBackupPanel", () => ({
@@ -101,6 +106,7 @@ vi.mock("../hooks/useSessionBrowser", async () => {
 describe("Sessions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    projectState.projectId = "default";
     browserState.selectedSessionIds = new Set();
     browserState.hasActiveFilters = false;
     browserState.bulkDeleteOpen = false;
@@ -156,6 +162,15 @@ describe("Sessions", () => {
     expect(screen.getByText("第二則對話預覽")).toBeTruthy();
     expect(screen.getByText("共 2 筆對話 · 16 則訊息")).toBeTruthy();
     expect(screen.getByText("support")).toBeTruthy();
+  });
+
+  it("keeps the current project when opening a session", () => {
+    projectState.projectId = "demo";
+    render(<Sessions />);
+
+    const rows = screen.getAllByRole("listitem");
+    expect(within(rows[0]).getByRole("link", { name: /開啟/ }).getAttribute("href"))
+      .toBe("/admin/chat?project=demo&session=aaaaaaaa-1111-2222-3333-444444444444&persona=default");
   });
 
   it("shows the backup panel only to root", () => {

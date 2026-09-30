@@ -198,6 +198,7 @@ function AppContent() {
       <div className="flex h-dvh overflow-hidden bg-surface text-content">
         <AppSidebar
           active={route.tab}
+          projectId={projectId}
           isPinned={isPinned}
           isAdmin={isAdmin}
           collapsedGroups={collapsedGroups}
@@ -235,6 +236,7 @@ function AppContent() {
           <MobileNavDrawer
             open={mobileNavOpen}
             active={route.tab}
+            projectId={projectId}
             onClose={closeMobileNav}
             onSelectTab={switchTab}
             isAdmin={isAdmin}

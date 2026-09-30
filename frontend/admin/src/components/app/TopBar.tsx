@@ -197,6 +197,7 @@ export default function TopBar({
 interface MobileNavDrawerProps {
   open: boolean;
   active: Tab;
+  projectId: string;
   onClose: () => void;
   onSelectTab: (tab: Tab) => void;
   isAdmin: boolean;
@@ -209,6 +210,7 @@ interface MobileNavDrawerProps {
 export function MobileNavDrawer({
   open,
   active,
+  projectId,
   onClose,
   onSelectTab,
   isAdmin,
@@ -286,6 +288,7 @@ export function MobileNavDrawer({
               label={group.label}
               tabs={group.tabs.filter((tab) => isTabVisible(tab, isAdmin))}
               active={active}
+              projectId={projectId}
               isExpanded
               isCollapsed={collapsedGroups[group.label]}
               onToggle={() => onToggleGroup(group.label)}

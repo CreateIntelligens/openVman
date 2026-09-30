@@ -41,7 +41,7 @@
 
 - `buildAdminPath()` 統一產生路徑。子視圖使用固定子路徑；query 參數順序為 `project`、`session`、`persona`。`project=default` 省略；其他值由 `URLSearchParams` 編碼。
 - `parseAdminRoute()` 解析已知頁面與合法子路徑；舊 `?view=graph`／`?view=asr` 仍接受並改成固定子路徑。路徑優先於 query view，預設子頁名稱及末尾斜線由 `App.tsx` 的 `replaceState()` 整理成簡短固定路徑。舊 `qa_node_tree` query view 對應知識庫文件頁。
-- 側欄使用帶有目前專案與公開前綴的 `<a href>`，一般點擊走 SPA 導覽，Ctrl／Cmd 點擊、右鍵與中鍵維持瀏覽器的新分頁行為。
+- 桌面、手機與對話側欄使用目前專案狀態產生帶有專案與公開前綴的 `<a href>`，一般點擊走 SPA 導覽，Ctrl／Cmd 點擊、右鍵與中鍵維持瀏覽器的新分頁行為。對話紀錄的「開啟」連結也會帶目前專案，避免非預設專案的對話在 default 專案開啟。
 - 切換頁面或專案時用 `pushState()` 建立導覽紀錄；`popstate` 還原頁面、專案與子視圖。未儲存內容交由 `NavigationGuardContext` 確認。
 - `/admin/` 入口會還原帳號範圍保存的頁面與子視圖，預設為對話頁，接著用 `replaceState()` 更新網址。未知頁面也會走此還原流程。
 - Chat 的 `session`／`persona` 是一次性開啟對話參數，在 lazy Chat 頁面尚未載入時保持於網址，由 `consumeChatDeepLink()` 在頁面掛載時消費並清除，重新整理後保持一般對話頁網址。
@@ -53,7 +53,7 @@
 
 **明確的頁面／子頁網址優先於瀏覽器偏好**：`project` 省略時採 default；有 `project` 時採指定專案。專案仍需在使用者可取得的清單內，無法使用時沿用既有 fallback。只有 `/admin/` 入口才會還原保存的專案、頁面與子視圖。各子頁不再使用先前的 localStorage tab 偏好覆蓋路由。
 
-本機執行 `pnpm test` 與 `pnpm build` 驗證路由解析、子頁直達、重新掛載、網址優先於保存偏好、深連結與導覽確認。完整測試結果為 85 個檔案、515 項測試通過；測試輸出有既有 Usage 重複 key 與 KnowledgeBase React `act()` 警告。
+本機執行 `pnpm test` 與 `pnpm build` 驗證路由解析、子頁直達、重新掛載、網址優先於保存偏好、跨專案對話深連結與導覽確認。完整測試結果為 85 個檔案、516 項測試通過；測試輸出有既有 Usage 重複 key 與 KnowledgeBase React `act()` 警告。
 
 另以本機 Chrome + Playwright，mock 本地帳號／專案及頁面讀取 API，驗證以下結果：
 

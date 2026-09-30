@@ -6,6 +6,7 @@ interface TabGroupProps {
   label: string;
   tabs: readonly TabConfig[];
   active: Tab;
+  projectId: string;
   onSelect: (tab: Tab) => void;
   isExpanded: boolean;
   isCollapsed: boolean;
@@ -16,13 +17,13 @@ export default function TabGroup({
   label,
   tabs,
   active,
+  projectId,
   onSelect,
   isExpanded,
   isCollapsed,
   onToggle,
 }: TabGroupProps) {
   const itemsId = useId();
-  const projectId = typeof window === "undefined" ? "default" : new URLSearchParams(window.location.search).get("project") || "default";
   const containsActive = tabs.some((tab) => tab.key === active);
   if (!tabs.length) return null;
 
