@@ -22,7 +22,7 @@ logger = logging.getLogger("gateway.ingestion_audio")
 _http = SharedAsyncClient(connect=5, read=120, write=30, pool=5)
 
 
-async def _transcribe_openai(file_path: str, trace_id: str) -> str:
+async def _transcribe_openai(file_path: str, trace_id: str, prompt: str = "") -> str:
     """Transcribe audio with OpenAI, letting the model detect the language.
 
     不帶 language：寫死 zh 會讓英文、西語被硬轉成中文（鶴記要中英西三語）。
@@ -33,10 +33,12 @@ async def _transcribe_openai(file_path: str, trace_id: str) -> str:
         client_kwargs["base_url"] = cfg.asr_openai_base_url
 
     client = AsyncOpenAI(**client_kwargs)
+    extra = {"prompt": prompt} if prompt else {}
     with open(file_path, "rb") as audio_file:
         response = await client.audio.transcriptions.create(
             model=cfg.asr_openai_model,
             file=audio_file,
+            **extra,
         )
     return response.text
 
@@ -74,7 +76,7 @@ def _as_wav(file_path: str) -> tuple[str, str | None]:
     return handle.name, handle.name
 
 
-async def _transcribe_sensevoice(file_path: str, trace_id: str) -> str:
+async def _transcribe_sensevoice(file_path: str, trace_id: str, prompt: str = "") -> str:
     """Transcribe via SenseVoice-Small (POST /api/v1/asr).
 
     送 multipart ``files`` + ``keys``，回 ``{"result": [{"key", "text",
@@ -106,7 +108,7 @@ async def _transcribe_sensevoice(file_path: str, trace_id: str) -> str:
     return str(first.get("clean_text") or first.get("text") or "").strip()
 
 
-async def _transcribe_breeze(file_path: str, trace_id: str) -> str:
+async def _transcribe_breeze(file_path: str, trace_id: str, prompt: str = "") -> str:
     """Transcribe via Breeze-ASR-360 (POST /transcribe, multipart ``file``).
 
     整個音檔一次送出——這個服務沒有串流端點，所以使用者講完才開始算延遲。
@@ -122,6 +124,8 @@ async def _transcribe_breeze(file_path: str, trace_id: str) -> str:
         response = await _http.get().post(
             f"{url}/transcribe",
             files={"file": (Path(source).name, Path(source).read_bytes())},
+            # 專案詞表當 Whisper 前文（Breeze 1.4 起）：「污泥泵」不再聽成「烏尼本」。
+            data={"prompt": prompt} if prompt else None,
         )
     finally:
         if scratch:
@@ -157,7 +161,7 @@ def collapse_repeated_transcript(text: str) -> str:
     return text
 
 
-async def _transcribe_xiaomi(file_path: str, trace_id: str) -> str:
+async def _transcribe_xiaomi(file_path: str, trace_id: str, prompt: str = "") -> str:
     """Transcribe via Xiaomi-CocktailASR-1 (POST /transcribe, target + ref).
 
     這是目標語者模型：要一段參考聲紋 ``ref``，只轉錄 ``ref`` 那個人的聲音，
@@ -241,9 +245,11 @@ def _provider_ready(cfg, name: str) -> bool:
 
 
 async def transcribe(
-    file_path: str, trace_id: str, preferred: str | None = None,
+    file_path: str, trace_id: str, preferred: str | None = None, prompt: str = "",
 ) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
+
+    ``prompt`` 是專案的專有名詞詞表；只有 Breeze、OpenAI 會用，其他引擎忽略。
 
     Returns IngestionResult with content_type="audio_transcription".
     """
@@ -257,7 +263,7 @@ async def transcribe(
     for name in chain:
         transcriber = _TRANSCRIBERS[name]
         try:
-            content = await transcriber(file_path, trace_id)
+            content = await transcriber(file_path, trace_id, prompt=prompt)
         except Exception as exc:
             logger.warning(
                 "transcription_attempt_failed trace_id=%s provider=%s err=%s",

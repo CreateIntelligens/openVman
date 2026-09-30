@@ -14,6 +14,9 @@
 
 ## Security boundaries
 
+- `ASR_PROMPT.md` 是可選詞表：不存在或無法讀取時忽略，不阻擋對話；讀取錯誤僅記錄錯誤類型。快取比對 `st_mtime_ns`、`st_size`、`st_ctime_ns`、`st_ino`。內容經 HTML 跳脫後置於 `<glossary>`，明確標示為參考資料而非指令；此提示邊界不能取代工具與資料 API 的權限檢查。
+- 詞表快取仍依賴檔案 metadata；若檔案系統讓以上四項完全相同，不能保證偵測內容變化。部署詞表宜採原子替換，避免保留全部 metadata 的原地覆寫。
+
 - Brain 的 project data 路由由 Backend 先做 project resource authorization；dreaming、session export/delete、memory mutation 等寫入性操作需要更高權限。
 - `search_knowledge`、`search_memory` 與其他工具的回傳值一律視為不可信資料，不能授權另一個工具執行；`save_memory` 需要目前使用者明確要求記憶——由 Jev 判斷（沒設 `TYPESAFE_API_KEY` 或失敗時退回關鍵字規則），文字與 Gemini Live 兩條路徑都檢查。
 - `main.py` 是 operator-managed skill source，不能透過技能檔案 API 上傳或替換。生產環境的 shared/project skill source 應維持唯讀並走 code review。
@@ -384,6 +387,8 @@ user input
 - `GET /brain/sessions`、`GET /brain/sessions/export`
   - 對話列表與匯出，可用 `language=zh|en|es` 篩選（語言取最後一則使用者訊息，規則即時判、Jev 背景校正）
 - 專案 workspace 的 `ASR_PROMPT.md`（選填）：語音專有名詞詞表，「#」開頭是說明、其餘整份（最多 800 字）放進每輪對話提示，告訴模型訊息可能是語音辨識結果、專有名詞可能被聽成同音字，理解問題與寫知識庫查詢時先對回。可加「常見誤聽：UNI本→污泥泵」這類對照。實測見 `scripts/experiments/asr-glossary/`
+- `GET /brain/internal/asr-glossary?project_id=`
+  - 回 `{"terms": "..."}`：專案 `ASR_PROMPT.md` 裡正確的專有名詞（去掉「#」說明與「常見誤聽：A→B」對照行，最多 2000 字）；Backend 語音辨識前取來帶給 Breeze（`/transcribe` 的 `prompt`）與 OpenAI 辨識
 - `POST /brain/internal/asr-judge`
   - body `{"project_id", "languages", "interim", "final"}`（`languages` 是這條連線實際生效的分流，前台臨時關掉的語言不算；沒給用後台設定），回 `{"text", "chosen": "interim"|"final", "scores", "reason"}`；Backend 的 Gemini Live 串流辨識定稿跟最後暫定字幕不同時呼叫。兩段文字各自問 Jev「像不像正確辨識的一句話」（情境帶專案名稱與語言分流），暫定字幕高出 0.2 以上才換，否則、Jev 關閉或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`；離線驗證見 `scripts/experiments/asr-final-judge/`）
 - `POST /brain/internal/audio-language`

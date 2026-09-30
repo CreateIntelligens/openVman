@@ -213,6 +213,17 @@ def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, An
     return "\n".join(lines)
 
 
+@router.get(
+    "/brain/internal/asr-glossary",
+    summary="專案的語音專有名詞（給辨識引擎當前文）",
+    description="Backend 送音檔給 Breeze／OpenAI 辨識前呼叫；只回正確的詞，「常見誤聽：A→B」對照行不回（會把錯字也教給引擎）。",
+)
+async def internal_asr_glossary(project_id: str = "default"):
+    from core.asr_glossary import asr_terms
+
+    return {"terms": asr_terms(project_id)}
+
+
 @router.post(
     "/brain/internal/asr-judge",
     summary="串流辨識定稿與暫定字幕二選一",

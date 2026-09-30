@@ -1290,7 +1290,7 @@ def test_asr_preview_returns_the_transcript_and_the_engine_that_answered(monkeyp
     module, _ = _load_main(monkeypatch)
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id, preferred=None):
+    async def _transcribe(path, trace_id, preferred=None, prompt=""):
         seen["trace_id"] = trace_id
         seen["preferred"] = preferred
         return types.SimpleNamespace(
@@ -1343,7 +1343,7 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
     """一般使用者要能在聊天室用語音，後台那個端點限 admin。"""
     module, _ = _load_main(monkeypatch)
 
-    async def _transcribe(path, trace_id, preferred=None):
+    async def _transcribe(path, trace_id, preferred=None, prompt=""):
         # 偏好的引擎掛了、由 sensevoice 接手。
         return types.SimpleNamespace(
             content_type="audio_transcription", content="你好", provider="sensevoice",
@@ -1377,7 +1377,7 @@ def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
     module, _ = _load_main(monkeypatch)
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id, preferred=None):
+    async def _transcribe(path, trace_id, preferred=None, prompt=""):
         seen["preferred"] = preferred
         return types.SimpleNamespace(
             content_type="audio_transcription", content="你好", provider="breeze",
@@ -1482,8 +1482,9 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
 
     calls: dict[str, object] = {}
 
-    async def fake_transcribe(path, trace_id, preferred=None):
+    async def fake_transcribe(path, trace_id, preferred=None, prompt=""):
         calls["preferred"] = preferred
+        calls["prompt"] = prompt
         return types.SimpleNamespace(content="我現在頭很痛", provider="breeze")
 
     async def fake_routes(current, project_id, requested):
@@ -1493,10 +1494,15 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
     async def fake_detect(path):
         return "nan"
 
+    async def fake_prompt(current, project_id):
+        calls["prompt_project"] = project_id
+        return "沉水泵、污泥泵"
+
     monkeypatch.setattr(ingestion_audio, "transcribe", fake_transcribe)
     monkeypatch.setattr(worker, "_account_asr_provider", lambda _: "xiaomi")
     monkeypatch.setattr(module.language_routes_mod, "effective_routes", fake_routes)
     monkeypatch.setattr(module.language_routes_mod, "detect_taiwanese", fake_detect)
+    monkeypatch.setattr(module.asr_glossary_mod, "project_asr_prompt", fake_prompt)
 
     from starlette.datastructures import UploadFile
 
@@ -1508,6 +1514,8 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
 
     body = json.loads(response.body)
     assert calls["preferred"] == "breeze"
+    # 專案詞表帶給 Breeze 當前文。
+    assert calls["prompt"] == "沉水泵、污泥泵" and calls["prompt_project"] == "proj-hospital"
     assert calls["routes_args"] == ("proj-hospital", ["zh", "nan"])
     assert body["language"] == "nan" and body["provider"] == "breeze"
     assert body["language_routes"] == ["zh", "nan"]

@@ -261,11 +261,11 @@ class TestProviderFallbackChain:
         )
         tried: list[str] = []
 
-        async def _sensevoice(path, trace):
+        async def _sensevoice(path, trace, prompt=""):
             tried.append("sensevoice")
             raise RuntimeError("GPU node restarting")
 
-        async def _breeze(path, trace):
+        async def _breeze(path, trace, prompt=""):
             tried.append("breeze")
             return "今天天氣不錯"
 
@@ -286,11 +286,11 @@ class TestProviderFallbackChain:
         cfg = _asr_cfg("sensevoice", asr_sensevoice_url="http://up:50002")
         tried: list[str] = []
 
-        async def _sensevoice(path, trace):
+        async def _sensevoice(path, trace, prompt=""):
             tried.append("sensevoice")
             return "好"
 
-        async def _breeze(path, trace):
+        async def _breeze(path, trace, prompt=""):
             tried.append("breeze")
             return "不該走到這裡"
 

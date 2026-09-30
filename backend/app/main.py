@@ -71,6 +71,7 @@ from app.providers.voxcpm_adapter import (
     VOXCPM_STREAM_CONTENT_TYPE,
     VoxCPMHTTPError,
 )
+from app import asr_glossary as asr_glossary_mod
 from app import language_routes as language_routes_mod
 from app import turn_timing as turn_timing_routes
 from app.gateway import asr_stream as asr_stream_routes
@@ -734,6 +735,7 @@ async def transcribe_for_account(
         routes = await language_routes_mod.effective_routes(
             account, project_id, language_routes_mod.parse_requested(language_routes),
         )
+        prompt = await asr_glossary_mod.project_asr_prompt(account, project_id)
         started = monotonic()
         speech_language: str | None = None
         if language_routes_mod.TAIWANESE in routes:
@@ -741,12 +743,12 @@ async def transcribe_for_account(
             # 轉錄出來的華語文字看不出原本講的是台語。
             preferred = language_routes_mod.TAIWANESE_ASR_ENGINE
             result, heard = await asyncio.gather(
-                transcribe(tmp_path, "asr-chat", preferred),
+                transcribe(tmp_path, "asr-chat", preferred, prompt=prompt),
                 language_routes_mod.detect_taiwanese(tmp_path),
             )
             speech_language = heard if heard == language_routes_mod.TAIWANESE else None
         else:
-            result = await transcribe(tmp_path, "asr-chat", preferred)
+            result = await transcribe(tmp_path, "asr-chat", preferred, prompt=prompt)
         return JSONResponse(content={
             "text": result.content,
             # 實際辨識的引擎：偏好的掛掉由備援接手時不是同一個；全掛時是空字串。

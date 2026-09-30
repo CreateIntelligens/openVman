@@ -59,3 +59,12 @@ async def test_model_and_base_url_are_configurable(monkeypatch, openai_calls):
     await ingestion_audio._transcribe_openai(openai_calls["path"], "t")
     assert openai_calls["create"]["model"] == "gpt-4o-transcribe"
     assert openai_calls["client"]["base_url"] == "http://proxy/v1"
+
+
+@pytest.mark.asyncio
+async def test_project_glossary_is_sent_as_the_prompt(monkeypatch, openai_calls):
+    _use_config(monkeypatch)
+    await ingestion_audio._transcribe_openai(openai_calls["path"], "t", prompt="沉水泵、DIVA")
+    assert openai_calls["create"]["prompt"] == "沉水泵、DIVA"
+    await ingestion_audio._transcribe_openai(openai_calls["path"], "t")
+    assert "prompt" not in openai_calls["create"]
