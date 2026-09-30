@@ -340,6 +340,103 @@ class TestProviderFallbackChain:
         assert "sensevoice" in caplog.text and "breeze" in caplog.text
 
 
+class TestUnreachableProviders:
+    """連不上的引擎暫停一陣子：不要每句話都白等一次連線逾時。"""
+
+    @pytest.fixture(autouse=True)
+    def _fresh(self, monkeypatch):
+        monkeypatch.setattr(ingestion_audio, "_unreachable_until", {})
+        self.now = [1000.0]
+        monkeypatch.setattr(ingestion_audio.time, "monotonic", lambda: self.now[0])
+
+    def _cfg(self):
+        return _asr_cfg("breeze", asr_breeze_url="http://b:8801", asr_xiaomi_url="http://x:8802",
+                        asr_sensevoice_url="http://s:50002", whisper_api_key="k")
+
+    async def _run(self, fake_audio, engines, preferred="xiaomi"):
+        with patch.object(ingestion_audio, "get_tts_config", return_value=self._cfg()), patch.dict(
+            ingestion_audio._TRANSCRIBERS, engines,
+        ):
+            return await transcribe(fake_audio, "trace-down", preferred)
+
+    @staticmethod
+    def _engines(tried, *, xiaomi_error=None):
+        async def xiaomi(path, trace, prompt=""):
+            tried.append("xiaomi")
+            if xiaomi_error:
+                raise xiaomi_error
+            return "小米"
+
+        async def breeze(path, trace, prompt=""):
+            tried.append("breeze")
+            return "布里茲"
+
+        async def sensevoice(path, trace, prompt=""):
+            tried.append("sensevoice")
+            return "森"
+
+        return {"xiaomi": xiaomi, "breeze": breeze, "sensevoice": sensevoice}
+
+    @pytest.mark.asyncio
+    async def test_a_provider_that_cannot_connect_is_skipped_next_time(self, fake_audio):
+        tried: list[str] = []
+        down = httpx.ConnectError("connection refused")
+        first = await self._run(fake_audio, self._engines(tried, xiaomi_error=down))
+        second = await self._run(fake_audio, self._engines(tried, xiaomi_error=down))
+
+        assert (first.provider, second.provider) == ("breeze", "breeze")
+        assert tried == ["xiaomi", "breeze", "breeze"]
+
+    @pytest.mark.asyncio
+    async def test_it_is_tried_again_after_the_cooldown(self, fake_audio):
+        tried: list[str] = []
+        await self._run(fake_audio, self._engines(tried, xiaomi_error=httpx.ConnectTimeout("t")))
+        self.now[0] += ingestion_audio._UNREACHABLE_COOLDOWN_SECONDS
+        result = await self._run(fake_audio, self._engines(tried))
+
+        assert result.provider == "xiaomi"
+        assert tried == ["xiaomi", "breeze", "xiaomi"]
+
+    @pytest.mark.asyncio
+    async def test_an_http_error_does_not_pause_the_provider(self, fake_audio):
+        """回 500 代表機器還活著、正在回應；下一句照樣先試它。"""
+        tried: list[str] = []
+        error = httpx.HTTPStatusError("500", request=httpx.Request("POST", "http://x"),
+                                      response=httpx.Response(500))
+        await self._run(fake_audio, self._engines(tried, xiaomi_error=error))
+        await self._run(fake_audio, self._engines(tried, xiaomi_error=error))
+
+        assert tried == ["xiaomi", "breeze", "xiaomi", "breeze"]
+
+    @pytest.mark.asyncio
+    async def test_openai_connection_errors_pause_it_too(self, fake_audio):
+        import openai
+
+        tried: list[str] = []
+        error = openai.APIConnectionError(request=httpx.Request("POST", "http://api.openai.com"))
+
+        async def openai_engine(path, trace, prompt=""):
+            tried.append("openai")
+            raise error
+
+        engines = {**self._engines(tried), "openai": openai_engine}
+        await self._run(fake_audio, engines, preferred="openai")
+        await self._run(fake_audio, engines, preferred="openai")
+
+        # openai 暫停後，下一句直接從部署預設（breeze）開始。
+        assert tried == ["openai", "breeze", "breeze"]
+
+    @pytest.mark.asyncio
+    async def test_when_every_provider_is_paused_they_are_tried_anyway(self, fake_audio):
+        for name in ("xiaomi", "breeze", "sensevoice", "openai"):
+            ingestion_audio._unreachable_until[name] = self.now[0] + 30
+        tried: list[str] = []
+        result = await self._run(fake_audio, self._engines(tried))
+
+        assert result.provider == "xiaomi"
+        # 成功就解除暫停，不必等冷卻時間。
+        assert "xiaomi" not in ingestion_audio._unreachable_until
+
 
 class TestDeploymentDefault:
     """沒選過引擎的人用 .env 的 ASR_PROVIDER；後台的全站預設已拔掉（2026-09-24）。"""

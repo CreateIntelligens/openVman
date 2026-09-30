@@ -29,6 +29,7 @@
 
 ### Changed
 
+- **連不上的 ASR 引擎自動暫停 60 秒**：小米 CocktailASR 那台（.19）停機後仍在備援順序裡，Breeze 一掛每句話都要先白等 3.3 秒連線失敗才換 SenseVoice。批次辨識現在遇到連線層失敗（`httpx.ConnectError`／`ConnectTimeout`、`openai.APIConnectionError`）就把那個引擎暫停 60 秒不排入，時間到由下一個請求再試；HTTP 錯誤碼不算（機器還活著）；全部都暫停時照樣全試。另外部署設定已停用小米：根目錄 `.env` 註解掉 `ASR_XIAOMI_URL`，使用者可自選的引擎拿掉 xiaomi。
 - **Brain 啟動時預熱台語判斷**：部署重啟後的第一句台語，Brain 判斷要 2.5 秒（之後約 1.2 秒），超過 Backend 的上限，被當成不是台語；每次 push 觸發 watchtower 重新部署都會碰到。多出來的是第一次載入 google-genai（1.2 秒）與建 client（0.17 秒）。背景預熱現在最先載入套件、建好共用 client、呼叫一次 `models.get`（不花 token，約 0.1 秒）。
 - **台語判斷回報結果與耗時**：批次辨識（`/api/v1/asr/transcribe`）在台語分流時多回 `language_check: {"result", "ms"}`，`result` 是語言代碼、`timeout` 或 `failed`。原本逾時和「判成華語」回應長得一樣（`language: null`），只能翻 log 數逾時，數錯過一次（見下一條）；語音模擬（`scripts/voice_e2e/`）的彙總表多了「判斷逾時」「判斷ms」兩欄。
 - **台語判斷少等 0.25–0.35 秒**：台語分流時，Breeze 轉寫約 1 秒就好，要等台語判斷（2.5 秒上限）才送出。Brain 端判斷耗時 p50 從 1.54 降到 1.24 秒、p90 從 1.73 降到 1.51 秒（真人台語 21 句，同時 1–3 句各跑 4 輪）。逾時本來就少：這批測試只有 Brain 部署重啟後的第一句逾時（碰上啟動預熱與 Gemini 冷啟動）；先前記的「同時 2–3 句約 15–20% 逾時」是數 log 時沒帶時區、把容器啟動以來的逾時都算進去，已更正。拆開量：Gemini flash-lite 聽音檔 1.2–1.7 秒是大宗（只送前 3 秒幾乎沒變快、沒有思考 token、提示詞太短用不上脈絡快取），另外 Backend 每次跑 ffmpeg 0.15 秒、Brain 每次新建 Gemini client 0.1–0.18 秒。現在上傳的已是 16 kHz 單聲道 WAV（前台 VAD 的格式）就直接送，Brain 重複使用同一個 client。

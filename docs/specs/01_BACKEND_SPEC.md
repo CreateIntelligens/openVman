@@ -160,6 +160,10 @@ ws.send(JSON.stringify(payload));
 
 ### 8. 打斷機制處理 (Interruption Handling)
 
+### 批次 ASR 備援（`transcribe()`）
+
+依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、xiaomi、sensevoice、openai）。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後暫停 60 秒不排入，時間到由下一個請求再試，成功就解除；HTTP 錯誤碼代表機器還在回應，不暫停。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。
+
 ### 串流 ASR（`GET /api/v1/asr/stream`，WebSocket）
 
 前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。

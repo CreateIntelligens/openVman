@@ -5,8 +5,11 @@ from __future__ import annotations
 import logging
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
+import httpx
+import openai
 from openai import AsyncOpenAI
 
 from app.config import get_tts_config
@@ -234,6 +237,34 @@ def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
     return ordered
 
 
+# 連不上的引擎暫停這麼久，期間直接跳過：小米那台（.19）停機後，Breeze 一掛每句話
+# 都要先白等 3.3 秒連線失敗才換 SenseVoice。時間到讓下一個請求去試，通了就恢復原順序。
+# 每個 worker 各記各的，重啟就清空，最多多試一次。
+_UNREACHABLE_COOLDOWN_SECONDS = 60.0
+_unreachable_until: dict[str, float] = {}
+
+
+def _is_unreachable(exc: Exception) -> bool:
+    """Connection-level failures only: an HTTP error means the node is up and answering."""
+    return isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, openai.APIConnectionError))
+
+
+def _cooling_down(name: str) -> bool:
+    until = _unreachable_until.get(name)
+    if until is None:
+        return False
+    if time.monotonic() >= until:
+        _unreachable_until.pop(name, None)
+        return False
+    return True
+
+
+def _skip_unreachable(chain: list[str]) -> list[str]:
+    """Drop providers that just failed to connect; all of them down means try them anyway."""
+    available = [name for name in chain if not _cooling_down(name)]
+    return available or chain
+
+
 def _provider_ready(cfg, name: str) -> bool:
     if name == "sensevoice":
         return bool(cfg.asr_sensevoice_url)
@@ -254,10 +285,12 @@ async def transcribe(
     Returns IngestionResult with content_type="audio_transcription".
     """
     cfg = get_tts_config()
-    chain = _resolve_chain(cfg, preferred)
+    configured = _resolve_chain(cfg, preferred)
+    chain = _skip_unreachable(configured)
     logger.info(
-        "transcribe trace_id=%s provider=%s preferred=%s chain=%s",
+        "transcribe trace_id=%s provider=%s preferred=%s chain=%s skipped=%s",
         trace_id, cfg.asr_provider, preferred or "-", ",".join(chain),
+        ",".join(name for name in configured if name not in chain) or "-",
     )
 
     for name in chain:
@@ -269,7 +302,14 @@ async def transcribe(
                 "transcription_attempt_failed trace_id=%s provider=%s err=%s",
                 trace_id, name, exc,
             )
+            if _is_unreachable(exc):
+                _unreachable_until[name] = time.monotonic() + _UNREACHABLE_COOLDOWN_SECONDS
+                logger.warning(
+                    "asr_provider_unreachable provider=%s skip_for=%.0fs",
+                    name, _UNREACHABLE_COOLDOWN_SECONDS,
+                )
             continue
+        _unreachable_until.pop(name, None)
 
         logger.info(
             "transcription_ok trace_id=%s provider=%s chars=%d",
