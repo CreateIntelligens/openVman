@@ -32,15 +32,16 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import anyio
 import websockets
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
+from app import language_routes as language_routes_mod
 from app.auth.asr_selection import permitted_asr_preference
 from app.auth.dependencies import authenticate_websocket
 from app.auth.runtime import get_auth_runtime
 from app.config import get_tts_config
 from app.http_client import SharedAsyncClient
-from app import language_routes as language_routes_mod
 from app.usage_ledger_client import UNIT_SECONDS, record_usage_event, usage_scope_for
 
 logger = logging.getLogger("gateway.asr_stream")
@@ -225,9 +226,21 @@ async def asr_stream(websocket: WebSocket) -> None:
                 asyncio.create_task(client_to_gemini()),
                 asyncio.create_task(gemini_to_client()),
             ]
-            _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for task in pending:
-                task.cancel()
+            try:
+                done, _pending = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in done:
+                    task.result()
+                if tasks[1] in done and tasks[0] not in done:
+                    raise RuntimeError("ASR upstream closed")
+            finally:
+                # Leave no receiver using a socket after its context closes.
+                for task in tasks:
+                    if not task.done():
+                        task.cancel()
+                with anyio.CancelScope(shield=True):
+                    await asyncio.gather(*tasks, return_exceptions=True)
     except WebSocketDisconnect:
         pass
     except Exception as exc:  # noqa: BLE001 - 上游失敗時讓前台退回批次 ASR

@@ -58,6 +58,11 @@ export interface SendMessageResult {
        reason?: 'empty' | 'not_ready'
 }
 
+export interface UtteranceContext {
+       source: 'text' | 'visual' | 'live'
+       speechLanguage: string | null
+}
+
 interface ChatOptions {
        /** Called when a PCM audio chunk arrives (binary frame) */
        onAudioChunk?: (data: ArrayBuffer) => void
@@ -68,7 +73,7 @@ interface ChatOptions {
         * server_stream_chunk). Receives the fully accumulated text for the
         * utterance — use this to drive a TTS synthesis pass.
         */
-       onUtteranceComplete?: (text: string) => void
+       onUtteranceComplete?: (text: string, context: UtteranceContext) => void
        /** Initial persona ID to use (default: "default") */
        personaId?: string
        /** Lip-sync mode to advertise after server_init_ack (default: "webgl") */
@@ -190,6 +195,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
        // Buffer of text chunks for the in-flight LLM utterance. Flushed to
        // `onUtteranceComplete` when `is_final=true` arrives (or on interrupt).
        let utteranceBuffer = ''
+       let liveSpeechLanguage: string | null = null
        let responsePlaybackActive = false
 
        function resetVisualState(): void {
@@ -397,7 +403,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                                    const full = utteranceBuffer
                                    utteranceBuffer = ''
                                    if (full.trim()) {
-                                          options.onUtteranceComplete?.(full)
+                                          options.onUtteranceComplete?.(full, {
+                                                 source: 'live',
+                                                 speechLanguage: liveSpeechLanguage,
+                                          })
                                    }
                             }
                             break
@@ -470,6 +479,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       return { accepted: true }
                }
 
+               liveSpeechLanguage = speechLanguage ?? null
                messages.value.push({ role: 'user', text: trimmed, timestamp: Date.now() })
                state.value = 'THINKING'
                sendEvent({
@@ -521,7 +531,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       state.value = 'IDLE'
                       if (data.reply?.trim()) {
                              responsePlaybackActive = true
-                             options.onUtteranceComplete?.(data.reply)
+                             options.onUtteranceComplete?.(data.reply, {
+                                    source: 'text',
+                                    speechLanguage: speechLanguage ?? null,
+                             })
                       }
                } catch (err) {
                       if ((err as Error).name !== 'AbortError') {
@@ -593,7 +606,10 @@ export function useAvatarChat(options: ChatOptions = {}) {
                      applyVisualState(data.visual_state)
                      if (data.reply?.trim()) {
                             responsePlaybackActive = true
-                            options.onUtteranceComplete?.(data.reply)
+                            options.onUtteranceComplete?.(data.reply, {
+                                   source: 'visual',
+                                   speechLanguage: null,
+                            })
                      }
               } catch (err) {
                      // 視覺管道失敗靜默記 log，不打斷使用者
@@ -649,6 +665,7 @@ export function useAvatarChat(options: ChatOptions = {}) {
                       || utteranceBuffer.length > 0
 
                utteranceBuffer = ''
+               liveSpeechLanguage = null
                responsePlaybackActive = false
                if (shouldStopLocal) options.onStopAudio?.()
 

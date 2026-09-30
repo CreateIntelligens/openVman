@@ -121,6 +121,12 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 ### 6. ASR 與語音輸入 (Speech Recognition)
 
+**授權邊界與部署（2026-09-30）**：前端的引擎選擇只是偏好，不是授權；Backend 必須依帳號允許的引擎重新驗證，串流端點也不可略過。不得信任前端傳入的 provider 或語言分流來取得未授權引擎。
+
+VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/` 載入。離線部署需將相符版本資產自架並調整 `vad-recognizer.ts` 的來源；目前不是完全離線可用，也沒有自動 CDN 鏡像切換。模型或 WASM 載入失敗回報 `vad-unavailable`，由共用控制器處理降級。
+
+串流 ASR 的 `start()` 共用尚未完成的啟動；停止或卸載使舊啟動失效，延遲取得的 media track 必須立即停止。ready 等待上限 10 秒。正常停止傳送 `{"type":"end"}` 後保留最多 5 秒等待最後定稿；重新啟動及卸載則直接關閉舊連線。Backend 在離開串流前取消並等待雙向工作結束。
+
 * 使用瀏覽器原生的 `SpeechRecognition` 或 `webkitSpeechRecognition` API。
 * 當 `onresult` 觸發，拿到 final 辨識結果後，透過 WebSocket 送出 `{"event": "user_speak", "text": "..."}`。
 * 在送出文字的同時，停止 ASR 聆聽，並發送 `client_interrupt`（如果當前正在播放聲音），立即清空播放佇列，狀態切換為 `THINKING`。

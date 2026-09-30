@@ -403,14 +403,11 @@ const ttsStreamer = useTtsStreamer({
 
 const languageRoutes = useLanguageRoutes(() => settings.projectId);
 
-// 上一句使用者輸入是語音時 ASR 判出的語言；打字、快速問答送出時清成 null。
-let lastSpeechLanguage: string | null = null;
-
 /** TTS 參數：使用者真的講台語（且有台語分流）才換 VoxCPM，後端會再核對一次。 */
-function languageRoutesSpeakOptions() {
+function languageRoutesSpeakOptions(speechLanguage: string | null) {
   const { provider, switched } = languageRoutes.ttsProviderFor(
     settings.ttsProvider,
-    lastSpeechLanguage,
+    speechLanguage,
   );
   return {
     provider,
@@ -418,7 +415,7 @@ function languageRoutesSpeakOptions() {
     extraBody: {
       project_id: settings.projectId,
       language_routes: languageRoutes.active.value.join(","),
-      speech_language: lastSpeechLanguage ?? "",
+      speech_language: speechLanguage ?? "",
     },
   };
 }
@@ -456,7 +453,7 @@ const chat = useAvatarChat({
     clearUnderrunTimer();
     isFinalReceived = false;
   },
-  onUtteranceComplete: (fullText) => {
+  onUtteranceComplete: (fullText, context) => {
     isFinalReceived = true;
     clearUnderrunTimer();
     audio.resetSchedule();
@@ -465,7 +462,7 @@ const chat = useAvatarChat({
     turnTiming.replyText(fullText);
     ttsPending.value = true;
     turnTiming.mark("tts_start");
-    void ttsStreamer.speak(fullText, languageRoutesSpeakOptions()).finally(() => {
+    void ttsStreamer.speak(fullText, languageRoutesSpeakOptions(context.speechLanguage)).finally(() => {
       ttsPending.value = false;
     });
   },
@@ -542,7 +539,6 @@ async function handleSend(
   referenceText?: string,
   speechLanguage?: string | null,
 ): Promise<ComposerSendResult> {
-  lastSpeechLanguage = speechLanguage ?? null;
   turnTiming.begin();
   if (
     !isStarted.value

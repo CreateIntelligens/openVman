@@ -22,6 +22,10 @@
 
 ## 對外接入
 
+### 語音可靠性
+
+Gemini Live ASR 僅做轉錄，回答仍由 Brain 產生。串流連線等待 ready 最多 10 秒，失敗沿用既有批次辨識備援；停止收音會立即釋放麥克風，最多再等 5 秒接最後定稿。重新開始或卸載後，舊連線不能再送出文字。每則回答獨立攜帶辨識語言，視覺回答與一般打字不沿用前一句台語分流。語音授權與 VAD 部署要求見 [前端規格](docs/specs/02_FRONTEND_SPEC.md#6-asr-與語音輸入-speech-recognition)。
+
 第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](docs/guides/avatar-embed/README.md)。
 
 Admin 也可將已上傳且素材完整的影片角色登記為右下角小助理。這類小助理同時檢查 mascot 與 avatar character 授權；宿主播放 TTS 時，會以 PCM 另行驅動嘴型，避免重複出聲。

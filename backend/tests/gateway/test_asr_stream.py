@@ -108,6 +108,66 @@ def test_relays_audio_and_transcripts(monkeypatch):
 
 
 
+def test_end_flushes_final_before_disconnect(monkeypatch):
+    client, _ = _client(monkeypatch)
+    upstream = FakeUpstream()
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    with client.websocket_connect("/api/v1/asr/stream") as ws:
+        assert ws.receive_json() == {"type": "ready"}
+        ws.send_json({"type": "end"})
+        assert ws.receive_json()["type"] == "interim"
+        assert ws.receive_json()["type"] == "final"
+    assert upstream.sent[1] == {"realtimeInput": {"audioStreamEnd": True}}
+
+
+@pytest.mark.parametrize("clean_close", [False, True])
+def test_receiver_failure_is_reported_and_other_receiver_is_cancelled(
+    monkeypatch, clean_close,
+):
+    client, _ = _client(monkeypatch)
+
+    class BrokenUpstream(FakeUpstream):
+        async def __anext__(self):
+            if clean_close:
+                raise StopAsyncIteration
+            raise RuntimeError("upstream disconnected")
+
+    upstream = BrokenUpstream()
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    with client.websocket_connect("/api/v1/asr/stream") as ws:
+        assert ws.receive_json() == {"type": "ready"}
+        assert ws.receive_json() == {"type": "error", "code": "upstream_failed"}
+
+
+def test_disconnect_waits_for_receiver_cleanup_before_closing_upstream(monkeypatch):
+    client, _ = _client(monkeypatch)
+
+    class TrackedUpstream(FakeUpstream):
+        active = False
+        cleaned = False
+
+        async def __anext__(self):
+            self.active = True
+            try:
+                return await super().__anext__()
+            finally:
+                self.active = False
+                self.cleaned = True
+
+        async def __aexit__(self, *exc):
+            assert not self.active
+            return False
+
+    upstream = TrackedUpstream()
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    with client.websocket_connect("/api/v1/asr/stream") as ws:
+        assert ws.receive_json() == {"type": "ready"}
+        ws.send_bytes(b"\x01\x00")
+        assert ws.receive_json()["type"] == "interim"
+        assert ws.receive_json()["type"] == "final"
+    assert upstream.cleaned
+
+
 class ScriptedUpstream(FakeUpstream):
     def __init__(self, replies):
         super().__init__()

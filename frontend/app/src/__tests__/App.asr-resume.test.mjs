@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { computed, effectScope, nextTick, ref, watch } from "vue";
 
 // 2026-09-30：虛擬人講完後麥克風不會恢復，每輪要重按；串流辨識的暫定字幕也不刷新閒置計時。
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,3 +40,43 @@ test("turning the microphone off by hand is not undone after the reply", () => {
   const toggle = app.match(/function handleAsrToggle\(\): void \{([\s\S]*?)\n\}/);
   assert.match(toggle[1], /resumeAsrAfterReply = false;\s*active\.stop\(\);/);
 });
+
+for (const streaming of [true, false]) {
+  test(`actual Vue watchers wait for TTS and resume ${streaming ? 'stream' : 'batch'} once`, async () => {
+    const calls = [];
+    const active = {
+      isListening: ref(true),
+      stop() { calls.push('stop'); this.isListening.value = false; },
+      pause() { calls.push('pause'); },
+      resume() { calls.push('resume'); },
+      start() { calls.push('start'); this.isListening.value = true; },
+    };
+    const chat = { state: ref('IDLE') };
+    const ttsPending = ref(false);
+    const avatarResponding = computed(() => chat.state.value !== 'IDLE' || ttsPending.value);
+    // Execute the production watcher bodies with Vue's real scheduler.
+    const start = app.indexOf('watch(() => chat.state.value, (newState) => {');
+    const end = app.indexOf('watch(showSettings,', start);
+    assert.ok(start >= 0 && end > start);
+    const install = new Function(
+      'watch', 'chat', 'activeAsr', 'streamAsr', 'avatarResponding',
+      'triggerStageAvatarGesture', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
+      `let resumeAsrAfterReply = false; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000;\n${app.slice(start, end)}`,
+    );
+    const scope = effectScope();
+    try {
+      scope.run(() => install(watch, chat, { value: active }, streaming ? active : {},
+        avatarResponding, () => {}, () => calls.push('clear'), ms => calls.push(ms)));
+      chat.state.value = 'THINKING'; await nextTick();
+      assert.deepEqual(calls, ['clear', streaming ? 'stop' : 'pause']);
+      ttsPending.value = true; chat.state.value = 'IDLE'; await nextTick();
+      assert.equal(calls.length, 2);
+      ttsPending.value = false; await nextTick();
+      assert.deepEqual(calls.slice(2), [streaming ? 'start' : 'resume', 6000]);
+      await nextTick();
+      assert.equal(calls.length, 4);
+    } finally {
+      scope.stop();
+    }
+  });
+}

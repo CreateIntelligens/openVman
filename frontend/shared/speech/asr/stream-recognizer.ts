@@ -12,6 +12,8 @@ import type { AsrErrorCode } from './errors'
 
 const TARGET_RATE = 16000
 const FRAME_SAMPLES = TARGET_RATE / 10 // 100 ms
+const READY_TIMEOUT_MS = 10_000
+const FINAL_TIMEOUT_MS = 5_000
 
 // Worklet 只負責把麥克風的 Float32 樣本往主執行緒送；降頻與打包在主執行緒做。
 const WORKLET_SOURCE = `
@@ -43,6 +45,11 @@ export class StreamRecognizer {
   private pending: number[] = []
   private paused = false
   private _listening = false
+  private generation = 0
+  private disposed = false
+  private starting: Promise<boolean> | null = null
+  private cancelOpening: (() => void) | null = null
+  private draining = new Map<WebSocket, { timer: number; generation: number }>()
 
   constructor(options: StreamRecognizerOptions) {
     this.options = options
@@ -60,19 +67,37 @@ export class StreamRecognizer {
   }
 
   async start(): Promise<boolean> {
+    if (this.disposed) return false
     if (this._listening) return true
+    if (this.starting) return this.starting
     if (!this.supported) {
       this.options.onError?.('stream-unavailable')
       return false
     }
+    this.closeDraining()
+    const generation = ++this.generation
+    const starting = this.startSession(generation)
+    this.starting = starting
     try {
-      await this.openSocket()
-      await this.openMicrophone()
+      return await starting
+    } finally {
+      if (this.starting === starting) this.starting = null
+    }
+  }
+
+  private async startSession(generation: number): Promise<boolean> {
+    try {
+      await this.openSocket(generation)
+      if (!this.isCurrent(generation)) return false
+      if (!await this.openMicrophone(generation)) return false
     } catch {
+      if (!this.isCurrent(generation)) return false
+      this.generation++
       this.teardown()
       this.options.onError?.('stream-unavailable')
       return false
     }
+    if (!this.isCurrent(generation)) return false
     this.paused = false
     this.setListening(true)
     return true
@@ -89,29 +114,75 @@ export class StreamRecognizer {
   }
 
   stop(): void {
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      this.flush()
-      // 讓 Gemini 把最後一句定稿；final 回來後再關，不然會漏掉。
-      this.socket.send(JSON.stringify({ type: 'end' }))
-      const socket = this.socket
-      window.setTimeout(() => socket.close(), 1500)
+    if (!this.socket && !this.starting && !this._listening) return
+    const generation = ++this.generation
+    this.starting = null
+    this.cancelOpening?.()
+    const socket = this.socket
+    if (socket?.readyState === WebSocket.OPEN && this._listening) {
+      // Keep this socket only for the last final; a new start invalidates it.
+      const timer = window.setTimeout(() => this.closeSocket(socket), FINAL_TIMEOUT_MS)
+      this.draining.set(socket, { timer, generation })
+      try {
+        this.flush()
+        socket.send(JSON.stringify({ type: 'end' }))
+      } catch {
+        this.closeSocket(socket)
+      }
       this.socket = null
+    } else if (socket) {
+      this.socket = null
+      this.closeSocket(socket)
     }
     this.stopMicrophone()
     this.setListening(false)
   }
 
   dispose(): void {
+    this.disposed = true
+    this.generation++
+    this.starting = null
     this.teardown()
   }
 
-  private openSocket(): Promise<void> {
+  private isCurrent(generation: number): boolean {
+    return !this.disposed && generation === this.generation
+  }
+
+  private closeSocket(socket: WebSocket): void {
+    const draining = this.draining.get(socket)
+    if (draining) window.clearTimeout(draining.timer)
+    this.draining.delete(socket)
+    socket.onmessage = null
+    socket.onerror = null
+    socket.onclose = null
+    socket.close()
+  }
+
+  private closeDraining(): void {
+    for (const socket of this.draining.keys()) this.closeSocket(socket)
+  }
+
+  private openSocket(generation: number): Promise<void> {
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(this.options.url())
       socket.binaryType = 'arraybuffer'
       this.socket = socket
       let ready = false
+      const finish = (error?: Error) => {
+        window.clearTimeout(timer)
+        if (this.cancelOpening === cancel) this.cancelOpening = null
+        if (error) reject(error)
+        else resolve()
+      }
+      const cancel = () => finish(new Error('start cancelled'))
+      const timer = window.setTimeout(() => finish(new Error('ready timeout')), READY_TIMEOUT_MS)
+      this.cancelOpening = cancel
       socket.onmessage = (event) => {
+        const active = this.socket === socket && this.isCurrent(generation)
+        const draining = this.draining.get(socket)
+        const acceptingFinal = draining?.generation === this.generation && !this.disposed
+        if (!active && !acceptingFinal) return
         let data: { type?: string; text?: string; code?: string }
         try {
           data = JSON.parse(String(event.data))
@@ -119,44 +190,56 @@ export class StreamRecognizer {
           return
         }
         if (data.type === 'ready') {
+          if (!active) return
           ready = true
-          resolve()
+          finish()
         } else if (data.type === 'interim' && data.text) {
-          this.options.onInterim?.(data.text)
+          if (active) this.options.onInterim?.(data.text)
         } else if (data.type === 'final' && data.text) {
           this.options.onResult?.(data.text)
+          if (acceptingFinal) this.closeSocket(socket)
         } else if (data.type === 'error') {
-          if (!ready) reject(new Error(data.code ?? 'error'))
-          else this.fail()
+          if (!ready) finish(new Error(data.code ?? 'error'))
+          else if (active) this.fail(generation)
+          else this.closeSocket(socket)
         }
       }
       socket.onerror = () => {
-        if (!ready) reject(new Error('socket error'))
+        if (!ready) finish(new Error('socket error'))
+        else if (this.socket === socket) this.fail(generation)
       }
       socket.onclose = () => {
-        if (!ready) reject(new Error('socket closed'))
-        else if (this.socket === socket) this.fail()
+        if (!ready) finish(new Error('socket closed'))
+        else if (this.socket === socket) this.fail(generation)
+        else this.closeSocket(socket)
       }
     })
   }
 
-  private async openMicrophone(): Promise<void> {
-    this.stream = await navigator.mediaDevices.getUserMedia({
+  private async openMicrophone(generation: number): Promise<boolean> {
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     })
-    this.context = new AudioContext()
+    if (!this.isCurrent(generation)) {
+      stream.getTracks().forEach((track) => track.stop())
+      return false
+    }
+    this.stream = stream
+    const context = new AudioContext()
+    this.context = context
     const moduleUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'application/javascript' }))
     try {
-      await this.context.audioWorklet.addModule(moduleUrl)
+      await context.audioWorklet.addModule(moduleUrl)
     } finally {
       URL.revokeObjectURL(moduleUrl)
     }
-    const source = this.context.createMediaStreamSource(this.stream)
-    this.node = new AudioWorkletNode(this.context, 'pcm-tap')
-    const ratio = this.context.sampleRate / TARGET_RATE
+    if (!this.isCurrent(generation)) return false
+    const source = context.createMediaStreamSource(stream)
+    this.node = new AudioWorkletNode(context, 'pcm-tap')
+    const ratio = context.sampleRate / TARGET_RATE
     let cursor = 0
     this.node.port.onmessage = (event: MessageEvent<Float32Array>) => {
-      if (this.paused) return
+      if (!this.isCurrent(generation) || this.paused) return
       const samples = event.data
       // 簡單抽樣降頻：語音辨識用 16 kHz 足夠，不值得為此做濾波。
       for (; cursor < samples.length; cursor += ratio) {
@@ -166,6 +249,7 @@ export class StreamRecognizer {
       if (this.pending.length >= FRAME_SAMPLES) this.flush()
     }
     source.connect(this.node)
+    return true
   }
 
   private flush(): void {
@@ -182,7 +266,10 @@ export class StreamRecognizer {
     this.socket.send(pcm.buffer)
   }
 
-  private fail(): void {
+  private fail(generation: number): void {
+    if (!this.isCurrent(generation)) return
+    this.generation++
+    this.starting = null
     this.teardown()
     this.options.onError?.('stream-unavailable')
   }
@@ -199,9 +286,11 @@ export class StreamRecognizer {
   }
 
   private teardown(): void {
+    this.cancelOpening?.()
     const socket = this.socket
     this.socket = null
-    socket?.close()
+    if (socket) this.closeSocket(socket)
+    this.closeDraining()
     this.stopMicrophone()
     this.setListening(false)
   }
