@@ -216,7 +216,7 @@ class TestToolPhaseError:
         monkeypatch.setattr(agent_loop, "execute_tool_call", lambda name, args: '{"status":"ok","tool_name":"test","data":{},"error":""}')
 
         fake_registry = MagicMock()
-        fake_registry.build_openai_tools.return_value = []
+        fake_registry.build_openai_tools.return_value = [{"type": "function", "function": {"name": "test"}}]
         monkeypatch.setattr(agent_loop, "get_tool_registry", lambda: fake_registry)
         monkeypatch.setattr(agent_loop, "bind_tool_context", lambda pid, proj="default", **kwargs: MagicMock(__enter__=lambda s: s, __exit__=lambda s, *a: None))
 

@@ -507,6 +507,103 @@ class TestOtherToolsStayAvailable:
         assert calls[2]["tools"] is None
 
 
+class TestUnofferedToolCalls:
+    """fast 模式查完知識庫就收掉工具，模型仍會叫 search_web：不能執行，要逼它用文字回答。"""
+
+    def _run(self, monkeypatch, *, stream_reply, generate_reply=None, tools=None):
+        agent_loop = _load_agent_loop(monkeypatch)
+        calls = _install_loop_stubs(monkeypatch, agent_loop, tools=tools)
+        executed: list[str] = []
+        monkeypatch.setattr(
+            agent_loop, "execute_tool_call",
+            lambda name, args: executed.append(name) or '{"status":"ok","data":{},"error":""}',
+        )
+        seen: list[list[dict]] = []
+
+        def make(kind, replies):
+            seq = list(replies)
+
+            def _fn(msgs, tools=None, **kw):
+                calls.append({"kind": kind, "tools": tools, **kw})
+                seen.append([dict(m) for m in msgs])
+                return seq.pop(0) if len(seq) > 1 else seq[0]
+
+            return _fn
+
+        monkeypatch.setattr(agent_loop, "stream_chat_turn", make("stream", stream_reply(agent_loop)))
+        monkeypatch.setattr(agent_loop, "generate_chat_turn", make(
+            "generate", (generate_reply or (lambda al: [_tool_turn(al)]))(agent_loop),
+        ))
+        return agent_loop, calls, executed, seen
+
+    def test_withdrawn_web_search_is_not_run_and_the_model_is_told_to_answer(self, monkeypatch):
+        agent_loop, calls, executed, seen = self._run(monkeypatch, stream_reply=lambda al: [
+            _tool_turn(al, name="search_web"),
+            al.LLMReply(content="棒球英豪是安達充的漫畫", tool_calls=[], model="m1"),
+        ])
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "棒球英豪是什麼意思？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "棒球英豪是安達充的漫畫"
+        assert executed == ["search_knowledge"]
+        assert calls[1]["tools"] is None
+        nudge = seen[2][-1]
+        assert nudge["role"] == "user" and "search_web" in nudge["content"]
+        assert all(step["name"] != "search_web" for step in result.tool_steps)
+
+    def test_first_round_unoffered_call_still_gets_the_knowledge_search(self, monkeypatch):
+        agent_loop, calls, executed, _ = self._run(
+            monkeypatch,
+            generate_reply=lambda al: [_tool_turn(al, name="search_web")],
+            stream_reply=lambda al: [al.LLMReply(content="答案", tool_calls=[], model="m1")],
+        )
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "今天天氣如何？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "答案"
+        assert executed == ["search_knowledge"]
+
+    def test_text_alongside_an_unoffered_call_is_the_answer(self, monkeypatch):
+        agent_loop, calls, executed, _ = self._run(monkeypatch, stream_reply=lambda al: [
+            al.LLMReply(
+                content="查不到相關資料",
+                tool_calls=[al.LLMToolCall(id="w", name="search_web", arguments="{}", extra_content=None)],
+                model="m1",
+            ),
+        ])
+
+        result = agent_loop.run_agent_loop(
+            [{"role": "user", "content": "棒球英豪是什麼意思？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert result.reply == "查不到相關資料"
+        assert executed == ["search_knowledge"]
+        assert len(calls) == 2
+
+    def test_offered_web_search_still_runs(self, monkeypatch):
+        agent_loop, calls, executed, _ = self._run(
+            monkeypatch, tools=[_SEARCH_TOOL_SPEC, _WEB_TOOL_SPEC],
+            stream_reply=lambda al: [
+                _tool_turn(al, name="search_web"),
+                al.LLMReply(content="晴天", tool_calls=[], model="m1"),
+            ],
+        )
+
+        agent_loop.run_agent_loop(
+            [{"role": "user", "content": "今天天氣如何？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert executed == ["search_knowledge", "search_web"]
+
+
 class TestEmptyReply:
     def test_empty_reply_is_retried_once_with_a_text_nudge(
         self, monkeypatch: pytest.MonkeyPatch

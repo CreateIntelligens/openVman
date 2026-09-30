@@ -265,10 +265,17 @@ def _run_tool_phase(
                 forced_tool_name=current_forced,
             )
             if turn.tool_calls:
+                turn, dropped = _drop_unoffered_calls(turn, current_tools)
                 if iteration == 0 and current_forced == REQUIRE_ANY_TOOL:
                     turn = _ensure_knowledge_search(turn, last_user_message)
-                _append_tool_turns(working_messages, tool_steps, turn, round_index=iteration)
-                continue
+                if turn.tool_calls:
+                    _append_tool_turns(working_messages, tool_steps, turn, round_index=iteration)
+                    continue
+                if not turn.content.strip():
+                    working_messages.append(
+                        {"role": "user", "content": _UNOFFERED_TOOL_RETRY_MSG.format(tools="、".join(dropped))}
+                    )
+                    continue
             if (
                 not hallucination_retried
                 and hallucination_pattern is not None
@@ -399,3 +406,25 @@ def _build_hallucination_pattern(tools: list[dict[str, Any]]) -> re.Pattern[str]
 _EMPTY_REPLY_RETRY_MSG = (
     "請直接以文字回答上一個問題；若手邊資料不足，請明確說明找不到相關資料，不要留空。"
 )
+_UNOFFERED_TOOL_RETRY_MSG = (
+    "這一輪不能使用 {tools}。請直接以文字回答上一個問題；"
+    "手邊資料沒有的內容就說明查不到，不要留空。"
+)
+
+
+def _drop_unoffered_calls(
+    turn: LLMReply, tools: list[dict[str, Any]] | None,
+) -> tuple[LLMReply, list[str]]:
+    """Drop calls to tools this round did not offer; return the kept turn and the dropped names.
+
+    模型會照提示或對話紀錄呼叫已收回的工具（fast 模式查完知識庫後仍叫 search_web，
+    參數還照抄 search_knowledge 的 queries）。不擋的話參數錯就被拒絕、繞到回空字串
+    變 502；參數對就等於繞過模式限制真的上網。
+    """
+    offered = {tool.get("function", {}).get("name") for tool in tools or []}
+    kept = [call for call in turn.tool_calls if call.name in offered]
+    if len(kept) == len(turn.tool_calls):
+        return turn, []
+    dropped = sorted({call.name for call in turn.tool_calls if call.name not in offered})
+    logger.warning("model called tools not offered this round: %s — dropped", dropped)
+    return replace(turn, tool_calls=kept), dropped
