@@ -158,3 +158,29 @@ def test_jev_does_not_pull_japanese_back_to_chinese(monkeypatch):
     monkeypatch.setattr(ld, "_executor", type("E", (), {"submit": lambda self, fn: called.append(fn)})())
     ld.refine_language_in_background("このポンプの馬力はいくつですか？", "ja", lambda lang: None)
     assert called == []
+
+
+def test_audio_language_reuses_one_gemini_client(monkeypatch):
+    """每次新建 client 要 0.1–0.18 秒；backend 只等 2.5 秒。"""
+    import google.genai as genai
+
+    built: list[str] = []
+
+    class FakeClient:
+        def __init__(self, api_key, http_options=None):
+            built.append(api_key)
+            self.models = types.SimpleNamespace(
+                generate_content=lambda **kw: types.SimpleNamespace(text='{"language": "nan"}'),
+            )
+
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    monkeypatch.setattr("config.get_settings", lambda: types.SimpleNamespace(
+        gemini_api_key="k1", live_audio_language_id_model="m",
+    ))
+    language_detect._audio_language_client.cache_clear()
+    try:
+        assert language_detect.detect_audio_language(b"RIFF") == "nan"
+        assert language_detect.detect_audio_language(b"RIFF") == "nan"
+        assert built == ["k1"]
+    finally:
+        language_detect._audio_language_client.cache_clear()

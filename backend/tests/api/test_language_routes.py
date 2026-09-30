@@ -85,3 +85,45 @@ def test_language_check_within_limit_is_used(monkeypatch):
 
     monkeypatch.setattr(lr, "_ask_brain_language", answers)
     assert asyncio.run(lr.detect_taiwanese("clip.wav")) == "nan"
+
+
+def _write_wav(path, *, rate=16000, channels=1):
+    import wave
+
+    with wave.open(str(path), "wb") as handle:
+        handle.setnchannels(channels)
+        handle.setsampwidth(2)
+        handle.setframerate(rate)
+        handle.writeframes(b"\0\0" * channels * 160)
+
+
+def test_speech_wav_is_sent_without_ffmpeg(monkeypatch, tmp_path):
+    """前台 VAD 上傳的就是 16 kHz 單聲道 wav；再跑 ffmpeg 白花 0.15 秒。"""
+    clip = tmp_path / "speech.wav"
+    _write_wav(clip)
+    monkeypatch.setattr(lr.subprocess, "run", lambda *a, **k: pytest.fail("ffmpeg should not run"))
+    assert lr._to_wav_bytes(str(clip)) == clip.read_bytes()
+
+
+@pytest.mark.parametrize("name,kwargs", [
+    ("cd.wav", {"rate": 44100}),
+    ("stereo.wav", {"channels": 2}),
+])
+def test_other_wavs_are_converted(monkeypatch, tmp_path, name, kwargs):
+    clip = tmp_path / name
+    _write_wav(clip, **kwargs)
+    ran = []
+    monkeypatch.setattr(lr.subprocess, "run", lambda cmd, **k: ran.append(cmd) or types.SimpleNamespace(
+        returncode=0, stdout=b"RIFF-converted", stderr=b"",
+    ))
+    assert lr._to_wav_bytes(str(clip)) == b"RIFF-converted"
+    assert ran and ran[0][0] == "ffmpeg"
+
+
+def test_non_wav_uploads_are_converted(monkeypatch, tmp_path):
+    clip = tmp_path / "speech.webm"
+    clip.write_bytes(b"\x1aE\xdf\xa3 not a wav")
+    monkeypatch.setattr(lr.subprocess, "run", lambda cmd, **k: types.SimpleNamespace(
+        returncode=0, stdout=b"RIFF-converted", stderr=b"",
+    ))
+    assert lr._to_wav_bytes(str(clip)) == b"RIFF-converted"

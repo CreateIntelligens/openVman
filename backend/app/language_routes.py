@@ -14,6 +14,7 @@ import asyncio
 import logging
 import subprocess
 import time
+import wave
 
 from app.auth.dependencies import CurrentAccount
 from app.auth.models import ResourceType
@@ -115,8 +116,25 @@ def taiwanese_tts_provider(provider: str | None) -> str | None:
     return TAIWANESE_TTS_PROVIDERS[0]
 
 
+def _is_speech_wav(file_path: str) -> bool:
+    try:
+        with wave.open(file_path, "rb") as handle:
+            return (
+                handle.getnchannels() == 1
+                and handle.getsampwidth() == 2
+                and handle.getframerate() == 16000
+                and handle.getcomptype() == "NONE"
+            )
+    except (wave.Error, EOFError, OSError):
+        return False
+
+
 def _to_wav_bytes(file_path: str) -> bytes:
-    # 判斷模型要 WAV；前台送來的多半是 webm/opus，一律轉 16 kHz 單聲道。
+    # 判斷模型要 WAV；其他格式轉 16 kHz 單聲道。前台 VAD 上傳的本來就是這個格式，
+    # 直接送：ffmpeg 每次要 0.15 秒，台語判斷只有 2.5 秒可用。
+    if _is_speech_wav(file_path):
+        with open(file_path, "rb") as handle:
+            return handle.read()
     result = subprocess.run(
         ["ffmpeg", "-nostdin", "-loglevel", "error", "-i", file_path,
          "-ac", "1", "-ar", "16000", "-f", "wav", "pipe:1"],

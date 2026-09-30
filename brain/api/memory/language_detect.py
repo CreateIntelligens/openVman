@@ -11,6 +11,7 @@ import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -219,23 +220,30 @@ _AUDIO_LANGUAGE_PROMPT = (
 )
 
 
+@lru_cache(maxsize=2)
+def _audio_language_client(api_key: str):
+    """One client per key: building it each call cost 0.1–0.18 s of the 2.5 s the backend waits."""
+    from google import genai
+    from google.genai import types
+
+    # 3.5-flash 實測有一次卡 182 秒；背景工作也要有上限，免得執行緒卡住。
+    return genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=_AUDIO_LANGUAGE_TIMEOUT_MS),
+    )
+
+
 def detect_audio_language(wav_bytes: bytes) -> str:
     """Ask Gemini which language an utterance is in; other is folded into zh.
 
     合成台語 8 句＋華英西 5 句：3.5-flash-lite 12/13（台語全對）、p50 1.4 秒（scripts/experiments/taigi）。
     """
-    from google import genai
     from google.genai import types
 
     from config import get_settings
 
     cfg = get_settings()
-    # 3.5-flash 實測有一次卡 182 秒；背景工作也要有上限，免得執行緒卡住。
-    client = genai.Client(
-        api_key=cfg.gemini_api_key,
-        http_options=types.HttpOptions(timeout=_AUDIO_LANGUAGE_TIMEOUT_MS),
-    )
-    response = client.models.generate_content(
+    response = _audio_language_client(cfg.gemini_api_key).models.generate_content(
         model=cfg.live_audio_language_id_model,
         contents=[
             types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
