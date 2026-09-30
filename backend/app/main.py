@@ -738,6 +738,7 @@ async def transcribe_for_account(
         prompt = await asr_glossary_mod.project_asr_prompt(account, project_id)
         started = monotonic()
         speech_language: str | None = None
+        language_check: dict | None = None
         if language_routes_mod.TAIWANESE in routes:
             # 台語分流：Breeze 把台語直接翻成華語（華語也準），同時請 Brain 聽是不是台語，
             # 轉錄出來的華語文字看不出原本講的是台語。
@@ -746,7 +747,8 @@ async def transcribe_for_account(
                 transcribe(tmp_path, "asr-chat", preferred, prompt=prompt),
                 language_routes_mod.detect_taiwanese(tmp_path),
             )
-            speech_language = heard if heard == language_routes_mod.TAIWANESE else None
+            speech_language = heard.language if heard.language == language_routes_mod.TAIWANESE else None
+            language_check = {"result": heard.result, "ms": heard.ms}
         else:
             result = await transcribe(tmp_path, "asr-chat", preferred, prompt=prompt)
         return JSONResponse(content={
@@ -755,6 +757,8 @@ async def transcribe_for_account(
             "provider": result.provider or "",
             "elapsed_seconds": round(monotonic() - started, 2),
             "language": speech_language,
+            # 台語分流時才有：判斷結果（語言代碼、timeout、failed）與耗時。
+            "language_check": language_check,
             "language_routes": routes,
         })
     except UploadTooLargeError as exc:

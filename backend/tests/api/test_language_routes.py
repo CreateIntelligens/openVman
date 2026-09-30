@@ -73,8 +73,10 @@ def test_slow_language_check_gives_up_instead_of_holding_the_turn(monkeypatch):
 
     monkeypatch.setattr(lr, "_ask_brain_language", hangs)
     started = time.monotonic()
-    assert asyncio.run(lr.detect_taiwanese("clip.wav")) is None
+    check = asyncio.run(lr.detect_taiwanese("clip.wav"))
     assert time.monotonic() - started < 1
+    # 逾時要跟「判成華語」分得開，語音模擬才數得出逾時。
+    assert (check.language, check.result) == (None, "timeout")
 
 
 def test_language_check_within_limit_is_used(monkeypatch):
@@ -84,7 +86,20 @@ def test_language_check_within_limit_is_used(monkeypatch):
         return "nan"
 
     monkeypatch.setattr(lr, "_ask_brain_language", answers)
-    assert asyncio.run(lr.detect_taiwanese("clip.wav")) == "nan"
+    check = asyncio.run(lr.detect_taiwanese("clip.wav"))
+    assert (check.language, check.result) == ("nan", "nan")
+    assert check.ms >= 0
+
+
+def test_language_check_that_cannot_tell_is_reported_as_failed(monkeypatch):
+    _language_check_limit(monkeypatch, 1.0)
+
+    async def cannot_tell(file_path, cfg):
+        return None
+
+    monkeypatch.setattr(lr, "_ask_brain_language", cannot_tell)
+    check = asyncio.run(lr.detect_taiwanese("clip.wav"))
+    assert (check.language, check.result) == (None, "failed")
 
 
 def _write_wav(path, *, rate=16000, channels=1):

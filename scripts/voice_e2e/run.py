@@ -142,6 +142,7 @@ def summarize(rows: list[dict]) -> list[dict]:
         with_terms = [a for m, a in pairs if m["terms"]]
         replies = [a["reply_ok"] for a in asr if a.get("reply_ok") is not None]
         languages = [a["language_ok"] for a in asr if a.get("language_ok") is not None]
+        checks = [a["language_check"] for a in asr if a.get("language_check")]
 
         def mean(values: list[float]) -> float | None:
             return round(sum(values) / len(values), 3) if values else None
@@ -155,6 +156,9 @@ def summarize(rows: list[dict]) -> list[dict]:
             "terms_ok": f"{sum(a['terms_ok'] for a in with_terms)}/{len(with_terms)}",
             "reply_ok": f"{sum(replies)}/{len(replies)}" if replies else "-",
             "language_ok": f"{sum(languages)}/{len(languages)}" if languages else "-",
+            "check_timeouts": (f"{sum(c['result'] == 'timeout' for c in checks)}/{len(checks)}"
+                               if checks else "-"),
+            "check_ms": mean([c["ms"] for c in checks]),
             "asr_ms": mean([a["asr_ms"] for a in asr if a.get("asr_ms") is not None]),
             "chat_ms": mean([a["chat_ms"] for a in asr if a.get("chat_ms") is not None]),
         })
@@ -265,6 +269,8 @@ class Harness:
             "provider": body.get("provider"),
             "language": body.get("language"),
             "routes": body.get("language_routes"),
+            # 台語分流時才有：{"result": 語言代碼|"timeout"|"failed", "ms": ...}
+            "language_check": body.get("language_check"),
             "asr_ms": round((time.monotonic() - started) * 1000),
         }
 
@@ -438,11 +444,12 @@ async def main(argv: list[str] | None = None) -> int:
                                         for k, v in vars(args).items() if k != "token"},
                                "summary": summary, "rows": rows}, ensure_ascii=False, indent=1),
                    encoding="utf-8")
-    print("\n聲音 × 辨識路徑          題數 失敗 平均錯字率 專有名詞 語言判斷 回答命中 辨識ms  回答ms")
+    print("\n聲音 × 辨識路徑          題數 失敗 平均錯字率 專有名詞 語言判斷 判斷逾時 判斷ms 回答命中 辨識ms  回答ms")
     for s in summary:
         print(f"{s['voice'][:22]:22} {s['path']:6} {s['cases']:4} {s['failed']:4} "
               f"{s['mean_cer'] if s['mean_cer'] is not None else '-':>9} {s['terms_ok']:>8} "
-              f"{s['language_ok']:>8} {s['reply_ok']:>8} {s['asr_ms'] or '-':>7} {s['chat_ms'] or '-':>7}")
+              f"{s['language_ok']:>8} {s['check_timeouts']:>8} {s['check_ms'] or '-':>6} "
+              f"{s['reply_ok']:>8} {s['asr_ms'] or '-':>7} {s['chat_ms'] or '-':>7}")
     print(f"\n逐題結果：{out.relative_to(ROOT)}")
     return 0
 

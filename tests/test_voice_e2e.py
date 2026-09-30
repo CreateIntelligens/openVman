@@ -64,6 +64,16 @@ class ScoringTest(unittest.TestCase):
         ]
         self.assertEqual(summarize(rows)[0]["language_ok"], "2/3")
 
+    def test_summary_counts_language_check_timeouts_from_the_response(self):
+        base = {"cer": 0.1, "terms_ok": True}
+        rows = [
+            {"voice": "recording", "terms": [], "batch": {**base, "language_check": {"result": r, "ms": ms}}}
+            for r, ms in (("nan", 1000), ("timeout", 2500), ("zh", 1200))
+        ] + [{"voice": "recording", "terms": [], "batch": {**base, "language_check": None}}]
+        summary = summarize(rows)[0]
+        self.assertEqual(summary["check_timeouts"], "1/3")
+        self.assertAlmostEqual(summary["check_ms"], 1566.667)
+
 
 class CaseFilesTest(unittest.TestCase):
     def test_every_case_file_loads_with_unique_ids(self):

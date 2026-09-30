@@ -1492,7 +1492,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
         return ["zh", "nan"]
 
     async def fake_detect(path):
-        return "nan"
+        return module.language_routes_mod.LanguageCheck("nan", "nan", 1234)
 
     async def fake_prompt(current, project_id):
         calls["prompt_project"] = project_id
@@ -1519,6 +1519,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
     assert calls["routes_args"] == ("proj-hospital", ["zh", "nan"])
     assert body["language"] == "nan" and body["provider"] == "breeze"
     assert body["language_routes"] == ["zh", "nan"]
+    assert body["language_check"] == {"result": "nan", "ms": 1234}
 
 
 def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):

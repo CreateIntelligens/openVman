@@ -66,7 +66,7 @@ python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 
 - `terms`：辨識結果裡要出現的詞，寫成 `A|B` 代表兩種寫法都算對。
 - `reply_any`：回答裡提到其中任何一個字就算命中。
 - `audio`：有給就用這個錄音，路徑相對於 repo 根目錄，ffmpeg 讀得了的格式都可以；這時 `text` 是正確答案。沒給就用 `voices` 裡的每個聲音各念一次。
-- `speech_language`：批次辨識應該判成的語言。`nan` 表示應判成台語，`zh` 表示不該被判成台語；彙總表的「語言判斷」欄統計判對的題數。串流辨識不判台語，所以不計入。
+- `speech_language`：批次辨識應該判成的語言。`nan` 表示應判成台語，`zh` 表示不該被判成台語；彙總表的「語言判斷」欄統計判對的題數。串流辨識不判台語，所以不計入。「判斷逾時」「判斷ms」來自回應的 `language_check`（台語分流時才有），不必去數 backend log。
 - 題庫最外層可以寫 `asr`，例如 `["batch"]`，當作預設的辨識路徑。
 
 現有題庫：

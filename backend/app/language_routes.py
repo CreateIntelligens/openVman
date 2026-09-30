@@ -15,6 +15,7 @@ import logging
 import subprocess
 import time
 import wave
+from dataclasses import dataclass
 
 from app.auth.dependencies import CurrentAccount
 from app.auth.models import ResourceType
@@ -146,16 +147,31 @@ def _to_wav_bytes(file_path: str) -> bytes:
     return result.stdout
 
 
-async def detect_taiwanese(file_path: str) -> str | None:
-    """Ask Brain whether the clip is Taiwanese; None when it cannot tell in time."""
+@dataclass(frozen=True)
+class LanguageCheck:
+    """What the Taiwanese check heard and how long it took."""
+
+    # KNOWN_ROUTES 裡的代碼；逾時或失敗是 None（當不是台語）。
+    language: str | None
+    # 回給前台與語音模擬的結果：語言代碼、"timeout" 或 "failed"。逾時與「判成華語」
+    # 在 language 上看起來一樣，分開才數得出逾時，不必去翻 log。
+    result: str
+    ms: int
+
+
+async def detect_taiwanese(file_path: str) -> LanguageCheck:
+    """Ask Brain whether the clip is Taiwanese, giving up after the configured limit."""
     cfg = get_tts_config()
     limit = cfg.asr_language_check_timeout_seconds
+    started = time.monotonic()
     try:
-        return await asyncio.wait_for(_ask_brain_language(file_path, cfg), timeout=limit)
+        language = await asyncio.wait_for(_ask_brain_language(file_path, cfg), timeout=limit)
+        result = language or "failed"
     except asyncio.TimeoutError:
         # 使用者在等這句的回答；判斷不出來就當不是台語，不能讓整輪卡住。
         logger.warning("audio language check timed out after %.1fs", limit)
-        return None
+        language, result = None, "timeout"
+    return LanguageCheck(language, result, round((time.monotonic() - started) * 1000))
 
 
 async def _ask_brain_language(file_path: str, cfg) -> str | None:
