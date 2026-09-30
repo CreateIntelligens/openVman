@@ -1,0 +1,312 @@
+[
+ {
+  "heard": "這臺奔騰的馬力是多少？",
+  "setting": "none",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "奔騰 馬力",
+   "奔騰 泵浦",
+   "EVAK 奔騰"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"奔騰 馬力\", \"奔騰 泵浦\", \"EVAK 奔騰\", \"這臺奔騰的馬力是多少？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 18 頁：STEEL AISI 316 全不鏽鋼耐腐蝕渦流污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 (Free Passage) | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) | 出水型式 || :--- | :---: | :---: | :---: | :---: | :---: | :-",
+  "reply": "型錄資料未提及此規格，請提供具體的泵浦型號或系列名稱，以便進一步查詢相關馬力與技術參數，或請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 7.6
+ },
+ {
+  "heard": "這臺奔騰的馬力是多少？",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "奔騰 泵浦 馬力",
+   "EVAK 泵浦 馬力"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"奔騰 泵浦 馬力\", \"EVAK 泵浦 馬力\", \"這臺奔騰的馬力是多少？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) || :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\", \"source\"",
+  "reply": "請提供具體的泵浦型號或系列名稱，例如 EUS、EDW、EUB-M、DIVA、HIPPO 或 ALLIGATOR 等，才能為您查詢正確的馬力與規格資料。",
+  "seconds": 2.5
+ },
+ {
+  "heard": "UNI 本有幾種型號？",
+  "setting": "none",
+  "term_ok": false,
+  "evidence_ok": true,
+  "queries": [
+   "UNI 泵浦 型號",
+   "UNI 系列 規格",
+   "EVAK UNI",
+   "UNI",
+   "型號"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"UNI 泵浦 型號\", \"UNI 系列 規格\", \"EVAK UNI\", \"UNI 本有幾種型號？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 3 頁：全系列產品矩陣索引與著脫座對照\\n內容：| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 || EUSR | 輕量殘水排水泵 | 0.5 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P05 || EUB / EUBS / EUBI | 輕型不鏽鋼排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | - | -",
+  "reply": "型錄資料未提及 UNI 系列或相關型號。請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 5.1
+ },
+ {
+  "heard": "UNI 本有幾種型號？",
+  "setting": "glossary",
+  "term_ok": false,
+  "evidence_ok": true,
+  "queries": [
+   "UNI 泵浦 型號",
+   "UNI 系列 億發",
+   "EVAK UNI 型號",
+   "UNI",
+   "型錄 UNI"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"UNI 泵浦 型號\", \"UNI 系列 億發\", \"EVAK UNI 型號\", \"UNI 本有幾種型號？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 3 頁：全系列產品矩陣索引與著脫座對照\\n內容：| 系列代碼 (Type) | 類別 | 馬力範圍 (HP) | 電源相數 | 支援 Duck Foot（自動著脫座）型號 | 著脫座材質 | 型錄對應頁次 || :--- | :--- | :--- | :--- | :--- | :--- | :--- |\\n\\n| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 || EUSR | 輕量殘水排水泵 ",
+  "reply": "型錄資料未提及 UNI 系列或相關型號。億發泵浦主要系列包含 EUS、EUSR、EUB、EUBR、EUBL、EDW、EUB-M、DIVA、DIVA PRO、HIPPO、STEEL、ALLIGATOR 與 LEOPARD 等。若有其他特定產品或客製需求，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 4.4
+ },
+ {
+  "heard": "沉睡泵最深可以放多深？",
+  "setting": "none",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "沉水泵下潛深度",
+   "泵浦下潛深度 極限 深度",
+   "EVAK 泵浦 下潛深度"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"沉水泵下潛深度\", \"泵浦下潛深度 極限 深度\", \"EVAK 泵浦 下潛深度\", \"沉睡泵最深可以放多深？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：evak_qa\\n問題：型錄中大部分輕型泵浦的最大下潛深度均為 10 公尺（10M），但有哪三個系列或馬力區間可承受高達 20 公尺（20M）的水下浸沒深度？\\n回答：1. EUB-M 系列之 10~20HP 機型；2. DIVA 系列（全系列 3~30HP）；3. DIVA PRO 系列（全系列 10~30HP）。\\n\\n【工程要點說明】\\n- 對應出處：第 12 頁、第 13 頁、第 14 頁\\n- 考核重點：全型錄下潛深度（Submersible depth）極值橫向比對。\", \"source\": \"workspace\", \"date\": \"2026-09-29\", \"metadata\": \"{\\\"path\\\": \\\"k",
+  "reply": "沉水泵的最大下潛深度會依據不同的系列與機型而有所不同。\n\n一般輕型與標準排水泵系列，其最大沉水深度通常為 10 公尺。\n\n部分重型與泥漿泵系列則可支援更深的工作環境，最大沉水深度可達 20 公尺，包含下列系列與規格：\n1. EUB-M 系列之 10 到 20 HP 機型\n2. DIVA 系列之全系列 3 到 30 HP 機型\n3. DIVA PRO 系列之全系列 10 到 30 HP 機型\n\n若有特定的工程工況或場地配置需求，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 2.9
+ },
+ {
+  "heard": "沉睡泵最深可以放多深？",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "沉水泵 最大下潛深度",
+   "沉水泵 下潛深度極限",
+   "EVAK 沉水泵 揚程 下潛深度"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"沉水泵 最大下潛深度\", \"沉水泵 下潛深度極限\", \"EVAK 沉水泵 揚程 下潛深度\", \"沉睡泵最深可以放多深？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 2. 馬達與泵浦技術規範 (Specifications)\\n內容：- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)- 最大沉水深度：10 公尺 (10M)- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F- 防護等級：IP 68 沉水密封等級- 過載保護器：內建 Auto-cut 自動復歸熱保護器-",
+  "reply": "沈水泵的最大下潛深度會依系列與機型而有所不同。大部分的輕型排水與污水泵浦系列，最大下潛深度為 10 公尺。部分中重型與泥漿泵浦系列則可支援到更深的水下浸沒深度，例如 EUB-M 系列的 10 至 20 馬力機型、DIVA 系列全系列 3 至 30 馬力機型，以及 DIVA PRO 系列全系列 10 至 30 馬力機型，最大下潛深度可達 20 公尺。若有特定的工況需求，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 2.8
+ },
+ {
+  "heard": "UBL 和 DBX 在哪裡？",
+  "setting": "none",
+  "term_ok": false,
+  "evidence_ok": false,
+  "queries": [
+   "UBL",
+   "DBX",
+   "UBL DBX 哪裡"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"UBL\", \"DBX\", \"UBL DBX 哪裡\", \"UBL 和 DBX 在哪裡？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [], \"related\": [], \"citations\": []}, \"error\": \"\"}",
+  "reply": "型錄資料未提及 UBL 和 DBX 的相關資訊。請洽詢鶴記企業或億發泵浦原廠工程業務團隊以取得進一步協助。",
+  "seconds": 5.6
+ },
+ {
+  "heard": "UBL 和 DBX 在哪裡？",
+  "setting": "glossary",
+  "term_ok": false,
+  "evidence_ok": false,
+  "queries": [
+   "UBL",
+   "DBX",
+   "UBL DBX"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"UBL\", \"DBX\", \"UBL DBX\", \"UBL 和 DBX 在哪裡？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [], \"related\": [], \"citations\": []}, \"error\": \"\"}",
+  "reply": "型錄資料未提及此規格，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 4.4
+ },
+ {
+  "heard": "一步的馬力多少",
+  "setting": "none",
+  "term_ok": false,
+  "evidence_ok": false,
+  "queries": [
+   "一步 馬力",
+   "1馬力 多少"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"一步 馬力\", \"1馬力 多少\", \"一步的馬力多少\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) || :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\", \"source\": \"workspac",
+  "reply": "一馬力等於 1 HP，其對應的國際標準功率為 0.75 kW。若您是指型錄中的 1 HP 泵浦規格（例如 1.0 HP 機型），其額定功率即為 0.75 kW。請洽詢鶴記企業或億發泵浦原廠工程業務團隊以獲得進一步的選型協助。",
+  "seconds": 2.6
+ },
+ {
+  "heard": "一步的馬力多少",
+  "setting": "glossary",
+  "term_ok": false,
+  "evidence_ok": false,
+  "queries": [
+   "一步 馬力",
+   "1馬力 泵浦 型號 規格",
+   "馬力 規格 鶴記 億發",
+   "1HP kW",
+   "1馬力 幾瓩"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"一步 馬力\", \"1馬力 泵浦 型號 規格\", \"馬力 規格 鶴記 億發\", \"一步的馬力多少\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) || :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\"",
+  "reply": "1馬力等於1.0 HP，換算為公制功率約為0.75 kW。若您是指特定系列泵浦的1馬力規格參數，例如HIPPO系列的1馬力機種，其額定點揚程為7.7公尺、流量為300 LPM，極限揚程可達11.3公尺、流量500 LPM，通過粒徑為50毫米。如需其他系列泵浦的1馬力詳細規格，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 4.1
+ },
+ {
+  "heard": "請問低瓦有攪拌器嗎",
+  "setting": "none",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "低瓦 攪拌器",
+   "沉水泵 攪拌器 低瓦數",
+   "EVAK 攪拌器 規格"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"低瓦 攪拌器\", \"沉水泵 攪拌器 低瓦數\", \"EVAK 攪拌器 規格\", \"請問低瓦有攪拌器嗎\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極重型沉水泥漿攪拌泵\\n內容：- 核心特色：全系列標準配置高鉻合金鋼泥漿攪拌器（Agitator），運轉時主動擊碎攪散池底沉澱物。- 規格數據：涵蓋 10 HP 至 30 HP（型號 100(150)DIVA PRO-5.100 ~ 200DIVA PRO-5.300L），水力參數、馬力、電流及重量與 DIVA 相容，但標準帶有 Agitator 模式。- 零件限定：同樣具備 `Lip Seal (24~30HP Only)` 與 `Wearing Plate (30HP Only)`",
+  "reply": "型錄中配置攪拌器的系列為 DIVA PRO 四極重型泥漿攪拌泵，其馬力範圍由 10 HP 起跳至 30 HP，並無提供低馬力或低瓦數的小型攪拌器機型。請洽詢鶴記企業或億發泵浦原廠工程業務團隊以取得進一步的選型協助。",
+  "seconds": 2.7
+ },
+ {
+  "heard": "請問低瓦有攪拌器嗎",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "DIVA 攪拌器",
+   "低瓦 攪拌器",
+   "DIVA 沉水泥漿泵 攪拌器"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"DIVA 攪拌器\", \"低瓦 攪拌器\", \"DIVA 沉水泥漿泵 攪拌器\", \"請問低瓦有攪拌器嗎\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 14 頁：DIVA PRO 4極重型沉水泥漿攪拌泵\\n內容：- 核心特色：全系列標準配置高鉻合金鋼泥漿攪拌器（Agitator），運轉時主動擊碎攪散池底沉澱物。- 規格數據：涵蓋 10 HP 至 30 HP（型號 100(150)DIVA PRO-5.100 ~ 200DIVA PRO-5.300L），水力參數、馬力、電流及重量與 DIVA 相容，但標準帶有 Agitator 模式。- 零件限定：同樣具備 `Lip Seal (24~30HP Only)` 與 `Wearing Plate (30HP Only)`",
+  "reply": "標準的 DIVA 系列沉水泥漿泵本身沒有配置攪拌器。如果需要帶有高鉻合金鋼泥漿攪拌器的機型，需選擇 DIVA PRO 系列，該系列全面配置攪拌器，馬力範圍由 10 HP 至 30 HP。若需進一步了解選型或規格細節，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 2.8
+ },
+ {
+  "heard": "哈波系列最大流量多少",
+  "setting": "none",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "哈波系列 最大流量",
+   "HIPPO 污水泵 最大流量",
+   "HIPPO 系列 規格數據表 最大流量",
+   "第 16 頁 HIPPO 污水泵 規格數據表",
+   "第 17 頁 HIPPO 污水泵 規格數據表",
+   "HIPPO-750 最大流量",
+   "HIPPO DN 系列 最大流量 1600 LPM",
+   "第 17 頁 HIPPO DN 規格數據表"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"哈波系列 最大流量\", \"HIPPO 污水泵 最大流量\", \"哈波系列最大流量多少\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 16 頁：HIPPO 2\\\" 大通徑渦流沉水污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) || :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\\n\\n| HIP",
+  "reply": "在哈波系列污水泵浦中，以重型大口徑的 HIPPO DN80 系列為例，7.5HP 的標準流量型機型最大流量可達到 1600 LPM。若需進一步了解特定口徑或馬力的選型細節，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 6.0
+ },
+ {
+  "heard": "哈波系列最大流量多少",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "HIPPO 沉水泵 最大流量",
+   "HIPPO 系列 最大流量",
+   "HIPPO-750 最大流量",
+   "HIPPO 系列 最大流量 1600 LPM"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"HIPPO 沉水泵 最大流量\", \"HIPPO 系列 最大流量\", \"哈波系列最大流量多少\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 16 頁：HIPPO 2\\\" 大通徑渦流沉水污水泵 > 1. 規格數據表 (50Hz / 2850rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) || :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\\n\\n|",
+  "reply": "在 HIPPO 系列污水泵浦中，最大流量可達 1600 LPM，此規格對應的機型為 HIPPO-750 標準流量型（7.5 HP，口徑 3 吋），其極限點最大流量為 1600 LPM（對應最大揚程 18 M）。若需進一步了解特定機型的選型或工況配置，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 4.0
+ },
+ {
+  "heard": "阿利蓋特可以絞碎什麼",
+  "setting": "none",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "阿利蓋特 絞碎 什麼",
+   "ALLIGATOR 泵浦 絞碎"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"阿利蓋特 絞碎 什麼\", \"ALLIGATOR 泵浦 絞碎\", \"阿利蓋特可以絞碎什麼\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：evak_qa\\n問題：ALLIGATOR 系列型錄右下角特別列出具備絞碎能力（Grinder Ability）的 3 種高難度纖維固體廢棄物圖示名稱為何？\\n回答：1. 棉紗手套（Cotton gloves）；2. 嬰兒紙尿褲（Diaper）；3. 紡織布料（Textile）。\\n\\n【工程要點說明】\\n- 對應出處：第 19 頁\\n- 考核重點：型錄中 Grinder Ability 所列之三大測試標的圖示文字。\", \"source\": \"workspace\", \"date\": \"2026-09-29\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/qa/evak_qa.csv\\\", \\\"title\\\": \\\"eva",
+  "reply": "ALLIGATOR 系列絞碎泵配置 AISI 440C 材質的徑向絞碎刀組，硬度達到 55 到 60 HRC，專門用來處理含有高難度纖維與固體廢棄物的污水。型錄中特別列出具備絞碎能力的三大測試標的包含：\n1. 棉紗手套\n2. 嬰兒紙尿褲\n3. 紡織布料\n\n若有其他污水處理工況或選型需求，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 2.8
+ },
+ {
+  "heard": "阿利蓋特可以絞碎什麼",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "阿利蓋特 絞碎 固體 範圍",
+   "ALLIGATOR 絞碎泵 應用 物質"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"阿利蓋特 絞碎 固體 範圍\", \"ALLIGATOR 絞碎泵 應用 物質\", \"阿利蓋特可以絞碎什麼\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：evak_qa\\n問題：ALLIGATOR 系列型錄右下角特別列出具備絞碎能力（Grinder Ability）的 3 種高難度纖維固體廢棄物圖示名稱為何？\\n回答：1. 棉紗手套（Cotton gloves）；2. 嬰兒紙尿褲（Diaper）；3. 紡織布料（Textile）。\\n\\n【工程要點說明】\\n- 對應出處：第 19 頁\\n- 考核重點：型錄中 Grinder Ability 所列之三大測試標的圖示文字。\", \"source\": \"workspace\", \"date\": \"2026-09-29\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/qa/evak_qa.csv\\\", \\\"title\\\"",
+  "reply": "ALLIGATOR 系列絞碎泵配置 AISI 440C 材質的徑向絞碎刀組，硬度達到 55 至 60 HRC，專門用來處理含有高難度纖維與固體廢棄物的污水。型錄中列出的主要絞碎測試標的包含棉紗手套、嬰兒紙尿褲以及紡織布料。透過強力絞碎機制，能將這類容易纏繞或阻塞管道的雜物切碎以順利排出。",
+  "seconds": 2.7
+ },
+ {
+  "heard": "沉水泵最深可以放多深？",
+  "setting": "none",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "沉水泵 下潛深度 最深 限制",
+   "沉水泵 最大下潛深度"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"沉水泵 下潛深度 最深 限制\", \"沉水泵 最大下潛深度\", \"沉水泵最深可以放多深？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 2. 馬達與泵浦技術規範 (Specifications)\\n內容：- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)- 最大沉水深度：10 公尺 (10M)- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F- 防護等級：IP 68 沉水密封等級- 過載保護器：內建 Auto-cut 自動復歸熱保護器- 葉輪材質：採用杜邦 DuPon",
+  "reply": "沉水泵的最大下潛深度會依系列與機型而有所不同。大部分標準輕型泵浦的最大下潛深度為 10 公尺。\n\n不過，部分中重型與高規格系列可承受更深的水下浸沒深度，最高可達 20 公尺，包含：\n1. EUB-M 系列的 10 到 20 HP 機型\n2. DIVA 系列的全系列 3 到 30 HP 機型\n3. DIVA PRO 系列的全系列 10 到 30 HP 機型\n\n若有特殊深井或深水工況的選型需求，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 2.7
+ },
+ {
+  "heard": "沉水泵最深可以放多深？",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "沉水泵 最大下潛深度 限制",
+   "EVAK 沉水泵 下潛深度 m"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"沉水泵 最大下潛深度 限制\", \"EVAK 沉水泵 下潛深度 m\", \"沉水泵最深可以放多深？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解 > 2. 馬達與泵浦技術規範 (Specifications)\\n內容：- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)- 最大沉水深度：10 公尺 (10M)- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F- 防護等級：IP 68 沉水密封等級- 過載保護器：內建 Auto-cut 自動復歸熱保護器- 葉輪材質：採用杜邦 D",
+  "reply": "沉水泵的最大下潛深度會依據不同的系列與機型而有所不同。大部分標準輕型與一般排水泵浦的最大沉水深度為 10 公尺。\n\n若是在深井、重型或高水壓工況下，部分中重型與泥漿系列的最大沉水深度可達 20 公尺，包含 EUB-M 系列的 10 到 20 HP 機型、DIVA 系列的全系列 3 到 30 HP 機型，以及 DIVA PRO 系列的全系列 10 到 30 HP 機型。\n\n如果在實際工程應用中有超過上述深度的特殊需求，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 2.4
+ },
+ {
+  "heard": "奔騰電腦現在還有在賣嗎？",
+  "setting": "none",
+  "term_ok": null,
+  "evidence_ok": null,
+  "queries": [
+   "奔騰電腦",
+   "Pentium 處理器 銷售"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"奔騰電腦\", \"Pentium 處理器 銷售\", \"奔騰電腦現在還有在賣嗎？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [], \"related\": [], \"citations\": []}, \"error\": \"\"}",
+  "reply": "英特爾的奔騰系列處理器已經逐漸退場，官方在 2023 年左右將 Pentium 與 Celeron 品牌整合並改名為 Intel Processor，因此市面上目前已經很難直接買到掛有奔騰名稱的新款電腦或處理器，多數通路以販售 Intel Core 系列或新型的 Intel Processor 系列產品為主。",
+  "seconds": 5.8
+ },
+ {
+  "heard": "奔騰電腦現在還有在賣嗎？",
+  "setting": "glossary",
+  "term_ok": null,
+  "evidence_ok": null,
+  "queries": [
+   "奔騰電腦",
+   "EVAK 奔騰電腦"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"奔騰電腦\", \"EVAK 奔騰電腦\", \"奔騰電腦現在還有在賣嗎？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 1 頁：封面與企業基本資訊\\n內容：- 型錄版本號：Vol.PIE-23121- 電源頻率規格：50 Hz- 製造商：EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技股份有限公司）- 官方網站：[www.evak-pumps.com](http://www.evak-pumps.com)- 聯絡電子郵件：sales@evak-pumps.com- 電話 (TEL)：+886-4-26233556- 傳真 (FAX)：+886-4-26235559---\", \"source\": \"workspace\", \"date\": \"2026",
+  "reply": "我們主要提供億發泵浦的沉水泵、污水泵、泥漿泵與加壓泵等流體機械產品與技術諮詢。電腦主機相關產品並不在我們的服務與產品範圍內，建議您洽詢相關的資訊科技與電腦硬體通路商。如果您有任何關於泵浦選型、揚程流量或水機工程的問題，歡迎隨時提出。",
+  "seconds": 4.2
+ },
+ {
+  "heard": "你好，請問你是誰？",
+  "setting": "none",
+  "term_ok": null,
+  "evidence_ok": null,
+  "queries": [
+   "你是誰",
+   "小鶴 代理身份",
+   "億發泵浦 智慧助理"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"你是誰\", \"小鶴 代理身份\", \"億發泵浦 智慧助理\", \"你好，請問你是誰？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：ASR_PROMPT\\n章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。\\n內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水泵、泥漿泵、殘水泵、絞碎泵、切割泵、EUS、EDW、EUB-M、DIVA、DIVA PRO、HIPPO、STEEL、ALLIGATOR、LEOPARD、Q.D.C.、自動著脫裝置、揚程、流量、LPM、機械軸封、葉輪、耐磨板、Yamada、過載保護器。\", \"source\": \"workspace\", \"date\": \"2026-09-21\", \"metadata\": \"{\\\"path\\\": \\\"ASR_PROMPT.md\\\", \\\"title\\\": \\\"ASR_PROMPT\\\", \\\"heading",
+  "reply": "我是鶴記企業與億發泵浦的產品與水機工程技術諮詢智慧助理小鶴。我專門協助經銷商、工程人員與客戶解答各系列沉水泵、污水泵、泥漿泵與加壓泵等規格及選型問題。請告訴我您需要了解哪一款泵浦的技術規格或選型細節。",
+  "seconds": 3.6
+ },
+ {
+  "heard": "你好，請問你是誰？",
+  "setting": "glossary",
+  "term_ok": null,
+  "evidence_ok": null,
+  "queries": [
+   "你是誰 鶴記企業 億發泵浦 小鶴"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"你是誰 鶴記企業 億發泵浦 小鶴\", \"你好，請問你是誰？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：ASR_PROMPT\\n章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。\\n內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水泵、泥漿泵、殘水泵、絞碎泵、切割泵、EUS、EDW、EUB-M、DIVA、DIVA PRO、HIPPO、STEEL、ALLIGATOR、LEOPARD、Q.D.C.、自動著脫裝置、揚程、流量、LPM、機械軸封、葉輪、耐磨板、Yamada、過載保護器。\", \"source\": \"workspace\", \"date\": \"2026-09-21\", \"metadata\": \"{\\\"path\\\": \\\"ASR_PROMPT.md\\\", \\\"title\\\": \\\"ASR_PROMPT\\\", \\\"heading_path\\\": [\\",
+  "reply": "我是小鶴，是鶴記企業與億發泵浦的產品與水機工程技術諮詢智慧助理。我可以協助您解答各系列沉水泵、污水泵、泥漿泵、加壓泵等規格選型、水力參數與技術應用問題。請告訴我您想了解哪一款泵浦或相關工程需求。",
+  "seconds": 3.8
+ }
+]

@@ -383,6 +383,7 @@ user input
   - 讀取當前 session history
 - `GET /brain/sessions`、`GET /brain/sessions/export`
   - 對話列表與匯出，可用 `language=zh|en|es` 篩選（語言取最後一則使用者訊息，規則即時判、Jev 背景校正）
+- 專案 workspace 的 `ASR_PROMPT.md`（選填）：語音專有名詞詞表，「#」開頭是說明、其餘整份（最多 800 字）放進每輪對話提示，告訴模型訊息可能是語音辨識結果、專有名詞可能被聽成同音字，理解問題與寫知識庫查詢時先對回。可加「常見誤聽：UNI本→污泥泵」這類對照。實測見 `scripts/experiments/asr-glossary/`
 - `POST /brain/internal/asr-judge`
   - body `{"project_id", "languages", "interim", "final"}`（`languages` 是這條連線實際生效的分流，前台臨時關掉的語言不算；沒給用後台設定），回 `{"text", "chosen": "interim"|"final", "scores", "reason"}`；Backend 的 Gemini Live 串流辨識定稿跟最後暫定字幕不同時呼叫。兩段文字各自問 Jev「像不像正確辨識的一句話」（情境帶專案名稱與語言分流），暫定字幕高出 0.2 以上才換，否則、Jev 關閉或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`；離線驗證見 `scripts/experiments/asr-final-judge/`）
 - `POST /brain/internal/audio-language`

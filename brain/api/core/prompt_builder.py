@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 logger = logging.getLogger("brain")
 
 from config import get_settings
+from core.asr_glossary import glossary_line
 from core.pipeline import enforce_context_budget
 from infra.reflection import (
     compress_text,
@@ -96,6 +97,7 @@ def build_chat_messages(
             _format_request_context(request_context),
             history_summary,
             answer_rules,
+            glossary_line(project_id),
             reply_language_line(
                 project_id, user_message, _speech_language(request_context),
             ),

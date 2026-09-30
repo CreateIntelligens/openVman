@@ -1,0 +1,84 @@
+[
+ {
+  "heard": "這臺奔騰的馬力是多少？",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "泵浦 馬力",
+   "奔騰 馬力"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"泵浦 馬力\", \"奔騰 馬力\", \"這臺奔騰的馬力是多少？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 20 頁：ALLIGATOR 規格表與 LEOPARD 4極鎢鋼刀切碎泵 > 2. LEOPARD 四極低轉速重型鎢鋼刀切碎泵 (4 Pole / 1450rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 出水口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 滿載電流 (3ø 400V) | 著脫基座型號 || :--- | :---: | :---: | :---: | :---: | :---: | :---: |\\n\\n| 80(100)LEOPARD-5.30 | 3 HP /",
+  "reply": "請提供您想查詢的具體泵浦型號或系列名稱，例如 EUS、EDW、EUB-M、DIVA、HIPPO、STEEL、ALLIGATOR 或 LEOPARD 等，才能為您精確查詢對應的馬力規格。",
+  "seconds": 7.1
+ },
+ {
+  "heard": "UNI 本有幾種型號？",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "UNI本 污泥泵 型號",
+   "EVAK 污泥泵 型號",
+   "EUBL 型號"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"UNI本 污泥泵 型號\", \"EVAK 污泥泵 型號\", \"UNI 本有幾種型號？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 3 頁：全系列產品矩陣索引與著脫座對照\\n內容：| 系列代碼 (Type) | 類別 | 馬力範圍 (HP) | 電源相數 | 支援 Duck Foot（自動著脫座）型號 | 著脫座材質 | 型錄對應頁次 || :--- | :--- | :--- | :--- | :--- | :--- | :--- |\\n\\n| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 || EUSR | 輕量殘水排水泵 | 0.5 HP | ",
+  "reply": "EUBL 系列固體污泥排水泵在型錄中主要涵蓋 1 HP 規格，標準型號為 50EUBL-5.10，出水口徑為 2 吋，具備 38 mm 的大固體通過粒徑。若需進一步了解特定電壓或其他配置需求，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 4.5
+ },
+ {
+  "heard": "UBL 和 DBX 在哪裡？",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "EUBL 泵浦 規格 應用",
+   "DIVA DBX 泵浦 規格 應用"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"EUBL 泵浦 規格 應用\", \"DIVA DBX 泵浦 規格 應用\", \"UBL 和 DBX 在哪裡？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：@ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |\\n\\n---\", \"source\": \"workspace\", \"date\": \"2026-09-29\", \"metadata\": \"{\\\"path\\\": \\\"knowledge/EVAK_CATALOG.md\\\", \\\"title\\\": \\\"EVAK_CATA",
+  "reply": "EUBL 與 DIVA 均為億發泵浦的產品系列。EUBL 系列適用於輕型至中型排水與污水抽送，可搭配 QG 自動著脫裝置。DIVA 系列則為重型泥漿與高耐磨泵浦，最大下潛深度可達 20 公尺，適用於惡劣工況。若需查詢特定型號的詳細規格、應用場景或庫存與安裝位置，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+  "seconds": 3.0
+ },
+ {
+  "heard": "一步的馬力多少",
+  "setting": "glossary",
+  "term_ok": true,
+  "evidence_ok": true,
+  "queries": [
+   "一步 泵浦 馬力",
+   "EUBL 泵浦 馬力",
+   "EUBL",
+   "EUB-M 馬力 範圍",
+   "EUBL 馬力 規格",
+   "EUBL 50EUBL"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"一步 泵浦 馬力\", \"EUBL 泵浦 馬力\", \"一步的馬力多少\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 11 頁：EUB-M (2~7.5HP) 重型耐磨排水泵規格 > 規格數據表 (50Hz / 2850rpm)\\n內容：| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) || :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\", \"source\": \"w",
+  "reply": "EUBL 系列固體污泥沉水排水泵的馬力為 1 HP / 0.75 kW，口徑為 2 吋。",
+  "seconds": 5.3
+ },
+ {
+  "heard": "奔騰電腦現在還有在賣嗎？",
+  "setting": "glossary",
+  "term_ok": null,
+  "evidence_ok": null,
+  "queries": [
+   "奔騰電腦",
+   "EVAK 奔騰電腦"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"奔騰電腦\", \"EVAK 奔騰電腦\", \"奔騰電腦現在還有在賣嗎？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：EVAK_CATALOG\\n章節：EVAK 沉水排水與污水泵浦產品型錄（50Hz / Vol.PIE-23121） > 第 1 頁：封面與企業基本資訊\\n內容：- 型錄版本號：Vol.PIE-23121- 電源頻率規格：50 Hz- 製造商：EVAK PUMP TECHNOLOGY CORP.（億發泵浦科技股份有限公司）- 官方網站：[www.evak-pumps.com](http://www.evak-pumps.com)- 聯絡電子郵件：sales@evak-pumps.com- 電話 (TEL)：+886-4-26233556- 傳真 (FAX)：+886-4-26235559---\", \"source\": \"workspace\", \"date\": \"2026",
+  "reply": "本助理專注於鶴記企業與億發泵浦的各系列沉水泵、污水泵、泥漿泵與加壓泵等產品技術與選型諮詢。電腦相關產品不在本公司的業務與專業範圍內，建議您向各大電腦資訊通路或原廠客服查詢。如果您有任何關於泵浦選型、揚程流量或水機工程的需求，歡迎隨時提出。",
+  "seconds": 2.7
+ },
+ {
+  "heard": "你好，請問你是誰？",
+  "setting": "glossary",
+  "term_ok": null,
+  "evidence_ok": null,
+  "queries": [
+   "小鶴 億發泵浦 鶴記企業 介紹"
+  ],
+  "found": "{\"status\": \"ok\", \"tool_name\": \"search_knowledge\", \"data\": {\"table\": \"knowledge\", \"queries\": [\"小鶴 億發泵浦 鶴記企業 介紹\", \"你好，請問你是誰？\"], \"embedding_versions\": [\"bge:BAAI/bge-m3:1024:float32:l2:query:5617a9f61b028005a4858fdac845db406aefb181\"], \"results\": [{\"text\": \"主題：ASR_PROMPT\\n章節：所有以 ＃ (井字號) 開頭的行都會被系統忽略，不納入語音辨識提示。\\n內容：鶴記企業、億發泵浦、EVAK、沉水泵、排水泵、污水泵、泥漿泵、殘水泵、絞碎泵、切割泵、EUS、EDW、EUB-M、DIVA、DIVA PRO、HIPPO、STEEL、ALLIGATOR、LEOPARD、Q.D.C.、自動著脫裝置、揚程、流量、LPM、機械軸封、葉輪、耐磨板、Yamada、過載保護器。\", \"source\": \"workspace\", \"date\": \"2026-09-21\", \"metadata\": \"{\\\"path\\\": \\\"ASR_PROMPT.md\\\", \\\"title\\\": \\\"ASR_PROMPT\\\", \\\"heading_path\\\": [\\\"",
+  "reply": "我是小鶴，是鶴記企業與億發泵浦的產品與水機工程技術諮詢智慧助理。我可以協助您解答各系列沉水泵、污水泵、泥漿泵與加壓泵等規格、選型及工程應用相關的問題。",
+  "seconds": 2.4
+ }
+]
