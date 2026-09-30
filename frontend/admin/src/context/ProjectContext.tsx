@@ -25,6 +25,7 @@ interface ProjectContextType {
   setProjectId: (id: string) => void;
   projects: ProjectSummary[];
   loadingProjects: boolean;
+  hasLoadedProjects: boolean;
   projectError: string | null;
   refreshProjects: () => Promise<void>;
 }
@@ -44,6 +45,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const projectIdRef = useRef(projectId);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [hasLoadedProjects, setHasLoadedProjects] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
 
   const setProjectId = useCallback((id: string) => {
@@ -68,6 +70,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
             ?.project_id ?? response.projects[0].project_id;
         setProjectId(fallback);
       }
+      setHasLoadedProjects(true);
     } catch (error) {
       setProjectError(errorMessage(error, "無法載入專案清單，請稍後重試。"));
     } finally {
@@ -86,6 +89,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setProjectId,
         projects,
         loadingProjects,
+        hasLoadedProjects,
         projectError,
         refreshProjects,
       }}

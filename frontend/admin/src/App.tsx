@@ -82,6 +82,9 @@ function AppContent() {
   );
   const ActiveComponent = pageComponents[route.tab];
   const isAdmin = account ? isAtLeastAdmin(account.role) : false;
+  const canLoadPage = projects.some((project) => project.project_id === projectId)
+    || route.tab === "Projects"
+    || route.tab === "Accounts";
 
   const applyRoute = useCallback(
     (
@@ -258,7 +261,13 @@ function AppContent() {
                   </div>
                 }
               >
-                <ActiveComponent />
+                {canLoadPage ? <ActiveComponent /> : (
+                  <div className="flex h-full items-center justify-center p-6 text-sm text-content-muted" role="alert">
+                    {projects.length
+                      ? "目前專案無法存取，請從上方選擇可用專案。"
+                      : "目前沒有可存取的專案，請聯絡管理員設定權限。"}
+                  </div>
+                )}
               </Suspense>
             </div>
           </div>
@@ -270,16 +279,41 @@ function AppContent() {
   );
 }
 
+function ProjectGate() {
+  const { hasLoadedProjects, projectError, refreshProjects } = useProject();
+
+  if (!hasLoadedProjects) {
+    return (
+      <main className="flex h-dvh items-center justify-center bg-surface p-6 text-content">
+        {projectError ? (
+          <div className="space-y-4 text-center">
+            <p role="alert">{projectError}</p>
+            <button className="btn btn-primary" type="button" onClick={() => void refreshProjects()}>
+              重試
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-content-muted" role="status">正在載入可用專案…</p>
+        )}
+      </main>
+    );
+  }
+
+  return (
+    <NavigationGuardProvider>
+      <MascotProvider>
+        <AppContent />
+      </MascotProvider>
+    </NavigationGuardProvider>
+  );
+}
+
 function AuthenticatedApp() {
   return (
     <ThemeProvider>
       <BackendHealthProvider>
         <ProjectProvider>
-          <NavigationGuardProvider>
-            <MascotProvider>
-              <AppContent />
-            </MascotProvider>
-          </NavigationGuardProvider>
+          <ProjectGate />
         </ProjectProvider>
       </BackendHealthProvider>
     </ThemeProvider>

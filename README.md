@@ -37,6 +37,7 @@ Admin 也可將已上傳且素材完整的影片角色登記為右下角小助�
 ### 管理介面網址
 
 管理介面具備 [Canonical Routes](docs/guides/admin-canonical-routes.md)：每頁與子頁有固定網址（例如 `/admin/tts/asr`、`/admin/knowledge/graph`、`/admin/avatar/mascots`、`/admin/accounts/temporary`），支援重新整理、上一頁／下一頁與 `/openvman` 公開前綴。`?project=demo` 指定專案，省略時採用 default；舊 `?view=` 網址自動正規化，側欄連結可開新分頁。
+若帳號無法存取 default，後台會先從可用專案清單選擇可存取的專案，再載入頁面並更新網址。
 從非預設專案的對話紀錄按「開啟」會把目前專案一併帶入 Chat，側欄的新分頁連結也會保留目前專案。
 
 ### TTS 試聽

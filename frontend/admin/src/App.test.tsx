@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -141,6 +142,25 @@ describe("App tab mounting", () => {
     expect(await screen.findByRole("button", { name: "目前專案：Default" })).toBeTruthy();
   });
 
+  it("waits for project grants before mounting a page without project in its URL", async () => {
+    let finishProjects!: (response: Awaited<ReturnType<typeof fetchProjects>>) => void;
+    vi.mocked(fetchProjects).mockImplementation(() => new Promise((resolve) => {
+      finishProjects = resolve;
+    }));
+    window.history.replaceState(null, "", "/admin/chat");
+
+    render(<App />);
+    expect(await screen.findByText("正在載入可用專案…")).toBeTruthy();
+    expect(screen.queryByTestId("tab-chat")).toBeNull();
+
+    await act(async () => finishProjects({
+      project_count: 1,
+      projects: [{ project_id: "allowed", label: "Allowed", document_count: 0, persona_count: 0 }],
+    }));
+    expect(await screen.findByTestId("tab-chat")).toBeTruthy();
+    expect(window.location.pathname + window.location.search).toBe("/admin/chat?project=allowed");
+  });
+
   it("restores page and project on browser history navigation", async () => {
     render(<App />);
     await screen.findByTestId("tab-chat");
@@ -148,6 +168,17 @@ describe("App tab mounting", () => {
     fireEvent.popState(window);
     await screen.findByTestId("tab-health");
     expect(window.location.pathname + window.location.search).toBe("/admin/health");
+  });
+
+  it("does not mount Chat without a project grant and keeps project management reachable", async () => {
+    vi.mocked(fetchProjects).mockResolvedValue({ project_count: 0, projects: [] });
+    render(<App />);
+
+    expect(await screen.findByText("目前沒有可存取的專案，請聯絡管理員設定權限。")).toBeTruthy();
+    expect(screen.queryByTestId("tab-chat")).toBeNull();
+    fireEvent.click(screen.getAllByRole("button", { name: "System" })[0]);
+    fireEvent.click(screen.getAllByRole("link", { name: /專案管理/ })[0]);
+    expect(await screen.findByTestId("tab-projects")).toBeTruthy();
   });
 
   it("mounts only the active tab content", async () => {
@@ -235,7 +266,7 @@ describe("App tab mounting", () => {
     expect(screen.queryByRole("dialog", { name: "主要導覽" })).toBeNull();
   });
 
-  it("shows a project loading error and retries without hiding the active project", async () => {
+  it("retries project loading before mounting project pages", async () => {
     vi.mocked(fetchProjects)
       .mockRejectedValueOnce(new Error("network unavailable"))
       .mockResolvedValueOnce({
@@ -251,13 +282,10 @@ describe("App tab mounting", () => {
       });
     render(<App />);
 
-    const trigger = await screen.findByRole("button", {
-      name: "目前專案：default",
-    });
-    fireEvent.click(trigger);
     expect((await screen.findByRole("alert")).textContent).toContain(
       "network unavailable",
     );
+    expect(screen.queryByTestId("tab-chat")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "重試" }));
     await waitFor(() => expect(fetchProjects).toHaveBeenCalledTimes(2));
