@@ -98,3 +98,7 @@ infra/nginx/native/openvman.conf
 
 # tsc -b 的增量建置快取
 *.tsbuildinfo
+
+# scripts/voice_e2e：合成語音快取與逐題結果（可重建、含對話內容）
+scripts/voice_e2e/.cache/
+scripts/voice_e2e/results/

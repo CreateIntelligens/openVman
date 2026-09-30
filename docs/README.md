@@ -23,6 +23,7 @@
 | [帳號管理](operations/account-administration.md) | 權限、密碼、migration 與備份 |
 | [GPU 服務共用](operations/gpu-service-sharing.md) | 跨專案服務與路由設定 |
 | [文件解析](operations/05_DOCLING_RUNBOOK.md) | PDF 解析、轉換、修復與驗證 |
+| [語音對話模擬](../scripts/voice_e2e/README.md) | 送合成語音或錄音跑完整一輪：辨識、回答、TTS |
 
 ## 整合指南
 

@@ -1,0 +1,22 @@
+{
+ "description": "鶴記（EVAK 型錄）：型號與泵浦專有名詞、閒聊對照。terms 是辨識要聽對的詞（A|B 任一即可），reply_any 是回答要提到的字（任一即可）。",
+ "project_id": "proj-0cc5c610b4",
+ "voices": [
+  "edge-tts:zh-TW-HsiaoChenNeural",
+  "edge-tts:zh-TW-YunJheNeural",
+  "voxcpm:voxcpm2-cosy-young-male-01",
+  "voxcpm:voxcpm2-cosy-senior-female-01"
+ ],
+ "cases": [
+  {"id": "diva-agitator", "text": "請問 DIVA 有攪拌器嗎？", "terms": ["DIVA"], "reply_any": ["DIVA"]},
+  {"id": "submersible-depth", "text": "沉水泵最深可以放多深？", "terms": ["沉水泵"], "reply_any": ["10", "十"]},
+  {"id": "eubl-hp", "text": "EUBL 有哪些馬力規格？", "terms": ["EUBL"], "reply_any": ["EUBL"]},
+  {"id": "eusr-outlet", "text": "50EUSR 的出水口徑是多少？", "terms": ["EUSR"], "reply_any": ["mm", "吋", "口徑"]},
+  {"id": "hippo-flow", "text": "HIPPO 污水泵最大流量是多少？", "terms": ["HIPPO", "污水泵"], "reply_any": ["HIPPO"]},
+  {"id": "alligator-cut", "text": "ALLIGATOR 絞碎泵可以絞碎什麼？", "terms": ["ALLIGATOR", "絞碎泵"], "reply_any": ["ALLIGATOR", "絞碎"]},
+  {"id": "slurry-pick", "text": "工地要抽泥漿，推薦哪一款泥漿泵？", "terms": ["泥漿泵"], "reply_any": ["泥漿"]},
+  {"id": "head-meaning", "text": "泵浦的揚程是什麼意思？", "terms": ["泵浦", "揚程"], "reply_any": ["揚程"]},
+  {"id": "qdc-install", "text": "自動著脫裝置要怎麼安裝？", "terms": ["自動著脫裝置|自動脫著裝置"], "reply_any": ["著脫", "Q.D.C", "QDC"]},
+  {"id": "chit-who", "text": "你好，請問你是誰？", "terms": [], "reply_any": []}
+ ]
+}
