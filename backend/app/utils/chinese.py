@@ -20,7 +20,10 @@ def _ensure_opencc_loaded() -> None:
     try:
         import opencc
 
-        _opencc_s2t = opencc.OpenCC("s2t")
+        # s2tw 是台灣標準字形：s2t 出的是 OpenCC 自己的字形（着、裏、爲），
+        # 辨識結果「自動着脫裝置」在台灣讀起來是錯字。不用 s2twp：它會把詞改成
+        # 台灣說法（軟件→軟體），等於改寫使用者講的話。
+        _opencc_s2t = opencc.OpenCC("s2tw")
     except ImportError:
         logger.warning(
             "opencc-python-reimplemented is not installed, "

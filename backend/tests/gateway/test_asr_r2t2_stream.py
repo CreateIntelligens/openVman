@@ -182,8 +182,8 @@ def test_incremental_transcripts_reset_and_final_text_override(monkeypatch):
     assert socket.sent == [
         {"type": "ready"},
         {"type": "interim", "text": "好，泵"},
-        {"type": "interim", "text": "好，泵浦在哪裏"},
-        {"type": "final", "text": "泵浦在哪裏？"},
+        {"type": "interim", "text": "好，泵浦在哪裡"},
+        {"type": "final", "text": "泵浦在哪裡？"},
         {"type": "interim", "text": "設備"},
         {"type": "final", "text": "設備開關"},
     ]
