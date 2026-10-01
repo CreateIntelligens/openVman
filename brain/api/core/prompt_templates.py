@@ -107,23 +107,41 @@ def reply_language_line(
             "這一輪的回答語言：看使用者這句話是用哪種語言寫的就用哪種（英文字句用英文、"
             "西班牙文字句用西班牙文、日文用日文、韓文用韓文），"
             f"只有型號、數字這類看不出語言的輸入才用{name}。"
-            + _FOREIGN_LENGTH_LINE
+            + reply_length_line("")
         )
     name = PRIMARY_LANGUAGE_NAMES.get(code, "繁體中文")
     line = f"這一輪的回答語言：{name}。整段回答都用{name}，不要夾雜其他語言。"
-    if code in ("ja", "ko"):
-        return line + _CJK_LENGTH_LINE
-    return line if code == "zh" else line + _FOREIGN_LENGTH_LINE
+    return line + reply_length_line(code)
 
 
-# 虛擬人會把回答念出來。同一句拒答，中文 67–89 字約 15 秒，西語 330–400 字元要講
-# 25–30 秒（鶴記 2026-09-29）：模型把人設的中文固定句翻過去時會順手加長。
-_FOREIGN_LENGTH_LINE = (
-    "英文、西班牙文回答的資訊量跟中文回答一樣，不要因為換語言而多加說明或客套："
-    "以 2 到 3 句、約 40 個單字以內為原則，使用者要求列出詳細規格時才寫長。"
-)
-# 日韓不是用單字數；跟中文一樣看句數與字數。
-_CJK_LENGTH_LINE = (
-    "回答的資訊量跟中文回答一樣，不要因為換語言而多加說明或客套："
-    "以 2 到 3 句為原則，使用者要求列出詳細規格時才寫長。"
-)
+# 虛擬人會把回答念出來，長度用「念多久」定，再依語速換成各語言的字數；只給「約」，
+# 不硬切。語速實測（2026-10-02，/v1/audio/speech 念鶴記答案）：
+# - 正式聲音 VoxCPM：一般中文句 3.1 字／秒（型錄答案型號數字多，算字元是 5.3）、
+#   日文 3.7、韓文 3.7 字／秒、英西約 1.45 詞／秒；Edge 曉臻中文 4.7 字／秒、英西 2.0 詞／秒。
+# - 同一題中英西念的秒數差不到一成：西語念得久是寫得長（09-29 拒答 330–400 字元、
+#   25–30 秒），不是語速慢。
+# 中日韓取 VoxCPM 與 Edge 之間的每秒 4 字。
+REPLY_SECONDS = 20
+DETAIL_SECONDS = 40
+_WORDS_PER_SECOND = 1.5
+_CHARS_PER_SECOND = 4
+_CHARACTER_LANGUAGES = ("zh", "nan", "ja", "ko")
+
+
+def _budget(code: str, seconds: int) -> str:
+    if code in _CHARACTER_LANGUAGES:
+        return f"約 {seconds * _CHARS_PER_SECOND} 字"
+    return f"約 {round(seconds * _WORDS_PER_SECOND)} 個單字"
+
+
+def reply_length_line(code: str) -> str:
+    """How long this turn's reply may be, as speaking time turned into this language's units."""
+    prefix = (
+        "" if code in ("zh", "nan")
+        else "資訊量跟中文回答一樣，不要因為換語言而多加說明或客套。"
+    )
+    return (
+        f"{prefix}回答會被念出來：以 {REPLY_SECONDS} 秒內念完（{_budget(code, REPLY_SECONDS)}）"
+        f"為原則；使用者要求詳細規格或一次問好幾件事時，最多約 {DETAIL_SECONDS} 秒"
+        f"（{_budget(code, DETAIL_SECONDS)}）。"
+    )

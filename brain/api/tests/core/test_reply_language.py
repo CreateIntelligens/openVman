@@ -76,11 +76,27 @@ def test_chat_prompt_ends_with_the_reply_language(monkeypatch):
     assert "本專案主要語言：" not in messages[0]["content"]
 
 
-def test_foreign_replies_are_kept_as_short_as_chinese():
-    """虛擬人會念出來：西語拒答 330–400 字元講 25–30 秒，中文同一句 15 秒。"""
+def test_every_language_gets_a_speaking_time_budget():
+    """虛擬人會念出來：長度用秒數定，再換成各語言的字數或單字數。"""
     spanish = prompt_templates.reply_language_line("p", "¿Cuántos caballos tiene la bomba de lodos?")
     english = prompt_templates.reply_language_line("p", "How much horsepower does the sludge pump have?")
     chinese = prompt_templates.reply_language_line("p", "污泥泵有幾匹馬力？")
-    assert "約 40 個單字以內" in spanish
-    assert "約 40 個單字以內" in english
+    taiwanese = prompt_templates.reply_language_line("p", "我想欲問掛號", speech_language="nan")
+    unclear = prompt_templates.reply_language_line("p", "EUBL pump specs")
+    for line in (spanish, english, chinese, taiwanese, unclear):
+        assert f"以 {prompt_templates.REPLY_SECONDS} 秒內念完" in line
+    assert "約 30 個單字" in spanish and "約 60 個單字" in spanish
+    assert "約 30 個單字" in english
+    assert "約 80 字" in chinese and "約 160 字" in chinese
+    assert "約 80 字" in taiwanese
     assert "單字" not in chinese
+    # 換語言不能多加說明：只有外語要這句。
+    assert "不要因為換語言" in spanish and "不要因為換語言" not in chinese
+
+
+@pytest.mark.parametrize("code", ["ja", "ko"])
+def test_japanese_and_korean_budget_by_characters(code):
+    line = prompt_templates.reply_length_line(code)
+    assert "約 80 字" in line and "約 160 字" in line
+    assert "單字" not in line
+    assert "不要因為換語言" in line

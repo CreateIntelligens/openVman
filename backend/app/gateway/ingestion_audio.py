@@ -312,7 +312,8 @@ async def transcribe(
 ) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
 
-    ``prompt`` 是專案的專有名詞詞表；只有 Breeze、OpenAI 會用，其他引擎忽略。
+    ``prompt`` 是專案的專有名詞詞表；Breeze、OpenAI（prompt）與 R2T2（context）會用，
+    SenseVoice、小米忽略。
 
     Returns IngestionResult with content_type="audio_transcription".
     """
