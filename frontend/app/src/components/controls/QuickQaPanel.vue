@@ -8,19 +8,19 @@
     >
       <div class="panel-header">
         <div class="panel-header__left">
-          <button v-if="currentPath.length > 0" type="button" class="back-btn" @click="goBack" title="返回上一層">
+          <button v-if="currentPath.length > 0" type="button" class="back-btn" @click="goBack" :title="copy.backHint">
             <svg class="back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="19" y1="12" x2="5" y2="12"/>
               <polyline points="12 19 5 12 12 5"/>
             </svg>
-            <span>返回</span>
+            <span>{{ copy.back }}</span>
           </button>
-          <span v-else class="header-label">快速問題</span>
+          <span v-else class="header-label">{{ copy.title }}</span>
         </div>
 
         <h4 id="quick-qa-title" class="panel-title">{{ currentTitle }}</h4>
 
-        <button type="button" class="close-btn" @click="handleClose" aria-label="關閉" title="關閉">
+        <button type="button" class="close-btn" @click="handleClose" :aria-label="copy.close" :title="copy.close">
           <svg class="close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -31,14 +31,14 @@
       <div class="panel-body">
         <div v-if="loading" class="state-container">
           <div class="spinner"></div>
-          <p>正在載入問答分類...</p>
+          <p>{{ copy.loading }}</p>
         </div>
         <div v-else-if="error" class="state-container error-state">
           <p>{{ error }}</p>
-          <button type="button" class="retry-btn" @click="fetchNodes">重新整理</button>
+          <button type="button" class="retry-btn" @click="fetchNodes">{{ copy.retry }}</button>
         </div>
         <div v-else-if="currentSubNodes.length === 0 && currentQuestions.length === 0" class="state-container empty-state">
-          <p>此分類尚無問答內容</p>
+          <p>{{ copy.empty }}</p>
         </div>
 
         <div v-else class="qa-grid">
@@ -70,6 +70,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { apiFetch } from "../../api/http";
+import { quickQaCopy, quickQaLanguage, visibleNodes } from "./quickQaText";
 
 export interface QaEntry {
   question: string;
@@ -121,17 +122,24 @@ const currentNode = computed(() => {
   return currentPath.value[currentPath.value.length - 1];
 });
 
+const copy = computed(() => quickQaCopy(quickQaLanguage(currentPath.value)));
+
+// 有可見子分類的才算資料夾：子分類全被隱藏時，這一層的題目直接列出來。
+function hasVisibleChildren(node: QaNode): boolean {
+  return visibleNodes(node.children).length > 0;
+}
+
 const currentSubNodes = computed(() => {
   if (!currentNode.value) {
-    return nodes.value.filter(n => n.children && n.children.length > 0);
+    return visibleNodes(nodes.value).filter(hasVisibleChildren);
   }
-  return currentNode.value.children ?? [];
+  return visibleNodes(currentNode.value.children);
 });
 
 const currentQuestions = computed(() => {
   if (!currentNode.value) {
-    return nodes.value.flatMap(node =>
-      (node.children && node.children.length > 0)
+    return visibleNodes(nodes.value).flatMap(node =>
+      hasVisibleChildren(node)
         ? []
         : (node.qa_entries ?? []).filter(entry => !entry.hidden)
     );
@@ -141,7 +149,7 @@ const currentQuestions = computed(() => {
 
 const currentTitle = computed(() => {
   if (!currentNode.value) {
-    return "快速問題";
+    return copy.value.title;
   }
   return currentNode.value.label || currentNode.value.node_id;
 });
@@ -175,7 +183,7 @@ function selectQuestion(question: string, sourcePath?: string): void {
 function getErrorMessage(err: unknown): string {
   return err instanceof Error && err.message
     ? err.message
-    : "載入問答分類失敗";
+    : copy.value.loadFailed;
 }
 
 async function fetchNodes(): Promise<void> {
@@ -184,7 +192,7 @@ async function fetchNodes(): Promise<void> {
   error.value = null;
   try {
     const res = await apiFetch(`/api/v1/knowledge/qa/nodes?project_id=${encodeURIComponent(props.projectId)}`);
-    if (!res.ok) throw new Error("無法取得問答分類");
+    if (!res.ok) throw new Error(copy.value.loadFailed);
     const data = await res.json();
     nodes.value = data ?? [];
   } catch (err) {
