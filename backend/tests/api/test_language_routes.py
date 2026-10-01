@@ -142,3 +142,53 @@ def test_non_wav_uploads_are_converted(monkeypatch, tmp_path):
         returncode=0, stdout=b"RIFF-converted", stderr=b"",
     ))
     assert lr._to_wav_bytes(str(clip)) == b"RIFF-converted"
+
+
+class _Settings:
+    """Brain's /brain/knowledge/settings: answers, or refuses like a restarting container."""
+
+    def __init__(self, routes):
+        self.routes = routes
+        self.down = False
+        self.calls = 0
+
+    async def get(self, url, params=None, headers=None):
+        self.calls += 1
+        if self.down:
+            raise ConnectionError("All connection attempts failed")
+        routes = self.routes
+        return types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"language_routes": routes})
+
+
+@pytest.fixture
+def brain_settings(monkeypatch):
+    settings = _Settings(["zh", "nan"])
+    monkeypatch.setattr(lr, "_cache", {})
+    monkeypatch.setattr(lr._http, "get", lambda: settings)
+    clock = [100.0]
+    monkeypatch.setattr(lr.time, "monotonic", lambda: clock[0])
+    return settings, clock
+
+
+def test_brain_restart_keeps_the_last_known_routes(brain_settings):
+    """部署時 Brain 重啟約半分鐘：不能因此把台語分流默默關掉。"""
+    settings, clock = brain_settings
+    assert asyncio.run(lr.admin_routes("proj-hospital")) == ["zh", "nan"]
+    clock[0] += lr._CACHE_SECONDS + 1
+    settings.down = True
+    assert asyncio.run(lr.admin_routes("proj-hospital")) == ["zh", "nan"]
+    assert settings.calls == 2  # 過期了還是有去問，問不到才沿用
+
+
+def test_never_seen_project_falls_back_to_chinese_when_brain_is_down(brain_settings):
+    settings, _ = brain_settings
+    settings.down = True
+    assert asyncio.run(lr.admin_routes("proj-new")) == ["zh"]
+
+
+def test_fresh_answer_replaces_the_last_known_routes(brain_settings):
+    settings, clock = brain_settings
+    asyncio.run(lr.admin_routes("proj-hospital"))
+    clock[0] += lr._CACHE_SECONDS + 1
+    settings.routes = ["zh"]
+    assert asyncio.run(lr.admin_routes("proj-hospital")) == ["zh"]

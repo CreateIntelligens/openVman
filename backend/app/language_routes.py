@@ -81,7 +81,14 @@ async def admin_routes(project_id: str | None) -> list[str]:
             route for route in response.json().get("language_routes", [])
             if route in KNOWN_ROUTES
         ]
-    except Exception as exc:  # noqa: BLE001 - Brain 查不到就當只有中文
+    except Exception as exc:  # noqa: BLE001 - Brain 查不到不能讓語音請求失敗
+        # 部署時 Brain 重啟約半分鐘查不到；退回「只有中文」會默默關掉台語分流，
+        # 那段時間講台語都被當華語。上次查到的設定（即使過期）比預設接近事實。
+        if cached:
+            logger.warning(
+                "language routes lookup failed for %s, using last known: %s", project_id, exc,
+            )
+            return cached[1]
         logger.warning("language routes lookup failed for %s: %s", project_id, exc)
         return [CHINESE]
     routes = routes or [CHINESE]
