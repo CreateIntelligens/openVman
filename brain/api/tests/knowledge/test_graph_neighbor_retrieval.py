@@ -247,3 +247,23 @@ def test_god_node_neighbour_is_excluded(monkeypatch):
 
     assert "index.md" not in fetched
     assert "linked.md" in fetched
+
+
+def test_expand_via_graph_skips_disabled_documents(monkeypatch):
+    """後台停用的文件不能經由圖譜鄰居被帶回答案。"""
+    table = _FakeTable([_row("knowledge/EVAK_QA.en.md")])
+    _stub_infra(monkeypatch, table)
+    kt = _load_knowledge_tools()
+
+    fake_graph_rag = types.ModuleType("knowledge.graph_rag")
+    fake_graph_rag.expand_with_graph = lambda hits, project_id, fetch_chunks: fetch_chunks(
+        "knowledge/EVAK_QA.en.md", 2,
+    )
+    monkeypatch.setitem(sys.modules, "knowledge.graph_rag", fake_graph_rag)
+    import knowledge.doc_meta as doc_meta
+
+    monkeypatch.setattr(doc_meta, "list_disabled_document_paths",
+                        lambda project_id: {"knowledge/EVAK_QA.en.md"})
+
+    assert kt._expand_via_graph([{"path": "knowledge/qa/EVAK_QA_en.md"}], "p", [0.1]) == []
+    assert table.search_calls == []

@@ -387,6 +387,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 - 同一份詞表的正確詞（不含對照行）也經 `GET /brain/internal/asr-glossary` 給 Backend，帶給 Breeze 與 OpenAI 辨識當 Whisper 前文，辨識出來的字本身就對；Gemini Live、Xiaomi、SenseVoice 不吃提示詞。
 
 - 檢索門檻：向量距離（LanceDB l2，即平方歐氏距離）超過 `rag_distance_cutoff`（1.0；2026-09-29 由 0.85 放寬，見 `scripts/experiments/kb-cutoff/`）的段落丟掉；關鍵字（FTS）命中的段落補算與查詢的距離，放寬到 `rag_fts_distance_cutoff`（1.1）。以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落。
+- 停用的文件（後台文件頁的啟用開關，`.doc_meta.json` 的 `enabled: false`）不會重建索引，而是在查詢時略過：向量／關鍵字檢索與知識圖譜擴充抓相鄰文件段落，兩條路都會檢查。
 - 跨語言提問靠同一份內容的多語版本（例如鶴記型錄中英西三版，翻譯版手動標語言），不在查詢時翻譯：bge-m3 跨語言距離比同語言高約 0.25，西語問中文型錄會被當時的 0.85 門檻全擋掉；有西語版後西語提問 0.65–0.79 查到正確頁。
 
 同一份內容可準備中、英、西三個版本的文件（例如鶴記的型錄），使用者用哪種語言問就用那個版本的原文回答，不靠模型翻譯。

@@ -258,9 +258,17 @@ def _expand_via_graph(
     project_id: str,
     query_vector: list[float] | None = None,
 ) -> list[dict[str, Any]]:
+    from knowledge.doc_meta import list_disabled_document_paths
     from knowledge.graph_rag import expand_with_graph
 
+    # 向量檢索會略過後台停用的文件，圖譜鄰居直接按路徑抓段落，也要略過：
+    # 不然停用的文件只要在圖上跟命中的文件相鄰，就會被帶回答案（鶴記停用的
+    # EVAK_QA.en.md 照樣出現在引用來源）。
+    disabled = list_disabled_document_paths(project_id)
+
     def fetch_project_chunks(file_path: str, limit: int) -> list[dict[str, Any]]:
+        if file_path in disabled:
+            return []
         return _fetch_chunks_by_file(file_path, limit, project_id, query_vector)
 
     try:
