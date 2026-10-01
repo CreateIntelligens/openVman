@@ -40,6 +40,8 @@
 
 - [Embedding 意圖影子模式計畫](plans/embedding-intent-shadow.md)（已退場，改用 Jev）
 - [兩個前端共用語音核心（ASR／VAD／TTS）](plans/shared-speech-core.md)
+- [Confucius4-R2T2 辨識實驗](../scripts/experiments/r2t2/REPORT.md)：批次準確度與 Breeze 相當、快約 3 倍；串流專有名詞 13/18 對 Gemini Live 3/18
+- [R2T2 串流辨識接上前台](plans/r2t2-streaming-asr.md)（Draft）：Gemini Live 以外的串流引擎，鶴記實測專有名詞 13/18 對 3/18
 - [OpenSpec 變更提案](../openspec/changes/)
 - [Jev 決策層計畫](plans/jev-decision-layer.md)：意圖分流影子觀測 → RAG 證據判斷；SemIf 退場
 - [Jev API 分流／打斷評估](../scripts/experiments/jev/REPORT.md)：官方 Jev API 在 SemIf 同一份合成題庫上 96/96、零順序翻轉。

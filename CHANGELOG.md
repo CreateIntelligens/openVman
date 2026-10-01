@@ -50,6 +50,9 @@
 
 ### Added
 
+- **批次辨識多一個引擎 Confucius4-R2T2（`r2t2`）**：網易有道開源、Qwen3-ASR-1.7B。`/transcribe` 帶 `language=Chinese`（.37 收到 `zhen` 會回 500）與專案詞表 `context`，輸出簡體轉繁體；設 `ASR_R2T2_URL` 才排進備援順序，使用者可在聊天室選它。鶴記 10 題合成語音帶詞表：.37 錯字率 6.9%、專有名詞 13/18、p50 0.28 秒，Breeze 5.8%、14/18、約 1.0 秒；R2T2 會把台語寫成台語漢字，台語分流照舊用 Breeze。.35（vLLM 版）同時請求會卡死，只用 .37（`scripts/experiments/r2t2/REPORT.md`）。
+- 前台新增 Confucius4-R2T2 串流引擎 `r2t2-live`，與 Gemini Live 並存、與批次 `r2t2` 分開授權。Backend 依帳號偏好轉接 .37、帶專案詞表、重切 PCM 片段、增量累加與繁體定稿；停止時補齊尾段再送 EOS。未設定或上游失敗沿用批次備援，台語分流維持 Breeze。
+
 - **語音對話模擬（`scripts/voice_e2e/`）**：不用對著前台講話，也能測完整的一輪語音對話。腳本用系統自己的 TTS（edge-tts、VoxCPM 等）念題目，或讀真人錄音，照前台的節奏送進串流辨識（`/api/v1/asr/stream`，每 0.1 秒 3200 bytes）與批次辨識（`/api/v1/asr/transcribe`），再問 `/api/v1/chat`，也可以用 `/api/v1/tts/stream` 念出回答；每一輪記錄錯字率、專有名詞有沒有聽對、回答有沒有講到預期的字，以及各段耗時。`--user` 在 backend 容器裡替帳號簽短效 token，不用存密碼；可以混入雜訊；跑完刪掉建立的對話。題庫在 `scripts/voice_e2e/cases/`：鶴記 10 題（合成語音）、台語連續劇真人錄音 75 句（批次辨識＋台語判斷；一次一句 69/75 判成台語，同時 3 句則全部超過 2.5 秒逾時），打分與題庫格式有單元測試（`tests/test_voice_e2e.py`）。
 - **專案詞表也帶給 Breeze 與 OpenAI 辨識**：Breeze-ASR-360 1.4 起 `/transcribe` 多了選填的 `prompt` 欄位（Whisper 前文；gb10 那邊實測 12 句含「污泥泵」「DIVA」「沉水泵」「EUBL」「泵浦」的合成音 12 句修正，台語 40 句回歸沒有硬塞詞表的字，延遲 +0.01 秒）。Backend 語音辨識前向 Brain 新的內部端點 `GET /brain/internal/asr-glossary` 取專案詞表（快取 60 秒），帶給 Breeze 與 OpenAI（gpt-4o-mini-transcribe 的 `prompt`）；Xiaomi、SenseVoice、Gemini Live 不吃提示詞，照舊。只帶正確的詞：`ASR_PROMPT.md` 裡「常見誤聽：A→B」這類對照行只給對話模型看，送給辨識引擎會把錯字也教給它。同一專案每次送同一串字，Breeze 才能併批。
 - **專案詞表幫 Brain 對回語音誤聽**：Gemini Live 辨識會把「沉水泵」聽成「沉睡泵」、「DIVA」聽成「低瓦」，而轉錄模型不吃背景知識（實測 `systemInstruction` 給不給結果一字不差）。Brain 每輪對話提示多一段：訊息可能是語音辨識結果、這個專案的專有名詞有哪些（讀專案 workspace 的 `ASR_PROMPT.md`，原本給 Whisper 的詞庫，2026-07 起沒人讀）；模型在理解問題與寫知識庫查詢時自己對回，不多一次模型呼叫。鶴記實測：「低瓦有攪拌器嗎」從答非所問變成答對；詞表加「常見誤聽：UNI本→污泥泵」這類對照後，原本修不回的三句都答對；「奔騰電腦」這類無關問題不被帶偏（`scripts/experiments/asr-glossary/`）。畫面上的使用者文字仍是原本辨識的結果。

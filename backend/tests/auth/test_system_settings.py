@@ -159,3 +159,29 @@ def test_frontend_engine_list_matches_the_backend():
     match = re.search(r"SERVER_ASR_ENGINES = \[([^\]]*)\]", source)
     assert match, "SERVER_ASR_ENGINES not found in engines.ts"
     assert set(re.findall(r'"([^"]+)"', match.group(1))) == set(SERVER_ASR_PROVIDERS)
+
+
+def test_streaming_engines_match_frontend_relay_and_admin_registration():
+    import re
+
+    from app.auth.settings_repository import (
+        SERVER_ASR_PROVIDERS,
+        STREAM_ASR_PROVIDERS,
+    )
+    from app.gateway.asr_stream import _STREAM_ENGINES
+    from app.routes.admin import _ASR_ENGINE_LABELS
+
+    source = (
+        Path(__file__).resolve().parents[3]
+        / "frontend" / "shared" / "speech" / "asr" / "engines.ts"
+    ).read_text(encoding="utf-8")
+    constants = dict(re.findall(r'export const (\w+) = "([^"]+)"', source))
+    match = re.search(r"STREAM_ASR_ENGINES = \[([^\]]*)\]", source)
+    assert match, "STREAM_ASR_ENGINES not found in engines.ts"
+    frontend = {
+        constants[name.strip()] for name in match.group(1).split(",")
+        if name.strip()
+    }
+    assert frontend == STREAM_ASR_PROVIDERS == _STREAM_ENGINES
+    assert not STREAM_ASR_PROVIDERS & SERVER_ASR_PROVIDERS
+    assert STREAM_ASR_PROVIDERS <= _ASR_ENGINE_LABELS.keys()

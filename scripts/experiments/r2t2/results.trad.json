@@ -1,0 +1,3216 @@
+[
+ {
+  "set": "heji",
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "r2t2_plain": {
+   "text": "请问tv有搅拌器吗？",
+   "ms": 1320,
+   "cer": 0.636,
+   "terms_ok": false,
+   "text_trad": "請問tv有攪拌器嗎？",
+   "cer_trad": 0.273,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "请问diva有搅拌器吗？",
+   "ms": 1049,
+   "cer": 0.364,
+   "terms_ok": true,
+   "text_trad": "請問diva有攪拌器嗎？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "請問DV有攪拌器嗎",
+   "ms": 1046,
+   "cer": 0.182,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "請問DIVA有攪拌器嗎",
+   "ms": 942,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "r2t2_plain": {
+   "text": "沉睡笨最深可以放多深？",
+   "ms": 1483,
+   "cer": 0.2,
+   "terms_ok": false,
+   "text_trad": "沉睡笨最深可以放多深？",
+   "cer_trad": 0.2,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "沉睡泵最深可以放多深？",
+   "ms": 1225,
+   "cer": 0.1,
+   "terms_ok": false,
+   "text_trad": "沉睡泵最深可以放多深？",
+   "cer_trad": 0.1,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "沈睡笨醉生可以放多生",
+   "ms": 936,
+   "cer": 0.6,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "沉水泵最深可以放多深",
+   "ms": 899,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "r2t2_plain": {
+   "text": "eubl有哪些马力规格？",
+   "ms": 1458,
+   "cer": 0.182,
+   "terms_ok": true,
+   "text_trad": "eubl有哪些馬力規格？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "eubl有哪些马力规格？",
+   "ms": 1221,
+   "cer": 0.182,
+   "terms_ok": true,
+   "text_trad": "eubl有哪些馬力規格？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "Eubl有哪些馬力規格",
+   "ms": 895,
+   "cer": 0.0,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "EUBL有哪些馬力規格",
+   "ms": 975,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "r2t2_plain": {
+   "text": "五十一usr的出水口径是多少？",
+   "ms": 1749,
+   "cer": 0.286,
+   "terms_ok": false,
+   "text_trad": "五十一usr的出水口徑是多少？",
+   "cer_trad": 0.214,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "五十一usr的出水口径是多少？",
+   "ms": 1414,
+   "cer": 0.286,
+   "terms_ok": false,
+   "text_trad": "五十一usr的出水口徑是多少？",
+   "cer_trad": 0.214,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "51USR的出水口徑是多少",
+   "ms": 933,
+   "cer": 0.143,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "51 EUSR的出水口徑是多少",
+   "ms": 993,
+   "cer": 0.071,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "r2t2_plain": {
+   "text": "hippo污水泵最大流量是多少？",
+   "ms": 1577,
+   "cer": 0.0,
+   "terms_ok": true,
+   "text_trad": "hippo污水泵最大流量是多少？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "hippo污水泵最大流量是多少？",
+   "ms": 1289,
+   "cer": 0.0,
+   "terms_ok": true,
+   "text_trad": "hippo污水泵最大流量是多少？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "那本無水分最大流量是多少",
+   "ms": 900,
+   "cer": 0.467,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "HIPPO汙水泵最大流量是多少",
+   "ms": 1019,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "r2t2_plain": {
+   "text": "alligator绞碎泵可以绞碎石吗？",
+   "ms": 1561,
+   "cer": 0.222,
+   "terms_ok": false,
+   "text_trad": "alligator絞碎泵可以絞碎石嗎？",
+   "cer_trad": 0.111,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "alligator绞碎泵可以绞碎石吗？",
+   "ms": 1254,
+   "cer": 0.222,
+   "terms_ok": false,
+   "text_trad": "alligator絞碎泵可以絞碎石嗎？",
+   "cer_trad": 0.111,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "Alligator絞碎棒可以絞碎石嗎",
+   "ms": 1021,
+   "cer": 0.167,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "ALLIGATOR絞碎棒可以絞碎石嗎",
+   "ms": 1133,
+   "cer": 0.167,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "r2t2_plain": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 1906,
+   "cer": 0.214,
+   "terms_ok": false,
+   "text_trad": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 1601,
+   "cer": 0.214,
+   "terms_ok": false,
+   "text_trad": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "工地要抽泥漿 推薦哪一款泥漿磅",
+   "ms": 1247,
+   "cer": 0.071,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "工地要抽泥漿 推薦哪一款泥漿泵",
+   "ms": 1311,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "r2t2_plain": {
+   "text": "洞浦的阳城是什么意思？",
+   "ms": 1486,
+   "cer": 0.4,
+   "terms_ok": false,
+   "text_trad": "洞浦的陽城是什麼意思？",
+   "cer_trad": 0.3,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "洞浦的阳城是什么意思？",
+   "ms": 1184,
+   "cer": 0.4,
+   "terms_ok": false,
+   "text_trad": "洞浦的陽城是什麼意思？",
+   "cer_trad": 0.3,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "東浦的揚晨是什麼意思",
+   "ms": 899,
+   "cer": 0.2,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "動譜的揚程是什麼意思",
+   "ms": 872,
+   "cer": 0.2,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "r2t2_plain": {
+   "text": "自动者拖装置要怎么安装？",
+   "ms": 1463,
+   "cer": 0.545,
+   "terms_ok": false,
+   "text_trad": "自動者拖裝置要怎麼安裝？",
+   "cer_trad": 0.182,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "自动著脱装置要怎么安装？",
+   "ms": 1181,
+   "cer": 0.455,
+   "terms_ok": false,
+   "text_trad": "自動著脫裝置要怎麼安裝？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "自動者托裝置要怎麼安裝",
+   "ms": 877,
+   "cer": 0.182,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "自動著脫裝置要怎麼安裝",
+   "ms": 913,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你好，请问你是谁？",
+   "ms": 1266,
+   "cer": 0.429,
+   "terms_ok": true,
+   "text_trad": "你好，請問你是誰？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "你好，请问你是谁？",
+   "ms": 1018,
+   "cer": 0.429,
+   "terms_ok": true,
+   "text_trad": "你好，請問你是誰？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你好 請問你是誰",
+   "ms": 816,
+   "cer": 0.0,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "你好 請問你是誰",
+   "ms": 965,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "r2t2_plain": {
+   "text": "请问低位有搅拌器吗？",
+   "ms": 1119,
+   "cer": 0.727,
+   "terms_ok": false,
+   "text_trad": "請問低位有攪拌器嗎？",
+   "cer_trad": 0.364,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "请问低位有搅拌器吗？",
+   "ms": 919,
+   "cer": 0.727,
+   "terms_ok": false,
+   "text_trad": "請問低位有攪拌器嗎？",
+   "cer_trad": 0.364,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "請問地方有攪拌器嗎",
+   "ms": 916,
+   "cer": 0.364,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "請問DIVA有攪拌器嗎",
+   "ms": 933,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "r2t2_plain": {
+   "text": "沉水泵最深可以放多深？",
+   "ms": 1448,
+   "cer": 0.0,
+   "terms_ok": true,
+   "text_trad": "沉水泵最深可以放多深？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "沉水泵最深可以放多深？",
+   "ms": 1172,
+   "cer": 0.0,
+   "terms_ok": true,
+   "text_trad": "沉水泵最深可以放多深？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "晨雪崩最深 可以放多深",
+   "ms": 943,
+   "cer": 0.3,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "沉水泵最深可以放多深",
+   "ms": 1032,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "r2t2_plain": {
+   "text": "eubl有哪些马力规格？",
+   "ms": 1421,
+   "cer": 0.182,
+   "terms_ok": true,
+   "text_trad": "eubl有哪些馬力規格？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "eubl有哪些马力规格",
+   "ms": 1178,
+   "cer": 0.182,
+   "terms_ok": true,
+   "text_trad": "eubl有哪些馬力規格",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "EU BR有哪些馬力規格",
+   "ms": 1021,
+   "cer": 0.091,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "EUBL有哪些馬力規格",
+   "ms": 969,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "r2t2_plain": {
+   "text": "五十伊万塞的出水口径是多少？",
+   "ms": 1589,
+   "cer": 0.5,
+   "terms_ok": false,
+   "text_trad": "五十伊萬塞的出水口徑是多少？",
+   "cer_trad": 0.429,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "五十一月赛的出水口径是多少？",
+   "ms": 1314,
+   "cer": 0.5,
+   "terms_ok": false,
+   "text_trad": "五十一月賽的出水口徑是多少？",
+   "cer_trad": 0.429,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "午時伊位薩德出水口 及時多少",
+   "ms": 1032,
+   "cer": 0.643,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "50 EUSR的出水口積是多少",
+   "ms": 952,
+   "cer": 0.071,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "r2t2_plain": {
+   "text": "一波污水泵最大流量是多少？",
+   "ms": 1561,
+   "cer": 0.333,
+   "terms_ok": false,
+   "text_trad": "一波污水泵最大流量是多少？",
+   "cer_trad": 0.333,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "hippo污水泵最大流量是多少",
+   "ms": 1280,
+   "cer": 0.0,
+   "terms_ok": true,
+   "text_trad": "hippo污水泵最大流量是多少",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "一泊汙水泵最大流量是多少",
+   "ms": 950,
+   "cer": 0.333,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "一波污水泵最大流量是多少",
+   "ms": 1021,
+   "cer": 0.333,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "r2t2_plain": {
+   "text": "阿拉杰的缴碎泵可以缴碎石吗？",
+   "ms": 1422,
+   "cer": 0.722,
+   "terms_ok": false,
+   "text_trad": "阿拉傑的繳碎泵可以繳碎石嗎？",
+   "cer_trad": 0.722,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "Alligator绞碎泵可以绞碎石吗？",
+   "ms": 1168,
+   "cer": 0.222,
+   "terms_ok": false,
+   "text_trad": "Alligator絞碎泵可以絞碎石嗎？",
+   "cer_trad": 0.111,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "阿勒給的繳稅簿可以繳稅是嗎",
+   "ms": 1098,
+   "cer": 0.889,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "ALLIGATOR絞碎泵可以絞碎石嗎",
+   "ms": 1108,
+   "cer": 0.111,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "r2t2_plain": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 1777,
+   "cer": 0.214,
+   "terms_ok": false,
+   "text_trad": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 1491,
+   "cer": 0.214,
+   "terms_ok": false,
+   "text_trad": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "工地要抽泥漿 推薦哪一款泥漿磅",
+   "ms": 1310,
+   "cer": 0.071,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "工地要抽泥漿 推薦哪一款泥漿泵",
+   "ms": 1271,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "r2t2_plain": {
+   "text": "蚌埠的羊城是什么意思？",
+   "ms": 1499,
+   "cer": 0.5,
+   "terms_ok": false,
+   "text_trad": "蚌埠的羊城是什麼意思？",
+   "cer_trad": 0.4,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "泵浦的扬程是什么意思？",
+   "ms": 1217,
+   "cer": 0.2,
+   "terms_ok": false,
+   "text_trad": "泵浦的揚程是什麼意思？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "孟婆的揚成是什麼意思",
+   "ms": 865,
+   "cer": 0.3,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "動土的揚程是什麼意思",
+   "ms": 883,
+   "cer": 0.2,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "r2t2_plain": {
+   "text": "自动褶托装置要怎么安装？",
+   "ms": 1306,
+   "cer": 0.545,
+   "terms_ok": false,
+   "text_trad": "自動褶託裝置要怎麼安裝？",
+   "cer_trad": 0.182,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "自动着脱装置要怎么安装？",
+   "ms": 1070,
+   "cer": 0.455,
+   "terms_ok": false,
+   "text_trad": "自動着脫裝置要怎麼安裝？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "自動折托裝置要怎麼安裝",
+   "ms": 900,
+   "cer": 0.182,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "自動著脫裝置要怎麼安裝",
+   "ms": 942,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你好，请问你是谁？",
+   "ms": 1411,
+   "cer": 0.429,
+   "terms_ok": true,
+   "text_trad": "你好，請問你是誰？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "你好，请问你是谁？",
+   "ms": 1177,
+   "cer": 0.429,
+   "terms_ok": true,
+   "text_trad": "你好，請問你是誰？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你好，請問你是誰",
+   "ms": 884,
+   "cer": 0.0,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "你好 請問你是誰",
+   "ms": 873,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "diva-agitator",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "r2t2_plain": {
+   "text": "請問，Diva有攪拌器嗎？",
+   "ms": 1964,
+   "cer": 0.0,
+   "terms_ok": true,
+   "text_trad": "請問，Diva有攪拌器嗎？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "请问diva有搅拌器吗？",
+   "ms": 1512,
+   "cer": 0.364,
+   "terms_ok": true,
+   "text_trad": "請問diva有攪拌器嗎？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "請問豬肉有拌半子嗎",
+   "ms": 1346,
+   "cer": 0.636,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "請問DIVA有招保試嗎",
+   "ms": 965,
+   "cer": 0.273,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "submersible-depth",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "r2t2_plain": {
+   "text": "沉水棒上深按怎放著深",
+   "ms": 2074,
+   "cer": 0.5,
+   "terms_ok": false,
+   "text_trad": "沉水棒上深按怎放著深",
+   "cer_trad": 0.5,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "沉水泵上深按按放着深",
+   "ms": 1721,
+   "cer": 0.4,
+   "terms_ok": true,
+   "text_trad": "沉水泵上深按按放着深",
+   "cer_trad": 0.4,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "釘水木 最深也要釋放到深",
+   "ms": 988,
+   "cer": 0.6,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "沉水泵 上深或下深",
+   "ms": 966,
+   "cer": 0.5,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eubl-hp",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "r2t2_plain": {
+   "text": "e u b l有哪些马列规则",
+   "ms": 1770,
+   "cer": 0.364,
+   "terms_ok": true,
+   "text_trad": "e u b l有哪些馬列規則",
+   "cer_trad": 0.182,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "eubl有哪些马力规格",
+   "ms": 1574,
+   "cer": 0.182,
+   "terms_ok": true,
+   "text_trad": "eubl有哪些馬力規格",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "以優比奧有打出來的馬力規格",
+   "ms": 977,
+   "cer": 0.727,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "EUBL有乾燥的馬力規格",
+   "ms": 969,
+   "cer": 0.273,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eusr-outlet",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "r2t2_plain": {
+   "text": "五十eusr的出水口径是",
+   "ms": 2897,
+   "cer": 0.357,
+   "terms_ok": true,
+   "text_trad": "五十eusr的出水口徑是",
+   "cer_trad": 0.286,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "五十eusr的出水口径是",
+   "ms": 1880,
+   "cer": 0.357,
+   "terms_ok": true,
+   "text_trad": "五十eusr的出水口徑是",
+   "cer_trad": 0.286,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "五十 EUSR的出水口徑是這些",
+   "ms": 940,
+   "cer": 0.286,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "五十EUSR的出水口徑是這些",
+   "ms": 990,
+   "cer": 0.286,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "hippo-flow",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "r2t2_plain": {
+   "text": "h i p o污水泵上大流量是偌济",
+   "ms": 2171,
+   "cer": 0.267,
+   "terms_ok": false,
+   "text_trad": "h i p o污水泵上大流量是偌濟",
+   "cer_trad": 0.267,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "hippo污水泵上大流量是",
+   "ms": 1787,
+   "cer": 0.2,
+   "terms_ok": true,
+   "text_trad": "hippo污水泵上大流量是",
+   "cer_trad": 0.2,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "HIPO烏水胖最大流量是勞資",
+   "ms": 1055,
+   "cer": 0.333,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "HIPO汙水泵最大流量是流這個",
+   "ms": 1085,
+   "cer": 0.267,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "alligator-cut",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "r2t2_plain": {
+   "text": "奶格了茶，九嘴放会当九嘴什么",
+   "ms": 2261,
+   "cer": 0.944,
+   "terms_ok": false,
+   "text_trad": "奶格了茶，九嘴放會當九嘴什麼",
+   "cer_trad": 0.889,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "nike的茶，九寸棒会当九寸什么",
+   "ms": 1859,
+   "cer": 0.889,
+   "terms_ok": false,
+   "text_trad": "nike的茶，九寸棒會當九寸什麼",
+   "cer_trad": 0.833,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "來 嫁就差 狗嘴放 可以狗嘴什麼",
+   "ms": 1163,
+   "cer": 0.778,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "來嫁就差，狗嘴放 可以狗嘴什麼",
+   "ms": 1373,
+   "cer": 0.778,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "slurry-pick",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "r2t2_plain": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵",
+   "ms": 2723,
+   "cer": 0.214,
+   "terms_ok": false,
+   "text_trad": "工地要抽泥漿，推薦哪一款泥漿泵",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "当地要抽泥浆，推荐哪一款泥浆泵",
+   "ms": 2191,
+   "cer": 0.286,
+   "terms_ok": false,
+   "text_trad": "當地要抽泥漿，推薦哪一款泥漿泵",
+   "cer_trad": 0.071,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "工地要抽奶漿 推薦哪一種奶漿麵包",
+   "ms": 1222,
+   "cer": 0.357,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "工地要抽奶漿 推薦哪一種奶漿麵包",
+   "ms": 1308,
+   "cer": 0.357,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "head-meaning",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "r2t2_plain": {
+   "text": "放屁的用情是什麽意思？",
+   "ms": 1398,
+   "cer": 0.5,
+   "terms_ok": false,
+   "text_trad": "放屁的用情是什麼意思？",
+   "cer_trad": 0.4,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "泵浦的用情是甚么意思？",
+   "ms": 1186,
+   "cer": 0.4,
+   "terms_ok": false,
+   "text_trad": "泵浦的用情是甚麼意思？",
+   "cer_trad": 0.3,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "放符的用情是什麼意思",
+   "ms": 841,
+   "cer": 0.4,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "放浦的揚程是什麼意思",
+   "ms": 899,
+   "cer": 0.1,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "qdc-install",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "r2t2_plain": {
+   "text": "主动就脱妆的，要安怎安装",
+   "ms": 1887,
+   "cer": 0.818,
+   "terms_ok": false,
+   "text_trad": "主動就脫妝的，要安怎安裝",
+   "cer_trad": 0.545,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "自动就脱装的，要安怎安装",
+   "ms": 1521,
+   "cer": 0.727,
+   "terms_ok": false,
+   "text_trad": "自動就脫裝的，要安怎安裝",
+   "cer_trad": 0.364,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "自動就託總機如何安裝",
+   "ms": 886,
+   "cer": 0.636,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "自動就脫裝置要如何安裝",
+   "ms": 949,
+   "cer": 0.273,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "chit-who",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "李好，请问你是",
+   "ms": 1310,
+   "cer": 0.571,
+   "terms_ok": true,
+   "text_trad": "李好，請問你是",
+   "cer_trad": 0.286,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "李好，请问你是",
+   "ms": 1128,
+   "cer": 0.571,
+   "terms_ok": true,
+   "text_trad": "李好，請問你是",
+   "cer_trad": 0.286,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你好 請問你是誰",
+   "ms": 755,
+   "cer": 0.0,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "你好 請問你是誰",
+   "ms": 873,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "diva-agitator",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "r2t2_plain": {
+   "text": "请问d i a a有交換器",
+   "ms": 2315,
+   "cer": 0.545,
+   "terms_ok": false,
+   "text_trad": "請問d i a a有交換器",
+   "cer_trad": 0.364,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "请问DIAA有胶管器",
+   "ms": 1821,
+   "cer": 0.545,
+   "terms_ok": false,
+   "text_trad": "請問DIAA有膠管器",
+   "cer_trad": 0.364,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "請問D-I-A-A有交辦器嗎",
+   "ms": 1074,
+   "cer": 0.273,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "請問DIAA有交換器嗎",
+   "ms": 1019,
+   "cer": 0.273,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "submersible-depth",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "r2t2_plain": {
+   "text": "电水烹上深会当放作深",
+   "ms": 1925,
+   "cer": 0.6,
+   "terms_ok": false,
+   "text_trad": "電水烹上深會當放作深",
+   "cer_trad": 0.6,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "沉水泵上深会当放造深",
+   "ms": 1585,
+   "cer": 0.4,
+   "terms_ok": true,
+   "text_trad": "沉水泵上深會當放造深",
+   "cer_trad": 0.4,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "燉水沖最深可以幫助深",
+   "ms": 925,
+   "cer": 0.4,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "沉水泵最深可以幫助深",
+   "ms": 1009,
+   "cer": 0.2,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eubl-hp",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "r2t2_plain": {
+   "text": "e u b l有呆怪马力规格",
+   "ms": 2096,
+   "cer": 0.364,
+   "terms_ok": true,
+   "text_trad": "e u b l有呆怪馬力規格",
+   "cer_trad": 0.182,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "eubl五呆怪马力规格",
+   "ms": 1735,
+   "cer": 0.455,
+   "terms_ok": true,
+   "text_trad": "eubl五呆怪馬力規格",
+   "cer_trad": 0.273,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "EUBL有呆拐馬力規格",
+   "ms": 943,
+   "cer": 0.182,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "EUBL有解決馬力規格",
+   "ms": 1011,
+   "cer": 0.182,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "eusr-outlet",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "r2t2_plain": {
+   "text": "五十eusr的出水口径是大",
+   "ms": 2256,
+   "cer": 0.357,
+   "terms_ok": true,
+   "text_trad": "五十eusr的出水口徑是大",
+   "cer_trad": 0.286,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "五十eusr的出水口径是大",
+   "ms": 1833,
+   "cer": 0.357,
+   "terms_ok": true,
+   "text_trad": "五十eusr的出水口徑是大",
+   "cer_trad": 0.286,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "五十EUSR的出水口徑是達界",
+   "ms": 999,
+   "cer": 0.286,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "五十EUSR的出水口徑是打折",
+   "ms": 1049,
+   "cer": 0.286,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "hippo-flow",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "r2t2_plain": {
+   "text": "h i p o无水硼上大流量是牙",
+   "ms": 2843,
+   "cer": 0.4,
+   "terms_ok": false,
+   "text_trad": "h i p o無水硼上大流量是牙",
+   "cer_trad": 0.4,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "h i p o污水泵上大流量是仰位",
+   "ms": 2214,
+   "cer": 0.267,
+   "terms_ok": false,
+   "text_trad": "h i p o污水泵上大流量是仰位",
+   "cer_trad": 0.267,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "HIPO 雨水篷 最大流量是衙尾",
+   "ms": 1095,
+   "cer": 0.333,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "HIPPO污水泵 最大流量是牙尾",
+   "ms": 1169,
+   "cer": 0.133,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "heji",
+  "id": "alligator-cut",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "r2t2_plain": {
+   "text": "l l i j o狗嘴棒会当狗嘴",
+   "ms": 2595,
+   "cer": 0.778,
+   "terms_ok": false,
+   "text_trad": "l l i j o狗嘴棒會當狗嘴",
+   "cer_trad": 0.778,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "l l i j o高嘴泵会当高嘴",
+   "ms": 2118,
+   "cer": 0.722,
+   "terms_ok": false,
+   "text_trad": "l l i j o高嘴泵會當高嘴",
+   "cer_trad": 0.722,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "L-L-I-J-O 狗嘴放 可以狗嘴什麼",
+   "ms": 1254,
+   "cer": 0.556,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "L-L-I-J-O 剪刀、石頭、布 可以剪刀、石頭、布",
+   "ms": 1600,
+   "cer": 0.778,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "slurry-pick",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "r2t2_plain": {
+   "text": "港地要抽泥浆，推荐哪一款泥浆",
+   "ms": 2370,
+   "cer": 0.357,
+   "terms_ok": false,
+   "text_trad": "港地要抽泥漿，推薦哪一款泥漿",
+   "cer_trad": 0.143,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "钢带要抽泥浆，推荐哪一款泥浆泵",
+   "ms": 1885,
+   "cer": 0.357,
+   "terms_ok": false,
+   "text_trad": "鋼帶要抽泥漿，推薦哪一款泥漿泵",
+   "cer_trad": 0.143,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "工地要抽奶漿 推薦哪一種奶漿麵包",
+   "ms": 1195,
+   "cer": 0.357,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "工地要抽泥漿 推薦哪一種泥漿麵包",
+   "ms": 1297,
+   "cer": 0.214,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "head-meaning",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "r2t2_plain": {
+   "text": "棒破的羊肠是什麽意思",
+   "ms": 1564,
+   "cer": 0.5,
+   "terms_ok": false,
+   "text_trad": "棒破的羊腸是什麼意思",
+   "cer_trad": 0.4,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "泵泡的洋字音是甚么意思",
+   "ms": 1235,
+   "cer": 0.6,
+   "terms_ok": false,
+   "text_trad": "泵泡的洋字音是甚麼意思",
+   "cer_trad": 0.5,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "放鞭炮的揚情是什麼意思",
+   "ms": 899,
+   "cer": 0.4,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "放鞭炮的揚程是什麼意思",
+   "ms": 941,
+   "cer": 0.3,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "qdc-install",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "r2t2_plain": {
+   "text": "自动就脱妆的，爱要安怎安装",
+   "ms": 2082,
+   "cer": 0.818,
+   "terms_ok": false,
+   "text_trad": "自動就脫妝的，愛要安怎安裝",
+   "cer_trad": 0.545,
+   "terms_ok_trad": false
+  },
+  "r2t2_glossary": {
+   "text": "自动就脱装置，要一安怎安装",
+   "ms": 1705,
+   "cer": 0.727,
+   "terms_ok": false,
+   "text_trad": "自動就脫裝置，要一安怎安裝",
+   "cer_trad": 0.364,
+   "terms_ok_trad": false
+  },
+  "breeze_plain": {
+   "text": "自動就脫裝置 要如何安裝",
+   "ms": 913,
+   "cer": 0.273,
+   "terms_ok": false
+  },
+  "breeze_glossary": {
+   "text": "自動就脫裝置 要如何安裝",
+   "ms": 1002,
+   "cer": 0.273,
+   "terms_ok": false
+  }
+ },
+ {
+  "set": "heji",
+  "id": "chit-who",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你好，请问你是谁？",
+   "ms": 1346,
+   "cer": 0.429,
+   "terms_ok": true,
+   "text_trad": "你好，請問你是誰？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "r2t2_glossary": {
+   "text": "你好，请问你是谁？",
+   "ms": 1063,
+   "cer": 0.429,
+   "terms_ok": true,
+   "text_trad": "你好，請問你是誰？",
+   "cer_trad": 0.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你好 請問你是誰",
+   "ms": 865,
+   "cer": 0.0,
+   "terms_ok": true
+  },
+  "breeze_glossary": {
+   "text": "你好 請問你是誰",
+   "ms": 887,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000001",
+  "voice": "recording",
+  "ref": "帝君保佑",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "这个宝贝",
+   "ms": 1355,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "這個寶貝",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "帝君保佑",
+   "ms": 803,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000006",
+  "voice": "recording",
+  "ref": "沒有啦 現在是在說什麼 男子漢大丈夫言出必行 既然我答應了 我就不可能反悔 是啦 勝強哥",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "没啦，只咪说讲声啦，这南州大丈夫话会讲出来，对你们做够到啦，既然我答应啊，我就无可能反悔啦，哦",
+   "ms": 4541,
+   "cer": 0.789,
+   "terms_ok": true,
+   "text_trad": "沒啦，只咪說講聲啦，這南州大丈夫話會講出來，對你們做夠到啦，既然我答應啊，我就無可能反悔啦，哦",
+   "cer_trad": 0.737,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "不是，現在說什麼呢 男子漢大丈夫 話說出來就一定要做到 既然我答應了就不可能反悔",
+   "ms": 1711,
+   "cer": 0.553,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000007",
+  "voice": "recording",
+  "ref": "從現在開始 我跟進輝的命就交給你了 我相信你絕對",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "最近嘛，开始我跟真惠阿爷名都教好你啊，",
+   "ms": 2182,
+   "cer": 0.818,
+   "terms_ok": true,
+   "text_trad": "最近嘛，開始我跟真惠阿爺名都教好你啊，",
+   "cer_trad": 0.773,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "從現在開始 我跟金花的命就交給你了",
+   "ms": 1068,
+   "cer": 0.364,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000008",
+  "voice": "recording",
+  "ref": "不會讓我們失望",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "特别好，你去保管呀。",
+   "ms": 1419,
+   "cer": 1.143,
+   "terms_ok": true,
+   "text_trad": "特別好，你去保管呀。",
+   "cer_trad": 1.143,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "不會讓你失望的",
+   "ms": 888,
+   "cer": 0.429,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000011",
+  "voice": "recording",
+  "ref": "子維都笑咪咪的",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "有紫薇的好造型嘞，",
+   "ms": 1564,
+   "cer": 1.143,
+   "terms_ok": true,
+   "text_trad": "有紫薇的好造型嘞，",
+   "cer_trad": 1.143,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "有紫薇的好象形",
+   "ms": 930,
+   "cer": 1.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000012",
+  "voice": "recording",
+  "ref": "沒錯 子維",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "保命，哎呦，这我",
+   "ms": 1426,
+   "cer": 1.5,
+   "terms_ok": true,
+   "text_trad": "保命，哎呦，這我",
+   "cer_trad": 1.5,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "沒錯 找到了",
+   "ms": 619,
+   "cer": 0.75,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000015",
+  "voice": "recording",
+  "ref": "碧玉你要知道 我們結婚只有登記",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "毕业后你就要知影咧，咱结婚",
+   "ms": 1507,
+   "cer": 0.857,
+   "terms_ok": true,
+   "text_trad": "畢業後你就要知影咧，咱結婚",
+   "cer_trad": 0.786,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "將來你要知道 我們結婚",
+   "ms": 904,
+   "cer": 0.429,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000019",
+  "voice": "recording",
+  "ref": "我當然知道你不會 不過我會 我會埋怨我自己",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我当然知道你没啦，啊不过我会啦，我会弯到",
+   "ms": 2218,
+   "cer": 0.684,
+   "terms_ok": true,
+   "text_trad": "我當然知道你沒啦，啊不過我會啦，我會彎到",
+   "cer_trad": 0.474,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我當然知道你不會 但是我會 我會埋怨自己",
+   "ms": 1051,
+   "cer": 0.158,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000020",
+  "voice": "recording",
+  "ref": "一個男人的責任 既然現在有這麼好的 賺錢機會 我當然要好好把握 不過進輝 你連出國要做什麼生意",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "引得去砸包人哦，歪东东啦，啊给你这猫这样好探钱机会，我同你好阿爸吧，唔够机会",
+   "ms": 4041,
+   "cer": 0.952,
+   "terms_ok": true,
+   "text_trad": "引得去砸包人哦，歪東東啦，啊給你這貓這樣好探錢機會，我同你好阿爸吧，唔夠機會",
+   "cer_trad": 0.905,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "一個男人 我會擔當 既然現在有這麼好的賺錢機會 我當然要好好把握 不過 靜慧",
+   "ms": 1764,
+   "cer": 0.381,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000022",
+  "voice": "recording",
+  "ref": "你相信我嗎 我當然相信你",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你敢不相信我？我懂你，嘛相信你",
+   "ms": 1773,
+   "cer": 0.545,
+   "terms_ok": true,
+   "text_trad": "你敢不相信我？我懂你，嘛相信你",
+   "cer_trad": 0.545,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "妳相信我嗎 我當然相信你",
+   "ms": 871,
+   "cer": 0.091,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000024",
+  "voice": "recording",
+  "ref": "既然你相信我 那我希望你能永遠記得",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "给你留上清华，拿你往",
+   "ms": 1536,
+   "cer": 0.875,
+   "terms_ok": true,
+   "text_trad": "給你留上清華，拿你往",
+   "cer_trad": 0.875,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "既然你相信我 我希望你...",
+   "ms": 910,
+   "cer": 0.375,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000025",
+  "voice": "recording",
+  "ref": "我的這裡 這裡永遠都有 你們母子倆的位置",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "外加加英万弄林",
+   "ms": 1463,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "外加加英萬弄林",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我會吃 這裡永遠都有妳們母女",
+   "ms": 991,
+   "cer": 0.5,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000026",
+  "voice": "recording",
+  "ref": "你們母子倆的位置",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "no,你无我惊诶，位置",
+   "ms": 1486,
+   "cer": 0.875,
+   "terms_ok": true,
+   "text_trad": "no,你無我驚誒，位置",
+   "cer_trad": 0.875,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "都有你們母子的位子",
+   "ms": 915,
+   "cer": 0.5,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000027",
+  "voice": "recording",
+  "ref": "都是希望能夠盡到一個 為人丈夫和父親的責任",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "零东西希望讲会当紧的节奏来硬塞，做咱爸爸的",
+   "ms": 2103,
+   "cer": 0.95,
+   "terms_ok": true,
+   "text_trad": "零東西希望講會當緊的節奏來硬塞，做咱爸爸的",
+   "cer_trad": 0.95,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "都是希望能盡到一個 為人丈夫 為人父親的責任",
+   "ms": 1150,
+   "cer": 0.15,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000029",
+  "voice": "recording",
+  "ref": "我不是跟你說過了 這次我是跟我結拜兄弟 一起出門",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我们食咖哩供给啊，即所我是讲",
+   "ms": 1552,
+   "cer": 0.864,
+   "terms_ok": true,
+   "text_trad": "我們食咖哩供給啊，即所我是講",
+   "cer_trad": 0.864,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我不是跟妳說過了 這組是跟我們拜把的組合",
+   "ms": 1042,
+   "cer": 0.455,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000030",
+  "voice": "recording",
+  "ref": "一起出門 他們是我最信任的人 大家互相扶持 互相照顧 絕對不會有問題",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "做会出门的，因是我上届信任的人，大家互相扶持，互相照顾，绝对没有问题。",
+   "ms": 3005,
+   "cer": 0.467,
+   "terms_ok": true,
+   "text_trad": "做會出門的，因是我上屆信任的人，大家互相扶持，互相照顧，絕對沒有問題。",
+   "cer_trad": 0.267,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "一起出門 他們是我最信任的人 大家互相扶持 照顧 絕對不會有問題",
+   "ms": 1628,
+   "cer": 0.067,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000031",
+  "voice": "recording",
+  "ref": "好啦 乖 不要哭",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "好了，乖了，迈克。",
+   "ms": 1872,
+   "cer": 0.667,
+   "terms_ok": true,
+   "text_trad": "好了，乖了，邁克。",
+   "cer_trad": 0.667,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "好了 乖，別哭了",
+   "ms": 1002,
+   "cer": 0.667,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000032",
+  "voice": "recording",
+  "ref": "你就乖乖等我回來好不好",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你也不要等我等啊，好吧，",
+   "ms": 1463,
+   "cer": 0.636,
+   "terms_ok": true,
+   "text_trad": "你也不要等我等啊，好吧，",
+   "cer_trad": 0.636,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "妳乖乖等我回來好嗎",
+   "ms": 916,
+   "cer": 0.364,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000036",
+  "voice": "recording",
+  "ref": "之前跟人打架留下來的紀念",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "进京干硬件是吧，老老的纪念啦",
+   "ms": 1448,
+   "cer": 0.917,
+   "terms_ok": true,
+   "text_trad": "進京乾硬件是吧，老老的紀念啦",
+   "cer_trad": 0.833,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "之前跟人家打架的留念",
+   "ms": 1045,
+   "cer": 0.417,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000037",
+  "voice": "recording",
+  "ref": "人這麼斯文 你也有抓狂的時候 那是沒踩到他的底線",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "诶，人啊，书闻到你也有去俩讲的时准啊，还是无打到下底",
+   "ms": 2138,
+   "cer": 0.773,
+   "terms_ok": true,
+   "text_trad": "誒，人啊，書聞到你也有去倆講的時準啊，還是無打到下底",
+   "cer_trad": 0.727,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "人這麼斯文 你也有抓狂的時候 那是沒踩到他的底線",
+   "ms": 1168,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000039",
+  "voice": "recording",
+  "ref": "我請教一下 我們這次如果賺到錢",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我请教一下哦，咱这届若",
+   "ms": 1443,
+   "cer": 0.714,
+   "terms_ok": true,
+   "text_trad": "我請教一下哦，咱這屆若",
+   "cer_trad": 0.571,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "請教 這次要是賺到錢",
+   "ms": 894,
+   "cer": 0.5,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000040",
+  "voice": "recording",
+  "ref": "我的願望就是 去我那個無緣的他家對面 蓋一棟豪宅 然後裝潢得很奢華",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "外观梦都是喜欢那个无言的到对面哦，去一栋豪宅，然后甲中甲",
+   "ms": 3061,
+   "cer": 0.767,
+   "terms_ok": true,
+   "text_trad": "外觀夢都是喜歡那個無言的到對面哦，去一棟豪宅，然後甲中甲",
+   "cer_trad": 0.6,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我的願望就是 去無緣的家對面蓋一棟豪宅 然後裝潢得亮晶晶",
+   "ms": 1585,
+   "cer": 0.233,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000041",
+  "voice": "recording",
+  "ref": "閃到讓他們眼睛都睜不開 看他們是不是還敢看不起我 你這個人就是有仇必報 誰惹到你 誰就倒楣",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "香港学院目前拢背未紧，看伊是不是够敢看我无，你这个人哦，就是有求必报啦，",
+   "ms": 3359,
+   "cer": 0.732,
+   "terms_ok": true,
+   "text_trad": "香港學院目前攏背未緊，看伊是不是夠敢看我無，你這個人哦，就是有求必報啦，",
+   "cer_trad": 0.659,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "閃得他們眼睛都睜不開 看他們還敢不敢瞧不起我 你這個人就是有仇必報",
+   "ms": 1645,
+   "cer": 0.366,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000042",
+  "voice": "recording",
+  "ref": "如果賺到錢之後 你們兩個第一個願望是什麼 我的願望是",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "啥赚到钱了，你两个投资的联盟是啥？外玩",
+   "ms": 1744,
+   "cer": 0.875,
+   "terms_ok": true,
+   "text_trad": "啥賺到錢了，你兩個投資的聯盟是啥？外玩",
+   "cer_trad": 0.708,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "賺到錢以後 你們第一個願望是什麼 我的願望是...",
+   "ms": 1114,
+   "cer": 0.208,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000045",
+  "voice": "recording",
+  "ref": "我的願望",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我爱运动哦，",
+   "ms": 1365,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "我愛運動哦，",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我的願望",
+   "ms": 794,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000047",
+  "voice": "recording",
+  "ref": "這樣看起來 你太太應該長得很漂亮 你才會這麼疼惜他 保護到把他藏起來 不讓我們看  對 進輝",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "看你靠，起来你没应该生了正水的，你这样子秀命命啊，啊个保护刚吼啊，仓库不要给我们看，哎，丢",
+   "ms": 4788,
+   "cer": 0.897,
+   "terms_ok": true,
+   "text_trad": "看你靠，起來你沒應該生了正水的，你這樣子秀命命啊，啊個保護剛吼啊，倉庫不要給我們看，哎，丟",
+   "cer_trad": 0.769,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你... 看來你老婆應該長得很漂亮 你才這麼疼愛有加 把她保護得 把她藏起來不讓我們看 對啦",
+   "ms": 1776,
+   "cer": 0.385,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000051",
+  "voice": "recording",
+  "ref": "來 先給你們看一下 我跟你們說 這次我們要出門前",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "day day先给你平放起，等我跟你讲哦，这桌咱要",
+   "ms": 1534,
+   "cer": 0.952,
+   "terms_ok": true,
+   "text_trad": "day day先給你平放起，等我跟你講哦，這桌咱要",
+   "cer_trad": 0.857,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "先讓你瞧瞧 告訴你 我們這趟要出門",
+   "ms": 1024,
+   "cer": 0.667,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000052",
+  "voice": "recording",
+  "ref": "這次我們要出門前 我還帶他去拍全家福",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我就抓那边出门进城哦，我搁带一个黑旋",
+   "ms": 1538,
+   "cer": 0.941,
+   "terms_ok": true,
+   "text_trad": "我就抓那邊出門進城哦，我擱帶一個黑旋",
+   "cer_trad": 0.882,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "這趟出門前 我還帶她去拍全家福",
+   "ms": 1075,
+   "cer": 0.294,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000055",
+  "voice": "recording",
+  "ref": "我們才剛認識 互相看不順眼 想不到現在 我們三個竟然會結拜",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "那咱打开再抽一些，啊和尚看不顺眼，想到今摆",
+   "ms": 2281,
+   "cer": 0.923,
+   "terms_ok": true,
+   "text_trad": "那咱打開再抽一些，啊和尚看不順眼，想到今擺",
+   "cer_trad": 0.885,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "所以我們大家才初認識 互看不熟 沒想到現在",
+   "ms": 1145,
+   "cer": 0.692,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000056",
+  "voice": "recording",
+  "ref": "我們三個竟然會結拜 一起做生意 打拚賺錢",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "啊，竟然是三个击败安尼做伙做行李票赚钱哦，",
+   "ms": 2651,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "啊，竟然是三個擊敗安尼做夥做行李票賺錢哦，",
+   "cer_trad": 0.889,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "現在我們竟然是三個結拜 一起做生意拚賺錢",
+   "ms": 1230,
+   "cer": 0.444,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000058",
+  "voice": "recording",
+  "ref": "人無橫財不富 我們如果想要有錢",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "人无怀才不遇啦，咱也是",
+   "ms": 1525,
+   "cer": 0.857,
+   "terms_ok": true,
+   "text_trad": "人無懷才不遇啦，咱也是",
+   "cer_trad": 0.786,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "人無橫財不富",
+   "ms": 940,
+   "cer": 0.571,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000059",
+  "voice": "recording",
+  "ref": "就要付出代價 所以不要埋怨 等我們這次  任務完成之後",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "呀，还要付出代价，所以蛮惋叹，行，等恁这边哦。",
+   "ms": 2989,
+   "cer": 0.739,
+   "terms_ok": true,
+   "text_trad": "呀，還要付出代價，所以蠻惋嘆，行，等恁這邊哦。",
+   "cer_trad": 0.652,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "要付出代價 所以不要埋怨 先等我們這次...",
+   "ms": 1162,
+   "cer": 0.348,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000061",
+  "voice": "recording",
+  "ref": "一定要參加我的婚禮 那當然 對了 你講半天",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "一定要参加我的婚礼啊，双面哦，对啦，你讲",
+   "ms": 2218,
+   "cer": 0.611,
+   "terms_ok": true,
+   "text_trad": "一定要參加我的婚禮啊，雙面哦，對啦，你講",
+   "cer_trad": 0.389,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "一定要參加我的婚禮 難道不用嗎 對了，說了半天",
+   "ms": 1275,
+   "cer": 0.389,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000081",
+  "voice": "recording",
+  "ref": "不會啦 大哥 反正我們現在任務 已經完成了 你不要自尋煩惱 這麼緊張好不好 那是因為大哥他有說過 他一定要把我們平安帶回去",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "贝拉，多哥，为了咱这班人务已经完成啊啦，你妈搞超环，这紧张好不，那是因为多哥又讲过，他一定要平安",
+   "ms": 4967,
+   "cer": 0.704,
+   "terms_ok": true,
+   "text_trad": "貝拉，多哥，爲了咱這班人務已經完成啊啦，你媽搞超環，這緊張好不，那是因爲多哥又講過，他一定要平安",
+   "cer_trad": 0.593,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "不會啦，大哥 反正我們現在任務已經完成 你別瞎操心、這麼緊張好嗎 那是因為大哥說過 他一定要平安將我們...",
+   "ms": 1931,
+   "cer": 0.315,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000082",
+  "voice": "recording",
+  "ref": "他才會這麼有壓力",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你们家家酿啊，对",
+   "ms": 1327,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "你們家家釀啊，對",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "他才會這麼有壓力",
+   "ms": 935,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000099",
+  "voice": "recording",
+  "ref": "怎麼流那麼多血 大哥",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "混到狼崽了，大爷",
+   "ms": 1391,
+   "cer": 0.889,
+   "terms_ok": true,
+   "text_trad": "混到狼崽了，大爺",
+   "cer_trad": 0.889,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "血流不止 大哥，我...",
+   "ms": 948,
+   "cer": 0.778,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000100",
+  "voice": "recording",
+  "ref": "我是不是會死在這裡 別亂說話 我一定會把你平安帶回去",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "哦，西米西莉姐，巴拉贡，我",
+   "ms": 1485,
+   "cer": 0.958,
+   "terms_ok": true,
+   "text_trad": "哦，西米西莉姐，巴拉貢，我",
+   "cer_trad": 0.958,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "YOLO",
+   "ms": 747,
+   "cer": 1.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000101",
+  "voice": "recording",
+  "ref": "我一定會把你平安帶回去 耀武",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我给你别个抓到诶，",
+   "ms": 1401,
+   "cer": 0.846,
+   "terms_ok": true,
+   "text_trad": "我給你別個抓到誒，",
+   "cer_trad": 0.846,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我一定平安帶你回去 大舅子",
+   "ms": 902,
+   "cer": 0.538,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000103",
+  "voice": "recording",
+  "ref": "進輝  不是 進輝 早就叫你要小心 你看你現在搞成這樣",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "怎么叫你来碎你啊",
+   "ms": 1461,
+   "cer": 0.864,
+   "terms_ok": true,
+   "text_trad": "怎麼叫你來碎你啊",
+   "cer_trad": 0.864,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "來，家輝 抱一下，家輝 董事長叫你要小心",
+   "ms": 1356,
+   "cer": 0.818,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000105",
+  "voice": "recording",
+  "ref": "大哥 有狗在叫 糟了 他們放狗來找我們了",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "同样，我告诉你补一点，哎呀，",
+   "ms": 1994,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "同樣，我告訴你補一點，哎呀，",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "大哥 有狗在吠 糟了",
+   "ms": 960,
+   "cer": 0.588,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000109",
+  "voice": "recording",
+  "ref": "你絕對不能放棄 聽到了沒有",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你到底为何红起我车的吗？",
+   "ms": 1461,
+   "cer": 0.917,
+   "terms_ok": true,
+   "text_trad": "你到底爲何紅起我車的嗎？",
+   "cer_trad": 0.917,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你絕不能放棄，聽到沒有",
+   "ms": 959,
+   "cer": 0.167,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000111",
+  "voice": "recording",
+  "ref": "大哥 他們好像快找過來了 我們快走 再不走就來不及了 我背你 耀武 來幫我 來",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "不要紧的啦，应该他这边找过来，咱紧走了，搿我们走就没糊啊啦，我跟你来，小虎来倒车",
+   "ms": 3969,
+   "cer": 0.938,
+   "terms_ok": true,
+   "text_trad": "不要緊的啦，應該他這邊找過來，咱緊走了，搿我們走就沒糊啊啦，我跟你來，小虎來倒車",
+   "cer_trad": 0.875,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "快點 他們似乎快找上門了 我們快走 再不走就來不及了 我背你 雅雯，來幫忙 來",
+   "ms": 2081,
+   "cer": 0.281,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000114",
+  "voice": "recording",
+  "ref": "進輝的血這樣一直流 那些狗聞到味道 一定很快就找過來了",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "今后要回过来查十次了，遐的狗片都不要，一定加紧就找过来。",
+   "ms": 3154,
+   "cer": 0.84,
+   "terms_ok": true,
+   "text_trad": "今後要回過來查十次了，遐的狗片都不要，一定加緊就找過來。",
+   "cer_trad": 0.76,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "先從那些花瓶查出來了 那些狗鼻的味道 一定很快就找過來了",
+   "ms": 1447,
+   "cer": 0.48,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000116",
+  "voice": "recording",
+  "ref": "幸好 不然這山崖這麼高 海一定很深 摔下去絕對死定了",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "托克阿赞，那我在刷坑再关掉，还要停车签，我来绝对想问起无爱",
+   "ms": 3515,
+   "cer": 1.13,
+   "terms_ok": true,
+   "text_trad": "托克阿贊，那我在刷坑再關掉，還要停車籤，我來絕對想問起無愛",
+   "cer_trad": 1.043,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "幸好 山谷這麼高 海浪一定很深 落海絕對是死不瞑目",
+   "ms": 1580,
+   "cer": 0.522,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000118",
+  "voice": "recording",
+  "ref": "我們快點走 走啦",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "赶紧走，走！",
+   "ms": 1367,
+   "cer": 0.714,
+   "terms_ok": true,
+   "text_trad": "趕緊走，走！",
+   "cer_trad": 0.714,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我們快走 走",
+   "ms": 807,
+   "cer": 0.286,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000123",
+  "voice": "recording",
+  "ref": "誰要拿錢回去救你媽",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "什么姐姐都要叫你骂啊！",
+   "ms": 1391,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "什麼姐姐都要叫你罵啊！",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "誰要拿錢救你媽",
+   "ms": 799,
+   "cer": 0.222,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000124",
+  "voice": "recording",
+  "ref": "大哥  你不是說會把我平安帶回去",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "董阳，",
+   "ms": 1415,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "董陽，",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "大哥 你還好嗎",
+   "ms": 908,
+   "cer": 0.786,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000125",
+  "voice": "recording",
+  "ref": "你不是說會把我平安帶回去",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "电电池供电，平安卓特",
+   "ms": 1438,
+   "cer": 0.833,
+   "terms_ok": true,
+   "text_trad": "電電池供電，平安卓特",
+   "cer_trad": 0.833,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你不是說會平安帶我回家嗎",
+   "ms": 954,
+   "cer": 0.417,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000126",
+  "voice": "recording",
+  "ref": "二哥 你不是說你會跟大哥  一起來參加我的婚禮",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "对啊，你们成功了，可对啊，你们这回来参加我的婚礼",
+   "ms": 3296,
+   "cer": 0.8,
+   "terms_ok": true,
+   "text_trad": "對啊，你們成功了，可對啊，你們這回來參加我的婚禮",
+   "cer_trad": 0.65,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "二哥 你不是說會和大哥 一起來參加我的婚禮嗎",
+   "ms": 1207,
+   "cer": 0.15,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000128",
+  "voice": "recording",
+  "ref": "方耀武  枉費我把你當成兄弟 你現在講這種話還是人嗎",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "不要我，不是我该动这些兄弟，我只把公家话当做是人话啊。",
+   "ms": 4033,
+   "cer": 0.826,
+   "terms_ok": true,
+   "text_trad": "不要我，不是我該動這些兄弟，我只把公家話當做是人話啊。",
+   "cer_trad": 0.826,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "方漢武 枉費我當你是兄弟 現在說這些話還是人話嗎",
+   "ms": 1409,
+   "cer": 0.348,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000130",
+  "voice": "recording",
+  "ref": "大哥你呢",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "欧阳璃",
+   "ms": 1281,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "歐陽璃",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我愛你",
+   "ms": 641,
+   "cer": 0.75,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000131",
+  "voice": "recording",
+  "ref": "自生自滅嗎",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "走形走味",
+   "ms": 1389,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "走形走味",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "造生、造滅",
+   "ms": 712,
+   "cer": 0.6,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000169",
+  "voice": "recording",
+  "ref": "我是見死不救 但我如果不這麼做 我們現在有可能活命嗎",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我是健壮不求，不过我是无得做，你即摆够有可能",
+   "ms": 2772,
+   "cer": 0.708,
+   "terms_ok": true,
+   "text_trad": "我是健壯不求，不過我是無得做，你即擺夠有可能",
+   "cer_trad": 0.708,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "我見死不救 但如果不這麼做 我們現在可能活命嗎",
+   "ms": 1210,
+   "cer": 0.125,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000175",
+  "voice": "recording",
+  "ref": "去啊 你去找進輝 讓你媽等死 你去啊",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "去呀，你去查警徽呀，我你妈打死呀，你去呀！",
+   "ms": 2502,
+   "cer": 0.667,
+   "terms_ok": true,
+   "text_trad": "去呀，你去查警徽呀，我你媽打死呀，你去呀！",
+   "cer_trad": 0.6,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "去啊 去找靜慧 讓你媽等死 你去啊",
+   "ms": 1348,
+   "cer": 0.2,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000176",
+  "voice": "recording",
+  "ref": "要我眼睜睜 看我的兄弟摔下去 我心裡也很難受",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "哎，我目睭金金看我的兄弟啊，跌落，我心里嘛真艰苦。",
+   "ms": 2599,
+   "cer": 0.65,
+   "terms_ok": true,
+   "text_trad": "哎，我目睭金金看我的兄弟啊，跌落，我心裏嘛真艱苦。",
+   "cer_trad": 0.6,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "要我眼睜睜看兄弟摔下去 我想來也很難過",
+   "ms": 1305,
+   "cer": 0.25,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000177",
+  "voice": "recording",
+  "ref": "如果要怪 就怪進輝的命不好",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你哪时会乖哦，乖是",
+   "ms": 1479,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "你哪時會乖哦，乖是",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "要怪就怪靜慧",
+   "ms": 786,
+   "cer": 0.667,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000180",
+  "voice": "recording",
+  "ref": "也沒有心臟替你媽媽換了 周先生 我們現在只能盡人事了 醫生 我拜託你",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "毛报新动态，听妈妈话，周先生，咱今",
+   "ms": 2564,
+   "cer": 0.9,
+   "terms_ok": true,
+   "text_trad": "毛報新動態，聽媽媽話，周先生，咱今",
+   "cer_trad": 0.833,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "也沒有心臟可以替你媽媽換 張先生 我們現在只能盡人事了 是我…",
+   "ms": 1599,
+   "cer": 0.3,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000184",
+  "voice": "recording",
+  "ref": "那位是周先生 他媽媽錯過換心臟的機會 你先起來 你不要這樣",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "对呀，抽签是呀，现在妈妈哦，错过换新装的机会了。",
+   "ms": 2520,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "對呀，抽籤是呀，現在媽媽哦，錯過換新裝的機會了。",
+   "cer_trad": 0.769,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "那個啊 周先生 你媽媽錯過了換心臟的機會",
+   "ms": 1105,
+   "cer": 0.5,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000187",
+  "voice": "recording",
+  "ref": "我拜託你 你先起來 你不要這樣 這裡是醫院 你去想辦法",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你先起来啦，你没安奈了，你",
+   "ms": 1714,
+   "cer": 0.826,
+   "terms_ok": true,
+   "text_trad": "你先起來啦，你沒安奈了，你",
+   "cer_trad": 0.783,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "拜託 你先起來 你別這樣 這裡是醫院 你去上班",
+   "ms": 1287,
+   "cer": 0.304,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000192",
+  "voice": "recording",
+  "ref": "請你 請你不要亂摸 這個東西很貴 我怕你賠不起",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "嘉丽，哎，嘉丽卖给贝翁，这物件真贵，我怕你赔不起",
+   "ms": 3679,
+   "cer": 0.75,
+   "terms_ok": true,
+   "text_trad": "嘉麗，哎，嘉麗賣給貝翁，這物件真貴，我怕你賠不起",
+   "cer_trad": 0.65,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "請你... 請你不要亂摸 這東西很貴 我怕你賠不起",
+   "ms": 1222,
+   "cer": 0.05,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000193",
+  "voice": "recording",
+  "ref": "所以現在你是看不起我 你是怕我沒錢 買你們的豪宅是不是",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "所以今日你是看我无啦，你是今日讲我无钱买你的豪宅是唔是，哈",
+   "ms": 3533,
+   "cer": 0.56,
+   "terms_ok": true,
+   "text_trad": "所以今日你是看我無啦，你是今日講我無錢買你的豪宅是唔是，哈",
+   "cer_trad": 0.48,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "所以現在你是瞧不起我 怕我沒錢買你們的豪宅嗎",
+   "ms": 1246,
+   "cer": 0.24,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000194",
+  "voice": "recording",
+  "ref": "看到沒有 你跟我說 你們這豪宅多少錢 看這些現金夠不夠 現金夠不夠",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我过来喽，我过来喽，你跟我讲啊，你这豪宅 worth 什么，看这气球够不啊，啊，气球够，气球够不，啊",
+   "ms": 4785,
+   "cer": 1.138,
+   "terms_ok": true,
+   "text_trad": "我過來嘍，我過來嘍，你跟我講啊，你這豪宅 worth 什麼，看這氣球夠不啊，啊，氣球夠，氣球夠不，啊",
+   "cer_trad": 0.966,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "看到了嗎 你跟我說 你這豪宅多少錢 看這些現金夠不夠 現金夠不夠",
+   "ms": 1488,
+   "cer": 0.103,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000195",
+  "voice": "recording",
+  "ref": "什麼沒有 錢最多",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "什么也没啦，钱上多啦",
+   "ms": 2316,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "什麼也沒啦，錢上多啦",
+   "cer_trad": 0.571,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "什麼沒有 錢最多",
+   "ms": 801,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000196",
+  "voice": "recording",
+  "ref": "看到沒有 我什麼沒有 錢最多",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "不怪我，我吃咩补啦，钱上多啦",
+   "ms": 2797,
+   "cer": 0.917,
+   "terms_ok": true,
+   "text_trad": "不怪我，我喫咩補啦，錢上多啦",
+   "cer_trad": 0.833,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "看到沒有，我什麼沒有 錢最多",
+   "ms": 956,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000262",
+  "voice": "recording",
+  "ref": "不過我比較好奇的是 我們的保全這麼森嚴 他是怎麼進來這裡的",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "亮哥，我较好奇的是，啊，咱的保存就遐严，以前咱咧卖食呀。",
+   "ms": 3754,
+   "cer": 0.741,
+   "terms_ok": true,
+   "text_trad": "亮哥，我較好奇的是，啊，咱的保存就遐嚴，以前咱咧賣食呀。",
+   "cer_trad": 0.667,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "不過我更好奇的是 我們的保全那麼嚴格 他是怎麼進來這裡的",
+   "ms": 1256,
+   "cer": 0.185,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000439",
+  "voice": "recording",
+  "ref": "周董事長 周夫人 歡迎 理事長你好",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "就当指定，少年，哎，欢迎欢迎，李处长你好。",
+   "ms": 3119,
+   "cer": 0.929,
+   "terms_ok": true,
+   "text_trad": "就當指定，少年，哎，歡迎歡迎，李處長你好。",
+   "cer_trad": 0.786,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "周董事長、周夫人 歡迎... 理事長，你好",
+   "ms": 1268,
+   "cer": 0.0,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000442",
+  "voice": "recording",
+  "ref": "是啦 周董事長我真的很羨慕你 有一位這麼開明的媽媽 還有一位 這麼賢慧孝順的漂亮老婆",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "是啦，就当注定，我真正做是等你啦，有这位哦，做你开明的妈妈啦，还佮有这位哦，这么贤惠，这么优秀的媳妇啦。",
+   "ms": 5904,
+   "cer": 0.868,
+   "terms_ok": true,
+   "text_trad": "是啦，就當註定，我真正做是等你啦，有這位哦，做你開明的媽媽啦，還佮有這位哦，這麼賢惠，這麼優秀的媳婦啦。",
+   "cer_trad": 0.684,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "是啊，周董事長 我真的很羨慕妳 有這位很離開明的媽媽 還有這位 這麼賢慧、孝順的漂亮老婆",
+   "ms": 2104,
+   "cer": 0.158,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000443",
+  "voice": "recording",
+  "ref": "你看他們婆媳關係這麼好 周董事長 你真的是最有福氣的人 我也是這麼想",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你快看这哦，国事关心哦，这样子好了，就当决定，你亲戚哦是上有福气的人啦，我",
+   "ms": 4016,
+   "cer": 0.871,
+   "terms_ok": true,
+   "text_trad": "你快看這哦，國事關心哦，這樣子好了，就當決定，你親戚哦是上有福氣的人啦，我",
+   "cer_trad": 0.774,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你看他們婆媳關係這麼好 周董事長 你真是最有福氣的人 我也是",
+   "ms": 1318,
+   "cer": 0.129,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000445",
+  "voice": "recording",
+  "ref": "是啦 各位 我看時間不早了 我們趕快進去會場 來 這邊請 來 請",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "是啦，是啦，哎，各位呀，我看时间无早，咱赶紧礼拜会议定，来，再请，来，请请请",
+   "ms": 4398,
+   "cer": 0.88,
+   "terms_ok": true,
+   "text_trad": "是啦，是啦，哎，各位呀，我看時間無早，咱趕緊禮拜會議定，來，再請，來，請請請",
+   "cer_trad": 0.68,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "是啊... 各位，我看時間不早了 我們趕緊進會場 來，這裡請 來，請...",
+   "ms": 1718,
+   "cer": 0.16,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000523",
+  "voice": "recording",
+  "ref": "董事長 我先去開車 你留在公司就好",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "大主任，我现在亏下来，你老爹关系都好。",
+   "ms": 1569,
+   "cer": 0.867,
+   "terms_ok": true,
+   "text_trad": "大主任，我現在虧下來，你老爹關係都好。",
+   "cer_trad": 0.867,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "董事長 我先去開車 妳留在公司就好",
+   "ms": 1181,
+   "cer": 0.067,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000557",
+  "voice": "recording",
+  "ref": "不能只貪圖自己便利就好 影響交通 謝謝 你們這些警察",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "我应该拿他的格雷便利就好，影响交通，等下",
+   "ms": 2258,
+   "cer": 0.739,
+   "terms_ok": true,
+   "text_trad": "我應該拿他的格雷便利就好，影響交通，等下",
+   "cer_trad": 0.696,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "不該貪圖自己的便利就好 影響交通 謝謝 你們才明白",
+   "ms": 1338,
+   "cer": 0.304,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000581",
+  "voice": "recording",
+  "ref": "才結婚沒多久 孩子才剛滿週歲 對了 你現在住在哪裡",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "你眼睛好冇话讲，阿囡啊，敢多谢",
+   "ms": 1611,
+   "cer": 1.0,
+   "terms_ok": true,
+   "text_trad": "你眼睛好冇話講，阿囡啊，敢多謝",
+   "cer_trad": 1.0,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "妳先生才剛結婚沒多久 孩子就獨當一面",
+   "ms": 1099,
+   "cer": 0.818,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000582",
+  "voice": "recording",
+  "ref": "對了 你現在住在哪裡",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "对啊，阿里金马是到底对啊。",
+   "ms": 1453,
+   "cer": 1.222,
+   "terms_ok": true,
+   "text_trad": "對啊，阿里金馬是到底對啊。",
+   "cer_trad": 1.111,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "對了 妳現在住哪裡",
+   "ms": 781,
+   "cer": 0.222,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000595",
+  "voice": "recording",
+  "ref": "你們扣下這期的應付帳款 不給我們 請問什麼意思 你欠一些包商幾個月的錢",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "他讲恁这期应该付的小口条，歹给阮，且问什么意思？你欠我",
+   "ms": 2411,
+   "cer": 0.812,
+   "terms_ok": true,
+   "text_trad": "他講恁這期應該付的小口條，歹給阮，且問什麼意思？你欠我",
+   "cer_trad": 0.719,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "你們這期該付的帳 扣掉不給我們 請問什麼意思 你欠一點包商",
+   "ms": 1392,
+   "cer": 0.406,
+   "terms_ok": true
+  }
+ },
+ {
+  "set": "taigi",
+  "id": "drama-000597",
+  "voice": "recording",
+  "ref": "在你的心目中 真的是那種自私自利 不講情義的人嗎 你就想方設法 找一些有的沒的理由 把你這個結拜兄弟 一腳踢開嗎",
+  "terms": [],
+  "r2t2_plain": {
+   "text": "毫不迭你的心目中，敢真正是迄种自私自利，无共情力的人，你若想要来收空收胖，找一个有话无话理由，甲你这结拜兄弟一脚踢开",
+   "ms": 5123,
+   "cer": 0.58,
+   "terms_ok": true,
+   "text_trad": "毫不迭你的心目中，敢真正是迄種自私自利，無共情力的人，你若想要來收空收胖，找一個有話無話理由，甲你這結拜兄弟一腳踢開",
+   "cer_trad": 0.48,
+   "terms_ok_trad": true
+  },
+  "breeze_plain": {
+   "text": "在你心目中 真是那種自私自利 不講情義的人嗎 你就想千方百計 找一些有的沒的理由 將你這個結拜兄弟一腳踢開嗎",
+   "ms": 2228,
+   "cer": 0.12,
+   "terms_ok": true
+  }
+ }
+]

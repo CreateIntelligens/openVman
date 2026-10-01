@@ -24,18 +24,22 @@ class InvalidSettingValueError(RepositoryError):
 # 伺服器端的 fallback chain。後端存它只是記住使用者的偏好。
 BROWSER_ASR_PROVIDER = "browser"
 
-# Gemini transcribe-live 串流辨識：前台經 /api/v1/asr/stream 邊錄邊送，跟 browser
+# 串流辨識：前台經 /api/v1/asr/stream 邊錄邊送，跟 browser
 # 一樣不進 transcribe() 的 fallback chain，後端存它只是記住偏好與授權。
 GEMINI_STREAM_ASR_PROVIDER = "gemini-live"
+R2T2_STREAM_ASR_PROVIDER = "r2t2-live"
+STREAM_ASR_PROVIDERS = frozenset({
+    GEMINI_STREAM_ASR_PROVIDER, R2T2_STREAM_ASR_PROVIDER,
+})
 
 # 伺服器端引擎：音檔會送上來，走 transcribe() 與 fallback chain。
-SERVER_ASR_PROVIDERS = frozenset({"breeze", "xiaomi", "sensevoice", "openai"})
+SERVER_ASR_PROVIDERS = frozenset({"breeze", "r2t2", "xiaomi", "sensevoice", "openai"})
 
 # 使用者可以在聊天室選哪些引擎，由管理者決定（例如 openai 會把語音送到
 # 外部服務，不一定想開放給每個人）。空集合代表不開放使用者自選。
 ASR_USER_CHOICES_KEY = "asr_user_choices"
 
-_ASR_PROVIDERS = SERVER_ASR_PROVIDERS | {BROWSER_ASR_PROVIDER, GEMINI_STREAM_ASR_PROVIDER}
+_ASR_PROVIDERS = SERVER_ASR_PROVIDERS | STREAM_ASR_PROVIDERS | {BROWSER_ASR_PROVIDER}
 _ALLOWED_VALUES: dict[str, frozenset[str]] = {
     ASR_USER_CHOICES_KEY: _ASR_PROVIDERS,
 }
@@ -180,6 +184,7 @@ __all__ = [
     "ASR_USER_CHOICES_KEY",
     "BROWSER_ASR_PROVIDER",
     "SERVER_ASR_PROVIDERS",
+    "STREAM_ASR_PROVIDERS",
     "InvalidSettingValueError",
     "SystemSettingsRepository",
     "UnknownSettingError",

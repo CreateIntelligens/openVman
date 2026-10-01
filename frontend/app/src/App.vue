@@ -189,7 +189,7 @@ import { useTurnTiming } from "./composables/useTurnTiming";
 import { useStageAvatarBridge } from "./composables/useStageAvatarBridge";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { fetchMyAsrProvider, setMyAsrProvider } from "./api/asr";
-import { BROWSER_ASR, GEMINI_STREAM_ASR, ASR_ENGINE_LABELS, getAsrErrorMessage } from "@shared/speech";
+import { BROWSER_ASR, isStreamAsrEngine, ASR_ENGINE_LABELS, getAsrErrorMessage } from "@shared/speech";
 import { useOpenVmanAvatarRuntime } from "./composables/useOpenVmanAvatarRuntime";
 import { leaveFullscreen, unlockKeyboard } from "./sessionCleanup";
 import { useTtsStreamer } from "./composables/useTtsStreamer";
@@ -903,9 +903,9 @@ void fetchMyAsrProvider()
 
 // 按鈕顯示的狀態要跟實際在收音的引擎同一個。先前畫面綁的永遠是瀏覽器辨識，
 // 選了伺服器引擎時按下去有在錄音，但按鈕毫無反應，使用者無從得知有沒有收音。
-// 選了 Gemini 串流、且沒開台語分流（Gemini 聽不懂台語，那時要走 Breeze 批次）才串流。
+// 台語分流需走 Breeze 批次，避免串流引擎無法轉寫成華語。
 const useStreamAsrEngine = computed(
-  () => myAsrProvider.value === GEMINI_STREAM_ASR
+  () => isStreamAsrEngine(myAsrProvider.value)
     && streamAvailable.value
     && !languageRoutes.taiwaneseOn.value,
 );

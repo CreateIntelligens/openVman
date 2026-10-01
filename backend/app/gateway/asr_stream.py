@@ -1,4 +1,4 @@
-"""Streaming ASR over Gemini transcribe-live.
+"""Streaming ASR over Gemini transcribe-live or Confucius4-R2T2.
 
 前台邊錄邊送 16 kHz 單聲道 PCM16（binary frame），這裡轉給 Gemini 的
 gemini-3.5-transcribe-live，把轉錄推回前台：
@@ -16,7 +16,8 @@ gemini-3.5-transcribe-live，把轉錄推回前台：
 docker logs 看不到 logger.info，所以寫檔，跟 turn_timing 一樣）。
 
 跟瀏覽器內建辨識一樣是前台直接驅動的引擎，不進 transcribe() 的 fallback chain；
-帳號要被授權 ``gemini-live`` 才能用。台語分流時前台不走這裡（Gemini 聽不懂台語），
+帳號依偏好使用被授權的 ``gemini-live`` 或 ``r2t2-live``。R2T2 帶專案詞表，
+增量累加、整句 final_text 轉繁體，不問 Jev；台語分流時前台不走這裡，
 改用 Breeze 批次。
 """
 
@@ -29,25 +30,37 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import anyio
 import websockets
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from app import language_routes as language_routes_mod
+from app.asr_glossary import project_asr_prompt
 from app.auth.asr_selection import permitted_asr_preference
-from app.auth.dependencies import authenticate_websocket
+from app.auth.dependencies import CurrentAccount, authenticate_websocket
 from app.auth.runtime import get_auth_runtime
-from app.config import get_tts_config
+from app.config import TTSRouterConfig, get_tts_config
 from app.http_client import SharedAsyncClient
-from app.usage_ledger_client import UNIT_SECONDS, record_usage_event, usage_scope_for
+from app.usage_ledger_client import (
+    UNIT_SECONDS,
+    record_usage_event,
+    usage_scope_for,
+)
+from app.utils.chinese import convert_to_traditional
 
 logger = logging.getLogger("gateway.asr_stream")
 router = APIRouter()
 
 GEMINI_STREAM_ASR_ENGINE = "gemini-live"
+R2T2_STREAM_ASR_ENGINE = "r2t2-live"
+_STREAM_ENGINES = {GEMINI_STREAM_ASR_ENGINE, R2T2_STREAM_ASR_ENGINE}
+_R2T2_CHUNK_BYTES = 5120
+_R2T2_EOS = "YOUDAO_ONETIME_ASR_STREAM_EOS"
 _GEMINI_LIVE_URL = (
     "wss://generativelanguage.googleapis.com/ws/"
     "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
@@ -145,13 +158,102 @@ async def _judge_final(project_id: str, routes: list[str], interim: str, final: 
     return text
 
 
-def _allowed(current) -> bool:
-    """嵌入金鑰沒有帳號授權，一律不給；帳號要被授權 gemini-live（ROOT 全開）。"""
+def _allowed(current) -> str:
+    """Resolve the account's selected streaming engine against current grants."""
     if current.embed_key is not None:
-        return False
+        return ""
     runtime = get_auth_runtime()
-    chosen = permitted_asr_preference(runtime, current.user, GEMINI_STREAM_ASR_ENGINE)
-    return chosen == GEMINI_STREAM_ASR_ENGINE
+    stored = runtime.account_access.get_asr_provider(current.user.id)
+    chosen = permitted_asr_preference(runtime, current.user, stored)
+    return chosen if chosen in _STREAM_ENGINES else ""
+
+
+async def _relay_r2t2(
+    websocket: WebSocket,
+    current: CurrentAccount,
+    project_id: str,
+    cfg: TTSRouterConfig,
+    count_audio: Callable[[int], None],
+) -> None:
+    prompt = await project_asr_prompt(current, project_id)
+    async with websockets.connect(
+        cfg.asr_r2t2_stream_url,
+        max_size=4 * 1024 * 1024,
+        open_timeout=10,
+    ) as upstream:
+        await upstream.send(json.dumps({
+            "requestId": str(uuid4()),
+            "language": "Chinese",
+            "use_vad": True,
+            "secret_key": cfg.asr_r2t2_secret_key,
+            "system_prompt": prompt,
+        }))
+        first = json.loads(await asyncio.wait_for(upstream.recv(), 10))
+        if first.get("status") != "connected":
+            raise RuntimeError("R2T2 handshake rejected")
+        await websocket.send_json({"type": "ready"})
+        ended = asyncio.Event()
+
+        async def client_to_r2t2() -> None:
+            buffer = bytearray()
+            while True:
+                message = await websocket.receive()
+                if message.get("type") == "websocket.disconnect":
+                    return
+                if chunk := message.get("bytes"):
+                    count_audio(len(chunk))
+                    buffer.extend(chunk)
+                    while len(buffer) >= _R2T2_CHUNK_BYTES:
+                        await upstream.send(bytes(buffer[:_R2T2_CHUNK_BYTES]))
+                        del buffer[:_R2T2_CHUNK_BYTES]
+                elif (text := message.get("text")) and json.loads(text).get("type") == "end":
+                    if buffer:
+                        await upstream.send(
+                            bytes(buffer).ljust(_R2T2_CHUNK_BYTES, b"\0"),
+                        )
+                        buffer.clear()
+                    ended.set()
+                    await upstream.send(_R2T2_EOS)
+                    # Keep receiving until the client disconnects so EOS finals survive.
+                    # The frontend owns the five-second final drain timeout.
+
+        async def r2t2_to_client() -> None:
+            accumulated = ""
+            async for raw in upstream:
+                response = json.loads(raw)
+                if response.get("status") != "success":
+                    raise RuntimeError("R2T2 transcription failed")
+                body = response.get("msg") or {}
+                accumulated += body.get("text") or ""
+                if body.get("reset"):
+                    text = convert_to_traditional(
+                        body.get("final_text") or accumulated,
+                    ).strip()
+                    if text:
+                        await websocket.send_json({"type": "final", "text": text})
+                    accumulated = ""
+                elif body.get("text"):
+                    await websocket.send_json({
+                        "type": "interim",
+                        "text": convert_to_traditional(accumulated),
+                    })
+            if not ended.is_set():
+                raise RuntimeError("R2T2 upstream closed")
+
+        tasks = [
+            asyncio.create_task(client_to_r2t2()),
+            asyncio.create_task(r2t2_to_client()),
+        ]
+        try:
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                task.result()
+        finally:
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            with anyio.CancelScope(shield=True):
+                await asyncio.gather(*tasks, return_exceptions=True)
 
 
 @router.websocket("/api/v1/asr/stream")
@@ -163,9 +265,18 @@ async def asr_stream(websocket: WebSocket) -> None:
         return
     await websocket.accept()
 
+    engine = _allowed(current)
     api_key = os.environ.get("GEMINI_API_KEY", "")
-    if not api_key or not _allowed(current):
-        await websocket.send_json({"type": "error", "code": "not_allowed" if api_key else "not_configured"})
+    cfg = get_tts_config()
+    configured = (
+        bool(cfg.asr_r2t2_stream_url and cfg.asr_r2t2_secret_key)
+        if engine == R2T2_STREAM_ASR_ENGINE else bool(api_key)
+    )
+    if not engine or not configured:
+        await websocket.send_json({
+            "type": "error",
+            "code": "not_allowed" if not engine else "not_configured",
+        })
         await websocket.close()
         return
 
@@ -176,7 +287,16 @@ async def asr_stream(websocket: WebSocket) -> None:
     languages = _gemini_languages(routes)
     audio_bytes = 0
     started = time.monotonic()
+
+    def count_audio(size: int) -> None:
+        nonlocal audio_bytes
+        audio_bytes += size
+
     try:
+        if engine == R2T2_STREAM_ASR_ENGINE:
+            await _relay_r2t2(websocket, current, project_id, cfg, count_audio)
+            await websocket.close()
+            return
         async with websockets.connect(
             _GEMINI_LIVE_URL,
             additional_headers={"x-goog-api-key": api_key},
@@ -254,8 +374,14 @@ async def asr_stream(websocket: WebSocket) -> None:
         seconds = audio_bytes / (2 * _SAMPLE_RATE)
         if seconds > 0:
             record_usage_event(
-                provider="gemini-transcribe-live",
-                model=_model(),
+                provider=(
+                    "r2t2-live" if engine == R2T2_STREAM_ASR_ENGINE
+                    else "gemini-transcribe-live"
+                ),
+                model=(
+                    "Confucius4-R2T2" if engine == R2T2_STREAM_ASR_ENGINE
+                    else _model()
+                ),
                 kind="asr",
                 unit_type=UNIT_SECONDS,
                 units=round(seconds, 2),

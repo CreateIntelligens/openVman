@@ -203,7 +203,7 @@ class TTSRouterConfig(BaseSettings):
     vision_llm_base_url: str = ""
 
     # --- ASR ---
-    # "breeze" | "xiaomi" | "sensevoice" | "openai"
+    # "breeze" | "r2t2" | "xiaomi" | "sensevoice" | "openai"
     # 都是整檔上傳、無串流端點：使用者講完才開始辨識。我們要的是華語逐字稿：
     # breeze 與 xiaomi 都把臺語轉寫成華語，sensevoice 則保留臺語漢字，所以它
     # 退居備援——全掛時臺語漢字仍比「音訊轉錄失敗」六個字進 prompt 好。
@@ -228,6 +228,11 @@ class TTSRouterConfig(BaseSettings):
     # Xiaomi-CocktailASR-1：POST /transcribe，multipart ``target`` + ``ref``。
     # 目標語者模型，我們把同一個音檔同時當 target 與 ref 送出。輸出簡體。
     asr_xiaomi_url: str = ""
+    # Confucius4-R2T2（網易有道，Qwen3-ASR-1.7B）：POST /transcribe，multipart
+    # ``file`` + ``language`` + ``context``（熱詞）。輸出簡體。同一台也有 WebSocket 串流。
+    asr_r2t2_url: str = ""
+    asr_r2t2_stream_url: str = ""
+    asr_r2t2_secret_key: str = ""
     # 台語分流時 ASR 要等「是不是台語」的判斷才回，這是判斷的等待上限。真人 95 句
     # p50 1.9 秒、p90 2.2 秒，但有一句拖到 22.7 秒；逾時就當不是台語，照原本的 TTS。
     asr_language_check_timeout_seconds: float = 2.5

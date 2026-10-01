@@ -123,6 +123,10 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 **授權邊界與部署（2026-09-30）**：前端的引擎選擇只是偏好，不是授權；Backend 必須依帳號允許的引擎重新驗證，串流端點也不可略過。不得信任前端傳入的 provider 或語言分流來取得未授權引擎。
 
+前台串流引擎由共用 `STREAM_ASR_ENGINES` 定義（`gemini-live`、`r2t2-live`）。帳號選了其中一個、串流可用且台語分流關閉才使用共用 `StreamRecognizer`；開啟台語分流時維持 Breeze 批次。`r2t2-live` 顯示 Confucius4-R2T2 串流，與 `r2t2` 批次分開授權；Backend 依帳號偏好選上游，前台不傳任意上游 URL 或金鑰。失敗沿用既有批次備援。
+
+後台帳號授權與個人引擎選單由後端註冊及共用引擎名稱呈現；「試辨識」使用 `SERVER_ASR_ENGINES`，仍只有批次引擎。後台 Chat 維持批次錄音，不在本次新增串流輸入；外部 Avatar SDK 不開放 ASR。
+
 VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/` 載入。離線部署需將相符版本資產自架並調整 `vad-recognizer.ts` 的來源；目前不是完全離線可用，也沒有自動 CDN 鏡像切換。模型或 WASM 載入失敗回報 `vad-unavailable`，由共用控制器處理降級。
 
 串流 ASR 的 `start()` 共用尚未完成的啟動；停止或卸載使舊啟動失效，延遲取得的 media track 必須立即停止。ready 等待上限 10 秒。正常停止傳送 `{"type":"end"}` 後保留最多 5 秒等待最後定稿；重新啟動及卸載則直接關閉舊連線。Backend 在離開串流前取消並等待雙向工作結束。

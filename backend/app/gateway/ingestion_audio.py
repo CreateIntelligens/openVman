@@ -1,4 +1,4 @@
-"""Audio ingestion — Breeze-ASR, Xiaomi, SenseVoice, or the OpenAI Whisper API."""
+"""Audio ingestion — Breeze-ASR, Confucius4-R2T2, Xiaomi, SenseVoice, or the OpenAI Whisper API."""
 
 from __future__ import annotations
 
@@ -202,11 +202,41 @@ async def _transcribe_xiaomi(file_path: str, trace_id: str, prompt: str = "") ->
     return convert_to_traditional(str(body.get("text", "")).strip())
 
 
+async def _transcribe_r2t2(file_path: str, trace_id: str, prompt: str = "") -> str:
+    """Transcribe via Confucius4-R2T2 (POST /transcribe, multipart ``file``).
+
+    ``language=Chinese``：兩套部署都認得（.35 vLLM 版把 zhen 也當 Chinese；.37 transformers
+    版收到 zhen 直接 500）。不指定會自動判斷語言，串流實測帶口音的華語會跑成葡萄牙文。
+    專案詞表放 ``context``（Qwen3-ASR 的熱詞提示）。輸出簡體，轉繁才跟其他家一致。
+    """
+    cfg = get_tts_config()
+    url = cfg.asr_r2t2_url.rstrip("/")
+    if not url:
+        raise RuntimeError("ASR_R2T2_URL is not configured")
+
+    source, scratch = _as_wav(file_path)
+    try:
+        response = await _http.get().post(
+            f"{url}/transcribe",
+            files={"file": (Path(source).name, Path(source).read_bytes())},
+            data={"language": "Chinese", "context": prompt},
+        )
+    finally:
+        if scratch:
+            Path(scratch).unlink(missing_ok=True)
+    response.raise_for_status()
+    body = response.json()
+    if body.get("status") == "error":
+        raise RuntimeError(f"R2T2 ASR error: {body.get('message', '')}")
+    return convert_to_traditional(str(body.get("text", "")).strip())
+
+
 # provider 名稱 → 轉寫函式。
 # 順序就是 fallback 順序（使用者選的、部署預設 ASR_PROVIDER 會被提到最前面）。預設把輸出華語的
 # 排在前面：使用者要的是華語逐字稿，臺語漢字只在全都掛掉時才聊勝於無。
 _TRANSCRIBERS: dict[str, object] = {
     "breeze": _transcribe_breeze,
+    "r2t2": _transcribe_r2t2,
     "xiaomi": _transcribe_xiaomi,
     "sensevoice": _transcribe_sensevoice,
     "openai": _transcribe_openai,
@@ -272,6 +302,8 @@ def _provider_ready(cfg, name: str) -> bool:
         return bool(cfg.asr_breeze_url)
     if name == "xiaomi":
         return bool(cfg.asr_xiaomi_url)
+    if name == "r2t2":
+        return bool(cfg.asr_r2t2_url)
     return bool(cfg.whisper_api_key)
 
 

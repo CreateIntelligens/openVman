@@ -37,6 +37,7 @@ def _asr_cfg(provider: str, **overrides) -> MagicMock:
         "asr_sensevoice_url": "",
         "asr_breeze_url": "",
         "asr_xiaomi_url": "",
+        "asr_r2t2_url": "",
         "whisper_api_key": "",
     }
     fields.update(overrides)

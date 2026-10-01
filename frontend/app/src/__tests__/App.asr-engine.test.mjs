@@ -3,9 +3,58 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
+const engineSource = readFileSync(
+  resolve(__dirname, "../../../shared/speech/asr/engines.ts"), "utf8",
+);
+const { outputText } = ts.transpileModule(engineSource, {
+  compilerOptions: { module: ts.ModuleKind.ESNext },
+});
+const { isStreamAsrEngine, ASR_ENGINE_NOTES } = await import(
+  `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
+);
+
+// 執行 App 的實際選擇條件，才能抓到移除台語或可用性閘門的回歸。
+const streamPredicate = source.match(
+  /const useStreamAsrEngine = computed\(\s*\(\) => ([\s\S]*?),\s*\);/,
+);
+assert.ok(streamPredicate, "App exposes its streaming selection predicate");
+const selectStream = new Function(
+  "isStreamAsrEngine", "myAsrProvider", "streamAvailable", "languageRoutes",
+  `return ${streamPredicate[1]};`,
+);
+
+function usesStream(provider, available = true, taiwaneseOn = false) {
+  return selectStream(
+    isStreamAsrEngine, { value: provider }, { value: available },
+    { taiwaneseOn: { value: taiwaneseOn } },
+  );
+}
+
+test("Gemini Live and R2T2 Live select streaming while batch engines do not", () => {
+  assert.equal(usesStream("gemini-live"), true);
+  assert.equal(usesStream("r2t2-live"), true);
+  for (const provider of ["r2t2", "breeze", "browser", ""]) {
+    assert.equal(usesStream(provider), false);
+  }
+  assert.match(source, /if \(useStreamAsrEngine\.value\) return streamAsr;/);
+  assert.match(ASR_ENGINE_NOTES["r2t2-live"].label, /串流/);
+});
+
+test("both streaming engines fall back when Taiwanese routing is enabled", () => {
+  for (const provider of ["gemini-live", "r2t2-live"]) {
+    assert.equal(usesStream(provider, true, true), false);
+  }
+});
+
+test("both streaming engines fall back after streaming becomes unavailable", () => {
+  for (const provider of ["gemini-live", "r2t2-live"]) {
+    assert.equal(usesStream(provider, false), false);
+  }
+});
 
 test("the chat picks an engine instead of always using the browser one", () => {
   assert.match(source, /useServerAsr/);

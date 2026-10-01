@@ -24,7 +24,11 @@
 
 ### 語音可靠性
 
-Gemini Live ASR 僅做轉錄，回答仍由 Brain 產生。串流連線等待 ready 最多 10 秒，失敗沿用既有批次辨識備援；停止收音會立即釋放麥克風，最多再等 5 秒接最後定稿。重新開始或卸載後，舊連線不能再送出文字。每則回答獨立攜帶辨識語言，視覺回答與一般打字不沿用前一句台語分流。語音授權與 VAD 部署要求見 [前端規格](docs/specs/02_FRONTEND_SPEC.md#6-asr-與語音輸入-speech-recognition)。
+Gemini Live 與 Confucius4-R2T2 串流 ASR 僅做轉錄，回答仍由 Brain 產生。串流連線等待 ready 最多 10 秒，失敗沿用既有批次辨識備援；停止收音會立即釋放麥克風，最多再等 5 秒接最後定稿。重新開始或卸載後，舊連線不能再送出文字。每則回答獨立攜帶辨識語言，視覺回答與一般打字不沿用前一句台語分流。語音授權與 VAD 部署要求見 [前端規格](docs/specs/02_FRONTEND_SPEC.md#6-asr-與語音輸入-speech-recognition)。
+
+批次引擎多了 Confucius4-R2T2（`r2t2`，設 `ASR_R2T2_URL=http://10.9.0.37:8803`）：一次性轉寫、帶專案詞表、輸出轉繁體，鶴記合成語音實測準確度與 Breeze 相當、快約 3 倍（`scripts/experiments/r2t2/REPORT.md`）。前台選 `r2t2-live` 可使用 Confucius4-R2T2 邊講邊出字；它與批次 `r2t2` 分開授權。部署需設定 `ASR_R2T2_STREAM_URL=ws://10.9.0.37:8803/asr_stream_api_v1` 與 `ASR_R2T2_SECRET_KEY`（由服務管理者提供，不寫入版本控制），並由管理者在帳號頁授權。專案詞表會送給 .37；暫定字幕累加、定稿以整句 `final_text` 轉繁體，不經 Jev。台語分流開啟時維持 Breeze 批次。後台授權與個人引擎選單共用此選項；後台「試辨識」仍只提供批次引擎，後台 Chat 維持原有批次輸入。外部 Avatar SDK 不暴露 ASR。
+
+正式環境由 push 後的 CI／watchtower 部署；本機測試不代表正式已套用。變更正式 `.env`、授權或修改真人帳號偏好前須取得使用者同意。部署後以專用測試帳號執行 [語音端到端驗收](scripts/voice_e2e/README.md)，設定偏好為 `r2t2-live`，測鶴記兩個 Edge 聲音與同時三路，不修改真人帳號。
 
 第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](docs/guides/avatar-embed/README.md)。
 

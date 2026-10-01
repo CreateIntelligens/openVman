@@ -211,10 +211,12 @@ _EDGE_TTS_VOICE_LABELS = {
 # 查。label 與前台選單一致，後台授權時看得懂在給什麼。
 _ASR_ENGINE_LABELS = {
     "breeze": "Breeze-ASR-26（臺語轉華語）",
+    "r2t2": "Confucius4-R2T2（華英混合，自動轉繁）",
     "xiaomi": "Xiaomi-CocktailASR-1（臺語轉華語，自動轉繁）",
     "sensevoice": "SenseVoice-Small（臺語漢字）",
     "openai": "OpenAI Whisper（語音送往外部服務）",
     "browser": "瀏覽器內建辨識（語音留在使用者裝置）",
+    "r2t2-live": "Confucius4-R2T2 串流辨識（邊講邊出字，帶專案詞表）",
     "gemini-live": "Gemini 串流辨識（邊講邊出字，語音送往 Google）",
 }
 

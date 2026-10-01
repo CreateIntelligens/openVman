@@ -58,7 +58,9 @@ def _client(monkeypatch, *, allowed=True, embed=False, judge=None):
         user=types.SimpleNamespace(id="u1"), embed_key=object() if embed else None,
     )
     monkeypatch.setattr(asr_stream, "authenticate_websocket", lambda ws, runtime: account)
-    monkeypatch.setattr(asr_stream, "get_auth_runtime", lambda: None)
+    monkeypatch.setattr(asr_stream, "get_auth_runtime", lambda: types.SimpleNamespace(
+        account_access=types.SimpleNamespace(get_asr_provider=lambda uid: "gemini-live"),
+    ))
     monkeypatch.setattr(
         asr_stream, "permitted_asr_preference",
         lambda runtime, user, stored: stored if allowed else "",

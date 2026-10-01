@@ -1,0 +1,646 @@
+[
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "plain": {
+   "text": "请问diver有搅拌器吗？",
+   "ms": 272
+  },
+  "glossary": {
+   "text": "请问diva有搅拌器吗？",
+   "ms": 278
+  }
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "plain": {
+   "text": "沉水泵最深可以放多深？",
+   "ms": 319
+  },
+  "glossary": {
+   "text": "沉水泵最深可以放多深？",
+   "ms": 296
+  }
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "plain": {
+   "text": "eubl有哪些马力规格？",
+   "ms": 242
+  },
+  "glossary": {
+   "text": "eubl有哪些马力规格？",
+   "ms": 281
+  }
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "plain": {
+   "text": "五十一usr的出水口径是多少？",
+   "ms": 293
+  },
+  "glossary": {
+   "text": "五十一usr的出水口径是多少？",
+   "ms": 305
+  }
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "plain": {
+   "text": "hippo污水泵最大流量是多少？",
+   "ms": 268
+  },
+  "glossary": {
+   "text": "hippo污水泵最大流量是多少？",
+   "ms": 266
+  }
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "plain": {
+   "text": "alligator绞碎泵可以绞碎石吗？",
+   "ms": 348
+  },
+  "glossary": {
+   "text": "alligator绞碎泵可以绞碎石吗？",
+   "ms": 353
+  }
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "plain": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 406
+  },
+  "glossary": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 405
+  }
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "plain": {
+   "text": "杜甫的阳城是什么意思？",
+   "ms": 306
+  },
+  "glossary": {
+   "text": "洞普的扬程是什么意思？",
+   "ms": 274
+  }
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "plain": {
+   "text": "自动着拖装置要怎么安装？",
+   "ms": 263
+  },
+  "glossary": {
+   "text": "自动着脱装置要怎么安装？",
+   "ms": 275
+  }
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "plain": {
+   "text": "你好，请问你是谁？",
+   "ms": 240
+  },
+  "glossary": {
+   "text": "你好，请问你是谁？",
+   "ms": 216
+  }
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "plain": {
+   "text": "请问低位有搅拌器吗？",
+   "ms": 271
+  },
+  "glossary": {
+   "text": "请问低位有搅拌器吗？",
+   "ms": 244
+  }
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "plain": {
+   "text": "沉水泵最深可以放多深？",
+   "ms": 310
+  },
+  "glossary": {
+   "text": "沉水泵最深可以放多深？",
+   "ms": 299
+  }
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "plain": {
+   "text": "eubl有哪些马力规格？",
+   "ms": 214
+  },
+  "glossary": {
+   "text": "eubl有哪些马力规格？",
+   "ms": 240
+  }
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "plain": {
+   "text": "五十亿赛的出水口径是多少？",
+   "ms": 292
+  },
+  "glossary": {
+   "text": "五十EUS的出水口径是多少？",
+   "ms": 330
+  }
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "plain": {
+   "text": "一波水泵最大流量是多少？",
+   "ms": 214
+  },
+  "glossary": {
+   "text": "hippo污水泵最大流量是多少？",
+   "ms": 266
+  }
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "plain": {
+   "text": "alleged绞碎泵可以绞碎石吗？",
+   "ms": 369
+  },
+  "glossary": {
+   "text": "allegate绞碎泵可以绞碎石吗？",
+   "ms": 409
+  }
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "plain": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 399
+  },
+  "glossary": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵？",
+   "ms": 398
+  }
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "plain": {
+   "text": "泵浦的羊城是什么意思？",
+   "ms": 379
+  },
+  "glossary": {
+   "text": "泵浦的扬程是什么意思？",
+   "ms": 268
+  }
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "plain": {
+   "text": "自动褶拖装置要怎么安装？",
+   "ms": 283
+  },
+  "glossary": {
+   "text": "自动着脱装置要怎么安装？",
+   "ms": 271
+  }
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "plain": {
+   "text": "你好，请问你是谁？",
+   "ms": 210
+  },
+  "glossary": {
+   "text": "你好，请问你是谁？",
+   "ms": 254
+  }
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "plain": {
+   "text": "请问diva有搅拌器吗？",
+   "ms": 276
+  },
+  "glossary": {
+   "text": "请问DIVA有搅拌器吗？",
+   "ms": 273
+  }
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "plain": {
+   "text": "沉水棒上深，按捺放着深",
+   "ms": 346
+  },
+  "glossary": {
+   "text": "沉水泵上深，按按放着深",
+   "ms": 383
+  }
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "plain": {
+   "text": "以右为后，有哪些马列规则",
+   "ms": 349
+  },
+  "glossary": {
+   "text": "eubl有哪些马力规格",
+   "ms": 267
+  }
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "plain": {
+   "text": "五十eusr的出水口径是",
+   "ms": 274
+  },
+  "glossary": {
+   "text": "五十eusr的出水口径是",
+   "ms": 282
+  }
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "plain": {
+   "text": "hipo污水胖上大流量是偌济",
+   "ms": 327
+  },
+  "glossary": {
+   "text": "hipo污水泵上大流量是",
+   "ms": 280
+  }
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "plain": {
+   "text": "奈格勒茶胶喙棒会当胶喙什么",
+   "ms": 377
+  },
+  "glossary": {
+   "text": "奈格罗查胶水泵会当胶水什么",
+   "ms": 385
+  }
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "plain": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵",
+   "ms": 380
+  },
+  "glossary": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵",
+   "ms": 391
+  }
+ },
+ {
+  "id": "head-meaning",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "plain": {
+   "text": "放屁的用情是什麽意思？",
+   "ms": 291
+  },
+  "glossary": {
+   "text": "泵浦的用情是什麽意思",
+   "ms": 264
+  }
+ },
+ {
+  "id": "qdc-install",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "plain": {
+   "text": "自动着套装的要安怎安装",
+   "ms": 270
+  },
+  "glossary": {
+   "text": "自动着托装器要安怎安装？",
+   "ms": 323
+  }
+ },
+ {
+  "id": "chit-who",
+  "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "plain": {
+   "text": "你好，请问你是|",
+   "ms": 185
+  },
+  "glossary": {
+   "text": "你好，请问你是|",
+   "ms": 190
+  }
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "terms": [
+   "DIVA"
+  ],
+  "plain": {
+   "text": "请问dial有交管器",
+   "ms": 275
+  },
+  "glossary": {
+   "text": "请问DIAA有胶管器",
+   "ms": 279
+  }
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "沉水泵最深可以放多深？",
+  "terms": [
+   "沉水泵"
+  ],
+  "plain": {
+   "text": "沉水盆上深，会当放造深",
+   "ms": 365
+  },
+  "glossary": {
+   "text": "沉水泵上深会当放造深",
+   "ms": 298
+  }
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "EUBL 有哪些馬力規格？",
+  "terms": [
+   "EUBL"
+  ],
+  "plain": {
+   "text": "eubl有代怪马力规格",
+   "ms": 326
+  },
+  "glossary": {
+   "text": "EUBL有代怪马力规格",
+   "ms": 249
+  }
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "terms": [
+   "EUSR"
+  ],
+  "plain": {
+   "text": "五十eusr的出水口径是大",
+   "ms": 331
+  },
+  "glossary": {
+   "text": "五十eusr的出水口径是大",
+   "ms": 296
+  }
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "terms": [
+   "HIPPO",
+   "污水泵"
+  ],
+  "plain": {
+   "text": "hipo污水泵上大流量是廿|",
+   "ms": 363
+  },
+  "glossary": {
+   "text": "hippo污水泵上大流量是仰位",
+   "ms": 319
+  }
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "terms": [
+   "ALLIGATOR",
+   "絞碎泵"
+  ],
+  "plain": {
+   "text": "l l i j o狗嘴棒会当狗嘴|",
+   "ms": 401
+  },
+  "glossary": {
+   "text": "l l i j o，胶嘴棒会当胶嘴|",
+   "ms": 434
+  }
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "terms": [
+   "泥漿泵"
+  ],
+  "plain": {
+   "text": "工地爱抽泥浆，推荐哪一款泥浆",
+   "ms": 346
+  },
+  "glossary": {
+   "text": "工地要抽泥浆，推荐哪一款泥浆泵",
+   "ms": 407
+  }
+ },
+ {
+  "id": "head-meaning",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "泵浦的揚程是什麼意思？",
+  "terms": [
+   "泵浦",
+   "揚程"
+  ],
+  "plain": {
+   "text": "放炮的洋情是什麽意思？",
+   "ms": 289
+  },
+  "glossary": {
+   "text": "放破的扬程是甚物意思",
+   "ms": 297
+  }
+ },
+ {
+  "id": "qdc-install",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "terms": [
+   "自動著脫裝置|自動脫著裝置"
+  ],
+  "plain": {
+   "text": "自动着脱装置要依安怎安装",
+   "ms": 292
+  },
+  "glossary": {
+   "text": "自动着脱装置要伊安怎安装？",
+   "ms": 334
+  }
+ },
+ {
+  "id": "chit-who",
+  "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+  "ref": "你好，請問你是誰？",
+  "terms": [],
+  "plain": {
+   "text": "你好，请问你是谁？",
+   "ms": 217
+  },
+  "glossary": {
+   "text": "你好，请问你是谁？",
+   "ms": 258
+  }
+ }
+]
