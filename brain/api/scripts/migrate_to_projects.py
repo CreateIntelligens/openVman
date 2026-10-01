@@ -7,7 +7,7 @@ Legacy layout:
     /data/knowledge_index_state.json → data/projects/default/knowledge_index_state.json
 
 This script is idempotent — it only moves data if the source exists and the
-destination does NOT exist.  Called once from main.py lifespan on startup.
+destination does NOT exist.  Called once from startup.py lifespan on startup.
 """
 
 from __future__ import annotations

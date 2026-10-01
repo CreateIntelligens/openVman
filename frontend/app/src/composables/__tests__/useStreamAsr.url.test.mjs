@@ -31,6 +31,6 @@ test("the stream URL carries the project and its language routes", () => {
 });
 
 test("the app passes the language route fields to the stream", () => {
-  const app = readFileSync(resolve(__dirname, "../../App.vue"), "utf8");
+  const app = readFileSync(resolve(__dirname, "../../App.vue"), "utf8") + "\n" + readFileSync(resolve(__dirname, "..//useAvatarVoiceInput.ts"), "utf8");
   assert.match(app, /useStreamAsr\(\{\s*query: \(\) => languageRoutes\.asrFormFields\(\),/);
 });

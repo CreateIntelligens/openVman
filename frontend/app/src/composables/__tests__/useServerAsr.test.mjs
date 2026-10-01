@@ -7,7 +7,7 @@ import { transformSync } from "esbuild";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(resolve(__dirname, "../..", p), "utf-8");
-const appSource = read("App.vue");
+const appSource = read("App.vue") + "\n" + read("composables/useAvatarVoiceInput.ts");
 const serverAsrSource = read("composables/useServerAsr.ts");
 
 test("App.vue uses unified getAsrErrorMessage from @shared/speech", () => {

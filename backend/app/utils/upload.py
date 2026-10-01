@@ -1,4 +1,4 @@
-"""Shared upload helpers used by main.py and gateway routes."""
+"""Shared upload helpers used by document/ASR and gateway routes."""
 
 from __future__ import annotations
 

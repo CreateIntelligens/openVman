@@ -1,6 +1,6 @@
 """跨模組共享的預熱完成狀態。
 
-main.py 在背景預熱完成後設定旗標，health 端點據此回報 readiness，
+startup.py 在背景預熱完成後設定旗標，health 端點據此回報 readiness，
 讓 readiness probe / 反向代理在預熱完成前擋下流量，避免第一個檢索
 請求承擔 embedding gateway 連線與 LanceDB 查詢冷啟成本。
 """

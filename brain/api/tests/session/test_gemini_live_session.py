@@ -17,6 +17,14 @@ if str(API_ROOT) not in sys.path:
 
 
 _saved_modules: dict[str, object] = {}
+_saved_package_attributes: dict[tuple[str, str], object] = {}
+_MISSING = object()
+_LIVE_MODULES = (
+    "live.gemini_live",
+    "live.gemini_payloads",
+    "live.gemini_tool_execution",
+    "live.gemini_transport",
+)
 
 
 def _load_module():
@@ -44,7 +52,14 @@ def _load_module():
     sys.modules["memory.retrieval"] = types.SimpleNamespace(
         search_records=lambda *args, **kwargs: [{"text": "result"}]
     )
-    sys.modules.pop("live.gemini_live", None)
+    for mod_name in _LIVE_MODULES:
+        _saved_modules.setdefault(mod_name, sys.modules.get(mod_name))
+        package_name, attribute = mod_name.rsplit(".", 1)
+        package = sys.modules.get(package_name)
+        _saved_package_attributes.setdefault(
+            (package_name, attribute), getattr(package, attribute, _MISSING),
+        )
+        sys.modules.pop(mod_name, None)
     return importlib.import_module("live.gemini_live"), fake_config
 
 
@@ -58,6 +73,14 @@ def _restore_modules():
         else:
             sys.modules[mod_name] = orig
     _saved_modules.clear()
+    for (package_name, attribute), original in _saved_package_attributes.items():
+        package = sys.modules.get(package_name)
+        if original is _MISSING:
+            if hasattr(package, attribute):
+                delattr(package, attribute)
+        elif package is not None:
+            setattr(package, attribute, original)
+    _saved_package_attributes.clear()
 
 
 class FakeTransport:
@@ -451,7 +474,7 @@ async def test_gemini_live_session_search_tool_runs_in_thread(monkeypatch):
 def test_gemini_live_declarations_include_2md_and_wiki_tools():
     module, _ = _load_module()
 
-    declarations = module.build_gemini_tool_declarations()
+    declarations = importlib.import_module("live.gemini_tools").build_gemini_tool_declarations()
 
     assert {item["name"] for item in declarations} >= {
         "search_web",
@@ -466,7 +489,7 @@ def test_gemini_live_declarations_respect_external_tool_flags():
     fake_config.url2md_read_enabled = False
     fake_config.wiki_publish_enabled = False
 
-    declarations = module.build_gemini_tool_declarations()
+    declarations = importlib.import_module("live.gemini_tools").build_gemini_tool_declarations()
     names = {item["name"] for item in declarations}
 
     assert {"search_web", "read_web_page", "publish_wiki"}.isdisjoint(names)
@@ -480,9 +503,9 @@ async def test_gemini_live_session_dispatches_2md_and_wiki_tools(monkeypatch):
         client_id="client-1",
     )
 
-    monkeypatch.setattr(session, "_search_web", lambda args: {"results": []})
-    monkeypatch.setattr(session, "_read_web_page", lambda args: {"content": "page"})
-    monkeypatch.setattr(session, "_publish_wiki", lambda args: {"shareUrl": "https://wiki/share/1"})
+    monkeypatch.setattr(session._tools, "_search_web", lambda args: {"results": []})
+    monkeypatch.setattr(session._tools, "_read_web_page", lambda args: {"content": "page"})
+    monkeypatch.setattr(session._tools, "_publish_wiki", lambda args: {"shareUrl": "https://wiki/share/1"})
 
     search_response = await session._execute_function_call({"id": "1", "name": "search_web", "args": {"query": "x"}})
     read_response = await session._execute_function_call(
@@ -1013,11 +1036,11 @@ async def test_live_knowledge_search_waits_for_taiwanese_verdict(monkeypatch):
     _stub_memory()
     captured: dict = {}
 
-    def fake_search_sync(self, table, args, heard_language=None):
+    def fake_search_sync(self, table, args, user_message, heard_language=None):
         captured["heard"] = heard_language
         return {"results": []}
 
-    monkeypatch.setattr(module.GeminiLiveSession, "_search_sync", fake_search_sync)
+    monkeypatch.setattr(module.GeminiLiveToolExecutor, "search_sync", fake_search_sync)
     session = module.GeminiLiveSession(
         relay_session_id="relay-wait",
         client_id="client-wait",
@@ -1032,7 +1055,7 @@ async def test_live_knowledge_search_waits_for_taiwanese_verdict(monkeypatch):
         return "nan"
 
     session._utterance_language = asyncio.create_task(slow_verdict())
-    await session._search("knowledge", {"queries": ["急診在哪裡"]})
+    await session._execute_function_call({"name": "search_knowledge", "args": {"queries": ["急診在哪裡"]}})
     assert captured["heard"] == "nan"
     await session.close()
 
@@ -1044,11 +1067,11 @@ async def test_text_turn_does_not_reuse_previous_audio_language(monkeypatch):
     _stub_memory()
     captured = []
 
-    def search_sync(self, table, args, heard_language=None):
+    def search_sync(self, table, args, user_message, heard_language=None):
         captured.append(heard_language)
         return {"results": []}
 
-    monkeypatch.setattr(module.GeminiLiveSession, "_search_sync", search_sync)
+    monkeypatch.setattr(module.GeminiLiveToolExecutor, "search_sync", search_sync)
     session = module.GeminiLiveSession(
         relay_session_id="relay-language-reset",
         client_id="client-language-reset",
@@ -1063,9 +1086,9 @@ async def test_text_turn_does_not_reuse_previous_audio_language(monkeypatch):
 
     session._utterance_language = asyncio.create_task(verdict())
     await session._utterance_language
-    await session._search("knowledge", {"queries": ["急診在哪裡"]})
+    await session._execute_function_call({"name": "search_knowledge", "args": {"queries": ["急診在哪裡"]}})
     await session.send_text_turn("Which pump do you recommend?")
-    await session._search("knowledge", {"queries": ["pump"]})
+    await session._execute_function_call({"name": "search_knowledge", "args": {"queries": ["pump"]}})
     assert captured == ["nan", None]
     await session.close()
 
@@ -1097,10 +1120,10 @@ def test_live_short_greeting_searches_in_the_primary_language(monkeypatch):
     module, fake_config = _load_module()
     seen: list[str | None] = []
     monkeypatch.setattr(
-        module, "search_records",
+        importlib.import_module("live.gemini_tool_execution"), "search_records",
         lambda *args, **kwargs: seen.append(kwargs.get("language")) or [],
     )
-    monkeypatch.setattr(module, "primary_language", lambda project_id: "en")
+    monkeypatch.setattr(importlib.import_module("live.gemini_tool_execution"), "primary_language", lambda project_id: "en")
     session = module.GeminiLiveSession(
         relay_session_id="relay-hi",
         client_id="client-hi",
@@ -1110,7 +1133,74 @@ def test_live_short_greeting_searches_in_the_primary_language(monkeypatch):
     )
     session._last_user_message = "hi"
 
-    session._search_sync("knowledge", {"query": "greeting"})
+    session._tools.search_sync("knowledge", {"query": "greeting"}, session._last_user_message)
 
     # 「hi」判斷不出語言：歸主要語言，跟文字模式的 search_knowledge 一致。
     assert seen and set(seen) == {"en"}
+
+
+@pytest.mark.asyncio
+async def test_live_search_keeps_project_context_and_emits_citations(monkeypatch):
+    module, fake_config = _load_module()
+    tools_module = importlib.import_module("live.gemini_tool_execution")
+    seen = []
+    emitted = []
+
+    def search_records(table, vector, **kwargs):
+        seen.append((table, kwargs))
+        return [{"text": "退款規則", "source": "rules.md"}]
+
+    async def sink(event):
+        emitted.append(event)
+
+    monkeypatch.setattr(tools_module, "search_records", search_records)
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-citations",
+        client_id="client-citations",
+        project_id="proj-rules",
+        persona_id="rules-guide",
+        config=fake_config,
+        event_sink=sink,
+    )
+    session._last_user_message = "退款規則是什麼？"
+    result = await session._execute_function_call({
+        "id": "rules-call",
+        "name": "search_knowledge",
+        "args": {"queries": ["refund policy"]},
+    })
+    assert all(kwargs["project_id"] == "proj-rules" for _, kwargs in seen)
+    assert all(kwargs["persona_id"] == "rules-guide" for _, kwargs in seen)
+    assert result["response"]["queries"] == ["refund policy", "退款規則是什麼？"]
+    assert emitted[0]["event"] == "server_search_results"
+    assert emitted[0]["session_id"] == "relay-citations"
+    assert emitted[0]["tool_name"] == "search_knowledge"
+    assert emitted[0]["citations"] == result["response"]["citations"]
+    assert emitted[0]["citations"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("name", "flag", "handler"),
+    [
+        ("search_web", "url2md_search_enabled", "_search_web"),
+        ("read_web_page", "url2md_read_enabled", "_read_web_page"),
+        ("publish_wiki", "wiki_publish_enabled", "_publish_wiki"),
+    ],
+)
+async def test_live_disabled_external_tool_never_calls_provider(
+    monkeypatch, name, flag, handler,
+):
+    module, fake_config = _load_module()
+    setattr(fake_config, flag, False)
+    session = module.GeminiLiveSession(
+        relay_session_id="relay-flags",
+        client_id="client-flags",
+        config=fake_config,
+    )
+    calls = []
+    monkeypatch.setattr(session._tools, handler, lambda args: calls.append(args))
+    result = await session._execute_function_call({"id": "blocked", "name": name})
+    assert result == {
+        "id": "blocked", "name": name, "response": {"error": f"{name} 已停用"},
+    }
+    assert calls == []

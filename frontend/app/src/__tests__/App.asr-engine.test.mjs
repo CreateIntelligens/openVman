@@ -1,3 +1,4 @@
+import { readAppComposition, readAppModule } from "./helpers/appSources.mjs";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -6,7 +7,7 @@ import { dirname, resolve } from "node:path";
 import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
+const source = readAppComposition("useAvatarVoiceInput", "useAsrPreferences", "useAvatarConversation", "useAvatarCamera");
 const engineSource = readFileSync(
   resolve(__dirname, "../../../shared/speech/asr/engines.ts"), "utf8",
 );

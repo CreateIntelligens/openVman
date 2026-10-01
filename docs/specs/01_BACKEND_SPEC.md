@@ -10,6 +10,10 @@
 * **主要職責**：維持與多台機台 (Kiosk) 的 WebSocket 連線、執行訊息處理層 (message handling layer)、調用大腦層生成對話、調用 TTS 服務合成語音，最後將音訊資料打包推播（前端由 DINet AI 根據音訊即時生成嘴型）。
 * **效能要求**：必須非阻塞 (Non-blocking/Async)，確保高併發下各 Session 互不干擾。首字節延遲 (TTFB) 需控制在 1 秒內。
 
+### 1.1 入口分工（2026-10-01）
+
+`app/main.py` 僅組裝 FastAPI、授權 middleware、HTTP metrics、lifespan、OpenAPI 及 router，並提供 server 執行入口。HTTP 業務處理由 `routes/tts.py`（同步／串流 TTS、授權、快取及備援）、`routes/asr.py`（帳號辨識、台語分流、語言路由及管理者試辨識）、`routes/documents.py`（文件轉換及暫存清理）承擔。基礎設施分為 `lifecycle.py`、`openapi.py`、`http_metrics.py`、`server_logging.py`。Brain proxy catch-all 必須最後註冊，否則遮蔽具體端點；入口邊界測試保護此順序與禁止 inline 業務端點。既有 R2T2 串流仍由 `gateway/asr_stream.py` 擁有，所有端點 URL、授權、用量與錯誤格式不變。
+
 ### 2. 連線與 Session 管理 (Session Management)
 伺服器必須在記憶體中維護一個 Session Map，管理所有活躍的機台連線。
 ```javascript

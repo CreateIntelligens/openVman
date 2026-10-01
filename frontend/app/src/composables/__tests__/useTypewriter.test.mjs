@@ -40,7 +40,7 @@ test("flush reveals the rest at once and reports done", () => {
 
 test("TTS finishing its download does not dump the subtitle", () => {
   // 下載完就 flush，長回覆會在講到一半整段跳出（2026-09-29 使用者回報）。
-  const app = readFileSync(resolve(__dirname, "../../App.vue"), "utf8");
+  const app = readFileSync(resolve(__dirname, "../../App.vue"), "utf8") + "\n" + readFileSync(resolve(__dirname, "..//useAvatarConversation.ts"), "utf8");
   const onEnd = app.match(/onEnd:\s*\(\)\s*=>\s*\{([^}]*)\}/);
   assert.ok(onEnd, "ttsStreamer onEnd not found");
   assert.doesNotMatch(onEnd[1], /flush/);

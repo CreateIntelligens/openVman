@@ -81,8 +81,11 @@ def test_metrics_prometheus_route_delegates_to_observability():
 
 def test_http_metrics_middleware_uses_route_template_for_proxy_paths(monkeypatch):
     import app.main as main
+    import app.http_metrics as http_metrics
 
     captured: list[dict[str, object]] = []
+
+    import app.brain_proxy as brain_proxy
 
     class _FailingClient:
         async def send(self, *args, **kwargs):
@@ -94,12 +97,12 @@ def test_http_metrics_middleware_uses_route_template_for_proxy_paths(monkeypatch
             return object()
 
     monkeypatch.setattr(
-        main,
+        http_metrics,
         "record_http_request",
         lambda **kwargs: captured.append(kwargs),
     )
     monkeypatch.setattr(
-        main._brain_proxy_http,
+        brain_proxy._http,
         "get",
         lambda: _FailingClient(),
     )
@@ -139,10 +142,11 @@ def test_http_metrics_middleware_uses_route_template_for_proxy_paths(monkeypatch
 
 def test_http_metrics_middleware_skips_metrics_routes(monkeypatch):
     import app.main as main
+    import app.http_metrics as http_metrics
 
     captured: list[dict[str, object]] = []
     monkeypatch.setattr(
-        main,
+        http_metrics,
         "record_http_request",
         lambda **kwargs: captured.append(kwargs),
     )

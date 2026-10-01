@@ -3,6 +3,12 @@ name: Contracts
 on:
   pull_request:
     paths:
+      - "backend/app/**"
+      - "brain/api/**"
+      - "brain/embedding/**"
+      - "brain/skills/**"
+      - "frontend/**"
+      - "tests/test_entry_boundaries.py"
       - "contracts/**"
       - "brain/api/protocol/**"
       - "brain/api/tests/contracts/**"
@@ -33,3 +39,6 @@ jobs:
 
       - name: Run backend protocol tests
         run: python3 -m pytest brain/api/tests/contracts/test_protocol_events.py -v
+
+      - name: Check entrypoint boundaries and owned source sizes
+        run: python3 -m pytest tests/test_entry_boundaries.py -q

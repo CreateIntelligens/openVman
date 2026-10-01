@@ -9,7 +9,7 @@ import { transformSync } from "esbuild";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(resolve(__dirname, "../..", p), "utf-8");
 const source = read("composables/useVadAsr.ts");
-const app = read("App.vue");
+const app = read("App.vue") + "\n" + read("composables/useAvatarVoiceInput.ts");
 const vadRecognizerSource = readFileSync(
   resolve(__dirname, "../../../../shared/speech/asr/vad-recognizer.ts"),
   "utf-8",

@@ -7,15 +7,10 @@ import base64
 import json
 import logging
 import random
-import re
 import time
-from typing import Any, Awaitable, Callable, Protocol
-
-import websockets
+from typing import Any, Awaitable, Callable
 
 from config import BrainSettings, get_settings
-from knowledge.kb_settings import primary_language
-from memory.embedder import encode_query_with_fallback
 from memory.language_detect import (
     DEFAULT_LANGUAGE,
     TAIWANESE,
@@ -23,93 +18,18 @@ from memory.language_detect import (
     detect_language,
     project_has_taiwanese_route,
 )
-from memory.retrieval import search_records
-from .gemini_tools import build_gemini_tool_declarations
+from .gemini_payloads import build_setup_message, parse_sample_rate, pcm_to_wav
+from .gemini_tool_execution import GeminiLiveToolExecutor
+from .gemini_transport import GeminiLiveWebSocketTransport, JsonTransport
 
 
 logger = logging.getLogger("brain.live.gemini_live")
 
-_GEMINI_LIVE_WS_URL = (
-    "wss://generativelanguage.googleapis.com/ws/"
-    "google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
-)
-_PCM_RATE_RE = re.compile(r"rate=(\d+)")
 _RECONNECT_DELAYS = (1, 2, 4, 8, 16)
 _KEEPALIVE_INTERVAL_SECONDS = 600
 _SETUP_COMPLETE_TIMEOUT_SECONDS = 10
 
 EventSink = Callable[[dict[str, Any]], Awaitable[None]]
-
-
-def _supports_thinking_level(model: str) -> bool:
-    """Whether a Live model accepts generationConfig.thinkingConfig.
-
-    3.8 起 thinkingLevel 只留在 extended-thinking 變體；一般的 gemini-3.8-live
-    收到這個欄位會直接報錯。3.1 preview 兩者都吃。
-    """
-    name = model.strip().removeprefix("models/")
-    if name.startswith("gemini-3.1-"):
-        return True
-    return "extended-thinking" in name
-
-
-class JsonTransport(Protocol):
-    async def connect(self) -> None: ...
-
-    async def send_json(self, payload: dict[str, Any]) -> None: ...
-
-    async def recv_json(self) -> dict[str, Any] | None: ...
-
-    async def ping(self) -> None: ...
-
-    async def close(self) -> None: ...
-
-
-class GeminiLiveWebSocketTransport:
-    """Minimal JSON transport for Gemini Live's raw websocket API."""
-
-    def __init__(self, config: BrainSettings) -> None:
-        self._config = config
-        self._ws: Any | None = None
-
-    async def connect(self) -> None:
-        if not self._config.gemini_api_key:
-            raise RuntimeError("GEMINI_API_KEY is not configured")
-        self._ws = await websockets.connect(
-            _GEMINI_LIVE_WS_URL,
-            additional_headers={"x-goog-api-key": self._config.gemini_api_key},
-            open_timeout=10,
-            max_size=4 * 1024 * 1024,
-        )
-
-    async def send_json(self, payload: dict[str, Any]) -> None:
-        if self._ws is None:
-            raise RuntimeError("Gemini Live transport is not connected")
-        await self._ws.send(json.dumps(payload))
-
-    async def recv_json(self) -> dict[str, Any] | None:
-        if self._ws is None:
-            raise RuntimeError("Gemini Live transport is not connected")
-        try:
-            message = await self._ws.recv()
-        except websockets.ConnectionClosedOK:
-            return None
-        except websockets.ConnectionClosedError as exc:
-            raise RuntimeError(f"Gemini Live websocket closed: {exc}") from exc
-        if isinstance(message, bytes):
-            message = message.decode("utf-8")
-        return json.loads(message)
-
-    async def ping(self) -> None:
-        if self._ws is None:
-            raise RuntimeError("Gemini Live transport is not connected")
-        pong = await self._ws.ping()
-        await pong
-
-    async def close(self) -> None:
-        if self._ws is not None:
-            await self._ws.close()
-            self._ws = None
 
 
 class GeminiLiveSession:
@@ -145,6 +65,12 @@ class GeminiLiveSession:
         self.config = config or get_settings()
         self._transport_factory = transport_factory or (lambda cfg: GeminiLiveWebSocketTransport(cfg))
         self._event_sink = event_sink
+        self._tools = GeminiLiveToolExecutor(
+            self.config,
+            relay_session_id=relay_session_id,
+            project_id=project_id,
+            persona_id=persona_id,
+        )
         self._transport: JsonTransport | None = None
         self._listener_task: asyncio.Task | None = None
         self._keepalive_task: asyncio.Task | None = None
@@ -220,7 +146,7 @@ class GeminiLiveSession:
         # 上行音訊同樣要計量；16-bit mono PCM，秒數 = bytes / (2 * rate)。
         try:
             pcm = base64.b64decode(audio_b64)
-            rate = _parse_sample_rate(mime_type)
+            rate = parse_sample_rate(mime_type)
             self._input_audio_seconds += len(pcm) / (2 * rate)
             if self._audio_language_id:
                 self._buffer_utterance(pcm, rate)
@@ -436,7 +362,7 @@ class GeminiLiveSession:
         """
         try:
             language = await asyncio.to_thread(
-                detect_audio_language, _pcm_to_wav(pcm, self._utterance_rate),
+                detect_audio_language, pcm_to_wav(pcm, self._utterance_rate),
             )
             if language == TAIWANESE:
                 from memory.memory import update_session_message_language
@@ -596,183 +522,29 @@ class GeminiLiveSession:
             )
 
     async def _execute_function_call(self, function_call: dict[str, Any]) -> dict[str, Any]:
-        name = str(function_call.get("name", "")).strip()
-        call_id = str(function_call.get("id", "")).strip()
-        args = function_call.get("args") or {}
-        if isinstance(args, str):
-            args = json.loads(args)
-
-        # Mapping of tool names to handlers
-        # Some are async, some are sync (wrapped in to_thread if needed)
-        tool_map = {
-            "search_knowledge": lambda: self._search("knowledge", args),
-            "search_memory": lambda: self._search("memories", args),
-            "get_chat_history": lambda: asyncio.to_thread(self._get_chat_history, args),
-            "save_memory": lambda: asyncio.to_thread(self._save_memory, args),
-            "search_web": lambda: asyncio.to_thread(self._search_web, args),
-            "read_web_page": lambda: asyncio.to_thread(self._read_web_page, args),
-            "publish_wiki": lambda: asyncio.to_thread(self._publish_wiki, args),
-        }
-
-        try:
-            if name == "search_web" and not getattr(self.config, "url2md_search_enabled", True):
-                raise ValueError("search_web 已停用")
-            if name == "read_web_page" and not getattr(self.config, "url2md_read_enabled", True):
-                raise ValueError("read_web_page 已停用")
-            if name == "publish_wiki" and not getattr(self.config, "wiki_publish_enabled", True):
-                raise ValueError("publish_wiki 已停用")
-            handler = tool_map.get(name)
-            if not handler:
-                raise ValueError(f"Unsupported Gemini Live tool: {name}")
-
-            response = await handler()
-        except Exception as exc:
-            logger.warning("Gemini Live tool %s failed: %s", name, exc)
-            response = {"error": str(exc)}
-
+        heard_language = (
+            await self._utterance_language_for_search()
+            if str(function_call.get("name", "")).strip() == "search_knowledge"
+            else None
+        )
+        result = await self._tools.execute(
+            function_call,
+            user_message=self._last_user_message,
+            heard_language=heard_language,
+        )
+        response = result["response"]
         if isinstance(response, dict) and response.get("citations"):
             await self._emit(
                 {
                     "event": "server_search_results",
                     "session_id": self.relay_session_id,
-                    "tool_name": name,
+                    "tool_name": result["name"],
                     "queries": response.get("queries", []),
                     "citations": response.get("citations", []),
                     "timestamp": int(time.time() * 1000),
                 }
             )
-
-        return {"id": call_id, "name": name, "response": response}
-
-
-    def _save_memory(self, args: dict[str, Any]) -> dict[str, Any]:
-        from memory.embedder import encode_text
-        from memory.memory import add_memory
-        from tools.builtin.memory_tools import is_explicit_memory_request
-
-        content = str(args.get("content", "")).strip()
-        if not content:
-            raise ValueError("content 不可為空")
-        # 文字模式早有這道檢查，Live 以前沒有，模型想存就存。
-        if not is_explicit_memory_request(self._last_user_message):
-            raise ValueError("只有使用者明確要求記憶時才能寫入長期記憶")
-        vector = encode_text(content)
-        add_memory(
-            text=content,
-            vector=vector,
-            source="agent",
-            persona_id=self.persona_id,
-            project_id=self.project_id,
-        )
-        return {"saved": True, "content": content}
-
-    def _get_chat_history(self, args: dict[str, Any]) -> dict[str, Any]:
-        from memory.memory import list_session_messages
-
-        session_id = str(args.get("session_id", "")).strip()
-        if not session_id:
-            session_id = self.relay_session_id
-        try:
-            max_messages = max(1, min(int(args.get("max_messages", 20)), 50))
-        except (ValueError, TypeError):
-            max_messages = 20
-        messages = list_session_messages(session_id, project_id=self.project_id)
-        recent = messages[-max_messages:]
-        return {"session_id": session_id, "messages": recent}
-
-    @staticmethod
-    def _search_web(args: dict[str, Any]) -> dict[str, Any]:
-        from tools.builtin.web_tools import _search_web
-
-        return _search_web(args)
-
-    @staticmethod
-    def _read_web_page(args: dict[str, Any]) -> dict[str, Any]:
-        from tools.builtin.web_tools import _read_web_page
-
-        return _read_web_page(args)
-
-    @staticmethod
-    def _publish_wiki(args: dict[str, Any]) -> dict[str, Any]:
-        from tools.builtin.wiki_tools import _publish_wiki
-
-        return _publish_wiki(args)
-
-    async def _search(self, table: str, args: dict[str, Any]) -> dict[str, Any]:
-        heard = await self._utterance_language_for_search() if table == "knowledge" else None
-        return await asyncio.to_thread(self._search_sync, table, args, heard)
-
-    def _search_sync(
-        self, table: str, args: dict[str, Any], heard_language: str | None = None,
-    ) -> dict[str, Any]:
-        from tools.search_helpers import (
-            build_citations,
-            fused_limit,
-            merge_search_results,
-            normalize_query_list,
-        )
-
-        queries = normalize_query_list(args)
-        fallback = (self._last_user_message or "").strip()
-        if fallback and fallback not in queries:
-            queries.append(fallback)
-        if not queries:
-            raise ValueError("queries is required")
-
-        top_k = max(1, min(int(args.get("top_k", 3) or 3), 8))
-        # Gemini 常把問題改寫成中英西多條查詢；語言要看使用者原話，不看查詢。
-        # 「hi」這類短句歸專案主要語言，跟訊息標籤、回覆語言一致。
-        language = (
-            detect_language(fallback, primary_language(self.project_id))
-            if table == "knowledge" and fallback
-            else None
-        )
-        # 聽出是台語就讓台語文件優先（沒有台語文件時 search_records 用其他語言補）。
-        if heard_language == TAIWANESE:
-            language = TAIWANESE
-        grouped: list[tuple[str, list[dict[str, Any]]]] = []
-        embedding_versions: list[str] = []
-        for query in queries:
-            try:
-                embedding_route = encode_query_with_fallback(
-                    query,
-                    project_id=self.project_id,
-                    table_names=(table,),
-                )
-                results = search_records(
-                    table,
-                    embedding_route.vector,
-                    top_k=top_k,
-                    query_text=query,
-                    query_type="vector",
-                    persona_id=self.persona_id,
-                    project_id=self.project_id,
-                    embedding_version=embedding_route.version,
-                    language=language,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Gemini Live search failed table=%s query=%r err=%s",
-                    table,
-                    query[:60],
-                    exc,
-                )
-                continue
-            grouped.append((query, results))
-            if embedding_route.version not in embedding_versions:
-                embedding_versions.append(embedding_route.version)
-
-        merged = merge_search_results(
-            grouped,
-            limit=fused_limit(top_k, self.config),
-        )
-        return {
-            "table": table,
-            "queries": queries,
-            "embedding_versions": embedding_versions,
-            "results": merged,
-            "citations": build_citations(merged),
-        }
+        return result
 
     async def _emit(self, event: dict[str, Any]) -> None:
         if self._event_sink is not None:
@@ -847,51 +619,7 @@ class GeminiLiveSession:
             raise
 
     def _build_setup_message(self) -> dict[str, Any]:
-        setup: dict[str, Any] = {
-            "model": f"models/{self.config.live_gemini_model}",
-            "generationConfig": {"responseModalities": ["AUDIO"]},
-        }
-        # gemini-3.8-live 不支援 thinkingLevel，帶了會被拒絕；extended-thinking
-        # 變體才吃這個欄位，所以依模型決定要不要送，而不是無條件帶上。
-        thinking_level = self.config.live_gemini_thinking_level.strip()
-        if thinking_level and _supports_thinking_level(self.config.live_gemini_model):
-            setup["generationConfig"]["thinkingConfig"] = {
-                "thinkingLevel": thinking_level,
-            }
-        elif thinking_level:
-            logger.warning(
-                "ignoring live_gemini_thinking_level=%r: %s does not accept it",
-                thinking_level,
-                self.config.live_gemini_model,
-            )
-        instruction = self._system_instruction.strip() or self.config.live_gemini_system_instruction.strip()
-        if instruction:
-            setup["systemInstruction"] = {
-                "parts": [{"text": instruction}]
-            }
-        # 不指定語言時中文轉錄回傳簡體；languageCodes 讓 Gemini 直接吐繁體
-        # （2026-09-23 實測；單數 languageCode 會被拒）。
-        transcription: dict[str, Any] = {}
-        languages = [
-            code.strip()
-            for code in str(getattr(self.config, "live_gemini_transcription_languages", "")).split(",")
-            if code.strip()
-        ]
-        if languages:
-            transcription["languageCodes"] = languages
-        if self.config.live_gemini_output_audio_transcription:
-            setup["outputAudioTranscription"] = dict(transcription)
-        setup["inputAudioTranscription"] = dict(transcription)
-        if self.config.live_gemini_tools_enabled:
-            setup["tools"] = [{"functionDeclarations": build_gemini_tool_declarations()}]
-
-        # Without compression Gemini Live caps a session at 15 min (audio) or
-        # 2 min (audio+video), then drops the socket with 1008. A sliding
-        # window lifts that cap so video sessions survive past ~2 min.
-        if self.config.live_gemini_context_compression:
-            setup["contextWindowCompression"] = {"slidingWindow": {}}
-
-        return setup
+        return build_setup_message(self.config, self._system_instruction)
 
     def _build_user_turn_message(self, user_text: str) -> dict[str, Any]:
         return {
@@ -935,9 +663,9 @@ class GeminiLiveSession:
                 # 16-bit mono，所以秒數 = bytes / (2 * rate)。要在轉成 WAV
                 # 之前算，否則 44 bytes 的檔頭會被算進音訊長度。
                 self._output_audio_seconds += len(audio_bytes) / (
-                    2 * _parse_sample_rate(mime_type)
+                    2 * parse_sample_rate(mime_type)
                 )
-                audio_bytes = _pcm_to_wav(audio_bytes, _parse_sample_rate(mime_type))
+                audio_bytes = pcm_to_wav(audio_bytes, parse_sample_rate(mime_type))
 
             self._chunk_counter += 1
             events.append(
@@ -969,41 +697,6 @@ class GeminiLiveSession:
         transcription = server_content.get("outputTranscription") or {}
         text = transcription.get("text", "")
         return text if isinstance(text, str) and text.strip() else ""
-
-
-
-
-def _parse_sample_rate(mime_type: str) -> int:
-    match = _PCM_RATE_RE.search(mime_type)
-    if not match:
-        return 24000
-    return int(match.group(1))
-
-
-def _pcm_to_wav(pcm_bytes: bytes, sample_rate: int) -> bytes:
-    data_size = len(pcm_bytes)
-    chunk_size = 36 + data_size
-    byte_rate = sample_rate * 2
-    block_align = 2
-    header = b"".join(
-        [
-            b"RIFF",
-            chunk_size.to_bytes(4, "little"),
-            b"WAVE",
-            b"fmt ",
-            (16).to_bytes(4, "little"),
-            (1).to_bytes(2, "little"),
-            (1).to_bytes(2, "little"),
-            sample_rate.to_bytes(4, "little"),
-            byte_rate.to_bytes(4, "little"),
-            block_align.to_bytes(2, "little"),
-            (16).to_bytes(2, "little"),
-            b"data",
-            data_size.to_bytes(4, "little"),
-        ]
-    )
-    return header + pcm_bytes
-
 
 async def _sleep_before_retry(base_delay: int) -> None:
     await asyncio.sleep(base_delay + random.uniform(0, 0.25))

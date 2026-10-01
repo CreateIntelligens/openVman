@@ -12,6 +12,14 @@
 - 支援 2md 即時網路搜尋與 URL／文件讀取，服務順序為 `2md.aiurl.tw` → `2md.glsoft.ai` → `create360.ai`
 - 支援 David888 Wiki 長篇報告發布；回應只保留公開 `shareUrl`
 
+## 入口與 Gemini Live 分工
+
+`api/main.py` 只組裝 FastAPI、路由與 middleware。`api/startup.py` 管理專案遷移、Privacy Filter 失敗降級、台語判斷先行預熱、embedding／LanceDB 逐專案預熱，以及備份／dreaming 背景任務的啟停；`api/safety/server_http.py` 管理 logging、HTTP trace 與 metrics。預熱成功／失敗釋放 readiness 的規則維持原樣。
+
+`api/live/gemini_live.py` 的 `GeminiLiveSession` 保留會話、重連、每輪語言、持久化與用量協調介面；`gemini_transport.py` 擁有 JSON WebSocket 傳輸，`gemini_payloads.py` 擁有 setup、轉錄及 PCM／WAV 編碼，`gemini_tool_execution.py` 擁有專案／persona 範圍內的工具執行與搜尋。工具開關、明確記憶授權、台語文件優先、citations 與既有回傳格式維持原樣。本次不改 Backend／Brain API 合約、DB schema、外部工具供應商或部署設定。
+
+單元測試的 patch 位置跟隨真正責任模組；可用 `cd brain/api && python -m pytest tests/ -m "not integration" -q` 驗證。根目錄 `tests/test_entry_boundaries.py` 同時保護兩個 Python 入口與自有正式程式檔行數邊界。
+
 ## Security boundaries
 
 - `ASR_PROMPT.md` 是可選詞表：不存在或無法讀取時忽略，不阻擋對話；讀取錯誤僅記錄錯誤類型。快取比對 `st_mtime_ns`、`st_size`、`st_ctime_ns`、`st_ino`。內容經 HTML 跳脫後置於 `<glossary>`，明確標示為參考資料而非指令；此提示邊界不能取代工具與資料 API 的權限檢查。

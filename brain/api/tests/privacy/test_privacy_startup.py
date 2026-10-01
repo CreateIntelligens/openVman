@@ -33,11 +33,11 @@ def test_model_load_failure_flag_passes_messages_through(monkeypatch) -> None:
 async def test_startup_model_load_failure_disables_filter(monkeypatch) -> None:
     enable_stub_detector_for_tests()
 
-    import main
+    import startup
     import privacy.filter as privacy_filter
     import privacy.model as privacy_model
 
-    monkeypatch.setattr(main, "get_settings", lambda: _Settings())
+    monkeypatch.setattr(startup, "get_settings", lambda: _Settings())
     monkeypatch.setattr(privacy_filter, "get_settings", lambda: _Settings())
     monkeypatch.setattr(privacy_model, "load_privacy_filter_model", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
     monkeypatch.setattr(
@@ -46,7 +46,7 @@ async def test_startup_model_load_failure_disables_filter(monkeypatch) -> None:
         lambda: (_ for _ in ()).throw(RuntimeError("cpu boom")),
     )
 
-    await main.load_privacy_filter_if_enabled()
+    await startup.load_privacy_filter_if_enabled()
 
     messages = [{"role": "user", "content": "Call 0912345678"}]
     assert detect_llm_messages_pii(messages, source="chat", trace_id="t1") is None

@@ -7,7 +7,7 @@ import ts from "typescript";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../useAvatarChat.ts"), "utf8");
-const appSource = readFileSync(resolve(__dirname, "../../App.vue"), "utf8");
+const appSource = readFileSync(resolve(__dirname, "../../App.vue"), "utf8") + "\n" + readFileSync(resolve(__dirname, "..//useAvatarConversation.ts"), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.ES2022,

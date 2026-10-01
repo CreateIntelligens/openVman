@@ -10,6 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = [
   readFileSync(resolve(__dirname, "../App.vue"), "utf8"),
   readFileSync(resolve(__dirname, "../composables/useAvatarBootstrap.ts"), "utf8"),
+  readFileSync(resolve(__dirname, "../composables/useAvatarSettings.ts"), "utf8"),
+  readFileSync(resolve(__dirname, "../composables/useAvatarConversation.ts"), "utf8"),
+  readFileSync(resolve(__dirname, "../composables/useAvatarCamera.ts"), "utf8"),
+  readFileSync(resolve(__dirname, "../composables/useAvatarStage.ts"), "utf8"),
 ].join("\n");
 
 test("settings modal receives project options and emits project changes", () => {

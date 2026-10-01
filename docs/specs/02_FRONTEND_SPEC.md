@@ -119,6 +119,10 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 > **現況更新（2026-07-01）**：三個策略類別（`Wav2LipStrategy`/`DinetStrategy`/`WebGLStrategy`）均未實作，`.ktx2`、ONNX 推論、Blendshapes 也都沒有對應程式碼。此節與第 14 節描述的協定（`SET_LIP_SYNC_MODE`）在程式碼裡只剩極簡骨架，詳見第 14 節補充。
 
+### 5.1 前台入口分工（2026-10-01）
+
+`App.vue` 保留畫面組裝與事件綁定，不再內含語音計時與流程策略。`useAvatarConversation` 管理回答、打字機、TTS／播放、停止與錯誤協調；`useAvatarVoiceInput` 管理四種辨識、降級、閒置計時、回答時暫停與回答後恢復；`useAsrPreferences` 管理帳號引擎選單及偏好儲存。角色舞台、鏡頭、沉浸模式與設定切換分別由 `useAvatarStage`、`useAvatarCamera`、`useImmersiveView`、`useAvatarSettings` 管理。各自用 lifecycle hooks 清理持有資源；`App.vue` 組裝時以延遲 callback 銜接會話與計時上下文。原有路由、wire schema、台語分流、語音引擎、字幕與角色行為維持。後台入口、批次試辨識與外部 Avatar SDK 無需變更。
+
 ### 6. ASR 與語音輸入 (Speech Recognition)
 
 **授權邊界與部署（2026-09-30）**：前端的引擎選擇只是偏好，不是授權；Backend 必須依帳號允許的引擎重新驗證，串流端點也不可略過。不得信任前端傳入的 provider 或語言分流來取得未授權引擎。
@@ -137,7 +141,7 @@ VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 
 
 > **現況更新（2026-07-01）**：行為精神相符，但實作分層不同：實際送出訊息、interrupt、狀態切換是由 `useAvatarChat.ts` 的 `sendMessage()` / `stopActiveResponse()` 處理，並非單一模組完成。
 
-> **現況更新（2026-09-22）**：語音核心（ASR / VAD / TTS / 音訊處理 / 偏好儲存）已統一抽取至無框架共用層 `frontend/shared/speech/`（路徑別名 `@shared/speech`），兩端（`frontend/app` Vue 與 `frontend/admin` React）僅保留薄層轉接，不再各自維護底層邏輯：
+> **現況更新（2026-09-22）**：語音核心（ASR / VAD / TTS / 音訊處理 / 偏好儲存）已統一抽取至無框架共用層 `frontend/shared/speech/`（路徑別名 `@shared/speech`），兩端（`frontend/app` Vue 與 `frontend/admin` React）共用辨識與音訊底層。後台使用共用 `SpeechController`；前台的串流／回答後恢復收音策略由專用 composable 協調：
 >
 > 1. **核心架構**：
 >    * `audio/wav.ts`：音訊編解碼（`encodeWav`、`encodePcm16`、`downmixToMono`、`resamplePcm`、`rmsVolume`）。

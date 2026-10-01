@@ -29,14 +29,14 @@ test("the chosen mode is read per request, not captured once", () => {
   assert.match(chat, /replyMode\?: \(\) => string/);
   assert.match(chat, /mode: options\.replyMode\?\.\(\) \?\? ''/);
 
-  const app = read("App.vue");
+  const app = read("App.vue") + "\n" + read("composables/useAvatarConversation.ts") + "\n" + read("composables/useAvatarSettings.ts");
   assert.match(app, /replyMode: \(\) => settings\.replyMode/);
 });
 
 test("the mode is persisted and offered in settings", () => {
   const store = read("stores/useSettingsStore.ts");
   assert.match(store, /replyMode: STORAGE_KEYS\.REPLY_MODE/);
-  assert.match(read("App.vue"), /saveSettings\(\{ replyMode: mode \}\)/);
+  assert.match(read("composables/useAvatarSettings.ts"), /saveSettings\(\{ replyMode: mode \}\)/);
 
   const modal = read("components/controls/SettingsModal.vue");
   assert.match(modal, /回覆深度/);

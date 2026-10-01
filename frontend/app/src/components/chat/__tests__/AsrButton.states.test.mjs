@@ -40,7 +40,7 @@ test("waiting for the server transcript is a visible, non-clickable state", () =
 
 test("the button reflects whichever engine is actually recording", () => {
   // 先前畫面永遠綁瀏覽器辨識，選了伺服器引擎時按下去毫無反應。
-  const app = readFileSync(resolve(__dirname, "../../../App.vue"), "utf8");
+  const app = readFileSync(resolve(__dirname, "../../../App.vue"), "utf8") + "\n" + readFileSync(resolve(__dirname, "../../../composables/useAvatarVoiceInput.ts"), "utf8");
   assert.match(app, /if \(useBrowserAsr\.value\) return asr;\s*if \(useStreamAsrEngine\.value\) return streamAsr;\s*return vadAvailable\.value \? vadAsr : serverAsr;/);
   // 啟動中也算「按下了」，按鈕要有反應，但實際收音狀態由提示文字區分。
   assert.match(app, /:asr-listening="activeAsr\.isListening\.value \|\| vadAsr\.isStarting\.value \|\| streamAsr\.isStarting\.value"/);

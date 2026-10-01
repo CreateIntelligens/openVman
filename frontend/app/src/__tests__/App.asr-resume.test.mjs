@@ -1,3 +1,4 @@
+import { readAppComposition, readAppModule } from "./helpers/appSources.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -7,7 +8,7 @@ import { computed, effectScope, nextTick, ref, watch } from "vue";
 
 // 2026-09-30：虛擬人講完後麥克風不會恢復，每輪要重按；串流辨識的暫定字幕也不刷新閒置計時。
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const app = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
+const app = readAppComposition("useAvatarVoiceInput", "useAvatarConversation");
 
 test("streaming interims keep the microphone from idling out mid-sentence", () => {
   const block = app.match(/const streamAsr = useStreamAsr\(\{([\s\S]*?)onResult:/);
@@ -17,7 +18,7 @@ test("streaming interims keep the microphone from idling out mid-sentence", () =
 
 test("listening resumes after the reply with a shorter idle window", () => {
   assert.match(app, /const ASR_RESUME_IDLE_TIMEOUT_MS = 6_000;/);
-  const resume = app.match(/watch\(avatarResponding, \(responding\) => \{([\s\S]*?)\n\}\);/);
+  const resume = app.match(/watch\(avatarResponding, \(responding\) => \{([\s\S]*?)\n\s*\}\);/);
   assert.ok(resume, "resume watcher missing");
   assert.match(resume[1], /if \(responding \|\| !resumeAsrAfterReply\) return;/);
   assert.match(resume[1], /active\.resume\(\)/);
@@ -37,7 +38,7 @@ test("the gap while TTS synthesises still counts as answering", () => {
 });
 
 test("turning the microphone off by hand is not undone after the reply", () => {
-  const toggle = app.match(/function handleAsrToggle\(\): void \{([\s\S]*?)\n\}/);
+  const toggle = app.match(/function handleAsrToggle\(\): void \{([\s\S]*?)\n\s*\}/);
   assert.match(toggle[1], /resumeAsrAfterReply = false;\s*active\.stop\(\);/);
 });
 
@@ -55,13 +56,14 @@ for (const streaming of [true, false]) {
     const ttsPending = ref(false);
     const avatarResponding = computed(() => chat.state.value !== 'IDLE' || ttsPending.value);
     // Execute the production watcher bodies with Vue's real scheduler.
-    const start = app.indexOf('watch(() => chat.state.value, (newState) => {');
-    const end = app.indexOf('watch(showSettings,', start);
+    const voice = readAppModule('useAvatarVoiceInput');
+    const start = voice.indexOf('watch(() => chat.state.value, (newState) => {');
+    const end = voice.indexOf('onUnmounted(clearAsrIdleTimer);', start);
     assert.ok(start >= 0 && end > start);
     const install = new Function(
       'watch', 'chat', 'activeAsr', 'streamAsr', 'avatarResponding',
       'triggerStageAvatarGesture', 'clearAsrIdleTimer', 'scheduleAsrIdleTimer',
-      `let resumeAsrAfterReply = false; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000;\n${app.slice(start, end)}`,
+      `let resumeAsrAfterReply = false; const ASR_RESUME_IDLE_TIMEOUT_MS = 6000;\n${voice.slice(start, end)}`,
     );
     const scope = effectScope();
     try {

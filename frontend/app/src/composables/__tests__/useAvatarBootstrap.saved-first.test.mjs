@@ -7,7 +7,7 @@ import test from "node:test";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(resolve(__dirname, "../..", p), "utf-8");
 const bootstrap = read("composables/useAvatarBootstrap.ts");
-const app = read("App.vue");
+const app = read("App.vue") + "\n" + read("composables/useAvatarStage.ts");
 
 function body(source, signature) {
   const start = source.indexOf(signature);

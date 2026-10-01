@@ -12,7 +12,7 @@ test("frontend wraps the vendor engine behind the openVman runtime name", () => 
   assert.equal(existsSync(runtimePath), true);
 
   const runtime = readFileSync(runtimePath, "utf-8");
-  const app = readFileSync(resolve(srcRoot, "App.vue"), "utf-8");
+  const app = readFileSync(resolve(srcRoot, "App.vue"), "utf-8") + "\n" + readFileSync(resolve(srcRoot, "composables/useAvatarStage.ts"), "utf8");
   const settings = readFileSync(
     resolve(srcRoot, "components/controls/SettingsModal.vue"),
     "utf-8",

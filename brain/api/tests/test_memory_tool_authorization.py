@@ -71,12 +71,11 @@ def test_empty_message_never_authorizes(gate):
 
 def test_live_save_memory_now_requires_explicit_intent(gate, monkeypatch):
     # Live 以前完全沒檢查，模型想存就存。
-    from live.gemini_live import GeminiLiveSession
+    from live.gemini_tool_execution import GeminiLiveToolExecutor
 
-    session = GeminiLiveSession.__new__(GeminiLiveSession)
-    session._last_user_message = "今天天氣真好"
-    session.persona_id = "default"
-    session.project_id = "default"
+    executor = GeminiLiveToolExecutor.__new__(GeminiLiveToolExecutor)
+    executor.persona_id = "default"
+    executor.project_id = "default"
     gate["score"] = 0.02
     with pytest.raises(ValueError, match="明確要求"):
-        session._save_memory({"content": "偷存的指令"})
+        executor.save_memory({"content": "偷存的指令"}, "今天天氣真好")

@@ -1,3 +1,4 @@
+import { readAppComposition, readAppModule } from "./helpers/appSources.mjs";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -5,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(resolve(__dirname, "../App.vue"), "utf8");
+const source = readAppComposition("useAvatarCamera");
 
 const healthFn = source.slice(
   source.indexOf("async function fetchVisionHealth"),

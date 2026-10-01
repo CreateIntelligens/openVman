@@ -20,6 +20,14 @@
 | 查早期討論與任務 | [歷史資料](docs/archive/README.md) |
 | 查版本變更 | [CHANGELOG](CHANGELOG.md) |
 
+## 入口與模組責任
+
+`frontend/app/src/main.ts` 掛載登入外殼，`App.vue` 組裝畫面與各領域 composable：回答播放（`useAvatarConversation`）、語音輸入及恢復（`useAvatarVoiceInput`）、引擎偏好（`useAsrPreferences`）、角色舞台、鏡頭、沉浸模式與設定切換。前後台共用 `frontend/shared/speech` 的辨識及音訊底層；後台使用共用 `SpeechController`，前台由專用 composable 協調串流與回答後收音。後台 `App.tsx` 維持導航及權限閘門。
+
+Backend `app/main.py` 僅建立 FastAPI、掛載 middleware／lifespan／OpenAPI、依原順序註冊路由與啟動 server。`routes/tts.py`、`routes/asr.py`、`routes/documents.py` 各自擁有 HTTP 流程；`lifecycle.py`、`openapi.py`、`http_metrics.py`、`server_logging.py` 管理基礎設施。Brain `api/main.py` 同樣負責組裝；`startup.py` 管理遷移、預熱及排程器，`safety/server_http.py` 管理追蹤與監控。Gemini Live 傳輸、payload 與工具執行的責任見 [Brain 文件](brain/README.md)。
+
+[入口邊界測試](tests/test_entry_boundaries.py) 防止業務端點／語音計時回到入口、檢查 Backend catch-all 最後註冊，以及自有正式程式碼每檔不超過 1000 實體行。第三方與測試不受此行數限制；Contracts CI 在相關程式變更時也會執行此檢查。重構不改路由、wire schema、資料儲存或外部 SDK；正式部署仍依原有 CI／watchtower 流程。[拆分計畫](docs/plans/thin-entry-refactor.md) 保持 Draft，待使用者確認。
+
 ## 對外接入
 
 ### 語音可靠性

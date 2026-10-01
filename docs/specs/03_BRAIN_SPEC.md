@@ -511,3 +511,7 @@ Content-Type: application/json
 
 回應：Server-Sent Events (SSE) 或 Streaming JSON
 ```
+
+### 入口與 Live 模組邊界（2026-10-01）
+
+`api/main.py` 是組裝入口，啟動／預熱／排程器生命週期委派 `startup.py`，HTTP tracing／metrics／logging 委派 `safety/server_http.py`。Gemini Live 會話保留在 `live/gemini_live.py`；WebSocket 傳輸、setup／音訊編碼、工具與搜尋執行分別委派 `gemini_transport.py`、`gemini_payloads.py`、`gemini_tool_execution.py`。此重構保留原有 public session 介面、每輪台語判斷、專案／persona 範圍、工具開關、記憶明確授權、搜尋 citations、重連與用量記錄；不變更知識圖譜停用文件修正、DB schema 或外部協定。根目錄入口邊界測試禁止 inline 業務處理回到入口，並檢查自有正式程式碼每檔不超過 1000 實體行。

@@ -201,7 +201,8 @@ test("temporary login accepts only a password and exposes the expiry notice", ()
 test("resource defaults are resolved only against the authorized lists", () => {
   // 帳號綁定與備援選擇搬到 useAvatarBootstrap，兩邊一起看。
   const app = read("App.vue") + "\n"
-    + read("composables/useAvatarBootstrap.ts");
+    + read("composables/useAvatarBootstrap.ts") + "\n"
+    + read("composables/useAvatarStage.ts");
 
   assert.match(app, /PREFERRED_PROJECT_ID = "proj-b85afb8bb6"/);
   assert.match(app, /PREFERRED_CHARACTER_ID = "0713"/);

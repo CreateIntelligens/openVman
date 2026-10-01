@@ -33,6 +33,8 @@
 
 ### Changed
 
+- 入口與大型模組依職責拆分：前台 `App.vue` 僅組裝畫面與 composables；Backend `main.py` 將 TTS／ASR／文件端點、OpenAPI、監控與生命週期委派至對應模組；Brain `main.py` 委派啟動預熱及 HTTP 監控，Gemini Live 將傳輸、訊息編碼及工具執行與會話分開。維持既有 API、授權、串流及備援行為，加入入口邊界及自有正式程式千行上限檢查。
+
 - **連不上的 ASR 引擎自動暫停 60 秒**：小米 CocktailASR 那台（.19）停機後仍在備援順序裡，Breeze 一掛每句話都要先白等 3.3 秒連線失敗才換 SenseVoice。批次辨識現在遇到連線層失敗（`httpx.ConnectError`／`ConnectTimeout`、`openai.APIConnectionError`）就把那個引擎暫停 60 秒不排入，時間到由下一個請求再試；HTTP 錯誤碼不算（機器還活著）；全部都暫停時照樣全試。另外部署設定已停用小米：根目錄 `.env` 註解掉 `ASR_XIAOMI_URL`，使用者可自選的引擎拿掉 xiaomi。
 - **Brain 啟動時預熱台語判斷**：部署重啟後的第一句台語，Brain 判斷要 2.5 秒（之後約 1.2 秒），超過 Backend 的上限，被當成不是台語；每次 push 觸發 watchtower 重新部署都會碰到。多出來的是第一次載入 google-genai（1.2 秒）與建 client（0.17 秒）。背景預熱現在最先載入套件、建好共用 client、呼叫一次 `models.get`（不花 token，約 0.1 秒）。
 - **台語判斷回報結果與耗時**：批次辨識（`/api/v1/asr/transcribe`）在台語分流時多回 `language_check: {"result", "ms"}`，`result` 是語言代碼、`timeout` 或 `failed`。原本逾時和「判成華語」回應長得一樣（`language: null`），只能翻 log 數逾時，數錯過一次（見下一條）；語音模擬（`scripts/voice_e2e/`）的彙總表多了「判斷逾時」「判斷ms」兩欄。

@@ -1,4 +1,4 @@
-"""Tests for the FastAPI entrypoint."""
+"""Integration tests for the assembled Backend and its HTTP route modules."""
 
 from __future__ import annotations
 
@@ -61,11 +61,21 @@ def _load_main(monkeypatch, *, max_upload_bytes: int = 1024):
     # Use monkeypatch.delitem so the original module objects (or their absence) are
     # restored on teardown — otherwise the freshly re-imported modules leak into
     # later tests and break patch("app.routes.admin...") targeting.
-    for name in ("app.gateway.websocket", "app.routes.admin", "app.main"):
+    for name in (
+        "app.gateway.websocket", "app.routes.admin", "app.routes.tts",
+        "app.routes.asr", "app.routes.documents", "app.openapi",
+        "app.lifecycle", "app.main",
+    ):
+        parent, _, attribute = name.rpartition(".")
+        if parent in sys.modules:
+            monkeypatch.delattr(sys.modules[parent], attribute, raising=False)
         monkeypatch.delitem(sys.modules, name, raising=False)
     module = importlib.import_module("app.main")
     _cfg = lambda: _make_test_config(max_upload_bytes=max_upload_bytes)
-    monkeypatch.setattr(module, "get_tts_config", _cfg)
+    for target in (
+        module, module.tts_routes, module.asr_routes, module.document_routes,
+    ):
+        monkeypatch.setattr(target, "get_tts_config", _cfg)
 
     # tts_text 綁定了自己的 get_tts_config，且會回退讀 NORMALIZE_API_URL。
     # 兩條路都要擋，否則正規化會另開一個 httpx client 干擾測試斷言。
@@ -247,7 +257,7 @@ def test_openapi_merges_brain_request_schema(monkeypatch):
 
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     module.app.openapi_schema = None
-    module._openapi_built = False
+    module.app.state.openapi_builder._built = False
 
     async def _fake_fetch():
         return {
@@ -281,8 +291,8 @@ def test_openapi_merges_brain_request_schema(monkeypatch):
             "tags": [{"name": "Chat", "description": "Chat endpoints."}],
         }
 
-    monkeypatch.setattr(module, "_fetch_brain_openapi", _fake_fetch)
-    schema = asyncio.run(module._build_openapi_schema())
+    monkeypatch.setattr(importlib.import_module("app.openapi"), "_fetch_brain_openapi", _fake_fetch)
+    schema = asyncio.run(module.app.state.openapi_builder.build())
 
     operation = schema["paths"]["/api/v1/chat"]["post"]
     assert operation["requestBody"]["required"] is True
@@ -311,7 +321,7 @@ def test_openapi_keeps_local_route_when_brain_remap_collides(monkeypatch):
         }
     }
 
-    schema = module._merge_brain_openapi(local_schema, brain_schema)
+    schema = importlib.import_module("app.openapi")._merge_brain_openapi(local_schema, brain_schema)
 
     operation = schema["paths"]["/api/v1/knowledge/upload"]["post"]
     assert operation["summary"] == "Backend knowledge upload"
@@ -455,12 +465,12 @@ def test_tts_providers_includes_gemini_when_configured(monkeypatch):
 
 def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
-    monkeypatch.setattr(module, "get_tts_config", lambda: types.SimpleNamespace(
+    monkeypatch.setattr(module.tts_routes, "get_tts_config", lambda: types.SimpleNamespace(
         document_max_upload_bytes=1024,
         tts_cache_enabled=True,
         tts_cache_ttl_seconds=86400,
     ))
-    module.make_cache_key = lambda text, voice_hint, provider: "tts:v1:test"
+    module.tts_routes.make_cache_key = lambda text, voice_hint, provider: "tts:v1:test"
 
     async def _fake_cache_get(key: str):
         assert key == "tts:v1:test"
@@ -477,9 +487,9 @@ def test_create_speech_uses_backend_tts_cache_when_hit(monkeypatch):
         def synthesize(self, request, provider=""):
             raise AssertionError("synthesize should not run on cache hit")
 
-    module.cache_get = _fake_cache_get
-    module.cache_put = _fake_cache_put
-    module._get_service = lambda: BrokenService()
+    module.tts_routes.cache_get = _fake_cache_get
+    module.tts_routes.cache_put = _fake_cache_put
+    module.tts_routes._get_service = lambda: BrokenService()
 
     client, _ = _authenticated_client(module)
     response = client.post(
@@ -549,9 +559,9 @@ def test_tts_stream_falls_back_to_service_when_indextts_stream_errors(monkeypatc
             )
 
     fake_service = FakeService()
-    monkeypatch.setattr(module.httpx, "AsyncClient", FakeAsyncClient)
-    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
-    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
+    monkeypatch.setattr(module.tts_routes.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(module.tts_routes, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
         tts_indextts_url="http://index-tts-vllm:8011",
         tts_indextts_default_character="hayley",
@@ -588,9 +598,9 @@ def test_tts_stream_voxcpm_streaming(monkeypatch):
         voxcpm_adapter=fake_voxcpm,
         edge_adapter=types.SimpleNamespace(enabled=False),
     )
-    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: fake_service)
     monkeypatch.setattr(
-        module,
+        module.tts_routes,
         "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=1024),
     )
@@ -631,9 +641,9 @@ def test_tts_stream_uses_edge_streaming_fallback_when_enabled(monkeypatch):
             raise AssertionError("buffered synthesize 不應被呼叫")
 
     fake_service = FakeService()
-    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: fake_service)
     # 無 IndexTTS → 直接進 fallback；Edge enabled → 走 streaming。
-    monkeypatch.setattr(module, "get_tts_config", lambda: _make_test_config(
+    monkeypatch.setattr(module.tts_routes, "get_tts_config", lambda: _make_test_config(
         document_max_upload_bytes=1024,
         tts_indextts_url="",
         tts_indextts_default_character="hayley",
@@ -1017,9 +1027,9 @@ def test_tts_stream_cosyvoice_uses_buffered_synthesis(monkeypatch):
                 ),
             )
 
-    monkeypatch.setattr(module, "_get_service", lambda: FakeService())
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: FakeService())
     monkeypatch.setattr(
-        module,
+        module.tts_routes,
         "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=1024),
     )
@@ -1209,9 +1219,9 @@ def test_tts_stream_voxcpm_failure_falls_back_to_edge(monkeypatch):
         voxcpm_adapter=types.SimpleNamespace(enabled=True, open_stream=_failing_voxcpm_stream),
         edge_adapter=types.SimpleNamespace(enabled=True, synthesize_stream=_edge_stream),
     )
-    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: fake_service)
     monkeypatch.setattr(
-        module,
+        module.tts_routes,
         "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=1024),
     )
@@ -1237,9 +1247,9 @@ def test_tts_stream_auto_provider_streams_voxcpm_when_indextts_is_absent(monkeyp
         voxcpm_adapter=types.SimpleNamespace(enabled=True, open_stream=_mock_voxcpm_stream),
         edge_adapter=types.SimpleNamespace(enabled=False),
     )
-    monkeypatch.setattr(module, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: fake_service)
     monkeypatch.setattr(
-        module,
+        module.tts_routes,
         "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=1024, tts_indextts_url=""),
     )
@@ -1406,7 +1416,7 @@ def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
 def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
     module, _ = _load_main(monkeypatch)
     monkeypatch.setattr(
-        module, "get_tts_config",
+        module.asr_routes, "get_tts_config",
         lambda: _make_test_config(document_max_upload_bytes=8),
     )
 
@@ -1492,7 +1502,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
         return ["zh", "nan"]
 
     async def fake_detect(path):
-        return module.language_routes_mod.LanguageCheck("nan", "nan", 1234)
+        return module.asr_routes.language_routes_mod.LanguageCheck("nan", "nan", 1234)
 
     async def fake_prompt(current, project_id):
         calls["prompt_project"] = project_id
@@ -1500,15 +1510,15 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
 
     monkeypatch.setattr(ingestion_audio, "transcribe", fake_transcribe)
     monkeypatch.setattr(worker, "_account_asr_provider", lambda _: "xiaomi")
-    monkeypatch.setattr(module.language_routes_mod, "effective_routes", fake_routes)
-    monkeypatch.setattr(module.language_routes_mod, "detect_taiwanese", fake_detect)
-    monkeypatch.setattr(module.asr_glossary_mod, "project_asr_prompt", fake_prompt)
+    monkeypatch.setattr(module.asr_routes.language_routes_mod, "effective_routes", fake_routes)
+    monkeypatch.setattr(module.asr_routes.language_routes_mod, "detect_taiwanese", fake_detect)
+    monkeypatch.setattr(module.asr_routes.asr_glossary_mod, "project_asr_prompt", fake_prompt)
 
     from starlette.datastructures import UploadFile
 
     upload = UploadFile(filename="clip.webm", file=__import__("io").BytesIO(b"fake-audio"))
     account = types.SimpleNamespace(user=types.SimpleNamespace(id="u1"), embed_key=None)
-    response = asyncio.run(module.transcribe_for_account(
+    response = asyncio.run(module.asr_routes.transcribe_for_account(
         account=account, file=upload, project_id="proj-hospital", language_routes="zh,nan",
     ))
 
@@ -1544,21 +1554,21 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
                 yield b"RIFF"
             return _gen()
 
-    monkeypatch.setattr(module.language_routes_mod, "effective_routes", fake_routes)
+    monkeypatch.setattr(module.tts_routes.language_routes_mod, "effective_routes", fake_routes)
     monkeypatch.setattr(module.admin_routes, "resolve_tts_voice", must_not_authorize)
-    monkeypatch.setattr(module, "_get_service", lambda: types.SimpleNamespace(voxcpm_adapter=FakeVox()))
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: types.SimpleNamespace(voxcpm_adapter=FakeVox()))
     async def _clean(text):
         return text
-    monkeypatch.setattr(module, "prepare_tts_text_async", _clean)
-    monkeypatch.setattr(module, "record_usage_event", lambda **kw: None)
-    monkeypatch.setattr(module, "usage_scope_for", lambda *a, **kw: {})
+    monkeypatch.setattr(module.tts_routes, "prepare_tts_text_async", _clean)
+    monkeypatch.setattr(module.tts_routes, "record_usage_event", lambda **kw: None)
+    monkeypatch.setattr(module.tts_routes, "usage_scope_for", lambda *a, **kw: {})
 
-    body = module.TtsStreamRequest(
+    body = module.tts_routes.TtsStreamRequest(
         text="你好", provider="gemini-tts", voice="Kore", project_id="p",
         language_routes="zh,nan", speech_language="nan",
     )
     current = types.SimpleNamespace(user=types.SimpleNamespace(id="u1"), embed_key=None)
-    response = asyncio.run(module.tts_stream_endpoint(body, current=current))
+    response = asyncio.run(module.tts_routes.tts_stream_endpoint(body, current=current))
 
     assert response.status_code == 200
     assert opened["voice"] == ""
@@ -1571,15 +1581,15 @@ def test_tts_stream_switches_to_voxcpm_before_voice_authorization(monkeypatch):
         return None
 
     monkeypatch.setattr(module.admin_routes, "resolve_tts_voice", record_authorization)
-    typed = module.TtsStreamRequest(
+    typed = module.tts_routes.TtsStreamRequest(
         text="你好", provider="voxcpm", voice="", project_id="p", language_routes="zh,nan",
     )
-    asyncio.run(module.tts_stream_endpoint(typed, current=current))
-    gemini = module.TtsStreamRequest(
+    asyncio.run(module.tts_routes.tts_stream_endpoint(typed, current=current))
+    gemini = module.tts_routes.TtsStreamRequest(
         text="你好", provider="gemini-tts", voice="Kore", project_id="p", language_routes="zh,nan",
     )
     try:
-        asyncio.run(module.tts_stream_endpoint(gemini, current=current))
+        asyncio.run(module.tts_routes.tts_stream_endpoint(gemini, current=current))
     except Exception:
         pass  # 假服務沒有 gemini adapter；只看有沒有被換掉
     assert authorized == ["voxcpm", "gemini-tts"]
