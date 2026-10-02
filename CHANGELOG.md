@@ -38,6 +38,8 @@
 
 ### Changed
 
+- **語音打斷改由 Jev 判斷規則判不出的長句（預設開）**：`JEV_INTERRUPT_ENABLED` 預設改 true。自寫 30 題規則 23/30、Jev 29/30，附和、對旁人說話不再誤停；只有規則判不出的那段長句多等最多 0.6 秒，沒有 `TYPESAFE_API_KEY`、失敗或逾時都維持中斷。
+- **移除 A2A 的 Jev 預先過濾**：`A2A_JEV_PREFILTER_ENABLED`、`A2A_JEV_NO_REPLY_THRESHOLD` 刪掉；正式環境 A2A 沒開（佇列資料庫從未建立），預先過濾也從未啟用。A2A 本身不變，要不要回仍由 Brain 決定。
 - **Jev 每次呼叫都記進用量**：記憶寫入把關、語言背景校正、串流定稿判斷、召回篩選共用的 `core/jev_client.jev_nouls` 每次呼叫（成功、失敗、逾時都算）記一筆 `provider=typesafe`、`kind=jev_<用途>`，附 token 數與 `raw.status`。原本只有影子觀測會記，正式環境又看不到 info log，數不出各功能每天打幾次。
 - **移除 Jev 影子觀測與知識庫段落 Jev 篩選**：兩者預設關閉、正式環境從未開啟，影子還會把對話送到外部。刪掉 `core/jev_shadow.py`、`_jev_screen` 與 `JEV_SHADOW_ENABLED`／`_SAMPLE_RATE`／`_TIMEOUT_SECONDS`／`_COOLDOWN_SECONDS`／`_DAILY_CALL_CAP`、`RAG_JEV_SCREEN_ENABLED`／`_EVIDENCE_THRESHOLD`／`_INJECTION_THRESHOLD`。Jev 網址改名 `JEV_BASE_URL`（舊名 `JEV_SHADOW_BASE_URL` 照讀）。
 - **回答長度改成硬上限，拿掉「要詳細規格可以更長」的例外**：上一版「約 N 字為原則，要詳細規格或一次問好幾件事時最多約 40 秒」上線後實測鶴記同一批 36 題，中文中位 79 字、超過 80 字 5/12，英西超過 30 個單字 6–7/12，模型常拿例外當理由寫長。改成 jtai 的寫法「每次回覆嚴格不超過 N 字，超過即違規，寧可精簡也不可超過；一次問好幾件事時每件只講重點」（中日韓 80 字、英西 30 個單字），同一批題目中文中位 49 字、超過 1/12，英文超過 2/12、西文 0/12。只改提示詞，不截斷回答。

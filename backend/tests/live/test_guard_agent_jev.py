@@ -54,11 +54,18 @@ async def test_rule_decided_cases_never_call_jev(jev, text, expected):
 
 
 @pytest.mark.asyncio
-async def test_disabled_by_default_keeps_old_fallback(monkeypatch):
+async def test_on_by_default_with_a_key(monkeypatch):
+    """2026-10-02 改預設開：自寫 30 題規則 23/30、Jev 29/30。"""
+    from app import config
+
+    assert config.get_tts_config().model_copy().jev_interrupt_enabled is True
+
+
+@pytest.mark.asyncio
+async def test_without_a_key_keeps_the_conservative_stop(monkeypatch):
     from app import config, jev_client
 
-    cfg = config.get_tts_config().model_copy(update={"typesafe_api_key": "k"})
+    cfg = config.get_tts_config().model_copy(update={"typesafe_api_key": ""})
     monkeypatch.setattr(config, "get_tts_config", lambda: cfg)
     monkeypatch.setattr(jev_client, "get_tts_config", lambda: cfg)
-    assert cfg.jev_interrupt_enabled is False
     assert await GuardAgent().classify("對啊我上次也是這樣覺得") == "STOP"

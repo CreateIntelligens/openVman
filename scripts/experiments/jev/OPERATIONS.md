@@ -74,14 +74,13 @@ US$0.05；帶多輪歷史會多一些，仍在每日一美元以下。上限的�
 - `RAG_JEV_SCREEN_ENABLED`（預設 false）：`search_knowledge` 後逐段問「能否當答案依據」（< 0.5 丟）與
   「是否夾帶指令」（≥ 0.7 丟），失敗原樣放行。會送段落原文；每次檢索多約 0.5 秒。記錄 `event=rag_jev_screen`。
 
-## backend 的兩個選用閘門（預設關）
+## backend 的 Jev 閘門
 
 backend 另有 `app/jev_client.py`（與 brain 不共用 runtime），共用一條連線；暖連線實測 330–410 ms。
 
-- `JEV_INTERRUPT_ENABLED`：`guard_agent` 規則判不出的長句（原本一律 STOP）改問 Jev STOP／IGNORE，
+- `JEV_INTERRUPT_ENABLED`（2026-10-02 起預設 true）：`guard_agent` 規則判不出的長句（原本一律 STOP）改問 Jev STOP／IGNORE，
   逾時 `JEV_INTERRUPT_TIMEOUT_SECONDS`（0.6）或失敗維持 STOP。記錄 `event=interrupt_jev`。只送那句 ASR 文字。
-- `A2A_JEV_PREFILTER_ENABLED`：對方訊息的 `no_reply` 機率 ≥ `A2A_JEV_NO_REPLY_THRESHOLD`（0.9）時，
-  直接記成 suppressed（reason=`jev`），不跑整輪 Brain；其他情況照舊交給 Brain 的 `[[A2A_NO_REPLY]]`。
+- A2A 預先過濾（`A2A_JEV_PREFILTER_ENABLED`）已於 2026-10-02 移除：正式環境 A2A 沒開、預先過濾也從未啟用。
 
 ## 記錄與排查
 
