@@ -122,7 +122,6 @@ def reply_language_line(
 #   25–30 秒），不是語速慢。
 # 中日韓取 VoxCPM 與 Edge 之間的每秒 4 字。
 REPLY_SECONDS = 20
-DETAIL_SECONDS = 40
 _WORDS_PER_SECOND = 1.5
 _CHARS_PER_SECOND = 4
 _CHARACTER_LANGUAGES = ("zh", "nan", "ja", "ko")
@@ -135,13 +134,18 @@ def _budget(code: str, seconds: int) -> str:
 
 
 def reply_length_line(code: str) -> str:
-    """How long this turn's reply may be, as speaking time turned into this language's units."""
+    """How long this turn's reply may be, as speaking time turned into this language's units.
+
+    寫成硬上限、不給「要詳細規格可以更長」的例外（jtai hciot 的寫法）。鶴記同一批 36 題
+    （2026-10-02）：「約 N 字為原則＋例外」中文中位 79 字、超過 80 字 5/12，英西超過 30 詞
+    6–7/12，模型常拿例外當理由；硬上限中文中位 49 字、超過 1/12，英西超過 2/12、0/12。
+    """
     prefix = (
         "" if code in ("zh", "nan")
         else "資訊量跟中文回答一樣，不要因為換語言而多加說明或客套。"
     )
     return (
-        f"{prefix}回答會被念出來：以 {REPLY_SECONDS} 秒內念完（{_budget(code, REPLY_SECONDS)}）"
-        f"為原則；使用者要求詳細規格或一次問好幾件事時，最多約 {DETAIL_SECONDS} 秒"
-        f"（{_budget(code, DETAIL_SECONDS)}）。"
+        f"{prefix}回答會被念出來，要在 {REPLY_SECONDS} 秒內念完：每次回覆嚴格不超過"
+        f"{_budget(code, REPLY_SECONDS).removeprefix('約')}，超過即違規，寧可精簡也不可超過；"
+        "使用者一次問好幾件事時，每件只講重點。"
     )

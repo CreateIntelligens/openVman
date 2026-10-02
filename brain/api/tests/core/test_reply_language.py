@@ -84,11 +84,13 @@ def test_every_language_gets_a_speaking_time_budget():
     taiwanese = prompt_templates.reply_language_line("p", "我想欲問掛號", speech_language="nan")
     unclear = prompt_templates.reply_language_line("p", "EUBL pump specs")
     for line in (spanish, english, chinese, taiwanese, unclear):
-        assert f"以 {prompt_templates.REPLY_SECONDS} 秒內念完" in line
-    assert "約 30 個單字" in spanish and "約 60 個單字" in spanish
-    assert "約 30 個單字" in english
-    assert "約 80 字" in chinese and "約 160 字" in chinese
-    assert "約 80 字" in taiwanese
+        assert f"要在 {prompt_templates.REPLY_SECONDS} 秒內念完" in line
+        # 硬上限、沒有「要詳細規格可以更長」的例外：有例外時模型常拿它當理由寫長。
+        assert "嚴格不超過" in line and "詳細規格" not in line
+    assert "嚴格不超過 30 個單字" in spanish
+    assert "嚴格不超過 30 個單字" in english
+    assert "嚴格不超過 80 字" in chinese
+    assert "嚴格不超過 80 字" in taiwanese
     assert "單字" not in chinese
     # 換語言不能多加說明：只有外語要這句。
     assert "不要因為換語言" in spanish and "不要因為換語言" not in chinese
@@ -97,6 +99,6 @@ def test_every_language_gets_a_speaking_time_budget():
 @pytest.mark.parametrize("code", ["ja", "ko"])
 def test_japanese_and_korean_budget_by_characters(code):
     line = prompt_templates.reply_length_line(code)
-    assert "約 80 字" in line and "約 160 字" in line
+    assert "嚴格不超過 80 字" in line
     assert "單字" not in line
     assert "不要因為換語言" in line
