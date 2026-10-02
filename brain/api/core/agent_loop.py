@@ -273,7 +273,9 @@ def _run_tool_phase(
                     continue
                 if not turn.content.strip():
                     working_messages.append(
-                        {"role": "user", "content": _UNOFFERED_TOOL_RETRY_MSG.format(tools="、".join(dropped))}
+                        {"role": "user", "content": _with_reply_rules(
+                            _UNOFFERED_TOOL_RETRY_MSG.format(tools="、".join(dropped)), messages,
+                        )}
                     )
                     continue
             if (
@@ -293,7 +295,9 @@ def _run_tool_phase(
                 # 而不是直接以「LLM 沒有回傳內容」失敗。
                 logger.warning("empty reply from provider — retrying once with a text nudge")
                 empty_reply_retried = True
-                working_messages.append({"role": "user", "content": _EMPTY_REPLY_RETRY_MSG})
+                working_messages.append(
+                    {"role": "user", "content": _with_reply_rules(_EMPTY_REPLY_RETRY_MSG, messages)}
+                )
                 continue
             if iteration == 0 and current_forced:
                 # 部分 provider 會忽略 tool_choice 直接回文字；接受它當答案，不要再繞圈。
@@ -404,12 +408,28 @@ def _build_hallucination_pattern(tools: list[dict[str, Any]]) -> re.Pattern[str]
         return None
     return re.compile(r"^(" + "|".join(re.escape(n) for n in names) + r")\s*\(.*\)\s*$", re.DOTALL)
 _EMPTY_REPLY_RETRY_MSG = (
-    "請直接以文字回答上一個問題；若手邊資料不足，請明確說明找不到相關資料，不要留空。"
+    "請直接以文字回答上一個問題；查不到的部分合併成一句帶過，不要逐項說明，也不要留空。"
 )
 _UNOFFERED_TOOL_RETRY_MSG = (
     "這一輪不能使用 {tools}。請直接以文字回答上一個問題；"
-    "手邊資料沒有的內容就說明查不到，不要留空。"
+    "查不到的部分合併成一句帶過，不要逐項說明，也不要留空。"
 )
+# prompt_builder 把這一輪的回答語言與長度放在 system prompt 最後，從這行開始。
+_REPLY_RULES_MARKER = "這一輪的回答語言："
+
+
+def _with_reply_rules(nudge: str, messages: list[dict[str, Any]]) -> str:
+    """Repeat the turn's reply language and length after a retry nudge.
+
+    催促訊息是模型寫回答前最後讀到的一句，會蓋過 system prompt 的規則：鶴記複合題
+    （2026-10-02）模型想再查一次被擋下、收到中文催促後，英文提問改用中文回答，
+    還把每個查不到的項目逐條說明，念到 50 秒。
+    """
+    system = next(
+        (str(m.get("content", "")) for m in messages if m.get("role") == "system"), "",
+    )
+    index = system.rfind(_REPLY_RULES_MARKER)
+    return f"{nudge}{system[index:].strip()}" if index >= 0 else nudge
 
 
 def _drop_unoffered_calls(

@@ -554,6 +554,39 @@ class TestUnofferedToolCalls:
         assert nudge["role"] == "user" and "search_web" in nudge["content"]
         assert all(step["name"] != "search_web" for step in result.tool_steps)
 
+    def test_nudge_repeats_the_turn_reply_language_and_length(self, monkeypatch):
+        """催促是模型最後讀到的一句：不帶規則時英文提問被改用中文、逐項說明查不到。"""
+        agent_loop, calls, executed, seen = self._run(monkeypatch, stream_reply=lambda al: [
+            _tool_turn(al, name="search_web"),
+            al.LLMReply(content="Semi-open and closed impellers.", tool_calls=[], model="m1"),
+        ])
+        rules = "這一輪的回答語言：English。每次回覆嚴格不超過 30 個單字。"
+
+        agent_loop.run_agent_loop(
+            [
+                {"role": "system", "content": f"人設……\n\n{rules}"},
+                {"role": "user", "content": "Compare the EUB-M impellers and depth."},
+            ],
+            allow_forced_knowledge_search=True,
+        )
+
+        nudge = seen[2][-1]["content"]
+        assert "search_web" in nudge and nudge.endswith(rules)
+        assert "合併成一句帶過" in nudge
+
+    def test_nudge_without_reply_rules_is_unchanged(self, monkeypatch):
+        agent_loop, calls, executed, seen = self._run(monkeypatch, stream_reply=lambda al: [
+            _tool_turn(al, name="search_web"),
+            al.LLMReply(content="答案", tool_calls=[], model="m1"),
+        ])
+
+        agent_loop.run_agent_loop(
+            [{"role": "user", "content": "棒球英豪是什麼意思？"}],
+            allow_forced_knowledge_search=True,
+        )
+
+        assert seen[2][-1]["content"] == agent_loop._UNOFFERED_TOOL_RETRY_MSG.format(tools="search_web")
+
     def test_first_round_unoffered_call_still_gets_the_knowledge_search(self, monkeypatch):
         agent_loop, calls, executed, _ = self._run(
             monkeypatch,
