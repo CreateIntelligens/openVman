@@ -102,6 +102,8 @@ def _environment(monkeypatch, *, stored="r2t2-live", grants=None, embed=False):
     cfg = SimpleNamespace(
         asr_r2t2_stream_url="ws://10.9.0.37:8803/asr_stream_api_v1",
         asr_r2t2_secret_key="fixture-secret",
+        asr_r2t2_backup_stream_url="",
+        asr_r2t2_backup_secret_key="",
     )
     usage = []
     prompts = []
@@ -288,3 +290,45 @@ def test_premature_upstream_close_reports_error_and_cancels_client_receiver(monk
     assert socket.sent == [
         {"type": "ready"}, {"type": "error", "code": "upstream_failed"},
     ]
+
+
+@pytest.mark.parametrize("failure", ["connection", "handshake"])
+def test_backup_host_takes_over_when_the_main_host_fails(monkeypatch, failure):
+    """主機連不上或握手失敗才換 .35；兩台用同一套握手，各帶自己的金鑰。"""
+    _, _, cfg, _, _ = _environment(monkeypatch)
+    cfg.asr_r2t2_backup_stream_url = "ws://10.9.0.35:8040/asr_stream_api_v1"
+    cfg.asr_r2t2_backup_secret_key = "backup-secret"
+    main = Upstream(
+        handshake="error" if failure == "handshake" else "connected",
+        failure=ConnectionError("unreachable") if failure == "connection" else None,
+    )
+    backup = Upstream([_reply(reset=True, final_text="备援")])
+    hosts = {cfg.asr_r2t2_stream_url: main, cfg.asr_r2t2_backup_stream_url: backup}
+    connected = []
+
+    def connect(url, **kwargs):
+        connected.append(url)
+        return hosts[url]
+
+    monkeypatch.setattr(asr_stream.websockets, "connect", connect)
+    socket = ClientSocket([{"text": '{"type":"end"}'}])
+    _run(socket)
+
+    assert connected == [cfg.asr_r2t2_stream_url, cfg.asr_r2t2_backup_stream_url]
+    assert socket.sent == [{"type": "ready"}, {"type": "final", "text": "備援"}]
+    assert json.loads(backup.sent[0])["secret_key"] == "backup-secret"
+    assert backup.closed
+    if failure == "handshake":
+        assert main.closed
+
+
+def test_backup_alone_is_enough_to_offer_r2t2_live(monkeypatch):
+    _, _, cfg, _, _ = _environment(monkeypatch)
+    cfg.asr_r2t2_stream_url = ""
+    cfg.asr_r2t2_backup_stream_url = "ws://10.9.0.35:8040/asr_stream_api_v1"
+    cfg.asr_r2t2_backup_secret_key = "backup-secret"
+    backup = Upstream([_reply(reset=True, final_text="好")])
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: backup)
+    socket = ClientSocket([{"text": '{"type":"end"}'}])
+    _run(socket)
+    assert socket.sent[0] == {"type": "ready"}

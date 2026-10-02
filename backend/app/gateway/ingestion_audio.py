@@ -208,22 +208,52 @@ async def _transcribe_r2t2(file_path: str, trace_id: str, prompt: str = "") -> s
     ``language=Chinese``：兩套部署都認得（.35 vLLM 版把 zhen 也當 Chinese；.37 transformers
     版收到 zhen 直接 500）。不指定會自動判斷語言，串流實測帶口音的華語會跑成葡萄牙文。
     專案詞表放 ``context``（Qwen3-ASR 的熱詞提示）。輸出簡體，轉繁才跟其他家一致。
+    主機連不上或回 5xx 時改打備援主機（``ASR_R2T2_BACKUP_URL``），都失敗才交給下一家引擎。
     """
     cfg = get_tts_config()
-    url = cfg.asr_r2t2_url.rstrip("/")
-    if not url:
+    endpoints = [
+        (url.rstrip("/"), timeout)
+        for url, timeout in (
+            (cfg.asr_r2t2_url, None),
+            (cfg.asr_r2t2_backup_url, cfg.asr_r2t2_backup_timeout_seconds),
+        )
+        if url
+    ]
+    if not endpoints:
         raise RuntimeError("ASR_R2T2_URL is not configured")
 
     source, scratch = _as_wav(file_path)
     try:
-        response = await _http.get().post(
-            f"{url}/transcribe",
-            files={"file": (Path(source).name, Path(source).read_bytes())},
-            data={"language": "Chinese", "context": prompt},
-        )
+        audio = Path(source).read_bytes()
+        for index, (url, timeout) in enumerate(endpoints):
+            try:
+                return await _r2t2_request(url, audio, Path(source).name, prompt, timeout)
+            except (httpx.RequestError, httpx.HTTPStatusError, RuntimeError) as exc:
+                # 4xx 是請求本身的問題，換一台也一樣。
+                client_error = (
+                    isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500
+                )
+                if client_error or index == len(endpoints) - 1:
+                    raise
+                logger.warning(
+                    "r2t2_endpoint_failed trace_id=%s url=%s err=%s — trying backup",
+                    trace_id, url, exc,
+                )
     finally:
         if scratch:
             Path(scratch).unlink(missing_ok=True)
+    raise RuntimeError("R2T2 has no endpoint left")
+
+
+async def _r2t2_request(
+    url: str, audio: bytes, filename: str, prompt: str, timeout: float | None,
+) -> str:
+    response = await _http.get().post(
+        f"{url}/transcribe",
+        files={"file": (filename, audio)},
+        data={"language": "Chinese", "context": prompt},
+        **({"timeout": timeout} if timeout else {}),
+    )
     response.raise_for_status()
     body = response.json()
     if body.get("status") == "error":
@@ -303,7 +333,7 @@ def _provider_ready(cfg, name: str) -> bool:
     if name == "xiaomi":
         return bool(cfg.asr_xiaomi_url)
     if name == "r2t2":
-        return bool(cfg.asr_r2t2_url)
+        return bool(cfg.asr_r2t2_url or cfg.asr_r2t2_backup_url)
     return bool(cfg.whisper_api_key)
 
 

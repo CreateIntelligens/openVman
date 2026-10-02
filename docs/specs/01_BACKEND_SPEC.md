@@ -172,7 +172,7 @@ ws.send(JSON.stringify(payload));
 
 端點依帳號保存的偏好選擇 `gemini-live` 或 `r2t2-live`，並驗證所選引擎的目前授權；嵌入金鑰不可使用。批次 `r2t2` 與串流 `r2t2-live` 分開授權，兩個串流引擎均不進 `transcribe()` 備援鏈。沒選串流或授權被撤銷回 `not_allowed`。
 
-R2T2 使用 `ASR_R2T2_STREAM_URL`（部署值 `ws://10.9.0.37:8803/asr_stream_api_v1`，不可用 .35）與 `ASR_R2T2_SECRET_KEY`；缺任一設定回 `not_configured`。握手送 `requestId`、`language=Chinese`、`use_vad=true`、金鑰與 `project_asr_prompt(account, project_id)` 詞表作為 `system_prompt`；收到 `status=connected` 後才回前台 `ready`，握手或連線失敗回 `upstream_failed`。金鑰只由環境提供，不在錯誤或日誌輸出握手內容。
+R2T2 使用 `ASR_R2T2_STREAM_URL`（部署值 `ws://10.9.0.37:8803/asr_stream_api_v1`）與 `ASR_R2T2_SECRET_KEY`；主機連線或握手失敗時改用備援 `ASR_R2T2_BACKUP_STREAM_URL`＋`ASR_R2T2_BACKUP_SECRET_KEY`（.35，同一套握手），講到一半斷線不換台。兩台都沒設定回 `not_configured`。批次 `r2t2` 同理：`ASR_R2T2_URL` 連不上或回 5xx 改打 `ASR_R2T2_BACKUP_URL`，備援只等 `ASR_R2T2_BACKUP_TIMEOUT_SECONDS`（預設 20 秒，.35 同時多句會卡死），4xx 不換台。握手送 `requestId`、`language=Chinese`、`use_vad=true`、金鑰與 `project_asr_prompt(account, project_id)` 詞表作為 `system_prompt`；收到 `status=connected` 後才回前台 `ready`，握手或連線失敗回 `upstream_failed`。金鑰只由環境提供，不在錯誤或日誌輸出握手內容。
 
 前台送 16 kHz、PCM16 單聲道 binary（通常每 100 ms、3200 bytes），Backend 累積重切為每段 5120 bytes。收到 `{"type":"end"}` 時剩餘片段補靜音至 5120 bytes，再送文字 `YOUDAO_ONETIME_ASR_STREAM_EOS`，繼續等待最後定稿；上游正常 EOS 關閉不算故障，意外關閉會回錯誤。`msg.text` 是增量：累加後轉繁體送整句 `interim`；`reset=true` 以 `final_text` 定稿，缺少或空字串則用累加文字，轉繁體後送非空 `final` 並清空累加。靜音不產生空字幕；R2T2 定稿不問 Jev。用量記 `kind=asr`、provider `r2t2-live`、model `Confucius4-R2T2`，秒數僅算原始前台音訊，不含補齊靜音。台語分流維持 Breeze 批次。
 

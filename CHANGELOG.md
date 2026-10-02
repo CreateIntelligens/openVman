@@ -28,6 +28,7 @@
 
 ### Reliability
 
+- **R2T2 加備援主機（.35）**：`ASR_R2T2_BACKUP_URL`、`ASR_R2T2_BACKUP_STREAM_URL`、`ASR_R2T2_BACKUP_SECRET_KEY`。批次主機 .37 連不上或回 5xx 改打 .35，.35 只等 `ASR_R2T2_BACKUP_TIMEOUT_SECONDS`（預設 20 秒；它同時多句會卡死），等不到再交給 Breeze；4xx 不換台。串流在連線或握手失敗時換台，講到一半斷線不換（前台照舊退回批次）。兩台用同一套握手。只設備援也算有 r2t2 可用。
 - **VoxCPM 推論 worker 死掉時，每句都等 120 秒才退到 Edge**：2026-10-01 17:17 GB10 記憶體被吃滿，VoxCPM 的推論 worker 被 OOM 殺掉，但 health 照回 ok，openVman 每次合成都等滿 120 秒逾時才退到 Edge，持續約 7 小時。VoxCPM360 的 health 現在會檢查 worker（死掉回 503）；openVman 的 VoxCPM adapter 合成前先查 health（最多等 2 秒、結果快取 10 秒），503 或連不上就立刻失敗退到下一家。舊版 health 沒有 worker 欄位，回 200 就照常合成。
 - 專案詞表缺失、讀取失敗或編碼錯誤時不再中斷對話；快取改用奈秒時間、大小與檔案身分，提示以跳脫的 `<glossary>` 標記為參考資料。
 - 串流辨識啟動加入世代隔離與 ready 逾時；停止期間才取得的麥克風立即釋放，重複啟動共用同一次收音。停止後最多保留 5 秒接最後定稿，重新啟動或卸載會清理舊連線。

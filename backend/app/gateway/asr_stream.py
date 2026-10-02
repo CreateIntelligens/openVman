@@ -30,9 +30,11 @@ import logging
 import os
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import anyio
@@ -168,6 +170,54 @@ def _allowed(current) -> str:
     return chosen if chosen in _STREAM_ENGINES else ""
 
 
+def _r2t2_stream_endpoints(cfg: TTSRouterConfig) -> list[tuple[str, str]]:
+    return [
+        (url, key)
+        for url, key in (
+            (cfg.asr_r2t2_stream_url, cfg.asr_r2t2_secret_key),
+            (cfg.asr_r2t2_backup_stream_url, cfg.asr_r2t2_backup_secret_key),
+        )
+        if url and key
+    ]
+
+
+@asynccontextmanager
+async def _r2t2_upstream(cfg: TTSRouterConfig, prompt: str) -> AsyncIterator[Any]:
+    """Connect and hand-shake with the main R2T2 host, or the backup when that fails.
+
+    只在連線、握手階段換台；講到一半斷線不換，照原本讓前台退回批次。
+    兩台用同一套握手（.35 vLLM 版也認 secret_key、use_vad）。
+    """
+    endpoints = _r2t2_stream_endpoints(cfg)
+    if not endpoints:
+        raise RuntimeError("R2T2 stream is not configured")
+    for index, (url, key) in enumerate(endpoints):
+        stack = AsyncExitStack()
+        try:
+            upstream = await stack.enter_async_context(
+                websockets.connect(url, max_size=4 * 1024 * 1024, open_timeout=10),
+            )
+            await upstream.send(json.dumps({
+                "requestId": str(uuid4()),
+                "language": "Chinese",
+                "use_vad": True,
+                "secret_key": key,
+                "system_prompt": prompt,
+            }))
+            first = json.loads(await asyncio.wait_for(upstream.recv(), 10))
+            if first.get("status") != "connected":
+                raise RuntimeError("R2T2 handshake rejected")
+        except Exception as exc:
+            await stack.aclose()
+            if index == len(endpoints) - 1:
+                raise
+            logger.warning("r2t2 stream %s failed (%s) — trying backup", url, exc)
+            continue
+        async with stack:
+            yield upstream
+        return
+
+
 async def _relay_r2t2(
     websocket: WebSocket,
     current: CurrentAccount,
@@ -176,21 +226,7 @@ async def _relay_r2t2(
     count_audio: Callable[[int], None],
 ) -> None:
     prompt = await project_asr_prompt(current, project_id)
-    async with websockets.connect(
-        cfg.asr_r2t2_stream_url,
-        max_size=4 * 1024 * 1024,
-        open_timeout=10,
-    ) as upstream:
-        await upstream.send(json.dumps({
-            "requestId": str(uuid4()),
-            "language": "Chinese",
-            "use_vad": True,
-            "secret_key": cfg.asr_r2t2_secret_key,
-            "system_prompt": prompt,
-        }))
-        first = json.loads(await asyncio.wait_for(upstream.recv(), 10))
-        if first.get("status") != "connected":
-            raise RuntimeError("R2T2 handshake rejected")
+    async with _r2t2_upstream(cfg, prompt) as upstream:
         await websocket.send_json({"type": "ready"})
         ended = asyncio.Event()
 
@@ -269,7 +305,7 @@ async def asr_stream(websocket: WebSocket) -> None:
     api_key = os.environ.get("GEMINI_API_KEY", "")
     cfg = get_tts_config()
     configured = (
-        bool(cfg.asr_r2t2_stream_url and cfg.asr_r2t2_secret_key)
+        bool(_r2t2_stream_endpoints(cfg))
         if engine == R2T2_STREAM_ASR_ENGINE else bool(api_key)
     )
     if not engine or not configured:
