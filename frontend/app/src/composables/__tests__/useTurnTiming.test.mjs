@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -90,6 +91,26 @@ test("a new turn before playback reports the old one as superseded", () => {
   assert.equal(sent[0].outcome, "superseded");
   at(900); timing.playbackStarted();
   assert.equal(sent[1].outcome, "played");
+});
+
+test("a sentence added while thinking reports the old turn as merged", () => {
+  const { timing, sent, at } = harness();
+  at(0); timing.begin(); timing.mark("sent");
+  at(1500); timing.begin("merged");
+  assert.equal(sent[0].outcome, "merged");
+  at(4000); timing.playbackStarted();
+  assert.equal(sent[1].outcome, "played");
+});
+
+test("every outcome the app reports is one the backend accepts", () => {
+  // 後端用 Literal 驗證，前台多一種 outcome 後端會整筆 422 丟掉，量測就靜靜少了。
+  const front = readFileSync(resolve(appRoot, "src/composables/useTurnTiming.ts"), "utf8");
+  const back = readFileSync(resolve(appRoot, "../../backend/app/turn_timing.py"), "utf8");
+  const quoted = (text) => [...text.matchAll(/['"](\w+)['"]/g)].map((m) => m[1]).sort();
+  const frontUnion = front.match(/export type TurnOutcome =([^\n]*)/)[1];
+  const backLiteral = back.match(/outcome: Literal\[([^\]]*)\]/)[1];
+  assert.ok(quoted(frontUnion).includes("merged"));
+  assert.deepEqual(quoted(frontUnion), quoted(backLiteral));
 });
 
 test("playback with no turn in flight sends nothing", () => {

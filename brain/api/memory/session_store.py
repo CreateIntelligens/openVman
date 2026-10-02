@@ -227,6 +227,135 @@ class SessionStore:
                     ).fetchall()
                 ]
 
+    def register_chat_turn(
+        self, session_id: str, persona_id: str, owner: str,
+        turn_id: str, revision: int,
+    ) -> bool:
+        """Advance a pending turn without allowing reordered requests to win."""
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            self._ensure_session_persona_locked(
+                conn, session_id, normalize_persona_id(persona_id),
+            )
+            row = conn.execute(
+                "SELECT revision, accepted FROM chat_turns "
+                "WHERE session_id = ? AND owner = ? AND turn_id = ?",
+                (session_id, owner, turn_id),
+            ).fetchone()
+            if row and (revision <= row[0] or row[1]):
+                return False
+            conn.execute(
+                "INSERT INTO chat_turns "
+                "(session_id, owner, turn_id, revision) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(session_id, owner, turn_id) DO UPDATE SET "
+                "revision = excluded.revision, payload = NULL",
+                (session_id, owner, turn_id, revision),
+            )
+            # Keep receipts bounded like history. Late generation results whose
+            # receipt has expired cannot stage or accept their response.
+            conn.execute(
+                "DELETE FROM chat_turns WHERE session_id = ? AND rowid NOT IN "
+                "(SELECT rowid FROM chat_turns WHERE session_id = ? "
+                "ORDER BY rowid DESC LIMIT ?)",
+                (session_id, session_id,
+                 max(get_settings().max_session_rounds * 2, 20)),
+            )
+            return True
+
+    def stage_chat_turn(
+        self, session_id: str, owner: str, turn_id: str,
+        revision: int, payload: dict[str, Any],
+    ) -> bool:
+        with self._lock, self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE chat_turns SET payload = ? "
+                "WHERE session_id = ? AND owner = ? AND turn_id = ? "
+                "AND revision = ? AND accepted = 0",
+                (json.dumps(payload, ensure_ascii=False), session_id,
+                 owner, turn_id, revision),
+            )
+            return cursor.rowcount == 1
+
+    def accept_chat_turn(
+        self, session_id: str, persona_id: str, owner: str,
+        turn_id: str, revision: int, default_language: str = "zh",
+    ) -> tuple[dict[str, Any], tuple[int, int] | None] | None:
+        """Check revision and persist both messages in one cross-worker transaction.
+
+        An accepted response cannot be merged later. A repeated acknowledgement
+        returns the payload without duplicating history or memory side effects.
+        """
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT revision, payload, accepted FROM chat_turns "
+                "WHERE session_id = ? AND owner = ? AND turn_id = ?",
+                (session_id, owner, turn_id),
+            ).fetchone()
+            if not row or row[0] != revision or not row[1]:
+                return None
+            payload = json.loads(row[1])
+            if normalize_persona_id(
+                payload["context"]["persona_id"]
+            ) != normalize_persona_id(persona_id):
+                return None
+            if row[2]:
+                return payload, None
+            now = utc_now_iso()
+            self._ensure_session_persona_locked(
+                conn, session_id, normalize_persona_id(persona_id), now,
+            )
+            context = payload["context"]
+            speech_language = context["request_context"].get(
+                "metadata", {},
+            ).get("speech_language")
+            given_language = (
+                speech_language
+                if isinstance(speech_language, str)
+                and speech_language in LANGUAGES else None
+            )
+            user_language = given_language or detect_language(
+                context["user_message"], default_language,
+            )
+            assistant_meta = {
+                key: value
+                for key, value in payload["response"]["history"][-1].items()
+                if key not in {"role", "content"}
+            }
+            ids = []
+            for role, content, meta, language in (
+                ("user", context["user_message"], None, user_language),
+                ("assistant", payload["response"]["reply"],
+                 assistant_meta or None, None),
+            ):
+                cursor = conn.execute(
+                    "INSERT INTO messages "
+                    "(session_id, role, content, created_at, metadata, language) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (session_id, role, content, now,
+                     json.dumps(meta, ensure_ascii=False) if meta else None,
+                     language),
+                )
+                ids.append(int(cursor.lastrowid or 0))
+            conn.execute(
+                "DELETE FROM messages WHERE session_id = ? AND id NOT IN "
+                "(SELECT id FROM messages WHERE session_id = ? "
+                "ORDER BY created_at DESC, id DESC LIMIT ?)",
+                (session_id, session_id,
+                 max(get_settings().max_session_rounds * 2, 20)),
+            )
+            conn.execute(
+                "UPDATE chat_turns SET accepted = 1 WHERE session_id = ? "
+                "AND owner = ? AND turn_id = ?",
+                (session_id, owner, turn_id),
+            )
+        if given_language is None:
+            refine_language_in_background(
+                context["user_message"], user_language,
+                lambda refined: self.update_message_language(ids[0], refined),
+            )
+        return payload, (ids[0], ids[1])
+
     def update_message_language(self, message_id: int, language: str) -> None:
         with self._lock:
             with self._connect() as conn:
@@ -586,6 +715,21 @@ class SessionStore:
                 conn.execute("ALTER TABLE messages ADD COLUMN language TEXT")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_messages_session_created_at ON messages(session_id, created_at, id)"
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chat_turns (
+                    session_id TEXT NOT NULL,
+                    owner TEXT NOT NULL,
+                    turn_id TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    payload TEXT,
+                    accepted INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(session_id, owner, turn_id),
+                    FOREIGN KEY(session_id) REFERENCES sessions(session_id)
+                        ON DELETE CASCADE
+                )
+                """
             )
             conn.commit()
 

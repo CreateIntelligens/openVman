@@ -84,6 +84,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   // 回覆已到、TTS 還在合成第一段聲音（約 2 秒）：這段空檔也算在回答，否則講完自動
   // 恢復收音會在開口前就打開麥克風，收到虛擬人自己的聲音。
   const ttsPending = ref(false);
+  const spokenReply = ref("");
 
   const ttsStreamer = useTtsStreamer({
     ttsProviders: () => ttsProviders.value,
@@ -164,6 +165,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       isFinalReceived = false;
     },
     onUtteranceComplete: (fullText, context) => {
+      spokenReply.value = fullText;
       isFinalReceived = true;
       clearUnderrunTimer();
       audio.resetSchedule();
@@ -198,14 +200,17 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
       statusToastRef.value?.show(text, { persistent: status === 'degraded' });
     },
   });
-  // 虛擬人在想、在講或字幕還在跑：這時送出鈕變成「停止」，Esc 也能停。
+  // 虛擬人在出聲（合成中、播放中或字幕還在跑）：麥克風只在這時關，免得收到自己的聲音。
   // 標準模式回覆一到 state 就回 IDLE，聲音還在播，所以要一併看播放與打字機。
-  const avatarResponding = computed(() =>
-    chat.state.value === "THINKING"
-    || chat.state.value === "SPEAKING"
+  const avatarSpeaking = computed(() =>
+    chat.state.value === "SPEAKING"
     || isTyping.value
     || ttsPending.value
     || audio.isPlaying.value,
+  );
+  // 在想或在出聲：這時送出鈕變成「停止」，Esc 也能停。
+  const avatarResponding = computed(() =>
+    chat.state.value === "THINKING" || avatarSpeaking.value,
   );
 
   function handleStopResponse(): void {
@@ -229,7 +234,7 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
     referenceText?: string,
     speechLanguage?: string | null,
   ): Promise<ComposerSendResult> {
-    turnTiming.begin();
+    turnTiming.begin(chat.mergesWithPending(sourcePath) ? "merged" : "superseded");
     if (
       !isStarted.value
       || !chat.sessionId.value
@@ -319,5 +324,5 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
 
   onUnmounted(clearUnderrunTimer);
 
-  return { chat, audio, isStarted, isTyping, avatarResponding, canSend, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
+  return { chat, audio, isStarted, isTyping, avatarSpeaking, avatarResponding, spokenReply, canSend, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
 }

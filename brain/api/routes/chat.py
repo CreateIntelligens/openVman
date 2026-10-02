@@ -13,6 +13,7 @@ from core.chat_service import (
     prepare_generation,
     record_generation_failure,
 )
+from core.chat_turns import accept_turn, register_turn, stage_turn
 from core.llm_client import LLMEmptyReplyError
 from core.reply_modes import DEFAULT_MODE, available_modes
 from core.slash_command import try_rewrite_slash
@@ -28,7 +29,7 @@ from protocol.message_envelope import (
     merge_metadata,
 )
 from protocol.protocol_events import ProtocolValidationError
-from protocol.schemas import ChatRequest
+from protocol.schemas import ChatRequest, ChatTurnAcceptRequest
 from safety.internal_auth import (
     PRINCIPAL_ID_HEADER,
     PRINCIPAL_TYPE_HEADER,
@@ -108,6 +109,8 @@ def _handle_generation_error(exc: Exception, action: str, request: Request) -> N
 async def chat(request: Request, payload: ChatRequest):
     try:
         t0 = time.monotonic()
+        if payload.turn_id is not None:
+            await asyncio.to_thread(register_turn, request, payload)
         logger.info("[CHAT] User Session: %s Project: %s Message: %r", payload.session_id, payload.project_id, payload.message)
 
         # 用量歸屬：prepare 階段（recall 摘要、query expansion）也會呼叫 LLM，
@@ -133,9 +136,15 @@ async def chat(request: Request, payload: ChatRequest):
             scope.channel = str(context.request_context.get("channel", ""))
             result = await asyncio.to_thread(execute_generation, context)
         response_time_s = round(time.monotonic() - t0, 2)
-        response = finalize_generation(
-            context, result.reply, result.tool_steps, response_time_s,
-        )
+        if payload.turn_id is not None:
+            response = await asyncio.to_thread(
+                stage_turn, request, payload, context,
+                result.reply, result.tool_steps, response_time_s,
+            )
+        else:
+            response = finalize_generation(
+                context, result.reply, result.tool_steps, response_time_s,
+            )
         response["tool_steps"] = result.tool_steps
         response["response_time_s"] = response_time_s
         response["usage"] = summarize_collected(scope)
@@ -143,8 +152,15 @@ async def chat(request: Request, payload: ChatRequest):
 
         logger.info("[CHAT] AI Reply: %r (Time: %ss)", result.reply, response_time_s)
         return response
+    except HTTPException:
+        raise
     except Exception as exc:
         _handle_generation_error(exc, "chat", request)
+
+
+@router.post("/chat/accept", summary="確認接收可合併回合的回答")
+async def chat_accept(request: Request, payload: ChatTurnAcceptRequest):
+    return await accept_turn(request, payload)
 
 
 @router.get("/chat/modes", summary="可用的回覆深度模式")

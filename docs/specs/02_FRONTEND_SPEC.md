@@ -148,7 +148,7 @@ VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 
 >    * `asr/`：無框架辨識單元與決策大腦：
 >      * `browser-recognizer.ts`：Web Speech API 包裝，支援 interim 與 speaking 狀態信號。
 >      * `server-recorder.ts`：MediaRecorder 按鍵錄音上傳。
->      * `vad-recognizer.ts`：Silero VAD 本機端點切句上傳，支援 `per-utterance`（app）與 `continuous`（admin）模式。
+>      * `vad-recognizer.ts`：Silero VAD 本機端點切句上傳，支援 `per-utterance` 與 `continuous` 模式；app、admin 都用 `continuous`（app 自 2026-10-02 起，回授改由虛擬人出聲時暫停收音來擋）。
 >      * `controller.ts`：統一狀態機 `SpeechController`，負責引擎判定、閒置超時、D2 降級、D8 樂觀更新與統一 UI 文案表。
 >      * `errors.ts`：統一錯誤碼與集中繁中錯誤訊息表。
 >      * `client.ts`：後端 ASR 端點通訊。
@@ -164,10 +164,27 @@ VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 
 >    按鈕狀態與 placeholder 引導文案統一取自 `ASR_UI_LABELS` 與 `ASR_PROMPT_LABELS`，保證兩端同狀態下文案與視覺體驗一致。
 >    continuous 閒置倒數在說話結束後重設為 10 秒；說話中或啟動中不能因閒置計時停錄。VAD 啟動失敗後切換按鍵錄音時，舊啟動流程不得覆寫新收音狀態或清除 60 秒停止計時器。
 >
-> 3. **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
+> 3. **思考中補一句（2026-10-02）**：前台麥克風只在虛擬人出聲時暫停——`useAvatarConversation` 的 `avatarSpeaking`（`state === 'SPEAKING'`、TTS 合成中、播放中或字幕還在跑），串流辨識正常關閉、其他引擎暫停（講話中插話的開關 `INTERRUPT_WHILE_SPEAKING` 預設關，打開時串流辨識保持收音並經 `/api/v1/voice/interrupt` 分類），出聲結束後自動恢復並倒數 6 秒。思考中（文字模式請求還沒回來）麥克風照開、不倒數閒置；這時再送一句，`useAvatarChat.sendMessage()` 中止舊請求，把等待中的那句與新的一句以換行接起來重送，`messages` 改寫原本那則使用者訊息而不新增，回傳 `merged: true`；延遲量測把前一輪記為 `merged`。回答一到（`state` 離開 `THINKING`）就不再合併。帶 `sourcePath` 的快速問答不合併；`speechLanguage` 取後一句。瀏覽器內建辨識一次只收一句，不支援；Live（WebSocket）模式未開放，未處理。思考中沒出聲就結束（出錯、按停止）時，從那時開始倒數閒置。
+>
+> 4. **鏡頭按鈕**：兩個前端都依 `GET /api/v1/vision/health` 的 `available` 決定要不要
 > 顯示（app 在 `App.vue`、admin 在 `useVisionAvailable.ts`）。三態：問到之前與
 > 401/403 都不顯示，`available: false` 不顯示，5xx 與網路錯誤 fail-open。不可用時
 > 是整個不出現，不是 disabled。
+
+#### 可合併回答的接收確認（2026-10-02）
+
+前台 HTTP Chat 同時送 `turn_id`、`turn_revision`；補句沿用 ID 並遞增版本。
+回答 headers 抵達不代表內容已收到，直到 JSON 完整解析並通過請求版本檢查前，
+都保持合併視窗。Brain 回傳 `requires_accept: true` 後，先送
+`POST /api/v1/chat/accept` 確認，再進入 TTS／字幕。確認使用與原請求相同的
+帳號、專案、人設與 session；丟失回應最多重試一次，每次等 10 秒。
+這次確認不跟隨播放停止一起取消，下一輪生成需等待確認，以確保歷史完整。
+過時回答與過時錯誤均不能覆寫新一輪狀態。
+
+Brain 在 SQLite 同一交易內檢查版本並寫入兩則訊息，未確認答案不進日誌與
+自動記憶。這不是模型或工具副作用的回滾。後台 Chat、外部 SDK、視覺事件與
+未提供回合欄位的 API 沿用原流程。ASR 啟動尚未完成而回答開始播放時，也必須
+取消啟動；連續 VAD 說話超過閒置上限不能被中途關麥克風。
 
 ### 7. 狀態機控制 (State Transitions)
 

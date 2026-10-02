@@ -19,10 +19,13 @@ test("the composer turns into a stop button while the avatar is answering", () =
 
 test("standard mode still counts as answering while audio plays", () => {
   // 標準模式回覆一到 state 就回 IDLE，只看 state 會讓停止鈕在講話時消失。
-  const block = app.match(/const avatarResponding = computed\(\(\) =>([\s\S]*?)\);/);
-  assert.ok(block);
-  assert.match(block[1], /audio\.isPlaying\.value/);
-  assert.match(block[1], /isTyping\.value/);
+  const responding = app.match(/const avatarResponding = computed\(\(\) =>([\s\S]*?)\);/);
+  assert.ok(responding);
+  assert.match(responding[1], /chat\.state\.value === "THINKING" \|\| avatarSpeaking\.value/);
+  const speaking = app.match(/const avatarSpeaking = computed\(\(\) =>([\s\S]*?)\);/);
+  assert.ok(speaking);
+  assert.match(speaking[1], /audio\.isPlaying\.value/);
+  assert.match(speaking[1], /isTyping\.value/);
 });
 
 test("Escape stops the answer before leaving immersive mode", () => {

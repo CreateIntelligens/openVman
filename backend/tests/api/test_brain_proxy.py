@@ -174,6 +174,7 @@ def test_backend_openapi_lists_explicit_brain_routes(client: TestClient):
     paths = response.json()["paths"]
     assert "/api/v1/health" in paths
     assert "/api/v1/chat" in paths
+    assert "/api/v1/chat/accept" in paths
     assert "/api/v1/knowledge/upload" in paths
     assert "/api/v1/knowledge/document/meta" in paths
     assert "/api/v1/knowledge/note" in paths
@@ -193,15 +194,18 @@ def test_project_content_writes_require_edit_access() -> None:
     assert _project_access("sessions/export", "POST") is ResourceAccess.EDIT
     assert _project_access("sessions/s1", "DELETE") is ResourceAccess.EDIT
     assert _project_access("knowledge/document", "GET") is ResourceAccess.READ
+    assert _project_access("chat/accept", "POST") is ResourceAccess.READ
 
 
 @pytest.mark.parametrize(
     ("granted", "expected_status"),
     [(True, 200), (False, 404)],
 )
+@pytest.mark.parametrize("path", ["knowledge/document", "chat/accept"])
 def test_portal_user_can_only_forward_granted_project_edits(
     granted: bool,
     expected_status: int,
+    path: str,
 ) -> None:
     from app.brain_proxy import router
 
@@ -228,13 +232,31 @@ def test_portal_user_can_only_forward_granted_project_edits(
         patch("app.brain_proxy._http.get", return_value=mock_client),
         TestClient(app) as isolated_client,
     ):
-        response = isolated_client.put(
-            "/api/v1/knowledge/document?project_id=project-a",
-            json={"path": "knowledge/a.md", "content": "updated"},
+        response = isolated_client.request(
+            "POST" if path == "chat/accept" else "PUT",
+            f"/api/v1/{path}?project_id=project-a",
+            json={"project_id": "project-a", "session_id": "s1",
+                  "turn_id": "t1", "turn_revision": 2,
+                  "path": "knowledge/a.md", "content": "updated"},
         )
 
     assert response.status_code == expected_status
     assert mock_client.send.await_count == (1 if granted else 0)
+
+
+def test_chat_accept_requires_login():
+    from app.brain_proxy import router
+
+    app = FastAPI()
+    app.include_router(router)
+    with patch("app.brain_proxy._http.get") as upstream, TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat/accept",
+            json={"project_id": "p1", "session_id": "s1",
+                  "turn_id": "t1", "turn_revision": 1},
+        )
+    assert response.status_code == 401
+    upstream.assert_not_called()
 
 
 def test_explicit_brain_routes_still_forward_options(client: TestClient):

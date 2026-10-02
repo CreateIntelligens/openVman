@@ -373,6 +373,20 @@ API 見 `docs/specs/01_BACKEND_SPEC.md`「前台設定跟著帳號」。
 
 ### 整輪延遲量測
 
+文字模式的虛擬人前台在思考中保持收音，可補一句並合併回答；開始合成、播放或
+顯示回答字幕時暫停收音（串流辨識關閉連線，其他引擎暫停），結束後自動恢復。
+瀏覽器內建辨識仍一次一句。快速問答保留獨立出處，不與其他句子合併。
+
+講話中插話已有分類端點，但前台預設不用：登入保護的 `POST /api/v1/voice/interrupt`，
+請求 `{transcript, reply_text}`，回應 `{action: "STOP" | "IGNORE"}`；先丟掉完整
+出現在回答裡的文字（喇叭回音），再由 GuardAgent 規則判定，模糊長句問 Jev，
+未設定或失敗判 STOP。前台開關是 `useAvatarVoiceInput.ts` 的
+`INTERRUPT_WHILE_SPEAKING`（預設 false）：回音過濾只擋完全相同的文字，現場
+喇叭／麥克風的回音消除實測過再開，見 `docs/plans/full-duplex-voice.md` 階段 B。
+合併回合由 Brain 先暫存答案，前台收到目前版本後再經 `/api/v1/chat/accept`
+確認寫入，避免被取消的舊回答留在對話或自動記憶。API 契約見
+[Brain README](brain/README.md#思考中補句與回答接收確認)。
+
 前台每一輪對話記下時間點，開始播放（或被打斷、出錯）時送到 Backend
 `POST /api/v1/metrics/turn`，每輪一行 JSON 寫進 `backend/logs/turn_timing.jsonl`
 （主機掛載目錄，部署重建容器也不會消失；可用 `TURN_TIMING_LOG` 改路徑）。
@@ -388,7 +402,7 @@ API 見 `docs/specs/01_BACKEND_SPEC.md`「前台設定跟著帳號」。
 
 `durations_ms` 已算好分段：`asr`（講完到辨識回來）、`send`、`brain`、`tts_first_audio`、
 `to_playback`、`total`（講完話到開始播放；打字是送出到開始播放）。`outcome` 為
-`played`／`interrupted`／`error`／`superseded`。按鍵錄音與 Gemini Live 辨識沒有講完的時間點，
+`played`／`interrupted`／`error`／`superseded`／`merged`（思考中補一句，前一輪併入下一輪重送）。按鍵錄音與 Gemini Live 辨識沒有講完的時間點，
 `total` 改從送出算。
 
 ```bash
@@ -413,3 +427,5 @@ Live 用量會帶上已驗證帳號／Embed key 的歸屬，中途關閉也清�
 ### 前端小模型實驗
 
 瀏覽器模型相容性調查與後續驗證項目，見 [P0 相容性紀錄](scripts/experiments/browser-intent/P0-COMPATIBILITY.md)。實驗紀錄不代表已整合正式環境。
+
+回復正式版本：`docker compose -f docker-compose.yml up -d --no-build --no-deps api backend gateway-worker avatar`。

@@ -1,8 +1,9 @@
 /**
  * useVadAsr — server-side engine, with the sentence boundary found in the browser.
  *
- * 薄層轉接：將 Vue 響應式狀態綁定至底層無框架的 VadRecognizer（per-utterance 模式）。
- * 講完一句自動 stop() 放掉麥克風並上傳轉寫，防止喇叭聲音回授。
+ * 薄層轉接：將 Vue 響應式狀態綁定至底層無框架的 VadRecognizer（continuous 模式）。
+ * 講完一句上傳轉寫、麥克風繼續開著，虛擬人思考中可以再補一句；虛擬人出聲時由
+ * useAvatarVoiceInput 暫停收音，防止喇叭聲音回授。雜音轉不出字時安靜略過，不報錯。
  */
 import { onUnmounted, readonly, ref } from 'vue'
 
@@ -42,7 +43,7 @@ export function useVadAsr(options: VadAsrOptions = {}) {
 
   const recognizer = new VadRecognizer({
     http: appHttpAdapter,
-    commitMode: 'per-utterance',
+    commitMode: 'continuous',
     onResult: (text, meta) => options.onResult?.(text, meta),
     formFields: () => options.formFields?.() ?? {},
     onError: (code: AsrErrorCode) => options.onError?.(code),

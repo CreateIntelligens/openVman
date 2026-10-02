@@ -1663,6 +1663,19 @@ def test_turn_timing_is_appended_as_one_json_line(monkeypatch, tmp_path):
     assert "received_at" in lines[0]
 
 
+def test_turn_timing_accepts_a_merged_turn(monkeypatch, tmp_path):
+    """思考中補一句時，前台把前一輪記成 merged（不是失敗）。"""
+    module, _ = _load_main(monkeypatch)
+    log = tmp_path / "turn_timing.jsonl"
+    monkeypatch.setenv("TURN_TIMING_LOG", str(log))
+    client, _ = _authenticated_client(module, admin=False)
+
+    response = client.post("/api/v1/metrics/turn", json=_turn_payload(outcome="merged"))
+
+    assert response.status_code == 204
+    assert json.loads(log.read_text(encoding="utf-8"))["outcome"] == "merged"
+
+
 def test_turn_timing_rejects_unknown_marks(monkeypatch, tmp_path):
     module, _ = _load_main(monkeypatch)
     monkeypatch.setenv("TURN_TIMING_LOG", str(tmp_path / "turn_timing.jsonl"))

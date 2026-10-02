@@ -8,8 +8,9 @@
  * - 啟動中（starting）狀態與取消防護（generation 計數）
  * - 多句併發辨識計數（pending 計數器）
  * - 支援兩種收音提交模式（D4）：
- *   - 'per-utterance'（app 用）：onSpeechEnd 先 stop() 放掉麥克風避免回授，再上傳；雜音回報 transcribe-failed（D5）。
- *   - 'continuous'（admin 用）：onSpeechEnd 異步上傳並繼續收音；雜音安靜略過（D5）。
+ *   - 'per-utterance'：onSpeechEnd 先 stop() 放掉麥克風避免回授，再上傳；雜音回報 transcribe-failed（D5）。
+ *   - 'continuous'（admin、app 用）：onSpeechEnd 異步上傳並繼續收音；雜音安靜略過（D5）。
+ *     app 在虛擬人出聲時自己暫停收音來擋回授。
  * - 錯誤分類（採 app 版）：
  *   - 麥克風權限被拒（NotAllowedError/NotFoundError）-> 'not-allowed'，supported 維持 true。
  *   - 模型/WASM 載入失敗 -> 'vad-unavailable'，supported 轉 false。

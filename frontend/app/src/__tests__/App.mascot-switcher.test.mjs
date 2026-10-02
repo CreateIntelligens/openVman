@@ -72,6 +72,6 @@ test("the stage bridge only drives the 3D renderer", () => {
 
 test("chat states trigger semantic VRM stage gestures", () => {
   assert.match(source, /triggerGesture:\s*triggerStageAvatarGesture/);
-  assert.match(source, /if \(newState === 'THINKING'\) triggerStageAvatarGesture\("thinking-hand"\)/);
+  assert.match(source, /if \(newState === 'THINKING'\) \{\s*triggerStageAvatarGesture\("thinking-hand"\)/);
   assert.match(source, /if \(newState === 'SPEAKING'\) triggerStageAvatarGesture\("explain-open-hand"\)/);
 });

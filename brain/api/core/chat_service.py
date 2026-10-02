@@ -241,11 +241,17 @@ def finalize_generation(
     reply: str,
     tool_steps: list[dict[str, Any]] | None = None,
     response_time_s: float | None = None,
+    *,
+    persist: bool = True,
+    persisted_message_ids: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     """Persist the assistant reply and return the standard API payload.
 
     Memory governance (summary/reindex/maintenance) is dispatched to a background
     thread so it does not block the response.
+
+    Replaceable HTTP turns use ``persist=False`` until delivery is acknowledged;
+    ``persisted_message_ids`` reuses the pair written by the atomic acknowledgement.
     """
     cleaned_reply = reply.strip()
     if not cleaned_reply:
@@ -257,19 +263,26 @@ def finalize_generation(
 
     reply_pii_future = _pii_writeback_executor.submit(
         _scan_reply_pii, cleaned_reply, context.trace_id,
-    )
+    ) if persist else None
 
-    if not ephemeral_user:
+    if persist and not ephemeral_user:
         user_pii_future = _pii_writeback_executor.submit(
             _scan_reply_pii, context.user_message, context.trace_id,
         )
         # 前台語音經 ASR 時會帶 speech_language（例如聽出是台語），轉錄文字看不出來。
         speech_language = context.request_context.get("metadata", {}).get("speech_language")
-        _, user_message_id = append_session_message_with_id(
-            context.session_id, context.persona_id, "user", context.user_message,
-            project_id=context.project_id,
-            language=speech_language if isinstance(speech_language, str) else None,
-        )
+        if persisted_message_ids is not None:
+            user_message_id = persisted_message_ids[0]
+        else:
+            _, user_message_id = append_session_message_with_id(
+                context.session_id, context.persona_id,
+                "user", context.user_message,
+                project_id=context.project_id,
+                language=(
+                    speech_language
+                    if isinstance(speech_language, str) else None
+                ),
+            )
         _pii_writeback_executor.submit(
             _patch_reply_pii_metadata,
             user_pii_future, user_message_id, context.project_id,
@@ -287,15 +300,20 @@ def finalize_generation(
     if citations:
         meta["citations"] = citations
     meta.update(primary_media)
-    _, assistant_message_id = append_session_message_with_id(
-        context.session_id, context.persona_id, "assistant", cleaned_reply,
-        project_id=context.project_id, metadata=meta or None,
-    )
-    _pii_writeback_executor.submit(
-        _patch_reply_pii_metadata,
-        reply_pii_future, assistant_message_id, context.project_id,
-    )
-    if not ephemeral_user:
+    if persist:
+        if persisted_message_ids is not None:
+            assistant_message_id = persisted_message_ids[1]
+        else:
+            _, assistant_message_id = append_session_message_with_id(
+                context.session_id, context.persona_id,
+                "assistant", cleaned_reply,
+                project_id=context.project_id, metadata=meta or None,
+            )
+        _pii_writeback_executor.submit(
+            _patch_reply_pii_metadata,
+            reply_pii_future, assistant_message_id, context.project_id,
+        )
+    if persist and not ephemeral_user:
         archive_session_turn(
             context.session_id,
             context.user_message,
@@ -303,7 +321,8 @@ def finalize_generation(
             context.persona_id,
             project_id=context.project_id,
         )
-    _schedule_memory_writes(context, cleaned_reply)
+    if persist:
+        _schedule_memory_writes(context, cleaned_reply)
 
     history = [_serialize_history_message(msg) for msg in context.prior_messages]
     user_entry: dict[str, Any] = {"role": "user", "content": context.user_message}
@@ -316,10 +335,10 @@ def finalize_generation(
         pii_pending = True
     history.append(user_entry)
     assistant_entry: dict[str, Any] = {"role": "assistant", "content": cleaned_reply}
-    if reply_pii_future.done():
+    if reply_pii_future is not None and reply_pii_future.done():
         if (warning := reply_pii_future.result()) is not None:
             assistant_entry["privacy_warning"] = warning
-    else:
+    elif reply_pii_future is not None:
         pii_pending = True
     if tool_steps:
         assistant_entry["tool_steps"] = tool_steps

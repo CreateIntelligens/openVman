@@ -46,7 +46,8 @@ class TurnTiming(BaseModel):
 
     turn_id: str = Field(min_length=1, max_length=64)
     input: Literal["voice", "text"]
-    outcome: Literal["played", "interrupted", "error", "superseded"]
+    # merged：還在等回答時使用者補了一句，前台把兩句合併重送，這一輪由合併後那輪接手。
+    outcome: Literal["played", "interrupted", "error", "superseded", "merged"]
     # 前台的牆上時間（第一個時間點），拿來跟其他 log 對時間。
     started_at: str = Field(max_length=40)
     # 各時間點相對第一個時間點的毫秒數。

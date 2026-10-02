@@ -133,8 +133,9 @@ test("vision availability starts unknown so the button does not flicker", () => 
 test("every voice turn is timed from speech to playback", () => {
   // 要從 log 撈整個流程多久（backend/logs/turn_timing.jsonl），缺一個點那段就量不到。
   assert.equal((source.match(/turnTiming\.asrDone\(\);/g) ?? []).length, 4, "四種 ASR 都要記辨識完成");
-  assert.match(source, /if \(speaking\) turnTiming\.speechStarted\(\);\s*else turnTiming\.speechEnded\(\);/);
-  assert.match(source, /turnTiming\.begin\(\);/);
+  assert.match(source, /if \(speaking\) \{\s*turnTiming\.speechStarted\(\);[\s\S]*?\} else \{\s*turnTiming\.speechEnded\(\);/);
+  // 思考中補一句：前一輪記成 merged，不算失敗。
+  assert.match(source, /turnTiming\.begin\(chat\.mergesWithPending\(sourcePath\) \? "merged" : "superseded"\);/);
   assert.match(source, /turnTiming\.mark\("sent"\);\s*const result: SendMessageResult = chat\.sendMessage\(/);
   assert.match(source, /turnTiming\.mark\("reply_done"\);/);
   assert.match(source, /turnTiming\.mark\("tts_start"\);\s*void ttsStreamer\.speak\(/);

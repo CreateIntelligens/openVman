@@ -1,4 +1,5 @@
 import { computed, ref, watch, onUnmounted } from "vue";
+import { apiFetch } from "../api/http";
 import { BROWSER_ASR, isStreamAsrEngine, getAsrErrorMessage } from "@shared/speech";
 import { useAsr } from "./useAsr";
 import { useServerAsr } from "./useServerAsr";
@@ -21,7 +22,7 @@ interface VoiceInputOptions {
   statusToastRef: Ref<InstanceType<typeof StatusToast> | null>;
 }
 export function useAvatarVoiceInput({ conversation, preferences, stage, languageRoutes, turnTiming, statusToastRef }: VoiceInputOptions) {
-  const { chat, avatarResponding, handleSend } = conversation;
+  const { chat, avatarSpeaking, avatarResponding, handleSend } = conversation;
   const { myAsrProvider } = preferences;
   const { triggerStageAvatarGesture } = stage;
   const asrError = ref("");
@@ -37,8 +38,42 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
 
   const asrInterim = ref("");
   let asrIdleTimer: ReturnType<typeof setTimeout> | null = null;
-  // 虛擬人在想、在講時停止收音，免得收到自己的聲音；講完自動恢復，使用者不必每輪重按麥克風。
+  // 虛擬人出聲時停止收音，免得收到自己的聲音；講完自動恢復，使用者不必每輪重按麥克風。
+  // 在想的時候不出聲，麥克風照開，使用者可以補一句（useAvatarChat 會把兩句合併重送）。
   let resumeAsrAfterReply = false;
+  let interruptionRevision = 0;
+  // 講話中插話（docs/plans/full-duplex-voice.md 階段 B）：串流辨識在虛擬人出聲時也收音，
+  // 交給 /api/v1/voice/interrupt 判斷要不要停。回音過濾只擋「完全包含在回答裡」的文字，
+  // 現場喇叭與麥克風的回音消除還沒實測，誤判會讓虛擬人自己打斷自己，所以先關著。
+  const INTERRUPT_WHILE_SPEAKING = false;
+
+  async function handleStreamResult(transcript: string): Promise<void> {
+    const revision = ++interruptionRevision;
+    if (avatarSpeaking.value) {
+      const reply = conversation.spokenReply.value;
+      try {
+        const response = await apiFetch("/api/v1/voice/interrupt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript, reply_text: reply }),
+          signal: AbortSignal.timeout(3000),
+        });
+        if (!response.ok) return;
+        const decision = await response.json();
+        // A late verdict must never stop a newer reply or submit old speech.
+        if (revision !== interruptionRevision
+          || !streamAsr.isListening.value
+          || conversation.spokenReply.value !== reply
+          || !avatarSpeaking.value
+          || decision.action !== "STOP") return;
+        conversation.handleStopResponse();
+      } catch {
+        return;
+      }
+    }
+    const result = await handleSend(transcript);
+    if (!result.accepted && result.message) statusToastRef.value?.show(result.message);
+  }
 
   function clearAsrIdleTimer(): void {
     if (asrIdleTimer) {
@@ -51,15 +86,24 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
     clearAsrIdleTimer();
     const timeout = asrInputMode.value === "push-to-talk" ? SERVER_ASR_MAX_CLIP_MS : idleMs;
     asrIdleTimer = setTimeout(() => {
+      asrIdleTimer = null;
+      if (asrInputMode.value !== "push-to-talk" && (
+        avatarResponding.value
+        || asrSpeaking.value
+        || asrStarting.value
+      )) {
+        scheduleAsrIdleTimer(idleMs);
+        return;
+      }
       if (activeAsr.value.isListening.value) {
         activeAsr.value.stop();
       }
-      asrIdleTimer = null;
     }, timeout);
   }
 
   function markAsrActivity(): void {
-    if (activeAsr.value.isListening.value) {
+    // 等回答期間不倒數，免得使用者等著等著麥克風自己關了。
+    if (activeAsr.value.isListening.value && !avatarResponding.value) {
       scheduleAsrIdleTimer();
     }
   }
@@ -135,13 +179,9 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
       turnTiming.asrDone();
       asrError.value = "";
       asrInterim.value = "";
-      clearAsrIdleTimer();
-      scheduleAsrIdleTimer();
-      void handleSend(transcript).then((result) => {
-        if (!result.accepted && result.message) {
-          statusToastRef.value?.show(result.message);
-        }
-      });
+      // 重新倒數；接著若進入思考中會再清掉（補一句時本來就在思考中，不倒數）。
+      markAsrActivity();
+      void handleStreamResult(transcript);
     },
     onError: (error) => {
       clearAsrIdleTimer();
@@ -160,7 +200,8 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
       turnTiming.asrDone();
       asrError.value = "";
       asrInterim.value = "";
-      clearAsrIdleTimer();
+      // VAD 講完一句麥克風還開著：同串流，重新倒數，思考中則不倒數。
+      markAsrActivity();
       void handleSend(transcript, undefined, undefined, meta?.language).then((result) => {
         if (!result.accepted && result.message) {
           statusToastRef.value?.show(result.message);
@@ -214,13 +255,25 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
     if (useBrowserAsr.value) return asr.isSpeaking.value;
     return vadAsr.isSpeaking.value;
   });
+  const asrStarting = computed(() => {
+    const active = activeAsr.value;
+    if (active === streamAsr) return streamAsr.isStarting.value;
+    if (active === vadAsr) return vadAsr.isStarting.value;
+    return false;
+  });
 
   watch(asrSpeaking, (speaking) => {
-    if (speaking) turnTiming.speechStarted();
-    else turnTiming.speechEnded();
+    if (speaking) {
+      turnTiming.speechStarted();
+      // VAD 沒有暫定字幕，開口本身就是活動；一句話講超過閒置時間不能被切掉。
+      markAsrActivity();
+    } else {
+      turnTiming.speechEnded();
+    }
   });
 
   function handleAsrToggle(): void {
+    interruptionRevision++;
     asrError.value = "";
     asrInterim.value = "";
     const active = activeAsr.value;
@@ -235,29 +288,45 @@ export function useAvatarVoiceInput({ conversation, preferences, stage, language
     }
   }
   watch(() => chat.state.value, (newState) => {
-    if (newState === 'THINKING') triggerStageAvatarGesture("thinking-hand");
-    if (newState === 'SPEAKING') triggerStageAvatarGesture("explain-open-hand");
-    if ((newState === 'THINKING' || newState === 'SPEAKING') && activeAsr.value.isListening.value) {
-      resumeAsrAfterReply = true;
-      // 回答期間不倒數；講完再重新計時。
+    if (newState === 'THINKING') {
+      triggerStageAvatarGesture("thinking-hand");
+      // 等回答期間不倒數；回答完再重新計時。
       clearAsrIdleTimer();
-      // 串流連線閒著可能被 Gemini 斷掉，斷線會被當成「串流不可用」而一直退回批次，
-      // 所以先正常關掉、講完再連；其他引擎暫停即可。
-      if (activeAsr.value === streamAsr) activeAsr.value.stop();
-      else activeAsr.value.pause();
     }
+    if (newState === 'SPEAKING') triggerStageAvatarGesture("explain-open-hand");
+  });
+
+  watch(() => avatarSpeaking.value && (
+    activeAsr.value.isListening.value || asrStarting.value
+  ), (shouldPause) => {
+    if (!shouldPause) return;
+    clearAsrIdleTimer();
+    if (activeAsr.value === streamAsr && INTERRUPT_WHILE_SPEAKING) return;
+    resumeAsrAfterReply = true;
+    // 串流連線閒著可能被 Gemini 斷掉，斷線會被當成「串流不可用」而一直退回批次，
+    // 所以先正常關掉、講完再連；其他引擎暫停即可。
+    if (activeAsr.value === streamAsr) activeAsr.value.stop();
+    else activeAsr.value.pause();
   });
 
   watch(avatarResponding, (responding) => {
-    if (responding || !resumeAsrAfterReply) return;
-    resumeAsrAfterReply = false;
+    if (responding) return;
     const active = activeAsr.value;
+    if (!resumeAsrAfterReply) {
+      // 想完沒出聲（出錯、被停止）：麥克風一直開著，從現在開始倒數。
+      if (active.isListening.value) scheduleAsrIdleTimer(ASR_RESUME_IDLE_TIMEOUT_MS);
+      return;
+    }
+    resumeAsrAfterReply = false;
     if (active.isListening.value) active.resume();
     else void active.start();
     scheduleAsrIdleTimer(ASR_RESUME_IDLE_TIMEOUT_MS);
   });
 
-  onUnmounted(clearAsrIdleTimer);
+  onUnmounted(() => {
+    interruptionRevision++;
+    clearAsrIdleTimer();
+  });
 
   return { activeAsr, serverAsr, vadAsr, streamAsr, useBrowserAsr, asrSpeaking, asrInputMode, asrInterim, asrError, handleAsrToggle };
 }

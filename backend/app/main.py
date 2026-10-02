@@ -27,6 +27,7 @@ from app.routes import asr as asr_routes
 from app.routes import avatar as avatar_routes
 from app.routes import backgrounds as background_routes
 from app.routes import documents as document_routes
+from app.routes import interrupt as interrupt_routes
 from app.routes import mascots as mascot_routes
 from app.routes import public_characters as public_characters_routes
 from app.routes import static_assets as static_assets_routes
@@ -58,6 +59,7 @@ app.include_router(project_router)
 app.include_router(websocket_routes.router)
 app.include_router(asr_stream_routes.router)
 app.include_router(turn_timing_routes.router)
+app.include_router(interrupt_routes.router)
 app.include_router(tts_routes.router)
 app.include_router(document_routes.router)
 app.include_router(asr_routes.router)

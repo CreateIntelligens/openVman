@@ -18,7 +18,8 @@ export type TurnMark =
   | 'first_audio'
   | 'playback_start'
 
-export type TurnOutcome = 'played' | 'interrupted' | 'error' | 'superseded'
+// merged：還在等回答時使用者又補一句，兩句合併重送；量測改看合併後的那一輪。
+export type TurnOutcome = 'played' | 'interrupted' | 'error' | 'superseded' | 'merged'
 
 export interface TurnContext {
   project_id: string
@@ -104,9 +105,9 @@ export function useTurnTiming(options: {
     speech = { ...speech, asrDone: now() }
   }
 
-  /** 使用者這一輪開始了（語音辨識完或打字送出）。上一輪還沒播就被取代。 */
-  function begin(): void {
-    if (turn) finish('superseded')
+  /** 使用者這一輪開始了（語音辨識完或打字送出）。上一輪還沒播就被取代或合併。 */
+  function begin(previous: 'superseded' | 'merged' = 'superseded'): void {
+    if (turn) finish(previous)
     const voice = speech.asrDone !== undefined
     const marks: Turn['marks'] = {}
     if (voice) {

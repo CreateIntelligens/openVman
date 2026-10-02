@@ -43,14 +43,14 @@ test("encodeWav writes a header the backend's decoder will accept", async () => 
   assert.equal(view.getInt16(50, true), 0x7fff);
 });
 
-test("one press captures one sentence, then the microphone closes", () => {
-  // App 端使用 per-utterance 模式，講完先關麥克風再送出，防止喇叭聲音回授。
-  assert.match(source, /commitMode:\s*['"]per-utterance['"]/);
+test("the microphone stays open after a sentence so the user can add another", () => {
+  // 2026-10-02：思考中補一句。回授改由虛擬人出聲時暫停收音來擋（useAvatarVoiceInput）。
+  assert.match(source, /commitMode:\s*['"]continuous['"]/);
   const onSpeechEnd = vadRecognizerSource.slice(
     vadRecognizerSource.indexOf("this.callbacks.onSpeechEnd = "),
     vadRecognizerSource.indexOf("this.callbacks.onVADMisfire = "),
   );
-  assert.ok(onSpeechEnd.indexOf("this.stop()") < onSpeechEnd.indexOf("this.send(audio)"));
+  assert.match(onSpeechEnd, /if \(this\.commitMode === 'per-utterance'\) \{\s*this\.stop\(\)/);
 });
 
 test("the model is shared with the admin console instead of duplicated", () => {

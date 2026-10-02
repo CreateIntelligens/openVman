@@ -356,15 +356,41 @@ FastAPI 入口。負責：
 ```text
 user input
   -> validate
-  -> session append
+  -> session read
   -> build prompt from workspace + persona + history
   -> LLM call 1（tool_choice=required：模型一次決定要查哪些；search_knowledge 未叫會自動補上，需要時同時叫 search_web）
   -> 平行執行第一輪的所有工具（知識庫：AI 改寫 queries + 原句各自檢索後 RRF 融合；網路：search_web）
   -> LLM call 2+（不再提供 search_knowledge，其他工具照常；模型可再查網路後作答，串流走這些回合）
-  -> append assistant reply
+  -> append user + assistant reply
   -> archive daily memory
   -> capture learnings / errors
 ```
+
+### 思考中補句與回答接收確認
+
+虛擬人前台在文字模式等待回答時，可將補充句以換行合併重送。`POST /api/v1/chat`
+（內部 `/brain/chat`）額外提供 `turn_id`（1–128 字）、`turn_revision`（正整數）
+及固定的 `session_id`；同一輪補句沿用 ID、版本加一。兩個回合欄位必須一起提供。
+這類回答先暫存於該專案 session SQLite 的 `chat_turns`，回應包含
+`requires_accept: true`、`turn_id`、`turn_revision`；此時尚未寫入對話、每日
+日誌或自動記憶。模型與工具已開始的工作可能繼續執行，這不是模型呼叫的取消保證。
+
+前台完整收到並接受目前版本後，送 `POST /api/v1/chat/accept`（內部
+`/brain/chat/accept`），JSON 為 `project_id`、`persona_id`、`session_id`、
+`turn_id`、`turn_revision`。成功回一般 Chat 回應與 `requires_accept: false`；
+版本已被取代、回合不存在／尚未生成或主體不符回 `409 TURN_SUPERSEDED`。
+確認具冪等性，重試不重複寫入對話、日誌與記憶；版本比對、兩則訊息寫入與確認標記
+在同一個 SQLite 交易內完成，涵蓋多 worker 及重啟。收到答案但確認尚未完成時，
+下一輪需等待確認後才生成，才能讀到完整歷史。
+
+這兩個公開端點沿用 Backend 帳號登入與專案讀取授權；Brain 需要
+`X-Internal-Token`，回合另外綁定 Backend 注入的 principal type／ID 與人設。
+未提供回合欄位的後台 Chat、外部 SDK 及既有 API 呼叫維持直接落庫；視覺事件與
+Live WebSocket 不使用這個確認流程。未確認的答案隨空 session／session TTL
+清理，session 刪除也連帶刪除暫存回合。每個 session 的回合收據最多保留
+`max_session_rounds × 2` 筆（至少 20 筆），超出歷史視窗的確認回 `409`。
+部署此功能需更新 api、backend、avatar；舊 Brain 忽略回合欄位時仍能回答，
+但不具有未接收答案不落庫的保護。
 
 一般使用者回合固定是「先查、再答」兩次呼叫。行為由根目錄 `.env` 控制：
 
@@ -392,6 +418,8 @@ user input
   - 寫入 memory
 - `POST /brain/chat`
   - 取得完整回答（含 tool call 執行結果與本次模型呼叫的 `usage` 彙總）
+- `POST /brain/chat/accept`
+  - 確認已接收目前版本的可合併回答，才寫入對話與自動記憶
 - `GET /brain/chat/history`
   - 讀取當前 session history
 - `GET /brain/sessions`、`GET /brain/sessions/export`

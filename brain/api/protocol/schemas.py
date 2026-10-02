@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ProjectCreateRequest(BaseModel):
@@ -88,6 +88,28 @@ class ChatRequest(BaseModel):
     metadata: dict[str, Any] = {}
     # 回覆深度：fast / standard / deep。認不得的值退回 standard，不讓請求失敗。
     mode: str = Field("", description="Reply depth mode: fast, standard or deep")
+    turn_id: str | None = Field(None, min_length=1, max_length=128)
+    turn_revision: int | None = Field(None, ge=1, le=1_000_000, strict=True)
+
+    @model_validator(mode="after")
+    def validate_turn(self) -> "ChatRequest":
+        if (self.turn_id is None) != (self.turn_revision is None):
+            raise ValueError("turn_id 與 turn_revision 必須一起提供")
+        if self.turn_id is not None and not self.session_id:
+            raise ValueError("可合併回合必須提供 session_id")
+        if self.turn_id is not None and self.metadata.get(
+            "ephemeral_user_message"
+        ):
+            raise ValueError("視覺事件不支援可合併回合")
+        return self
+
+
+class ChatTurnAcceptRequest(BaseModel):
+    project_id: str = "default"
+    persona_id: str = "default"
+    session_id: str = Field(..., min_length=1, max_length=128)
+    turn_id: str = Field(..., min_length=1, max_length=128)
+    turn_revision: int = Field(..., ge=1, le=1_000_000, strict=True)
 
 
 class InternalAsrJudgeRequest(BaseModel):
