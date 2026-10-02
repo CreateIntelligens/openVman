@@ -32,8 +32,8 @@ python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 
 # 只測辨識、不問 Brain；混入雜訊
 python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 --steps "" --noise 0.02
 
-# 在鶴記dev 跑（建議）：對話與記憶摘要寫在測試專案，不進正式鶴記
-python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 --project dev-c0c8fdff34
+# 鶴記題庫預設就跑在鶴記dev；要打正式鶴記才加 --project proj-0cc5c610b4
+python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user voice-e2e-test
 ```
 
 ### 測試專案
@@ -90,7 +90,7 @@ python3 scripts/project_mirror.py sync
 
 | 題庫 | 內容 |
 |------|------|
-| `heji.json` | 鶴記型錄 10 題（型號、泵浦專有名詞、閒聊），合成語音 4 種聲音，串流與批次都跑 |
+| `heji.json` | 鶴記型錄 10 題（型號、泵浦專有名詞、閒聊），合成語音 4 種聲音，串流與批次都跑；跑在鶴記dev，測試帳號 `voice-e2e-test` 也只開了鶴記dev |
 | `taigi-drama.json` | 台語連續劇對白真人錄音 75 句（`/srv/818data`，只有這台機器有），`text` 是華語字幕（意譯，所以錯字率偏高），只跑批次。用來看 Breeze 轉寫和台語判斷；只測辨識時加 `--steps ""`。同時跑多句會讓台語判斷超過 2.5 秒逾時，要量判斷準度時加 `--concurrency 1` |
 
 ## 副作用與限制

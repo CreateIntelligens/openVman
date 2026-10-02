@@ -1,6 +1,6 @@
 {
  "description": "鶴記（EVAK 型錄）：型號與泵浦專有名詞、閒聊對照。terms 是辨識要聽對的詞（A|B 任一即可），reply_any 是回答要提到的字（任一即可）。",
- "project_id": "proj-0cc5c610b4",
+ "project_id": "dev-c0c8fdff34",
  "voices": [
   "edge-tts:zh-TW-HsiaoChenNeural",
   "edge-tts:zh-TW-YunJheNeural",
