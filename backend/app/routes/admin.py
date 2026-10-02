@@ -212,11 +212,13 @@ _EDGE_TTS_VOICE_LABELS = {
 _ASR_ENGINE_LABELS = {
     "breeze": "Breeze-ASR-26（臺語轉華語）",
     "r2t2": "Confucius4-R2T2（華英混合，自動轉繁）",
+    "r2t2-dev": "Confucius4-R2T2 dev（.35 測試機，可能不穩）",
     "xiaomi": "Xiaomi-CocktailASR-1（臺語轉華語，自動轉繁）",
     "sensevoice": "SenseVoice-Small（臺語漢字）",
     "openai": "OpenAI Whisper（語音送往外部服務）",
     "browser": "瀏覽器內建辨識（語音留在使用者裝置）",
     "r2t2-live": "Confucius4-R2T2 串流辨識（邊講邊出字，帶專案詞表）",
+    "r2t2-dev-live": "Confucius4-R2T2 dev 串流辨識（.35 測試機，可能不穩）",
     "gemini-live": "Gemini 串流辨識（邊講邊出字，語音送往 Google）",
 }
 

@@ -28,12 +28,13 @@ BROWSER_ASR_PROVIDER = "browser"
 # 一樣不進 transcribe() 的 fallback chain，後端存它只是記住偏好與授權。
 GEMINI_STREAM_ASR_PROVIDER = "gemini-live"
 R2T2_STREAM_ASR_PROVIDER = "r2t2-live"
+R2T2_DEV_STREAM_ASR_PROVIDER = "r2t2-dev-live"
 STREAM_ASR_PROVIDERS = frozenset({
-    GEMINI_STREAM_ASR_PROVIDER, R2T2_STREAM_ASR_PROVIDER,
+    GEMINI_STREAM_ASR_PROVIDER, R2T2_STREAM_ASR_PROVIDER, R2T2_DEV_STREAM_ASR_PROVIDER,
 })
 
 # 伺服器端引擎：音檔會送上來，走 transcribe() 與 fallback chain。
-SERVER_ASR_PROVIDERS = frozenset({"breeze", "r2t2", "xiaomi", "sensevoice", "openai"})
+SERVER_ASR_PROVIDERS = frozenset({"breeze", "r2t2", "r2t2-dev", "xiaomi", "sensevoice", "openai"})
 
 # 使用者可以在聊天室選哪些引擎，由管理者決定（例如 openai 會把語音送到
 # 外部服務，不一定想開放給每個人）。空集合代表不開放使用者自選。

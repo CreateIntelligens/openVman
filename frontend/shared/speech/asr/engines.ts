@@ -2,7 +2,9 @@ export const BROWSER_ASR = "browser";
 /** Gemini transcribe-live 串流辨識；台語分流時不用（Gemini 聽不懂台語）。 */
 export const GEMINI_STREAM_ASR = "gemini-live";
 export const R2T2_STREAM_ASR = "r2t2-live";
-export const STREAM_ASR_ENGINES = [GEMINI_STREAM_ASR, R2T2_STREAM_ASR] as const;
+/** .35 測試機的串流：選了才用，失敗不換台。 */
+export const R2T2_DEV_STREAM_ASR = "r2t2-dev-live";
+export const STREAM_ASR_ENGINES = [GEMINI_STREAM_ASR, R2T2_STREAM_ASR, R2T2_DEV_STREAM_ASR] as const;
 
 export function isStreamAsrEngine(provider: string): boolean {
   return STREAM_ASR_ENGINES.some((engine) => engine === provider);
@@ -12,7 +14,7 @@ export function isStreamAsrEngine(provider: string): boolean {
  * 在伺服器上跑、音檔要上傳的引擎（跟後端 SERVER_ASR_PROVIDERS 同一組）。沒選過
  * 引擎的人用部署設定的 ASR_PROVIDER，後台已經沒有「全站預設」可以改。
  */
-export const SERVER_ASR_ENGINES = ["breeze", "r2t2", "xiaomi", "sensevoice", "openai"] as const;
+export const SERVER_ASR_ENGINES = ["breeze", "r2t2", "r2t2-dev", "xiaomi", "sensevoice", "openai"] as const;
 
 /** ASR 引擎的顯示名稱與說明。後台「語音」頁、前端設定與聊天室的引擎選單共用。 */
 export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> = {
@@ -23,6 +25,10 @@ export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> =
   r2t2: {
     label: "Confucius4-R2T2",
     note: "網易有道開源（Qwen3-ASR），華英混合，輸出簡體會自動轉繁；會帶專案詞表。",
+  },
+  "r2t2-dev": {
+    label: "Confucius4-R2T2 dev",
+    note: ".35 測試機，同時多句可能卡住；只有選它才用，不當其他引擎的備援。",
   },
   xiaomi: {
     label: "Xiaomi-CocktailASR-1",
@@ -47,6 +53,10 @@ export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> =
   "r2t2-live": {
     label: "Confucius4-R2T2 串流",
     note: "邊講邊出字，帶專案詞表、定稿轉繁體；台語分流時改用 Breeze 批次。",
+  },
+  "r2t2-dev-live": {
+    label: "Confucius4-R2T2 dev 串流",
+    note: ".35 測試機的串流，可能不穩；連不上時退回批次辨識。",
   },
 };
 

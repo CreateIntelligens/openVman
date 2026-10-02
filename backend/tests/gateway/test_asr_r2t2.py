@@ -25,7 +25,7 @@ def r2t2(monkeypatch, tmp_path):
     audio = tmp_path / "clip.wav"
     audio.write_bytes(b"RIFF")
     cfg = ingestion_audio.get_tts_config().model_copy(
-        update={"asr_r2t2_url": "http://r2t2:8040/", "asr_r2t2_backup_url": ""},
+        update={"asr_r2t2_url": "http://r2t2:8040/", "asr_r2t2_dev_url": ""},
     )
     monkeypatch.setattr(ingestion_audio, "get_tts_config", lambda: cfg)
     sent = []
@@ -71,75 +71,47 @@ def test_r2t2_joins_the_chain_only_when_configured():
     assert ingestion_audio._resolve_chain(configured, "r2t2") == ["r2t2", "breeze"]
 
 
-class _Failing:
-    def __init__(self, status):
-        self.status = status
-
-    def raise_for_status(self):
-        import httpx
-
-        request = httpx.Request("POST", "http://x")
-        raise httpx.HTTPStatusError("boom", request=request, response=httpx.Response(self.status, request=request))
-
 
 @pytest.fixture
-def two_hosts(monkeypatch, tmp_path):
-    """主機 .37、備援 .35；回傳每台的回應怎麼設與送了哪些請求。"""
+def dev_host(monkeypatch, tmp_path):
     audio = tmp_path / "clip.wav"
     audio.write_bytes(b"RIFF")
     cfg = ingestion_audio.get_tts_config().model_copy(update={
-        "asr_r2t2_url": "http://main:8803", "asr_r2t2_backup_url": "http://backup:8040",
-        "asr_r2t2_backup_timeout_seconds": 20.0,
+        "asr_r2t2_url": "http://main:8803", "asr_r2t2_dev_url": "http://dev:8040/",
+        "asr_r2t2_dev_timeout_seconds": 20.0,
     })
     monkeypatch.setattr(ingestion_audio, "get_tts_config", lambda: cfg)
     calls = []
-    behaviour = {}
 
     class Client:
         async def post(self, url, files, data=None, **kwargs):
             calls.append((url, kwargs.get("timeout")))
-            result = behaviour[url.split("/transcribe")[0]]
-            if isinstance(result, Exception):
-                raise result
-            return result
+            return _Response({"status": "success", "text": "测试机"})
 
     monkeypatch.setattr(ingestion_audio._http, "get", lambda: Client())
-    return str(audio), behaviour, calls
+    return str(audio), calls
 
 
-def test_backup_host_answers_when_the_main_host_is_down(two_hosts):
-    import httpx
-
-    audio, behaviour, calls = two_hosts
-    behaviour["http://main:8803"] = httpx.ConnectError("refused")
-    behaviour["http://backup:8040"] = _Response({"status": "success", "text": "备援"})
-
-    assert asyncio.run(ingestion_audio._transcribe_r2t2(audio, "t")) == "備援"
-    # 備援 .35 同時多句會卡死：只等設定的秒數，等不到就交給下一家引擎。
-    assert calls == [("http://main:8803/transcribe", None), ("http://backup:8040/transcribe", 20.0)]
+def test_dev_engine_uses_the_dev_host_with_a_short_timeout(dev_host):
+    audio, calls = dev_host
+    assert asyncio.run(ingestion_audio._transcribe_r2t2_dev(audio, "t")) == "測試機"
+    # .35 同時多句會卡死：只等設定的秒數，等不到就交給下一家引擎。
+    assert calls == [("http://dev:8040/transcribe", 20.0)]
 
 
-def test_backup_host_answers_when_the_main_host_errors(two_hosts):
-    audio, behaviour, calls = two_hosts
-    behaviour["http://main:8803"] = _Failing(503)
-    behaviour["http://backup:8040"] = _Response({"status": "success", "text": "好"})
-    assert asyncio.run(ingestion_audio._transcribe_r2t2(audio, "t")) == "好"
+def test_main_engine_never_touches_the_dev_host(dev_host):
+    audio, calls = dev_host
+    asyncio.run(ingestion_audio._transcribe_r2t2(audio, "t"))
+    assert calls == [("http://main:8803/transcribe", None)]
 
 
-def test_client_errors_do_not_retry_on_the_backup(two_hosts):
-    import httpx
-
-    audio, behaviour, calls = two_hosts
-    behaviour["http://main:8803"] = _Failing(400)
-    with pytest.raises(httpx.HTTPStatusError):
-        asyncio.run(ingestion_audio._transcribe_r2t2(audio, "t"))
-    assert len(calls) == 1
-
-
-def test_backup_alone_still_joins_the_chain():
+def test_dev_engine_is_only_used_when_chosen():
+    """測試機不當別人的備援：沒選它就不會排進順序。"""
     cfg = ingestion_audio.get_tts_config().model_copy(update={
-        "asr_provider": "breeze", "asr_breeze_url": "http://b", "asr_r2t2_url": "",
-        "asr_r2t2_backup_url": "http://backup", "asr_xiaomi_url": "", "asr_sensevoice_url": "",
+        "asr_provider": "breeze", "asr_breeze_url": "http://b", "asr_r2t2_url": "http://r",
+        "asr_r2t2_dev_url": "http://dev", "asr_xiaomi_url": "", "asr_sensevoice_url": "",
         "whisper_api_key": "",
     })
+    assert ingestion_audio._resolve_chain(cfg) == ["breeze", "r2t2"]
     assert ingestion_audio._resolve_chain(cfg, "r2t2") == ["r2t2", "breeze"]
+    assert ingestion_audio._resolve_chain(cfg, "r2t2-dev") == ["r2t2-dev", "breeze", "r2t2"]

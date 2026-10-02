@@ -36,7 +36,7 @@ describe("AsrProviderPanel", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "試辨識的引擎" }));
     const labels = (await screen.findAllByRole("option")).map((o) => o.textContent);
     expect(labels).toEqual([
-      "Breeze-ASR-26", "Confucius4-R2T2", "Xiaomi-CocktailASR-1", "SenseVoice-Small", "OpenAI Whisper",
+      "Breeze-ASR-26", "Confucius4-R2T2", "Confucius4-R2T2 dev", "Xiaomi-CocktailASR-1", "SenseVoice-Small", "OpenAI Whisper",
     ]);
     // 選單上只有引擎代號的話，使用者無從判斷該選哪個。
     fireEvent.mouseDown(screen.getByRole("option", { name: /SenseVoice-Small/ }));

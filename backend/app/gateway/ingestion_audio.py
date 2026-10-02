@@ -208,41 +208,30 @@ async def _transcribe_r2t2(file_path: str, trace_id: str, prompt: str = "") -> s
     ``language=Chinese``：兩套部署都認得（.35 vLLM 版把 zhen 也當 Chinese；.37 transformers
     版收到 zhen 直接 500）。不指定會自動判斷語言，串流實測帶口音的華語會跑成葡萄牙文。
     專案詞表放 ``context``（Qwen3-ASR 的熱詞提示）。輸出簡體，轉繁才跟其他家一致。
-    主機連不上或回 5xx 時改打備援主機（``ASR_R2T2_BACKUP_URL``），都失敗才交給下一家引擎。
     """
     cfg = get_tts_config()
-    endpoints = [
-        (url.rstrip("/"), timeout)
-        for url, timeout in (
-            (cfg.asr_r2t2_url, None),
-            (cfg.asr_r2t2_backup_url, cfg.asr_r2t2_backup_timeout_seconds),
-        )
-        if url
-    ]
-    if not endpoints:
+    if not cfg.asr_r2t2_url:
         raise RuntimeError("ASR_R2T2_URL is not configured")
+    return await _r2t2_file(cfg.asr_r2t2_url, file_path, prompt, None)
 
+
+async def _transcribe_r2t2_dev(file_path: str, trace_id: str, prompt: str = "") -> str:
+    """Same request against the R2T2 dev host (.35), which hangs under concurrent load."""
+    cfg = get_tts_config()
+    if not cfg.asr_r2t2_dev_url:
+        raise RuntimeError("ASR_R2T2_DEV_URL is not configured")
+    return await _r2t2_file(cfg.asr_r2t2_dev_url, file_path, prompt, cfg.asr_r2t2_dev_timeout_seconds)
+
+
+async def _r2t2_file(url: str, file_path: str, prompt: str, timeout: float | None) -> str:
     source, scratch = _as_wav(file_path)
     try:
-        audio = Path(source).read_bytes()
-        for index, (url, timeout) in enumerate(endpoints):
-            try:
-                return await _r2t2_request(url, audio, Path(source).name, prompt, timeout)
-            except (httpx.RequestError, httpx.HTTPStatusError, RuntimeError) as exc:
-                # 4xx 是請求本身的問題，換一台也一樣。
-                client_error = (
-                    isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500
-                )
-                if client_error or index == len(endpoints) - 1:
-                    raise
-                logger.warning(
-                    "r2t2_endpoint_failed trace_id=%s url=%s err=%s — trying backup",
-                    trace_id, url, exc,
-                )
+        return await _r2t2_request(
+            url.rstrip("/"), Path(source).read_bytes(), Path(source).name, prompt, timeout,
+        )
     finally:
         if scratch:
             Path(scratch).unlink(missing_ok=True)
-    raise RuntimeError("R2T2 has no endpoint left")
 
 
 async def _r2t2_request(
@@ -267,10 +256,14 @@ async def _r2t2_request(
 _TRANSCRIBERS: dict[str, object] = {
     "breeze": _transcribe_breeze,
     "r2t2": _transcribe_r2t2,
+    "r2t2-dev": _transcribe_r2t2_dev,
     "xiaomi": _transcribe_xiaomi,
     "sensevoice": _transcribe_sensevoice,
     "openai": _transcribe_openai,
 }
+
+
+_OPT_IN_TRANSCRIBERS = frozenset({"r2t2-dev"})
 
 
 def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
@@ -288,6 +281,8 @@ def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
     configured = [
         name for name in (preferred, cfg.asr_provider, *_TRANSCRIBERS)
         if name in _TRANSCRIBERS
+        # 測試機只在自己被選時用，不當別人的備援：它卡住就讓這一句多等，不該拖累其他人。
+        and (name not in _OPT_IN_TRANSCRIBERS or name in (preferred, cfg.asr_provider))
     ]
     ordered: list[str] = []
     for name in configured:
@@ -333,7 +328,9 @@ def _provider_ready(cfg, name: str) -> bool:
     if name == "xiaomi":
         return bool(cfg.asr_xiaomi_url)
     if name == "r2t2":
-        return bool(cfg.asr_r2t2_url or cfg.asr_r2t2_backup_url)
+        return bool(cfg.asr_r2t2_url)
+    if name == "r2t2-dev":
+        return bool(cfg.asr_r2t2_dev_url)
     return bool(cfg.whisper_api_key)
 
 

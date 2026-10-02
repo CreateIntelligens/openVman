@@ -16,7 +16,7 @@ gemini-3.5-transcribe-live，把轉錄推回前台：
 docker logs 看不到 logger.info，所以寫檔，跟 turn_timing 一樣）。
 
 跟瀏覽器內建辨識一樣是前台直接驅動的引擎，不進 transcribe() 的 fallback chain；
-帳號依偏好使用被授權的 ``gemini-live`` 或 ``r2t2-live``。R2T2 帶專案詞表，
+帳號依偏好使用被授權的 ``gemini-live``、``r2t2-live`` 或 ``r2t2-dev-live``（.35 測試機）。R2T2 帶專案詞表，
 增量累加、整句 final_text 轉繁體，不問 Jev；台語分流時前台不走這裡，
 改用 Breeze 批次。
 """
@@ -31,7 +31,7 @@ import os
 import threading
 import time
 from collections.abc import AsyncIterator, Callable
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -60,7 +60,10 @@ router = APIRouter()
 
 GEMINI_STREAM_ASR_ENGINE = "gemini-live"
 R2T2_STREAM_ASR_ENGINE = "r2t2-live"
-_STREAM_ENGINES = {GEMINI_STREAM_ASR_ENGINE, R2T2_STREAM_ASR_ENGINE}
+# .35 測試機（vLLM 版）：帳號自己選了才用，失敗不換台。
+R2T2_DEV_STREAM_ASR_ENGINE = "r2t2-dev-live"
+_R2T2_STREAM_ENGINES = {R2T2_STREAM_ASR_ENGINE, R2T2_DEV_STREAM_ASR_ENGINE}
+_STREAM_ENGINES = {GEMINI_STREAM_ASR_ENGINE, *_R2T2_STREAM_ENGINES}
 _R2T2_CHUNK_BYTES = 5120
 _R2T2_EOS = "YOUDAO_ONETIME_ASR_STREAM_EOS"
 _GEMINI_LIVE_URL = (
@@ -170,63 +173,42 @@ def _allowed(current) -> str:
     return chosen if chosen in _STREAM_ENGINES else ""
 
 
-def _r2t2_stream_endpoints(cfg: TTSRouterConfig) -> list[tuple[str, str]]:
-    return [
-        (url, key)
-        for url, key in (
-            (cfg.asr_r2t2_stream_url, cfg.asr_r2t2_secret_key),
-            (cfg.asr_r2t2_backup_stream_url, cfg.asr_r2t2_backup_secret_key),
-        )
-        if url and key
-    ]
+def _r2t2_stream_endpoint(cfg: TTSRouterConfig, engine: str) -> tuple[str, str] | None:
+    """URL and key for this R2T2 streaming engine, or None when it is not configured."""
+    url, key = (
+        (cfg.asr_r2t2_dev_stream_url, cfg.asr_r2t2_dev_secret_key)
+        if engine == R2T2_DEV_STREAM_ASR_ENGINE
+        else (cfg.asr_r2t2_stream_url, cfg.asr_r2t2_secret_key)
+    )
+    return (url, key) if url and key else None
 
 
 @asynccontextmanager
-async def _r2t2_upstream(cfg: TTSRouterConfig, prompt: str) -> AsyncIterator[Any]:
-    """Connect and hand-shake with the main R2T2 host, or the backup when that fails.
-
-    只在連線、握手階段換台；講到一半斷線不換，照原本讓前台退回批次。
-    兩台用同一套握手（.35 vLLM 版也認 secret_key、use_vad）。
-    """
-    endpoints = _r2t2_stream_endpoints(cfg)
-    if not endpoints:
-        raise RuntimeError("R2T2 stream is not configured")
-    for index, (url, key) in enumerate(endpoints):
-        stack = AsyncExitStack()
-        try:
-            upstream = await stack.enter_async_context(
-                websockets.connect(url, max_size=4 * 1024 * 1024, open_timeout=10),
-            )
-            await upstream.send(json.dumps({
-                "requestId": str(uuid4()),
-                "language": "Chinese",
-                "use_vad": True,
-                "secret_key": key,
-                "system_prompt": prompt,
-            }))
-            first = json.loads(await asyncio.wait_for(upstream.recv(), 10))
-            if first.get("status") != "connected":
-                raise RuntimeError("R2T2 handshake rejected")
-        except Exception as exc:
-            await stack.aclose()
-            if index == len(endpoints) - 1:
-                raise
-            logger.warning("r2t2 stream %s failed (%s) — trying backup", url, exc)
-            continue
-        async with stack:
-            yield upstream
-        return
+async def _r2t2_upstream(url: str, key: str, prompt: str) -> AsyncIterator[Any]:
+    """Connect and hand-shake with one R2T2 host; .37 與 .35 用同一套握手。"""
+    async with websockets.connect(url, max_size=4 * 1024 * 1024, open_timeout=10) as upstream:
+        await upstream.send(json.dumps({
+            "requestId": str(uuid4()),
+            "language": "Chinese",
+            "use_vad": True,
+            "secret_key": key,
+            "system_prompt": prompt,
+        }))
+        first = json.loads(await asyncio.wait_for(upstream.recv(), 10))
+        if first.get("status") != "connected":
+            raise RuntimeError("R2T2 handshake rejected")
+        yield upstream
 
 
 async def _relay_r2t2(
     websocket: WebSocket,
     current: CurrentAccount,
     project_id: str,
-    cfg: TTSRouterConfig,
+    endpoint: tuple[str, str],
     count_audio: Callable[[int], None],
 ) -> None:
     prompt = await project_asr_prompt(current, project_id)
-    async with _r2t2_upstream(cfg, prompt) as upstream:
+    async with _r2t2_upstream(*endpoint, prompt) as upstream:
         await websocket.send_json({"type": "ready"})
         ended = asyncio.Event()
 
@@ -304,10 +286,8 @@ async def asr_stream(websocket: WebSocket) -> None:
     engine = _allowed(current)
     api_key = os.environ.get("GEMINI_API_KEY", "")
     cfg = get_tts_config()
-    configured = (
-        bool(_r2t2_stream_endpoints(cfg))
-        if engine == R2T2_STREAM_ASR_ENGINE else bool(api_key)
-    )
+    endpoint = _r2t2_stream_endpoint(cfg, engine) if engine in _R2T2_STREAM_ENGINES else None
+    configured = bool(endpoint) if engine in _R2T2_STREAM_ENGINES else bool(api_key)
     if not engine or not configured:
         await websocket.send_json({
             "type": "error",
@@ -329,8 +309,8 @@ async def asr_stream(websocket: WebSocket) -> None:
         audio_bytes += size
 
     try:
-        if engine == R2T2_STREAM_ASR_ENGINE:
-            await _relay_r2t2(websocket, current, project_id, cfg, count_audio)
+        if endpoint:
+            await _relay_r2t2(websocket, current, project_id, endpoint, count_audio)
             await websocket.close()
             return
         async with websockets.connect(
@@ -411,11 +391,11 @@ async def asr_stream(websocket: WebSocket) -> None:
         if seconds > 0:
             record_usage_event(
                 provider=(
-                    "r2t2-live" if engine == R2T2_STREAM_ASR_ENGINE
+                    engine if engine in _R2T2_STREAM_ENGINES
                     else "gemini-transcribe-live"
                 ),
                 model=(
-                    "Confucius4-R2T2" if engine == R2T2_STREAM_ASR_ENGINE
+                    "Confucius4-R2T2" if engine in _R2T2_STREAM_ENGINES
                     else _model()
                 ),
                 kind="asr",

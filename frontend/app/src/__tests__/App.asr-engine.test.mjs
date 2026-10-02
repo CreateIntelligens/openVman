@@ -38,21 +38,23 @@ function usesStream(provider, available = true, taiwaneseOn = false) {
 test("Gemini Live and R2T2 Live select streaming while batch engines do not", () => {
   assert.equal(usesStream("gemini-live"), true);
   assert.equal(usesStream("r2t2-live"), true);
-  for (const provider of ["r2t2", "breeze", "browser", ""]) {
+  assert.equal(usesStream("r2t2-dev-live"), true);
+  for (const provider of ["r2t2", "r2t2-dev", "breeze", "browser", ""]) {
     assert.equal(usesStream(provider), false);
   }
   assert.match(source, /if \(useStreamAsrEngine\.value\) return streamAsr;/);
   assert.match(ASR_ENGINE_NOTES["r2t2-live"].label, /串流/);
+  assert.match(ASR_ENGINE_NOTES["r2t2-dev-live"].label, /dev 串流/);
 });
 
 test("both streaming engines fall back when Taiwanese routing is enabled", () => {
-  for (const provider of ["gemini-live", "r2t2-live"]) {
+  for (const provider of ["gemini-live", "r2t2-live", "r2t2-dev-live"]) {
     assert.equal(usesStream(provider, true, true), false);
   }
 });
 
 test("both streaming engines fall back after streaming becomes unavailable", () => {
-  for (const provider of ["gemini-live", "r2t2-live"]) {
+  for (const provider of ["gemini-live", "r2t2-live", "r2t2-dev-live"]) {
     assert.equal(usesStream(provider, false), false);
   }
 });
