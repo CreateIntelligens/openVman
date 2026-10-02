@@ -3,7 +3,7 @@ from functools import cached_property
 import json
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_INTERNAL_PORT = 8100
@@ -139,11 +139,6 @@ class BrainSettings(BaseSettings):
     # 有 TYPESAFE_API_KEY 時先用 Jev 篩相關記憶並條列，省掉摘要那次 LLM 呼叫；
     # Jev 失敗才退回 LLM 摘要。
     auto_recall_use_jev_filter: bool = True
-    # 查知識庫後用 Jev 篩段落（能否當答案依據、是否夾帶指令）。每次檢索多約
-    # 0.5 秒且每輪都會強制檢索，預設關。
-    rag_jev_screen_enabled: bool = False
-    rag_jev_evidence_threshold: float = Field(default=0.5, ge=0, le=1)
-    rag_jev_injection_threshold: float = Field(default=0.7, ge=0, le=1)
     auto_recall_llm_model: str = ""
 
     # === Privacy Filter 設定 ===
@@ -189,13 +184,11 @@ class BrainSettings(BaseSettings):
     # 但 search_web、wiki、技能等其他工具照常；問天氣這類題目仍能上網查。
     chat_answer_pass_excludes_knowledge_search: bool = True
 
-    # Jev 影子：外部 API，有費用與資料外送，所以抽樣保守並有每日硬上限。
-    jev_shadow_enabled: bool = False
-    jev_shadow_sample_rate: float = Field(default=0.05, ge=0, le=1)
-    jev_shadow_timeout_seconds: float = Field(default=0.6, gt=0, le=5)
-    jev_shadow_cooldown_seconds: float = Field(default=60, ge=0, le=3600)
-    jev_shadow_daily_call_cap: int = Field(default=2000, ge=0)
-    jev_shadow_base_url: str = "https://api.typesafe.ai"
+    # Jev（TypeSafe System One）：外部 API。舊名 JEV_SHADOW_BASE_URL 照讀。
+    jev_base_url: str = Field(
+        default="https://api.typesafe.ai",
+        validation_alias=AliasChoices("JEV_BASE_URL", "JEV_SHADOW_BASE_URL"),
+    )
     typesafe_api_key: str = ""
     # save_memory 授權改由 Jev 判斷；沒設 key 或呼叫失敗時退回關鍵字規則。
     jev_memory_gate_enabled: bool = True

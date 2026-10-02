@@ -179,6 +179,7 @@ def detect_language_with_jev(text: str) -> str:
         return DEFAULT_LANGUAGE
     scores = jev_nouls(
         text, _JEV_QUESTIONS, timeout=get_settings().jev_gate_timeout_seconds,
+        purpose="language",
     )
     best = max(scores, key=scores.__getitem__)
     return best if scores[best] >= 0.5 else DEFAULT_LANGUAGE

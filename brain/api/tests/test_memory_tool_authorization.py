@@ -26,7 +26,7 @@ def gate(monkeypatch):
     monkeypatch.setattr(jev_client, "get_settings", lambda: settings)
     control = {"score": 0.9, "error": None, "calls": []}
 
-    def fake_noul(state, question, *, timeout):
+    def fake_noul(state, question, *, timeout, purpose):
         control["calls"].append(state)
         if control["error"]:
             raise control["error"]

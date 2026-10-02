@@ -188,7 +188,9 @@ def _jev_filter(query: str, results: list[dict[str, Any]], config: Any) -> list[
         }
         for key, _, _ in memories
     }
-    scores = jev_nouls(state, questions, timeout=config.jev_gate_timeout_seconds)
+    scores = jev_nouls(
+        state, questions, timeout=config.jev_gate_timeout_seconds, purpose="recall_filter",
+    )
     kept = {key for key, score in scores.items() if score >= 0.5}
     logger.info(json.dumps(
         {"event": "auto_recall_jev", "candidates": len(memories), "kept": len(kept)},

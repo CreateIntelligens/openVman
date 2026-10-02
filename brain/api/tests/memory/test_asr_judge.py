@@ -19,7 +19,7 @@ def jev(monkeypatch):
     calls: list[dict] = []
 
     def answer(scores):
-        def fake(state, questions, *, timeout):
+        def fake(state, questions, *, timeout, purpose):
             calls.append({"state": state, "questions": questions, "timeout": timeout})
             if isinstance(scores, Exception):
                 raise scores

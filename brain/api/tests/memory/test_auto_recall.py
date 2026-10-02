@@ -327,7 +327,7 @@ class TestJevFilter:
     def test_keeps_only_relevant_and_skips_llm(self, monkeypatch):
         seen = {}
 
-        def jev(state, questions, *, timeout):
+        def jev(state, questions, *, timeout, purpose):
             seen["questions"] = list(questions)
             return {"m1": 0.92, "m3": 0.1}
 
@@ -342,12 +342,12 @@ class TestJevFilter:
 
     def test_nothing_relevant_yields_empty(self, monkeypatch):
         result, llm = self._run(monkeypatch, [{"text": "使用者住台中"}],
-                                lambda state, questions, *, timeout: {"m1": 0.05})
+                                lambda state, questions, *, timeout, purpose: {"m1": 0.05})
         assert result.status == "empty"
         llm.assert_not_called()
 
     def test_jev_failure_falls_back_to_llm(self, monkeypatch):
-        def boom(state, questions, *, timeout):
+        def boom(state, questions, *, timeout, purpose):
             raise RuntimeError("down")
 
         result, llm = self._run(monkeypatch, [{"text": "使用者喜歡烏龍茶"}], boom)

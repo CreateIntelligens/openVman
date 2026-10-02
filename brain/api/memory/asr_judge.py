@@ -110,6 +110,7 @@ def choose_transcript(
             _project_context(project_id, languages),
             {"interim": _plausible(interim), "final": _plausible(final)},
             timeout=cfg.asr_final_judge_timeout_seconds,
+            purpose="asr_final_judge",
         )
     except Exception as exc:  # noqa: BLE001 - 判斷失敗照定稿送
         logger.warning(json.dumps(

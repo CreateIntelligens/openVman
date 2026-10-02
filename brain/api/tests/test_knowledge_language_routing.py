@@ -20,7 +20,6 @@ def test_search_knowledge_passes_user_language(monkeypatch):
     )
     monkeypatch.setattr(retrieval, "search_records", lambda *a, **kw: seen.append(kw.get("language")) or [])
     monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a: [])
-    monkeypatch.setattr(knowledge_tools, "_jev_screen", lambda q, merged, related: (merged, related))
 
     token = active_user_message.set("¿Qué bomba me recomiendas para agua sucia?")
     project = active_project_id.set("proj-x")
@@ -44,7 +43,6 @@ def test_short_greeting_searches_in_the_primary_language(monkeypatch):
     )
     monkeypatch.setattr(retrieval, "search_records", lambda *a, **kw: seen.append(kw.get("language")) or [])
     monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a: [])
-    monkeypatch.setattr(knowledge_tools, "_jev_screen", lambda q, merged, related: (merged, related))
     monkeypatch.setattr(knowledge_tools, "primary_language", lambda project_id: "en")
 
     token = active_user_message.set("hi")

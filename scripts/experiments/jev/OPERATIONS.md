@@ -1,5 +1,7 @@
 # Jev 意圖影子模式
 
+> **2026-10-02 已移除**：影子觀測（`core/jev_shadow.py`、`JEV_SHADOW_*`）與知識庫段落篩選（`RAG_JEV_SCREEN_*`）預設關閉、正式環境從未開啟，已從程式拔掉。本文件保留當作實驗紀錄；目前 Jev 的用量改由 `core/jev_client.jev_nouls` 每次呼叫記一筆（`kind=jev_<用途>`）。
+
 實驗功能的操作契約：只觀察、不控制正式路由，設定預設關閉。結果以 `trace_id`
 對照實際走的路徑。（原本並排的 BGE embedding 影子已於 2026-09-23 移除。）計畫與驗收條件見
 [docs/plans/jev-decision-layer.md](../../../docs/plans/jev-decision-layer.md) §2。

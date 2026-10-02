@@ -47,7 +47,7 @@ def is_explicit_memory_request(user_message: str) -> bool:
         try:
             score = jev_noul(
                 text, _MEMORY_REQUEST_QUESTION,
-                timeout=cfg.jev_gate_timeout_seconds,
+                timeout=cfg.jev_gate_timeout_seconds, purpose="memory_gate",
             )
             logger.info(json.dumps(
                 {"event": "memory_gate", "source": "jev", "score": score},
