@@ -109,6 +109,10 @@ def test_long_chinese_document_with_a_stray_spanish_mark_stays_chinese():
         ("hi", "en", "en"),
         ("hola", "es", "es"),
         ("ok thanks", "en", "en"),
+        # ¿¡ñ 只有西語用：再短也看得出是西語。
+        ("¿Quién eres?", "zh", "es"),
+        ("¡Hola!", "zh", "es"),
+        ("señor", "en", "es"),
         # 有中文就是中文，不管主要語言是什麼。
         ("EUS 多少", "en", "zh"),
         ("hi 你好", "es", "zh"),
@@ -149,6 +153,7 @@ def test_short_japanese_and_korean_are_not_treated_as_unknown():
     # 「hi」「ok」會歸主要語言；「はい」「네」是看得出語言的。
     assert not is_short_text("はい")
     assert not is_short_text("네")
+    assert not is_short_text("¿Quién eres?")
 
 
 def test_jev_does_not_pull_japanese_back_to_chinese(monkeypatch):

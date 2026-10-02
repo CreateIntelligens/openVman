@@ -42,6 +42,13 @@ def test_short_greeting_follows_the_primary_language(primary):
     )
 
 
+def test_short_spanish_question_is_answered_in_spanish():
+    """鶴記實測（2026-10-02）：「¿Quién eres?」只有兩個字被歸主要語言，一直回中文。"""
+    assert prompt_templates.reply_language_line("p", "¿Quién eres?").startswith(
+        "這一輪的回答語言：Español。",
+    )
+
+
 def test_taiwanese_speech_is_answered_in_traditional_chinese():
     line = prompt_templates.reply_language_line("p", "我想欲問掛號", speech_language="nan")
     assert line.startswith("這一輪的回答語言：繁體中文。")

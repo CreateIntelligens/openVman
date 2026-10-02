@@ -50,9 +50,12 @@ _SHORT_TEXT_WORDS = 2
 
 
 def is_short_text(text: str) -> bool:
-    """Too short to tell a language: at most two Latin words and no CJK script."""
+    """Too short to tell a language: at most two Latin words, no CJK script, no ¿¡ñ."""
     text = text or ""
     if _HAN.search(text) or _KANA.search(text) or _HANGUL.search(text):
+        return False
+    # 「¿Quién eres?」只有兩個字，但 ¿¡ñ 只有西語會用：之前歸主要語言，西語問句被回中文。
+    if _SPANISH_MARKS.search(text.lower()):
         return False
     return len(_LATIN_WORD.findall(text.lower())) <= _SHORT_TEXT_WORDS
 
@@ -83,10 +86,10 @@ def detect_language(text: str, default: str = DEFAULT_LANGUAGE) -> str:
     han = len(_HAN.findall(text or ""))
     if han and (han > len(words) or len(text or "") < 200):
         return "zh"
-    if len(words) <= _SHORT_TEXT_WORDS:
-        return default
     if _SPANISH_MARKS.search(lowered):
         return "es"
+    if len(words) <= _SHORT_TEXT_WORDS:
+        return default
     en_hits = sum(word in _EN_WORDS for word in words)
     es_hits = sum(word in _ES_WORDS for word in words)
     if en_hits == es_hits:
