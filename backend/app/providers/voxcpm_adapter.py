@@ -32,6 +32,11 @@ VOXCPM_CONTENT_TYPE = "audio/mpeg"
 VOXCPM_STREAM_CONTENT_TYPE = "audio/wav; rate=48000"
 # 一次合成整段（非串流），GPU 排隊時可能超過一分鐘；上游 nginx 為 900s。
 _REQUEST_TIMEOUT_SECONDS = 120.0
+# 合成前先看 /api/v1/health：推論 worker 死掉時回 503。2026-10-01 worker 被 OOM 殺掉、
+# health 卻照回 ok，每句都等滿 120 秒才退到 Edge，持續約 7 小時。結果快取一小段時間，
+# 不讓每句多一次往返。
+_HEALTH_TIMEOUT_SECONDS = 2.0
+_HEALTH_CACHE_SECONDS = 10.0
 
 
 def _resolve_reference_preset(voice: str) -> str:
@@ -51,6 +56,8 @@ class VoxCPMAdapter:
         # 但 CastVoice 沒有串流版本，要低首音延遲只能走後者的 /stream。
         self._url = f"{base_url}/api/v1/tts/synthesize" if base_url else ""
         self._stream_url = f"{base_url}/api/v1/synthesize/stream" if base_url else ""
+        self._health_url = f"{base_url}/api/v1/health" if base_url else ""
+        self._health: tuple[float, str] | None = None
         self._default_voice = config.tts_voxcpm_default_voice or VOXCPM_DEFAULT_VOICE
         self._inference_timesteps = str(config.tts_voxcpm_inference_timesteps)
         self._headers = _auth_headers(config.tts_voxcpm_api_key)
@@ -63,6 +70,50 @@ class VoxCPMAdapter:
     @property
     def enabled(self) -> bool:
         return bool(self._url)
+
+    def _cached_health(self) -> str | None:
+        if self._health and monotonic() - self._health[0] < _HEALTH_CACHE_SECONDS:
+            return self._health[1]
+        return None
+
+    def _remember_health(self, response: httpx.Response | None, error: str = "") -> str:
+        """"" when VoxCPM can synthesize, otherwise why not."""
+        if response is None:
+            problem = error or "health check failed"
+        elif response.status_code >= 500:
+            problem = f"health {response.status_code}: {response.text[:200]}"
+        else:
+            # 舊版 health 沒有 worker 欄位：回 200 就當可用。
+            problem = ""
+        if problem:
+            logger.warning("voxcpm unavailable, skipping: %s", problem)
+        self._health = (monotonic(), problem)
+        return problem
+
+    def _ensure_healthy(self) -> None:
+        problem = self._cached_health()
+        if problem is None:
+            try:
+                response = httpx.get(self._health_url, headers=self._headers, timeout=_HEALTH_TIMEOUT_SECONDS)
+            except httpx.RequestError as exc:
+                problem = self._remember_health(None, f"health request failed: {exc}")
+            else:
+                problem = self._remember_health(response)
+        if problem:
+            raise VoxCPMHTTPError(status_code=503, detail=problem)
+
+    async def _ensure_healthy_async(self) -> None:
+        problem = self._cached_health()
+        if problem is None:
+            try:
+                async with httpx.AsyncClient(timeout=_HEALTH_TIMEOUT_SECONDS) as client:
+                    response = await client.get(self._health_url, headers=self._headers)
+            except httpx.RequestError as exc:
+                problem = self._remember_health(None, f"health request failed: {exc}")
+            else:
+                problem = self._remember_health(response)
+        if problem:
+            raise VoxCPMHTTPError(status_code=503, detail=problem)
 
     def _build_payload(self, request: SynthesizeRequest) -> dict[str, str]:
         """JSON body for the CastVoice endpoint (``/api/v1/tts/synthesize``).
@@ -98,6 +149,7 @@ class VoxCPMAdapter:
         """POST to /api/v1/tts/synthesize on the VoxCPM360 CastVoice API."""
         if not self._url:
             raise RuntimeError("VoxCPM URL is not configured")
+        self._ensure_healthy()
 
         payload = self._build_payload(request)
 
@@ -146,6 +198,7 @@ class VoxCPMAdapter:
         """
         if not self._stream_url:
             raise RuntimeError("VoxCPM URL is not configured")
+        await self._ensure_healthy_async()
 
         form_data = self._build_stream_form(request)
 

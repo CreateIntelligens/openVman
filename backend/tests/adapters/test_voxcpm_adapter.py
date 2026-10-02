@@ -20,6 +20,13 @@ from app.providers.voxcpm_adapter import (
 )
 
 _VOXCPM_URL = "http://voxcpm:8800"
+_REAL_CACHED_HEALTH = VoxCPMAdapter._cached_health
+
+
+@pytest.fixture(autouse=True)
+def _healthy_voxcpm(monkeypatch):
+    """其他測試只管合成本身：health 一律當作正常。health 的行為在下面另外測。"""
+    monkeypatch.setattr(VoxCPMAdapter, "_cached_health", lambda self: "")
 
 
 def test_voxcpm_adapter_disabled_by_default():
@@ -314,3 +321,67 @@ class TestInferenceTimesteps:
         assert "inference_timesteps" not in adapter._build_payload(
             SynthesizeRequest(text="你好"),
         )
+
+
+class TestHealthGate:
+    """推論 worker 死掉時 health 回 503：直接失敗退到 Edge，不等合成逾時 120 秒。"""
+
+    @pytest.fixture(autouse=True)
+    def _real_health(self, monkeypatch):
+        monkeypatch.setattr(VoxCPMAdapter, "_cached_health", _REAL_CACHED_HEALTH)
+
+    def _adapter(self):
+        return VoxCPMAdapter(TTSRouterConfig(tts_voxcpm_url=_VOXCPM_URL))
+
+    def test_dead_worker_fails_fast_without_synthesizing(self, monkeypatch):
+        adapter = self._adapter()
+        monkeypatch.setattr(httpx, "get", MagicMock(return_value=httpx.Response(
+            503, json={"status": "worker_dead", "worker": {"alive": False}},
+        )))
+        post = MagicMock()
+        monkeypatch.setattr(adapter._client, "post", post)
+
+        with pytest.raises(VoxCPMHTTPError) as exc:
+            adapter.synthesize(SynthesizeRequest(text="你好"))
+
+        assert exc.value.status_code == 503
+        post.assert_not_called()
+
+    def test_unreachable_health_fails_fast(self, monkeypatch):
+        adapter = self._adapter()
+        monkeypatch.setattr(httpx, "get", MagicMock(side_effect=httpx.ConnectError("refused")))
+        with pytest.raises(VoxCPMHTTPError):
+            adapter.synthesize(SynthesizeRequest(text="你好"))
+
+    def test_healthy_result_is_cached(self, monkeypatch):
+        adapter = self._adapter()
+        get = MagicMock(return_value=httpx.Response(200, json={"status": "ok"}))
+        monkeypatch.setattr(httpx, "get", get)
+        monkeypatch.setattr(adapter._client, "post", MagicMock(return_value=httpx.Response(200, content=b"mp3")))
+
+        adapter.synthesize(SynthesizeRequest(text="一"))
+        adapter.synthesize(SynthesizeRequest(text="二"))
+
+        assert get.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_stream_checks_health_too(self, monkeypatch):
+        adapter = self._adapter()
+
+        class DeadHealthClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def get(self, *args, **kwargs):
+                return httpx.Response(503, json={"status": "worker_dead"})
+
+        monkeypatch.setattr(httpx, "AsyncClient", DeadHealthClient)
+        with pytest.raises(VoxCPMHTTPError) as exc:
+            await adapter.open_stream(SynthesizeRequest(text="你好"))
+        assert exc.value.status_code == 503
