@@ -31,7 +31,24 @@ python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 
 
 # 只測辨識、不問 Brain；混入雜訊
 python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 --steps "" --noise 0.02
+
+# 在鶴記dev 跑（建議）：對話與記憶摘要寫在測試專案，不進正式鶴記
+python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 --project dev-c0c8fdff34
 ```
+
+### 測試專案
+
+要問 Brain 的測試請跑在測試專案（目前有「鶴記dev」`dev-c0c8fdff34`，鏡像正式「鶴記」`proj-0cc5c610b4`）。
+`--project` 是測試專案時，腳本開跑前會比對兩邊的知識庫、原始資料、詞表、人設、文件設定與語言分流，
+不一樣就列出差異並停下：數字要能代表正式環境，兩邊就得一致。同步（正式 → 測試，先備份測試專案、
+沿用正式專案的知識圖譜、再重建索引）：
+
+```bash
+python3 scripts/project_mirror.py check   # 有差異 exit 1
+python3 scripts/project_mirror.py sync
+```
+
+對話、記憶、夢境整理不比對，那些是使用產生的。鏡像對照表在 `scripts/project_mirror.py` 的 `MIRRORS`。
 
 | 參數 | 說明 |
 |------|------|
@@ -81,6 +98,7 @@ python3 scripts/voice_e2e/run.py scripts/voice_e2e/cases/heji.json --user ai360 
 - 會產生：
   - 用量記錄（Brain `usage.db`），算在 `--user` 那個帳號。
   - Jev 定稿判斷的記錄，寫進 `backend/logs/asr_final_judge.jsonl`。這個檔目前沒有欄位能區分測試和真人，用這份檔驗證 Jev 時要排除腳本執行期間的時間。
+  - 專案的每日記憶摘要（`MEMORY_SUMMARIES.md` 與當天的記憶檔）：每輪對話寫完都會整理進去，刪掉對話也不會跟著刪。這是要在測試專案跑的主要原因。
 - 不會產生：turn timing 記錄（腳本不打 `/api/v1/metrics/turn`）。建立的對話 session（`voice-e2e-<時間>-*`）跑完會刪掉。
 - 簽 token 需要能進 backend 容器，而能進容器本來就有完整權限。這個方式跳過登入稽核，只給維運用。
 - 合成語音比真人清楚，錯字率只能拿來比較版本、聲音或引擎之間的差異，不代表真人的實際表現。要評估真人效果，請把錄音放進題庫的 `audio`。

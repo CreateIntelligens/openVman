@@ -57,6 +57,8 @@
 
 ### Added
 
+- **測試專案鏡像（`scripts/project_mirror.py`）**：語音模擬與提示詞實驗改在「鶴記dev」跑，測試對話與每日記憶摘要才不會寫進正式鶴記。`check` 比對兩邊的知識庫、原始資料、詞表、人設、文件設定與語言分流，不一樣就 exit 1；`sync` 由正式複製到測試專案（先備份、沿用正式專案的知識圖譜、重建索引）。`scripts/voice_e2e/run.py` 的 `--project` 是測試專案時會先檢查，不一致就停下。voice_e2e README 補上「會寫進專案每日記憶摘要」這項副作用（原本誤寫為不會）。
+
 - **批次辨識多一個引擎 Confucius4-R2T2（`r2t2`）**：網易有道開源、Qwen3-ASR-1.7B。`/transcribe` 帶 `language=Chinese`（.37 收到 `zhen` 會回 500）與專案詞表 `context`，輸出簡體轉繁體；設 `ASR_R2T2_URL` 才排進備援順序，使用者可在聊天室選它。鶴記 10 題合成語音帶詞表：.37 錯字率 6.9%、專有名詞 13/18、p50 0.28 秒，Breeze 5.8%、14/18、約 1.0 秒；R2T2 會把台語寫成台語漢字，台語分流照舊用 Breeze。.35（vLLM 版）同時請求會卡死，只用 .37（`scripts/experiments/r2t2/REPORT.md`）。
 - 前台新增 Confucius4-R2T2 串流引擎 `r2t2-live`，與 Gemini Live 並存、與批次 `r2t2` 分開授權。Backend 依帳號偏好轉接 .37、帶專案詞表、重切 PCM 片段、增量累加與繁體定稿；停止時補齊尾段再送 EOS。未設定或上游失敗沿用批次備援，台語分流維持 Breeze。
 

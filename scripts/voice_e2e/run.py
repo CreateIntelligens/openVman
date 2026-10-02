@@ -425,6 +425,13 @@ async def main(argv: list[str] | None = None) -> int:
     args.asr = args.asr or data.get("asr", ["stream", "batch"])
     if not args.token and not args.user:
         sys.exit("要給 --user（簽 token）或 --token")
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from scripts.project_mirror import MIRRORS, check as mirror_matches
+
+    # 測試專案跟正式專案不一樣時，量出來的數字不能代表正式環境。
+    if args.project in MIRRORS and not mirror_matches(args.project):
+        sys.exit(1)
     token = args.token or mint_token(args.user, 60)
     harness = Harness(args, token)
     gate = asyncio.Semaphore(args.concurrency)
