@@ -126,6 +126,8 @@ class KnowledgeSettingsPutRequest(BaseModel):
     project_id: str = "default"
     # 至少一條、不一定要中文；nan（台語）勾了才會另外聽使用者是不是講台語。
     language_routes: list[str] = Field(default_factory=lambda: ["zh"])
+    # 回答要在幾秒內念完，0 是不限制；不帶就保留原本的設定。
+    reply_seconds: int | None = Field(None, ge=0, le=120)
 
     @field_validator("language_routes")
     @classmethod

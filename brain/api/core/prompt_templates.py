@@ -107,11 +107,11 @@ def reply_language_line(
             "這一輪的回答語言：看使用者這句話是用哪種語言寫的就用哪種（英文字句用英文、"
             "西班牙文字句用西班牙文、日文用日文、韓文用韓文），"
             f"只有型號、數字這類看不出語言的輸入才用{name}。"
-            + reply_length_line("")
+            + reply_length_line("", _reply_seconds(project_id))
         )
     name = PRIMARY_LANGUAGE_NAMES.get(code, "繁體中文")
     line = f"這一輪的回答語言：{name}。整段回答都用{name}，不要夾雜其他語言。"
-    return line + reply_length_line(code)
+    return line + reply_length_line(code, _reply_seconds(project_id))
 
 
 # 虛擬人會把回答念出來，長度用「念多久」定，再依語速換成各語言的字數；只給「約」，
@@ -120,32 +120,51 @@ def reply_language_line(
 #   日文 3.7、韓文 3.7 字／秒、英西約 1.45 詞／秒；Edge 曉臻中文 4.7 字／秒、英西 2.0 詞／秒。
 # - 同一題中英西念的秒數差不到一成：西語念得久是寫得長（09-29 拒答 330–400 字元、
 #   25–30 秒），不是語速慢。
-# 中日韓取 VoxCPM 與 Edge 之間的每秒 4 字。
-REPLY_SECONDS = 20
+# 中日韓取 VoxCPM 與 Edge 之間的每秒 4 字。秒數是每個專案在知識庫設定填的
+# （knowledge/kb_settings.reply_seconds，預設 20、0 是不限制）。
 _WORDS_PER_SECOND = 1.5
 _CHARS_PER_SECOND = 4
 _CHARACTER_LANGUAGES = ("zh", "nan", "ja", "ko")
 
 
+def speech_rates() -> dict[str, float]:
+    """Speaking rates the admin uses to show what a number of seconds means per language."""
+    return {"chars_per_second": _CHARS_PER_SECOND, "words_per_second": _WORDS_PER_SECOND}
+
+
 def _budget(code: str, seconds: int) -> str:
     if code in _CHARACTER_LANGUAGES:
-        return f"約 {seconds * _CHARS_PER_SECOND} 字"
-    return f"約 {round(seconds * _WORDS_PER_SECOND)} 個單字"
+        return f"{seconds * _CHARS_PER_SECOND} 字"
+    return f"{round(seconds * _WORDS_PER_SECOND)} 個單字"
 
 
-def reply_length_line(code: str) -> str:
+def _reply_seconds(project_id: str) -> int:
+    try:
+        from knowledge.kb_settings import reply_seconds
+
+        return reply_seconds(project_id)
+    except Exception:  # noqa: BLE001 - 讀不到設定就用預設
+        from knowledge.kb_settings import DEFAULT_REPLY_SECONDS
+
+        return DEFAULT_REPLY_SECONDS
+
+
+def reply_length_line(code: str, seconds: int) -> str:
     """How long this turn's reply may be, as speaking time turned into this language's units.
 
     寫成硬上限、不給「要詳細規格可以更長」的例外（jtai hciot 的寫法）。鶴記同一批 36 題
     （2026-10-02）：「約 N 字為原則＋例外」中文中位 79 字、超過 80 字 5/12，英西超過 30 詞
     6–7/12，模型常拿例外當理由；硬上限中文中位 49 字、超過 1/12，英西超過 2/12、0/12。
+    0 秒是專案不限制長度，不加這行。
     """
+    if seconds <= 0:
+        return ""
     prefix = (
         "" if code in ("zh", "nan")
         else "資訊量跟中文回答一樣，不要因為換語言而多加說明或客套。"
     )
     return (
-        f"{prefix}回答會被念出來，要在 {REPLY_SECONDS} 秒內念完：每次回覆嚴格不超過"
-        f"{_budget(code, REPLY_SECONDS).removeprefix('約')}，超過即違規，寧可精簡也不可超過；"
+        f"{prefix}回答會被念出來，要在 {seconds} 秒內念完：每次回覆嚴格不超過"
+        f" {_budget(code, seconds)}，超過即違規，寧可精簡也不可超過；"
         "使用者一次問好幾件事時，每件只講重點。"
     )

@@ -171,18 +171,29 @@ async def save_knowledge_document_route(payload: KnowledgeDocumentPutRequest):
     return {"status": "ok", "document": document}
 
 
-@router.get("/knowledge/settings", summary="取得知識庫設定（語言分流）")
+def _with_speech_rates(settings: dict) -> dict:
+    # 後台用同一組語速即時換算「幾秒＝幾個字」，不在前端另寫一份。
+    from core.prompt_templates import speech_rates
+
+    return {**settings, "speech_rates": speech_rates()}
+
+
+@router.get("/knowledge/settings", summary="取得知識庫設定（語言分流、回答長度）")
 async def get_knowledge_settings_route(project_id: str = "default"):
     from knowledge.kb_settings import load_kb_settings
 
-    return load_kb_settings(project_id)
+    return _with_speech_rates(load_kb_settings(project_id))
 
 
-@router.put("/knowledge/settings", summary="更新知識庫設定（語言分流）")
+@router.put("/knowledge/settings", summary="更新知識庫設定（語言分流、回答長度）")
 async def put_knowledge_settings_route(payload: KnowledgeSettingsPutRequest):
     from knowledge.kb_settings import save_kb_settings
 
-    return save_kb_settings(payload.project_id, language_routes=payload.language_routes)
+    return _with_speech_rates(save_kb_settings(
+        payload.project_id,
+        language_routes=payload.language_routes,
+        reply_seconds=payload.reply_seconds,
+    ))
 
 
 @router.patch("/knowledge/document/meta", summary="更新文件中繼屬性")

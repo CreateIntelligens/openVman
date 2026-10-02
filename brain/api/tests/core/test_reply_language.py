@@ -19,6 +19,7 @@ def primary(monkeypatch):
         monkeypatch.setattr(prompt_templates, "_primary_language", lambda project_id: code)
 
     use("zh")
+    monkeypatch.setattr(prompt_templates, "_reply_seconds", lambda project_id: 20)
     return use
 
 
@@ -91,7 +92,7 @@ def test_every_language_gets_a_speaking_time_budget():
     taiwanese = prompt_templates.reply_language_line("p", "我想欲問掛號", speech_language="nan")
     unclear = prompt_templates.reply_language_line("p", "EUBL pump specs")
     for line in (spanish, english, chinese, taiwanese, unclear):
-        assert f"要在 {prompt_templates.REPLY_SECONDS} 秒內念完" in line
+        assert "要在 20 秒內念完" in line
         # 硬上限、沒有「要詳細規格可以更長」的例外：有例外時模型常拿它當理由寫長。
         assert "嚴格不超過" in line and "詳細規格" not in line
     assert "嚴格不超過 30 個單字" in spanish
@@ -105,7 +106,23 @@ def test_every_language_gets_a_speaking_time_budget():
 
 @pytest.mark.parametrize("code", ["ja", "ko"])
 def test_japanese_and_korean_budget_by_characters(code):
-    line = prompt_templates.reply_length_line(code)
+    line = prompt_templates.reply_length_line(code, 20)
     assert "嚴格不超過 80 字" in line
     assert "單字" not in line
     assert "不要因為換語言" in line
+
+
+def test_project_seconds_are_converted_per_language(monkeypatch):
+    """每個專案在後台填秒數：元復醫院 40 字＝10 秒。"""
+    monkeypatch.setattr(prompt_templates, "_reply_seconds", lambda project_id: 10)
+    chinese = prompt_templates.reply_language_line("p", "污泥泵有幾匹馬力？")
+    spanish = prompt_templates.reply_language_line("p", "¿Cuántos caballos tiene la bomba de lodos?")
+    assert "要在 10 秒內念完" in chinese and "嚴格不超過 40 字" in chinese
+    assert "嚴格不超過 15 個單字" in spanish
+
+
+def test_zero_seconds_means_no_length_rule(monkeypatch):
+    """ESG 要照抄完整 QA 答案：設 0 就不加長度規則。"""
+    monkeypatch.setattr(prompt_templates, "_reply_seconds", lambda project_id: 0)
+    line = prompt_templates.reply_language_line("p", "污泥泵有幾匹馬力？")
+    assert line == "這一輪的回答語言：繁體中文。整段回答都用繁體中文，不要夾雜其他語言。"

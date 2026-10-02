@@ -404,7 +404,7 @@ user input
 - `POST /brain/internal/audio-language`
   - body 是 WAV，回 `{"language": "nan"|"zh"|...|null}`；Backend ASR 在台語分流時呼叫（gemini-3.5-flash-lite 聽聲音）
 - `GET/PUT /brain/knowledge/settings`
-  - 知識庫語言分流（`language_routes`：zh、en、es、nan＝台語、ja、ko，至少一條、不必含 zh，順序＝優先順序、第一條是主要語言）；只有一條不分流；多條時所有文件都查得到，使用者語言的文件優先、不夠用主要語言再用其他語言補；勾台語才聽台語
+  - 知識庫語言分流（`language_routes`：zh、en、es、nan＝台語、ja、ko，至少一條、不必含 zh，順序＝優先順序、第一條是主要語言）；只有一條不分流；多條時所有文件都查得到，使用者語言的文件優先、不夠用主要語言再用其他語言補；勾台語才聽台語；回答長度（`reply_seconds`，回答要在幾秒內念完，預設 20、0＝不限制、上限 120；只送分流不帶秒數時保留原值）。GET／PUT 回應另附 `speech_rates`（每秒字數／單字數），後台用它即時換算
 - `PATCH /brain/knowledge/document/meta`
   - 文件啟用、來源與語言（`language=zh|en|es|auto`）。知識庫依使用者語言讓同語言文件優先，不夠再用主要語言與其他語言補
 - `GET /brain/backups/sessions`、`POST /brain/backups/sessions`
@@ -452,7 +452,7 @@ Live 秒數事件沿用 Backend 驗證後的 `user_id`、`role`、`principal_typ
 `principal_id`，因此帳號與 Embed key 篩選也涵蓋 Live。正常回合完成或連線關閉
 都會清算未記錄的音訊；取消 listener 時會等待已開始的入帳，不重複計算同一段。
 
-每輪 system prompt 最後指定回答語言，並以「念多久」限制長度：20 秒內念完，寫成硬上限「每次回覆嚴格不超過 N 字，超過即違規」，中日韓 80 字、英西 30 個單字，一次問好幾件事時每件只講重點（`core/prompt_templates.reply_length_line`；語速依 VoxCPM 與 Edge 實測，不給「要詳細規格可以更長」的例外，模型會拿它當理由寫長；只靠提示詞，不截斷）。
+每輪 system prompt 最後指定回答語言，並以「念多久」限制長度：秒數由各專案在後台知識庫設定填（`reply_seconds`，預設 20 秒、0＝不限制），依實測語速換成每秒中日韓 4 字、英西 1.5 個單字，寫成硬上限「每次回覆嚴格不超過 N 字，超過即違規」，一次問好幾件事時每件只講重點（`core/prompt_templates.reply_length_line`；不給「要詳細規格可以更長」的例外，模型會拿它當理由寫長；只靠提示詞，不截斷）。fast 模式模型想再查資料被擋下時，催促訊息後面也會再附一次這行。
 
 知識庫語言分流不過濾文件，只排先後：使用者語言的文件優先進 top_k，不夠再用主要語言、
 其他語言補。使用者語言有勾分流時會逐次擴大候選窗，直到同語言結果足夠或候選耗盡。擴展詞向量在同一次查詢內快取。語言尚未存成索引

@@ -341,9 +341,18 @@ export function updateKnowledgeDocumentMeta(
   );
 }
 
+export interface SpeechRates {
+  chars_per_second: number;
+  words_per_second: number;
+}
+
 export interface KnowledgeSettings {
   // zh 一定在；只有 zh 時不分流。nan（台語）勾了 Live 才會另外聽使用者是不是講台語。
   language_routes: KnowledgeLanguage[];
+  // 回答要在幾秒內念完，0 是不限制；不帶就保留原本的設定。
+  reply_seconds?: number;
+  // Brain 換算「幾秒＝幾個字」用的語速，只讀。
+  speech_rates?: SpeechRates;
 }
 
 export function fetchKnowledgeSettings() {

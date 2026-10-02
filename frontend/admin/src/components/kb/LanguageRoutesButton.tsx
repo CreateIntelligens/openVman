@@ -4,6 +4,8 @@ import {
   fetchKnowledgeSettings,
   saveKnowledgeSettings,
   type KnowledgeLanguage,
+  type KnowledgeSettings,
+  type SpeechRates,
 } from "../../api";
 
 const ROUTES: { value: KnowledgeLanguage; label: string }[] = [
@@ -15,9 +17,25 @@ const ROUTES: { value: KnowledgeLanguage; label: string }[] = [
   { value: "ko", label: "한국어" },
 ];
 
-/** 知識庫的語言分流設定；由管理者勾選，不看有哪些文件。 */
+const DEFAULT_SECONDS = 20;
+const MAX_SECONDS = 120;
+// Brain 回傳前的預設值；實際以 GET /settings 的 speech_rates 為準。
+const FALLBACK_RATES: SpeechRates = { chars_per_second: 4, words_per_second: 1.5 };
+
+/** 「幾秒」換成各語言大約幾個字，跟 Brain 寫進提示詞的換算一致。 */
+export function lengthTable(seconds: number, rates: SpeechRates) {
+  return [
+    { label: "中文、台語、日韓", value: `${seconds * rates.chars_per_second} 字` },
+    { label: "English、Español", value: `${Math.round(seconds * rates.words_per_second)} 個單字` },
+  ];
+}
+
+/** 知識庫的語言分流與回答長度設定；分流由管理者勾選，不看有哪些文件。 */
 export default function LanguageRoutesButton({ projectId }: { projectId: string }) {
   const [routes, setRoutes] = useState<KnowledgeLanguage[]>(["zh"]);
+  const [seconds, setSeconds] = useState(DEFAULT_SECONDS);
+  const [secondsDraft, setSecondsDraft] = useState(String(DEFAULT_SECONDS));
+  const [rates, setRates] = useState<SpeechRates>(FALLBACK_RATES);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +44,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
   useEffect(() => {
     let disposed = false;
     fetchKnowledgeSettings()
-      .then((settings) => { if (!disposed) setRoutes(settings.language_routes); })
+      .then((settings) => { if (!disposed) apply(settings); })
       .catch(() => { if (!disposed) setRoutes(["zh"]); });
     return () => { disposed = true; };
   }, [projectId]);
@@ -40,16 +58,41 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
-  async function save(next: KnowledgeLanguage[]) {
+  function apply(settings: KnowledgeSettings) {
+    setRoutes(settings.language_routes);
+    if (typeof settings.reply_seconds === "number") {
+      setSeconds(settings.reply_seconds);
+      setSecondsDraft(String(settings.reply_seconds));
+    }
+    if (settings.speech_rates) setRates(settings.speech_rates);
+  }
+
+  async function persist(settings: KnowledgeSettings) {
     setSaving(true);
     setError("");
     try {
-      setRoutes((await saveKnowledgeSettings({ language_routes: next })).language_routes);
+      apply(await saveKnowledgeSettings(settings));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "儲存失敗");
     } finally {
       setSaving(false);
     }
+  }
+
+  // 只送分流：秒數不帶，Brain 會保留原本的設定。
+  function save(next: KnowledgeLanguage[]) {
+    return persist({ language_routes: next });
+  }
+
+  function saveSeconds() {
+    const value = Math.round(Number(secondsDraft));
+    if (!Number.isFinite(value) || value < 0 || value > MAX_SECONDS) {
+      setError(`回答長度要填 0 到 ${MAX_SECONDS} 秒`);
+      setSecondsDraft(String(seconds));
+      return;
+    }
+    if (value === seconds) return;
+    void persist({ language_routes: routes, reply_seconds: value });
   }
 
   function toggle(language: KnowledgeLanguage) {
@@ -78,6 +121,8 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
   ];
 
   const summary = routes.map(labelOf).join("、");
+  const preview = Math.round(Number(secondsDraft));
+  const showTable = Number.isFinite(preview) && preview > 0 && preview <= MAX_SECONDS;
 
   return (
     <div className="relative" ref={panelRef}>
@@ -90,6 +135,7 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
       >
         <span className="material-symbols-outlined text-[1rem]">translate</span>
         分流：{summary}
+        <span className="text-content-subtle">· 回答 {seconds > 0 ? `${seconds} 秒` : "不限"}</span>
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-border bg-surface-raised p-3 shadow-lg">
@@ -131,6 +177,44 @@ export default function LanguageRoutesButton({ projectId }: { projectId: string 
               );
             })}
           </ul>
+          <div className="mt-3 border-t border-border pt-3">
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span>回答長度上限</span>
+              <span className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  max={MAX_SECONDS}
+                  inputMode="numeric"
+                  aria-label="回答長度上限（秒）"
+                  className="w-16 rounded border border-border bg-surface px-1.5 py-0.5 text-right text-sm"
+                  value={secondsDraft}
+                  disabled={saving}
+                  onChange={(event) => setSecondsDraft(event.target.value)}
+                  onBlur={saveSeconds}
+                  onKeyDown={(event) => { if (event.key === "Enter") saveSeconds(); }}
+                />
+                秒
+              </span>
+            </label>
+            <p className="mt-1 text-xs text-content-muted">
+              回答會被念出來，模型會照這個秒數換算的字數回答；填 0 不限制（例如要照抄完整答案的知識庫）。
+            </p>
+            {showTable ? (
+              <table className="mt-2 w-full text-xs" aria-label="秒數換算">
+                <tbody>
+                  {lengthTable(preview, rates).map((row) => (
+                    <tr key={row.label}>
+                      <td className="py-0.5 text-content-muted">{row.label}</td>
+                      <td className="py-0.5 text-right font-semibold">約 {row.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              preview === 0 && <p className="mt-2 text-xs font-semibold">不限制長度</p>
+            )}
+          </div>
           {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
         </div>
       )}
