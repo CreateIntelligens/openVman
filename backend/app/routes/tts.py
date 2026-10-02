@@ -297,8 +297,9 @@ async def tts_stream_endpoint(
             media_type=output.result.content_type,
         )
 
-    # Primary: proxy stream directly from IndexTTS
-    if cfg.tts_indextts_url:
+    # Primary: proxy stream directly from IndexTTS — 只在沒指定或指定 IndexTTS 時。明確指定
+    # Edge（或 VoxCPM 掛掉往下退）卻先送 IndexTTS，IndexTTS 沒在跑時會回 200 空音檔。
+    if cfg.tts_indextts_url and provider in ("", "indextts"):
         indextts_stream_url = cfg.tts_indextts_url.rstrip("/") + "/tts_stream"
         proxied = await _proxy_indextts_stream(
             indextts_stream_url=indextts_stream_url,

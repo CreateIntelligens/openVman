@@ -297,9 +297,11 @@ class Harness:
         payload = {"text": reply, "project_id": self.args.project, "speech_language": speech_language or ""}
         if self.args.tts_voice:
             payload["provider"], _, payload["voice"] = self.args.tts_voice.partition(":")
+        audio = bytearray()
         async with self.http.stream("POST", f"{self.base}/api/v1/tts/stream", json=payload) as response:
             async for chunk in response.aiter_bytes():
                 size += len(chunk)
+                audio.extend(chunk)
                 if first_audio_ms is None and size > 44:  # 44 bytes 是 wav 標頭
                     first_audio_ms = round((time.monotonic() - started) * 1000)
             return {
@@ -309,7 +311,7 @@ class Harness:
                                  or payload.get("provider") or "account-default"),
                 "tts_fallback": response.headers.get("X-TTS-Fallback"),
                 "tts_first_audio_ms": first_audio_ms,
-                "tts_seconds": round(max(size - 44, 0) / (SAMPLE_RATE * 2), 1),
+                "tts_seconds": audio_seconds(bytes(audio), response.headers.get("content-type", "")),
             }
 
     async def turn(self, case: Case, path: str, pcm: bytes) -> dict:
@@ -371,6 +373,29 @@ class Harness:
         )
         if response.status_code != 200:
             print(f"清理對話失敗 HTTP {response.status_code}；session 前綴 voice-e2e-{self.run_id}", file=sys.stderr)
+
+
+def audio_seconds(audio: bytes, content_type: str) -> float:
+    """How long the reply is spoken: Edge streams mp3, VoxCPM wav, Gemini raw PCM."""
+    if not audio:
+        return 0.0
+    if "pcm" in content_type or "L16" in content_type:
+        rate = int(re.search(r"rate=(\d+)", content_type).group(1)) if "rate=" in content_type else SAMPLE_RATE
+        return round(len(audio) / (rate * 2), 1)
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", "-i", "pipe:0"],
+        input=audio, capture_output=True,
+    )
+    try:
+        return round(float(probe.stdout.strip()), 1)
+    except ValueError:
+        # 串流 mp3 沒有長度標頭時 ffprobe 讀不到，改用解碼後的取樣數。
+        decoded = subprocess.run(
+            ["ffmpeg", "-nostdin", "-loglevel", "error", "-i", "pipe:0", "-ac", "1", "-ar", str(SAMPLE_RATE),
+             "-f", "s16le", "pipe:1"],
+            input=audio, capture_output=True,
+        ).stdout
+        return round(len(decoded) / (SAMPLE_RATE * 2), 1)
 
 
 def mint_token(username: str, minutes: int) -> str:

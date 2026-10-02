@@ -1235,6 +1235,41 @@ def test_tts_stream_voxcpm_failure_falls_back_to_edge(monkeypatch):
     assert response.content == b"edge-mp3"
 
 
+def test_tts_stream_explicit_edge_skips_indextts(monkeypatch):
+    """指定 Edge 就用 Edge：先送沒在跑的 IndexTTS 會回 200 空音檔（voice_e2e 2026-10-02）。"""
+    module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
+
+    async def _indextts_must_not_run(**kwargs):
+        raise AssertionError("explicit Edge must not go to IndexTTS")
+
+    def _edge_stream(req):
+        async def _gen():
+            yield b"edge-mp3"
+        return _gen()
+
+    fake_service = types.SimpleNamespace(
+        voxcpm_adapter=types.SimpleNamespace(enabled=False),
+        edge_adapter=types.SimpleNamespace(enabled=True, synthesize_stream=_edge_stream),
+    )
+    monkeypatch.setattr(module.tts_routes, "_get_service", lambda: fake_service)
+    monkeypatch.setattr(module.tts_routes, "_proxy_indextts_stream", _indextts_must_not_run)
+    monkeypatch.setattr(
+        module.tts_routes,
+        "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024, tts_indextts_url="http://indextts:8011"),
+    )
+    monkeypatch.setattr(module.tts_routes.admin_routes, "resolve_tts_voice", lambda *a, **kw: None)
+
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/tts/stream",
+        json={"text": "你好", "provider": "edge-tts", "voice": "zh-TW-HsiaoChenNeural"},
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"edge-mp3"
+
+
 def test_tts_stream_auto_provider_streams_voxcpm_when_indextts_is_absent(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
 
