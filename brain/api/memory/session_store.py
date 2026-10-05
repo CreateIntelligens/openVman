@@ -118,6 +118,41 @@ class DuplicateMessageError(RuntimeError):
 _DEDUP_WINDOW_SECONDS = 5.0
 
 
+def _message_language(
+    role: str, content: str, language: str | None, default_language: str,
+) -> tuple[str | None, str | None]:
+    """Return (language to store, language the caller supplied)."""
+    # 呼叫端（例如 ASR 聽出是台語）給了語言就直接用，不再規則判斷、不問 Jev。
+    given = language if role == "user" and language in LANGUAGES else None
+    # default_language 是專案主要語言：「hi」這類判斷不出來的短句歸它。
+    if given or role != "user":
+        return given, given
+    return detect_language(content, default_language), None
+
+
+def _insert_message_locked(
+    conn: sqlite3.Connection, session_id: str, role: str, content: str,
+    now: str, metadata: dict[str, Any] | None, language: str | None,
+) -> int:
+    cursor = conn.execute(
+        "INSERT INTO messages(session_id, role, content, created_at, metadata, language) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (session_id, role, content, now,
+         json.dumps(metadata, ensure_ascii=False) if metadata else None, language),
+    )
+    return int(cursor.lastrowid or 0)
+
+
+def _prune_messages_locked(conn: sqlite3.Connection, session_id: str) -> None:
+    """Keep only the newest messages of a session, like the history window."""
+    conn.execute(
+        "DELETE FROM messages WHERE session_id = ? AND id NOT IN "
+        "(SELECT id FROM messages WHERE session_id = ? "
+        "ORDER BY created_at DESC, id DESC LIMIT ?)",
+        (session_id, session_id, max(get_settings().max_session_rounds * 2, 20)),
+    )
+
+
 class SessionStore:
     """Persist chat sessions in SQLite so they survive process restarts.
 
@@ -170,42 +205,20 @@ class SessionStore:
         language: str | None = None,
         default_language: str = "zh",
     ) -> tuple[SessionState, int]:
-        cfg = get_settings()
         now = utc_now_iso()
-        max_messages = max(cfg.max_session_rounds * 2, 20)
         persona_key = normalize_persona_id(persona_id)
-        metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
-        # 呼叫端（例如 ASR 聽出是台語）給了語言就直接用，不再規則判斷、不問 Jev。
-        given_language = language if role == "user" and language in LANGUAGES else None
-        # default_language 是專案主要語言：「hi」這類判斷不出來的短句歸它。
-        language = given_language or (
-            detect_language(content, default_language) if role == "user" else None
+        language, given_language = _message_language(
+            role, content, language, default_language,
         )
 
         with self._lock:
             self._prune_expired_sessions_locked()
             with self._connect() as conn:
                 self._ensure_session_persona_locked(conn, session_id, persona_key, now)
-                cursor = conn.execute(
-                    "INSERT INTO messages(session_id, role, content, created_at, metadata, language) VALUES (?, ?, ?, ?, ?, ?)",
-                    (session_id, role, content, now, metadata_json, language),
+                message_id = _insert_message_locked(
+                    conn, session_id, role, content, now, metadata, language,
                 )
-                message_id = int(cursor.lastrowid or 0)
-
-                # Prune oldest messages beyond the limit
-                overflow_ids = [
-                    row[0]
-                    for row in conn.execute(
-                        "SELECT id FROM messages WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT -1 OFFSET ?",
-                        (session_id, max_messages),
-                    ).fetchall()
-                ]
-                if overflow_ids:
-                    placeholders = ",".join("?" for _ in overflow_ids)
-                    conn.execute(
-                        f"DELETE FROM messages WHERE id IN ({placeholders})",
-                        overflow_ids,
-                    )
+                _prune_messages_locked(conn, session_id)
                 conn.commit()
                 state = self._load_session_locked(conn, session_id)
         if language is not None and given_language is None:
@@ -309,41 +322,27 @@ class SessionStore:
             speech_language = context["request_context"].get(
                 "metadata", {},
             ).get("speech_language")
-            given_language = (
-                speech_language
-                if isinstance(speech_language, str)
-                and speech_language in LANGUAGES else None
-            )
-            user_language = given_language or detect_language(
-                context["user_message"], default_language,
+            user_language, given_language = _message_language(
+                "user", context["user_message"],
+                speech_language if isinstance(speech_language, str) else None,
+                default_language,
             )
             assistant_meta = {
                 key: value
                 for key, value in payload["response"]["history"][-1].items()
                 if key not in {"role", "content"}
             }
-            ids = []
-            for role, content, meta, language in (
-                ("user", context["user_message"], None, user_language),
-                ("assistant", payload["response"]["reply"],
-                 assistant_meta or None, None),
-            ):
-                cursor = conn.execute(
-                    "INSERT INTO messages "
-                    "(session_id, role, content, created_at, metadata, language) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
-                    (session_id, role, content, now,
-                     json.dumps(meta, ensure_ascii=False) if meta else None,
-                     language),
-                )
-                ids.append(int(cursor.lastrowid or 0))
-            conn.execute(
-                "DELETE FROM messages WHERE session_id = ? AND id NOT IN "
-                "(SELECT id FROM messages WHERE session_id = ? "
-                "ORDER BY created_at DESC, id DESC LIMIT ?)",
-                (session_id, session_id,
-                 max(get_settings().max_session_rounds * 2, 20)),
-            )
+            ids = [
+                _insert_message_locked(
+                    conn, session_id, "user", context["user_message"], now,
+                    None, user_language,
+                ),
+                _insert_message_locked(
+                    conn, session_id, "assistant", payload["response"]["reply"],
+                    now, assistant_meta or None, None,
+                ),
+            ]
+            _prune_messages_locked(conn, session_id)
             conn.execute(
                 "UPDATE chat_turns SET accepted = 1 WHERE session_id = ? "
                 "AND owner = ? AND turn_id = ?",
