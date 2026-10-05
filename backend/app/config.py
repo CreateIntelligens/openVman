@@ -230,11 +230,12 @@ class TTSRouterConfig(BaseSettings):
     asr_xiaomi_url: str = ""
     # Confucius4-R2T2（網易有道，Qwen3-ASR-1.7B）：POST /transcribe，multipart
     # ``file`` + ``language`` + ``context``（熱詞）。輸出簡體。同一台也有 WebSocket 串流。
+    # 部署接 .35（vLLM 版，對外是 asr.5gao.ai），2026-10-05 起它是主機。
     asr_r2t2_url: str = ""
     asr_r2t2_stream_url: str = ""
     asr_r2t2_secret_key: str = ""
-    # R2T2 dev（.35，vLLM 版，對外是 asr.5gao.ai）：獨立的引擎 r2t2-dev／r2t2-dev-live，
-    # 帳號自己選了才用，不當其他引擎的備援。它同時多句會卡死，批次只等這麼久。
+    # R2T2 dev（部署接 .37 GB10，transformers 版）：獨立的引擎 r2t2-dev／r2t2-dev-live，
+    # 帳號自己選了才用，不當其他引擎的備援；批次只等這麼久，等不到交給下一家。
     asr_r2t2_dev_url: str = ""
     asr_r2t2_dev_stream_url: str = ""
     asr_r2t2_dev_secret_key: str = ""

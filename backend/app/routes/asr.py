@@ -58,13 +58,15 @@ async def _transcribe_routed(
         if taiwanese_uses_breeze:
             preferred = language_routes_mod.TAIWANESE_ASR_ENGINE
         result, heard = await asyncio.gather(
-            transcribe(tmp_path, trace_id, preferred, prompt=prompt),
+            transcribe(tmp_path, trace_id, preferred, prompt=prompt, routes=routes),
             language_routes_mod.detect_taiwanese(tmp_path),
         )
         speech_language = heard.language if heard.language == language_routes_mod.TAIWANESE else None
         language_check = {"result": heard.result, "ms": heard.ms}
     else:
-        result = await transcribe(tmp_path, trace_id, preferred, prompt=prompt)
+        result = await transcribe(
+            tmp_path, trace_id, preferred, prompt=prompt, routes=routes,
+        )
     return {
         "text": result.content,
         # 實際辨識的引擎：指定的掛掉由備援接手時不是同一個；全掛時是空字串。

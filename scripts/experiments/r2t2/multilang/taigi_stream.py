@@ -11,8 +11,8 @@ from scripts.voice_e2e.run import to_pcm, cer
 from r2t2_lang import env
 
 TARGETS = {
-    ".35 zhen": (env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"], "zhen"),
-    ".37 Chinese": (env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"], "Chinese"),
+    ".35 zhen": (env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"], "zhen"),
+    ".37 Chinese": (env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"], "Chinese"),
 }
 
 async def one(pcm, url, key, language):

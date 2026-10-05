@@ -32,6 +32,15 @@ KNOWN_ROUTES = ("zh", "en", "es", "nan", "ja", "ko")
 TAIWANESE_ASR_ENGINE = "breeze"
 TAIWANESE_TTS_PROVIDERS = ("voxcpm", "cosyvoice")
 
+# 指定正確語言時 .37、.35 五種語言全對（串流、批次都一樣）；.37 不會自己判斷（zhen 也當
+# Chinese，西日韓會被當成中文解碼），.35 的 zhen 能自己分中英西、日文不行（2026-10-05 實測）。
+R2T2_LANGUAGES = {
+    "zh": "Chinese", "en": "English", "es": "Spanish", "ja": "Japanese", "ko": "Korean",
+}
+R2T2_CHINESE = "Chinese"
+# 多種語言時交給 R2T2 自己判斷：.35 會分中英西，.37 當中文（中英夾雜照樣聽得懂）。
+R2T2_AUTO = "zhen"
+
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 # 每次語音都要查分流；後台改設定後最多這麼久生效。
 _CACHE_SECONDS = 30.0
@@ -115,6 +124,25 @@ async def effective_routes(
         return allowed
     narrowed = [route for route in allowed if route in requested]
     return narrowed or allowed[:1]
+
+
+def r2t2_language(routes: list[str]) -> str:
+    """The language R2T2 should decode in, from the effective routes."""
+    spoken = [route for route in routes if route != TAIWANESE]
+    if not spoken:
+        # 只有台語或不知道分流：當華語聽。.35 的 zhen 會把台語判成英文、葡萄牙文。
+        return R2T2_CHINESE
+    if len(spoken) == 1:
+        return R2T2_LANGUAGES.get(spoken[0], R2T2_CHINESE)
+    return R2T2_AUTO
+
+
+def r2t2_outputs_chinese(language: str) -> bool:
+    """Whether R2T2 may answer in Simplified Chinese that needs converting.
+
+    指定日文時轉繁會把「学校」改成「學校」，只有中文或自動判斷才轉。
+    """
+    return language in (R2T2_CHINESE, R2T2_AUTO)
 
 
 def taiwanese_tts_provider(provider: str | None) -> str | None:

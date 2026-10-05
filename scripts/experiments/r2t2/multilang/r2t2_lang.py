@@ -1,7 +1,7 @@
 """R2T2 串流多語實測：每種語言 3 句 edge-tts 合成語音 × 三種 language 設定（指定、zhen、Chinese），一次一路。
 
-    python3 scripts/experiments/r2t2/multilang/r2t2_lang.py 37   # .37（ASR_R2T2_STREAM_URL）
-    python3 scripts/experiments/r2t2/multilang/r2t2_lang.py 35   # .35（ASR_R2T2_DEV_STREAM_URL）
+    python3 scripts/experiments/r2t2/multilang/r2t2_lang.py 37   # .37（ASR_R2T2_DEV_STREAM_URL）
+    python3 scripts/experiments/r2t2/multilang/r2t2_lang.py 35   # .35（ASR_R2T2_STREAM_URL）
 """
 import asyncio, json, sys, uuid
 from pathlib import Path
@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[4]; sys.path.insert(0, str(ROOT))
 from scripts.voice_e2e.run import to_pcm
 env = dict(l.split("=", 1) for l in (ROOT / ".env").read_text().splitlines() if "=" in l and not l.startswith("#"))
 HOST = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ("35", "37") else "37"
-URL, KEY = ((env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"]) if HOST == "35"
-            else (env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"]))
+URL, KEY = ((env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"]) if HOST == "35"
+            else (env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"]))
 CASES = {
     "zh": ("Chinese", "edge-tts:zh-TW-HsiaoChenNeural", ["請問沉水泵最深可以放多深？", "工地要抽泥漿，推薦哪一款？", "你們的營業時間是幾點？"]),
     "en": ("English", "edge-tts:en-US-JennyNeural", ["How deep can the submersible pump go?", "Which slurry pump do you recommend for a construction site?", "What are your business hours?"]),

@@ -48,8 +48,30 @@ def test_r2t2_sends_the_glossary_and_returns_traditional_chinese(r2t2):
     text = asyncio.run(ingestion_audio._transcribe_r2t2(audio, "t", prompt="沉水泵、DIVA"))
 
     assert text == "請問DIVA有攪拌器嗎"
-    # 兩套部署都認得 Chinese（.37 收到 zhen 會 500）；詞表放 context。
+    # 沒指定語言分流就當華語；詞表放 context。
     assert sent == [("http://r2t2:8040/transcribe", ["file"], {"language": "Chinese", "context": "沉水泵、DIVA"})]
+
+
+@pytest.mark.parametrize(
+    ("routes", "language", "reply", "text"),
+    [
+        # R2T2 不會自己判斷語言，西日韓當中文解碼會整句壞掉（2026-10-05 批次實測，串流同）。
+        (["es"], "Spanish", "¿Qué bomba?", "¿Qué bomba?"),
+        # 指定日文不轉繁：「学校」是日文漢字，不是簡體。
+        (["ja"], "Japanese", "学校のポンプ", "学校のポンプ"),
+        (["nan", "zh"], "Chinese", "请问", "請問"),
+        (["zh", "en", "es"], "zhen", "请问", "請問"),
+        (None, "Chinese", "请问", "請問"),
+    ],
+)
+def test_transcribe_decodes_in_the_project_language(r2t2, routes, language, reply, text):
+    audio, sent, answer = r2t2
+    answer({"status": "success", "text": reply})
+
+    result = asyncio.run(ingestion_audio.transcribe(audio, "t", "r2t2", routes=routes))
+
+    assert (result.provider, result.content) == ("r2t2", text)
+    assert sent[0][2]["language"] == language
 
 
 def test_r2t2_error_status_falls_back_instead_of_returning_nothing(r2t2):

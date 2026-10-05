@@ -35,8 +35,8 @@ async def r2t2(pcm, url, key, language, prompt):
 
 ENGINES = {
     "gemini(zh,en,es)": lambda pcm: gemini_stream(pcm, ["zh-TW", "en-US", "es-ES"]),
-    ".37 Chinese+詞表": lambda pcm: r2t2(pcm, env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"], "Chinese", terms_prompt),
-    ".35 zhen+詞表": lambda pcm: r2t2(pcm, env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"], "zhen", terms_prompt),
+    ".37 Chinese+詞表": lambda pcm: r2t2(pcm, env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"], "Chinese", terms_prompt),
+    ".35 zhen+詞表": lambda pcm: r2t2(pcm, env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"], "zhen", terms_prompt),
 }
 
 async def main():

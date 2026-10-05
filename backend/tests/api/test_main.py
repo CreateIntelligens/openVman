@@ -1335,9 +1335,10 @@ def test_asr_preview_returns_the_transcript_and_the_engine_that_answered(monkeyp
     module, _ = _load_main(monkeypatch)
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id, preferred=None, prompt=""):
+    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
         seen["trace_id"] = trace_id
         seen["preferred"] = preferred
+        seen["routes"] = routes
         return types.SimpleNamespace(
             content_type="audio_transcription", content="今仔日天氣袂䆀", provider="breeze",
         )
@@ -1362,6 +1363,8 @@ def test_asr_preview_returns_the_transcript_and_the_engine_that_answered(monkeyp
     assert body["text"] == "今仔日天氣袂䆀"
     assert body["provider"] == "breeze"
     assert seen["preferred"] == "sensevoice"
+    # R2T2 照生效的語言分流決定解碼語言，所以分流要一路傳到 transcribe()。
+    assert seen["routes"] == body["language_routes"]
     # 操作者要能比較兩家引擎誰快，所以回傳這一次實測到的耗時。
     assert isinstance(body["elapsed_seconds"], (int, float))
 
@@ -1388,7 +1391,7 @@ def test_chat_transcribe_is_open_to_ordinary_users(monkeypatch):
     """一般使用者要能在聊天室用語音，後台那個端點限 admin。"""
     module, _ = _load_main(monkeypatch)
 
-    async def _transcribe(path, trace_id, preferred=None, prompt=""):
+    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
         # 偏好的引擎掛了、由 sensevoice 接手。
         return types.SimpleNamespace(
             content_type="audio_transcription", content="你好", provider="sensevoice",
@@ -1422,7 +1425,7 @@ def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
     module, _ = _load_main(monkeypatch)
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id, preferred=None, prompt=""):
+    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
         seen["preferred"] = preferred
         return types.SimpleNamespace(
             content_type="audio_transcription", content="你好", provider="breeze",
@@ -1452,7 +1455,7 @@ def _routed_asr_fixture(monkeypatch, module, routes):
     """Fake transcribe, project routes, glossary and Taiwanese check for the routed ASR paths."""
     seen: dict[str, object] = {}
 
-    async def _transcribe(path, trace_id, preferred=None, prompt=""):
+    async def _transcribe(path, trace_id, preferred=None, prompt="", routes=None):
         seen.update(preferred=preferred, prompt=prompt, trace_id=trace_id)
         return types.SimpleNamespace(
             content_type="audio_transcription", content="今仔日天氣真好", provider=preferred or "breeze",
@@ -1598,7 +1601,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
 
     calls: dict[str, object] = {}
 
-    async def fake_transcribe(path, trace_id, preferred=None, prompt=""):
+    async def fake_transcribe(path, trace_id, preferred=None, prompt="", routes=None):
         calls["preferred"] = preferred
         calls["prompt"] = prompt
         return types.SimpleNamespace(content="我現在頭很痛", provider="breeze")

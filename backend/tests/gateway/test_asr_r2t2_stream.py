@@ -203,7 +203,9 @@ def test_incremental_transcripts_reset_and_final_text_override(monkeypatch):
         (["nan", "zh"], "Chinese"),
         # 多種語言時交給 R2T2 自己判斷（.35 會分中英西，.37 當中文）。
         (["zh", "en", "es"], "zhen"),
-        ([], "zhen"),
+        # 只有台語（或沒有分流）當華語：.35 的 zhen 會把台語判成英文、葡萄牙文。
+        (["nan"], "Chinese"),
+        ([], "Chinese"),
     ],
 )
 def test_decoding_language_follows_a_single_route(monkeypatch, routes, language):

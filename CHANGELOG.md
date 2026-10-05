@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- **R2T2 批次辨識也把西文、日文、韓文當中文解碼**：`/transcribe` 的 `language` 寫死 `Chinese`，跟串流同一個問題。現在 `transcribe()` 多收 `routes`，R2T2（`r2t2`、`r2t2-dev`）照專案生效的分流帶語言，規則與串流共用 `language_routes.r2t2_language`：只有一種語言帶該語言，多種語言帶 `zhen`，沒有分流或只有台語當華語（.35 的 `zhen` 會把台語判成英文、葡萄牙文；串流原本沒有分流時送 `zhen`，一併改成華語）。非中文輸出不轉繁。直接打兩台批次端點實測：指定語言時中英西日韓全對；.37 收到 `zhen` 已經不會 500，當中文處理。聊天附件等沒有分流的批次辨識照舊當華語。
 - **.35 串流（`r2t2-dev-live`）經過前台一句都收不到**：.35 辨識中會送一則空的 `{}`，backend 把沒有 `status` 的訊息當成失敗，整條連線斷掉、前台退回批次。現在沒有 `status` 的訊息當心跳略過，只有明確不是 `success` 才算失敗。
 - **R2T2 串流把西文、日文、韓文都當中文解碼**：握手的 `language` 寫死 `Chinese`，R2T2 不會自己判斷語言，西文「bomba」被聽成「炸彈」、日韓夾進中文字。現在照這條連線的分流帶語言：只有一種語言時帶 `English`／`Spanish`／`Japanese`／`Korean`／`Chinese`，多種語言時送 `zhen` 讓 R2T2 自己判斷（.35 能分中英西；.37 收到 `zhen` 仍當中文，中英夾雜沒問題）。非中文的輸出不再做簡轉繁（會把日文「学校」改成「學校」）。直接連 .37 實測五種語言各 3 句，指定語言全對。多語言專案含西日韓時仍要另外決定語言來源。
 - **鶴記dev 檢索時沒有圖譜擴充**：`scripts/project_mirror.py sync` 只複製了 `graphify-out/` 檔案，檢索用的 LanceDB `note_graph` 表沒帶過去，測試專案的檢索跟正式不一樣。現在 `sync` 一併複製、`check` 一併比對（差異顯示為 `lancedb:note_graph`）；鶴記dev 已重新同步。
@@ -52,6 +53,7 @@
 
 ### Changed
 
+- **R2T2 主機改成 .35、.37 改當 dev**：`r2t2`／`r2t2-live` 改接 .35（`ASR_R2T2_URL=http://10.9.0.35:8040`、`ASR_R2T2_STREAM_URL=ws://10.9.0.35:8040/asr_stream_api_v1`），`r2t2-dev`／`r2t2-dev-live` 改接 .37。引擎 id 與授權不變，已授權 `r2t2-live` 的帳號（含 80 個臨時帳號）之後都送 .35。今天實測 .35 同時三路定稿要 8.6 秒（.37 1.6 秒）、男聲常吃句尾，正式流量會受影響。後台與前台的引擎說明改標機器；`.env.example`、README、Backend 規格與 `scripts/experiments/r2t2/multilang/` 腳本的變數對應一起改。
 - **共用 VAD 移除 `per-utterance` 模式與 `commitMode` 選項**：原本給前台用（講完一句就關麥克風），前台改連續收音後已沒有呼叫端。`VadRecognizer`／`createSpeechController` 一律連續收音，雜音轉不出字時安靜略過；admin 三個呼叫端拿掉 `commitMode: "continuous"`。
 - Brain `SessionStore` 寫入訊息、偵測語言、裁掉舊訊息抽成共用函式，`append_message` 與合併回合的 `accept_chat_turn` 不再各寫一份。
 - **語音打斷改由 Jev 判斷規則判不出的長句（預設開）**：`JEV_INTERRUPT_ENABLED` 預設改 true。自寫 30 題規則 23/30、Jev 29/30，附和、對旁人說話不再誤停；只有規則判不出的那段長句多等最多 0.6 秒，沒有 `TYPESAFE_API_KEY`、失敗或逾時都維持中斷。

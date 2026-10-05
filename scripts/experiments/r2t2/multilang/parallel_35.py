@@ -12,8 +12,8 @@ from scripts.voice_e2e.run import to_pcm, cer
 from r2t2_lang import env
 
 HOST = sys.argv[2] if len(sys.argv) > 2 else "35"
-URL, KEY, LANGUAGE = ((env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"], "Chinese") if HOST == "37"
-                      else (env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"], "zhen"))
+URL, KEY, LANGUAGE = ((env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"], "Chinese") if HOST == "37"
+                      else (env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"], "zhen"))
 PROMPT = glossary("proj-0cc5c610b4")
 
 async def one(pcm):

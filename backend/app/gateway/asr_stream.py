@@ -16,7 +16,7 @@ gemini-3.5-transcribe-live，把轉錄推回前台：
 docker logs 看不到 logger.info，所以寫檔，跟 turn_timing 一樣）。
 
 跟瀏覽器內建辨識一樣是前台直接驅動的引擎，不進 transcribe() 的 fallback chain；
-帳號依偏好使用被授權的 ``gemini-live``、``r2t2-live`` 或 ``r2t2-dev-live``（.35 測試機）。R2T2 帶專案詞表，
+帳號依偏好使用被授權的 ``gemini-live``、``r2t2-live`` 或 ``r2t2-dev-live``（R2T2 dev 機，部署接 .37）。R2T2 帶專案詞表，
 增量累加、整句 final_text 轉繁體，不問 Jev；台語分流時前台不走這裡，
 改用 Breeze 批次。
 """
@@ -61,19 +61,11 @@ router = APIRouter()
 
 GEMINI_STREAM_ASR_ENGINE = "gemini-live"
 R2T2_STREAM_ASR_ENGINE = "r2t2-live"
-# .35 測試機（vLLM 版）：帳號自己選了才用，失敗不換台。
+# R2T2 dev 機（部署接 .37）：帳號自己選了才用，失敗不換台。
 R2T2_DEV_STREAM_ASR_ENGINE = "r2t2-dev-live"
 _R2T2_STREAM_ENGINES = {R2T2_STREAM_ASR_ENGINE, R2T2_DEV_STREAM_ASR_ENGINE}
 _STREAM_ENGINES = {GEMINI_STREAM_ASR_ENGINE, *_R2T2_STREAM_ENGINES}
 _R2T2_CHUNK_BYTES = 5120
-# 指定正確語言時 .37、.35 五種語言各 3 句全對；.37 不會自己判斷（zhen 也當 Chinese，西日韓
-# 會被當成中文解碼），.35 的 zhen 能自己分中英西、日文不行（2026-10-05 實測）。
-_R2T2_LANGUAGES = {
-    "zh": "Chinese", "en": "English", "es": "Spanish", "ja": "Japanese", "ko": "Korean",
-}
-_R2T2_CHINESE = "Chinese"
-# 多種語言時交給 R2T2 自己判斷：.35 會分中英西，.37 當中文（中英夾雜照樣聽得懂）。
-_R2T2_AUTO = "zhen"
 _R2T2_EOS = "YOUDAO_ONETIME_ASR_STREAM_EOS"
 _GEMINI_LIVE_URL = (
     "wss://generativelanguage.googleapis.com/ws/"
@@ -205,17 +197,9 @@ def _r2t2_stream_endpoint(cfg: TTSRouterConfig, engine: str) -> tuple[str, str] 
     return (url, key) if url and key else None
 
 
-def _r2t2_language(routes: list[str]) -> str:
-    """The language R2T2 should decode this connection in, from its effective routes."""
-    spoken = [route for route in routes if route != language_routes_mod.TAIWANESE]
-    if len(spoken) == 1:
-        return _R2T2_LANGUAGES.get(spoken[0], _R2T2_CHINESE)
-    return _R2T2_AUTO
-
-
 @asynccontextmanager
 async def _r2t2_upstream(
-    url: str, key: str, prompt: str, language: str = _R2T2_CHINESE,
+    url: str, key: str, prompt: str, language: str = language_routes_mod.R2T2_CHINESE,
 ) -> AsyncIterator[Any]:
     """Connect and hand-shake with one R2T2 host; .37 與 .35 用同一套握手。"""
     async with websockets.connect(url, max_size=4 * 1024 * 1024, open_timeout=10) as upstream:
@@ -241,10 +225,10 @@ async def _relay_r2t2(
     routes: list[str],
 ) -> None:
     prompt = await project_asr_prompt(current, project_id)
-    language = _r2t2_language(routes)
-    # R2T2 中文輸出簡體才要轉繁；指定日文時轉了會把「学校」改成「學校」。
+    language = language_routes_mod.r2t2_language(routes)
     display = (
-        convert_to_traditional if language in (_R2T2_CHINESE, _R2T2_AUTO) else str
+        convert_to_traditional
+        if language_routes_mod.r2t2_outputs_chinese(language) else str
     )
     async with _r2t2_upstream(*endpoint, prompt, language) as upstream:
         await websocket.send_json({"type": "ready"})

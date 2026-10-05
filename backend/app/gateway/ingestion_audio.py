@@ -12,6 +12,7 @@ import httpx
 import openai
 from openai import AsyncOpenAI
 
+from app import language_routes as language_routes_mod
 from app.config import get_tts_config
 from app.gateway.ingestion import IngestionResult
 from app.http_client import SharedAsyncClient
@@ -202,32 +203,44 @@ async def _transcribe_xiaomi(file_path: str, trace_id: str, prompt: str = "") ->
     return convert_to_traditional(str(body.get("text", "")).strip())
 
 
-async def _transcribe_r2t2(file_path: str, trace_id: str, prompt: str = "") -> str:
+async def _transcribe_r2t2(
+    file_path: str, trace_id: str, prompt: str = "",
+    language: str = language_routes_mod.R2T2_CHINESE,
+) -> str:
     """Transcribe via Confucius4-R2T2 (POST /transcribe, multipart ``file``).
 
-    ``language=Chinese``：兩套部署都認得（.35 vLLM 版把 zhen 也當 Chinese；.37 transformers
-    版收到 zhen 直接 500）。不指定會自動判斷語言，串流實測帶口音的華語會跑成葡萄牙文。
-    專案詞表放 ``context``（Qwen3-ASR 的熱詞提示）。輸出簡體，轉繁才跟其他家一致。
+    ``language`` 照專案語言分流（language_routes.r2t2_language），跟串流同一套：R2T2 不會
+    自己判斷，西日韓當中文解碼會整句壞掉；不帶 language 則會把帶口音的華語跑成葡萄牙文。
+    專案詞表放 ``context``（Qwen3-ASR 的熱詞提示）。中文輸出簡體，轉繁才跟其他家一致。
     """
     cfg = get_tts_config()
     if not cfg.asr_r2t2_url:
         raise RuntimeError("ASR_R2T2_URL is not configured")
-    return await _r2t2_file(cfg.asr_r2t2_url, file_path, prompt, None)
+    return await _r2t2_file(cfg.asr_r2t2_url, file_path, prompt, language, None)
 
 
-async def _transcribe_r2t2_dev(file_path: str, trace_id: str, prompt: str = "") -> str:
-    """Same request against the R2T2 dev host (.35), which hangs under concurrent load."""
+async def _transcribe_r2t2_dev(
+    file_path: str, trace_id: str, prompt: str = "",
+    language: str = language_routes_mod.R2T2_CHINESE,
+) -> str:
+    """Same request against the R2T2 dev host (deployed on .37), with a bounded wait."""
     cfg = get_tts_config()
     if not cfg.asr_r2t2_dev_url:
         raise RuntimeError("ASR_R2T2_DEV_URL is not configured")
-    return await _r2t2_file(cfg.asr_r2t2_dev_url, file_path, prompt, cfg.asr_r2t2_dev_timeout_seconds)
+    return await _r2t2_file(
+        cfg.asr_r2t2_dev_url, file_path, prompt, language,
+        cfg.asr_r2t2_dev_timeout_seconds,
+    )
 
 
-async def _r2t2_file(url: str, file_path: str, prompt: str, timeout: float | None) -> str:
+async def _r2t2_file(
+    url: str, file_path: str, prompt: str, language: str, timeout: float | None,
+) -> str:
     source, scratch = _as_wav(file_path)
     try:
         return await _r2t2_request(
-            url.rstrip("/"), Path(source).read_bytes(), Path(source).name, prompt, timeout,
+            url.rstrip("/"), Path(source).read_bytes(), Path(source).name,
+            prompt, language, timeout,
         )
     finally:
         if scratch:
@@ -235,19 +248,23 @@ async def _r2t2_file(url: str, file_path: str, prompt: str, timeout: float | Non
 
 
 async def _r2t2_request(
-    url: str, audio: bytes, filename: str, prompt: str, timeout: float | None,
+    url: str, audio: bytes, filename: str, prompt: str, language: str,
+    timeout: float | None,
 ) -> str:
     response = await _http.get().post(
         f"{url}/transcribe",
         files={"file": (filename, audio)},
-        data={"language": "Chinese", "context": prompt},
+        data={"language": language, "context": prompt},
         **({"timeout": timeout} if timeout else {}),
     )
     response.raise_for_status()
     body = response.json()
     if body.get("status") == "error":
         raise RuntimeError(f"R2T2 ASR error: {body.get('message', '')}")
-    return convert_to_traditional(str(body.get("text", "")).strip())
+    text = str(body.get("text", "")).strip()
+    if language_routes_mod.r2t2_outputs_chinese(language):
+        return convert_to_traditional(text)
+    return text
 
 
 # provider 名稱 → 轉寫函式。
@@ -264,6 +281,8 @@ _TRANSCRIBERS: dict[str, object] = {
 
 
 _OPT_IN_TRANSCRIBERS = frozenset({"r2t2-dev"})
+# 要照語言分流指定解碼語言的引擎；其他家自己判斷語言或只聽華語。
+_LANGUAGE_AWARE_TRANSCRIBERS = frozenset({"r2t2", "r2t2-dev"})
 
 
 def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
@@ -281,7 +300,7 @@ def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
     configured = [
         name for name in (preferred, cfg.asr_provider, *_TRANSCRIBERS)
         if name in _TRANSCRIBERS
-        # 測試機只在自己被選時用，不當別人的備援：它卡住就讓這一句多等，不該拖累其他人。
+        # dev 機只在自己被選時用，不當別人的備援：它慢就讓這一句多等，不該拖累其他人。
         and (name not in _OPT_IN_TRANSCRIBERS or name in (preferred, cfg.asr_provider))
     ]
     ordered: list[str] = []
@@ -336,11 +355,13 @@ def _provider_ready(cfg, name: str) -> bool:
 
 async def transcribe(
     file_path: str, trace_id: str, preferred: str | None = None, prompt: str = "",
+    routes: list[str] | None = None,
 ) -> IngestionResult:
     """Transcribe audio, falling back through the other configured providers.
 
     ``prompt`` 是專案的專有名詞詞表；Breeze、OpenAI（prompt）與 R2T2（context）會用，
-    SenseVoice、小米忽略。
+    SenseVoice、小米忽略。``routes`` 是專案生效的語言分流，R2T2 照它決定解碼語言；
+    沒給（例如聊天附件）就當華語。
 
     Returns IngestionResult with content_type="audio_transcription".
     """
@@ -353,10 +374,12 @@ async def transcribe(
         ",".join(name for name in configured if name not in chain) or "-",
     )
 
+    language = {"language": language_routes_mod.r2t2_language(routes or [])}
     for name in chain:
         transcriber = _TRANSCRIBERS[name]
+        extra = language if name in _LANGUAGE_AWARE_TRANSCRIBERS else {}
         try:
-            content = await transcriber(file_path, trace_id, prompt=prompt)
+            content = await transcriber(file_path, trace_id, prompt=prompt, **extra)
         except Exception as exc:
             logger.warning(
                 "transcription_attempt_failed trace_id=%s provider=%s err=%s",
