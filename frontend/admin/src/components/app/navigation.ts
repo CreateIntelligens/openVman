@@ -6,7 +6,7 @@ import {
 
 export const workspaceTabs = [
   { key: "Chat", label: "對話", icon: "chat" },
-  { key: "Tts", label: "語音", icon: "graphic_eq" },
+  { key: "Voice", label: "語音", icon: "graphic_eq" },
   { key: "Sessions", label: "對話紀錄", icon: "forum" },
   { key: "Search", label: "知識庫搜尋", icon: "search" },
   { key: "Workspace", label: "工作區", icon: "folder_managed" },
@@ -47,7 +47,7 @@ export const pageComponents: Record<
   LazyExoticComponent<ComponentType>
 > = {
   Chat: lazy(() => import("../../pages/Chat")),
-  Tts: lazy(() => import("../../pages/Tts")),
+  Voice: lazy(() => import("../../pages/Voice")),
   Sessions: lazy(() => import("../../pages/Sessions")),
   Search: lazy(() => import("../../pages/Search")),
   Workspace: lazy(() => import("../../pages/Workspace")),
@@ -66,7 +66,7 @@ export const pageComponents: Record<
 
 const tabPathSegments: Record<Tab, string> = {
   Chat: "chat",
-  Tts: "tts",
+  Voice: "voice",
   Sessions: "sessions",
   Search: "search",
   Workspace: "workspace",
@@ -89,7 +89,7 @@ const tabsByPathSegment = Object.fromEntries(
 
 /** First view is the page default; non-default views have their own URL. */
 export const adminSubViews: Partial<Record<Tab, readonly string[]>> = {
-  Tts: ["tts", "asr"],
+  Voice: ["tts", "asr"],
   KnowledgeBase: ["documents", "graph"],
   Avatar: ["characters", "backgrounds", "mascots"],
   Memory: ["browse", "add"],

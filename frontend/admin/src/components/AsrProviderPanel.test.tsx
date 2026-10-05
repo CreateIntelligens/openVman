@@ -2,13 +2,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchKnowledgeDocument, fetchKnowledgeSettings, saveKnowledgeDocument } from "../api/knowledge";
-import { previewAsr } from "../api/settings";
+import { fetchAsrEngines, previewAsr } from "../api/settings";
 import { charErrorRate } from "../utils/charErrorRate";
 import AsrProviderPanel from "./AsrProviderPanel";
 import { summarizeGlossary } from "./asr/GlossaryEditor";
 import { streamTestUrl } from "./asr/StreamTester";
 
-vi.mock("../api/settings", () => ({ previewAsr: vi.fn() }));
+vi.mock("../api/settings", () => ({ previewAsr: vi.fn(), fetchAsrEngines: vi.fn() }));
 vi.mock("../api/knowledge", () => ({
   fetchKnowledgeSettings: vi.fn(),
   fetchKnowledgeDocument: vi.fn(),
@@ -21,6 +21,7 @@ vi.mock("../hooks/useVad", () => ({
 
 beforeEach(() => {
   vi.mocked(previewAsr).mockReset();
+  vi.mocked(fetchAsrEngines).mockResolvedValue(["breeze", "r2t2", "r2t2-dev", "sensevoice"]);
   vi.mocked(fetchKnowledgeSettings).mockResolvedValue({ language_routes: ["zh", "en", "nan"] });
   vi.mocked(fetchKnowledgeDocument).mockResolvedValue({
     path: "ASR_PROMPT.md", content: "# 鶴記\nDIVA 沉水泵\n常見誤聽：沉睡泵→沉水泵\n",
@@ -71,7 +72,7 @@ describe("AsrProviderPanel", () => {
     expect(await screen.findByText("已儲存，約一分鐘內生效。")).toBeTruthy();
   });
 
-  it("同一段音檔依序送給勾的每個引擎，帶專案與分流", async () => {
+  it("同一段音檔同時送給勾的每個引擎，帶專案與分流", async () => {
     vi.mocked(previewAsr)
       .mockResolvedValueOnce({ text: "請問沉水泵", provider: "breeze", elapsed_seconds: 0.8, language_routes: ["zh", "en", "nan"], glossary: "DIVA 沉水泵", language_check: { result: "zh", ms: 900 } })
       .mockResolvedValueOnce({ text: "請問沉睡泵", provider: "r2t2", elapsed_seconds: 0.3, language_routes: ["zh", "en", "nan"], glossary: "DIVA 沉水泵", language_check: { result: "zh", ms: 900 } });
@@ -119,6 +120,40 @@ describe("AsrProviderPanel", () => {
     render(<AsrProviderPanel />);
     upload();
     expect(await screen.findByText(/Breeze-ASR-26 沒有回應，這次由 Xiaomi-CocktailASR-1 辨識/)).toBeTruthy();
+  });
+
+  it("沒設定的引擎不列出來", async () => {
+    vi.mocked(fetchAsrEngines).mockResolvedValue(["breeze", "r2t2"]);
+    render(<AsrProviderPanel />);
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^SenseVoice-Small$/ })).toBeNull());
+    const group = within(screen.getByRole("group", { name: "試辨識的引擎" }));
+    expect(group.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Breeze-ASR-26", "Confucius4-R2T2",
+    ]);
+  });
+
+  it("不等前一家回來就送下一家", async () => {
+    let release: () => void = () => {};
+    vi.mocked(previewAsr)
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        release = () => resolve({ text: "慢", provider: "breeze" });
+      }))
+      .mockResolvedValueOnce({ text: "快", provider: "r2t2" });
+    render(<AsrProviderPanel />);
+    fireEvent.click(await waitFor(() => engineButton(/^Confucius4-R2T2$/)));
+    upload();
+
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("快")).toBeTruthy();
+    release();
+    expect(await screen.findByText("慢")).toBeTruthy();
+  });
+
+  it("收音一律走 VAD，沒有另外的自動斷句開關", async () => {
+    render(<AsrProviderPanel />);
+    expect(await screen.findByRole("button", { name: "開始講話" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "自動斷句" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "錄一段" })).toBeNull();
   });
 
   it("一個引擎都沒勾就不送", async () => {

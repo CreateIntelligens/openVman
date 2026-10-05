@@ -148,6 +148,20 @@ async def get_language_routes(
     })
 
 
+@router.get(
+    "/api/v1/asr/engines",
+    tags=["ASR"],
+    summary="列出這個部署設定齊全的伺服器端 ASR 引擎",
+)
+async def list_asr_engines(
+    admin: CurrentAccount = Depends(require_admin),
+) -> JSONResponse:
+    """Engines the admin test bench can actually reach, so dead ones are not offered."""
+    from app.gateway.ingestion_audio import configured_providers
+
+    return JSONResponse(content={"engines": configured_providers()})
+
+
 @router.post(
     "/api/v1/asr/preview",
     tags=["ASR"],

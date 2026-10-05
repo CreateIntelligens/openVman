@@ -2,6 +2,14 @@ import { apiFetch, apiUrl, parseErrorMessage } from "./common";
 
 // apiUrl 會自己補上 /api/v1，這裡再寫一次會變成 /api/v1/api/v1/... 然後 404。
 const PREVIEW_PATH = "/asr/preview";
+const ENGINES_PATH = "/asr/engines";
+
+/** 這個部署設定齊全的伺服器端引擎；沒設定的選了也只會被備援接走。 */
+export async function fetchAsrEngines(): Promise<string[]> {
+  const res = await apiFetch(apiUrl(ENGINES_PATH));
+  if (!res.ok) throw new Error(await parseErrorMessage(res));
+  return ((await res.json()) as { engines: string[] }).engines;
+}
 
 export interface AsrPreview {
   text: string;

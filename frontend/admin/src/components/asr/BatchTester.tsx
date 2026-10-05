@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
-import { previewAsr, type AsrPreview } from "../../api/settings";
+import { fetchAsrEngines, previewAsr, type AsrPreview } from "../../api/settings";
 import { useVad } from "../../hooks/useVad";
 import { charErrorRate } from "../../utils/charErrorRate";
-import { preferredRecorderMimeType, rmsVolume } from "../../utils/liveAudioUtils";
 import { SERVER_ASR_ENGINES, VAD_SAMPLE_RATE, describeAsrEngine as describe, encodeWav } from "@shared/speech";
 
 /** 留最近幾段，太多會讓頁面一直變長；每段都佔一個 object URL。 */
@@ -27,36 +26,53 @@ interface BatchTesterProps {
 }
 
 /**
- * 批次試辨識：同一段音檔依序送給勾選的引擎，結果並排比較。
+ * 批次試辨識：同一段音檔同時送給勾選的引擎，結果並排比較。
  *
- * 一次只送一家：.35 同時多句會排隊變慢，並行送反而量不出各家真正的速度。
+ * 每家是不同機器，一家各送一句不會互相排隊，耗時由後端各自量，並行不影響比較。
+ * 只列部署設定齊全的引擎：沒設定的選了也只會被備援接走。
+ * 收音一律走 VAD：講完一句自動送出，連續講就一句一句出結果，跟正式對話一樣。
  * 帶專案與語言分流，跟正式對話一樣套詞表、開台語分流時聽是不是台語，但引擎照勾選的跑。
  */
 export default function BatchTester({ projectId, routes }: BatchTesterProps) {
+  const [offered, setOffered] = useState<string[]>([...SERVER_ASR_ENGINES]);
   const [engines, setEngines] = useState<string[]>([SERVER_ASR_ENGINES[0]]);
   const [reference, setReference] = useState("");
   const [clips, setClips] = useState<Clip[]>([]);
-  const [recording, setRecording] = useState(false);
-  const [autoSplit, setAutoSplit] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [level, setLevel] = useState(0);
+  const [listening, setListening] = useState(false);
+  // 連續講時上一句還沒辨識完下一句就送了，用計數而不是布林。
+  const [pending, setPending] = useState(0);
   const [error, setError] = useState("");
   const nextId = useRef(1);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const meterFrameRef = useRef<number | null>(null);
   const clipsRef = useRef<Clip[]>([]);
   clipsRef.current = clips;
-  // 錄音／自動斷句進來的那一刻要用當下的勾選，不能用建立 callback 時的舊值。
+  // VAD 送出那一刻要用當下的勾選，不能用建立 callback 時的舊值。
   const contextRef = useRef({ engines, projectId, routes });
   contextRef.current = { engines, projectId, routes };
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchAsrEngines()
+      .then((configured) => {
+        if (cancelled) return;
+        const usable: string[] = SERVER_ASR_ENGINES.filter((id) => configured.includes(id));
+        setOffered(usable);
+        setEngines((current) => {
+          const kept = current.filter((id) => usable.includes(id));
+          return kept.length ? kept : usable.slice(0, 1);
+        });
+      })
+      // 讀不到就照全部列，試辨識本身還是能用。
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const vad = useVad({
-    enabled: autoSplit,
+    enabled: listening,
     onSpeechCommit: () => {},
     onAudio: (samples) => {
-      void runClip(encodeWav(samples, VAD_SAMPLE_RATE), `自動斷句 ${nextId.current}`, "speech.wav");
+      void runClip(encodeWav(samples, VAD_SAMPLE_RATE), `第 ${nextId.current} 句`, "speech.wav");
     },
   });
 
@@ -85,9 +101,9 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
       kept.slice(MAX_CLIPS).forEach((old) => URL.revokeObjectURL(old.url));
       return kept.slice(0, MAX_CLIPS);
     });
-    setBusy(true);
+    setPending((count) => count + 1);
     try {
-      for (const engine of chosen) {
+      await Promise.all(chosen.map(async (engine) => {
         try {
           const preview = await previewAsr(blob, filename, engine, {
             projectId: project,
@@ -101,96 +117,22 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
             message: reason instanceof Error ? reason.message : "辨識失敗",
           });
         }
-      }
+      }));
     } finally {
-      setBusy(false);
+      setPending((count) => count - 1);
     }
-  }
-
-  function stopTracks() {
-    if (meterFrameRef.current !== null) cancelAnimationFrame(meterFrameRef.current);
-    meterFrameRef.current = null;
-    void audioContextRef.current?.close().catch(() => {});
-    audioContextRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    setLevel(0);
-  }
-
-  /** 錄音時顯示輸入音量：靜音的麥克風和「講了但沒收到」看起來一模一樣。 */
-  function startMeter(stream: MediaStream) {
-    try {
-      const context = new AudioContext();
-      audioContextRef.current = context;
-      const analyser = context.createAnalyser();
-      analyser.fftSize = 1024;
-      context.createMediaStreamSource(stream).connect(analyser);
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      const tick = () => {
-        analyser.getByteTimeDomainData(data);
-        setLevel(rmsVolume(data));
-        meterFrameRef.current = requestAnimationFrame(tick);
-      };
-      tick();
-    } catch {
-      // 音量條只是輔助，拿不到 AudioContext 不該讓錄音失敗。
-    }
-  }
-
-  async function startRecording() {
-    setError("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const mimeType = preferredRecorderMimeType();
-      // opus 壓到 24 kbps 時辨識會崩壞（「今仔日天氣袂歹」變「今拿日天氣袂買」），
-      // 128 kbps 的結果與未壓縮的 WAV 一致。
-      const recorder = new MediaRecorder(stream, {
-        ...(mimeType ? { mimeType } : {}),
-        audioBitsPerSecond: 128_000,
-      });
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size) chunks.push(event.data);
-      };
-      recorder.onstop = () => {
-        stopTracks();
-        const blob = new Blob(chunks, { type: mimeType || "audio/webm" });
-        if (!blob.size) {
-          setError("沒有錄到聲音，請確認麥克風。");
-          return;
-        }
-        void runClip(blob, "錄音");
-      };
-      recorderRef.current = recorder;
-      recorder.start();
-      startMeter(stream);
-      setRecording(true);
-    } catch {
-      stopTracks();
-      setError("無法存取麥克風，請檢查瀏覽器權限。");
-    }
-  }
-
-  function stopRecording() {
-    recorderRef.current?.stop();
-    recorderRef.current = null;
-    setRecording(false);
   }
 
   useEffect(() => () => {
-    stopTracks();
     clipsRef.current.forEach((clip) => URL.revokeObjectURL(clip.url));
   }, []);
-
-  const inputBusy = recording || autoSplit;
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="asr-batch-title">
       <div className="flex flex-col gap-1">
         <h2 id="asr-batch-title" className="text-sm font-semibold">試辨識</h2>
         <p className="text-xs leading-5 text-content-muted">
-          勾幾個引擎，錄一段話、開自動斷句或上傳音檔，同一段音檔會依序送給每一家，結果並排比較。
+          勾幾個引擎，按「開始講話」直接講，每講完一句會自動送出，同一句同時給每一家辨識、結果並排比較；也可以上傳音檔。
           跟正式對話一樣套專案詞表與語言分流；開台語分流時另外聽是不是台語，但引擎照勾的跑（正式對話會換成 Breeze）。
           只影響這一次，不會改任何人的設定。
         </p>
@@ -198,14 +140,13 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
 
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap gap-2" role="group" aria-label="試辨識的引擎">
-          {SERVER_ASR_ENGINES.map((id) => {
+          {offered.map((id) => {
             const on = engines.includes(id);
             return (
               <button
                 key={id}
                 type="button"
                 aria-pressed={on}
-                disabled={busy}
                 onClick={() => setEngines(on ? engines.filter((e) => e !== id) : [...engines, id])}
                 className={`btn px-3 py-1 text-xs ${on ? "btn-primary" : "btn-ghost"}`}
               >
@@ -237,29 +178,21 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          className={recording ? "btn btn-danger" : "btn btn-primary"}
-          disabled={autoSplit || busy}
-          onClick={() => (recording ? stopRecording() : void startRecording())}
-        >
-          {recording ? "停止並辨識" : "錄一段"}
-        </button>
-        <button
-          type="button"
-          aria-pressed={autoSplit}
-          className={autoSplit ? "btn btn-danger" : "btn btn-ghost"}
-          disabled={recording || (!vad.supported && !autoSplit)}
+          aria-pressed={listening}
+          className={listening ? "btn btn-danger" : "btn btn-primary"}
+          disabled={!vad.supported && !listening}
           title={vad.supported ? "講完一句自動送出，可以連續講" : "這個瀏覽器載不到 VAD 模型"}
-          onClick={() => setAutoSplit(!autoSplit)}
+          onClick={() => setListening(!listening)}
         >
-          {autoSplit ? "停止自動斷句" : "自動斷句"}
+          {listening ? "停止講話" : "開始講話"}
         </button>
-        <label className={`btn btn-ghost ${inputBusy || busy ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+        <label className={`btn btn-ghost ${listening ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
           上傳音檔
           <input
             type="file"
             accept="audio/*"
             className="sr-only"
-            disabled={inputBusy || busy}
+            disabled={listening}
             onChange={(event) => {
               const input = event.target;
               const picked = input.files?.[0];
@@ -269,23 +202,12 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
             }}
           />
         </label>
-        {recording && (
-          <span className="flex items-center gap-2" aria-hidden="true">
-            <span className="h-2 w-32 overflow-hidden rounded-full bg-border">
-              <span
-                className="block h-full rounded-full bg-primary transition-[width] duration-75"
-                style={{ width: `${Math.round(level * 100)}%` }}
-              />
-            </span>
-            <span className="text-xs text-content-muted">{level > 0.02 ? "收音中" : "聽不到聲音"}</span>
-          </span>
-        )}
-        {autoSplit && (
+        {listening && (
           <span role="status" className="text-xs text-content-muted">
             {vad.starting ? "麥克風準備中…" : vad.speaking ? "聽到聲音了…" : "請說話，講完一句會自動送出"}
           </span>
         )}
-        {busy && <span role="status" className="text-xs text-content-muted">辨識中…</span>}
+        {pending > 0 && <span role="status" className="text-xs text-content-muted">辨識中…</span>}
       </div>
 
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
@@ -329,7 +251,7 @@ function ClipResult({ clip, reference }: { clip: Clip; reference: string }) {
                 </span>
               )}
             </div>
-            {row.state === "pending" && <span className="text-sm text-content-muted">等待中…</span>}
+            {row.state === "pending" && <span className="text-sm text-content-muted">辨識中…</span>}
             {row.state === "error" && <span className="text-sm text-danger">{row.message}</span>}
             {row.state === "done" && (
               <>

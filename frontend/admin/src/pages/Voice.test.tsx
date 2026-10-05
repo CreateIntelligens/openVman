@@ -4,16 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect, useState } from "react";
 import { buildAdminPath, parseAdminRoute } from "../components/app/navigation";
 import { NavigationProvider } from "../context/NavigationContext";
-import Voice from "./Tts";
+import Voice from "./Voice";
 
 function RoutedVoice() {
-  const [route, setRoute] = useState(() => parseAdminRoute(window.location.pathname, window.location.search) ?? { tab: "Tts" as const });
+  const [route, setRoute] = useState(() => parseAdminRoute(window.location.pathname, window.location.search) ?? { tab: "Voice" as const });
   useEffect(() => {
-    const onPop = () => setRoute(parseAdminRoute(window.location.pathname, window.location.search) ?? { tab: "Tts" });
+    const onPop = () => setRoute(parseAdminRoute(window.location.pathname, window.location.search) ?? { tab: "Voice" });
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
-  return <NavigationProvider currentTab="Tts" currentSubView={route.subView} onSelectTab={(tab, subView) => {
+  return <NavigationProvider currentTab="Voice" currentSubView={route.subView} onSelectTab={(tab, subView) => {
     window.history.pushState(null, "", buildAdminPath(tab, "default", subView));
     setRoute({ tab, subView });
   }}><Voice /></NavigationProvider>;
@@ -26,7 +26,7 @@ vi.mock("../components/AsrProviderPanel", () => ({
   default: () => <div>ASR 面板</div>,
 }));
 
-beforeEach(() => window.history.replaceState(null, "", "/admin/tts"));
+beforeEach(() => window.history.replaceState(null, "", "/admin/voice"));
 
 // 每次從明確的網址開始，瀏覽器偏好不能覆蓋路由。
 afterEach(() => {
@@ -48,7 +48,7 @@ describe("語音頁分頁", () => {
     fireEvent.click(screen.getByRole("tab", { name: "語音辨識" }));
 
     expect(screen.getByText("ASR 面板")).toBeTruthy();
-    expect(window.location.pathname).toBe("/admin/tts/asr");
+    expect(window.location.pathname).toBe("/admin/voice/asr");
     expect(screen.queryByText("TTS 面板")).toBeNull();
   });
 
@@ -86,10 +86,10 @@ describe("語音頁分頁", () => {
     expect(screen.getByText("TTS 面板")).toBeTruthy();
   });
   it("直接開啟 ASR 路徑並隨 history 回到 TTS", () => {
-    window.history.replaceState(null, "", "/admin/tts/asr");
+    window.history.replaceState(null, "", "/admin/voice/asr");
     render(<RoutedVoice />);
     expect(screen.getByText("ASR 面板")).toBeTruthy();
-    window.history.pushState(null, "", "/admin/tts");
+    window.history.pushState(null, "", "/admin/voice");
     fireEvent.popState(window);
     expect(screen.getByText("TTS 面板")).toBeTruthy();
   });

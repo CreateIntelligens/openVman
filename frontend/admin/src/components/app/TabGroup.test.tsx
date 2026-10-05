@@ -19,8 +19,8 @@ describe("collapsible navigation group", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("link", { name: /對話$/ }).getAttribute("aria-current")).toBe("page");
     fireEvent.click(screen.getByRole("link", { name: /語音$/ }));
-    expect(props.onSelect).toHaveBeenCalledWith("Tts");
-    expect(screen.getByRole("link", { name: /語音$/ }).getAttribute("href")).toBe("/admin/tts");
+    expect(props.onSelect).toHaveBeenCalledWith("Voice");
+    expect(screen.getByRole("link", { name: /語音$/ }).getAttribute("href")).toBe("/admin/voice");
   });
 
   it("keeps the group reachable in the narrow icon sidebar", () => {
@@ -45,6 +45,6 @@ it("uses the active project and public prefix for links opened in a new tab", ()
   window.history.replaceState(null, "", "/openvman/admin/chat");
   render(<TabGroup label="Workspace" tabs={workspaceTabs} active="Chat" projectId="demo" onSelect={vi.fn()}
     isExpanded isCollapsed={false} onToggle={vi.fn()} />);
-  expect(screen.getByRole("link", { name: /語音$/ }).getAttribute("href")).toBe("/openvman/admin/tts?project=demo");
+  expect(screen.getByRole("link", { name: /語音$/ }).getAttribute("href")).toBe("/openvman/admin/voice?project=demo");
   window.history.replaceState(null, "", "/admin/chat");
 });

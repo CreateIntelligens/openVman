@@ -1380,6 +1380,23 @@ def test_asr_preview_refuses_an_unknown_engine(monkeypatch):
     assert response.status_code == 422
 
 
+def test_asr_engines_lists_only_configured_engines(monkeypatch):
+    """沒設定的引擎（例如停機的小米）不該出現在試辨識：選了只會被備援接走。"""
+    module, _ = _load_main(monkeypatch)
+    import app.gateway.ingestion_audio as ingestion_audio
+
+    monkeypatch.setattr(ingestion_audio, "get_tts_config", lambda: _make_test_config(
+        asr_breeze_url="http://breeze", asr_r2t2_url="http://r2t2", asr_r2t2_dev_url="",
+        asr_xiaomi_url="", asr_sensevoice_url="", whisper_api_key="",
+    ))
+    client, _ = _authenticated_client(module)
+
+    response = client.get("/api/v1/asr/engines")
+
+    assert response.status_code == 200
+    assert response.json() == {"engines": ["breeze", "r2t2"]}
+
+
 def test_the_site_asr_default_endpoints_are_gone(monkeypatch):
     module, _ = _load_main(monkeypatch)
     paths = {getattr(route, "path", "") for route in module.app.routes}

@@ -339,6 +339,15 @@ def _skip_unreachable(chain: list[str]) -> list[str]:
     return available or chain
 
 
+def configured_providers() -> list[str]:
+    """Server-side engines whose URL or key is set, in fallback order.
+
+    後台試辨識只列這些：沒設定的引擎選了也只會被備援接走，看起來像它辨識的。
+    """
+    cfg = get_tts_config()
+    return [name for name in _TRANSCRIBERS if _provider_ready(cfg, name)]
+
+
 def _provider_ready(cfg, name: str) -> bool:
     if name == "sensevoice":
         return bool(cfg.asr_sensevoice_url)

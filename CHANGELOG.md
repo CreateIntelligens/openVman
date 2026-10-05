@@ -3,8 +3,9 @@
 ## [Unreleased]
 
 ### Added
-- **後台語音辨識分頁改成完整的測試台**：可以編輯專案詞表（`ASR_PROMPT.md`，顯示幾個詞、幾條誤聽對照）；勾語言分流；批次試辨識一次勾多個引擎、同一段音檔依序比較，輸入有錄音、VAD 自動斷句（可連續講）、上傳三種，顯示實際引擎、耗時、套用的分流與詞表、台語判斷，填參考文字就算錯字率（跟 voice_e2e 同算法），最近 5 段可回放；新增串流試聽，邊講邊出字。後端：`/api/v1/asr/preview` 多收 `project_id`、`language_routes`，跟正式對話一樣套詞表與台語判斷（引擎照選的跑），回傳 `glossary`、`language_check`、`language_routes`；`/api/v1/asr/stream` 多一個只有管理員能用的 `engine` 參數。原本錄音鈕用到不存在的 `btn-secondary` 樣式，一起改掉。
+- **後台語音辨識分頁改成完整的測試台**：可以編輯專案詞表（`ASR_PROMPT.md`，顯示幾個詞、幾條誤聽對照）；勾語言分流；批次試辨識一次勾多個引擎、同一段音檔同時送出比較，輸入有 VAD 收音（講完一句自動送出，可連續講）與上傳，顯示實際引擎、耗時、套用的分流與詞表、台語判斷，填參考文字就算錯字率（跟 voice_e2e 同算法），最近 5 段可回放；新增串流試聽，邊講邊出字。後端：`/api/v1/asr/preview` 多收 `project_id`、`language_routes`，跟正式對話一樣套詞表與台語判斷（引擎照選的跑），回傳 `glossary`、`language_check`、`language_routes`；`/api/v1/asr/stream` 多一個只有管理員能用的 `engine` 參數。原本錄音鈕用到不存在的 `btn-secondary` 樣式，一起改掉。
 - 講話中插話的分類端點（預設不用）：新增登入保護的 `POST /api/v1/voice/interrupt`（`{transcript, reply_text}` → `{action: "STOP" | "IGNORE"}`），先丟掉完整出現在回答裡的文字（當成喇叭回音），再交給既有 GuardAgent／Jev 判斷。前台串流辨識接好了，但開關 `INTERRUPT_WHILE_SPEAKING`（`useAvatarVoiceInput.ts`）預設關：回音過濾只擋完全相同的文字，辨識錯一個字就擋不住，現場喇叭與麥克風的回音消除還沒實測，開了可能讓虛擬人自己打斷自己。虛擬人出聲時所有引擎照舊停止收音。
+
 
 ### Fixed
 
@@ -54,6 +55,9 @@
 ### Changed
 
 - **R2T2 主機改成 .35、.37 改當 dev**：`r2t2`／`r2t2-live` 改接 .35（`ASR_R2T2_URL=http://10.9.0.35:8040`、`ASR_R2T2_STREAM_URL=ws://10.9.0.35:8040/asr_stream_api_v1`），`r2t2-dev`／`r2t2-dev-live` 改接 .37。引擎 id 與授權不變，已授權 `r2t2-live` 的帳號（含 80 個臨時帳號）之後都送 .35。今天實測 .35 同時三路定稿要 8.6 秒（.37 1.6 秒）、男聲常吃句尾，正式流量會受影響。後台與前台的引擎說明改標機器；`.env.example`、README、Backend 規格與 `scripts/experiments/r2t2/multilang/` 腳本的變數對應一起改。
+- **後台語音頁搬到 `/admin/voice`**：TTS 試聽 `/admin/voice`、語音辨識 `/admin/voice/asr`（原本語音辨識掛在 `/admin/tts/asr` 底下）。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址；內部頁籤 key 由 `Tts` 改為 `Voice`。
+- **後台試辨識同時送給勾選的引擎**：原本一家一家依序送，最慢的那家要等前面都回來才開始。每家是不同機器，一家各送一句不會互相排隊，耗時照舊由後端各自量。收音一律走 VAD（講完一句自動送出，可以連續講），拿掉「錄一段」與另外的「自動斷句」開關；上傳音檔保留。
+- **後台試辨識只列設定齊全的引擎**：新增管理員用的 `GET /api/v1/asr/engines`（`{"engines": [...]}`，照 fallback 順序），沒設定網址或金鑰的引擎（例如已停用的小米）不再出現；原本選了會被備援接走，看起來像它辨識的。
 - **共用 VAD 移除 `per-utterance` 模式與 `commitMode` 選項**：原本給前台用（講完一句就關麥克風），前台改連續收音後已沒有呼叫端。`VadRecognizer`／`createSpeechController` 一律連續收音，雜音轉不出字時安靜略過；admin 三個呼叫端拿掉 `commitMode: "continuous"`。
 - Brain `SessionStore` 寫入訊息、偵測語言、裁掉舊訊息抽成共用函式，`append_message` 與合併回合的 `accept_chat_turn` 不再各寫一份。
 - **語音打斷改由 Jev 判斷規則判不出的長句（預設開）**：`JEV_INTERRUPT_ENABLED` 預設改 true。自寫 30 題規則 23/30、Jev 29/30，附和、對旁人說話不再誤停；只有規則判不出的那段長句多等最多 0.6 秒，沒有 `TYPESAFE_API_KEY`、失敗或逾時都維持中斷。

@@ -48,13 +48,13 @@ Admin 也可將已上傳且素材完整的影片角色登記為右下角小助�
 
 ### 管理介面網址
 
-管理介面具備 [Canonical Routes](docs/guides/admin-canonical-routes.md)：每頁與子頁有固定網址（例如 `/admin/tts/asr`、`/admin/knowledge/graph`、`/admin/avatar/mascots`、`/admin/accounts/temporary`），支援重新整理、上一頁／下一頁與 `/openvman` 公開前綴。`?project=demo` 指定專案，省略時採用 default；舊 `?view=` 網址自動正規化，側欄連結可開新分頁。
+管理介面具備 [Canonical Routes](docs/guides/admin-canonical-routes.md)：每頁與子頁有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/avatar/mascots`、`/admin/accounts/temporary`），支援重新整理、上一頁／下一頁與 `/openvman` 公開前綴。`?project=demo` 指定專案，省略時採用 default；舊 `?view=` 網址自動正規化，側欄連結可開新分頁。
 若帳號無法存取 default，後台會先從可用專案清單選擇可存取的專案，再載入頁面並更新網址。
 從非預設專案的對話紀錄按「開啟」會把目前專案一併帶入 Chat，側欄的新分頁連結也會保留目前專案。
 
 ### TTS 試聽
 
-管理介面側欄的「TTS 試聽」（`/admin/tts`，公開子路徑為 `/openvman/admin/tts`）可選擇帳號已授權的供應商與聲音，輸入最多 1000 字後直接播放。可停止請求／播放，並以播放器重播；若瀏覽器未允許自動播放，按播放器的播放鍵即可。此功能不建立對話紀錄，也不修改對話頁的聲音偏好。若後端改用備援供應商，頁面會標示實際供應商。
+管理介面側欄的「語音 → TTS 試聽」（`/admin/voice`，公開子路徑為 `/openvman/admin/voice`）可選擇帳號已授權的供應商與聲音，輸入最多 1000 字後直接播放。可停止請求／播放，並以播放器重播；若瀏覽器未允許自動播放，按播放器的播放鍵即可。此功能不建立對話紀錄，也不修改對話頁的聲音偏好。若後端改用備援供應商，頁面會標示實際供應商。
 
 聲音清單沿用 `GET /api/v1/tts/providers`，試聽沿用登入驗證的 `POST /v1/audio/speech`（`input`、`provider`、`voice`）；依回應 `Content-Type` 播放 WAV／MP3，並讀取 `X-TTS-Provider` 與 `X-TTS-Fallback`。供應商與聲音權限仍由後端執行。
 
@@ -360,7 +360,7 @@ GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_D
 60 秒錄音上限。ASR worker 與設定 API 共用授權判定，撤權後不再採用帳號的
 舊引擎偏好，改用部署設定的 `ASR_PROVIDER` 與既有 fallback 鏈；連不上的引擎會暫停 60 秒不排入。後台沒有「全站預設
 引擎」可以改：沒選過引擎的人一律用 `ASR_PROVIDER`，每個人在聊天室或前台設定自己選
-（能選哪些由帳號頁授權）；後台「語音 → 語音辨識」可以編輯專案詞表、勾語言分流，批次試辨識一次比較多個引擎（錄音、VAD 自動斷句或上傳，可填參考文字算錯字率、看台語判斷），也能串流試聽 Gemini／R2T2 的即時字幕；都只影響這一次，不改任何人的設定。
+（能選哪些由帳號頁授權）；後台「語音 → 語音辨識」（`/admin/voice/asr`）可以編輯專案詞表、勾語言分流，批次試辨識一次比較多個引擎（收音一律走 VAD，講完一句自動送出；也可上傳，可填參考文字算錯字率、看台語判斷），同一句同時送給勾選的引擎，只列這個部署設定齊全的引擎（`GET /api/v1/asr/engines`）；也能串流試聽 Gemini／R2T2 的即時字幕；都只影響這一次，不改任何人的設定。
 虛擬人在想或在講時，前台的送出鈕會變成「停止」，沒開視窗時按 Esc 也能打斷；講話中麥克風會暫停（避免收到自己的聲音），所以不能用開口打斷；講完會自動恢復收音，6 秒沒開口才關麥克風。
 開了台語分流的專案一律改用 Breeze 批次辨識（Gemini Live 辨識聽不懂台語），並同時判斷是不是台語；
 判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時當不是台語，細節見 `docs/specs/03_BRAIN_SPEC.md`。

@@ -12,7 +12,7 @@ const TABS: { id: Tab; label: string }[] = [
 const TAB_IDS = TABS.map((entry) => entry.id);
 
 export default function Voice() {
-  const [tab, setTab] = useAdminSubView<Tab>("Tts", "tts", TAB_IDS);
+  const [tab, setTab] = useAdminSubView<Tab>("Voice", "tts", TAB_IDS);
 
   return (
     <div className="page-scroll p-6 lg:p-8">

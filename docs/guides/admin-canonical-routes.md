@@ -9,7 +9,7 @@
 | 頁面 | Canonical path |
 |------|----------------|
 | 對話 | `/admin/chat` |
-| 語音 | `/admin/tts` |
+| 語音 | `/admin/voice` |
 | 對話紀錄 | `/admin/sessions` |
 | 知識庫搜尋 | `/admin/search` |
 | 工作區 | `/admin/workspace` |
@@ -29,7 +29,7 @@
 
 | 頁面 | 預設子頁（省略子路徑） | 其他固定子路徑 |
 |------|------------------------|----------------|
-| 語音 | TTS 試聽：`/admin/tts` | ASR 試辨識：`/admin/tts/asr` |
+| 語音 | TTS 試聽：`/admin/voice` | ASR 試辨識：`/admin/voice/asr` |
 | 知識庫 | 文件：`/admin/knowledge` | 圖譜：`/admin/knowledge/graph` |
 | Avatar | 角色：`/admin/avatar` | 背景：`/admin/avatar/backgrounds`；小助理：`/admin/avatar/mascots` |
 | 記憶 | 瀏覽：`/admin/memory` | 新增：`/admin/memory/add` |
@@ -57,9 +57,9 @@
 
 另以本機 Chrome + Playwright，mock 本地帳號／專案及頁面讀取 API，驗證以下結果：
 
-- `/admin/tts/asr?project=audit` 直達 ASR，切換 TTS、重新整理及上一頁／下一頁均還原對應畫面與網址。
+- `/admin/voice/asr?project=audit` 直達 ASR，切換 TTS、重新整理及上一頁／下一頁均還原對應畫面與網址。
 - `/admin/avatar/mascots`、`/admin/accounts/temporary` 直達指定子頁；省略 project 採 default。
-- 舊 `?view=asr` 正規化為 `/admin/tts/asr`。
+- 舊 `?view=asr` 正規化為 `/admin/voice/asr`。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址（2026-10-05 起）。
 - Chat lazy module 載入前保留 `session`／`persona`，掛載後對指定對話讀取 history 並清除一次性參數。
 
 瀏覽器 `pageerror` 為空；console 僅有本地 HTTP 環境的既有 Vite wss HMR SSL 警告及測試隔離外部字體的訊息。正式 nginx 的直接開啟與重新整理須在部署後確認，這次保留已具備的 SPA fallback 設定。
