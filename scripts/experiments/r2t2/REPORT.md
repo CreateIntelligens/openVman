@@ -7,10 +7,8 @@
 | | .35:8040 | .37:8803 |
 |---|---|---|
 | 程式 | `server.py`（Sanic + vLLM），systemd | `app/main.py`（FastAPI + transformers），容器，GB10 |
-| 同時請求 | 會卡死：同時送 3 句之後，所有請求都等 60 秒回 503，`/health` 卻照樣回 healthy | 同時請求會排隊，不會卡死；r2t2asr session 依本報告的回報改版後，也支援串流 |
-| 結論 | 不使用，等修正 | 正式使用 |
-
-.35 卡死的原因：每個 `/transcribe` 都丟進 `asyncio.to_thread`，多個執行緒同時呼叫同一個同步的 vLLM `LLM` 物件，而且沒有加鎖。串流則是推論直接在事件迴圈上同步執行。這些已回報給 r2t2asr session；repo 裡的 `server.py` 已修，但 .35 實際跑的那份在 `/home/david/r2t2-service`，還沒修，也還沒重啟。
+| 同時請求 | 同時送多句會卡住（實測 3 句後全部 60 秒回 503） | 同時請求會排隊，有串流 |
+| 結論 | 接成獨立引擎 `r2t2-dev`／`r2t2-dev-live`，帳號選了才用，批次只等 20 秒 | 正式使用 |
 
 ## 方法
 

@@ -1,6 +1,6 @@
 # R2T2 串流辨識接上前台
 
-狀態：Done（2026-10-05 使用者授權結案）。已於 `afb9d6c` 提交並部署，正式引擎 `r2t2-live`（.37）；.35 另列為 `r2t2-dev`／`r2t2-dev-live`（`dd20940`）。下方「現況（交接時）」是 2026-10-01 的交接紀錄，不是現況。
+狀態：Done（2026-10-05 使用者授權結案）。已於 `afb9d6c` 提交並部署，正式引擎 `r2t2-live`（.37）；.35 另列為 `r2t2-dev`／`r2t2-dev-live`（`dd20940`）。
 
 ## 目標
 
@@ -18,18 +18,6 @@
 
 - 數據和腳本在 `scripts/experiments/r2t2/`：`run.py` 測批次，`stream.py` 測串流。
 - 延遲從音檔裡最後一個有聲音的取樣算起。
-
-## 現況（交接時）
-
-- **工作區有 Vman0914 未 commit 的改動。** 不要改、不要混進你的 commit，也不要 push。使用者交代 push 要等他確認。這些改動包括：
-  - R2T2 **批次**整合：`backend/app/gateway/ingestion_audio.py` 的 `_transcribe_r2t2`、`config.py` 的 `asr_r2t2_url`、`settings_repository.py` 的 `SERVER_ASR_PROVIDERS` 加 `r2t2`、`routes/admin.py` 的引擎名稱、`frontend/shared/speech/asr/engines.ts`、`backend/tests/gateway/test_asr_r2t2.py`，以及兩個前端測試的引擎清單。
-  - 知識圖譜略過停用文件的修正：`brain/api/tools/builtin/knowledge_tools.py`、`brain/api/tests/knowledge/test_graph_neighbor_retrieval.py`、`docs/specs/03_BRAIN_SPEC.md`，以及 `CHANGELOG.md` 的一條。
-  - `scripts/experiments/r2t2/`、`scripts/experiments/__init__.py`。
-  - 先跟使用者確認，是要等這些 commit 之後再開工，還是在另一個 worktree 做（`.worktree/<name>`）。
-- R2T2 有兩套部署：
-  - **用 .37**：`10.9.0.37:8803`，GB10，transformers。6 項修正已經上線，但改動還在 gb10 本機，沒有 commit。
-  - .35（`10.9.0.35:8040`，vLLM，對外是 asr.5gao.ai）同時請求會卡死，接成獨立引擎 `r2t2-dev`／`r2t2-dev-live`（`ASR_R2T2_DEV_*`）：帳號選了才用，失敗不換台、不當其他引擎的備援，批次只等 20 秒。
-- 正式 `.env` 還沒有任何 R2T2 設定。
 
 ## R2T2 串流協定（.37，以實測為準）
 

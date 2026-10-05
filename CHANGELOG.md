@@ -37,7 +37,7 @@
 ### Reliability
 
 - **R2T2 dev 引擎（.35）**：新增可授權的 `r2t2-dev`（批次）與 `r2t2-dev-live`（串流），接 .35 測試機（對外是 asr.5gao.ai），設定 `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_STREAM_URL`、`ASR_R2T2_DEV_SECRET_KEY`。帳號自己選了才用，失敗不換到 .37，也不排進其他引擎的備援順序；批次只等 `ASR_R2T2_DEV_TIMEOUT_SECONDS`（預設 20 秒，.35 同時多句會卡死），等不到交給下一家引擎。取代同一天先上的「.35 當 .37 的自動備援」做法。
-- **VoxCPM 推論 worker 死掉時，每句都等 120 秒才退到 Edge**：2026-10-01 17:17 GB10 記憶體被吃滿，VoxCPM 的推論 worker 被 OOM 殺掉，但 health 照回 ok，openVman 每次合成都等滿 120 秒逾時才退到 Edge，持續約 7 小時。VoxCPM360 的 health 現在會檢查 worker（死掉回 503）；openVman 的 VoxCPM adapter 合成前先查 health（最多等 2 秒、結果快取 10 秒），503 或連不上就立刻失敗退到下一家。舊版 health 沒有 worker 欄位，回 200 就照常合成。
+- **VoxCPM 推論 worker 死掉時，每句都等 120 秒才退到 Edge**：VoxCPM 的 health 照回 ok，openVman 每次合成都等滿 120 秒逾時才退到 Edge（2026-10-01 持續約 7 小時）。現在 VoxCPM adapter 合成前先查 `/api/v1/health`（最多等 2 秒、結果快取 10 秒），回 503 或連不上就立刻失敗退到下一家；health 沒有 worker 欄位時回 200 就照常合成。
 - 專案詞表缺失、讀取失敗或編碼錯誤時不再中斷對話；快取改用奈秒時間、大小與檔案身分，提示以跳脫的 `<glossary>` 標記為參考資料。
 - 串流辨識啟動加入世代隔離與 ready 逾時；停止期間才取得的麥克風立即釋放，重複啟動共用同一次收音。停止後最多保留 5 秒接最後定稿，重新啟動或卸載會清理舊連線。
 - 回應攜帶自身語言上下文，獨立視覺回答不再繼承上一句台語的 VoxCPM 分流；補上華語、打字及過期回應的行為測試。
