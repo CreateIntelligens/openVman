@@ -201,8 +201,9 @@ def test_incremental_transcripts_reset_and_final_text_override(monkeypatch):
         (["ko"], "Korean"),
         (["en"], "English"),
         (["nan", "zh"], "Chinese"),
-        # 多種語言時不知道使用者講什麼：維持中文，中英夾雜照樣聽得懂。
-        (["zh", "en", "es"], "Chinese"),
+        # 多種語言時交給 R2T2 自己判斷（.35 會分中英西，.37 當中文）。
+        (["zh", "en", "es"], "zhen"),
+        ([], "zhen"),
     ],
 )
 def test_decoding_language_follows_a_single_route(monkeypatch, routes, language):

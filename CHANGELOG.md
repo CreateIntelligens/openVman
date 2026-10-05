@@ -7,7 +7,7 @@
 
 ### Fixed
 
-- **R2T2 串流把西文、日文、韓文都當中文解碼**：握手的 `language` 寫死 `Chinese`，R2T2 不會自己判斷語言，西文「bomba」被聽成「炸彈」、日韓夾進中文字。現在照這條連線的分流帶語言：只有一種語言時帶 `English`／`Spanish`／`Japanese`／`Korean`／`Chinese`，多種語言時維持 `Chinese`（中英夾雜沒問題）。非中文的輸出不再做簡轉繁（會把日文「学校」改成「學校」）。直接連 .37 實測五種語言各 3 句，指定語言全對。多語言專案含西日韓時仍要另外決定語言來源。
+- **R2T2 串流把西文、日文、韓文都當中文解碼**：握手的 `language` 寫死 `Chinese`，R2T2 不會自己判斷語言，西文「bomba」被聽成「炸彈」、日韓夾進中文字。現在照這條連線的分流帶語言：只有一種語言時帶 `English`／`Spanish`／`Japanese`／`Korean`／`Chinese`，多種語言時送 `zhen` 讓 R2T2 自己判斷（.35 能分中英西；.37 收到 `zhen` 仍當中文，中英夾雜沒問題）。非中文的輸出不再做簡轉繁（會把日文「学校」改成「學校」）。直接連 .37 實測五種語言各 3 句，指定語言全對。多語言專案含西日韓時仍要另外決定語言來源。
 - **鶴記dev 檢索時沒有圖譜擴充**：`scripts/project_mirror.py sync` 只複製了 `graphify-out/` 檔案，檢索用的 LanceDB `note_graph` 表沒帶過去，測試專案的檢索跟正式不一樣。現在 `sync` 一併複製、`check` 一併比對（差異顯示為 `lancedb:note_graph`）；鶴記dev 已重新同步。
 - R2T2 串流實驗腳本 `scripts/experiments/r2t2/stream.py` 改讀 `.env` 的 `ASR_R2T2_SECRET_KEY`，跟正式設定同一個來源，不再在腳本裡另寫一份。
 - **voice_e2e 跑完沒有刪掉測試對話**：刪對話要專案的編輯權限，測試帳號 voice-e2e-test 只有讀取，`/api/v1/sessions/batch-delete` 一直被 Backend 回 404，對話留在鶴記dev。用 `--user` 跑時改在 api 容器裡刪（跟簽 token 一樣進容器），`--token` 打遠端時照舊走 API。
