@@ -1,0 +1,4 @@
+# 中途存檔與完整逐檔雜湊只留在執行機器上；提交的是摘要版。
+*_checkpoint.json
+*.full.json
+evaluation_setup_failure.json

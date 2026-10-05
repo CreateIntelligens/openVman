@@ -1,0 +1,6194 @@
+{
+  "scope": "EUS第4頁五個原樣型號組，不含EUSR，不展開括號；只核對原生成筆記，未修訂筆記。",
+  "method": {
+    "frontmatter_numeric": "4個有數值的欄位×5篇=20；3個缺資料欄位×5篇=15另計，不將null算成數值。",
+    "body_numeric": "逐個核對實際規格數字及中文「雙重」；型號數碼、wikilink與H1/H2欄位標籤是識別符，不當成規格數值。",
+    "provenance": "數值是否吻合原文與筆記是否正確引用分開；source.page=4視為主頁，62行及428行起的附錄需額外頁面標記。",
+    "numeric_error_rule": "數值不一致、缺資料猜值或把其他欄位／系列數字當作規格才列數值錯；漏引或跨頁標註缺失列warning。"
+  },
+  "summary": {
+    "note_count": 5,
+    "numeric_field_count": 20,
+    "numeric_errors": 0,
+    "missing_as_null_count": 15,
+    "missing_as_null_field_count": 15,
+    "missing_as_null_errors": 0,
+    "body_numeric_field_count": 30,
+    "body_numeric_errors": 0,
+    "provenance_issues": 14,
+    "provenance_affected_note_count": 5,
+    "non_numeric_semantic_errors": 1,
+    "invalid_wikilinks": 0,
+    "wikilink_count": 20,
+    "source_sha256_match": true,
+    "errors": [
+      {
+        "filename": "50EUS-5.05.md",
+        "severity": "error",
+        "category": "non_numeric_semantic",
+        "claim": "具備鑄鐵材質",
+        "reason": "62行鑄鐵位於「著脫座材質」欄，不是EUS泵體材質；第4頁沒有明列泵體為鑄鐵，正文誤把配件材質泛化為泵浦材質。",
+        "source_lines": [
+          60,
+          62
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 3,
+            "line": 60,
+            "quote": "| 系列代碼 (Type) | 類別 | 馬力範圍 (HP) | 電源相數 | 支援 Duck Foot（自動著脫座）型號 | 著脫座材質 | 型錄對應頁次 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 3,
+            "line": 62,
+            "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+          }
+        ]
+      }
+    ],
+    "suffix_errors": 0,
+    "residue_condition_errors": 0
+  },
+  "errors": [
+    {
+      "filename": "50EUS-5.05.md",
+      "severity": "error",
+      "category": "non_numeric_semantic",
+      "claim": "具備鑄鐵材質",
+      "reason": "62行鑄鐵位於「著脫座材質」欄，不是EUS泵體材質；第4頁沒有明列泵體為鑄鐵，正文誤把配件材質泛化為泵浦材質。",
+      "source_lines": [
+        60,
+        62
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 3,
+          "line": 60,
+          "quote": "| 系列代碼 (Type) | 類別 | 馬力範圍 (HP) | 電源相數 | 支援 Duck Foot（自動著脫座）型號 | 著脫座材質 | 型錄對應頁次 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 3,
+          "line": 62,
+          "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+        }
+      ]
+    }
+  ],
+  "provenance_issues": [
+    {
+      "filename": "50EUS-5.05.md",
+      "severity": "warning",
+      "code": "cross_page_annotations_missing",
+      "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+      "actual_source_lines": [
+        62,
+        428,
+        429,
+        430,
+        431,
+        432,
+        433,
+        434,
+        435
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.10.md",
+      "severity": "warning",
+      "code": "incomplete_depth_citation",
+      "message": "10 m最大沉水深度數值正確，但source.lines未包含97或432，引用不完整。",
+      "missing_source_lines": [
+        97,
+        432
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.10.md",
+      "severity": "warning",
+      "code": "incomplete_purpose_citation",
+      "message": "輕型沉水排水泵類別有原文依據，但source.lines未列第3頁62行。",
+      "missing_source_lines": [
+        62
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.10.md",
+      "severity": "warning",
+      "code": "incomplete_residue_condition_citation",
+      "message": "殘水底盤0.5HP／1HP選配條件正確，但source.lines未列116行。",
+      "missing_source_lines": [
+        116
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.10.md",
+      "severity": "warning",
+      "code": "incomplete_dimension_header_citation",
+      "message": "已列尺寸列，但未列107行H／H1／H2欄位表頭，水位欄位語意引用不完整。",
+      "missing_source_lines": [
+        107
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.10.md",
+      "severity": "warning",
+      "code": "incomplete_body_claim_citations",
+      "message": "正文規格與技術敘述可在原文查得，但現有source.lines未列部分依據。",
+      "missing_source_lines": [
+        85,
+        100,
+        101,
+        103,
+        104
+      ]
+    },
+    {
+      "filename": "80EUS-5.10L.md",
+      "severity": "warning",
+      "code": "cross_page_annotations_missing",
+      "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+      "actual_source_lines": [
+        62,
+        428,
+        429,
+        430,
+        431,
+        432,
+        433,
+        434,
+        435,
+        436,
+        437,
+        438,
+        439,
+        440
+      ]
+    },
+    {
+      "filename": "80EUS-5.10L.md",
+      "severity": "warning",
+      "code": "unrelated_supplemental_lines",
+      "message": "列入其他系列著脫座條目的附錄行，對本篇EUS規格沒有支持作用。",
+      "actual_source_lines": [
+        436,
+        437,
+        438,
+        439,
+        440
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.20C.md",
+      "severity": "warning",
+      "code": "cross_page_annotations_missing",
+      "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+      "actual_source_lines": [
+        62
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.20C.md",
+      "severity": "warning",
+      "code": "incomplete_depth_citation",
+      "message": "10 m最大沉水深度數值正確，但source.lines未包含97或432，引用不完整。",
+      "missing_source_lines": [
+        97,
+        432
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.20C.md",
+      "severity": "warning",
+      "code": "incomplete_body_claim_citations",
+      "message": "正文規格與技術敘述可在原文查得，但現有source.lines未列部分依據。",
+      "missing_source_lines": [
+        85,
+        100,
+        101,
+        102,
+        103,
+        104
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.20.md",
+      "severity": "warning",
+      "code": "cross_page_annotations_missing",
+      "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+      "actual_source_lines": [
+        62
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.20.md",
+      "severity": "warning",
+      "code": "incomplete_dimension_header_citation",
+      "message": "已列尺寸列，但未列107行H／H1／H2欄位表頭，水位欄位語意引用不完整。",
+      "missing_source_lines": [
+        107
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.20.md",
+      "severity": "warning",
+      "code": "incomplete_body_claim_citations",
+      "message": "正文規格與技術敘述可在原文查得，但現有source.lines未列部分依據。",
+      "missing_source_lines": [
+        85,
+        100,
+        101,
+        102,
+        103,
+        104
+      ]
+    }
+  ],
+  "details": [
+    {
+      "filename": "50EUS-5.05.md",
+      "model": "50EUS-5.05",
+      "frontmatter_identity_checks": [
+        {
+          "field": "model",
+          "category": "identity",
+          "expected": "50EUS-5.05",
+          "actual": "50EUS-5.05",
+          "match": true,
+          "source_lines": [
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "series",
+          "category": "identity",
+          "expected": "EUS",
+          "actual": "EUS",
+          "match": true,
+          "source_lines": [
+            62,
+            80,
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 80,
+              "quote": "## 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "purpose",
+          "category": "identity",
+          "expected": "輕型沉水排水泵",
+          "actual": "輕型沉水排水泵",
+          "match": true,
+          "source_lines": [
+            62
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            }
+          ]
+        }
+      ],
+      "numeric_field_checks": [
+        {
+          "field": "max_depth_m",
+          "category": "numeric",
+          "expected": 10,
+          "actual": 10,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ]
+        },
+        {
+          "field": "height_mm",
+          "category": "numeric",
+          "expected": 352.0,
+          "actual": 352,
+          "match": true,
+          "source_lines": [
+            107,
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "cwl_mm",
+          "category": "numeric",
+          "expected": 200.0,
+          "actual": 200,
+          "match": true,
+          "source_lines": [
+            107,
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "lwl_mm",
+          "category": "numeric",
+          "expected": 84.0,
+          "actual": 84,
+          "match": true,
+          "source_lines": [
+            107,
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ]
+        }
+      ],
+      "missing_as_null_checks": [
+        {
+          "field": "hp",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "head_m",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "outlet_inches",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        }
+      ],
+      "suffix_check": {
+        "field": "suffix_meaning",
+        "expected": null,
+        "actual": null,
+        "match": true,
+        "source_lines": [
+          109,
+          119,
+          120
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 109,
+            "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 119,
+            "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 120,
+            "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+          }
+        ]
+      },
+      "residue_condition_check": {
+        "field": "residue_plate_eligibility",
+        "expected": "0.5HP與1HP可選配殘水吸附底盤，該選配可抽至3 mm；逐型號HP未明列，所以無法逐型號確認資格。",
+        "actual": "0.5HP 與 1HP 可選配殘水吸附底盤，但型號 50EUS-5.05 未明確記載對應馬力，故無法逐型號判定是否符合 eligibility",
+        "match": true,
+        "source_lines": [
+          116
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          }
+        ],
+        "completeness_note": "各篇皆保留0.5HP／1HP、選配與逐型號資格未知的限制；欄位省略3 mm能力，但沒有誤述為標準配備或錯誤數字。"
+      },
+      "body_numeric_checks": [
+        {
+          "field": "protection_grade",
+          "category": "body_numeric",
+          "expected": 68,
+          "actual": 68.0,
+          "match": true,
+          "source_lines": [
+            100
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            }
+          ],
+          "actual_text": "IP68"
+        },
+        {
+          "field": "max_depth_m",
+          "category": "body_numeric",
+          "expected": 10,
+          "actual": 10.0,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ],
+          "actual_text": "10 公尺"
+        },
+        {
+          "field": "height_mm",
+          "category": "body_numeric",
+          "expected": 352.0,
+          "actual": 352.0,
+          "match": true,
+          "source_lines": [
+            107,
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ],
+          "actual_text": "高度為 352 mm"
+        },
+        {
+          "field": "cwl_mm",
+          "category": "body_numeric",
+          "expected": 200.0,
+          "actual": 200.0,
+          "match": true,
+          "source_lines": [
+            107,
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ],
+          "actual_text": "連續運轉水位 (H1) 為 200 mm"
+        },
+        {
+          "field": "lwl_mm",
+          "category": "body_numeric",
+          "expected": 84.0,
+          "actual": 84.0,
+          "match": true,
+          "source_lines": [
+            107,
+            109
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            }
+          ],
+          "actual_text": "最低運轉水位 (H2) 為 84 mm"
+        }
+      ],
+      "unreviewed_body_numeric_tokens": [],
+      "wikilinks": [
+        {
+          "target": "50(80)EUS-5.10",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "80EUS-5.10L",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20C",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        }
+      ],
+      "source_check": {
+        "path_expected": "knowledge/EVAK_CATALOG.md",
+        "path_actual": "knowledge/EVAK_CATALOG.md",
+        "path_match": true,
+        "main_page_expected": 4,
+        "page_actual": 4,
+        "main_page_match": true,
+        "lines_actual": [
+          62,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          428,
+          429,
+          430,
+          431,
+          432,
+          433,
+          434,
+          435
+        ],
+        "line_numbers_valid": true,
+        "dimension_row_cited": true,
+        "depth_source_cited": true,
+        "quoted_line_contexts": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 3,
+            "line": 62,
+            "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 80,
+            "quote": "## 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 81,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 82,
+            "quote": "### 1. 結構剖面分解零件清單 (50EUS-5.05 Section View)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 83,
+            "quote": "| 標號 | 零件名稱 (Part Name) | 標號 | 零件名稱 (Part Name) |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 84,
+            "quote": "| :---: | :--- | :---: | :--- |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 85,
+            "quote": "| 1 | Cable（防水電纜） | 11 | Impeller（高耐磨半開式葉輪） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 86,
+            "quote": "| 2 | Handle（耐衝擊人體工學提把） | 12 | Pump Casing（泵殼流道） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 87,
+            "quote": "| 3 | Motor Cover（馬達頂蓋） | 15-1| Upper Bearing（上滾珠軸承） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 88,
+            "quote": "| 4 | Bracket（軸承托架） | 15-2| Lower Bearing（下滾珠軸承） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 89,
+            "quote": "| 5 | Motor Housing + Stator（外殼與定子） | 16 | Strainer（底座濾網） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 90,
+            "quote": "| 6 | Shaft with Rotor（轉子軸心） | 28 | Agitator（泥砂攪拌器） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 91,
+            "quote": "| 7 | Oil Chamber（潤滑油室） | - | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 92,
+            "quote": "| 8-1| Upper Mechanical Seal（上機械軸封） | 10 | Lip Seal（唇型油封，僅限 2HP 機型配備：2HP Only） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 93,
+            "quote": "| 8-2| Lower Mechanical Seal（下機械軸封） | - | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 94,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 95,
+            "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 96,
+            "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 97,
+            "quote": "- 最大沉水深度：10 公尺 (10M)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 98,
+            "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 99,
+            "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 100,
+            "quote": "- 防護等級：IP 68 沉水密封等級"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 101,
+            "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 102,
+            "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 103,
+            "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 104,
+            "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 105,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 106,
+            "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 107,
+            "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 108,
+            "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 109,
+            "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 110,
+            "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 111,
+            "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 112,
+            "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 113,
+            "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 114,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 115,
+            "quote": "> [!NOTE] 關鍵註腳說明"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 117,
+            "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 118,
+            "quote": "> 3. 型號字尾微小代碼："
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 119,
+            "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 120,
+            "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 121,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 428,
+            "quote": "## 附錄：全系列通用運轉條件與著脫座對照"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 429,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 430,
+            "quote": "1. 環境運轉極限："
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 431,
+            "quote": "   - 水溫限制：0 ~ 40 °C (32 ~ 104 °F)。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 432,
+            "quote": "   - 最大沉水深度：標準系列為 10 公尺；EUB-M (10~20HP)、DIVA、DIVA PRO 為 20 公尺。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 433,
+            "quote": "   - 電機防護等級：全機 IP68 沉水連續運轉級密封。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 434,
+            "quote": "2. Duck Foot（Q.D.C. 自動著脫座）對照總結："
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 435,
+            "quote": "   - QG：EUS, EUSR, EUBL, ALLIGATOR (帶 QG 代碼)"
+          }
+        ]
+      },
+      "generation_consistency": {
+        "frontmatter_match": true,
+        "markdown_match_ignoring_outer_whitespace": true,
+        "trailing_newline_only_difference": true
+      },
+      "provenance_issues": [
+        {
+          "filename": "50EUS-5.05.md",
+          "severity": "warning",
+          "code": "cross_page_annotations_missing",
+          "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+          "actual_source_lines": [
+            62,
+            428,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435
+          ]
+        }
+      ],
+      "content_issues": [
+        {
+          "filename": "50EUS-5.05.md",
+          "severity": "error",
+          "category": "non_numeric_semantic",
+          "claim": "具備鑄鐵材質",
+          "reason": "62行鑄鐵位於「著脫座材質」欄，不是EUS泵體材質；第4頁沒有明列泵體為鑄鐵，正文誤把配件材質泛化為泵浦材質。",
+          "source_lines": [
+            60,
+            62
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 60,
+              "quote": "| 系列代碼 (Type) | 類別 | 馬力範圍 (HP) | 電源相數 | 支援 Duck Foot（自動著脫座）型號 | 著脫座材質 | 型錄對應頁次 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "50(80)EUS-5.10.md",
+      "model": "50(80)EUS-5.10",
+      "frontmatter_identity_checks": [
+        {
+          "field": "model",
+          "category": "identity",
+          "expected": "50(80)EUS-5.10",
+          "actual": "50(80)EUS-5.10",
+          "match": true,
+          "source_lines": [
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "series",
+          "category": "identity",
+          "expected": "EUS",
+          "actual": "EUS",
+          "match": true,
+          "source_lines": [
+            62,
+            80,
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 80,
+              "quote": "## 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "purpose",
+          "category": "identity",
+          "expected": "輕型沉水排水泵",
+          "actual": "輕型沉水排水泵",
+          "match": true,
+          "source_lines": [
+            62
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            }
+          ]
+        }
+      ],
+      "numeric_field_checks": [
+        {
+          "field": "max_depth_m",
+          "category": "numeric",
+          "expected": 10,
+          "actual": 10,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ]
+        },
+        {
+          "field": "height_mm",
+          "category": "numeric",
+          "expected": 377.0,
+          "actual": 377,
+          "match": true,
+          "source_lines": [
+            107,
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "cwl_mm",
+          "category": "numeric",
+          "expected": 225.0,
+          "actual": 225,
+          "match": true,
+          "source_lines": [
+            107,
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ]
+        },
+        {
+          "field": "lwl_mm",
+          "category": "numeric",
+          "expected": 84.0,
+          "actual": 84,
+          "match": true,
+          "source_lines": [
+            107,
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ]
+        }
+      ],
+      "missing_as_null_checks": [
+        {
+          "field": "hp",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "head_m",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "outlet_inches",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        }
+      ],
+      "suffix_check": {
+        "field": "suffix_meaning",
+        "expected": null,
+        "actual": null,
+        "match": true,
+        "source_lines": [
+          110,
+          119,
+          120
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 110,
+            "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 119,
+            "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 120,
+            "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+          }
+        ]
+      },
+      "residue_condition_check": {
+        "field": "residue_plate_eligibility",
+        "expected": "0.5HP與1HP可選配殘水吸附底盤，該選配可抽至3 mm；逐型號HP未明列，所以無法逐型號確認資格。",
+        "actual": "型號未明確標示馬力，0.5HP與1HP可選配殘水吸附底盤，無法逐型號判定",
+        "match": true,
+        "source_lines": [
+          116
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          }
+        ],
+        "completeness_note": "各篇皆保留0.5HP／1HP、選配與逐型號資格未知的限制；欄位省略3 mm能力，但沒有誤述為標準配備或錯誤數字。"
+      },
+      "body_numeric_checks": [
+        {
+          "field": "protection_grade",
+          "category": "body_numeric",
+          "expected": 68,
+          "actual": 68.0,
+          "match": true,
+          "source_lines": [
+            100
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            }
+          ],
+          "actual_text": "IP68"
+        },
+        {
+          "field": "max_depth_m",
+          "category": "body_numeric",
+          "expected": 10,
+          "actual": 10.0,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ],
+          "actual_text": "10 公尺"
+        },
+        {
+          "field": "height_mm",
+          "category": "body_numeric",
+          "expected": 377.0,
+          "actual": 377.0,
+          "match": true,
+          "source_lines": [
+            107,
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ],
+          "actual_text": "高度為 377 mm"
+        },
+        {
+          "field": "cwl_mm",
+          "category": "body_numeric",
+          "expected": 225.0,
+          "actual": 225.0,
+          "match": true,
+          "source_lines": [
+            107,
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ],
+          "actual_text": "連續運轉水位 (C.W.L.) 為 225 mm"
+        },
+        {
+          "field": "lwl_mm",
+          "category": "body_numeric",
+          "expected": 84.0,
+          "actual": 84.0,
+          "match": true,
+          "source_lines": [
+            107,
+            110
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            }
+          ],
+          "actual_text": "最低運轉水位 (L.W.L.) 為 84 mm"
+        },
+        {
+          "field": "mechanical_seal_count",
+          "category": "body_numeric",
+          "expected": 2,
+          "actual": 2,
+          "match": true,
+          "source_lines": [
+            103
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            }
+          ],
+          "reason": "正文「雙重」為兩重機械軸封，符合型錄；此為中文數字語意。"
+        }
+      ],
+      "unreviewed_body_numeric_tokens": [],
+      "wikilinks": [
+        {
+          "target": "50EUS-5.05",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "80EUS-5.10L",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20C",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        }
+      ],
+      "source_check": {
+        "path_expected": "knowledge/EVAK_CATALOG.md",
+        "path_actual": "knowledge/EVAK_CATALOG.md",
+        "path_match": true,
+        "main_page_expected": 4,
+        "page_actual": 4,
+        "main_page_match": true,
+        "lines_actual": [
+          110
+        ],
+        "line_numbers_valid": true,
+        "dimension_row_cited": true,
+        "depth_source_cited": false,
+        "quoted_line_contexts": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 110,
+            "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+          }
+        ]
+      },
+      "generation_consistency": {
+        "frontmatter_match": true,
+        "markdown_match_ignoring_outer_whitespace": true,
+        "trailing_newline_only_difference": true
+      },
+      "provenance_issues": [
+        {
+          "filename": "50(80)EUS-5.10.md",
+          "severity": "warning",
+          "code": "incomplete_depth_citation",
+          "message": "10 m最大沉水深度數值正確，但source.lines未包含97或432，引用不完整。",
+          "missing_source_lines": [
+            97,
+            432
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.10.md",
+          "severity": "warning",
+          "code": "incomplete_purpose_citation",
+          "message": "輕型沉水排水泵類別有原文依據，但source.lines未列第3頁62行。",
+          "missing_source_lines": [
+            62
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.10.md",
+          "severity": "warning",
+          "code": "incomplete_residue_condition_citation",
+          "message": "殘水底盤0.5HP／1HP選配條件正確，但source.lines未列116行。",
+          "missing_source_lines": [
+            116
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.10.md",
+          "severity": "warning",
+          "code": "incomplete_dimension_header_citation",
+          "message": "已列尺寸列，但未列107行H／H1／H2欄位表頭，水位欄位語意引用不完整。",
+          "missing_source_lines": [
+            107
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.10.md",
+          "severity": "warning",
+          "code": "incomplete_body_claim_citations",
+          "message": "正文規格與技術敘述可在原文查得，但現有source.lines未列部分依據。",
+          "missing_source_lines": [
+            85,
+            100,
+            101,
+            103,
+            104
+          ]
+        }
+      ],
+      "content_issues": []
+    },
+    {
+      "filename": "80EUS-5.10L.md",
+      "model": "80EUS-5.10L",
+      "frontmatter_identity_checks": [
+        {
+          "field": "model",
+          "category": "identity",
+          "expected": "80EUS-5.10L",
+          "actual": "80EUS-5.10L",
+          "match": true,
+          "source_lines": [
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ]
+        },
+        {
+          "field": "series",
+          "category": "identity",
+          "expected": "EUS",
+          "actual": "EUS",
+          "match": true,
+          "source_lines": [
+            62,
+            80,
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 80,
+              "quote": "## 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ]
+        },
+        {
+          "field": "purpose",
+          "category": "identity",
+          "expected": "輕型沉水排水泵",
+          "actual": "輕型沉水排水泵",
+          "match": true,
+          "source_lines": [
+            62
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            }
+          ]
+        }
+      ],
+      "numeric_field_checks": [
+        {
+          "field": "max_depth_m",
+          "category": "numeric",
+          "expected": 10,
+          "actual": 10,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ]
+        },
+        {
+          "field": "height_mm",
+          "category": "numeric",
+          "expected": 426.5,
+          "actual": 426.5,
+          "match": true,
+          "source_lines": [
+            107,
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ]
+        },
+        {
+          "field": "cwl_mm",
+          "category": "numeric",
+          "expected": 294.0,
+          "actual": 294,
+          "match": true,
+          "source_lines": [
+            107,
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ]
+        },
+        {
+          "field": "lwl_mm",
+          "category": "numeric",
+          "expected": 112.0,
+          "actual": 112,
+          "match": true,
+          "source_lines": [
+            107,
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ]
+        }
+      ],
+      "missing_as_null_checks": [
+        {
+          "field": "hp",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "head_m",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "outlet_inches",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        }
+      ],
+      "suffix_check": {
+        "field": "suffix_meaning",
+        "expected": "L代表大流量設計（Larger flow）",
+        "actual": "大流量設計（Larger flow）",
+        "match": true,
+        "source_lines": [
+          120
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 120,
+            "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+          }
+        ]
+      },
+      "residue_condition_check": {
+        "field": "residue_plate_eligibility",
+        "expected": "0.5HP與1HP可選配殘水吸附底盤，該選配可抽至3 mm；逐型號HP未明列，所以無法逐型號確認資格。",
+        "actual": "0.5HP 與 1HP 可選配殘水吸附底盤，但型號對應不明，無法逐型號判定。",
+        "match": true,
+        "source_lines": [
+          116
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          }
+        ],
+        "completeness_note": "各篇皆保留0.5HP／1HP、選配與逐型號資格未知的限制；欄位省略3 mm能力，但沒有誤述為標準配備或錯誤數字。"
+      },
+      "body_numeric_checks": [
+        {
+          "field": "protection_grade",
+          "category": "body_numeric",
+          "expected": 68,
+          "actual": 68.0,
+          "match": true,
+          "source_lines": [
+            100
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            }
+          ],
+          "actual_text": "IP68"
+        },
+        {
+          "field": "max_depth_m",
+          "category": "body_numeric",
+          "expected": 10,
+          "actual": 10.0,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ],
+          "actual_text": "10 公尺"
+        },
+        {
+          "field": "height_mm",
+          "category": "body_numeric",
+          "expected": 426.5,
+          "actual": 426.5,
+          "match": true,
+          "source_lines": [
+            107,
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ],
+          "actual_text": "高度為 426.5 mm"
+        },
+        {
+          "field": "cwl_mm",
+          "category": "body_numeric",
+          "expected": 294.0,
+          "actual": 294.0,
+          "match": true,
+          "source_lines": [
+            107,
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ],
+          "actual_text": "連續運轉水位 (C.W.L.) 為 294 mm"
+        },
+        {
+          "field": "lwl_mm",
+          "category": "body_numeric",
+          "expected": 112.0,
+          "actual": 112.0,
+          "match": true,
+          "source_lines": [
+            107,
+            111
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            }
+          ],
+          "actual_text": "最低運轉水位 (L.W.L.) 則為 112 mm"
+        }
+      ],
+      "unreviewed_body_numeric_tokens": [],
+      "wikilinks": [
+        {
+          "target": "50EUS-5.05",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.10",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20C",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        }
+      ],
+      "source_check": {
+        "path_expected": "knowledge/EVAK_CATALOG.md",
+        "path_actual": "knowledge/EVAK_CATALOG.md",
+        "path_match": true,
+        "main_page_expected": 4,
+        "page_actual": 4,
+        "main_page_match": true,
+        "lines_actual": [
+          62,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          428,
+          429,
+          430,
+          431,
+          432,
+          433,
+          434,
+          435,
+          436,
+          437,
+          438,
+          439,
+          440
+        ],
+        "line_numbers_valid": true,
+        "dimension_row_cited": true,
+        "depth_source_cited": true,
+        "quoted_line_contexts": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 3,
+            "line": 62,
+            "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 80,
+            "quote": "## 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 81,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 82,
+            "quote": "### 1. 結構剖面分解零件清單 (50EUS-5.05 Section View)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 83,
+            "quote": "| 標號 | 零件名稱 (Part Name) | 標號 | 零件名稱 (Part Name) |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 84,
+            "quote": "| :---: | :--- | :---: | :--- |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 85,
+            "quote": "| 1 | Cable（防水電纜） | 11 | Impeller（高耐磨半開式葉輪） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 86,
+            "quote": "| 2 | Handle（耐衝擊人體工學提把） | 12 | Pump Casing（泵殼流道） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 87,
+            "quote": "| 3 | Motor Cover（馬達頂蓋） | 15-1| Upper Bearing（上滾珠軸承） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 88,
+            "quote": "| 4 | Bracket（軸承托架） | 15-2| Lower Bearing（下滾珠軸承） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 89,
+            "quote": "| 5 | Motor Housing + Stator（外殼與定子） | 16 | Strainer（底座濾網） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 90,
+            "quote": "| 6 | Shaft with Rotor（轉子軸心） | 28 | Agitator（泥砂攪拌器） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 91,
+            "quote": "| 7 | Oil Chamber（潤滑油室） | - | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 92,
+            "quote": "| 8-1| Upper Mechanical Seal（上機械軸封） | 10 | Lip Seal（唇型油封，僅限 2HP 機型配備：2HP Only） |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 93,
+            "quote": "| 8-2| Lower Mechanical Seal（下機械軸封） | - | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 94,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 95,
+            "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 96,
+            "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 97,
+            "quote": "- 最大沉水深度：10 公尺 (10M)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 98,
+            "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 99,
+            "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 100,
+            "quote": "- 防護等級：IP 68 沉水密封等級"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 101,
+            "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 102,
+            "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 103,
+            "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 104,
+            "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 105,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 106,
+            "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 107,
+            "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 108,
+            "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 109,
+            "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 110,
+            "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 111,
+            "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 112,
+            "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 113,
+            "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 114,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 115,
+            "quote": "> [!NOTE] 關鍵註腳說明"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 117,
+            "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 118,
+            "quote": "> 3. 型號字尾微小代碼："
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 119,
+            "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 120,
+            "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 121,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 428,
+            "quote": "## 附錄：全系列通用運轉條件與著脫座對照"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 429,
+            "quote": ""
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 430,
+            "quote": "1. 環境運轉極限："
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 431,
+            "quote": "   - 水溫限制：0 ~ 40 °C (32 ~ 104 °F)。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 432,
+            "quote": "   - 最大沉水深度：標準系列為 10 公尺；EUB-M (10~20HP)、DIVA、DIVA PRO 為 20 公尺。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 433,
+            "quote": "   - 電機防護等級：全機 IP68 沉水連續運轉級密封。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 434,
+            "quote": "2. Duck Foot（Q.D.C. 自動著脫座）對照總結："
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 435,
+            "quote": "   - QG：EUS, EUSR, EUBL, ALLIGATOR (帶 QG 代碼)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 436,
+            "quote": "   - QH / QL：EUB-M (2~20HP), DIVA (3~30HP), DIVA PRO, HIPPO-Q (水平出水款)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 437,
+            "quote": "   - QD-65 / QD-80：HIPPO DN65 與 DN80 大口徑專用（自帶彎管 Elbow 設計）"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 438,
+            "quote": "   - QM-65：ALLIGATOR 專用"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 439,
+            "quote": "   - QL-100：LEOPARD 專用"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": "附錄",
+            "line": 440,
+            "quote": "   - SQS / SQM：STEEL 全不鏽鋼系列專用（AISI 316 全不鏽鋼材質）"
+          }
+        ]
+      },
+      "generation_consistency": {
+        "frontmatter_match": true,
+        "markdown_match_ignoring_outer_whitespace": true,
+        "trailing_newline_only_difference": true
+      },
+      "provenance_issues": [
+        {
+          "filename": "80EUS-5.10L.md",
+          "severity": "warning",
+          "code": "cross_page_annotations_missing",
+          "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+          "actual_source_lines": [
+            62,
+            428,
+            429,
+            430,
+            431,
+            432,
+            433,
+            434,
+            435,
+            436,
+            437,
+            438,
+            439,
+            440
+          ]
+        },
+        {
+          "filename": "80EUS-5.10L.md",
+          "severity": "warning",
+          "code": "unrelated_supplemental_lines",
+          "message": "列入其他系列著脫座條目的附錄行，對本篇EUS規格沒有支持作用。",
+          "actual_source_lines": [
+            436,
+            437,
+            438,
+            439,
+            440
+          ]
+        }
+      ],
+      "content_issues": []
+    },
+    {
+      "filename": "50(80)EUS-5.20C.md",
+      "model": "50(80)EUS-5.20C",
+      "frontmatter_identity_checks": [
+        {
+          "field": "model",
+          "category": "identity",
+          "expected": "50(80)EUS-5.20C",
+          "actual": "50(80)EUS-5.20C",
+          "match": true,
+          "source_lines": [
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "series",
+          "category": "identity",
+          "expected": "EUS",
+          "actual": "EUS",
+          "match": true,
+          "source_lines": [
+            62,
+            80,
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 80,
+              "quote": "## 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "purpose",
+          "category": "identity",
+          "expected": "輕型沉水排水泵",
+          "actual": "輕型沉水排水泵",
+          "match": true,
+          "source_lines": [
+            62
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            }
+          ]
+        }
+      ],
+      "numeric_field_checks": [
+        {
+          "field": "max_depth_m",
+          "category": "numeric",
+          "expected": 10,
+          "actual": 10,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ]
+        },
+        {
+          "field": "height_mm",
+          "category": "numeric",
+          "expected": 464.0,
+          "actual": 464,
+          "match": true,
+          "source_lines": [
+            107,
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "cwl_mm",
+          "category": "numeric",
+          "expected": 308.0,
+          "actual": 308,
+          "match": true,
+          "source_lines": [
+            107,
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "lwl_mm",
+          "category": "numeric",
+          "expected": 90.0,
+          "actual": 90,
+          "match": true,
+          "source_lines": [
+            107,
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        }
+      ],
+      "missing_as_null_checks": [
+        {
+          "field": "hp",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "head_m",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "outlet_inches",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        }
+      ],
+      "suffix_check": {
+        "field": "suffix_meaning",
+        "expected": "C代表ECO（節能）、較低功率輸入（Lower input）",
+        "actual": "C 代表 ECO（節能）、較低功率輸入（Lower input）",
+        "match": true,
+        "source_lines": [
+          119
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 119,
+            "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+          }
+        ]
+      },
+      "residue_condition_check": {
+        "field": "residue_plate_eligibility",
+        "expected": "0.5HP與1HP可選配殘水吸附底盤，該選配可抽至3 mm；逐型號HP未明列，所以無法逐型號確認資格。",
+        "actual": "型號對應不明，殘水底盤僅載明0.5HP和1HP可選配，無法逐型號判定",
+        "match": true,
+        "source_lines": [
+          116
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          }
+        ],
+        "completeness_note": "各篇皆保留0.5HP／1HP、選配與逐型號資格未知的限制；欄位省略3 mm能力，但沒有誤述為標準配備或錯誤數字。"
+      },
+      "body_numeric_checks": [
+        {
+          "field": "protection_grade",
+          "category": "body_numeric",
+          "expected": 68,
+          "actual": 68.0,
+          "match": true,
+          "source_lines": [
+            100
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            }
+          ],
+          "actual_text": "IP 68"
+        },
+        {
+          "field": "max_depth_m",
+          "category": "body_numeric",
+          "expected": 10,
+          "actual": 10.0,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ],
+          "actual_text": "10 公尺"
+        },
+        {
+          "field": "height_mm",
+          "category": "body_numeric",
+          "expected": 464.0,
+          "actual": 464.0,
+          "match": true,
+          "source_lines": [
+            107,
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ],
+          "actual_text": "高度為 464 mm"
+        },
+        {
+          "field": "cwl_mm",
+          "category": "body_numeric",
+          "expected": 308.0,
+          "actual": 308.0,
+          "match": true,
+          "source_lines": [
+            107,
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ],
+          "actual_text": "連續運轉水位 (C.W.L.) 為 308 mm"
+        },
+        {
+          "field": "lwl_mm",
+          "category": "body_numeric",
+          "expected": 90.0,
+          "actual": 90.0,
+          "match": true,
+          "source_lines": [
+            107,
+            112
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ],
+          "actual_text": "最低運轉水位 (L.W.L.) 為 90 mm"
+        },
+        {
+          "field": "mechanical_seal_count",
+          "category": "body_numeric",
+          "expected": 2,
+          "actual": 2,
+          "match": true,
+          "source_lines": [
+            103
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            }
+          ],
+          "reason": "正文「雙重」為兩重機械軸封，符合型錄；此為中文數字語意。"
+        }
+      ],
+      "unreviewed_body_numeric_tokens": [],
+      "wikilinks": [
+        {
+          "target": "50EUS-5.05",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.10",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "80EUS-5.10L",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        }
+      ],
+      "source_check": {
+        "path_expected": "knowledge/EVAK_CATALOG.md",
+        "path_actual": "knowledge/EVAK_CATALOG.md",
+        "path_match": true,
+        "main_page_expected": 4,
+        "page_actual": 4,
+        "main_page_match": true,
+        "lines_actual": [
+          62,
+          107,
+          112,
+          116,
+          119
+        ],
+        "line_numbers_valid": true,
+        "dimension_row_cited": true,
+        "depth_source_cited": false,
+        "quoted_line_contexts": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 3,
+            "line": 62,
+            "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 107,
+            "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 112,
+            "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 119,
+            "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+          }
+        ]
+      },
+      "generation_consistency": {
+        "frontmatter_match": true,
+        "markdown_match_ignoring_outer_whitespace": true,
+        "trailing_newline_only_difference": true
+      },
+      "provenance_issues": [
+        {
+          "filename": "50(80)EUS-5.20C.md",
+          "severity": "warning",
+          "code": "cross_page_annotations_missing",
+          "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+          "actual_source_lines": [
+            62
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.20C.md",
+          "severity": "warning",
+          "code": "incomplete_depth_citation",
+          "message": "10 m最大沉水深度數值正確，但source.lines未包含97或432，引用不完整。",
+          "missing_source_lines": [
+            97,
+            432
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.20C.md",
+          "severity": "warning",
+          "code": "incomplete_body_claim_citations",
+          "message": "正文規格與技術敘述可在原文查得，但現有source.lines未列部分依據。",
+          "missing_source_lines": [
+            85,
+            100,
+            101,
+            102,
+            103,
+            104
+          ]
+        }
+      ],
+      "content_issues": []
+    },
+    {
+      "filename": "50(80)EUS-5.20.md",
+      "model": "50(80)EUS-5.20",
+      "frontmatter_identity_checks": [
+        {
+          "field": "model",
+          "category": "identity",
+          "expected": "50(80)EUS-5.20",
+          "actual": "50(80)EUS-5.20",
+          "match": true,
+          "source_lines": [
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "series",
+          "category": "identity",
+          "expected": "EUS",
+          "actual": "EUS",
+          "match": true,
+          "source_lines": [
+            62,
+            80,
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 80,
+              "quote": "## 第 4 頁：50EUS 沉水排水泵結構剖面與零件分解"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "purpose",
+          "category": "identity",
+          "expected": "輕型沉水排水泵",
+          "actual": "輕型沉水排水泵",
+          "match": true,
+          "source_lines": [
+            62
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 3,
+              "line": 62,
+              "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+            }
+          ]
+        }
+      ],
+      "numeric_field_checks": [
+        {
+          "field": "max_depth_m",
+          "category": "numeric",
+          "expected": 10,
+          "actual": 10,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ]
+        },
+        {
+          "field": "height_mm",
+          "category": "numeric",
+          "expected": 464.0,
+          "actual": 464,
+          "match": true,
+          "source_lines": [
+            107,
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "cwl_mm",
+          "category": "numeric",
+          "expected": 308.0,
+          "actual": 308,
+          "match": true,
+          "source_lines": [
+            107,
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        },
+        {
+          "field": "lwl_mm",
+          "category": "numeric",
+          "expected": 90.0,
+          "actual": 90,
+          "match": true,
+          "source_lines": [
+            107,
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ]
+        }
+      ],
+      "missing_as_null_checks": [
+        {
+          "field": "hp",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "head_m",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        },
+        {
+          "field": "outlet_inches",
+          "category": "missing_as_null",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_lines": [
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 95,
+              "quote": "### 2. 馬達與泵浦技術規範 (Specifications)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 96,
+              "quote": "- 液體耐受溫度：0 ~ 40 °C (32 ~ 104 °F)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 98,
+              "quote": "- 電氣頻率與極數：50Hz / 2 Pole（2極感應乾式馬達，轉速 2850 rpm）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 99,
+              "quote": "- 馬達絕緣等級：0.5 ~ 1 HP 為 Class B；2 HP 為 Class F"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 101,
+              "quote": "- 過載保護器：內建 Auto-cut 自動復歸熱保護器"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 102,
+              "quote": "- 葉輪材質：採用杜邦 DuPont Hytrel® 熱塑性聚酯彈性體覆層鋼板，極度耐砂石磨耗"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 104,
+              "quote": "- 特殊運轉模式：適用於打鼾模式 / 吸氣啜飲運轉模式（Suitable to use in snoring mode）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 105,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 106,
+              "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 108,
+              "quote": "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 109,
+              "quote": "| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 110,
+              "quote": "| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 111,
+              "quote": "| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 112,
+              "quote": "| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 114,
+              "quote": ""
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 115,
+              "quote": "> [!NOTE] 關鍵註腳說明"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 117,
+              "quote": "> 2. 浮球選配：全系列單相與三相機種均可依需求加裝自動浮球液位開關。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 118,
+              "quote": "> 3. 型號字尾微小代碼："
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 119,
+              "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 120,
+              "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+            }
+          ],
+          "reason": "第4頁沒有逐型號HP對應、揚程表或明列出水口徑；null代表未知，不能由型號猜值。"
+        }
+      ],
+      "suffix_check": {
+        "field": "suffix_meaning",
+        "expected": null,
+        "actual": null,
+        "match": true,
+        "source_lines": [
+          113,
+          119,
+          120
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 113,
+            "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 119,
+            "quote": ">    - » C 代表 ECO（節能）、較低功率輸入（Lower input）（如 50(80)EUS-5.20C）。"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 120,
+            "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+          }
+        ]
+      },
+      "residue_condition_check": {
+        "field": "residue_plate_eligibility",
+        "expected": "0.5HP與1HP可選配殘水吸附底盤，該選配可抽至3 mm；逐型號HP未明列，所以無法逐型號確認資格。",
+        "actual": "無法逐型號判定（型錄僅載明0.5HP與1HP可選配殘水吸附底盤）",
+        "match": true,
+        "source_lines": [
+          116
+        ],
+        "sources": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          }
+        ],
+        "completeness_note": "各篇皆保留0.5HP／1HP、選配與逐型號資格未知的限制；欄位省略3 mm能力，但沒有誤述為標準配備或錯誤數字。"
+      },
+      "body_numeric_checks": [
+        {
+          "field": "protection_grade",
+          "category": "body_numeric",
+          "expected": 68,
+          "actual": 68.0,
+          "match": true,
+          "source_lines": [
+            100
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 100,
+              "quote": "- 防護等級：IP 68 沉水密封等級"
+            }
+          ],
+          "actual_text": "IP68"
+        },
+        {
+          "field": "max_depth_m",
+          "category": "body_numeric",
+          "expected": 10,
+          "actual": 10.0,
+          "match": true,
+          "source_lines": [
+            97
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 97,
+              "quote": "- 最大沉水深度：10 公尺 (10M)"
+            }
+          ],
+          "actual_text": "10 公尺"
+        },
+        {
+          "field": "height_mm",
+          "category": "body_numeric",
+          "expected": 464.0,
+          "actual": 464.0,
+          "match": true,
+          "source_lines": [
+            107,
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ],
+          "actual_text": "高度為 464 mm"
+        },
+        {
+          "field": "cwl_mm",
+          "category": "body_numeric",
+          "expected": 308.0,
+          "actual": 308.0,
+          "match": true,
+          "source_lines": [
+            107,
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ],
+          "actual_text": "連續運轉水位 (C.W.L.) 為 308 mm"
+        },
+        {
+          "field": "lwl_mm",
+          "category": "body_numeric",
+          "expected": 90.0,
+          "actual": 90.0,
+          "match": true,
+          "source_lines": [
+            107,
+            113
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 107,
+              "quote": "| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |"
+            },
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 113,
+              "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+            }
+          ],
+          "actual_text": "最低運轉水位 (L.W.L.) 為 90 mm"
+        },
+        {
+          "field": "mechanical_seal_count",
+          "category": "body_numeric",
+          "expected": 2,
+          "actual": 2,
+          "match": true,
+          "source_lines": [
+            103
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 103,
+              "quote": "- 軸封配置：雙重機械軸封（Double Mechanical Seal）"
+            }
+          ],
+          "reason": "正文「雙重」為兩重機械軸封，符合型錄；此為中文數字語意。"
+        },
+        {
+          "field": "residue_plate_hp_condition",
+          "expected": [
+            0.5,
+            1
+          ],
+          "actual": 0.5,
+          "match": true,
+          "source_lines": [
+            116
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            }
+          ],
+          "actual_text": "0.5HP",
+          "reason": "正文說的是系列選配馬力條件，沒有把數字指定給目前型號。"
+        },
+        {
+          "field": "residue_plate_hp_condition",
+          "expected": [
+            0.5,
+            1
+          ],
+          "actual": 1.0,
+          "match": true,
+          "source_lines": [
+            116
+          ],
+          "sources": [
+            {
+              "path": "knowledge/EVAK_CATALOG.md",
+              "page": 4,
+              "line": 116,
+              "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+            }
+          ],
+          "actual_text": "1HP",
+          "reason": "正文說的是系列選配馬力條件，沒有把數字指定給目前型號。"
+        }
+      ],
+      "unreviewed_body_numeric_tokens": [],
+      "wikilinks": [
+        {
+          "target": "50EUS-5.05",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.10",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "80EUS-5.10L",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        },
+        {
+          "target": "50(80)EUS-5.20C",
+          "is_generated_model": true,
+          "target_file_exists": true,
+          "is_other_model": true
+        }
+      ],
+      "source_check": {
+        "path_expected": "knowledge/EVAK_CATALOG.md",
+        "path_actual": "knowledge/EVAK_CATALOG.md",
+        "path_match": true,
+        "main_page_expected": 4,
+        "page_actual": 4,
+        "main_page_match": true,
+        "lines_actual": [
+          62,
+          97,
+          106,
+          113,
+          116
+        ],
+        "line_numbers_valid": true,
+        "dimension_row_cited": true,
+        "depth_source_cited": true,
+        "quoted_line_contexts": [
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 3,
+            "line": 62,
+            "quote": "| EUS | 輕型沉水排水泵 | 0.5 ~ 2 HP | 1ø (230V) / 3ø (400V) | QG | 鑄鐵 (Cast Iron) | P04 |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 97,
+            "quote": "- 最大沉水深度：10 公尺 (10M)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 106,
+            "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 113,
+            "quote": "| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+          },
+          {
+            "path": "knowledge/EVAK_CATALOG.md",
+            "page": 4,
+            "line": 116,
+            "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+          }
+        ]
+      },
+      "generation_consistency": {
+        "frontmatter_match": true,
+        "markdown_match_ignoring_outer_whitespace": true,
+        "trailing_newline_only_difference": true
+      },
+      "provenance_issues": [
+        {
+          "filename": "50(80)EUS-5.20.md",
+          "severity": "warning",
+          "code": "cross_page_annotations_missing",
+          "message": "source.page=4主頁正確，但來源清單含第3頁或附錄，未分別標示補充來源頁面；這是出處品質問題，不是規格數值錯。",
+          "actual_source_lines": [
+            62
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.20.md",
+          "severity": "warning",
+          "code": "incomplete_dimension_header_citation",
+          "message": "已列尺寸列，但未列107行H／H1／H2欄位表頭，水位欄位語意引用不完整。",
+          "missing_source_lines": [
+            107
+          ]
+        },
+        {
+          "filename": "50(80)EUS-5.20.md",
+          "severity": "warning",
+          "code": "incomplete_body_claim_citations",
+          "message": "正文規格與技術敘述可在原文查得，但現有source.lines未列部分依據。",
+          "missing_source_lines": [
+            85,
+            100,
+            101,
+            102,
+            103,
+            104
+          ]
+        }
+      ],
+      "content_issues": []
+    }
+  ]
+}

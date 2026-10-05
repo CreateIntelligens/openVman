@@ -1,0 +1,447 @@
+{
+  "rubric_source": {
+    "path": "scripts/experiments/product-notes/questions.json",
+    "grading_rubric": {
+      "對": "完整回答全部required_points，完整列出符合或待確認型號組，數字、單位與條件正確，沒有任何forbidden_claims或新增無來源事實。數值等值、文字同義且意思清楚可接受。",
+      "部分對": "至少一項required_points正確且沒有forbidden_claims，但漏列符合型號組、漏述限制或未完整回答比較；無法判定與確認不符合必須區分。",
+      "錯": "命中任一forbidden_claims，列入不符合型號組，關鍵數字錯誤，從型號猜測缺資料，混淆H/H1/H2/沉水深度/揚程/殘水水深，或沒有正確回答任何required_points。",
+      "共同要求": [
+        "全程EUS、不引入EUSR性能",
+        "原樣保留五個型號組、不展開括號",
+        "資料不足時明說無法確認，不將未知當成不符合",
+        "3 mm殘水能力須保留0.5HP或1HP及選配底盤條件",
+        "推薦僅限題目指定且資料支持的條件"
+      ],
+      "數字核對方法": "以sources逐字引文與欄位表頭判斷數值；可接受426.50=426.5、10公尺=10 m等精確等值寫法，不可改變欄位意義。"
+    },
+    "question_ids": [
+      "Q01",
+      "Q02",
+      "Q03",
+      "Q04",
+      "Q05"
+    ],
+    "source_catalog": "scripts/experiments/product-notes/source_catalog.md",
+    "answers_source": "scripts/experiments/product-notes/results.json",
+    "interpretation": "主要依required_points評分；expected_answer未列入required_points的補充不自動扣分。chunk id不當成頁碼；可辨識的頁次、排版或立即澄清的措辭問題單列quality_issues，保留產品規格判定。"
+  },
+  "grader": "Codex：依凍結規則與來源原文逐題人工判讀，未呼叫LLM API，未改動原回答。",
+  "grades": [
+    {
+      "id": "Q01",
+      "arm": "A",
+      "verdict": "對",
+      "reason": "完整列出唯二符合的型號組及H 352/377 mm，並以H 426.5/464/464 mm逐組排除其餘三組；未展開括號或混用水位欄位。",
+      "matched_points": [
+        "完整符合名單只有50EUS-5.05與50(80)EUS-5.10",
+        "兩者H依序為352 mm與377 mm",
+        "其餘三組H為426.5 mm、464 mm、464 mm，均超過400 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q01",
+      "arm": "B",
+      "verdict": "對",
+      "reason": "完整列出唯二符合的型號組及H 352/377 mm，並以H 426.5/464/464 mm逐組排除其餘三組；未展開括號或混用水位欄位。",
+      "matched_points": [
+        "完整符合名單只有50EUS-5.05與50(80)EUS-5.10",
+        "兩者H依序為352 mm與377 mm",
+        "其餘三組H為426.5 mm、464 mm、464 mm，均超過400 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q01",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "完整列出唯二符合的型號組及H 352/377 mm，並以H 426.5/464/464 mm逐組排除其餘三組；未展開括號或混用水位欄位。",
+      "matched_points": [
+        "完整符合名單只有50EUS-5.05與50(80)EUS-5.10",
+        "兩者H依序為352 mm與377 mm",
+        "其餘三組H為426.5 mm、464 mm、464 mm，均超過400 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q02",
+      "arm": "A",
+      "verdict": "對",
+      "reason": "完整列出兩組H2 84 mm與兩組H2 90 mm，正確以H2 112 mm排除80EUS-5.10L，且保留0.5HP或1HP及選配底盤的3 mm條件，未從型號推定馬力。",
+      "matched_points": [
+        "完整符合名單為兩個84 mm型號組與兩個90 mm型號組",
+        "80EUS-5.10L的H2為112 mm，超過90 mm",
+        "H2與選配底盤後的3 mm殘水水深不同，不能宣稱標準配備即可抽至3 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 116,
+          "line_end": 116,
+          "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q02",
+      "arm": "B",
+      "verdict": "對",
+      "reason": "完整列出兩組H2 84 mm與兩組H2 90 mm，正確以H2 112 mm排除80EUS-5.10L，且保留0.5HP或1HP及選配底盤的3 mm條件，未從型號推定馬力。",
+      "matched_points": [
+        "完整符合名單為兩個84 mm型號組與兩個90 mm型號組",
+        "80EUS-5.10L的H2為112 mm，超過90 mm",
+        "H2與選配底盤後的3 mm殘水水深不同，不能宣稱標準配備即可抽至3 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 116,
+          "line_end": 116,
+          "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q02",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "完整列出兩組H2 84 mm與兩組H2 90 mm，正確以H2 112 mm排除80EUS-5.10L，且保留0.5HP或1HP及選配底盤的3 mm條件，未從型號推定馬力。",
+      "matched_points": [
+        "完整符合名單為兩個84 mm型號組與兩個90 mm型號組",
+        "80EUS-5.10L的H2為112 mm，超過90 mm",
+        "H2與選配底盤後的3 mm殘水水深不同，不能宣稱標準配備即可抽至3 mm"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 116,
+          "line_end": 116,
+          "quote": "> 1. 殘水配件：0.5HP 與 1HP 可選配殘水吸附底盤（Optional Suction Plate），可抽水至最低 3 mm 水深。"
+        }
+      ],
+      "quality_issues": [
+        "開頭誤寫「第50頁」，同一句立即以「應為第4頁」明確訂正；列為頁次品質問題，規格評分不扣分。"
+      ]
+    },
+    {
+      "id": "Q03",
+      "arm": "A",
+      "verdict": "對",
+      "reason": "完整候選只有50EUS-5.05與50(80)EUS-5.10，依H1 200<225 mm推薦前者；80EUS-5.10L的H2 112 mm與兩組5.20的H 464/H1 308 mm排除理由正確。",
+      "matched_points": [
+        "完整候選只有50EUS-5.05與50(80)EUS-5.10",
+        "推薦50EUS-5.05，理由是H1 200 mm低於225 mm",
+        "80EUS-5.10L因H2 112 mm不合格；兩個5.20型號組因H 464 mm與H1 308 mm不合格"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q03",
+      "arm": "B",
+      "verdict": "對",
+      "reason": "完整候選只有50EUS-5.05與50(80)EUS-5.10，依H1 200<225 mm推薦前者；80EUS-5.10L的H2 112 mm與兩組5.20的H 464/H1 308 mm排除理由正確。",
+      "matched_points": [
+        "完整候選只有50EUS-5.05與50(80)EUS-5.10",
+        "推薦50EUS-5.05，理由是H1 200 mm低於225 mm",
+        "80EUS-5.10L因H2 112 mm不合格；兩個5.20型號組因H 464 mm與H1 308 mm不合格"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q03",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "完整候選只有50EUS-5.05與50(80)EUS-5.10，依H1 200<225 mm推薦前者；80EUS-5.10L的H2 112 mm與兩組5.20的H 464/H1 308 mm排除理由正確。",
+      "matched_points": [
+        "完整候選只有50EUS-5.05與50(80)EUS-5.10",
+        "推薦50EUS-5.05，理由是H1 200 mm低於225 mm",
+        "80EUS-5.10L因H2 112 mm不合格；兩個5.20型號組因H 464 mm與H1 308 mm不合格"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        }
+      ],
+      "quality_issues": [
+        "開頭與來源指向第4頁，但表格標題孤立誤寫「第5頁」且未明確訂正。數據與所有必答要點均為第4頁EUS正確內容，沒有套用EUSR性能；列為頁次引用問題，不將其視為規格錯。"
+      ]
+    },
+    {
+      "id": "Q04",
+      "arm": "A",
+      "verdict": "對",
+      "reason": "兩組H/H1/H2數值與增加量49.5/69/28 mm全部正確；正確解釋L為大流量並明說缺少流量數值，不能給確切差值。",
+      "matched_points": [
+        "兩組H/H1/H2依序為377/225/84 mm與426.5/294/112 mm",
+        "差值依序為49.5、69、28 mm",
+        "L代表大流量設計，但未載明確切流量數值或流量差"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 111,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 120,
+          "line_end": 120,
+          "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q04",
+      "arm": "B",
+      "verdict": "對",
+      "reason": "兩組H/H1/H2數值與增加量49.5/69/28 mm全部正確；正確解釋L為大流量並明說缺少流量數值，不能給確切差值。",
+      "matched_points": [
+        "兩組H/H1/H2依序為377/225/84 mm與426.5/294/112 mm",
+        "差值依序為49.5、69、28 mm",
+        "L代表大流量設計，但未載明確切流量數值或流量差"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 111,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 120,
+          "line_end": 120,
+          "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+        }
+      ],
+      "quality_issues": [
+        "「###二、」缺少Markdown標題空格，可能未渲染為標題；不影響規格內容。"
+      ]
+    },
+    {
+      "id": "Q04",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "兩組H/H1/H2數值與增加量49.5/69/28 mm全部正確；正確解釋L為大流量並明說缺少流量數值，不能給確切差值。",
+      "matched_points": [
+        "兩組H/H1/H2依序為377/225/84 mm與426.5/294/112 mm",
+        "差值依序為49.5、69、28 mm",
+        "L代表大流量設計，但未載明確切流量數值或流量差"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 111,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 120,
+          "line_end": 120,
+          "quote": ">    - » L 代表 大流量設計（Larger flow）（如 80EUS-5.10L）。"
+        }
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q05",
+      "arm": "A",
+      "verdict": "部分對",
+      "reason": "共通最大沉水深度10 m、11 m無符合者，以及沉水深度不能回答10 m揚程選型都正確；但9 m情境未列出五個EUS型號組完整集合，第二項必答要點只回答11 m部分。未命中禁止主張。",
+      "matched_points": [
+        "共通最大沉水深度10 m",
+        "第二項部分符合：11 m時沒有任何符合者",
+        "沉水深度不同於揚程，不能回答10 m揚程選型"
+      ],
+      "missing_points": [
+        "9 m時未逐一列出50EUS-5.05、50(80)EUS-5.10、80EUS-5.10L、50(80)EUS-5.20C、50(80)EUS-5.20五組完整符合集合。"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 97,
+          "line_end": 97,
+          "quote": "- 最大沉水深度：10 公尺 (10M)"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 428,
+          "line_end": 432,
+          "quote": "## 附錄：全系列通用運轉條件與著脫座對照\n\n1. 環境運轉極限：\n   - 水溫限制：0 ~ 40 °C (32 ~ 104 °F)。\n   - 最大沉水深度：標準系列為 10 公尺；EUB-M (10~20HP)、DIVA、DIVA PRO 為 20 公尺。"
+        }
+      ],
+      "quality_issues": [
+        "回答以其檢索所得參考資料未含型號明細為由拒列清單；評分原文source_catalog.md第106–113行確實具有五組完整型號。這是答題資料覆蓋不足，列入缺項，不視為五組不符合深度條件或新增產品規格。"
+      ]
+    },
+    {
+      "id": "Q05",
+      "arm": "B",
+      "verdict": "對",
+      "reason": "正確採共通最大沉水深度10 m，完整列出9 m時五組全部符合、11 m時空集合，並區分沉水深度與揚程，拒絕據此判定10 m揚程需求。",
+      "matched_points": [
+        "共通最大沉水深度10 m",
+        "9 m時五組全部列出，11 m時沒有任何符合者",
+        "沉水深度不同於揚程，不能回答10 m揚程選型"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 97,
+          "line_end": 97,
+          "quote": "- 最大沉水深度：10 公尺 (10M)"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 428,
+          "line_end": 432,
+          "quote": "## 附錄：全系列通用運轉條件與著脫座對照\n\n1. 環境運轉極限：\n   - 水溫限制：0 ~ 40 °C (32 ~ 104 °F)。\n   - 最大沉水深度：標準系列為 10 公尺；EUB-M (10~20HP)、DIVA、DIVA PRO 為 20 公尺。"
+        }
+      ],
+      "quality_issues": [
+        "引用「頁次4、75」中的75沒有source_catalog.md原文頁次支持；原文第97行直接支持第4頁10 m限制，附錄第428–432行也支持10 m。列為引用頁次問題。"
+      ]
+    },
+    {
+      "id": "Q05",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "正確採共通最大沉水深度10 m，完整列出9 m時五組全部符合、11 m時空集合，並區分沉水深度與揚程，拒絕據此判定10 m揚程需求。",
+      "matched_points": [
+        "共通最大沉水深度10 m",
+        "9 m時五組全部列出，11 m時沒有任何符合者",
+        "沉水深度不同於揚程，不能回答10 m揚程選型"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 97,
+          "line_end": 97,
+          "quote": "- 最大沉水深度：10 公尺 (10M)"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 106,
+          "line_end": 113,
+          "quote": "### 3. 外觀尺寸數據 (Dimensions in mm)\n| 機型 (Type) | A | A1 | A2 | H | H1 (連續運轉水位 C.W.L.) | H2 (最低水位 L.W.L.) | H3 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUS-5.05 | 243 | 94 | 117 | 352 | 200 | 84 | - |\n| 50(80)EUS-5.10 | 279 | 94 | 133 | 377 | 225 | 84 | - |\n| 80EUS-5.10L | 284 | 94 | 138 | 426.5 | 294 | 112 | - |\n| 50(80)EUS-5.20C| 313 | 107 | 155 | 464 | 308 | 90 | - |\n| 50(80)EUS-5.20 | 313 | 107 | 155 | 464 | 308 | 90 | - |"
+        },
+        {
+          "path": "scripts/experiments/product-notes/source_catalog.md",
+          "line_start": 428,
+          "line_end": 432,
+          "quote": "## 附錄：全系列通用運轉條件與著脫座對照\n\n1. 環境運轉極限：\n   - 水溫限制：0 ~ 40 °C (32 ~ 104 °F)。\n   - 最大沉水深度：標準系列為 10 公尺；EUB-M (10~20HP)、DIVA、DIVA PRO 為 20 公尺。"
+        }
+      ],
+      "quality_issues": [
+        "9 m清單內五次寫成「最大沉水深度10 m，未超過9 m限制」，比較方向顛倒。緊接的說明明確訂正為實際沉水深度9 m≤10 m限制，且10 m規格、五組符合集合與11 m空集合皆正確；記錄措辭矛盾，不將已明確澄清的括號文字當成規格數字錯誤。"
+      ]
+    }
+  ]
+}

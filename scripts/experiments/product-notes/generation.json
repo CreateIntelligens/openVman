@@ -1,0 +1,395 @@
+{
+ "notes": [
+  {
+   "filename": "50EUS-5.05.md",
+   "markdown": "---\nmodel: 50EUS-5.05\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 352\ncwl_mm: 200\nlwl_mm: 84\nsuffix_meaning: null\nresidue_plate_eligibility: 0.5HP 與 1HP 可選配殘水吸附底盤，但型號 50EUS-5.05 未明確記載對應馬力，故無法逐型號判定是否符合 eligibility\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines: [62, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 428, 429, 430, 431, 432, 433, 434, 435]\n---\n\n型號 50EUS-5.05 為 EUS 系列輕型沉水排水泵，具備鑄鐵材質、IP68 沉水密封等級與 10 公尺最大沉水深度。本機型支援打鼾模式（吸氣啜飲運轉模式），並配置高耐磨半開式葉輪與泥砂攪拌器。外觀尺寸部分，高度為 352 mm，連續運轉水位 (H1) 為 200 mm，最低運轉水位 (H2) 為 84 mm。全系列可對應 QG 自動著脫座。\n\n相關：[[50(80)EUS-5.10]]、[[80EUS-5.10L]]、[[50(80)EUS-5.20C]]、[[50(80)EUS-5.20]]",
+   "frontmatter": {
+    "model": "50EUS-5.05",
+    "series": "EUS",
+    "hp": null,
+    "head_m": null,
+    "max_depth_m": 10,
+    "outlet_inches": null,
+    "purpose": "輕型沉水排水泵",
+    "height_mm": 352,
+    "cwl_mm": 200,
+    "lwl_mm": 84,
+    "suffix_meaning": null,
+    "residue_plate_eligibility": "0.5HP 與 1HP 可選配殘水吸附底盤，但型號 50EUS-5.05 未明確記載對應馬力，故無法逐型號判定是否符合 eligibility",
+    "source": {
+     "path": "knowledge/EVAK_CATALOG.md",
+     "page": 4,
+     "lines": [
+      62,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      428,
+      429,
+      430,
+      431,
+      432,
+      433,
+      434,
+      435
+     ]
+    }
+   }
+  },
+  {
+   "filename": "50(80)EUS-5.10.md",
+   "markdown": "---\nmodel: \"50(80)EUS-5.10\"\nseries: \"EUS\"\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: \"輕型沉水排水泵\"\nheight_mm: 377\ncwl_mm: 225\nlwl_mm: 84\nsuffix_meaning: null\nresidue_plate_eligibility: \"型號未明確標示馬力，0.5HP與1HP可選配殘水吸附底盤，無法逐型號判定\"\nsource:\n  path: \"knowledge/EVAK_CATALOG.md\"\n  page: 4\n  lines: [110]\n---\n\n50(80)EUS-5.10 屬於 EVAK EUS 輕型沉水排水泵系列，具備 IP68 沉水防護等級，最大沉水深度為 10 公尺，適用於打鼾模式與吸氣啜飲運轉模式。本型號外觀高度為 377 mm，連續運轉水位 (C.W.L.) 為 225 mm，最低運轉水位 (L.W.L.) 為 84 mm。全系列採用雙重機械軸封與高耐磨半開式葉輪，並內建自動復歸熱保護器。\n\n相關：[[50EUS-5.05]]、[[80EUS-5.10L]]、[[50(80)EUS-5.20C]]、[[50(80)EUS-5.20]]",
+   "frontmatter": {
+    "model": "50(80)EUS-5.10",
+    "series": "EUS",
+    "hp": null,
+    "head_m": null,
+    "max_depth_m": 10,
+    "outlet_inches": null,
+    "purpose": "輕型沉水排水泵",
+    "height_mm": 377,
+    "cwl_mm": 225,
+    "lwl_mm": 84,
+    "suffix_meaning": null,
+    "residue_plate_eligibility": "型號未明確標示馬力，0.5HP與1HP可選配殘水吸附底盤，無法逐型號判定",
+    "source": {
+     "path": "knowledge/EVAK_CATALOG.md",
+     "page": 4,
+     "lines": [
+      110
+     ]
+    }
+   }
+  },
+  {
+   "filename": "80EUS-5.10L.md",
+   "markdown": "---\nmodel: 80EUS-5.10L\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 426.5\ncwl_mm: 294\nlwl_mm: 112\nsuffix_meaning: 大流量設計（Larger flow）\nresidue_plate_eligibility: 0.5HP 與 1HP 可選配殘水吸附底盤，但型號對應不明，無法逐型號判定。\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines:\n  - 62\n  - 80\n  - 81\n  - 82\n  - 83\n  - 84\n  - 85\n  - 86\n  - 87\n  - 88\n  - 89\n  - 90\n  - 91\n  - 92\n  - 93\n  - 94\n  - 95\n  - 96\n  - 97\n  - 98\n  - 99\n  - 100\n  - 101\n  - 102\n  - 103\n  - 104\n  - 105\n  - 106\n  - 107\n  - 108\n  - 109\n  - 110\n  - 111\n  - 112\n  - 113\n  - 114\n  - 115\n  - 116\n  - 117\n  - 118\n  - 119\n  - 120\n  - 121\n  - 428\n  - 429\n  - 430\n  - 431\n  - 432\n  - 433\n  - 434\n  - 435\n  - 436\n  - 437\n  - 438\n  - 439\n  - 440\n---\n\n80EUS-5.10L 屬於 EUS 輕型沉水排水泵系列，字尾 L 代表大流量設計。型號具備 10 公尺最大沉水深度與 IP68 防水防護等級，支援打鼾模式（吸氣啜飲運轉模式），並內建自動復歸熱保護器。外觀尺寸方面，高度為 426.5 mm，連續運轉水位 (C.W.L.) 為 294 mm，最低運轉水位 (L.W.L.) 則為 112 mm。\n\n相關：[[50EUS-5.05]]\n相關：[[50(80)EUS-5.10]]\n相關：[[50(80)EUS-5.20C]]\n相關：[[50(80)EUS-5.20]]",
+   "frontmatter": {
+    "model": "80EUS-5.10L",
+    "series": "EUS",
+    "hp": null,
+    "head_m": null,
+    "max_depth_m": 10,
+    "outlet_inches": null,
+    "purpose": "輕型沉水排水泵",
+    "height_mm": 426.5,
+    "cwl_mm": 294,
+    "lwl_mm": 112,
+    "suffix_meaning": "大流量設計（Larger flow）",
+    "residue_plate_eligibility": "0.5HP 與 1HP 可選配殘水吸附底盤，但型號對應不明，無法逐型號判定。",
+    "source": {
+     "path": "knowledge/EVAK_CATALOG.md",
+     "page": 4,
+     "lines": [
+      62,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      428,
+      429,
+      430,
+      431,
+      432,
+      433,
+      434,
+      435,
+      436,
+      437,
+      438,
+      439,
+      440
+     ]
+    }
+   }
+  },
+  {
+   "filename": "50(80)EUS-5.20C.md",
+   "markdown": "---\nmodel: 50(80)EUS-5.20C\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 464\ncwl_mm: 308\nlwl_mm: 90\nsuffix_meaning: C 代表 ECO（節能）、較低功率輸入（Lower input）\nresidue_plate_eligibility: 型號對應不明，殘水底盤僅載明0.5HP和1HP可選配，無法逐型號判定\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines: [62, 107, 112, 116, 119]\n---\n\n型號 50(80)EUS-5.20C 屬於 EUS 輕型沉水排水泵系列，具備 IP 68 沉水密封等級與最大 10 公尺沉水深度。本系列配備高耐磨半開式葉輪與雙重機械軸封，並採用杜邦 Hytrel® 熱塑性聚酯彈性體覆層鋼板，適用於打鼾模式與吸氣啜飲運轉模式。尺寸方面，本機型高度為 464 mm，連續運轉水位 (C.W.L.) 為 308 mm，最低運轉水位 (L.W.L.) 為 90 mm。字尾 C 代表 ECO（節能）、較低功率輸入（Lower input）。\n\n相關：[[50EUS-5.05]], [[50(80)EUS-5.10]], [[80EUS-5.10L]], [[50(80)EUS-5.20]]",
+   "frontmatter": {
+    "model": "50(80)EUS-5.20C",
+    "series": "EUS",
+    "hp": null,
+    "head_m": null,
+    "max_depth_m": 10,
+    "outlet_inches": null,
+    "purpose": "輕型沉水排水泵",
+    "height_mm": 464,
+    "cwl_mm": 308,
+    "lwl_mm": 90,
+    "suffix_meaning": "C 代表 ECO（節能）、較低功率輸入（Lower input）",
+    "residue_plate_eligibility": "型號對應不明，殘水底盤僅載明0.5HP和1HP可選配，無法逐型號判定",
+    "source": {
+     "path": "knowledge/EVAK_CATALOG.md",
+     "page": 4,
+     "lines": [
+      62,
+      107,
+      112,
+      116,
+      119
+     ]
+    }
+   }
+  },
+  {
+   "filename": "50(80)EUS-5.20.md",
+   "markdown": "---\nmodel: 50(80)EUS-5.20\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 464\ncwl_mm: 308\nlwl_mm: 90\nsuffix_meaning: null\nresidue_plate_eligibility: 無法逐型號判定（型錄僅載明0.5HP與1HP可選配殘水吸附底盤）\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines:\n  - 62\n  - 97\n  - 106\n  - 113\n  - 116\n---\n\n50(80)EUS-5.20 屬於 EUS 輕型沉水排水泵系列，具備 IP68 沉水密封等級、內建自動復歸熱保護器及雙重機械軸封配置，並採用高耐磨半開式葉輪與杜邦 Hytrel® 熱塑性聚酯彈性體覆層鋼板，適用於打鼾模式與吸氣啜飲運轉。本型號之外觀高度為 464 mm，連續運轉水位 (C.W.L.) 為 308 mm，最低運轉水位 (L.W.L.) 為 90 mm，最大沉水深度為 10 公尺。殘水底盤選配僅知 0.5HP 與 1HP 可選配，無法逐型號判定。\n\n相關：[[50EUS-5.05]]、[[50(80)EUS-5.10]]、[[80EUS-5.10L]]、[[50(80)EUS-5.20C]]",
+   "frontmatter": {
+    "model": "50(80)EUS-5.20",
+    "series": "EUS",
+    "hp": null,
+    "head_m": null,
+    "max_depth_m": 10,
+    "outlet_inches": null,
+    "purpose": "輕型沉水排水泵",
+    "height_mm": 464,
+    "cwl_mm": 308,
+    "lwl_mm": 90,
+    "suffix_meaning": null,
+    "residue_plate_eligibility": "無法逐型號判定（型錄僅載明0.5HP與1HP可選配殘水吸附底盤）",
+    "source": {
+     "path": "knowledge/EVAK_CATALOG.md",
+     "page": 4,
+     "lines": [
+      62,
+      97,
+      106,
+      113,
+      116
+     ]
+    }
+   }
+  }
+ ],
+ "config": {
+  "model": "gemini-3.5-flash-lite",
+  "provider": "gemini",
+  "temperature": 0.3,
+  "project": "dev-c0c8fdff34",
+  "persona": "default",
+  "source_sha256": "9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa",
+  "scope": "第4頁五個原樣型號組；EUSR不包含；括號型號不展開",
+  "telemetry": "僅此子程序停用寫入，正式服務設定未修改"
+ },
+ "calls": [
+  {
+   "label": "note-50EUS-5.05",
+   "requested_model": "gemini-3.5-flash-lite",
+   "model": "gemini-3.5-flash-lite",
+   "usage": {
+    "input_tokens": 2124,
+    "output_tokens": 609,
+    "total_tokens": 2733,
+    "cached_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "elapsed_seconds": 3.001,
+   "content": "---\nmodel: 50EUS-5.05\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 352\ncwl_mm: 200\nlwl_mm: 84\nsuffix_meaning: null\nresidue_plate_eligibility: 0.5HP 與 1HP 可選配殘水吸附底盤，但型號 50EUS-5.05 未明確記載對應馬力，故無法逐型號判定是否符合 eligibility\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines: [62, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 428, 429, 430, 431, 432, 433, 434, 435]\n---\n\n型號 50EUS-5.05 為 EUS 系列輕型沉水排水泵，具備鑄鐵材質、IP68 沉水密封等級與 10 公尺最大沉水深度。本機型支援打鼾模式（吸氣啜飲運轉模式），並配置高耐磨半開式葉輪與泥砂攪拌器。外觀尺寸部分，高度為 352 mm，連續運轉水位 (H1) 為 200 mm，最低運轉水位 (H2) 為 84 mm。全系列可對應 QG 自動著脫座。\n\n相關：[[50(80)EUS-5.10]]、[[80EUS-5.10L]]、[[50(80)EUS-5.20C]]、[[50(80)EUS-5.20]]"
+  },
+  {
+   "label": "note-50(80)EUS-5.10",
+   "requested_model": "gemini-3.5-flash-lite",
+   "model": "gemini-3.5-flash-lite",
+   "usage": {
+    "input_tokens": 2128,
+    "output_tokens": 376,
+    "total_tokens": 2504,
+    "cached_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "elapsed_seconds": 2.193,
+   "content": "---\nmodel: \"50(80)EUS-5.10\"\nseries: \"EUS\"\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: \"輕型沉水排水泵\"\nheight_mm: 377\ncwl_mm: 225\nlwl_mm: 84\nsuffix_meaning: null\nresidue_plate_eligibility: \"型號未明確標示馬力，0.5HP與1HP可選配殘水吸附底盤，無法逐型號判定\"\nsource:\n  path: \"knowledge/EVAK_CATALOG.md\"\n  page: 4\n  lines: [110]\n---\n\n50(80)EUS-5.10 屬於 EVAK EUS 輕型沉水排水泵系列，具備 IP68 沉水防護等級，最大沉水深度為 10 公尺，適用於打鼾模式與吸氣啜飲運轉模式。本型號外觀高度為 377 mm，連續運轉水位 (C.W.L.) 為 225 mm，最低運轉水位 (L.W.L.) 為 84 mm。全系列採用雙重機械軸封與高耐磨半開式葉輪，並內建自動復歸熱保護器。\n\n相關：[[50EUS-5.05]]、[[80EUS-5.10L]]、[[50(80)EUS-5.20C]]、[[50(80)EUS-5.20]]"
+  },
+  {
+   "label": "note-80EUS-5.10L",
+   "requested_model": "gemini-3.5-flash-lite",
+   "model": "gemini-3.5-flash-lite",
+   "usage": {
+    "input_tokens": 2125,
+    "output_tokens": 739,
+    "total_tokens": 2864,
+    "cached_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "elapsed_seconds": 2.527,
+   "content": "---\nmodel: 80EUS-5.10L\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 426.5\ncwl_mm: 294\nlwl_mm: 112\nsuffix_meaning: 大流量設計（Larger flow）\nresidue_plate_eligibility: 0.5HP 與 1HP 可選配殘水吸附底盤，但型號對應不明，無法逐型號判定。\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines:\n  - 62\n  - 80\n  - 81\n  - 82\n  - 83\n  - 84\n  - 85\n  - 86\n  - 87\n  - 88\n  - 89\n  - 90\n  - 91\n  - 92\n  - 93\n  - 94\n  - 95\n  - 96\n  - 97\n  - 98\n  - 99\n  - 100\n  - 101\n  - 102\n  - 103\n  - 104\n  - 105\n  - 106\n  - 107\n  - 108\n  - 109\n  - 110\n  - 111\n  - 112\n  - 113\n  - 114\n  - 115\n  - 116\n  - 117\n  - 118\n  - 119\n  - 120\n  - 121\n  - 428\n  - 429\n  - 430\n  - 431\n  - 432\n  - 433\n  - 434\n  - 435\n  - 436\n  - 437\n  - 438\n  - 439\n  - 440\n---\n\n80EUS-5.10L 屬於 EUS 輕型沉水排水泵系列，字尾 L 代表大流量設計。型號具備 10 公尺最大沉水深度與 IP68 防水防護等級，支援打鼾模式（吸氣啜飲運轉模式），並內建自動復歸熱保護器。外觀尺寸方面，高度為 426.5 mm，連續運轉水位 (C.W.L.) 為 294 mm，最低運轉水位 (L.W.L.) 則為 112 mm。\n\n相關：[[50EUS-5.05]]\n相關：[[50(80)EUS-5.10]]\n相關：[[50(80)EUS-5.20C]]\n相關：[[50(80)EUS-5.20]]"
+  },
+  {
+   "label": "note-50(80)EUS-5.20C",
+   "requested_model": "gemini-3.5-flash-lite",
+   "model": "gemini-3.5-flash-lite",
+   "usage": {
+    "input_tokens": 2129,
+    "output_tokens": 427,
+    "total_tokens": 2556,
+    "cached_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "elapsed_seconds": 2.068,
+   "content": "---\nmodel: 50(80)EUS-5.20C\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 464\ncwl_mm: 308\nlwl_mm: 90\nsuffix_meaning: C 代表 ECO（節能）、較低功率輸入（Lower input）\nresidue_plate_eligibility: 型號對應不明，殘水底盤僅載明0.5HP和1HP可選配，無法逐型號判定\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines: [62, 107, 112, 116, 119]\n---\n\n型號 50(80)EUS-5.20C 屬於 EUS 輕型沉水排水泵系列，具備 IP 68 沉水密封等級與最大 10 公尺沉水深度。本系列配備高耐磨半開式葉輪與雙重機械軸封，並採用杜邦 Hytrel® 熱塑性聚酯彈性體覆層鋼板，適用於打鼾模式與吸氣啜飲運轉模式。尺寸方面，本機型高度為 464 mm，連續運轉水位 (C.W.L.) 為 308 mm，最低運轉水位 (L.W.L.) 為 90 mm。字尾 C 代表 ECO（節能）、較低功率輸入（Lower input）。\n\n相關：[[50EUS-5.05]], [[50(80)EUS-5.10]], [[80EUS-5.10L]], [[50(80)EUS-5.20]]"
+  },
+  {
+   "label": "note-50(80)EUS-5.20",
+   "requested_model": "gemini-3.5-flash-lite",
+   "model": "gemini-3.5-flash-lite",
+   "usage": {
+    "input_tokens": 2128,
+    "output_tokens": 435,
+    "total_tokens": 2563,
+    "cached_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "elapsed_seconds": 2.198,
+   "content": "---\nmodel: 50(80)EUS-5.20\nseries: EUS\nhp: null\nhead_m: null\nmax_depth_m: 10\noutlet_inches: null\npurpose: 輕型沉水排水泵\nheight_mm: 464\ncwl_mm: 308\nlwl_mm: 90\nsuffix_meaning: null\nresidue_plate_eligibility: 無法逐型號判定（型錄僅載明0.5HP與1HP可選配殘水吸附底盤）\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 4\n  lines:\n  - 62\n  - 97\n  - 106\n  - 113\n  - 116\n---\n\n50(80)EUS-5.20 屬於 EUS 輕型沉水排水泵系列，具備 IP68 沉水密封等級、內建自動復歸熱保護器及雙重機械軸封配置，並採用高耐磨半開式葉輪與杜邦 Hytrel® 熱塑性聚酯彈性體覆層鋼板，適用於打鼾模式與吸氣啜飲運轉。本型號之外觀高度為 464 mm，連續運轉水位 (C.W.L.) 為 308 mm，最低運轉水位 (L.W.L.) 為 90 mm，最大沉水深度為 10 公尺。殘水底盤選配僅知 0.5HP 與 1HP 可選配，無法逐型號判定。\n\n相關：[[50EUS-5.05]]、[[50(80)EUS-5.10]]、[[80EUS-5.10L]]、[[50(80)EUS-5.20C]]"
+  }
+ ],
+ "usage": {
+  "llm_calls": 5,
+  "provider_attempts": 5,
+  "missing_usage_calls": 0,
+  "tokens": {
+   "input_tokens": 10634,
+   "output_tokens": 2586,
+   "total_tokens": 13220,
+   "cached_tokens": 0,
+   "reasoning_tokens": 0
+  }
+ },
+ "route_attempts": [
+  {
+   "trace_id": "product-notes-note-50EUS-5.05",
+   "provider": "gemini",
+   "model": "gemini-3.5-flash-lite",
+   "hop_index": 0,
+   "result": "success",
+   "latency_ms": 2689.3056955337524,
+   "chain_length": 1
+  },
+  {
+   "trace_id": "product-notes-note-50(80)EUS-5.10",
+   "provider": "gemini",
+   "model": "gemini-3.5-flash-lite",
+   "hop_index": 0,
+   "result": "success",
+   "latency_ms": 2088.309154510498,
+   "chain_length": 1
+  },
+  {
+   "trace_id": "product-notes-note-80EUS-5.10L",
+   "provider": "gemini",
+   "model": "gemini-3.5-flash-lite",
+   "hop_index": 0,
+   "result": "success",
+   "latency_ms": 2387.396116256714,
+   "chain_length": 1
+  },
+  {
+   "trace_id": "product-notes-note-50(80)EUS-5.20C",
+   "provider": "gemini",
+   "model": "gemini-3.5-flash-lite",
+   "hop_index": 0,
+   "result": "success",
+   "latency_ms": 1971.5263233184814,
+   "chain_length": 1
+  },
+  {
+   "trace_id": "product-notes-note-50(80)EUS-5.20",
+   "provider": "gemini",
+   "model": "gemini-3.5-flash-lite",
+   "hop_index": 0,
+   "result": "success",
+   "latency_ms": 2100.7295875549316,
+   "chain_length": 1
+  }
+ ],
+ "integrity": {
+  "changed": [],
+  "before": {
+   "files": 2892,
+   "sha256_of_listing": "d0e53abf6cf1c21a9313106f707b95761794a2b4bcf939f5f49ed648c68c8702"
+  },
+  "after": {
+   "files": 2892,
+   "sha256_of_listing": "d0e53abf6cf1c21a9313106f707b95761794a2b4bcf939f5f49ed648c68c8702"
+  },
+  "note": "逐檔雜湊已摘要；完整清單只留在執行機器的 *.full.json（不進 git）"
+ }
+}
