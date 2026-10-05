@@ -1,0 +1,1844 @@
+{
+  "method": "獨立解析凍結規格表，核對所有frontmatter欄位；不修改原生成筆記。",
+  "note_count": 15,
+  "known_numeric_count": 168,
+  "null_count": 24,
+  "spec_errors": [],
+  "provenance_issues": [
+    {
+      "model": "80EDW-5.20S/T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 201,
+        "footnotes": [
+          {
+            "page": 9,
+            "line": 208
+          }
+        ]
+      },
+      "expected_row": 201,
+      "expected_page": 9
+    },
+    {
+      "model": "80EDW-5.30S/T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 202,
+        "footnotes": [
+          {
+            "page": 9,
+            "line": 208
+          }
+        ]
+      },
+      "expected_row": 202,
+      "expected_page": 9
+    },
+    {
+      "model": "100EDW-5.30S/T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 203,
+        "footnotes": [
+          {
+            "page": 9,
+            "line": 208
+          }
+        ]
+      },
+      "expected_row": 203,
+      "expected_page": 9
+    },
+    {
+      "model": "80EDW-5.50T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 204,
+        "footnotes": [
+          {
+            "page": 9,
+            "line": 208
+          }
+        ]
+      },
+      "expected_row": 204,
+      "expected_page": 9
+    },
+    {
+      "model": "50EUB-M-5.20S",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 233,
+        "footnotes": []
+      },
+      "expected_row": 233,
+      "expected_page": 11
+    },
+    {
+      "model": "80EUB-M-5.20S",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 234,
+        "footnotes": []
+      },
+      "expected_row": 234,
+      "expected_page": 11
+    },
+    {
+      "model": "50EUB-M-5.20T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 235,
+        "footnotes": []
+      },
+      "expected_row": 235,
+      "expected_page": 11
+    },
+    {
+      "model": "80EUB-M-5.20T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 236,
+        "footnotes": []
+      },
+      "expected_row": 236,
+      "expected_page": 11
+    },
+    {
+      "model": "50EUB-M-5.30T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 237,
+        "footnotes": []
+      },
+      "expected_row": 237,
+      "expected_page": 11
+    },
+    {
+      "model": "80EUB-M-5.30T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 238,
+        "footnotes": []
+      },
+      "expected_row": 238,
+      "expected_page": 11
+    },
+    {
+      "model": "100EUB-M-5.50T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 240,
+        "footnotes": []
+      },
+      "expected_row": 240,
+      "expected_page": 11
+    },
+    {
+      "model": "80EUB-M-5.75T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 241,
+        "footnotes": []
+      },
+      "expected_row": 241,
+      "expected_page": 11
+    },
+    {
+      "model": "100EUB-M-5.75T",
+      "source": {
+        "path": "knowledge/EVAK_CATALOG.md",
+        "page": "主頁",
+        "row_line": 242,
+        "footnotes": []
+      },
+      "expected_row": 242,
+      "expected_page": 11
+    }
+  ],
+  "details": [
+    {
+      "model": "80EDW-5.20S/T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EDW-5.20S/T",
+          "actual": "80EDW-5.20S/T",
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "series",
+          "expected": "EDW",
+          "actual": "EDW",
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "hp",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "kw",
+          "expected": 1.5,
+          "actual": 1.5,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 9.5,
+          "actual": 9.5,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 500.0,
+          "actual": 500,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "max_head_m",
+          "expected": 16.4,
+          "actual": 16.4,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 820.0,
+          "actual": 820,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "phase",
+          "expected": [
+            1,
+            3
+          ],
+          "actual": [
+            1,
+            3
+          ],
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": 11.0,
+          "actual": 11.0,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 3.8,
+          "actual": 3.8,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": 47.0,
+          "actual": 47,
+          "match": true,
+          "source_line": 201
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 46.0,
+          "actual": 46,
+          "match": true,
+          "source_line": 201
+        }
+      ]
+    },
+    {
+      "model": "80EDW-5.30S/T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EDW-5.30S/T",
+          "actual": "80EDW-5.30S/T",
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "series",
+          "expected": "EDW",
+          "actual": "EDW",
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "hp",
+          "expected": 3.0,
+          "actual": 3.0,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "kw",
+          "expected": 2.2,
+          "actual": 2.2,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 14.5,
+          "actual": 14.5,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 500.0,
+          "actual": 500,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "max_head_m",
+          "expected": 26.5,
+          "actual": 26.5,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 980.0,
+          "actual": 980,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "phase",
+          "expected": [
+            1,
+            3
+          ],
+          "actual": [
+            1,
+            3
+          ],
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": 15.0,
+          "actual": 15.0,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 5.7,
+          "actual": 5.7,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": 46.0,
+          "actual": 46,
+          "match": true,
+          "source_line": 202
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 45.0,
+          "actual": 45,
+          "match": true,
+          "source_line": 202
+        }
+      ]
+    },
+    {
+      "model": "100EDW-5.30S/T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "100EDW-5.30S/T",
+          "actual": "100EDW-5.30S/T",
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "series",
+          "expected": "EDW",
+          "actual": "EDW",
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "hp",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "kw",
+          "expected": 2.2,
+          "actual": 2.2,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 4.0,
+          "actual": 4,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 9.5,
+          "actual": 9.5,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 800.0,
+          "actual": 800,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "max_head_m",
+          "expected": 17.0,
+          "actual": 17.0,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 1200.0,
+          "actual": 1200,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "phase",
+          "expected": [
+            1,
+            3
+          ],
+          "actual": [
+            1,
+            3
+          ],
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": 15.0,
+          "actual": 15.0,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 5.7,
+          "actual": 5.7,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": 47.0,
+          "actual": 47,
+          "match": true,
+          "source_line": 203
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 46.0,
+          "actual": 46,
+          "match": true,
+          "source_line": 203
+        }
+      ]
+    },
+    {
+      "model": "80EDW-5.50T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EDW-5.50T",
+          "actual": "80EDW-5.50T",
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "series",
+          "expected": "EDW",
+          "actual": "EDW",
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "hp",
+          "expected": 5.0,
+          "actual": 5,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "kw",
+          "expected": 3.7,
+          "actual": 3.7,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 21.5,
+          "actual": 21.5,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 400.0,
+          "actual": 400,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "max_head_m",
+          "expected": 32.4,
+          "actual": 32.4,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 1040.0,
+          "actual": 1040,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 7.9,
+          "actual": 7.9,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 204
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 49.5,
+          "actual": 49.5,
+          "match": true,
+          "source_line": 204
+        }
+      ]
+    },
+    {
+      "model": "100EDW-5.50T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "100EDW-5.50T",
+          "actual": "100EDW-5.50T",
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "series",
+          "expected": "EDW",
+          "actual": "EDW",
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "hp",
+          "expected": 5.0,
+          "actual": 5,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "kw",
+          "expected": 3.7,
+          "actual": 3.7,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 4.0,
+          "actual": 4,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 12.5,
+          "actual": 12.5,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 1000.0,
+          "actual": 1000,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "max_head_m",
+          "expected": 22.0,
+          "actual": 22.0,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 1680.0,
+          "actual": 1680,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 7.9,
+          "actual": 7.9,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 205
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 50.5,
+          "actual": 50.5,
+          "match": true,
+          "source_line": 205
+        }
+      ]
+    },
+    {
+      "model": "50EUB-M-5.20S",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "50EUB-M-5.20S",
+          "actual": "50EUB-M-5.20S",
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "hp",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "kw",
+          "expected": 1.5,
+          "actual": 1.5,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 15.0,
+          "actual": 15,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 270.0,
+          "actual": 270,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "max_head_m",
+          "expected": 23.0,
+          "actual": 23,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 500.0,
+          "actual": 500,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "solids_mm",
+          "expected": 9.0,
+          "actual": 9,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "phase",
+          "expected": 1,
+          "actual": 1,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": 12.5,
+          "actual": 12.5,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": 27.5,
+          "actual": 27.5,
+          "match": true,
+          "source_line": 233
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 233
+        }
+      ]
+    },
+    {
+      "model": "80EUB-M-5.20S",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EUB-M-5.20S",
+          "actual": "80EUB-M-5.20S",
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "hp",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "kw",
+          "expected": 1.5,
+          "actual": 1.5,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 400.0,
+          "actual": 400,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "max_head_m",
+          "expected": 17.0,
+          "actual": 17,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 690.0,
+          "actual": 690,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "solids_mm",
+          "expected": 9.0,
+          "actual": 9,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "phase",
+          "expected": 1,
+          "actual": 1,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": 12.5,
+          "actual": 12.5,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": 27.5,
+          "actual": 27.5,
+          "match": true,
+          "source_line": 234
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 234
+        }
+      ]
+    },
+    {
+      "model": "50EUB-M-5.20T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "50EUB-M-5.20T",
+          "actual": "50EUB-M-5.20T",
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "hp",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "kw",
+          "expected": 1.5,
+          "actual": 1.5,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 15.0,
+          "actual": 15,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 220.0,
+          "actual": 220,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "max_head_m",
+          "expected": 21.0,
+          "actual": 21,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 450.0,
+          "actual": 450,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "solids_mm",
+          "expected": 9.0,
+          "actual": 9,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 3.5,
+          "actual": 3.5,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 235
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 26.4,
+          "actual": 26.4,
+          "match": true,
+          "source_line": 235
+        }
+      ]
+    },
+    {
+      "model": "80EUB-M-5.20T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EUB-M-5.20T",
+          "actual": "80EUB-M-5.20T",
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "hp",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "kw",
+          "expected": 1.5,
+          "actual": 1.5,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 9.0,
+          "actual": 9,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 400.0,
+          "actual": 400,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "max_head_m",
+          "expected": 16.0,
+          "actual": 16,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 630.0,
+          "actual": 630,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "solids_mm",
+          "expected": 9.0,
+          "actual": 9,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 3.5,
+          "actual": 3.5,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 236
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 25.9,
+          "actual": 25.9,
+          "match": true,
+          "source_line": 236
+        }
+      ]
+    },
+    {
+      "model": "50EUB-M-5.30T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "50EUB-M-5.30T",
+          "actual": "50EUB-M-5.30T",
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "hp",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "kw",
+          "expected": 2.2,
+          "actual": 2.2,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 2.0,
+          "actual": 2,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 15.0,
+          "actual": 15,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 330.0,
+          "actual": 330,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "max_head_m",
+          "expected": 26.0,
+          "actual": 26,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 550.0,
+          "actual": 550,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "solids_mm",
+          "expected": 9.0,
+          "actual": 9,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 5.2,
+          "actual": 5.2,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 237
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 29.8,
+          "actual": 29.8,
+          "match": true,
+          "source_line": 237
+        }
+      ]
+    },
+    {
+      "model": "80EUB-M-5.30T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EUB-M-5.30T",
+          "actual": "80EUB-M-5.30T",
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "hp",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "kw",
+          "expected": 2.2,
+          "actual": 2.2,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 500.0,
+          "actual": 500,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "max_head_m",
+          "expected": 23.0,
+          "actual": 23,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 700.0,
+          "actual": 700,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "solids_mm",
+          "expected": 9.0,
+          "actual": 9,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 5.2,
+          "actual": 5.2,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 238
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 30.0,
+          "actual": 30.0,
+          "match": true,
+          "source_line": 238
+        }
+      ]
+    },
+    {
+      "model": "80EUB-M-5.50T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EUB-M-5.50T",
+          "actual": "80EUB-M-5.50T",
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "hp",
+          "expected": 5.0,
+          "actual": 5,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "kw",
+          "expected": 3.7,
+          "actual": 3.7,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 19.0,
+          "actual": 19,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 600.0,
+          "actual": 600,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "max_head_m",
+          "expected": 30.0,
+          "actual": 30,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 900.0,
+          "actual": 900,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 9.5,
+          "actual": 9.5,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 239
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 35.6,
+          "actual": 35.6,
+          "match": true,
+          "source_line": 239
+        }
+      ]
+    },
+    {
+      "model": "100EUB-M-5.50T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "100EUB-M-5.50T",
+          "actual": "100EUB-M-5.50T",
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "hp",
+          "expected": 5.0,
+          "actual": 5,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "kw",
+          "expected": 3.7,
+          "actual": 3.7,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 4.0,
+          "actual": 4,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 12.5,
+          "actual": 12.5,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 800.0,
+          "actual": 800,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "max_head_m",
+          "expected": 18.5,
+          "actual": 18.5,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 1400.0,
+          "actual": 1400,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 9.5,
+          "actual": 9.5,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 240
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 34.9,
+          "actual": 34.9,
+          "match": true,
+          "source_line": 240
+        }
+      ]
+    },
+    {
+      "model": "80EUB-M-5.75T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "80EUB-M-5.75T",
+          "actual": "80EUB-M-5.75T",
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "hp",
+          "expected": 7.5,
+          "actual": 7.5,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "kw",
+          "expected": 5.5,
+          "actual": 5.5,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 3.0,
+          "actual": 3,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 25.0,
+          "actual": 25,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 680.0,
+          "actual": 680,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "max_head_m",
+          "expected": 33.0,
+          "actual": 33,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 1200.0,
+          "actual": 1200,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 12.5,
+          "actual": 12.5,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 241
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 51.6,
+          "actual": 51.6,
+          "match": true,
+          "source_line": 241
+        }
+      ]
+    },
+    {
+      "model": "100EUB-M-5.75T",
+      "checks": [
+        {
+          "field": "model",
+          "expected": "100EUB-M-5.75T",
+          "actual": "100EUB-M-5.75T",
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "series",
+          "expected": "EUB-M",
+          "actual": "EUB-M",
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "hp",
+          "expected": 7.5,
+          "actual": 7.5,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "kw",
+          "expected": 5.5,
+          "actual": 5.5,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "outlet_inch",
+          "expected": 4.0,
+          "actual": 4,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "rated_head_m",
+          "expected": 16.0,
+          "actual": 16,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "rated_flow_lpm",
+          "expected": 1060.0,
+          "actual": 1060,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "max_head_m",
+          "expected": 23.0,
+          "actual": 23,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "max_flow_lpm",
+          "expected": 1900.0,
+          "actual": 1900,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "solids_mm",
+          "expected": 10.0,
+          "actual": 10,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "phase",
+          "expected": 3,
+          "actual": 3,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "current_1ph_a",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "current_3ph_a",
+          "expected": 12.5,
+          "actual": 12.5,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "weight_1ph_kg",
+          "expected": null,
+          "actual": null,
+          "match": true,
+          "source_line": 242
+        },
+        {
+          "field": "weight_3ph_kg",
+          "expected": 51.4,
+          "actual": 51.4,
+          "match": true,
+          "source_line": 242
+        }
+      ]
+    }
+  ],
+  "spec_error_count": 0,
+  "provenance_issue_count": 13
+}

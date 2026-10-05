@@ -1,0 +1,487 @@
+{
+  "scope": {
+    "catalog_path": "knowledge/EVAK_CATALOG.md",
+    "catalog_local_snapshot": "scripts/experiments/product-notes/round2/source_catalog.md",
+    "series": [
+      "EDW",
+      "EUB-M"
+    ],
+    "row_count": 15,
+    "models": [
+      "80EDW-5.20S/T",
+      "80EDW-5.30S/T",
+      "100EDW-5.30S/T",
+      "80EDW-5.50T",
+      "100EDW-5.50T",
+      "50EUB-M-5.20S",
+      "80EUB-M-5.20S",
+      "50EUB-M-5.20T",
+      "80EUB-M-5.20T",
+      "50EUB-M-5.30T",
+      "80EUB-M-5.30T",
+      "80EUB-M-5.50T",
+      "100EUB-M-5.50T",
+      "80EUB-M-5.75T",
+      "100EUB-M-5.75T"
+    ],
+    "row_ranges": {
+      "EDW": [
+        201,
+        205
+      ],
+      "EUB-M": [
+        233,
+        242
+      ]
+    },
+    "model_rule": "以原規格表一列為一款；EDW的S/T合併列不拆名，依208行及電流欄可代表單相或三相。EUB-M S與T獨立列保留。",
+    "phase_rule": "EDW使用208行S/T定義與199行電流欄；EUB-M使用231行單相／三相電流欄，不從型號猜未載明規格。",
+    "comparison_rule": "額定揚程／額定流量按同一額定點；最大揚程與最大流量分欄比較，不能視為同時達成。",
+    "excluded": "EDW其他未列型號、EUB-M 10～20HP及其他系列不在15列範圍。"
+  },
+  "grading_rubric": {
+    "對": "必要主結論正確，所有應列型號完整且沒有錯納；題目要求的數字、單位、排序、情境與重要限定均正確。只評required_points，不以expected_answer額外補充自動扣分。",
+    "部分對": "主結論至少一部分正確且未有錯誤數字、錯納型號、虛構資訊或錯誤運轉點，但漏列型號、漏題目要求的數字、漏情境、次排序或重要限定。",
+    "錯": "數字答錯、錯納型號、單位換算錯、主結論錯誤、虛構價格或保固，或把最大揚程與最大流量合成同時達成的運轉點；任一重大forbidden_claims成立即判錯。",
+    "等值與名稱": "精確等值單位與同義敘述可接受；EDW保留原S/T列名，若答明同一列的單相或三相版本亦可接受，不要求把合併列拆成兩款。",
+    "範圍與缺資料": "只比較scope的15列；未知不可說成確認不符合。價格、保固問答不能自行補值。",
+    "OR與排序": "Q06兩現場各自給完整集合，不能壓成AND；Q07多欄排序為必要，其他集合題不要求型號出現順序。",
+    "出處": "來源引用品質另列；chunk id不是頁碼。未提供逐行引用本身不扣內容分。"
+  },
+  "questions": [
+    {
+      "id": "Q01",
+      "kind": "篩選",
+      "question": "我要接3吋出水管，先看最大揚程至少20米的款式。EDW跟EUB-M有哪些符合？幫我都列出來，順便寫最大揚程。",
+      "expected_answer": "完整符合清單：80EDW-5.30S/T（最大揚程26.5 m）；80EDW-5.50T（最大揚程32.4 m）；80EUB-M-5.30T（最大揚程23 m）；80EUB-M-5.50T（最大揚程30 m）；80EUB-M-5.75T（最大揚程33 m）。",
+      "required_points": [
+        "完整列出五款：80EDW-5.30S/T、80EDW-5.50T、80EUB-M-5.30T、80EUB-M-5.50T、80EUB-M-5.75T",
+        "五款最大揚程依序26.5、32.4、23、30、33 m，口徑皆3吋"
+      ],
+      "forbidden_claims": [
+        "納入任何非3吋或最大揚程低於20 m的款式",
+        "把額定揚程當成最大揚程"
+      ],
+      "expected_models": [
+        "80EDW-5.30S/T",
+        "80EDW-5.50T",
+        "80EUB-M-5.30T",
+        "80EUB-M-5.50T",
+        "80EUB-M-5.75T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q02",
+      "kind": "篩選",
+      "question": "現場是三相電，我想找3HP以下、最大流量至少500 LPM的泵，口徑不限。這兩系列有哪些能選？請把馬力跟最大流量一起列給我。",
+      "expected_answer": "完整符合清單：80EDW-5.20S/T（馬力2 HP、最大流量820 LPM）；80EDW-5.30S/T（馬力3 HP、最大流量980 LPM）；100EDW-5.30S/T（馬力3 HP、最大流量1200 LPM）；80EUB-M-5.20T（馬力2 HP、最大流量630 LPM）；50EUB-M-5.30T（馬力3 HP、最大流量550 LPM）；80EUB-M-5.30T（馬力3 HP、最大流量700 LPM）。EDW三筆S/T合併列均有T（三相）版本，保留原型號列名；EUB-M三筆均由三相電流欄確認。",
+      "required_points": [
+        "完整列出六款：80EDW-5.20S/T、80EDW-5.30S/T、100EDW-5.30S/T、80EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "六款HP／最大流量依序為2/820、3/980、3/1200、2/630、3/550、3/700，單位HP與LPM",
+        "EDW的S/T列有三相版本，EUB-M所列T款為三相"
+      ],
+      "forbidden_claims": [
+        "因EDW是S/T合併列而把它排除三相候選",
+        "納入單相EUB-M、超過3HP或最大流量低於500 LPM的款式"
+      ],
+      "expected_models": [
+        "80EDW-5.20S/T",
+        "80EDW-5.30S/T",
+        "100EDW-5.30S/T",
+        "80EUB-M-5.20T",
+        "50EUB-M-5.30T",
+        "80EUB-M-5.30T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 208,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |\n\n> [!IMPORTANT] 第 9 頁關鍵客製註腳\n> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q03",
+      "kind": "極值",
+      "question": "先不管口徑跟馬力，這批EDW和EUB-M裡，哪一款的最大流量最大？是多少LPM？",
+      "expected_answer": "100EUB-M-5.75T最大流量最高，為1900 LPM。",
+      "required_points": [
+        "最大流量冠軍為100EUB-M-5.75T",
+        "最大流量1900 LPM"
+      ],
+      "forbidden_claims": [
+        "把額定流量1060 LPM說成最大流量",
+        "推薦範圍外的10～20HP EUB-M或其他系列為冠軍",
+        "給出錯誤冠軍或錯誤最大流量"
+      ],
+      "expected_models": [
+        "100EUB-M-5.75T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q04",
+      "kind": "比較",
+      "question": "如果都選3HP，哪一款最大揚程最高？也幫我列出其他3HP款的最大揚程，好比較。",
+      "expected_answer": "同為3HP的完整清單：80EDW-5.30S/T（最大揚程26.5 m）；100EDW-5.30S/T（最大揚程17 m）；50EUB-M-5.30T（最大揚程26 m）；80EUB-M-5.30T（最大揚程23 m）。最高為80EDW-5.30S/T的26.5 m。",
+      "required_points": [
+        "四款3HP比較清單：80EDW-5.30S/T、100EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "四款最大揚程依序26.5、17、26、23 m",
+        "最大揚程最高為80EDW-5.30S/T，26.5 m"
+      ],
+      "forbidden_claims": [
+        "把額定揚程當成最大揚程",
+        "把50EUB-M-5.30T的26 m說成高於EDW的26.5 m",
+        "納入非3HP款式比較同馬力冠軍"
+      ],
+      "expected_models": [
+        "80EDW-5.30S/T",
+        "100EDW-5.30S/T",
+        "50EUB-M-5.30T",
+        "80EUB-M-5.30T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q05",
+      "kind": "跨系列比較",
+      "question": "都是3吋出水的話，EDW和EUB-M各挑最大揚程最高的一款，分別是誰？兩邊差幾米？",
+      "expected_answer": "EDW的3吋冠軍是80EDW-5.50T，最大揚程32.4 m；EUB-M的3吋冠軍是80EUB-M-5.75T，最大揚程33 m。EUB-M這款高0.6 m。",
+      "required_points": [
+        "EDW：80EDW-5.50T，最大揚程32.4 m",
+        "EUB-M：80EUB-M-5.75T，最大揚程33 m",
+        "EUB-M冠軍高0.6 m"
+      ],
+      "forbidden_claims": [
+        "不依最大揚程比較或選出錯誤系列冠軍",
+        "將此比較說成同馬力比較，兩款分別為5HP與7.5HP"
+      ],
+      "expected_models": [
+        "80EDW-5.50T",
+        "80EUB-M-5.75T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q06",
+      "kind": "多情境篩選",
+      "question": "我有兩個現場，符合任一邊都可以，但請分開給完整清單：甲要單相、2HP、3吋，最大流量至少650 LPM；乙要三相、3HP，口徑不限，最大揚程至少23米。各有哪些？把甲的最大流量和乙的最大揚程寫上。",
+      "expected_answer": "甲：80EDW-5.20S/T（最大流量820 LPM）；80EUB-M-5.20S（最大流量690 LPM），兩款均有單相、2HP、3吋。乙：80EDW-5.30S/T（最大揚程26.5 m）；50EUB-M-5.30T（最大揚程26 m）；80EUB-M-5.30T（最大揚程23 m），三款均有三相、3HP。EDW S/T合併列按S或T版本符合各現場，保留原列名；兩邊是OR，不能合併成一組AND條件。",
+      "required_points": [
+        "甲完整清單為80EDW-5.20S/T、80EUB-M-5.20S，最大流量依序820、690 LPM",
+        "乙完整清單為80EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T，最大揚程依序26.5、26、23 m",
+        "分開兩情境，正確使用甲單相／2HP／3吋及乙三相／3HP條件，EDW S/T列可取相應版本"
+      ],
+      "forbidden_claims": [
+        "把兩現場合併成同時滿足全部條件的AND而回答無候選",
+        "將乙的口徑也限制3吋而排除50EUB-M-5.30T",
+        "納入任何不符合各情境條件的款式"
+      ],
+      "expected_models": {
+        "甲": [
+          "80EDW-5.20S/T",
+          "80EUB-M-5.20S"
+        ],
+        "乙": [
+          "80EDW-5.30S/T",
+          "50EUB-M-5.30T",
+          "80EUB-M-5.30T"
+        ]
+      },
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 208,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |\n\n> [!IMPORTANT] 第 9 頁關鍵客製註腳\n> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q07",
+      "kind": "排序",
+      "question": "幫我把EUB-M裡三相、最大揚程至少20米的款式全部排一下：先按最大揚程由高到低，同分再按最大流量由大到小。每款兩個數字都寫上。",
+      "expected_answer": "完整排序：80EUB-M-5.75T（最大揚程33 m、最大流量1200 LPM）；80EUB-M-5.50T（最大揚程30 m、最大流量900 LPM）；50EUB-M-5.30T（最大揚程26 m、最大流量550 LPM）；100EUB-M-5.75T（最大揚程23 m、最大流量1900 LPM）；80EUB-M-5.30T（最大揚程23 m、最大流量700 LPM）；50EUB-M-5.20T（最大揚程21 m、最大流量450 LPM）。兩款23 m同分時，100EUB-M-5.75T的1900 LPM排在80EUB-M-5.30T的700 LPM前。",
+      "required_points": [
+        "完整順序：80EUB-M-5.75T → 80EUB-M-5.50T → 50EUB-M-5.30T → 100EUB-M-5.75T → 80EUB-M-5.30T → 50EUB-M-5.20T",
+        "依序最大揚程／最大流量為33/1200、30/900、26/550、23/1900、23/700、21/450，單位m與LPM",
+        "23 m同分時，1900 LPM先於700 LPM"
+      ],
+      "forbidden_claims": [
+        "忽略第二排序欄位，把兩個23 m款式次序顛倒",
+        "納入單相款、最大揚程低於20 m的款式或EDW",
+        "將最大揚程與最大流量說成同時達成的運轉點"
+      ],
+      "expected_models": [
+        "80EUB-M-5.75T",
+        "80EUB-M-5.50T",
+        "50EUB-M-5.30T",
+        "100EUB-M-5.75T",
+        "80EUB-M-5.30T",
+        "50EUB-M-5.20T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q08",
+      "kind": "單位換算與篩選",
+      "question": "我只有單相電，想用2HP，最大流量至少每小時30立方米，口徑不限。這相當於多少LPM？EDW和EUB-M有哪些符合？也把各款最大流量寫出來。",
+      "expected_answer": "30 m³/h = 30000 L/h ÷ 60 = 500 LPM。完整符合清單：80EDW-5.20S/T，最大流量820 LPM（49.2 m³/h）；50EUB-M-5.20S，500 LPM（30 m³/h）；80EUB-M-5.20S，690 LPM（41.4 m³/h）。EDW合併列有S單相版本，保留原列名。",
+      "required_points": [
+        "30 m³/h等於500 LPM",
+        "完整列出80EDW-5.20S/T、50EUB-M-5.20S、80EUB-M-5.20S，皆有單相2HP版本",
+        "各款最大流量依序820、500、690 LPM，或等值49.2、30、41.4 m³/h"
+      ],
+      "forbidden_claims": [
+        "把30 m³/h換算成30、1800或30000 LPM",
+        "漏掉剛好等於500 LPM的50EUB-M-5.20S",
+        "納入三相專用或非2HP款式"
+      ],
+      "expected_models": [
+        "80EDW-5.20S/T",
+        "50EUB-M-5.20S",
+        "80EUB-M-5.20S"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 208,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |\n\n> [!IMPORTANT] 第 9 頁關鍵客製註腳\n> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q09",
+      "kind": "額定與極限區分",
+      "question": "我想在15米揚程下抽400 LPM，光看這份表能保證哪款嗎？如果沒列15米、400 LPM這個點，就先把「同一個額定點的揚程至少15米、流量至少400 LPM」的候選全部列出，附額定點。最大揚程跟最大流量可以直接拼成一個工作點嗎？",
+      "expected_answer": "表內沒有明列15 m @ 400 LPM這個工作點，不能直接保證哪款在15 m時恰好或至少有400 LPM。只按題目要求的同一額定點兩個門檻，完整待查候選為80EDW-5.50T（21.5 m @ 400 LPM）、80EUB-M-5.50T（19 m @ 600 LPM）、80EUB-M-5.75T（25 m @ 680 LPM）、100EUB-M-5.75T（16 m @ 1060 LPM）。這是額定點門檻篩選，仍需原廠性能曲線確認15 m時流量；最大揚程與最大流量不能拼成同時達成的運轉點。",
+      "required_points": [
+        "型錄未列15 m @ 400 LPM，不能保證指定工作點",
+        "額定點雙門檻完整候選：80EDW-5.50T、80EUB-M-5.50T、80EUB-M-5.75T、100EUB-M-5.75T",
+        "四款額定點依序21.5 m @ 400 LPM、19 m @ 600 LPM、25 m @ 680 LPM、16 m @ 1060 LPM",
+        "最大揚程與最大流量不代表同時達成；額定點候選不等於已確認15 m時流量"
+      ],
+      "forbidden_claims": [
+        "把最大揚程和最大流量合成同時達成的運轉點",
+        "以額定點雙門檻或最大數值直接保證15 m時400 LPM",
+        "納入額定揚程不足15 m或同一額定點流量不足400 LPM的款式",
+        "把15 m @ 270、220或330 LPM當成15 m @ 400 LPM"
+      ],
+      "expected_models": [
+        "80EDW-5.50T",
+        "80EUB-M-5.50T",
+        "80EUB-M-5.75T",
+        "100EUB-M-5.75T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q10",
+      "kind": "跨系列比較",
+      "question": "如果出水口都用4吋，EDW跟EUB-M各自最大流量最多的是哪款？各多少LPM，哪邊多多少？",
+      "expected_answer": "EDW的4吋最大流量冠軍為100EDW-5.50T，1680 LPM；EUB-M的4吋冠軍為100EUB-M-5.75T，1900 LPM。EUB-M這款多220 LPM。",
+      "required_points": [
+        "EDW：100EDW-5.50T，最大流量1680 LPM",
+        "EUB-M：100EUB-M-5.75T，最大流量1900 LPM",
+        "EUB-M冠軍多220 LPM"
+      ],
+      "forbidden_claims": [
+        "選入非4吋或範圍外型號",
+        "把額定流量1000或1060 LPM當成兩款最大流量",
+        "冠軍、流量或差值錯誤"
+      ],
+      "expected_models": [
+        "100EDW-5.50T",
+        "100EUB-M-5.75T"
+      ],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q11",
+      "kind": "價格資料不足",
+      "question": "這些EDW跟EUB-M裡哪一款最便宜？這份型錄有售價讓你幫我排嗎？沒有的話就直接說缺什麼。",
+      "expected_answer": "型錄沒有產品售價或報價資料，無法判定哪款最便宜，也不能依HP、口徑或系列推定價格排序；需要另外取得相同交易條件的實際報價。",
+      "required_points": [
+        "型錄沒有售價／價格資料",
+        "無法判定最便宜款式或排列價格"
+      ],
+      "forbidden_claims": [
+        "虛構任何產品價格、價格範圍或折扣",
+        "依HP、口徑、流量或系列宣稱某款最便宜"
+      ],
+      "expected_models": [],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    },
+    {
+      "id": "Q12",
+      "kind": "保固資料不足",
+      "question": "EDW跟EUB-M哪個保固比較長？這份型錄有寫各保幾年、保哪些東西嗎？",
+      "expected_answer": "這份型錄沒有EDW或EUB-M的保固年限、涵蓋項目或保固條款，不能判定哪個保固比較長；需要向供應商取得適用地區及交易版本的保固文件。",
+      "required_points": [
+        "型錄未載保固年限與保固涵蓋／條款",
+        "無法判定EDW或EUB-M哪個保固較長"
+      ],
+      "forbidden_claims": [
+        "虛構保固年限、免費維修條件或涵蓋項目",
+        "宣稱某系列保固較長或有終身保固"
+      ],
+      "expected_models": [],
+      "sources": [
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø/3ø) | 重量 (1ø/3ø) | 特性備註 |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |\n| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |\n| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |\n| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |\n| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |\n| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+        },
+        {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "quote": "| 機型 (Type) | 馬力 (HP/kW) | 口徑 | 額定點 (Head / Cap.) | 極限點 (Max Head / Cap.) | 通過粒徑 | 滿載電流 (1ø 230V) | 滿載電流 (3ø 400V) | 淨重 (1ø/3ø) |\n| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |\n| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |\n| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |\n| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |\n| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |\n| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |\n| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |\n| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |\n| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+        }
+      ]
+    }
+  ]
+}

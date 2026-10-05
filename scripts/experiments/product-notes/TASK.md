@@ -1,10 +1,12 @@
-# 交辦（第二輪）：有完整規格表的系列，產品筆記＋篩選工具能不能答好選型問題
+# 交辦：產品筆記＋篩選工具能不能答好選型問題
+
+這份是最近一次（第二輪）的交辦；下一輪直接改這份。第一輪（EUS）的交辦見 git 歷史（`git show 56e8357:scripts/experiments/product-notes/CODEX_TASK.md`）。
 
 > 手動在 `/home/human/openVman` 開 Codex 執行（要用你 config 的 `danger-full-access` 才能存取 Docker）。從 Claude 外掛派出的 Codex 會被沙盒擋住 docker.sock。
 
 ## 為什麼要第二輪
 
-第一輪（見同目錄 `REPORT.md`）選了 EUS，但型錄 EUS 那頁沒有逐型號的馬力、揚程、口徑，五篇筆記這三欄全是 null。結果 B 贏在「不亂猜」，C 的篩選工具沒東西可篩，題目也寫成考卷式問法。這一輪換成每個型號都有完整規格表的系列，題目用真人會問的講法，專門看篩選工具（C）有沒有價值。
+第一輪（見 `REPORT.md` 第一輪一節）選了 EUS，但型錄 EUS 那頁沒有逐型號的馬力、揚程、口徑，五篇筆記這三欄全是 null。結果 B 贏在「不亂猜」，C 的篩選工具沒東西可篩，題目也寫成考卷式問法。這一輪換成每個型號都有完整規格表的系列，題目用真人會問的講法，專門看篩選工具（C）有沒有價值。
 
 ## 範圍
 
@@ -13,7 +15,7 @@
   - 第 9 頁 EDW 規格數據表（約 L198 起）
   兩個系列都有逐型號的馬力（HP/kW）、口徑、額定點與極限點（揚程／流量）、通過粒徑、電流、重量。以實際讀到的行號為準。
 - 每個表格列一篇筆記（`50EUB-M-5.20S` 與 `50EUB-M-5.20T` 是不同列就分開）。
-- 沿用第一輪的 `runtime.py`、`common.py` 與容器內唯讀防護，產出放在 `scripts/experiments/product-notes/round2/`，不要覆寫第一輪的檔案。
+- 沿用第一輪的 `runtime.py`、`common.py` 與容器內唯讀防護，產出放在 `scripts/experiments/product-notes/round2/`，不要覆寫 `round1/`。
 
 ## 要做的
 
@@ -46,6 +48,6 @@
 
 ## 交付
 
-`round2/`：生成腳本、`notes/`、`questions.json`、評測腳本、`results.json`、`REPORT.md`、驗證腳本。
+`round2/`：生成腳本、`notes/`、`questions.json`、評測腳本、`results.json`、驗證腳本；結論寫進上層 `REPORT.md` 的第二輪一節，不另開報告檔。
 
 回報（不超過 40 行）：A／B／C 各答對／部分對／錯幾題，C 是否贏過 B、贏在哪幾題；筆記規格錯幾個；LLM 呼叫數與 token；建議下一步（例如把篩選工具做成正式 Brain 工具值不值得）；沒做到或不確定的地方要明說。

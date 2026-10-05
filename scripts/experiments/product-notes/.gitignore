@@ -2,3 +2,4 @@
 *_checkpoint.json
 *.full.json
 evaluation_setup_failure.json
+__pycache__/

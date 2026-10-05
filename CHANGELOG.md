@@ -27,7 +27,7 @@
 ### Documentation
 
 - `scripts/experiments/r2t2/REPORT.md` 加 2026-10-05 複測：R2T2 .37 指定語言時中英西日韓全對、不指定會把西日韓當中文；.35 `zhen` 能自動分中英西但句尾常被吃掉；Gemini 3.5 transcribe 多語全對但型號只聽對 6/24（.37＋詞表 19/24）。腳本與逐句結果在 `multilang/`。
-- 新增 `scripts/experiments/product-notes/`：AI 產生 Obsidian 式產品筆記能不能改善跨產品問答的實驗（鶴記 EUS 系列 10 題）。現行檢索 5 對／3 部分對／2 錯，加筆記 9／1／0，再加 frontmatter 篩選 9／1／0；改善主要在「資料不足時不亂猜」。EUS 頁沒有逐型號規格，篩選工具測不出價值，第二輪改用有規格表的 EUB-M／EDW（`CODEX_TASK_ROUND2.md`）。只動實驗目錄，正式程式與知識庫未變。
+- 新增 `scripts/experiments/product-notes/`：AI 產生 Obsidian 式產品筆記能不能改善跨產品選型問答。比現行檢索（A）、加最相近 3 篇筆記（B）、再加 frontmatter 篩選工具（C）。第一輪 EUS（型錄沒有逐型號規格）10 題：A 5／3／2、B 9／1／0、C 9／1／0（對／部分對／錯）；第二輪 EUB-M＋EDW 完整規格表 12 題：A 2／1／9、B 2／4／6、C 11／1／0。C 看得到全部規格、B 只有 3 篇，進步還不能全歸功於篩選；筆記數字 0 錯但正文有語意與出處錯誤，不能直接入庫。資料夾整理成單一 `README.md`／`TASK.md`／`REPORT.md`，各輪資料放 `round1/`、`round2/`。只動實驗目錄，正式程式與知識庫未變。
 - `docs/plans/thin-entry-refactor.md`、`docs/plans/r2t2-streaming-asr.md` 標為 Done（已提交並部署，使用者授權結案）；`full-duplex-voice.md` 改為進行中，並列入 `docs/README.md`。
 - 新增 `docs/plans/full-duplex-voice.md`（Draft）：語音對話不再一問一答的評估。現況是虛擬人思考與講話時麥克風寫死關閉、新的一句取代舊的；計畫分兩階段：思考中補一句合併回答（含 Brain 接收確認後落庫），講話中插話（需先在現場實測瀏覽器回音消除）。
 - 供應鏈報告恢復 Azure、D-ID、HeyGen 真人方案說明，保留遠端算圖與費用差異；依本次調查補充 MatesX／DHLiveMini2 最符合目前真人效果、本地運算與成本需求的結論。

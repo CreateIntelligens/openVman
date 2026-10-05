@@ -1,0 +1,1014 @@
+{
+  "status": "frozen_before_answer_generation",
+  "source_sha256": "9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa",
+  "questions_sha256": "a841179eef0ef3ec0be664fc50be0ef8e1186ff7854dec24825e1dc53331215d",
+  "table_rows_sha256": "d9d40ec8b9de95c40835af6358437fa41091c09c3e43094d656f465f175d9907",
+  "summary": {
+    "question_count": 12,
+    "source_row_count": 15,
+    "table_rows_match_original": true,
+    "all_citations_match": true,
+    "all_manual_sets_match_recomputation": true,
+    "has_multi_scenario_or": true,
+    "has_multicolumn_sort_with_tie": true,
+    "has_unit_conversion": true,
+    "has_rated_vs_max_point_check": true,
+    "unanswerable_price_warranty_questions": 2
+  },
+  "full_catalog_absence_checks": {
+    "price": {
+      "searched_lines": [
+        1,
+        440
+      ],
+      "pattern": "價格|售價|報價|定價|價錢|新臺幣|新台幣|NT\\$|USD|price|pricing|cost",
+      "matches": [],
+      "full_catalog_review_conclusion": "已通讀完整中文型錄的產品頁與附錄，沒有此類條款或價格資訊；規格表也沒有對應欄位。"
+    },
+    "warranty": {
+      "searched_lines": [
+        1,
+        440
+      ],
+      "pattern": "保固|保修|質保|warranty|guarantee",
+      "matches": [],
+      "full_catalog_review_conclusion": "已通讀完整中文型錄的產品頁與附錄，沒有此類條款或價格資訊；規格表也沒有對應欄位。"
+    }
+  },
+  "manual_arithmetic": {
+    "unit_conversion": "30 m³/h ×1000 L/m³ ÷60 min/h =500 LPM；820×0.06=49.2，500×0.06=30，690×0.06=41.4 m³/h",
+    "Q05_difference": "33−32.4=0.6 m",
+    "Q10_difference": "1900−1680=220 LPM",
+    "Q07_tie_break": "23 m並列時1900 LPM>700 LPM，100EUB-M-5.75T在80EUB-M-5.30T之前",
+    "Q09_point_check": "沒有15 m @400 LPM明列額定點；四個rated_head>=15與rated_flow>=400的完整列只是待查候選，不保證15 m時的流量。"
+  },
+  "phase_checks": {
+    "EDW": "201–203行的S/T列各有單相、三相電流，208行定義S=單相、T=三相；204–205行只列三相電流。",
+    "EUB-M": "233–234行只有單相電流；235–242行只有三相電流，與231行欄位一致。"
+  },
+  "questions": [
+    {
+      "id": "Q01",
+      "manual_condition": "outlet_inch=3且max_head_m>=20",
+      "manual_expected_models": [
+        "80EDW-5.30S/T",
+        "80EDW-5.50T",
+        "80EUB-M-5.30T",
+        "80EUB-M-5.50T",
+        "80EUB-M-5.75T"
+      ],
+      "recomputed_from_raw_rows": [
+        "80EDW-5.30S/T",
+        "80EDW-5.50T",
+        "80EUB-M-5.30T",
+        "80EUB-M-5.50T",
+        "80EUB-M-5.75T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EDW-5.30S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 202,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 14.5,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 26.5,
+          "max_flow_lpm": 980.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "80EDW-5.50T",
+          "series": "EDW",
+          "page": 9,
+          "line": 204,
+          "hp": 5.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 21.5,
+          "rated_flow_lpm": 400.0,
+          "max_head_m": 32.4,
+          "max_flow_lpm": 1040.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 238,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 10.0,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 700.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.50T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 239,
+          "hp": 5.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 19.0,
+          "rated_flow_lpm": 600.0,
+          "max_head_m": 30.0,
+          "max_flow_lpm": 900.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 241,
+          "hp": 7.5,
+          "outlet_inch": 3.0,
+          "rated_head_m": 25.0,
+          "rated_flow_lpm": 680.0,
+          "max_head_m": 33.0,
+          "max_flow_lpm": 1200.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q02",
+      "manual_condition": "available_phases含3且hp<=3且max_flow_lpm>=500",
+      "manual_expected_models": [
+        "80EDW-5.20S/T",
+        "80EDW-5.30S/T",
+        "100EDW-5.30S/T",
+        "80EUB-M-5.20T",
+        "50EUB-M-5.30T",
+        "80EUB-M-5.30T"
+      ],
+      "recomputed_from_raw_rows": [
+        "80EDW-5.20S/T",
+        "80EDW-5.30S/T",
+        "100EDW-5.30S/T",
+        "80EUB-M-5.20T",
+        "50EUB-M-5.30T",
+        "80EUB-M-5.30T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 208,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EDW-5.20S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 201,
+          "hp": 2.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 9.5,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 16.4,
+          "max_flow_lpm": 820.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "80EDW-5.30S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 202,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 14.5,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 26.5,
+          "max_flow_lpm": 980.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "100EDW-5.30S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 203,
+          "hp": 3.0,
+          "outlet_inch": 4.0,
+          "rated_head_m": 9.5,
+          "rated_flow_lpm": 800.0,
+          "max_head_m": 17.0,
+          "max_flow_lpm": 1200.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.20T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 236,
+          "hp": 2.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 9.0,
+          "rated_flow_lpm": 400.0,
+          "max_head_m": 16.0,
+          "max_flow_lpm": 630.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "50EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 237,
+          "hp": 3.0,
+          "outlet_inch": 2.0,
+          "rated_head_m": 15.0,
+          "rated_flow_lpm": 330.0,
+          "max_head_m": 26.0,
+          "max_flow_lpm": 550.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 238,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 10.0,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 700.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q03",
+      "manual_condition": "全15列max_flow_lpm最高",
+      "manual_expected_models": [
+        "100EUB-M-5.75T"
+      ],
+      "recomputed_from_raw_rows": [
+        "100EUB-M-5.75T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "100EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 242,
+          "hp": 7.5,
+          "outlet_inch": 4.0,
+          "rated_head_m": 16.0,
+          "rated_flow_lpm": 1060.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 1900.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q04",
+      "manual_condition": "hp=3的完整比較清單，冠軍依max_head_m",
+      "manual_expected_models": [
+        "80EDW-5.30S/T",
+        "100EDW-5.30S/T",
+        "50EUB-M-5.30T",
+        "80EUB-M-5.30T"
+      ],
+      "recomputed_from_raw_rows": [
+        "80EDW-5.30S/T",
+        "100EDW-5.30S/T",
+        "50EUB-M-5.30T",
+        "80EUB-M-5.30T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EDW-5.30S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 202,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 14.5,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 26.5,
+          "max_flow_lpm": 980.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "100EDW-5.30S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 203,
+          "hp": 3.0,
+          "outlet_inch": 4.0,
+          "rated_head_m": 9.5,
+          "rated_flow_lpm": 800.0,
+          "max_head_m": 17.0,
+          "max_flow_lpm": 1200.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "50EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 237,
+          "hp": 3.0,
+          "outlet_inch": 2.0,
+          "rated_head_m": 15.0,
+          "rated_flow_lpm": 330.0,
+          "max_head_m": 26.0,
+          "max_flow_lpm": 550.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 238,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 10.0,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 700.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q05",
+      "manual_condition": "各series中outlet_inch=3，分別取max_head_m最高",
+      "manual_expected_models": [
+        "80EDW-5.50T",
+        "80EUB-M-5.75T"
+      ],
+      "recomputed_from_raw_rows": [
+        "80EDW-5.50T",
+        "80EUB-M-5.75T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EDW-5.50T",
+          "series": "EDW",
+          "page": 9,
+          "line": 204,
+          "hp": 5.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 21.5,
+          "rated_flow_lpm": 400.0,
+          "max_head_m": 32.4,
+          "max_flow_lpm": 1040.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 241,
+          "hp": 7.5,
+          "outlet_inch": 3.0,
+          "rated_head_m": 25.0,
+          "rated_flow_lpm": 680.0,
+          "max_head_m": 33.0,
+          "max_flow_lpm": 1200.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q06",
+      "manual_condition": "甲=phase含1 AND hp=2 AND outlet=3 AND max_flow>=650；乙=phase含3 AND hp=3 AND max_head>=23；各別輸出，跨情境OR",
+      "manual_expected_models": {
+        "甲": [
+          "80EDW-5.20S/T",
+          "80EUB-M-5.20S"
+        ],
+        "乙": [
+          "80EDW-5.30S/T",
+          "50EUB-M-5.30T",
+          "80EUB-M-5.30T"
+        ]
+      },
+      "recomputed_from_raw_rows": {
+        "甲": [
+          "80EDW-5.20S/T",
+          "80EUB-M-5.20S"
+        ],
+        "乙": [
+          "80EDW-5.30S/T",
+          "50EUB-M-5.30T",
+          "80EUB-M-5.30T"
+        ]
+      },
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 208,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EDW-5.20S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 201,
+          "hp": 2.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 9.5,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 16.4,
+          "max_flow_lpm": 820.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.20S",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 234,
+          "hp": 2.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 10.0,
+          "rated_flow_lpm": 400.0,
+          "max_head_m": 17.0,
+          "max_flow_lpm": 690.0,
+          "available_phases": [
+            1
+          ]
+        },
+        {
+          "model": "80EDW-5.30S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 202,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 14.5,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 26.5,
+          "max_flow_lpm": 980.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "50EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 237,
+          "hp": 3.0,
+          "outlet_inch": 2.0,
+          "rated_head_m": 15.0,
+          "rated_flow_lpm": 330.0,
+          "max_head_m": 26.0,
+          "max_flow_lpm": 550.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 238,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 10.0,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 700.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q07",
+      "manual_condition": "series=EUB-M且phase含3且max_head>=20；依max_head降冪、max_flow降冪",
+      "manual_expected_models": [
+        "80EUB-M-5.75T",
+        "80EUB-M-5.50T",
+        "50EUB-M-5.30T",
+        "100EUB-M-5.75T",
+        "80EUB-M-5.30T",
+        "50EUB-M-5.20T"
+      ],
+      "recomputed_from_raw_rows": [
+        "80EUB-M-5.75T",
+        "80EUB-M-5.50T",
+        "50EUB-M-5.30T",
+        "100EUB-M-5.75T",
+        "80EUB-M-5.30T",
+        "50EUB-M-5.20T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 241,
+          "hp": 7.5,
+          "outlet_inch": 3.0,
+          "rated_head_m": 25.0,
+          "rated_flow_lpm": 680.0,
+          "max_head_m": 33.0,
+          "max_flow_lpm": 1200.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.50T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 239,
+          "hp": 5.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 19.0,
+          "rated_flow_lpm": 600.0,
+          "max_head_m": 30.0,
+          "max_flow_lpm": 900.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "50EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 237,
+          "hp": 3.0,
+          "outlet_inch": 2.0,
+          "rated_head_m": 15.0,
+          "rated_flow_lpm": 330.0,
+          "max_head_m": 26.0,
+          "max_flow_lpm": 550.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "100EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 242,
+          "hp": 7.5,
+          "outlet_inch": 4.0,
+          "rated_head_m": 16.0,
+          "rated_flow_lpm": 1060.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 1900.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.30T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 238,
+          "hp": 3.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 10.0,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 700.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "50EUB-M-5.20T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 235,
+          "hp": 2.0,
+          "outlet_inch": 2.0,
+          "rated_head_m": 15.0,
+          "rated_flow_lpm": 220.0,
+          "max_head_m": 21.0,
+          "max_flow_lpm": 450.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": true
+    },
+    {
+      "id": "Q08",
+      "manual_condition": "30m³/h=500LPM；phase含1且hp=2且max_flow>=500",
+      "manual_expected_models": [
+        "80EDW-5.20S/T",
+        "50EUB-M-5.20S",
+        "80EUB-M-5.20S"
+      ],
+      "recomputed_from_raw_rows": [
+        "80EDW-5.20S/T",
+        "50EUB-M-5.20S",
+        "80EUB-M-5.20S"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 208,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EDW-5.20S/T",
+          "series": "EDW",
+          "page": 9,
+          "line": 201,
+          "hp": 2.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 9.5,
+          "rated_flow_lpm": 500.0,
+          "max_head_m": 16.4,
+          "max_flow_lpm": 820.0,
+          "available_phases": [
+            1,
+            3
+          ]
+        },
+        {
+          "model": "50EUB-M-5.20S",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 233,
+          "hp": 2.0,
+          "outlet_inch": 2.0,
+          "rated_head_m": 15.0,
+          "rated_flow_lpm": 270.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 500.0,
+          "available_phases": [
+            1
+          ]
+        },
+        {
+          "model": "80EUB-M-5.20S",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 234,
+          "hp": 2.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 10.0,
+          "rated_flow_lpm": 400.0,
+          "max_head_m": 17.0,
+          "max_flow_lpm": 690.0,
+          "available_phases": [
+            1
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q09",
+      "manual_condition": "同一額定列rated_head>=15且rated_flow>=400；並無rated_head=15且rated_flow=400的明列點",
+      "manual_expected_models": [
+        "80EDW-5.50T",
+        "80EUB-M-5.50T",
+        "80EUB-M-5.75T",
+        "100EUB-M-5.75T"
+      ],
+      "recomputed_from_raw_rows": [
+        "80EDW-5.50T",
+        "80EUB-M-5.50T",
+        "80EUB-M-5.75T",
+        "100EUB-M-5.75T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "80EDW-5.50T",
+          "series": "EDW",
+          "page": 9,
+          "line": 204,
+          "hp": 5.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 21.5,
+          "rated_flow_lpm": 400.0,
+          "max_head_m": 32.4,
+          "max_flow_lpm": 1040.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.50T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 239,
+          "hp": 5.0,
+          "outlet_inch": 3.0,
+          "rated_head_m": 19.0,
+          "rated_flow_lpm": 600.0,
+          "max_head_m": 30.0,
+          "max_flow_lpm": 900.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "80EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 241,
+          "hp": 7.5,
+          "outlet_inch": 3.0,
+          "rated_head_m": 25.0,
+          "rated_flow_lpm": 680.0,
+          "max_head_m": 33.0,
+          "max_flow_lpm": 1200.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "100EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 242,
+          "hp": 7.5,
+          "outlet_inch": 4.0,
+          "rated_head_m": 16.0,
+          "rated_flow_lpm": 1060.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 1900.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q10",
+      "manual_condition": "各series中outlet_inch=4，分別取max_flow最高",
+      "manual_expected_models": [
+        "100EDW-5.50T",
+        "100EUB-M-5.75T"
+      ],
+      "recomputed_from_raw_rows": [
+        "100EDW-5.50T",
+        "100EUB-M-5.75T"
+      ],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [
+        {
+          "model": "100EDW-5.50T",
+          "series": "EDW",
+          "page": 9,
+          "line": 205,
+          "hp": 5.0,
+          "outlet_inch": 4.0,
+          "rated_head_m": 12.5,
+          "rated_flow_lpm": 1000.0,
+          "max_head_m": 22.0,
+          "max_flow_lpm": 1680.0,
+          "available_phases": [
+            3
+          ]
+        },
+        {
+          "model": "100EUB-M-5.75T",
+          "series": "EUB-M",
+          "page": 11,
+          "line": 242,
+          "hp": 7.5,
+          "outlet_inch": 4.0,
+          "rated_head_m": 16.0,
+          "rated_flow_lpm": 1060.0,
+          "max_head_m": 23.0,
+          "max_flow_lpm": 1900.0,
+          "available_phases": [
+            3
+          ]
+        }
+      ],
+      "order_is_required": false
+    },
+    {
+      "id": "Q11",
+      "manual_condition": "全型錄沒有價格，不能形成最低價格候選",
+      "manual_expected_models": [],
+      "recomputed_from_raw_rows": [],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [],
+      "order_is_required": false
+    },
+    {
+      "id": "Q12",
+      "manual_condition": "全型錄沒有保固，不能形成最長保固候選",
+      "manual_expected_models": [],
+      "recomputed_from_raw_rows": [],
+      "complete_set_match": true,
+      "citation_matches": [
+        {
+          "page": 9,
+          "line_start": 199,
+          "line_end": 205,
+          "match": true
+        },
+        {
+          "page": 11,
+          "line_start": 231,
+          "line_end": 242,
+          "match": true
+        }
+      ],
+      "numeric_evidence": [],
+      "order_is_required": false
+    }
+  ]
+}

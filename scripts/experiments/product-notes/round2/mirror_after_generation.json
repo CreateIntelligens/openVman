@@ -1,0 +1,6 @@
+{
+  "command": "python3 scripts/project_mirror.py check",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": ""
+}

@@ -1,0 +1,204 @@
+{
+  "grader": "Codex獨立代理逐條原文核對；不是人類人工驗收，沒有額外實驗模型自評或LLM API呼叫",
+  "rubric_source": "round2/questions.json的凍結grading_rubric、required_points與forbidden_claims；逐條核對round2/source_catalog.md原文，答案取完整round2/results.json（與checkpoint一致）",
+  "grades": [
+    {
+      "id": "Q01",
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "未列任何候選或揚程，將檢索未取回誤說成型錄沒有；原表實有五款符合。",
+      "matched_points": [],
+      "missing_points": ["五款完整清單", "五款最大揚程26.5、32.4、23、30、33 m"],
+      "false_claims": ["型錄沒有符合需求的相關款式與數值資料"],
+      "source_lines": [202, 204, 238, 239, 241],
+      "quality_issues": ["把檢索未取回資料誤說成型錄未載；拒答不能當成正確選型答案"]
+    },
+    {
+      "id": "Q01",
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "誤寫80EUB-M-5.30S/T及22 m、把5.75T寫36 m，並錯稱EDW沒有3吋候選；正值為5.30T/23 m、5.75T/33 m。",
+      "matched_points": ["80EUB-M-5.50T為3吋、最大揚程30 m"],
+      "missing_points": ["80EDW-5.30S/T：26.5 m", "80EDW-5.50T：32.4 m", "80EUB-M-5.30T：23 m", "80EUB-M-5.75T：33 m"],
+      "false_claims": ["80EUB-M-5.30S/T為本範圍型號且最大揚程22 m", "80EUB-M-5.75T最大揚程36 m", "EDW口徑為4吋或6吋，沒有符合條件的3吋款"],
+      "source_lines": [201, 202, 204, 238, 239, 241],
+      "quality_issues": ["只列檔案名，無法支持錯誤型號與數字"]
+    },
+    {
+      "id": "Q01",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "五款完整，3吋口徑及最大揚程26.5、32.4、23、30、33 m逐項正確，沒有錯納。",
+      "matched_points": ["完整列出五款", "五款均3吋且最大揚程數字及單位正確"],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [202, 204, 238, 239, 241],
+      "quality_issues": []
+    },
+    {
+      "id": "Q02",
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "未列任何三相候選、HP或最大流量；原表有六款，無資料拒答未達主結論。",
+      "matched_points": [],
+      "missing_points": ["六款完整清單", "六款HP及最大流量", "EDW S/T列可選三相版本及EUB-M T款為三相"],
+      "false_claims": ["型錄沒有相關資料可供查詢與篩選"],
+      "source_lines": [199, 201, 202, 203, 208, 231, 236, 237, 238],
+      "quality_issues": ["把檢索未取回資料誤說成型錄未載"]
+    },
+    {
+      "id": "Q02",
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "主結論無候選錯誤；六款均有三相版本、HP不超過3且最大流量至少500 LPM。",
+      "matched_points": [],
+      "missing_points": ["六款完整清單", "六款HP／最大流量2/820、3/980、3/1200、2/630、3/550、3/700", "相數條件說明"],
+      "false_claims": ["型錄沒有符合3HP以下且最大流量至少500 LPM的型號"],
+      "source_lines": [199, 201, 202, 203, 208, 231, 236, 237, 238],
+      "quality_issues": ["把未取得足夠檢索資料誤判為型錄沒有符合候選"]
+    },
+    {
+      "id": "Q02",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "六款與各自HP／最大流量完整正確；有承認EDW S/T列在三相現場可取T版本。",
+      "matched_points": ["六款完整清單", "六款HP及LPM數字正確", "所列型號符合三相，EDW保留S/T合併列"],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [199, 201, 202, 203, 208, 231, 236, 237, 238],
+      "quality_issues": ["『S/T表示單相與三相通用型號』措辭不精確；原文是S單相、T三相的兩種版本，不應解讀為同一台可任意換接電源"]
+    },
+    {
+      "id": "Q03",
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "未給冠軍與數值，誤稱型錄未記載；原表100EUB-M-5.75T為1900 LPM。",
+      "matched_points": [],
+      "missing_points": ["100EUB-M-5.75T為15列最大流量冠軍", "1900 LPM"],
+      "false_claims": ["型錄沒有記載此範圍內最大流量最大的型號與數值"],
+      "source_lines": [201, 202, 203, 204, 205, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242],
+      "quality_issues": ["把檢索未取回資料誤說成型錄未載；QA檔案無法代替15列規格比較"]
+    },
+    {
+      "id": "Q03",
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "未給冠軍或1900 LPM，將檢索資料不完整誤說成型錄沒有資訊。",
+      "matched_points": [],
+      "missing_points": ["100EUB-M-5.75T為15列最大流量冠軍", "1900 LPM"],
+      "false_claims": ["型錄沒有提供此資訊"],
+      "source_lines": [201, 202, 203, 204, 205, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242],
+      "quality_issues": ["把檢索未取回完整對照資料誤說成型錄未載"]
+    },
+    {
+      "id": "Q03",
+      "arm": "C",
+      "verdict": "部分對",
+      "reason": "100EUB-M-5.75T及1900 LPM正確，但只稱目前可見最大，明說無法全面跨系列比較，未確認15列全域冠軍。",
+      "matched_points": ["正確指出100EUB-M-5.75T", "正確最大流量1900 LPM"],
+      "missing_points": ["確認100EUB-M-5.75T為EDW與EUB-M全部15列的最大流量冠軍"],
+      "false_claims": [],
+      "source_lines": [201, 202, 203, 204, 205, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242],
+      "quality_issues": ["第242行引用精確；惟將參考資料未取回完整EDW混稱型錄資料不足，應分清檢索缺口與原文是否記載"]
+    },
+    {
+      "id": "Q04",
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "沒有任何3HP型號、最大揚程或冠軍，原表四款完整可比較。",
+      "matched_points": [],
+      "missing_points": ["四款3HP完整清單", "最大揚程26.5、17、26、23 m", "冠軍80EDW-5.30S/T：26.5 m"],
+      "false_claims": ["型錄沒有相關資料"],
+      "source_lines": [202, 203, 237, 238],
+      "quality_issues": ["把檢索未取回完整資料誤說成型錄未載"]
+    },
+    {
+      "id": "Q04",
+      "arm": "B",
+      "verdict": "部分對",
+      "reason": "50EUB-M-5.30T為3HP、最大揚程26 m正確；漏另三款及真正冠軍80EDW-5.30S/T的26.5 m。",
+      "matched_points": ["50EUB-M-5.30T為3HP、最大揚程26 m"],
+      "missing_points": ["80EDW-5.30S/T：26.5 m", "100EDW-5.30S/T：17 m", "80EUB-M-5.30T：23 m", "冠軍80EDW-5.30S/T：26.5 m"],
+      "false_claims": ["型錄未收錄任何3HP EDW、也未收錄其他3HP EUB-M；實際另有三列"],
+      "source_lines": [202, 203, 237, 238],
+      "quality_issues": ["第237行引用精確；但把其他型號未被檢索取回誤說成型錄未載，所謂唯一是檢索片段的限制"]
+    },
+    {
+      "id": "Q04",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "四款3HP及最大揚程完整正確，正確選80EDW-5.30S/T的26.5 m為最高；未宣稱極限流量與揚程同時達成。",
+      "matched_points": ["四款3HP完整比較清單", "最大揚程26.5、17、26、23 m正確", "冠軍80EDW-5.30S/T：26.5 m"],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [202, 203, 237, 238],
+      "quality_issues": []
+    },
+    {
+      "id": "Q05",
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "兩系列冠軍、揚程及差距均未回答，原表可得32.4 m與33 m，差0.6 m。",
+      "matched_points": [],
+      "missing_points": ["EDW冠軍80EDW-5.50T：32.4 m", "EUB-M冠軍80EUB-M-5.75T：33 m", "EUB-M高0.6 m"],
+      "false_claims": ["型錄沒有相關資料"],
+      "source_lines": [201, 202, 204, 234, 236, 238, 239, 241],
+      "quality_issues": ["把檢索未取回資料誤說成型錄未載"]
+    },
+    {
+      "id": "Q05",
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "錯稱型錄沒有3吋EDW；原表EDW三款均3吋，最高80EDW-5.50T為32.4 m。",
+      "matched_points": [],
+      "missing_points": ["EDW冠軍80EDW-5.50T：32.4 m", "EUB-M冠軍80EUB-M-5.75T：33 m", "EUB-M高0.6 m"],
+      "false_claims": ["型錄中沒有符合3吋出水的EDW資料，EDW口徑通常為4吋或以上"],
+      "source_lines": [201, 202, 204, 234, 236, 238, 239, 241],
+      "quality_issues": ["以未取回正確規格片段作沒有候選的證據"]
+    },
+    {
+      "id": "Q05",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "正確選EDW的5.50T/32.4 m及EUB-M的5.75T/33 m，並指出EUB-M高0.6 m。",
+      "matched_points": ["80EDW-5.50T：32.4 m", "80EUB-M-5.75T：33 m", "EUB-M高0.6 m"],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [201, 202, 204, 234, 236, 238, 239, 241],
+      "quality_issues": ["額外『80 mm / 3吋』應明示公稱口徑，原表只載3吋；不宜被讀為精確單位換算，本題未要求此補充"]
+    },
+    {
+      "id": "Q06",
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "雖保留甲乙不同條件，兩邊型號及數值均未回答；原表甲有兩款、乙有三款。",
+      "matched_points": ["正確複述甲乙各自條件，沒有壓成AND"],
+      "missing_points": ["甲80EDW-5.20S/T：820 LPM、80EUB-M-5.20S：690 LPM", "乙80EDW-5.30S/T：26.5 m、50EUB-M-5.30T：26 m、80EUB-M-5.30T：23 m", "EDW合併列可取各現場對應相數版本"],
+      "false_claims": ["型錄沒有相關數據可供比對與提供"],
+      "source_lines": [199, 201, 202, 208, 231, 234, 237, 238],
+      "quality_issues": ["把檢索未取回完整表格誤說成型錄未載"]
+    },
+    {
+      "id": "Q06",
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "甲5.20S誤寫630而非690 LPM；乙捏造80EDW-3.30T/24 m、100EDW-3.30T/21.5 m，並漏完整集合。",
+      "matched_points": ["分開甲乙情境並正確複述需求", "80EUB-M-5.20S的單相、2HP、3吋正確"],
+      "missing_points": ["甲80EDW-5.20S/T：820 LPM、80EUB-M-5.20S：690 LPM", "乙80EDW-5.30S/T：26.5 m、50EUB-M-5.30T：26 m、80EUB-M-5.30T：23 m"],
+      "false_claims": ["80EUB-M-5.20S最大流量630 LPM，因而甲沒有650 LPM以上候選", "80EDW-3.30T為本範圍候選且最大揚程24.0 m", "100EDW-3.30T為本範圍型號且最大揚程21.5 m"],
+      "source_lines": [199, 201, 202, 208, 231, 234, 236, 237, 238],
+      "quality_issues": ["630 LPM是80EUB-M-5.20T的最大流量，混用S與T兩列"]
+    },
+    {
+      "id": "Q06",
+      "arm": "C",
+      "verdict": "對",
+      "reason": "甲兩款820、690 LPM與乙三款26.5、26、23 m完整正確；分開OR兩情境並按EDW S/T對應版本選擇。",
+      "matched_points": ["甲完整兩款及最大流量", "乙完整三款及最大揚程", "甲乙條件分開，單相／三相及EDW S/T版本使用正確"],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [199, 201, 202, 208, 231, 234, 237, 238],
+      "quality_issues": []
+    }
+  ]
+}

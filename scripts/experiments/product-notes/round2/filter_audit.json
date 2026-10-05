@@ -1,0 +1,13 @@
+{
+  "schema_valid_questions": 11,
+  "schema_errors": [
+    "Q03"
+  ],
+  "Q03": "LLM產生where.or；schema只支援all/any，因此拒絕。不修補或重試，保留其對C答題的影響。",
+  "Q06": "甲乙分成兩個scenarios，完整集合分別2與3列，沒有合併AND。",
+  "Q07": "以max_head_m desc再max_flow_lpm desc排序，23m同值依1900>700LPM正確排序。",
+  "Q08": "30m³/h轉500LPM，gte方向與邊界正確，S/T合併列包含單相。",
+  "Q09": "設定15m/400LPM operating_point，exact為空；同額定點門檻候選4列，不把最大值合成工作點。",
+  "null": "本批相數限定的電流與重量有24個null；18項測試另驗證null AND/OR不能當確認排除。",
+  "confound": "成功的工具回覆保留matches/unknown/excluded完整frontmatter，C能見全15列，資料量多於B三篇；需加A+全15篇不篩選的控制才能分離資訊量與運算效果。"
+}

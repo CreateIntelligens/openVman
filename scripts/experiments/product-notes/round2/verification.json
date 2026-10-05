@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "questions": 12,
+  "exact_citations": 23,
+  "source_rows": 15,
+  "known_numeric_fields": 168,
+  "null_fields": 24,
+  "spec_errors": 0
+}

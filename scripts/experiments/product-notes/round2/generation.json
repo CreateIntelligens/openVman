@@ -1,0 +1,862 @@
+{
+  "notes": [
+    {
+      "filename": "80EDW-5.20S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 201\n  footnotes:\n    - page: 9\n      line: 208\n---\n\n80EDW-5.20S/T 規格為 2 HP（1.5 kW），口徑 3\"，額定點 9.5 m 搭配 500 LPM，極限點 16.4 m 搭配 820 LPM，通過粒徑 10 mm。單相滿載電流 11.0A、重量 47 kg；三相滿載電流 3.8A、重量 46 kg。電源標記 S 代表單相，T 代表三相。\n\n相關連結：[[80EDW-5.20S-T|80EDW-5.20S/T]]",
+      "frontmatter": {
+        "model": "80EDW-5.20S/T",
+        "series": "EDW",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 16.4,
+        "max_flow_lpm": 820,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 11.0,
+        "current_3ph_a": 3.8,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 201,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      }
+    },
+    {
+      "filename": "80EDW-5.30S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.30S/T\nseries: EDW\nhp: 3.0\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 14.5\nrated_flow_lpm: 500\nmax_head_m: 26.5\nmax_flow_lpm: 980\nsolids_mm: 10\nphase:\n  - 1\n  - 3\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 46\nweight_3ph_kg: 45\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 202\n  footnotes:\n    - page: 9\n      line: 208\n---\n\n80EDW-5.30S/T 規格為 3 HP / 2.2 kW，口徑 3\"，額定點為 14.5 m 搭配 500 LPM，極限點為 26.5 m 搭配 980 LPM，通過粒徑 10 mm。單相滿載電流 15.0A，重量 46 kg；三相滿載電流 5.7A，重量 45 kg。\n\n## 出處\n- 主頁 L202，註腳 L208\n\n## 相關連結\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "frontmatter": {
+        "model": "80EDW-5.30S/T",
+        "series": "EDW",
+        "hp": 3.0,
+        "kw": 2.2,
+        "outlet_inch": 3,
+        "rated_head_m": 14.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 26.5,
+        "max_flow_lpm": 980,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 15.0,
+        "current_3ph_a": 5.7,
+        "weight_1ph_kg": 46,
+        "weight_3ph_kg": 45,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 202,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      }
+    },
+    {
+      "filename": "100EDW-5.30S-T.md",
+      "markdown": "---\nmodel: 100EDW-5.30S/T\nseries: EDW\nhp: 3\nkw: 2.2\noutlet_inch: 4\nrated_head_m: 9.5\nrated_flow_lpm: 800\nmax_head_m: 17.0\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: [1, 3]\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 203\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n100EDW-5.30S/T 潛水泵浦，馬力 3 HP (2.2 kW)，口徑 4 吋。其額定點為 9.5 m 時 800 LPM，極限點（Max Head / Cap.）為 17.0 m 時 1200 LPM，通過粒徑為 10 mm。滿載電流單相為 15.0A、三相為 5.7A；重量單相為 47 kg、三相為 46 kg。\n\n出處：\n- 規格表列：knowledge/EVAK_CATALOG.md 主頁 第 203 行\n- 註腳：knowledge/EVAK_CATALOG.md 第 9 頁 第 208 行\n\n相關連結：\n- [[100EDW-5.30S-T|100EDW-5.30S/T]]",
+      "frontmatter": {
+        "model": "100EDW-5.30S/T",
+        "series": "EDW",
+        "hp": 3,
+        "kw": 2.2,
+        "outlet_inch": 4,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 800,
+        "max_head_m": 17.0,
+        "max_flow_lpm": 1200,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 15.0,
+        "current_3ph_a": 5.7,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 203,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      }
+    },
+    {
+      "filename": "80EDW-5.50T.md",
+      "markdown": "---\nmodel: 80EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 21.5\nrated_flow_lpm: 400\nmax_head_m: 32.4\nmax_flow_lpm: 1040\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 49.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 204\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n80EDW-5.50T 是一款口徑 3\" 的三相泵浦，馬力為 5 HP（3.7 kW）。其額定揚程為 21.5 m、額定流量為 400 LPM；極限揚程可達 32.4 m、極限流量可達 1040 LPM。通過粒徑為 10 mm，三相滿載電流為 7.9A，重量為 49.5 kg。\n\n出處：\n- `knowledge/EVAK_CATALOG.md` 主頁 行 204\n- 註腳：第 9 頁 行 208\n\n相關連結：\n- [[80EDW-5.50T]]",
+      "frontmatter": {
+        "model": "80EDW-5.50T",
+        "series": "EDW",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 3,
+        "rated_head_m": 21.5,
+        "rated_flow_lpm": 400,
+        "max_head_m": 32.4,
+        "max_flow_lpm": 1040,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 7.9,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 49.5,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 204,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      }
+    },
+    {
+      "filename": "100EDW-5.50T.md",
+      "markdown": "---\nmodel: 100EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 1000\nmax_head_m: 22.0\nmax_flow_lpm: 1680\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 50.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 205\n  footnotes: []\n---\n\n100EDW-5.50T 是一款 EDW 系列的三相潛水泵浦，馬力為 5 HP（3.7 kW），口徑為 4 吋。其額定揚程為 12.5 公尺，額定流量為 1000 LPM；極限揚程可達 22.0 公尺，極限流量為 1680 LPM。允許通過的最大粒徑為 10 mm。滿載電流為 7.9A（三相），重量為 50.5 kg（三相）。\n\n出處：\n- knowledge/EVAK_CATALOG.md page 9, row 205\n\n相關連結：\n- [[100EDW-5.50T|100EDW-5.50T]]",
+      "frontmatter": {
+        "model": "100EDW-5.50T",
+        "series": "EDW",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 4,
+        "rated_head_m": 12.5,
+        "rated_flow_lpm": 1000,
+        "max_head_m": 22.0,
+        "max_flow_lpm": 1680,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 7.9,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 50.5,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 205,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "50EUB-M-5.20S.md",
+      "markdown": "---\nmodel: 50EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 270\nmax_head_m: 23\nmax_flow_lpm: 500\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 233\n  footnotes: []\n---\n\n型號 50EUB-M-5.20S 屬 EUB-M 系列，馬力為 2 HP / 1.5 kW，口徑 2 吋。其額定點為 15 m 時 270 LPM，極限點（Max Head / Cap.）可達 23 m 時 500 LPM，通過粒徑為 9 mm。在電氣與重量規格方面，單相（1ø 230V）滿載電流為 12.5 A，淨重 27.5 kg；三相規格則無提供。\n\n相關連結：[[50EUB-M-5.20S]]",
+      "frontmatter": {
+        "model": "50EUB-M-5.20S",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 2,
+        "rated_head_m": 15,
+        "rated_flow_lpm": 270,
+        "max_head_m": 23,
+        "max_flow_lpm": 500,
+        "solids_mm": 9,
+        "phase": 1,
+        "current_1ph_a": 12.5,
+        "current_3ph_a": null,
+        "weight_1ph_kg": 27.5,
+        "weight_3ph_kg": null,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 233,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.20S.md",
+      "markdown": "---\nmodel: 80EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 400\nmax_head_m: 17\nmax_flow_lpm: 690\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 234\n  footnotes: []\n---\n\n80EUB-M-5.20S 規格為馬力 2 HP / 1.5 kW，口徑 3\"，額定點為 10 m 搭配 400 LPM，極限點為 17 m 搭配 690 LPM，通過粒徑 9 mm，1ø 230V 滿載電流為 12.5 A，1ø 淨重為 27.5 kg。\n\n相關連結：[[80EUB-M-5.20S]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.20S",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 10,
+        "rated_flow_lpm": 400,
+        "max_head_m": 17,
+        "max_flow_lpm": 690,
+        "solids_mm": 9,
+        "phase": 1,
+        "current_1ph_a": 12.5,
+        "current_3ph_a": null,
+        "weight_1ph_kg": 27.5,
+        "weight_3ph_kg": null,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 234,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "50EUB-M-5.20T.md",
+      "markdown": "---\nmodel: 50EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 220\nmax_head_m: 21\nmax_flow_lpm: 450\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 26.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 235\n  footnotes: []\n---\n\n50EUB-M-5.20T 屬於 EUB-M 系列，馬力為 2 HP / 1.5 kW，口徑 2\"，額定點為 15 m @ 220 LPM，極限點 (Max Head / Cap.) 為 21 m @ 450 LPM，通過粒徑 9 mm，三相滿載電流 (3ø 400V) 為 3.5 A，三相淨重為 26.4 kg。\n\n出處：\n- `knowledge/EVAK_CATALOG.md` 主頁 第 235 行\n\n相關連結：\n- [[50EUB-M-5.20T]]",
+      "frontmatter": {
+        "model": "50EUB-M-5.20T",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 2,
+        "rated_head_m": 15,
+        "rated_flow_lpm": 220,
+        "max_head_m": 21,
+        "max_flow_lpm": 450,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 3.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 26.4,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 235,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.20T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9\nrated_flow_lpm: 400\nmax_head_m: 16\nmax_flow_lpm: 630\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 25.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 236\n  footnotes: []\n---\n\n80EUB-M-5.20T 屬於 EUB-M 系列，馬力為 2 HP / 1.5 kW，口徑 3 吋。額定點為 9 m 時 400 LPM，極限點最大揚程可達 16 m、最大流量可達 630 LPM，通過粒徑為 9 mm。三相滿載電流為 3.5 A，淨重 25.9 kg。\n\n相關連結：[[80EUB-M-5.20T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.20T",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9,
+        "rated_flow_lpm": 400,
+        "max_head_m": 16,
+        "max_flow_lpm": 630,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 3.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 25.9,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 236,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "50EUB-M-5.30T.md",
+      "markdown": "---\nmodel: 50EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 330\nmax_head_m: 26\nmax_flow_lpm: 550\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 29.8\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 237\n  footnotes: []\n---\n\n50EUB-M-5.30T 型號馬力為 3 HP / 2.2 kW，口徑 2\"，額定點為 15 m @ 330 LPM，極限點為 26 m @ 550 LPM，通過粒徑 9 mm，3ø 400V 滿載電流為 5.2 A，3ø 淨重為 29.8 kg。\n\n出處：\n- 規格表行號 237\n\n相關連結：\n- [[50EUB-M-5.30T|50EUB-M-5.30T]]",
+      "frontmatter": {
+        "model": "50EUB-M-5.30T",
+        "series": "EUB-M",
+        "hp": 3,
+        "kw": 2.2,
+        "outlet_inch": 2,
+        "rated_head_m": 15,
+        "rated_flow_lpm": 330,
+        "max_head_m": 26,
+        "max_flow_lpm": 550,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 5.2,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 29.8,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 237,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.30T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 500\nmax_head_m: 23\nmax_flow_lpm: 700\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 30.0\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 238\n  footnotes: []\n---\n\n80EUB-M-5.30T 是一款 EUB-M 系列的三相潛水泵，馬力為 3 HP（2.2 kW），口徑 3 吋。其額定點為 10 m 時 500 LPM，極限點（Max Head / Cap.）為 23 m 時 700 LPM，可通過粒徑為 9 mm。在 3ø 400V 電壓下的滿載電流為 5.2 A，三相淨重為 30.0 kg。\n\n出處：\n- 規格表：`knowledge/EVAK_CATALOG.md` (主頁) 第 238 行\n\n相關連結：\n- [[80EUB-M-5.30T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.30T",
+        "series": "EUB-M",
+        "hp": 3,
+        "kw": 2.2,
+        "outlet_inch": 3,
+        "rated_head_m": 10,
+        "rated_flow_lpm": 500,
+        "max_head_m": 23,
+        "max_flow_lpm": 700,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 5.2,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 30.0,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 238,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.50T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 19\nrated_flow_lpm: 600\nmax_head_m: 30\nmax_flow_lpm: 900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 35.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 239\n  footnotes: []\n---\n\n80EUB-M-5.50T 是一款三相潛水泵，馬力為 5 HP（3.7 kW），口徑 3 吋。其額定揚程為 19 m、額定流量為 600 LPM，極限揚程可達 30 m、極限流量為 900 LPM，可通過固體粒徑 10 mm。滿載電流（3ø 400V）為 9.5 A，三相淨重 35.6 kg。\n\n相關連結：\n- [[80EUB-M-5.50T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.50T",
+        "series": "EUB-M",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 3,
+        "rated_head_m": 19,
+        "rated_flow_lpm": 600,
+        "max_head_m": 30,
+        "max_flow_lpm": 900,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 9.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 35.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 239,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "100EUB-M-5.50T.md",
+      "markdown": "---\nmodel: 100EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 800\nmax_head_m: 18.5\nmax_flow_lpm: 1400\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 34.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 240\n  footnotes: []\n---\n\n100EUB-M-5.50T 是一款馬力 5 HP（3.7 kW）、口徑 4\" 的三相泵浦。其額定點為 12.5 m 時 800 LPM，極限點（Max Head / Cap.）為 18.5 m 時 1400 LPM，通過粒徑為 10 mm。滿載電流（3ø 400V）為 9.5 A，淨重 34.9 kg。\n\n相關連結：[[100EUB-M-5.50T]]",
+      "frontmatter": {
+        "model": "100EUB-M-5.50T",
+        "series": "EUB-M",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 4,
+        "rated_head_m": 12.5,
+        "rated_flow_lpm": 800,
+        "max_head_m": 18.5,
+        "max_flow_lpm": 1400,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 9.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 34.9,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 240,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 241\n  footnotes: []\n---\n\n80EUB-M-5.75T 是一款口徑 3\" 的三相泵浦，馬力為 7.5 HP / 5.5 kW。其額定點為 25 m 時 680 LPM，極限點（Max Head / Cap.）可達 33 m 與 1200 LPM，通過粒徑為 10 mm。滿載電流（3ø 400V）為 12.5 A，淨重（3ø）為 51.6 kg。\n\n## 出處\n- 檔案：knowledge/EVAK_CATALOG.md（頁：主頁，行號：241）\n\n## 相關連結\n- [[80EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": 7.5,
+        "kw": 5.5,
+        "outlet_inch": 3,
+        "rated_head_m": 25,
+        "rated_flow_lpm": 680,
+        "max_head_m": 33,
+        "max_flow_lpm": 1200,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 241,
+          "footnotes": []
+        }
+      }
+    },
+    {
+      "filename": "100EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 100EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 4\nrated_head_m: 16\nrated_flow_lpm: 1060\nmax_head_m: 23\nmax_flow_lpm: 1900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 242\n  footnotes: []\n---\n\n100EUB-M-5.75T 是一款口徑 4\" 的 EUB-M 系列三相電動泵浦，馬力為 7.5 HP（5.5 kW）。其額定點為 16 m 時 1060 LPM，極限點（Max Head / Cap.）可達 23 m 與 1900 LPM，通過粒徑為 10 mm。滿載電流（3ø 400V）為 12.5 A，3ø 淨重為 51.4 kg。\n\n相關連結：[[100EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "100EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": 7.5,
+        "kw": 5.5,
+        "outlet_inch": 4,
+        "rated_head_m": 16,
+        "rated_flow_lpm": 1060,
+        "max_head_m": 23,
+        "max_flow_lpm": 1900,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.4,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": "主頁",
+          "row_line": 242,
+          "footnotes": []
+        }
+      }
+    }
+  ],
+  "config": {
+    "model": "gemini-3.5-flash-lite",
+    "provider": "gemini",
+    "temperature": 0.3,
+    "project": "dev-c0c8fdff34",
+    "persona": "default",
+    "source_sha256": "9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa",
+    "scope": "EDW第9頁五列與EUB-M第11頁十列，S/T合併列不拆分",
+    "telemetry": "僅此子程序停用寫入，正式服務設定未修改"
+  },
+  "generation_system_prompt": "你是 openVman 產品筆記編輯，只依給定規格表的一列及明示註腳。\n只輸出一篇Markdown，以YAML frontmatter開頭，不加code fence。\n保留model原文，包括S/T。欄位：model,series,hp,kw,outlet_inch,\nrated_head_m,rated_flow_lpm,max_head_m,max_flow_lpm,solids_mm,\nphase,current_1ph_a,current_3ph_a,weight_1ph_kg,weight_3ph_kg,\nsource:{path:knowledge/EVAK_CATALOG.md,page:主頁,row_line:該列行號,\nfootnotes:[{page:註腳頁次,line:註腳行號}]}。\n數值欄純數值，單位已在欄位名；缺值或表中-一律null，不猜測。\nphase：只有單相=1，只有三相=3，合併S/T列=[1,3]。\n重量與電流的1ø/3ø數字分開存，不能把一相的重量用給另一相。\nMax Head與Max Cap.分開存，不表示兩個最大值是同一運轉點。\n正文一小段摘要，只寫表中數據，不寫材質、用途或推論。\n出處只列自己的資料列及實際用到的註腳，不把整段列進去。\n結尾相關連結只可指向給定的檔名；遇S/T用提供的檔名映射，\n例如[[80EDW-5.20S-T|80EDW-5.20S/T]]。全程繁體中文。",
+  "calls": [
+    {
+      "label": "note-80EDW-5.20S/T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1045,
+        "output_tokens": 355,
+        "total_tokens": 1400,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 2.041,
+      "content": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 201\n  footnotes:\n    - page: 9\n      line: 208\n---\n\n80EDW-5.20S/T 規格為 2 HP（1.5 kW），口徑 3\"，額定點 9.5 m 搭配 500 LPM，極限點 16.4 m 搭配 820 LPM，通過粒徑 10 mm。單相滿載電流 11.0A、重量 47 kg；三相滿載電流 3.8A、重量 46 kg。電源標記 S 代表單相，T 代表三相。\n\n相關連結：[[80EDW-5.20S-T|80EDW-5.20S/T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 873,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EDW-5.30S/T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1047,
+        "output_tokens": 376,
+        "total_tokens": 1423,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.933,
+      "content": "---\nmodel: 80EDW-5.30S/T\nseries: EDW\nhp: 3.0\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 14.5\nrated_flow_lpm: 500\nmax_head_m: 26.5\nmax_flow_lpm: 980\nsolids_mm: 10\nphase:\n  - 1\n  - 3\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 46\nweight_3ph_kg: 45\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 202\n  footnotes:\n    - page: 9\n      line: 208\n---\n\n80EDW-5.30S/T 規格為 3 HP / 2.2 kW，口徑 3\"，額定點為 14.5 m 搭配 500 LPM，極限點為 26.5 m 搭配 980 LPM，通過粒徑 10 mm。單相滿載電流 15.0A，重量 46 kg；三相滿載電流 5.7A，重量 45 kg。\n\n## 出處\n- 主頁 L202，註腳 L208\n\n## 相關連結\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 873,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EDW-5.30S/T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1049,
+        "output_tokens": 425,
+        "total_tokens": 1474,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 2.151,
+      "content": "---\nmodel: 100EDW-5.30S/T\nseries: EDW\nhp: 3\nkw: 2.2\noutlet_inch: 4\nrated_head_m: 9.5\nrated_flow_lpm: 800\nmax_head_m: 17.0\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: [1, 3]\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 203\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n100EDW-5.30S/T 潛水泵浦，馬力 3 HP (2.2 kW)，口徑 4 吋。其額定點為 9.5 m 時 800 LPM，極限點（Max Head / Cap.）為 17.0 m 時 1200 LPM，通過粒徑為 10 mm。滿載電流單相為 15.0A、三相為 5.7A；重量單相為 47 kg、三相為 46 kg。\n\n出處：\n- 規格表列：knowledge/EVAK_CATALOG.md 主頁 第 203 行\n- 註腳：knowledge/EVAK_CATALOG.md 第 9 頁 第 208 行\n\n相關連結：\n- [[100EDW-5.30S-T|100EDW-5.30S/T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 875,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EDW-5.50T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1040,
+        "output_tokens": 370,
+        "total_tokens": 1410,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.982,
+      "content": "---\nmodel: 80EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 21.5\nrated_flow_lpm: 400\nmax_head_m: 32.4\nmax_flow_lpm: 1040\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 49.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 204\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n80EDW-5.50T 是一款口徑 3\" 的三相泵浦，馬力為 5 HP（3.7 kW）。其額定揚程為 21.5 m、額定流量為 400 LPM；極限揚程可達 32.4 m、極限流量可達 1040 LPM。通過粒徑為 10 mm，三相滿載電流為 7.9A，重量為 49.5 kg。\n\n出處：\n- `knowledge/EVAK_CATALOG.md` 主頁 行 204\n- 註腳：第 9 頁 行 208\n\n相關連結：\n- [[80EDW-5.50T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 864,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EDW-5.50T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1042,
+        "output_tokens": 371,
+        "total_tokens": 1413,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.984,
+      "content": "---\nmodel: 100EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 1000\nmax_head_m: 22.0\nmax_flow_lpm: 1680\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 50.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 205\n  footnotes: []\n---\n\n100EDW-5.50T 是一款 EDW 系列的三相潛水泵浦，馬力為 5 HP（3.7 kW），口徑為 4 吋。其額定揚程為 12.5 公尺，額定流量為 1000 LPM；極限揚程可達 22.0 公尺，極限流量為 1680 LPM。允許通過的最大粒徑為 10 mm。滿載電流為 7.9A（三相），重量為 50.5 kg（三相）。\n\n出處：\n- knowledge/EVAK_CATALOG.md page 9, row 205\n\n相關連結：\n- [[100EDW-5.50T|100EDW-5.50T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 867,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-50EUB-M-5.20S",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1009,
+        "output_tokens": 338,
+        "total_tokens": 1347,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.822,
+      "content": "---\nmodel: 50EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 270\nmax_head_m: 23\nmax_flow_lpm: 500\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 233\n  footnotes: []\n---\n\n型號 50EUB-M-5.20S 屬 EUB-M 系列，馬力為 2 HP / 1.5 kW，口徑 2 吋。其額定點為 15 m 時 270 LPM，極限點（Max Head / Cap.）可達 23 m 時 500 LPM，通過粒徑為 9 mm。在電氣與重量規格方面，單相（1ø 230V）滿載電流為 12.5 A，淨重 27.5 kg；三相規格則無提供。\n\n相關連結：[[50EUB-M-5.20S]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 802,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.20S",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1009,
+        "output_tokens": 305,
+        "total_tokens": 1314,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.736,
+      "content": "---\nmodel: 80EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 400\nmax_head_m: 17\nmax_flow_lpm: 690\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 234\n  footnotes: []\n---\n\n80EUB-M-5.20S 規格為馬力 2 HP / 1.5 kW，口徑 3\"，額定點為 10 m 搭配 400 LPM，極限點為 17 m 搭配 690 LPM，通過粒徑 9 mm，1ø 230V 滿載電流為 12.5 A，1ø 淨重為 27.5 kg。\n\n相關連結：[[80EUB-M-5.20S]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 802,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-50EUB-M-5.20T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1008,
+        "output_tokens": 342,
+        "total_tokens": 1350,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.562,
+      "content": "---\nmodel: 50EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 220\nmax_head_m: 21\nmax_flow_lpm: 450\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 26.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 235\n  footnotes: []\n---\n\n50EUB-M-5.20T 屬於 EUB-M 系列，馬力為 2 HP / 1.5 kW，口徑 2\"，額定點為 15 m @ 220 LPM，極限點 (Max Head / Cap.) 為 21 m @ 450 LPM，通過粒徑 9 mm，三相滿載電流 (3ø 400V) 為 3.5 A，三相淨重為 26.4 kg。\n\n出處：\n- `knowledge/EVAK_CATALOG.md` 主頁 第 235 行\n\n相關連結：\n- [[50EUB-M-5.20T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 801,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.20T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1007,
+        "output_tokens": 306,
+        "total_tokens": 1313,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.905,
+      "content": "---\nmodel: 80EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9\nrated_flow_lpm: 400\nmax_head_m: 16\nmax_flow_lpm: 630\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 25.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 236\n  footnotes: []\n---\n\n80EUB-M-5.20T 屬於 EUB-M 系列，馬力為 2 HP / 1.5 kW，口徑 3 吋。額定點為 9 m 時 400 LPM，極限點最大揚程可達 16 m、最大流量可達 630 LPM，通過粒徑為 9 mm。三相滿載電流為 3.5 A，淨重 25.9 kg。\n\n相關連結：[[80EUB-M-5.20T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 800,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-50EUB-M-5.30T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1008,
+        "output_tokens": 331,
+        "total_tokens": 1339,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.784,
+      "content": "---\nmodel: 50EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 330\nmax_head_m: 26\nmax_flow_lpm: 550\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 29.8\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 237\n  footnotes: []\n---\n\n50EUB-M-5.30T 型號馬力為 3 HP / 2.2 kW，口徑 2\"，額定點為 15 m @ 330 LPM，極限點為 26 m @ 550 LPM，通過粒徑 9 mm，3ø 400V 滿載電流為 5.2 A，3ø 淨重為 29.8 kg。\n\n出處：\n- 規格表行號 237\n\n相關連結：\n- [[50EUB-M-5.30T|50EUB-M-5.30T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 801,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.30T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1008,
+        "output_tokens": 359,
+        "total_tokens": 1367,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.905,
+      "content": "---\nmodel: 80EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 500\nmax_head_m: 23\nmax_flow_lpm: 700\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 30.0\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 238\n  footnotes: []\n---\n\n80EUB-M-5.30T 是一款 EUB-M 系列的三相潛水泵，馬力為 3 HP（2.2 kW），口徑 3 吋。其額定點為 10 m 時 500 LPM，極限點（Max Head / Cap.）為 23 m 時 700 LPM，可通過粒徑為 9 mm。在 3ø 400V 電壓下的滿載電流為 5.2 A，三相淨重為 30.0 kg。\n\n出處：\n- 規格表：`knowledge/EVAK_CATALOG.md` (主頁) 第 238 行\n\n相關連結：\n- [[80EUB-M-5.30T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 801,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.50T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1009,
+        "output_tokens": 327,
+        "total_tokens": 1336,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.482,
+      "content": "---\nmodel: 80EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 19\nrated_flow_lpm: 600\nmax_head_m: 30\nmax_flow_lpm: 900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 35.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 239\n  footnotes: []\n---\n\n80EUB-M-5.50T 是一款三相潛水泵，馬力為 5 HP（3.7 kW），口徑 3 吋。其額定揚程為 19 m、額定流量為 600 LPM，極限揚程可達 30 m、極限流量為 900 LPM，可通過固體粒徑 10 mm。滿載電流（3ø 400V）為 9.5 A，三相淨重 35.6 kg。\n\n相關連結：\n- [[80EUB-M-5.50T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 802,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EUB-M-5.50T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1016,
+        "output_tokens": 326,
+        "total_tokens": 1342,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.716,
+      "content": "---\nmodel: 100EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 800\nmax_head_m: 18.5\nmax_flow_lpm: 1400\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 34.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 240\n  footnotes: []\n---\n\n100EUB-M-5.50T 是一款馬力 5 HP（3.7 kW）、口徑 4\" 的三相泵浦。其額定點為 12.5 m 時 800 LPM，極限點（Max Head / Cap.）為 18.5 m 時 1400 LPM，通過粒徑為 10 mm。滿載電流（3ø 400V）為 9.5 A，淨重 34.9 kg。\n\n相關連結：[[100EUB-M-5.50T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 806,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.75T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1013,
+        "output_tokens": 363,
+        "total_tokens": 1376,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.601,
+      "content": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 241\n  footnotes: []\n---\n\n80EUB-M-5.75T 是一款口徑 3\" 的三相泵浦，馬力為 7.5 HP / 5.5 kW。其額定點為 25 m 時 680 LPM，極限點（Max Head / Cap.）可達 33 m 與 1200 LPM，通過粒徑為 10 mm。滿載電流（3ø 400V）為 12.5 A，淨重（3ø）為 51.6 kg。\n\n## 出處\n- 檔案：knowledge/EVAK_CATALOG.md（頁：主頁，行號：241）\n\n## 相關連結\n- [[80EUB-M-5.75T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 805,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EUB-M-5.75T",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1016,
+        "output_tokens": 338,
+        "total_tokens": 1354,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.542,
+      "content": "---\nmodel: 100EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 4\nrated_head_m: 16\nrated_flow_lpm: 1060\nmax_head_m: 23\nmax_flow_lpm: 1900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 主頁\n  row_line: 242\n  footnotes: []\n---\n\n100EUB-M-5.75T 是一款口徑 4\" 的 EUB-M 系列三相電動泵浦，馬力為 7.5 HP（5.5 kW）。其額定點為 16 m 時 1060 LPM，極限點（Max Head / Cap.）可達 23 m 與 1900 LPM，通過粒徑為 10 mm。滿載電流（3ø 400V）為 12.5 A，3ø 淨重為 51.4 kg。\n\n相關連結：[[100EUB-M-5.75T]]",
+      "system_sha256": "706de9005bbd95f5ad8ede372e29cc5972d8c63afd8aa3caec3c0c772fff9c20",
+      "user_chars": 807,
+      "max_tokens": 2200
+    }
+  ],
+  "usage": {
+    "llm_calls": 15,
+    "provider_attempts": 15,
+    "missing_usage_calls": 0,
+    "tokens": {
+      "input_tokens": 15326,
+      "output_tokens": 5232,
+      "total_tokens": 20558,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    }
+  },
+  "route_attempts": [
+    {
+      "trace_id": "product-notes-round2-note-80EDW-5.20S/T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1734.404275894165,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-80EDW-5.30S/T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1836.6363945007324,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-100EDW-5.30S/T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 2039.7946815490723,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-80EDW-5.50T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1877.6731491088867,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-100EDW-5.50T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1877.2437763214111,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-50EUB-M-5.20S",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1724.1558485031128,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-80EUB-M-5.20S",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1640.270839691162,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-50EUB-M-5.20T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1463.7203569412231,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-80EUB-M-5.20T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1811.6237239837646,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-50EUB-M-5.30T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1686.2171230316162,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-80EUB-M-5.30T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1810.4939575195312,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-80EUB-M-5.50T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1379.4851903915405,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-100EUB-M-5.50T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1621.2724571228027,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-80EUB-M-5.75T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1506.7096490859985,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round2-note-100EUB-M-5.75T",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1445.8514947891235,
+      "chain_length": 1
+    }
+  ],
+  "integrity": {
+    "file_count_before": 2892,
+    "file_count_after": 2892,
+    "digest_before": "5047696c3097c0d5a36cee19cf8da315e7b0a0d9e69a1cad95ebe999f165a20a",
+    "digest_after": "5047696c3097c0d5a36cee19cf8da315e7b0a0d9e69a1cad95ebe999f165a20a",
+    "changed": []
+  }
+}

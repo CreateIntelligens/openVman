@@ -20,7 +20,7 @@ def write_json(name, data):
 def mirror_check(name):
     result = subprocess.run(
         [sys.executable, "scripts/project_mirror.py", "check"],
-        cwd=ROOT.parents[2], capture_output=True, text=True,
+        cwd=ROOT.parents[3], capture_output=True, text=True,
     )
     write_json(name, {
         "command": "python3 scripts/project_mirror.py check",
@@ -34,6 +34,13 @@ def mirror_check(name):
 def run_container(payload, checkpoint):
     # Only stdout artifacts return to this directory; /data stays read-only.
     code = "DATA = " + repr(payload) + "\n"
+    code += "import types, sys\n"
+    code += "filter_module = types.ModuleType(\"filter_engine\")\n"
+    code += "sys.modules[\"filter_engine\"] = filter_module\n"
+    code += (
+        "exec(" + repr((ROOT / "filter_engine.py").read_text())
+        + ", filter_module.__dict__)\n"
+    )
     code += (ROOT / "runtime.py").read_text(encoding="utf-8")
     process = subprocess.Popen(
         ["docker", "exec", "-i", "-w", "/app",
@@ -53,6 +60,9 @@ def run_container(payload, checkpoint):
         write_json(checkpoint, events)
         if event["type"] == "result":
             result = event["data"]
+            full = result["integrity"].pop("full", None)
+            if full is not None:
+                write_json(payload["operation"] + ".full.json", full)
         else:
             print(event["type"], event.get("label", ""), flush=True)
     if process.wait() or result is None:
