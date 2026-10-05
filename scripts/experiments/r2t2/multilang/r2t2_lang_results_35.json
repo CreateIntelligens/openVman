@@ -1,0 +1,542 @@
+[
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "e1e91bc0-a74c-4320-af42-28be9f18af75",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "zhen",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "d7758da3-e00c-4330-b359-7c8a56720881",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "82b2c6a6-f912-40f0-839d-e9b33f7241f5",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "d0dd1773-115b-4252-a254-3d1c69de080b",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "zhen",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "954b8650-1e1a-40a4-85c8-421b45b34450",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "be7a3943-517f-43fb-a15e-4fff491e7680",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "a1114459-80ce-46fb-84a6-b2bc3e56e941",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "zhen",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "475e51dc-9625-4514-9d2f-2348fe54cc8a",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "b70583af-3dfe-4111-b2a2-6512ce33b01d",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "English",
+  "ref": "How deep can the submersible pump go?",
+  "out": "How deep can the submersible pump go?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "ca35f246-8982-4c9a-9630-a93766c084a1",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "zhen",
+  "ref": "How deep can the submersible pump go?",
+  "out": "How deep can the submersible pump go?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "180e1562-6133-44a7-a256-f10630824ec4",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "Chinese",
+  "ref": "How deep can the submersible pump go?",
+  "out": "how deep can the submersible pump go?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "05099e44-f5e4-479c-98e1-a706817f1c19",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "English",
+  "ref": "Which slurry pump do you recommend for a construction site?",
+  "out": "Which slurry pump do you recommend for a construction site?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "15ebd794-3c8d-4857-af45-8d4a575df039",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "zhen",
+  "ref": "Which slurry pump do you recommend for a construction site?",
+  "out": "Which slurry pump do you recommend for a construction site?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "6022ddf2-0cb8-4e7d-a3b7-d88fc5e9236d",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "Chinese",
+  "ref": "Which slurry pump do you recommend for a construction site?",
+  "out": "which slurry pump do you recommend for a construction site?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "00c0eea6-35b9-4004-83e2-c28fa2140185",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "English",
+  "ref": "What are your business hours?",
+  "out": "What are your business hours?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "3d6a3bac-54d1-4ec1-9569-a000bb3b50ae",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "zhen",
+  "ref": "What are your business hours?",
+  "out": "What are your business hours?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "aab19866-4c2b-4b93-ac21-dd508762da23",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "en",
+  "setting": "Chinese",
+  "ref": "What are your business hours?",
+  "out": "what are your business hours",
+  "server_language": {
+   "status": "connected",
+   "requestId": "ae39e5a1-5866-40da-aef7-2a97be200262",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "Spanish",
+  "ref": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "out": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "dc988d54-3495-48bc-b0c2-a3108438cebe",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "zhen",
+  "ref": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "out": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "8e1533d1-4355-427b-b7f5-5430a6e2a884",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "Chinese",
+  "ref": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "out": "什麼深度最大支援了潛水炸彈？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "b6ad576c-497e-40be-9bf6-d8be6ded8b26",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "Spanish",
+  "ref": "¿Qué bomba de lodos recomiendan para una obra?",
+  "out": "qué bomba de lodos recomiendan para una obra",
+  "server_language": {
+   "status": "connected",
+   "requestId": "46c0fcc0-3358-4e7d-8ddd-cd3f03d69c08",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "zhen",
+  "ref": "¿Qué bomba de lodos recomiendan para una obra?",
+  "out": "qué bomba de lodos recomiendan para una obra",
+  "server_language": {
+   "status": "connected",
+   "requestId": "d93767a0-023c-414d-99bf-c74d80907eec",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "Chinese",
+  "ref": "¿Qué bomba de lodos recomiendan para una obra?",
+  "out": "que bomba de lodos recomiendan para una obra",
+  "server_language": {
+   "status": "connected",
+   "requestId": "d206a78e-c894-42b0-a68d-d10f53fa1349",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "Spanish",
+  "ref": "¿Cuál es su horario de atención?",
+  "out": "Cuál es su horario de atención",
+  "server_language": {
+   "status": "connected",
+   "requestId": "75be4fea-8ff2-4a54-802b-58b289d3f10d",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "zhen",
+  "ref": "¿Cuál es su horario de atención?",
+  "out": "Cuál es su horario de atención",
+  "server_language": {
+   "status": "connected",
+   "requestId": "9f81c112-3596-40e5-8d8a-d315e22920b1",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "es",
+  "setting": "Chinese",
+  "ref": "¿Cuál es su horario de atención?",
+  "out": "qual é seu horário de atenção",
+  "server_language": {
+   "status": "connected",
+   "requestId": "397e7eef-379c-4253-8691-ebc3fe9c0e65",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "Japanese",
+  "ref": "水中ポンプはどのくらいの深さまで使えますか？",
+  "out": "水中ポンプはどのくらいの深さまで使えますか",
+  "server_language": {
+   "status": "connected",
+   "requestId": "71c20b41-a508-4289-89c0-b6613df05271",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "zhen",
+  "ref": "水中ポンプはどのくらいの深さまで使えますか？",
+  "out": "水中泵浦是どのくらいの深さまで使えます？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "20b712ff-0fc2-4f63-9cc2-ca65cb370ff2",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "Chinese",
+  "ref": "水中ポンプはどのくらいの深さまで使えますか？",
+  "out": "水中泵浦是どのくらいの深さまで使えますか？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "b4c9f3f8-6757-4fb5-b80d-2c9508159486",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "Japanese",
+  "ref": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
+  "out": "工事現場で泥水を數にはどのポンプがおすすめですか",
+  "server_language": {
+   "status": "connected",
+   "requestId": "e58fc28d-f1ce-4369-9f48-c25d20b06fb7",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "zhen",
+  "ref": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
+  "out": "工地現場で泥水を數にはどのポンプがおすすめですか？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "50e0b2be-8d5e-4d21-be3f-99ee2e1b2a6a",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "Chinese",
+  "ref": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
+  "out": "工地現場で泥水を數にはどのポンプがおすすめですか？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "faa6c100-9e9a-451a-987a-b11c52582ffe",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "Japanese",
+  "ref": "営業時間は何時から何時までですか？",
+  "out": "営業時間は何時から何時までですか",
+  "server_language": {
+   "status": "connected",
+   "requestId": "47b5cc66-19f5-44f1-bbc2-4316776e1257",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "zhen",
+  "ref": "営業時間は何時から何時までですか？",
+  "out": "營業時間是幾時到幾時までですか",
+  "server_language": {
+   "status": "connected",
+   "requestId": "dbf9f09e-1929-49c6-adaa-5d8e7fca9938",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ja",
+  "setting": "Chinese",
+  "ref": "営業時間は何時から何時までですか？",
+  "out": "營業時間是幾時到幾時までですか？",
+  "server_language": {
+   "status": "connected",
+   "requestId": "5b2727a5-ee03-4278-abbe-ba8ed5cb1fca",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "Korean",
+  "ref": "수중 펌프는 얼마나 깊이 설치할 수 있나요?",
+  "out": "수중펌프는 얼마나 깊이 설치할 수 있나요?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "3820eee3-5963-48b8-bb1a-a61aa297bdc5",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "zhen",
+  "ref": "수중 펌프는 얼마나 깊이 설치할 수 있나요?",
+  "out": "수중펌프는 얼마나 깊이 설치할 수나",
+  "server_language": {
+   "status": "connected",
+   "requestId": "be526ba1-e509-4264-9435-ad0a4e4eae89",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "Chinese",
+  "ref": "수중 펌프는 얼마나 깊이 설치할 수 있나요?",
+  "out": "水중펌프는얼마나깊이설치할수있나요?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "ca983049-aaa0-43f8-a6cd-bd88cb87e64d",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "Korean",
+  "ref": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+  "out": "공사 현장에서 진행물을 퍼내려면 펌",
+  "server_language": {
+   "status": "connected",
+   "requestId": "3e389546-08a1-415d-b9f5-0d1d2be0da90",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "zhen",
+  "ref": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+  "out": "공사 현장에서 진흙물을",
+  "server_language": {
+   "status": "connected",
+   "requestId": "717a3103-20d6-46f7-ab97-a6fac4e4c681",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "Chinese",
+  "ref": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+  "out": "工地現場에서 진행물을퍼내려면 어떤펌프가 좋나요?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "60492b74-67b0-45e8-a82e-09c175b2670c",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "Korean",
+  "ref": "영업 시간이 어떻게 되나요?",
+  "out": "영업 시간이 어떻게 되나요?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "6769eba0-fc58-4e13-93e6-60ca0bffc077",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "zhen",
+  "ref": "영업 시간이 어떻게 되나요?",
+  "out": "영업 시간이 어떻게 되요",
+  "server_language": {
+   "status": "connected",
+   "requestId": "687bc24d-913b-4fc7-a8f5-daa6bc0fd087",
+   "msg": "",
+   "active_connections": 1
+  }
+ },
+ {
+  "lang": "ko",
+  "setting": "Chinese",
+  "ref": "영업 시간이 어떻게 되나요?",
+  "out": "營業時間是 어떻게 되나요?",
+  "server_language": {
+   "status": "connected",
+   "requestId": "4122e1e6-5bfe-472d-9245-34a4aee873c5",
+   "msg": "",
+   "active_connections": 1
+  }
+ }
+]

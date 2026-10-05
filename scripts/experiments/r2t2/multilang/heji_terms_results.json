@@ -1,0 +1,542 @@
+[
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "out": "請問 Diva 有攪拌器嗎？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "out": "請問diva有攪拌器嗎？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "out": "請問diva有攪拌器嗎？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "沉水泵最深可以放多深？",
+  "out": "潛水泵最深可以放多深？",
+  "cer": 0.1,
+  "terms": "0/1"
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "沉水泵最深可以放多深？",
+  "out": "沉水泵最深可以放多深？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "沉水泵最深可以放多深？",
+  "out": "沉水泵最深可以放多深？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "EUBL 有哪些馬力規格？",
+  "out": "UBL 有哪些馬力規格？",
+  "cer": 0.091,
+  "terms": "0/1"
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "EUBL 有哪些馬力規格？",
+  "out": "eubl有哪些馬力規格？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "EUBL 有哪些馬力規格？",
+  "out": "eubl有哪些馬力規格",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "out": "51USR 的出水口徑是多少？",
+  "cer": 0.143,
+  "terms": "0/1"
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "out": "五十一usr的出水口徑是多少？",
+  "cer": 0.214,
+  "terms": "0/1"
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "out": "五十一usr的出水口徑是多少？",
+  "cer": 0.214,
+  "terms": "0/1"
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "out": "HP 500 水泵最大流量是多少？",
+  "cer": 0.267,
+  "terms": "0/2"
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "out": "hippo汙水泵最大流量是多少？",
+  "cer": 0.0,
+  "terms": "2/2"
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "out": "hippo汙水泵最大流量是多少",
+  "cer": 0.0,
+  "terms": "2/2"
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "out": "Alligator 攪碎泵可以攪碎石嗎？",
+  "cer": 0.222,
+  "terms": "1/2"
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "out": "alligator絞碎泵可以絞碎石嗎？",
+  "cer": 0.111,
+  "terms": "2/2"
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "out": "Alligator絞碎泵可以絞碎石嗎？",
+  "cer": 0.111,
+  "terms": "2/2"
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "out": "工地要抽泥漿，推薦哪款泥漿泵？",
+  "cer": 0.071,
+  "terms": "1/1"
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "out": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "out": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "泵浦的揚程是什麼意思？",
+  "out": "斷片的陽城是什麼意思？",
+  "cer": 0.4,
+  "terms": "0/2"
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "泵浦的揚程是什麼意思？",
+  "out": "洞普的揚程是什麼意思？",
+  "cer": 0.2,
+  "terms": "1/2"
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "泵浦的揚程是什麼意思？",
+  "out": "洞浦的陽城是什麼意思？",
+  "cer": 0.3,
+  "terms": "0/2"
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "out": "自動摺疊裝置要怎麼安裝？",
+  "cer": 0.182,
+  "terms": "0/1"
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "out": "自動著脫裝置要怎麼安裝？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "out": "自動著脫裝置要怎麼安裝？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "你好，請問你是誰？",
+  "out": "你好，請問你是誰？",
+  "cer": 0.0,
+  "terms": "0/0"
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "你好，請問你是誰？",
+  "out": "你好，請問你是誰？",
+  "cer": 0.0,
+  "terms": "0/0"
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "你好，請問你是誰？",
+  "out": "你好，請問你是誰？",
+  "cer": 0.0,
+  "terms": "0/0"
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "out": "請問迪威有攪拌器嗎？",
+  "cer": 0.364,
+  "terms": "0/1"
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "out": "請問低位有攪拌器嗎？",
+  "cer": 0.364,
+  "terms": "0/1"
+ },
+ {
+  "id": "diva-agitator",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "請問 DIVA 有攪拌器嗎？",
+  "out": "請問低位有？",
+  "cer": 0.727,
+  "terms": "0/1"
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "沉水泵最深可以放多深？",
+  "out": "沉睡泵最深可以放多深？",
+  "cer": 0.1,
+  "terms": "0/1"
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "沉水泵最深可以放多深？",
+  "out": "沉水泵最深可以放多深？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "submersible-depth",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "沉水泵最深可以放多深？",
+  "out": "沉水泵最多",
+  "cer": 0.5,
+  "terms": "1/1"
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "EUBL 有哪些馬力規格？",
+  "out": "U比亞有哪些馬力規格？",
+  "cer": 0.273,
+  "terms": "0/1"
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "EUBL 有哪些馬力規格？",
+  "out": "eubl有哪些馬力規格？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "eubl-hp",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "EUBL 有哪些馬力規格？",
+  "out": "EUBL有哪些？",
+  "cer": 0.364,
+  "terms": "1/1"
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "out": "51 賽的出水口是多少？",
+  "cer": 0.429,
+  "terms": "0/1"
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "out": "五十EUS的出水口徑是多少？",
+  "cer": 0.214,
+  "terms": "0/1"
+ },
+ {
+  "id": "eusr-outlet",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "50EUSR 的出水口徑是多少？",
+  "out": "五十EUS的出水？",
+  "cer": 0.571,
+  "terms": "0/1"
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "out": "Hippo water slide 蹦最大流量是多少？",
+  "cer": 0.733,
+  "terms": "1/2"
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "out": "hippo汙水泵最大流量是多少？",
+  "cer": 0.0,
+  "terms": "2/2"
+ },
+ {
+  "id": "hippo-flow",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "HIPPO 污水泵最大流量是多少？",
+  "out": "hippo汙水泵最大流量是多少",
+  "cer": 0.0,
+  "terms": "2/2"
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "out": "Alligator 攪碎棒可以攪碎石嗎？",
+  "cer": 0.278,
+  "terms": "1/2"
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "out": "Allegate絞碎泵可以絞碎石嗎？",
+  "cer": 0.278,
+  "terms": "1/2"
+ },
+ {
+  "id": "alligator-cut",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+  "out": "Allegate絞碎泵可以絞碎石？",
+  "cer": 0.278,
+  "terms": "1/2"
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "out": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "out": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "slurry-pick",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "out": "工地要抽泥漿，推薦哪一款泥漿泵？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "泵浦的揚程是什麼意思？",
+  "out": "蹦蹦的羊腸是什麼意思？",
+  "cer": 0.4,
+  "terms": "0/2"
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "泵浦的揚程是什麼意思？",
+  "out": "泵浦的揚程是什麼意思？",
+  "cer": 0.0,
+  "terms": "2/2"
+ },
+ {
+  "id": "head-meaning",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "泵浦的揚程是什麼意思？",
+  "out": "泵浦的揚程是什麼意思？",
+  "cer": 0.0,
+  "terms": "2/2"
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "out": "自動摺疊裝置要怎麼安裝？",
+  "cer": 0.182,
+  "terms": "0/1"
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "out": "自動著脫裝置要怎麼安裝？",
+  "cer": 0.0,
+  "terms": "1/1"
+ },
+ {
+  "id": "qdc-install",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "自動著脫裝置要怎麼安裝？",
+  "out": "自動著脫安裝",
+  "cer": 0.455,
+  "terms": "0/1"
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": "gemini(zh,en,es)",
+  "ref": "你好，請問你是誰？",
+  "out": "你好，請問你是誰？",
+  "cer": 0.0,
+  "terms": "0/0"
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".37 Chinese+詞表",
+  "ref": "你好，請問你是誰？",
+  "out": "你好，請問你是誰？",
+  "cer": 0.0,
+  "terms": "0/0"
+ },
+ {
+  "id": "chit-who",
+  "voice": "edge-tts:zh-TW-YunJheNeural",
+  "engine": ".35 zhen+詞表",
+  "ref": "你好，請問你是誰？",
+  "out": "你好，請問你是誰？",
+  "cer": 0.0,
+  "terms": "0/0"
+ }
+]

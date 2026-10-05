@@ -1,0 +1,182 @@
+[
+ {
+  "lang": "zh",
+  "hint": "all5",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？"
+ },
+ {
+  "lang": "zh",
+  "hint": "zh_en_es",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？"
+ },
+ {
+  "lang": "zh",
+  "hint": "all5",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？"
+ },
+ {
+  "lang": "zh",
+  "hint": "zh_en_es",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？"
+ },
+ {
+  "lang": "zh",
+  "hint": "all5",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？"
+ },
+ {
+  "lang": "zh",
+  "hint": "zh_en_es",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？"
+ },
+ {
+  "lang": "en",
+  "hint": "all5",
+  "ref": "How deep can the submersible pump go?",
+  "out": "How deep can the submersible pump go?"
+ },
+ {
+  "lang": "en",
+  "hint": "zh_en_es",
+  "ref": "How deep can the submersible pump go?",
+  "out": "How deep can the submersible pump go?"
+ },
+ {
+  "lang": "en",
+  "hint": "all5",
+  "ref": "Which slurry pump do you recommend for a construction site?",
+  "out": "Which slurry pump do you recommend for a construction site?"
+ },
+ {
+  "lang": "en",
+  "hint": "zh_en_es",
+  "ref": "Which slurry pump do you recommend for a construction site?",
+  "out": "Which slurry pump do you recommend for a construction site?"
+ },
+ {
+  "lang": "en",
+  "hint": "all5",
+  "ref": "What are your business hours?",
+  "out": "What are your business hours?"
+ },
+ {
+  "lang": "en",
+  "hint": "zh_en_es",
+  "ref": "What are your business hours?",
+  "out": "What are your business hours?"
+ },
+ {
+  "lang": "es",
+  "hint": "all5",
+  "ref": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "out": "¿Qué profundidad máxima soporta la bomba sumergible?"
+ },
+ {
+  "lang": "es",
+  "hint": "zh_en_es",
+  "ref": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "out": "¿Qué profundidad máxima soporta la bomba sumergible?"
+ },
+ {
+  "lang": "es",
+  "hint": "all5",
+  "ref": "¿Qué bomba de lodos recomiendan para una obra?",
+  "out": "¿Qué bomba de lodos recomiendan para una obra?"
+ },
+ {
+  "lang": "es",
+  "hint": "zh_en_es",
+  "ref": "¿Qué bomba de lodos recomiendan para una obra?",
+  "out": "¿Qué bomba de lodos recomiendan para una obra?"
+ },
+ {
+  "lang": "es",
+  "hint": "all5",
+  "ref": "¿Cuál es su horario de atención?",
+  "out": "¿Cuál es su horario de atención?"
+ },
+ {
+  "lang": "es",
+  "hint": "zh_en_es",
+  "ref": "¿Cuál es su horario de atención?",
+  "out": "¿Cuál es su horario de atención?"
+ },
+ {
+  "lang": "ja",
+  "hint": "all5",
+  "ref": "水中ポンプはどのくらいの深さまで使えますか？",
+  "out": "水中ポンプはどのくらいの深さまで使えますか？"
+ },
+ {
+  "lang": "ja",
+  "hint": "zh_en_es",
+  "ref": "水中ポンプはどのくらいの深さまで使えますか？",
+  "out": "水中ポンプはどのくらいの深さまで使えますか？"
+ },
+ {
+  "lang": "ja",
+  "hint": "all5",
+  "ref": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
+  "out": "工事現場で泥水を吸うにはどのポンプがおすすめですか？"
+ },
+ {
+  "lang": "ja",
+  "hint": "zh_en_es",
+  "ref": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
+  "out": "工事現場で泥水を吸うにはどのポンプがおすすめですか？"
+ },
+ {
+  "lang": "ja",
+  "hint": "all5",
+  "ref": "営業時間は何時から何時までですか？",
+  "out": "営業時間は何時から何時までですか？"
+ },
+ {
+  "lang": "ja",
+  "hint": "zh_en_es",
+  "ref": "営業時間は何時から何時までですか？",
+  "out": "营业时间は何時から何時までですか？"
+ },
+ {
+  "lang": "ko",
+  "hint": "all5",
+  "ref": "수중 펌프는 얼마나 깊이 설치할 수 있나요?",
+  "out": "수중 펌프는 얼마나 깊이 설치할 수 있나요?"
+ },
+ {
+  "lang": "ko",
+  "hint": "zh_en_es",
+  "ref": "수중 펌프는 얼마나 깊이 설치할 수 있나요?",
+  "out": "수중 펌프는 얼마나 깊이 설치할 수 있나요?"
+ },
+ {
+  "lang": "ko",
+  "hint": "all5",
+  "ref": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+  "out": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?"
+ },
+ {
+  "lang": "ko",
+  "hint": "zh_en_es",
+  "ref": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+  "out": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?"
+ },
+ {
+  "lang": "ko",
+  "hint": "all5",
+  "ref": "영업 시간이 어떻게 되나요?",
+  "out": "영업 시간이 어떻게 되나요?"
+ },
+ {
+  "lang": "ko",
+  "hint": "zh_en_es",
+  "ref": "영업 시간이 어떻게 되나요?",
+  "out": "영업 시간이 어떻게 되나요?"
+ }
+]

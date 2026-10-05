@@ -25,6 +25,7 @@
 
 ### Documentation
 
+- `scripts/experiments/r2t2/REPORT.md` 加 2026-10-05 複測：R2T2 .37 指定語言時中英西日韓全對、不指定會把西日韓當中文；.35 `zhen` 能自動分中英西但句尾常被吃掉；Gemini 3.5 transcribe 多語全對但型號只聽對 6/24（.37＋詞表 19/24）。腳本與逐句結果在 `multilang/`。
 - 新增 `scripts/experiments/product-notes/`：AI 產生 Obsidian 式產品筆記能不能改善跨產品問答的實驗（鶴記 EUS 系列 10 題）。現行檢索 5 對／3 部分對／2 錯，加筆記 9／1／0，再加 frontmatter 篩選 9／1／0；改善主要在「資料不足時不亂猜」。EUS 頁沒有逐型號規格，篩選工具測不出價值，第二輪改用有規格表的 EUB-M／EDW（`CODEX_TASK_ROUND2.md`）。只動實驗目錄，正式程式與知識庫未變。
 - `docs/plans/thin-entry-refactor.md`、`docs/plans/r2t2-streaming-asr.md` 標為 Done（已提交並部署，使用者授權結案）；`full-duplex-voice.md` 改為進行中，並列入 `docs/README.md`。
 - 新增 `docs/plans/full-duplex-voice.md`（Draft）：語音對話不再一問一答的評估。現況是虛擬人思考與講話時麥克風寫死關閉、新的一句取代舊的；計畫分兩階段：思考中補一句合併回答（含 Brain 接收確認後落庫），講話中插話（需先在現場實測瀏覽器回音消除）。
