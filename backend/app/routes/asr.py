@@ -156,10 +156,18 @@ async def get_language_routes(
 async def list_asr_engines(
     admin: CurrentAccount = Depends(require_admin),
 ) -> JSONResponse:
-    """Engines the admin test bench can actually reach, so dead ones are not offered."""
+    """Engines the admin test bench can actually reach, so dead ones are not offered.
+
+    ``engines`` 是批次（音檔上傳），``stream`` 是串流（/api/v1/asr/stream）；瀏覽器內建
+    辨識在使用者裝置上跑，後端不知道能不能用，不列。
+    """
+    from app.gateway.asr_stream import configured_stream_engines
     from app.gateway.ingestion_audio import configured_providers
 
-    return JSONResponse(content={"engines": configured_providers()})
+    return JSONResponse(content={
+        "engines": configured_providers(),
+        "stream": configured_stream_engines(),
+    })
 
 
 @router.post(

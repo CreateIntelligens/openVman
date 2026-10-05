@@ -1385,16 +1385,23 @@ def test_asr_engines_lists_only_configured_engines(monkeypatch):
     module, _ = _load_main(monkeypatch)
     import app.gateway.ingestion_audio as ingestion_audio
 
-    monkeypatch.setattr(ingestion_audio, "get_tts_config", lambda: _make_test_config(
+    import app.gateway.asr_stream as asr_stream
+
+    cfg = _make_test_config(
         asr_breeze_url="http://breeze", asr_r2t2_url="http://r2t2", asr_r2t2_dev_url="",
         asr_xiaomi_url="", asr_sensevoice_url="", whisper_api_key="",
-    ))
+        asr_r2t2_stream_url="ws://r2t2", asr_r2t2_secret_key="k",
+        asr_r2t2_dev_stream_url="", asr_r2t2_dev_secret_key="",
+    )
+    monkeypatch.setattr(ingestion_audio, "get_tts_config", lambda: cfg)
+    monkeypatch.setattr(asr_stream, "get_tts_config", lambda: cfg)
+    monkeypatch.setenv("GEMINI_API_KEY", "g")
     client, _ = _authenticated_client(module)
 
     response = client.get("/api/v1/asr/engines")
 
     assert response.status_code == 200
-    assert response.json() == {"engines": ["breeze", "r2t2"]}
+    assert response.json() == {"engines": ["breeze", "r2t2"], "stream": ["gemini-live", "r2t2-live"]}
 
 
 def test_the_site_asr_default_endpoints_are_gone(monkeypatch):

@@ -7,6 +7,7 @@ import { charErrorRate } from "../utils/charErrorRate";
 import AsrProviderPanel from "./AsrProviderPanel";
 import { summarizeGlossary } from "./asr/GlossaryEditor";
 import { streamTestUrl } from "./asr/StreamTester";
+import { streamClip } from "./asr/streamClip";
 
 vi.mock("../api/settings", () => ({ previewAsr: vi.fn(), fetchAsrEngines: vi.fn() }));
 vi.mock("../api/knowledge", () => ({
@@ -15,13 +16,17 @@ vi.mock("../api/knowledge", () => ({
   saveKnowledgeDocument: vi.fn(),
 }));
 vi.mock("../api", () => ({ getActiveProjectId: () => "proj-1" }));
+vi.mock("./asr/streamClip", () => ({ streamClip: vi.fn() }));
 vi.mock("../hooks/useVad", () => ({
   useVad: () => ({ speaking: false, starting: false, supported: true }),
 }));
 
 beforeEach(() => {
   vi.mocked(previewAsr).mockReset();
-  vi.mocked(fetchAsrEngines).mockResolvedValue(["breeze", "r2t2", "r2t2-dev", "sensevoice"]);
+  vi.mocked(fetchAsrEngines).mockResolvedValue({
+    engines: ["breeze", "r2t2", "r2t2-dev", "sensevoice"], stream: ["gemini-live"],
+  });
+  vi.mocked(streamClip).mockReset();
   vi.mocked(fetchKnowledgeSettings).mockResolvedValue({ language_routes: ["zh", "en", "nan"] });
   vi.mocked(fetchKnowledgeDocument).mockResolvedValue({
     path: "ASR_PROMPT.md", content: "# 鶴記\nDIVA 沉水泵\n常見誤聽：沉睡泵→沉水泵\n",
@@ -123,12 +128,12 @@ describe("AsrProviderPanel", () => {
   });
 
   it("沒設定的引擎不列出來", async () => {
-    vi.mocked(fetchAsrEngines).mockResolvedValue(["breeze", "r2t2"]);
+    vi.mocked(fetchAsrEngines).mockResolvedValue({ engines: ["breeze", "r2t2"], stream: ["r2t2-live"] });
     render(<AsrProviderPanel />);
     await waitFor(() => expect(screen.queryByRole("button", { name: /^SenseVoice-Small$/ })).toBeNull());
     const group = within(screen.getByRole("group", { name: "試辨識的引擎" }));
     expect(group.getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "Breeze-ASR-26", "Confucius4-R2T2",
+      "Breeze-ASR-26", "Confucius4-R2T2", "Confucius4-R2T2 串流",
     ]);
   });
 
@@ -154,6 +159,51 @@ describe("AsrProviderPanel", () => {
     expect(await screen.findByRole("button", { name: "開始講話" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "自動斷句" })).toBeNull();
     expect(screen.queryByRole("button", { name: "錄一段" })).toBeNull();
+  });
+
+  it("之後再勾的引擎直接拿畫面上的音檔跑，不用重傳", async () => {
+    vi.mocked(previewAsr)
+      .mockResolvedValueOnce({ text: "第一家", provider: "breeze" })
+      .mockResolvedValueOnce({ text: "後來勾的", provider: "r2t2" });
+    render(<AsrProviderPanel />);
+    const clip = upload();
+    expect(await screen.findByText("第一家")).toBeTruthy();
+
+    fireEvent.click(engineButton(/^Confucius4-R2T2$/));
+
+    expect(await screen.findByText("後來勾的")).toBeTruthy();
+    expect(previewAsr).toHaveBeenLastCalledWith(clip, "clip.wav", "r2t2", expect.anything());
+    // 取消再勾回來直接顯示，不重跑。
+    fireEvent.click(engineButton(/^Confucius4-R2T2$/));
+    fireEvent.click(engineButton(/^Confucius4-R2T2$/));
+    expect(previewAsr).toHaveBeenCalledTimes(2);
+  });
+
+  it("重跑用同一段音檔再送一次", async () => {
+    vi.mocked(previewAsr)
+      .mockResolvedValueOnce({ text: "舊的", provider: "breeze" })
+      .mockResolvedValueOnce({ text: "新的", provider: "breeze" });
+    render(<AsrProviderPanel />);
+    upload();
+    expect(await screen.findByText("舊的")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "clip.wav 重跑" }));
+    expect(await screen.findByText("新的")).toBeTruthy();
+    expect(screen.queryByText("舊的")).toBeNull();
+  });
+
+  it("串流引擎把同一段音檔整段送進串流端點", async () => {
+    vi.mocked(previewAsr).mockResolvedValue({ text: "批次", provider: "breeze" });
+    vi.mocked(streamClip).mockResolvedValue({ text: "串流聽到的", elapsedSeconds: 0.6 });
+    render(<AsrProviderPanel />);
+    fireEvent.click(await waitFor(() => engineButton(/^Gemini Live$/)));
+    const clip = upload();
+
+    expect(await screen.findByText("串流聽到的")).toBeTruthy();
+    const [url, sent] = vi.mocked(streamClip).mock.calls[0];
+    expect(new URL(url).searchParams.get("engine")).toBe("gemini-live");
+    expect(new URL(url).searchParams.get("language_routes")).toBe("zh,en,nan");
+    expect(sent).toBe(clip);
+    expect(screen.getByText(/0\.60 秒/)).toBeTruthy();
   });
 
   it("一個引擎都沒勾就不送", async () => {

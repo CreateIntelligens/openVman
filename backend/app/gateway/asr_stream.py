@@ -187,6 +187,20 @@ def _engine_for(current, requested: str | None) -> str:
     return ""
 
 
+def configured_stream_engines() -> list[str]:
+    """Streaming engines whose URL and key are set, in the order the admin bench lists them."""
+    cfg = get_tts_config()
+    return [
+        engine for engine in (
+            GEMINI_STREAM_ASR_ENGINE, R2T2_STREAM_ASR_ENGINE, R2T2_DEV_STREAM_ASR_ENGINE,
+        )
+        if (
+            _r2t2_stream_endpoint(cfg, engine) if engine in _R2T2_STREAM_ENGINES
+            else os.environ.get("GEMINI_API_KEY")
+        )
+    ]
+
+
 def _r2t2_stream_endpoint(cfg: TTSRouterConfig, engine: str) -> tuple[str, str] | None:
     """URL and key for this R2T2 streaming engine, or None when it is not configured."""
     url, key = (

@@ -4,11 +4,19 @@ import { apiFetch, apiUrl, parseErrorMessage } from "./common";
 const PREVIEW_PATH = "/asr/preview";
 const ENGINES_PATH = "/asr/engines";
 
-/** 這個部署設定齊全的伺服器端引擎；沒設定的選了也只會被備援接走。 */
-export async function fetchAsrEngines(): Promise<string[]> {
+export interface AsrEngines {
+  /** 批次（上傳音檔）。 */
+  engines: string[];
+  /** 串流（/api/v1/asr/stream）。 */
+  stream: string[];
+}
+
+/** 這個部署設定齊全的引擎；沒設定的選了也只會被備援接走或連不上。 */
+export async function fetchAsrEngines(): Promise<AsrEngines> {
   const res = await apiFetch(apiUrl(ENGINES_PATH));
   if (!res.ok) throw new Error(await parseErrorMessage(res));
-  return ((await res.json()) as { engines: string[] }).engines;
+  const body = (await res.json()) as Partial<AsrEngines>;
+  return { engines: body.engines ?? [], stream: body.stream ?? [] };
 }
 
 export interface AsrPreview {
