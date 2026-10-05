@@ -27,7 +27,7 @@ def synth(voice, text):
         async for chunk in edge_tts.Communicate(text, voice.partition(":")[2]).stream():
             if chunk["type"] == "audio": buf += chunk["data"]
         return buf
-    return to_pcm(asyncio.get_event_loop().run_until_complete(go()) if False else asyncio.run(go()), 0.0)
+    return to_pcm(asyncio.run(go()), 0.0)
 
 async def stream(pcm, language):
     header = {"channels": 1, "sample_rate": 16000, "requestId": str(uuid.uuid4()), "language": language,
