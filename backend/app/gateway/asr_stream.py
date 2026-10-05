@@ -263,7 +263,11 @@ async def _relay_r2t2(
             accumulated = ""
             async for raw in upstream:
                 response = json.loads(raw)
-                if response.get("status") != "success":
+                status = response.get("status")
+                # .35 辨識中會送空的 {}；不是錯誤，當成心跳略過，不然整條連線會被斷掉。
+                if not status:
+                    continue
+                if status != "success":
                     raise RuntimeError("R2T2 transcription failed")
                 body = response.get("msg") or {}
                 accumulated += body.get("text") or ""

@@ -215,6 +215,16 @@ def test_decoding_language_follows_a_single_route(monkeypatch, routes, language)
     assert json.loads(upstream.sent[0])["language"] == language
 
 
+def test_empty_heartbeat_messages_do_not_end_the_stream(monkeypatch):
+    # .35 辨識中會送空的 {}；原本被當成失敗，r2t2-dev-live 經過前台一句都收不到（2026-10-05）。
+    _environment(monkeypatch)
+    upstream = Upstream([{}, _reply(text="你好", reset=True)])
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    socket = ClientSocket([{"text": '{"type":"end"}'}])
+    _run(socket)
+    assert socket.sent == [{"type": "ready"}, {"type": "final", "text": "你好"}]
+
+
 def test_non_chinese_text_is_not_converted_to_traditional_chinese(monkeypatch):
     _environment(monkeypatch, routes=["ja"])
     upstream = Upstream([_reply(text="学校の気温", reset=True)])
