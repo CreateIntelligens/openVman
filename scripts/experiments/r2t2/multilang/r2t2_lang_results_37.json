@@ -1,5 +1,68 @@
 [
  {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？",
+  "server_language": "Chinese"
+ },
+ {
+  "lang": "zh",
+  "setting": "zhen",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？",
+  "server_language": "auto"
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "請問沉水泵最深可以放多深？",
+  "out": "請問沉水泵最深可以放多深？",
+  "server_language": "Chinese"
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？",
+  "server_language": "Chinese"
+ },
+ {
+  "lang": "zh",
+  "setting": "zhen",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？",
+  "server_language": "auto"
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "工地要抽泥漿，推薦哪一款？",
+  "out": "工地要抽泥漿，推薦哪一款？",
+  "server_language": "Chinese"
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？",
+  "server_language": "Chinese"
+ },
+ {
+  "lang": "zh",
+  "setting": "zhen",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？",
+  "server_language": "auto"
+ },
+ {
+  "lang": "zh",
+  "setting": "Chinese",
+  "ref": "你們的營業時間是幾點？",
+  "out": "你們的營業時間是幾點？",
+  "server_language": "Chinese"
+ },
+ {
   "lang": "en",
   "setting": "English",
   "ref": "How deep can the submersible pump go?",
@@ -10,8 +73,8 @@
   "lang": "en",
   "setting": "zhen",
   "ref": "How deep can the submersible pump go?",
-  "out": "how deep can the submersible pump go?",
-  "server_language": "Chinese"
+  "out": "How deep can the submersible pump go?",
+  "server_language": "auto"
  },
  {
   "lang": "en",
@@ -32,7 +95,7 @@
   "setting": "zhen",
   "ref": "Which slurry pump do you recommend for a construction site?",
   "out": "Which slurry pump do you recommend for a construction site?",
-  "server_language": "Chinese"
+  "server_language": "auto"
  },
  {
   "lang": "en",
@@ -52,8 +115,8 @@
   "lang": "en",
   "setting": "zhen",
   "ref": "What are your business hours?",
-  "out": "what are your business hours",
-  "server_language": "Chinese"
+  "out": "What are your business hours?",
+  "server_language": "auto"
  },
  {
   "lang": "en",
@@ -73,8 +136,8 @@
   "lang": "es",
   "setting": "zhen",
   "ref": "¿Qué profundidad máxima soporta la bomba sumergible?",
-  "out": "何深度最大支援的炸彈下潛？",
-  "server_language": "Chinese"
+  "out": "¿Qué profundidad máxima soporta la bomba sumergible?",
+  "server_language": "auto"
  },
  {
   "lang": "es",
@@ -94,8 +157,8 @@
   "lang": "es",
   "setting": "zhen",
   "ref": "¿Qué bomba de lodos recomiendan para una obra?",
-  "out": "qué bomba de lodos recomiendan para una obra",
-  "server_language": "Chinese"
+  "out": "¿Qué bomba de lodos recomiendan para una obra?",
+  "server_language": "auto"
  },
  {
   "lang": "es",
@@ -115,14 +178,14 @@
   "lang": "es",
   "setting": "zhen",
   "ref": "¿Cuál es su horario de atención?",
-  "out": "什麼時間？",
-  "server_language": "Chinese"
+  "out": "¿Cuál es su horario de atención?",
+  "server_language": "auto"
  },
  {
   "lang": "es",
   "setting": "Chinese",
   "ref": "¿Cuál es su horario de atención?",
-  "out": "什麼時間？",
+  "out": "什麼時間營業",
   "server_language": "Chinese"
  },
  {
@@ -136,8 +199,8 @@
   "lang": "ja",
   "setting": "zhen",
   "ref": "水中ポンプはどのくらいの深さまで使えますか？",
-  "out": "水中泵浦是どのくらいの深さまで使えますか？",
-  "server_language": "Chinese"
+  "out": "水中ポンプはどのくらいの深さまで使えますか？",
+  "server_language": "auto"
  },
  {
   "lang": "ja",
@@ -157,8 +220,8 @@
   "lang": "ja",
   "setting": "zhen",
   "ref": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
-  "out": "工地現場で泥水を吸にはどのポンプがおすすめですか？",
-  "server_language": "Chinese"
+  "out": "工事現場で泥水を吸うにはどのポンプがおすすめですか",
+  "server_language": "auto"
  },
  {
   "lang": "ja",
@@ -178,8 +241,8 @@
   "lang": "ja",
   "setting": "zhen",
   "ref": "営業時間は何時から何時までですか？",
-  "out": "營業時間是幾時到幾時までですか？",
-  "server_language": "Chinese"
+  "out": "営業時間は何時から何時までですか",
+  "server_language": "auto"
  },
  {
   "lang": "ja",
@@ -199,8 +262,8 @@
   "lang": "ko",
   "setting": "zhen",
   "ref": "수중 펌프는 얼마나 깊이 설치할 수 있나요?",
-  "out": "水중펌프는 얼마나 깊이 설치할 수 있나요?",
-  "server_language": "Chinese"
+  "out": "수중펌프는 얼마나 깊이 설치할 수 있나요?",
+  "server_language": "auto"
  },
  {
   "lang": "ko",
@@ -221,7 +284,7 @@
   "setting": "zhen",
   "ref": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
   "out": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
-  "server_language": "Chinese"
+  "server_language": "auto"
  },
  {
   "lang": "ko",
@@ -241,8 +304,8 @@
   "lang": "ko",
   "setting": "zhen",
   "ref": "영업 시간이 어떻게 되나요?",
-  "out": "營業時間是 어떻게 되나요?",
-  "server_language": "Chinese"
+  "out": "영업 시간이 어떻게 되나요?",
+  "server_language": "auto"
  },
  {
   "lang": "ko",

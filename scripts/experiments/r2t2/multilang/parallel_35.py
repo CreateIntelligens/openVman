@@ -2,6 +2,7 @@
 
     python3 scripts/experiments/r2t2/multilang/parallel_35.py 2        # .35 同時 2 路（zhen）
     python3 scripts/experiments/r2t2/multilang/parallel_35.py 2 37     # .37 同時 2 路（Chinese）
+    python3 scripts/experiments/r2t2/multilang/parallel_35.py 3 35 Chinese  # 第三個參數指定 language
 """
 import asyncio, json, statistics, sys, time, uuid
 from pathlib import Path
@@ -14,6 +15,7 @@ from r2t2_lang import env
 HOST = sys.argv[2] if len(sys.argv) > 2 else "35"
 URL, KEY, LANGUAGE = ((env["ASR_R2T2_DEV_STREAM_URL"], env["ASR_R2T2_DEV_SECRET_KEY"], "Chinese") if HOST == "37"
                       else (env["ASR_R2T2_STREAM_URL"], env["ASR_R2T2_SECRET_KEY"], "zhen"))
+LANGUAGE = sys.argv[3] if len(sys.argv) > 3 else LANGUAGE
 PROMPT = glossary("proj-0cc5c610b4")
 
 async def one(pcm):
@@ -67,14 +69,14 @@ async def main(parallel):
     started = time.monotonic()
     await asyncio.gather(*(lane(n, items[n::1] if parallel == 1 else items, rows) for n in range(parallel)))
     waits = [r["last_final_after_speech_s"] for r in rows if r["last_final_after_speech_s"] is not None]
-    summary = {"host": HOST, "parallel": parallel, "sentences": len(rows), "errors": sum(1 for r in rows if r["error"]),
+    summary = {"host": HOST, "language": LANGUAGE, "parallel": parallel, "sentences": len(rows), "errors": sum(1 for r in rows if r["error"]),
                "mean_cer": round(statistics.mean(r["cer"] for r in rows), 3),
                "truncated(cer>=0.3)": sum(1 for r in rows if r["cer"] >= 0.3),
                "split_into_segments": sum(1 for r in rows if len(r.get("segments", [])) > 1),
                "final_wait_p50_s": round(statistics.median(waits), 2) if waits else None,
                "final_wait_max_s": max(waits) if waits else None, "wall_s": round(time.monotonic() - started, 1)}
     print(json.dumps(summary, ensure_ascii=False), flush=True)
-    Path(__file__).with_name(f"parallel_{HOST}_x{parallel}.json").write_text(json.dumps({"summary": summary, "rows": rows}, ensure_ascii=False, indent=1))
+    Path(__file__).with_name(f"parallel_{HOST}_x{parallel}{'' if len(sys.argv) <= 3 else '_' + LANGUAGE}.json").write_text(json.dumps({"summary": summary, "rows": rows}, ensure_ascii=False, indent=1))
 
 if __name__ == "__main__":
     asyncio.run(main(int(sys.argv[1]) if len(sys.argv) > 1 else 1))

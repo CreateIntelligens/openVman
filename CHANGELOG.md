@@ -29,6 +29,7 @@
 
 ### Documentation
 
+- `scripts/experiments/r2t2/REPORT.md` 部署表改成 .35 正式、.37 dev，並補 10/05 晚的複測：正式路徑 .35 `Chinese`＋詞表型號題 17/24、錯字率 8.6%（沒再吃句尾）；.37 新版 `zhen` 逐句自動判斷語言，中英西日韓 15/15、型號題 18/24、台語不再判成葡萄牙文（錯字率 0.78），同語言連講時第二句起串流字幕幾乎等於定稿。腳本 `multilang/heji_35_chinese.py`、`multilang/auto_37.py`（並行）。
 - `scripts/experiments/r2t2/REPORT.md` 加 2026-10-05 複測：R2T2 .37 指定語言時中英西日韓全對、不指定會把西日韓當中文；.35 `zhen` 能自動分中英西但句尾常被吃掉；Gemini 3.5 transcribe 多語全對但型號只聽對 6/24（.37＋詞表 19/24）。腳本與逐句結果在 `multilang/`。 另補 .35 同時 1／2／3 路（不出錯、不卡死，定稿等待 1.6／4.6／8.6 秒）、經過 backend 的 .35 串流驗證，以及台語 75 句（.37 錯字率 0.78、.35 `zhen` 1.03 會判成英葡，台語仍只能走 Breeze 0.36）。
 - 新增 `scripts/experiments/product-notes/`：AI 產生 Obsidian 式產品筆記能不能改善跨產品選型問答。比現行檢索（A）、加最相近 3 篇筆記（B）、再加 frontmatter 篩選工具（C）。第一輪 EUS（型錄沒有逐型號規格）10 題：A 5／3／2、B 9／1／0、C 9／1／0（對／部分對／錯）；第二輪 EUB-M＋EDW 完整規格表 12 題：A 2／1／9、B 2／4／6、C 11／1／0。C 看得到全部規格、B 只有 3 篇，進步還不能全歸功於篩選；筆記數字 0 錯但正文有語意與出處錯誤，不能直接入庫。資料夾整理成單一 `README.md`／`TASK.md`／`REPORT.md`，各輪資料放 `round1/`、`round2/`。只動實驗目錄，正式程式與知識庫未變。
 - `docs/plans/thin-entry-refactor.md`、`docs/plans/r2t2-streaming-asr.md` 標為 Done（已提交並部署，使用者授權結案）；`full-duplex-voice.md` 改為進行中，並列入 `docs/README.md`。

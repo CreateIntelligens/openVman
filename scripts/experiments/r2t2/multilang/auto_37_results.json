@@ -1,0 +1,991 @@
+{
+ "consecutive": [
+  {
+   "lang": "es",
+   "idx": 1,
+   "ref": "¿Qué profundidad máxima soporta la bomba sumergible?",
+   "stream": "什麼深度最大支援了潛水炸彈？",
+   "final": "¿Qué profundidad máxima soporta la bomba sumergible?",
+   "language": "Spanish",
+   "stream_cer": 1.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "es",
+   "idx": 2,
+   "ref": "¿Qué bomba de lodos recomiendan para una obra?",
+   "stream": "qué bomba de lodos recomiendan para una obra",
+   "final": "¿Qué bomba de lodos recomiendan para una obra?",
+   "language": "Spanish",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "es",
+   "idx": 3,
+   "ref": "¿Cuál es su horario de atención?",
+   "stream": "Cuál es su horario de atención",
+   "final": "¿Cuál es su horario de atención?",
+   "language": "Spanish",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "es",
+   "idx": 4,
+   "ref": "",
+   "stream": "",
+   "final": "",
+   "language": "",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "en",
+   "idx": 1,
+   "ref": "How deep can the submersible pump go?",
+   "stream": "how deep can the submersible pump go?",
+   "final": "How deep can the submersible pump go?",
+   "language": "English",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "en",
+   "idx": 2,
+   "ref": "Which slurry pump do you recommend for a construction site?",
+   "stream": "which slurry pump do you recommend for a construction site?",
+   "final": "Which slurry pump do you recommend for a construction site?",
+   "language": "English",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "en",
+   "idx": 3,
+   "ref": "What are your business hours?",
+   "stream": "what are your business hours",
+   "final": "What are your business hours?",
+   "language": "English",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "en",
+   "idx": 4,
+   "ref": "",
+   "stream": "",
+   "final": "",
+   "language": "",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ko",
+   "idx": 1,
+   "ref": "수중 펌프는 얼마나 깊이 설치할 수 있나요?",
+   "stream": "水중펌프는 얼마나 깊이 설치할 수 있나요?",
+   "final": "수중펌프는 얼마나 깊이 설치할 수 있나요?",
+   "language": "Korean",
+   "stream_cer": 0.059,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ko",
+   "idx": 2,
+   "ref": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+   "stream": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+   "final": "공사 현장에서 진흙물을 퍼내려면 어떤 펌프가 좋나요?",
+   "language": "Korean",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ko",
+   "idx": 3,
+   "ref": "영업 시간이 어떻게 되나요?",
+   "stream": "영업 시간이 어떻게 되나요?",
+   "final": "영업 시간이 어떻게 되나요?",
+   "language": "Korean",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ko",
+   "idx": 4,
+   "ref": "",
+   "stream": "",
+   "final": "",
+   "language": "",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "zh",
+   "idx": 1,
+   "ref": "請問沉水泵最深可以放多深？",
+   "stream": "請問沉水泵最深可以放多深？",
+   "final": "請問沉水泵最深可以放多深？",
+   "language": "Chinese",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "zh",
+   "idx": 2,
+   "ref": "工地要抽泥漿，推薦哪一款？",
+   "stream": "工地要抽泥漿，推薦哪一款？",
+   "final": "工地要抽泥漿，推薦哪一款？",
+   "language": "Chinese",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "zh",
+   "idx": 3,
+   "ref": "你們的營業時間是幾點？",
+   "stream": "你們的營業時間是幾點？",
+   "final": "你們的營業時間是幾點？",
+   "language": "Chinese",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "zh",
+   "idx": 4,
+   "ref": "",
+   "stream": "",
+   "final": "",
+   "language": "",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ja",
+   "idx": 1,
+   "ref": "水中ポンプはどのくらいの深さまで使えますか？",
+   "stream": "水中泵浦是どのくらいの深さまで使えますか？",
+   "final": "水中ポンプはどのくらいの深さまで使えますか？",
+   "language": "Japanese",
+   "stream_cer": 0.19,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ja",
+   "idx": 2,
+   "ref": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
+   "stream": "工事現場で泥水を數にはどのポンプがおすすめですか？",
+   "final": "工事現場で泥水を吸うにはどのポンプがおすすめですか？",
+   "language": "Japanese",
+   "stream_cer": 0.08,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ja",
+   "idx": 3,
+   "ref": "営業時間は何時から何時までですか？",
+   "stream": "営業時間は何時から何時までですか",
+   "final": "営業時間は何時から何時までですか",
+   "language": "Japanese",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  },
+  {
+   "lang": "ja",
+   "idx": 4,
+   "ref": "",
+   "stream": "",
+   "final": "",
+   "language": "",
+   "stream_cer": 0.0,
+   "final_cer": 0.0
+  }
+ ],
+ "taigi": [
+  {
+   "id": "drama-000001",
+   "ref": "帝君保佑",
+   "out": "這個寶貝",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000008",
+   "ref": "不會讓我們失望",
+   "out": "準備好你去保管呀。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.143
+  },
+  {
+   "id": "drama-000012",
+   "ref": "沒錯 子維",
+   "out": "包不掉，哎呦，哎呦，",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.75
+  },
+  {
+   "id": "drama-000011",
+   "ref": "子維都笑咪咪的",
+   "out": "有紫薇的好唱型嘞",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.143
+  },
+  {
+   "id": "drama-000007",
+   "ref": "從現在開始 我跟進輝的命就交給你了 我相信你絕對",
+   "out": "從今物開始，我甲真灰暗的命就交給你啊。我",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.545
+  },
+  {
+   "id": "drama-000006",
+   "ref": "沒有啦 現在是在說什麼 男子漢大丈夫言出必行 既然我答應了 我就不可能反悔 是啦 勝強哥",
+   "out": "無啦，這嘛是講聲啦，這男主角大丈夫話講出來，你應該做得到啦，既然我答應啦，我就無可能反悔啦，哦",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.684
+  },
+  {
+   "id": "drama-000015",
+   "ref": "碧玉你要知道 我們結婚只有登記",
+   "out": "畢業你就要知影咧。能結婚",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.714
+  },
+  {
+   "id": "drama-000022",
+   "ref": "你相信我嗎 我當然相信你",
+   "out": "你怎麼想情況？我當然嘛相信你啊！",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.636
+  },
+  {
+   "id": "drama-000024",
+   "ref": "既然你相信我 那我希望你能永遠記得",
+   "out": "給你說傷心話那你我是一般的",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.875
+  },
+  {
+   "id": "drama-000019",
+   "ref": "我當然知道你不會 不過我會 我會埋怨我自己",
+   "out": "我當然知道你沒啦，啊不過我會啦。我會擔當自己。",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.368
+  },
+  {
+   "id": "drama-000020",
+   "ref": "一個男人的責任 既然現在有這麼好的 賺錢機會 我當然要好好把握 不過進輝 你連出國要做什麼生意",
+   "out": "你是一個查甫人哦，我會等等他，啊既然這冇這樣好賺錢的機會，我當然和我爸吧，",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.857
+  },
+  {
+   "id": "drama-000025",
+   "ref": "我的這裡 這裡永遠都有 你們母子倆的位置",
+   "out": "外加加英萬弄林伯",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000026",
+   "ref": "你們母子倆的位置",
+   "out": "弄你無我行的問題。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.875
+  },
+  {
+   "id": "drama-000027",
+   "ref": "都是希望能夠盡到一個 為人丈夫和父親的責任",
+   "out": "這攏是希望講會當盡得力做了昂塞周龍爸爸這裡",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.9
+  },
+  {
+   "id": "drama-000029",
+   "ref": "我不是跟你說過了 這次我是跟我結拜兄弟 一起出門",
+   "out": "我不是跟你講價啊，之所以是講我貼租",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.682
+  },
+  {
+   "id": "drama-000030",
+   "ref": "一起出門 他們是我最信任的人 大家互相扶持 互相照顧 絕對不會有問題",
+   "out": "做夥出門咧，因是我上界信任的人，大家互相扶持，互相照顧，絕對沒有問題。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.267
+  },
+  {
+   "id": "drama-000031",
+   "ref": "好啦 乖 不要哭",
+   "out": "好了。過來吧，邁克。",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000032",
+   "ref": "你就乖乖等我回來好不好",
+   "out": "那個鍋不要當個燉鍋，好吧，",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000036",
+   "ref": "之前跟人打架留下來的紀念",
+   "out": "之前跟王傑相拍留下來紀念啦。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.5
+  },
+  {
+   "id": "drama-000039",
+   "ref": "我請教一下 我們這次如果賺到錢",
+   "out": "我警告你哦！咱這屆的碳",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.857
+  },
+  {
+   "id": "drama-000037",
+   "ref": "人這麼斯文 你也有抓狂的時候 那是沒踩到他的底線",
+   "out": "人啊，書聞到你也有去打工的時候啊，還是無打到業底線",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.591
+  },
+  {
+   "id": "drama-000042",
+   "ref": "如果賺到錢之後 你們兩個第一個願望是什麼 我的願望是",
+   "out": "啥賺到錢了，你兩個投資的願望是啥？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.625
+  },
+  {
+   "id": "drama-000040",
+   "ref": "我的願望就是 去我那個無緣的他家對面 蓋一棟豪宅 然後裝潢得很奢華",
+   "out": "我的願望就是去我那個無煙大道對面哦，起一棟豪宅，然後甲中",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.4
+  },
+  {
+   "id": "drama-000045",
+   "ref": "我的願望",
+   "out": "我的運動哦。呃",
+   "languages": [
+    "Chinese",
+    "English",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000041",
+   "ref": "閃到讓他們眼睛都睜不開 看他們是不是還敢看不起我 你這個人就是有仇必報 誰惹到你 誰就倒楣",
+   "out": "什麼給後面螃蟹攏背未緊，看伊是不是夠敢看我無，你這個人哦，就是有求必報啦。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.659
+  },
+  {
+   "id": "drama-000051",
+   "ref": "來 先給你們看一下 我跟你們說 這次我們要出門前",
+   "out": "來來先給你平放一下，我跟你講哦，這船咱要",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.524
+  },
+  {
+   "id": "drama-000052",
+   "ref": "這次我們要出門前 我還帶他去拍全家福",
+   "out": "哦，就抓恁要出門進前哦，我給帶一個黑全家福",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.588
+  },
+  {
+   "id": "drama-000047",
+   "ref": "這樣看起來 你太太應該長得很漂亮 你才會這麼疼惜他 保護到把他藏起來 不讓我們看  對 進輝",
+   "out": "看你看起來你母應該生了真水，你這樣子惜命命，啊甲保護甲吼甲藏開不要阮看，對啦",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.692
+  },
+  {
+   "id": "drama-000055",
+   "ref": "我們才剛認識 互相看不順眼 想不到現在 我們三個竟然會結拜",
+   "out": "咱大概才做熟食，啊和尚看無適合想要",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.962
+  },
+  {
+   "id": "drama-000058",
+   "ref": "人無橫財不富 我們如果想要有錢",
+   "out": "人無懷才不遇啦，咱也是想要",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.643
+  },
+  {
+   "id": "drama-000056",
+   "ref": "我們三個竟然會結拜 一起做生意 打拚賺錢",
+   "out": "啊，竟然是三個結拜安尼做夥做行李票賺錢哦。啊",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.889
+  },
+  {
+   "id": "drama-000059",
+   "ref": "就要付出代價 所以不要埋怨 等我們這次  任務完成之後",
+   "out": "都要付出代價，所以蠻惋嘆。稍等在這邊哦。",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.609
+  },
+  {
+   "id": "drama-000061",
+   "ref": "一定要參加我的婚禮 那當然 對了 你講半天",
+   "out": "一定要參加我的婚禮啊，雙面啊對吧，你講幾波",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.389
+  },
+  {
+   "id": "drama-000082",
+   "ref": "他才會這麼有壓力",
+   "out": "你們家家鳥啊，對",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000099",
+   "ref": "怎麼流那麼多血 大哥",
+   "out": "回到狼嘴了，大爺",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.889
+  },
+  {
+   "id": "drama-000100",
+   "ref": "我是不是會死在這裡 別亂說話 我一定會把你平安帶回去",
+   "out": "公司沒得事的，不要管我，我",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.958
+  },
+  {
+   "id": "drama-000101",
+   "ref": "我一定會把你平安帶回去 耀武",
+   "out": "我給你別個抓到誒，",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.846
+  },
+  {
+   "id": "drama-000081",
+   "ref": "不會啦 大哥 反正我們現在任務 已經完成了 你不要自尋煩惱 這麼緊張好不好 那是因為大哥他有說過 他一定要把我們平安帶回去",
+   "out": "沒啦，大哥，今日咱這擺任務已經完成啦啦，你媽搞超環，這緊張好不？那是因為大哥他有講過，他一定要平安",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.463
+  },
+  {
+   "id": "drama-000103",
+   "ref": "進輝  不是 進輝 早就叫你要小心 你看你現在搞成這樣",
+   "out": "叫你來睡你啊，你看",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.818
+  },
+  {
+   "id": "drama-000109",
+   "ref": "你絕對不能放棄 聽到了沒有",
+   "out": "你到底為了紅旗有車掉嗎？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.917
+  },
+  {
+   "id": "drama-000105",
+   "ref": "大哥 有狗在叫 糟了 他們放狗來找我們了",
+   "out": "同樣我告訴你，要肥點。哎呀",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000111",
+   "ref": "大哥 他們好像快找過來了 我們快走 再不走就來不及了 我背你 耀武 來幫我 來",
+   "out": "我要趕緊啦，應該就要找過來，咱緊走啦，搿唔走就沒福啦，",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.906
+  },
+  {
+   "id": "drama-000118",
+   "ref": "我們快點走 走啦",
+   "out": "趕緊走！給",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.857
+  },
+  {
+   "id": "drama-000123",
+   "ref": "誰要拿錢回去救你媽",
+   "out": "想要第二天再去叫你媽啊！",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.778
+  },
+  {
+   "id": "drama-000114",
+   "ref": "進輝的血這樣一直流 那些狗聞到味道 一定很快就找過來了",
+   "out": "政府要回過來查十D了。遐的狗片都不要，一定趕緊就找過來。",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.76
+  },
+  {
+   "id": "drama-000124",
+   "ref": "大哥  你不是說會把我平安帶回去",
+   "out": "東陽",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000116",
+   "ref": "幸好 不然這山崖這麼高 海一定很深 摔下去絕對死定了",
+   "out": "兔家仔，啊我這刷坎這關掉，還有停車籤，我這絕對想問起無愛",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.957
+  },
+  {
+   "id": "drama-000125",
+   "ref": "你不是說會把我平安帶回去",
+   "out": "你你不是工地，平安坐下等",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.667
+  },
+  {
+   "id": "drama-000130",
+   "ref": "大哥你呢",
+   "out": "託利亞",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000131",
+   "ref": "自生自滅嗎",
+   "out": "走形走味",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000126",
+   "ref": "二哥 你不是說你會跟大哥  一起來參加我的婚禮",
+   "out": "弟兄，你不是講你會跟大兄，你要做回來參加我的婚禮？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.4
+  },
+  {
+   "id": "drama-000169",
+   "ref": "我是見死不救 但我如果不這麼做 我們現在有可能活命嗎",
+   "out": "我是結束不救，不過我還是無咧做，恁這擺夠有可能活命。在",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 0.583
+  },
+  {
+   "id": "drama-000128",
+   "ref": "方耀武  枉費我把你當成兄弟 你現在講這種話還是人嗎",
+   "out": "不要我，無在乎我當作是兄弟，我今",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.913
+  },
+  {
+   "id": "drama-000175",
+   "ref": "去啊 你去找進輝 讓你媽等死 你去啊",
+   "out": "氣呀，你去查警徽呀，讓你媽打死呀，你氣呀！",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.667
+  },
+  {
+   "id": "drama-000177",
+   "ref": "如果要怪 就怪進輝的命不好",
+   "out": "你拿什麼管呀？關心",
+   "languages": [
+    "Chinese",
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000176",
+   "ref": "要我眼睜睜 看我的兄弟摔下去 我心裡也很難受",
+   "out": "哎，我目睭金金看我的兄弟啊，跌落，我心裡嘛真艱苦。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.6
+  },
+  {
+   "id": "drama-000180",
+   "ref": "也沒有心臟替你媽媽換了 周先生 我們現在只能盡人事了 醫生 我拜託你",
+   "out": "我無心當偷聽媽媽話，周先生，咱今",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.8
+  },
+  {
+   "id": "drama-000187",
+   "ref": "我拜託你 你先起來 你不要這樣 這裡是醫院 你去想辦法",
+   "out": "你先起來啦，你去上班",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.739
+  },
+  {
+   "id": "drama-000184",
+   "ref": "那位是周先生 他媽媽錯過換心臟的機會 你先起來 你不要這樣",
+   "out": "今天哦，邱先生啦，他媽媽哦錯過話西裝的機會了。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.692
+  },
+  {
+   "id": "drama-000193",
+   "ref": "所以現在你是看不起我 你是怕我沒錢 買你們的豪宅是不是",
+   "out": "所以今麥你是看我無啦，你是今日講我無錢買你的豪宅是唔是，哈？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.48
+  },
+  {
+   "id": "drama-000192",
+   "ref": "請你 請你不要亂摸 這個東西很貴 我怕你賠不起",
+   "out": "請你，請你賣我北王",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.75
+  },
+  {
+   "id": "drama-000195",
+   "ref": "什麼沒有 錢最多",
+   "out": "啥咪無啦，錢上多啦",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.857
+  },
+  {
+   "id": "drama-000196",
+   "ref": "看到沒有 我什麼沒有 錢最多",
+   "out": "好看嗎？我上面無啦，只上最啦",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.917
+  },
+  {
+   "id": "drama-000194",
+   "ref": "看到沒有 你跟我說 你們這豪宅多少錢 看這些現金夠不夠 現金夠不夠",
+   "out": "我看下喔，我看下喔，你講啊，你這豪宅多少錢啊，看這現金夠不啊，啊現金夠不，現金夠不，哈",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.655
+  },
+  {
+   "id": "drama-000262",
+   "ref": "不過我比較好奇的是 我們的保全這麼森嚴 他是怎麼進來這裡的",
+   "out": "那麼我較好奇的是，啊咱的儲存就遐嚴，伊啥儂你袂吃呀？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.704
+  },
+  {
+   "id": "drama-000439",
+   "ref": "周董事長 周夫人 歡迎 理事長你好",
+   "out": "就當處長，周夫人，哎，歡迎歡迎，秘書叫你好",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.643
+  },
+  {
+   "id": "drama-000523",
+   "ref": "董事長 我先去開車 你留在公司就好",
+   "out": "張主任，我想來看一下你老爹的關係如何。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000443",
+   "ref": "你看他們婆媳關係這麼好 周董事長 你真的是最有福氣的人 我也是這麼想",
+   "out": "你看你姐哦，婆媳關係哦這麼好啦，就當決定你先生哦是上有福氣的人啦，",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.613
+  },
+  {
+   "id": "drama-000442",
+   "ref": "是啦 周董事長我真的很羨慕你 有一位這麼開明的媽媽 還有一位 這麼賢慧孝順的漂亮老婆",
+   "out": "是啦，就當註定，我真正做是恁女兒，有這位哦，這麼開明的媽媽啦，還佮有這位哦，這麼賢惠，這麼優秀的媳婦啦。",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.658
+  },
+  {
+   "id": "drama-000557",
+   "ref": "不能只貪圖自己便利就好 影響交通 謝謝 你們這些警察",
+   "out": "唔應",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 1.0
+  },
+  {
+   "id": "drama-000445",
+   "ref": "是啦 各位 我看時間不早了 我們趕快進去會場 來 這邊請 來 請",
+   "out": "是啦是啦，會夠位啦，我看時間無早，咱趕緊禮拜會議定，來再請來請請請",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.72
+  },
+  {
+   "id": "drama-000581",
+   "ref": "才結婚沒多久 孩子才剛滿週歲 對了 你現在住在哪裡",
+   "out": "你剛才剛好沒話講，阿囡啊，剛多謝",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.909
+  },
+  {
+   "id": "drama-000582",
+   "ref": "對了 你現在住在哪裡",
+   "out": "對啊，你這嘛是到底對啊？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.889
+  },
+  {
+   "id": "drama-000595",
+   "ref": "你們扣下這期的應付帳款 不給我們 請問什麼意思 你欠一些包商幾個月的錢",
+   "out": "阿公，恁這期應該付的小口條埋給阮，請問什麼意思？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.75
+  },
+  {
+   "id": "drama-000597",
+   "ref": "在你的心目中 真的是那種自私自利 不講情義的人嗎 你就想方設法 找一些有的沒的理由 把你這個結拜兄弟 一腳踢開嗎",
+   "out": "老母在你的心目中，敢真正是一種自私自利、無講正義的人，你著想要來想空想方，找這個有誒無誒理由，把你這結巴兄弟一腳踢開毋？",
+   "languages": [
+    "Chinese",
+    ""
+   ],
+   "cer": 0.46
+  }
+ ],
+ "taigi_summary": {
+  "sentences": 75,
+  "mean_cer": 0.781,
+  "languages": {
+   "Chinese": 100,
+   "": 75,
+   "English": 1
+  }
+ }
+}
