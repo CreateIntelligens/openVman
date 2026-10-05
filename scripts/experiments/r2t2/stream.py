@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 import time
 import uuid
@@ -35,6 +36,17 @@ STEP = 0.16
 OUT = Path(__file__).with_name("stream_results.json")
 
 
+def secret_key() -> str:
+    """R2T2 金鑰只放 .env（ASR_R2T2_SECRET_KEY），不寫進程式碼。"""
+    if key := os.environ.get("ASR_R2T2_SECRET_KEY"):
+        return key
+    for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
+        name, _, value = line.partition("=")
+        if name.strip() == "ASR_R2T2_SECRET_KEY":
+            return value.strip()
+    sys.exit("找不到 ASR_R2T2_SECRET_KEY：設環境變數或寫進 repo 根目錄的 .env")
+
+
 def voiced_seconds(pcm: bytes, threshold: int = 500) -> float:
     """Where the last audible sample is: synthesized clips end with silence of varying length."""
     import array
@@ -47,7 +59,7 @@ def voiced_seconds(pcm: bytes, threshold: int = 500) -> float:
 
 
 async def stream_one(pcm: bytes, system_prompt: str, url: str = URL) -> dict:
-    header = {"requestId": str(uuid.uuid4()), "language": "zhen", "use_vad": True, "secret_key": "test0102"}
+    header = {"requestId": str(uuid.uuid4()), "language": "zhen", "use_vad": True, "secret_key": secret_key()}
     if system_prompt:
         header["system_prompt"] = system_prompt
     pieces: list[str] = []

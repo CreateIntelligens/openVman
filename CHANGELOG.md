@@ -7,6 +7,7 @@
 
 ### Fixed
 
+- **R2T2 金鑰寫在公開 repo 裡**：`scripts/experiments/r2t2/stream.py` 與 `docs/plans/r2t2-streaming-asr.md` 自 2026-10-01（`afb9d6c`）起含明文金鑰，與正式 .37、.35 使用的是同一把。現在腳本改讀 `.env` 的 `ASR_R2T2_SECRET_KEY`，文件不再寫值；git 歷史裡仍查得到，需由 R2T2 服務管理者換金鑰後更新 `.env`。
 - **voice_e2e 跑完沒有刪掉測試對話**：刪對話要專案的編輯權限，測試帳號 voice-e2e-test 只有讀取，`/api/v1/sessions/batch-delete` 一直被 Backend 回 404，對話留在鶴記dev。用 `--user` 跑時改在 api 容器裡刪（跟簽 token 一樣進容器），`--token` 打遠端時照舊走 API。
 - **合併補句時舊回答可能仍寫入 Brain**：可合併 HTTP 回合加入 `turn_id`／遞增 `turn_revision`，答案先暫存，前台完整接收目前版本後透過 `/api/v1/chat/accept` 確認，才原子寫入問題與回答並執行日誌／記憶更新。取消、被取代或未接收的答案不落庫；確認重試不重複寫入，下一輪等待上一輪確認以保留完整歷史。後台 Chat、外部 SDK 與未提供回合欄位的 API 維持既有流程。
 - **`/api/v1/tts/stream` 指定 Edge 卻回 200 空音檔**：只要設了 IndexTTS 網址，這個端點不管指定哪家都先送 IndexTTS；IndexTTS 沒在跑時連上就斷，回空音檔。現在只有沒指定或指定 IndexTTS 才走它，VoxCPM 失敗也直接退到 Edge。前台 Edge 聲音本來走整段合成，不受影響；voice_e2e 的念回答步驟被影響。voice_e2e 念回答的秒數原本把回應當 wav 算，Edge 回 mp3 時記成 0，改用 ffprobe 讀實際長度。

@@ -39,7 +39,7 @@
   {"requestId": "<uuid>", "language": "Chinese", "use_vad": true,
    "secret_key": "<ASR_R2T2_SECRET_KEY>", "system_prompt": "<專案詞表>"}
   ```
-  - 金鑰目前是 `test0102`，放 `.env`，不要寫進程式碼。
+  - 金鑰放 `.env`（`ASR_R2T2_SECRET_KEY`），不要寫進程式碼或文件。
   - `system_prompt` 是熱詞，選填。
   - `language` 用 `Chinese` 或 `zhen`（兩個都會以中文解碼，夾雜的英文照實輸出）。不要用 `auto`：自動判斷時，帶口音的華語曾被轉成葡萄牙文。
   - 伺服器會回一則 connected 訊息，裡面有實際使用的 language。
