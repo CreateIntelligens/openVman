@@ -65,6 +65,12 @@ R2T2_DEV_STREAM_ASR_ENGINE = "r2t2-dev-live"
 _R2T2_STREAM_ENGINES = {R2T2_STREAM_ASR_ENGINE, R2T2_DEV_STREAM_ASR_ENGINE}
 _STREAM_ENGINES = {GEMINI_STREAM_ASR_ENGINE, *_R2T2_STREAM_ENGINES}
 _R2T2_CHUNK_BYTES = 5120
+# R2T2 只會用指定的語言解碼，不會自己判斷：.37 收到 zhen 也當 Chinese，西日韓會被當成
+# 中文解碼（「bomba」變「炸彈」）；指定正確語言時五種語言各 3 句全對（2026-10-05 實測）。
+_R2T2_LANGUAGES = {
+    "zh": "Chinese", "en": "English", "es": "Spanish", "ja": "Japanese", "ko": "Korean",
+}
+_R2T2_DEFAULT_LANGUAGE = "Chinese"
 _R2T2_EOS = "YOUDAO_ONETIME_ASR_STREAM_EOS"
 _GEMINI_LIVE_URL = (
     "wss://generativelanguage.googleapis.com/ws/"
@@ -183,13 +189,24 @@ def _r2t2_stream_endpoint(cfg: TTSRouterConfig, engine: str) -> tuple[str, str] 
     return (url, key) if url and key else None
 
 
+def _r2t2_language(routes: list[str]) -> str:
+    """The language R2T2 should decode this connection in, from its effective routes."""
+    spoken = [route for route in routes if route != language_routes_mod.TAIWANESE]
+    # 只有一種語言時才知道使用者講什麼；多種時用中文，中英夾雜照樣聽得懂。
+    if len(spoken) == 1:
+        return _R2T2_LANGUAGES.get(spoken[0], _R2T2_DEFAULT_LANGUAGE)
+    return _R2T2_DEFAULT_LANGUAGE
+
+
 @asynccontextmanager
-async def _r2t2_upstream(url: str, key: str, prompt: str) -> AsyncIterator[Any]:
+async def _r2t2_upstream(
+    url: str, key: str, prompt: str, language: str = _R2T2_DEFAULT_LANGUAGE,
+) -> AsyncIterator[Any]:
     """Connect and hand-shake with one R2T2 host; .37 與 .35 用同一套握手。"""
     async with websockets.connect(url, max_size=4 * 1024 * 1024, open_timeout=10) as upstream:
         await upstream.send(json.dumps({
             "requestId": str(uuid4()),
-            "language": "Chinese",
+            "language": language,
             "use_vad": True,
             "secret_key": key,
             "system_prompt": prompt,
@@ -206,9 +223,15 @@ async def _relay_r2t2(
     project_id: str,
     endpoint: tuple[str, str],
     count_audio: Callable[[int], None],
+    routes: list[str],
 ) -> None:
     prompt = await project_asr_prompt(current, project_id)
-    async with _r2t2_upstream(*endpoint, prompt) as upstream:
+    language = _r2t2_language(routes)
+    # R2T2 中文輸出簡體才要轉繁；日文漢字轉了會變成中文字形。
+    display = (
+        convert_to_traditional if language == _R2T2_DEFAULT_LANGUAGE else str
+    )
+    async with _r2t2_upstream(*endpoint, prompt, language) as upstream:
         await websocket.send_json({"type": "ready"})
         ended = asyncio.Event()
 
@@ -244,16 +267,14 @@ async def _relay_r2t2(
                 body = response.get("msg") or {}
                 accumulated += body.get("text") or ""
                 if body.get("reset"):
-                    text = convert_to_traditional(
-                        body.get("final_text") or accumulated,
-                    ).strip()
+                    text = display(body.get("final_text") or accumulated).strip()
                     if text:
                         await websocket.send_json({"type": "final", "text": text})
                     accumulated = ""
                 elif body.get("text"):
                     await websocket.send_json({
                         "type": "interim",
-                        "text": convert_to_traditional(accumulated),
+                        "text": display(accumulated),
                     })
             if not ended.is_set():
                 raise RuntimeError("R2T2 upstream closed")
@@ -310,7 +331,9 @@ async def asr_stream(websocket: WebSocket) -> None:
 
     try:
         if endpoint:
-            await _relay_r2t2(websocket, current, project_id, endpoint, count_audio)
+            await _relay_r2t2(
+                websocket, current, project_id, endpoint, count_audio, routes,
+            )
             await websocket.close()
             return
         async with websockets.connect(

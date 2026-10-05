@@ -29,7 +29,7 @@
   ```
   - 金鑰放 `.env`（`ASR_R2T2_SECRET_KEY`），不要寫進程式碼或文件。
   - `system_prompt` 是熱詞，選填。
-  - `language` 用 `Chinese` 或 `zhen`（兩個都會以中文解碼，夾雜的英文照實輸出）。不要用 `auto`：自動判斷時，帶口音的華語曾被轉成葡萄牙文。
+  - `language`：.37 收到 `zhen` 也當 `Chinese`，不會自己判斷語言。2026-10-05 實測五種語言各 3 句：指定正確語言（English／Spanish／Japanese／Korean）全對；當中文解碼時中英沒問題，西日韓整句壞掉。正式程式照分流帶語言（見 `01_BACKEND_SPEC.md` 串流 ASR）。不要用 `auto`：自動判斷時，帶口音的華語曾被轉成葡萄牙文。
   - 伺服器會回一則 connected 訊息，裡面有實際使用的 language。
 - 之後每 0.16 秒送一段 binary：16 kHz、16-bit、單聲道 PCM，每段 **5120 bytes**。
 - 結束時送文字 `YOUDAO_ONETIME_ASR_STREAM_EOS`。

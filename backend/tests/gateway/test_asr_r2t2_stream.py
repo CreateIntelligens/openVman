@@ -83,7 +83,9 @@ def _reply(**body):
     return {"status": "success", "msg": body}
 
 
-def _environment(monkeypatch, *, stored="r2t2-live", grants=None, embed=False):
+def _environment(
+    monkeypatch, *, stored="r2t2-live", grants=None, embed=False, routes=("zh",),
+):
     account = SimpleNamespace(
         user=SimpleNamespace(id="stream-test", role=AccountRole.ADMIN),
         embed_key=object() if embed else None,
@@ -112,8 +114,8 @@ def _environment(monkeypatch, *, stored="r2t2-live", grants=None, embed=False):
         prompts.append((current, project_id))
         return "鶴記，億發泵浦"
 
-    async def routes(*args):
-        return ["zh"]
+    async def project_routes(*args):
+        return list(routes)
 
     async def judge(*args):
         pytest.fail("R2T2 finals must not invoke Gemini's final judge")
@@ -122,7 +124,7 @@ def _environment(monkeypatch, *, stored="r2t2-live", grants=None, embed=False):
     monkeypatch.setattr(asr_stream, "get_auth_runtime", lambda: runtime)
     monkeypatch.setattr(asr_stream, "get_tts_config", lambda: cfg)
     monkeypatch.setattr(asr_stream, "project_asr_prompt", glossary)
-    monkeypatch.setattr(asr_stream, "_project_routes", routes)
+    monkeypatch.setattr(asr_stream, "_project_routes", project_routes)
     monkeypatch.setattr(asr_stream, "_judge_final", judge)
     monkeypatch.setattr(asr_stream, "record_usage_event", lambda **kw: usage.append(kw))
     monkeypatch.setattr(asr_stream, "usage_scope_for", lambda *a, **kw: {})
@@ -189,6 +191,36 @@ def test_incremental_transcripts_reset_and_final_text_override(monkeypatch):
         {"type": "interim", "text": "設備"},
         {"type": "final", "text": "設備開關"},
     ]
+
+
+@pytest.mark.parametrize(
+    ("routes", "language"),
+    [
+        (["es"], "Spanish"),
+        (["ja"], "Japanese"),
+        (["ko"], "Korean"),
+        (["en"], "English"),
+        (["nan", "zh"], "Chinese"),
+        # 多種語言時不知道使用者講什麼：維持中文，中英夾雜照樣聽得懂。
+        (["zh", "en", "es"], "Chinese"),
+    ],
+)
+def test_decoding_language_follows_a_single_route(monkeypatch, routes, language):
+    # R2T2 不會自己判斷語言，西日韓被當中文解碼會整句壞掉（2026-10-05 實測）。
+    _environment(monkeypatch, routes=routes)
+    upstream = Upstream()
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    _run(ClientSocket([{"text": '{"type":"end"}'}]))
+    assert json.loads(upstream.sent[0])["language"] == language
+
+
+def test_non_chinese_text_is_not_converted_to_traditional_chinese(monkeypatch):
+    _environment(monkeypatch, routes=["ja"])
+    upstream = Upstream([_reply(text="学校の気温", reset=True)])
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+    socket = ClientSocket([{"text": '{"type":"end"}'}])
+    _run(socket)
+    assert socket.sent[-1] == {"type": "final", "text": "学校の気温"}
 
 
 @pytest.mark.parametrize("failure", ["connection", "handshake", "transcript"])
