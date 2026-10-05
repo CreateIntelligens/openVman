@@ -1,0 +1,276 @@
+{
+ "summary": {
+  "host": "37",
+  "parallel": 1,
+  "sentences": 20,
+  "errors": 0,
+  "mean_cer": 0.069,
+  "truncated(cer>=0.3)": 1,
+  "split_into_segments": 20,
+  "final_wait_p50_s": 1.62,
+  "final_wait_max_s": 1.63,
+  "wall_s": 100.1
+ },
+ "rows": [
+  {
+   "lane": 0,
+   "id": "diva-agitator",
+   "ref": "請問 DIVA 有攪拌器嗎？",
+   "segments": [
+    "請問diva有攪拌器嗎？",
+    ""
+   ],
+   "out": "請問diva有攪拌器嗎？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "submersible-depth",
+   "ref": "沉水泵最深可以放多深？",
+   "segments": [
+    "沉水泵最深可以放多深？",
+    ""
+   ],
+   "out": "沉水泵最深可以放多深？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.63,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "eubl-hp",
+   "ref": "EUBL 有哪些馬力規格？",
+   "segments": [
+    "eubl有哪些馬力規格？",
+    ""
+   ],
+   "out": "eubl有哪些馬力規格？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "eusr-outlet",
+   "ref": "50EUSR 的出水口徑是多少？",
+   "segments": [
+    "五十一usr的出水口徑是多少？",
+    ""
+   ],
+   "out": "五十一usr的出水口徑是多少？",
+   "cer": 0.214,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "hippo-flow",
+   "ref": "HIPPO 污水泵最大流量是多少？",
+   "segments": [
+    "hippo汙水泵最大流量是多少？",
+    ""
+   ],
+   "out": "hippo汙水泵最大流量是多少？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "alligator-cut",
+   "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+   "segments": [
+    "alligator絞碎泵可以絞碎石嗎？",
+    ""
+   ],
+   "out": "alligator絞碎泵可以絞碎石嗎？",
+   "cer": 0.111,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "slurry-pick",
+   "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "segments": [
+    "工地要抽泥漿，推薦哪一款泥漿泵？",
+    ""
+   ],
+   "out": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "head-meaning",
+   "ref": "泵浦的揚程是什麼意思？",
+   "segments": [
+    "洞普的揚程是什麼意思？",
+    ""
+   ],
+   "out": "洞普的揚程是什麼意思？",
+   "cer": 0.2,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "qdc-install",
+   "ref": "自動著脫裝置要怎麼安裝？",
+   "segments": [
+    "自動著脫裝置要怎麼安裝？",
+    ""
+   ],
+   "out": "自動著脫裝置要怎麼安裝？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "chit-who",
+   "ref": "你好，請問你是誰？",
+   "segments": [
+    "你好，請問你是誰？",
+    ""
+   ],
+   "out": "你好，請問你是誰？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.63,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "diva-agitator",
+   "ref": "請問 DIVA 有攪拌器嗎？",
+   "segments": [
+    "請問低位有攪拌器嗎？",
+    ""
+   ],
+   "out": "請問低位有攪拌器嗎？",
+   "cer": 0.364,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "submersible-depth",
+   "ref": "沉水泵最深可以放多深？",
+   "segments": [
+    "沉水泵最深可以放多深？",
+    ""
+   ],
+   "out": "沉水泵最深可以放多深？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "eubl-hp",
+   "ref": "EUBL 有哪些馬力規格？",
+   "segments": [
+    "eubl有哪些馬力規格？",
+    ""
+   ],
+   "out": "eubl有哪些馬力規格？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.63,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "eusr-outlet",
+   "ref": "50EUSR 的出水口徑是多少？",
+   "segments": [
+    "五十EUS的出水口徑是多少？",
+    ""
+   ],
+   "out": "五十EUS的出水口徑是多少？",
+   "cer": 0.214,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "hippo-flow",
+   "ref": "HIPPO 污水泵最大流量是多少？",
+   "segments": [
+    "hippo汙水泵最大流量是多少？",
+    ""
+   ],
+   "out": "hippo汙水泵最大流量是多少？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "alligator-cut",
+   "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+   "segments": [
+    "Allegate絞碎泵可以絞碎石嗎？",
+    ""
+   ],
+   "out": "Allegate絞碎泵可以絞碎石嗎？",
+   "cer": 0.278,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "slurry-pick",
+   "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "segments": [
+    "工地要抽泥漿，推薦哪一款泥漿泵？",
+    ""
+   ],
+   "out": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "head-meaning",
+   "ref": "泵浦的揚程是什麼意思？",
+   "segments": [
+    "泵浦的揚程是什麼意思？",
+    ""
+   ],
+   "out": "泵浦的揚程是什麼意思？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "qdc-install",
+   "ref": "自動著脫裝置要怎麼安裝？",
+   "segments": [
+    "自動著脫裝置要怎麼安裝？",
+    ""
+   ],
+   "out": "自動著脫裝置要怎麼安裝？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  },
+  {
+   "lane": 0,
+   "id": "chit-who",
+   "ref": "你好，請問你是誰？",
+   "segments": [
+    "你好，請問你是誰？",
+    ""
+   ],
+   "out": "你好，請問你是誰？",
+   "cer": 0.0,
+   "last_final_after_speech_s": 1.62,
+   "error": null
+  }
+ ]
+}
