@@ -7,6 +7,7 @@
 
 ### Fixed
 
+- **voice_e2e 跑完沒有刪掉測試對話**：刪對話要專案的編輯權限，測試帳號 voice-e2e-test 只有讀取，`/api/v1/sessions/batch-delete` 一直被 Backend 回 404，對話留在鶴記dev。用 `--user` 跑時改在 api 容器裡刪（跟簽 token 一樣進容器），`--token` 打遠端時照舊走 API。
 - **合併補句時舊回答可能仍寫入 Brain**：可合併 HTTP 回合加入 `turn_id`／遞增 `turn_revision`，答案先暫存，前台完整接收目前版本後透過 `/api/v1/chat/accept` 確認，才原子寫入問題與回答並執行日誌／記憶更新。取消、被取代或未接收的答案不落庫；確認重試不重複寫入，下一輪等待上一輪確認以保留完整歷史。後台 Chat、外部 SDK 與未提供回合欄位的 API 維持既有流程。
 - **`/api/v1/tts/stream` 指定 Edge 卻回 200 空音檔**：只要設了 IndexTTS 網址，這個端點不管指定哪家都先送 IndexTTS；IndexTTS 沒在跑時連上就斷，回空音檔。現在只有沒指定或指定 IndexTTS 才走它，VoxCPM 失敗也直接退到 Edge。前台 Edge 聲音本來走整段合成，不受影響；voice_e2e 的念回答步驟被影響。voice_e2e 念回答的秒數原本把回應當 wav 算，Edge 回 mp3 時記成 0，改用 ffprobe 讀實際長度。
 - **一次問好幾件事時，英文提問被用中文回答、逐條列出查不到的項目，念到 50 秒**：fast 模式模型想再查資料被擋下時，程式補一句中文催促「手邊資料沒有的內容就說明查不到」，這句是模型最後讀到的話，蓋過了 system prompt 的回答語言與長度。現在催促訊息改成「查不到的部分合併成一句帶過，不要逐項說明」，後面再附一次這一輪的回答語言與長度。鶴記dev 同一批 36 題：英文最長 63 → 29 個單字、超過上限 1/12 → 0/12，Markdown 列點 1 → 0 題。
@@ -21,6 +22,7 @@
 
 ### Documentation
 
+- `docs/plans/thin-entry-refactor.md`、`docs/plans/r2t2-streaming-asr.md` 標為 Done（已提交並部署，使用者授權結案）；`full-duplex-voice.md` 改為進行中，並列入 `docs/README.md`。
 - 新增 `docs/plans/full-duplex-voice.md`（Draft）：語音對話不再一問一答的評估。現況是虛擬人思考與講話時麥克風寫死關閉、新的一句取代舊的；計畫分兩階段：思考中補一句合併回答（含 Brain 接收確認後落庫），講話中插話（需先在現場實測瀏覽器回音消除）。
 - 供應鏈報告恢復 Azure、D-ID、HeyGen 真人方案說明，保留遠端算圖與費用差異；依本次調查補充 MatesX／DHLiveMini2 最符合目前真人效果、本地運算與成本需求的結論。
 
@@ -43,6 +45,8 @@
 
 ### Changed
 
+- **共用 VAD 移除 `per-utterance` 模式與 `commitMode` 選項**：原本給前台用（講完一句就關麥克風），前台改連續收音後已沒有呼叫端。`VadRecognizer`／`createSpeechController` 一律連續收音，雜音轉不出字時安靜略過；admin 三個呼叫端拿掉 `commitMode: "continuous"`。
+- Brain `SessionStore` 寫入訊息、偵測語言、裁掉舊訊息抽成共用函式，`append_message` 與合併回合的 `accept_chat_turn` 不再各寫一份。
 - **語音打斷改由 Jev 判斷規則判不出的長句（預設開）**：`JEV_INTERRUPT_ENABLED` 預設改 true。自寫 30 題規則 23/30、Jev 29/30，附和、對旁人說話不再誤停；只有規則判不出的那段長句多等最多 0.6 秒，沒有 `TYPESAFE_API_KEY`、失敗或逾時都維持中斷。
 - **移除 A2A 的 Jev 預先過濾**：`A2A_JEV_PREFILTER_ENABLED`、`A2A_JEV_NO_REPLY_THRESHOLD` 刪掉；正式環境 A2A 沒開（佇列資料庫從未建立），預先過濾也從未啟用。A2A 本身不變，要不要回仍由 Brain 決定。
 - **Jev 每次呼叫都記進用量**：記憶寫入把關、語言背景校正、串流定稿判斷、召回篩選共用的 `core/jev_client.jev_nouls` 每次呼叫（成功、失敗、逾時都算）記一筆 `provider=typesafe`、`kind=jev_<用途>`，附 token 數與 `raw.status`。原本只有影子觀測會記，正式環境又看不到 info log，數不出各功能每天打幾次。

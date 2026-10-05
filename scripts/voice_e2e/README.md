@@ -99,7 +99,7 @@ python3 scripts/project_mirror.py sync
   - 用量記錄（Brain `usage.db`），算在 `--user` 那個帳號。
   - Jev 定稿判斷的記錄，寫進 `backend/logs/asr_final_judge.jsonl`。這個檔目前沒有欄位能區分測試和真人，用這份檔驗證 Jev 時要排除腳本執行期間的時間。
   - 專案的每日記憶摘要（`MEMORY_SUMMARIES.md` 與當天的記憶檔）：每輪對話寫完都會整理進去，刪掉對話也不會跟著刪。這是要在測試專案跑的主要原因。
-- 不會產生：turn timing 記錄（腳本不打 `/api/v1/metrics/turn`）。建立的對話 session（`voice-e2e-<時間>-*`）跑完會刪掉。
+- 不會產生：turn timing 記錄（腳本不打 `/api/v1/metrics/turn`）。建立的對話 session（`voice-e2e-<時間>-*`）跑完會刪掉：用 `--user` 時在 api 容器裡刪（測試帳號沒有專案編輯權限，打刪除 API 會被擋），用 `--token` 時走 `/api/v1/sessions/batch-delete`，該帳號要有編輯權限。
 - 簽 token 需要能進 backend 容器，而能進容器本來就有完整權限。這個方式跳過登入稽核，只給維運用。
 - 合成語音比真人清楚，錯字率只能拿來比較版本、聲音或引擎之間的差異，不代表真人的實際表現。要評估真人效果，請把錄音放進題庫的 `audio`。
 - 同一條串流連線裡，Gemini 可能把一句話切成兩段定稿。前台會把它們當成兩輪送出，這裡則合起來問 Brain；逐題結果的 `finals` 看得出來有沒有被切開。

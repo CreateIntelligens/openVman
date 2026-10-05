@@ -61,6 +61,17 @@ now = datetime.now(timezone.utc)
 print(runtime.tokens.issue(user, now=now, expires_at=now + timedelta(minutes=int(sys.argv[2]))))
 """
 
+# 刪對話要專案的編輯權限，測試帳號只有讀取，打 API 會被 Backend 擋（404）。
+# 跟簽 token 一樣進容器做：只刪這次建立的 session。
+_DELETE_SESSIONS = """
+import json, sys
+sys.path.insert(0, "/app")
+from memory.memory import delete_session_for_project
+project_id, session_ids = sys.argv[1], json.loads(sys.argv[2])
+deleted = [sid for sid in session_ids if delete_session_for_project(project_id=project_id, session_id=sid)]
+print(len(deleted))
+"""
+
 
 @dataclass
 class Case:
@@ -366,6 +377,9 @@ class Harness:
     async def cleanup(self) -> None:
         if not self.sessions or self.args.keep_sessions:
             return
+        if self.args.user:
+            delete_sessions_in_container(self.args.project, self.sessions)
+            return
         response = await self.http.post(
             f"{self.base}/api/v1/sessions/batch-delete",
             params={"project_id": self.args.project},
@@ -396,6 +410,16 @@ def audio_seconds(audio: bytes, content_type: str) -> float:
             input=audio, capture_output=True,
         ).stdout
         return round(len(decoded) / (SAMPLE_RATE * 2), 1)
+
+
+def delete_sessions_in_container(project_id: str, session_ids: list[str]) -> None:
+    result = subprocess.run(
+        ["docker", "compose", "exec", "-T", "api", "python3", "-c", _DELETE_SESSIONS,
+         project_id, json.dumps(session_ids)],
+        capture_output=True, text=True, cwd=ROOT,
+    )
+    if result.returncode != 0:
+        print(f"清理對話失敗：{result.stderr.strip()[-300:]}", file=sys.stderr)
 
 
 def mint_token(username: str, minutes: int) -> str:

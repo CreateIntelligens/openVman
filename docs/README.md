@@ -39,10 +39,11 @@
 計畫保留原始狀態；Draft 不表示已確認完成。實驗腳本與逐筆資料維持在原目錄，避免報告與重現工具分離。
 
 - [Embedding 意圖影子模式計畫](plans/embedding-intent-shadow.md)（已退場，改用 Jev）
-- [入口與大型模組職責拆分](plans/thin-entry-refactor.md)（Draft）：保留行為、拆分前台／Backend／Brain 入口與 Gemini Live。
+- [入口與大型模組職責拆分](plans/thin-entry-refactor.md)（Done）：保留行為、拆分前台／Backend／Brain 入口與 Gemini Live。
 - [兩個前端共用語音核心（ASR／VAD／TTS）](plans/shared-speech-core.md)
 - [Confucius4-R2T2 辨識實驗](../scripts/experiments/r2t2/REPORT.md)：批次準確度與 Breeze 相當、快約 3 倍；串流專有名詞 13/18 對 Gemini Live 3/18
-- [R2T2 串流辨識接上前台](plans/r2t2-streaming-asr.md)（Draft）：Gemini Live 以外的串流引擎，鶴記實測專有名詞 13/18 對 3/18
+- [R2T2 串流辨識接上前台](plans/r2t2-streaming-asr.md)（Done）：Gemini Live 以外的串流引擎，鶴記實測專有名詞 13/18 對 3/18
+- [語音對話不再一問一答：插話與連續追問](plans/full-duplex-voice.md)（進行中）：思考中補一句合併回答已上線；講話中插話待現場回音實測
 - [OpenSpec 變更提案](../openspec/changes/)
 - [Jev 決策層計畫](plans/jev-decision-layer.md)：意圖分流影子觀測 → RAG 證據判斷；SemIf 退場
 - [Jev API 分流／打斷評估](../scripts/experiments/jev/REPORT.md)：官方 Jev API 在 SemIf 同一份合成題庫上 96/96、零順序翻轉。

@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import io
+import json
+import subprocess
 import unittest
 import wave
 from pathlib import Path
+from unittest import mock
 
+from scripts.voice_e2e import run
 from scripts.voice_e2e.run import cer, load_cases, summarize, terms_heard, wav_bytes
 
 CASES_DIR = Path(__file__).resolve().parents[1] / "scripts" / "voice_e2e" / "cases"
@@ -94,3 +98,15 @@ class CaseFilesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CleanupTest(unittest.TestCase):
+    def test_sessions_are_deleted_inside_the_api_container(self):
+        # 測試帳號沒有專案編輯權限，打 batch-delete 會被 Backend 擋掉，對話一直留著。
+        done = subprocess.CompletedProcess([], 0, stdout="2\n", stderr="")
+        with mock.patch.object(run.subprocess, "run", return_value=done) as call:
+            run.delete_sessions_in_container("dev-x", ["voice-e2e-1-a", "voice-e2e-1-b"])
+        command = call.call_args.args[0]
+        self.assertEqual(command[:6], ["docker", "compose", "exec", "-T", "api", "python3"])
+        self.assertEqual(command[-2:], ["dev-x", json.dumps(["voice-e2e-1-a", "voice-e2e-1-b"])])
+        self.assertIn("delete_session_for_project", command[-3])
