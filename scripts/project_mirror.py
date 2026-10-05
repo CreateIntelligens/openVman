@@ -7,8 +7,9 @@
     python3 scripts/project_mirror.py sync             # 正式 → 測試，先備份測試專案再重建索引
 
 在 repo 根目錄、主機上執行；檔案操作都在 api 容器裡做（docker compose exec）。
-只比對「決定行為」的檔案：知識庫、原始資料、詞表、人設、文件設定、語言分流。
-對話、記憶、夢境整理、知識圖譜快取不比對：那些是使用產生的，本來就該不同。
+只比對「決定行為」的檔案：知識庫、原始資料、詞表、人設、文件設定、語言分流，
+以及檢索時用的知識圖譜鄰接表（LanceDB `note_graph`，Graph RAG 靠它多帶相關文件）。
+對話、記憶、夢境整理不比對：那些是使用產生的，本來就該不同。
 """
 
 from __future__ import annotations
@@ -30,6 +31,9 @@ _IN_CONTAINER = r'''
 import hashlib, json, os, shutil, sys, time, urllib.request
 from pathlib import Path
 
+sys.path.insert(0, "/app")
+from infra.db import get_db
+
 action, source, target = sys.argv[1:4]
 projects = Path("/data/projects")
 # 決定行為的檔案與目錄（相對於 workspace）。
@@ -45,7 +49,17 @@ def fingerprints(project):
         paths = [path] if path.is_file() else sorted(p for p in path.rglob("*") if p.is_file())
         for item in paths:
             out[str(item.relative_to(workspace))] = hashlib.md5(item.read_bytes()).hexdigest()
+    rows = note_graph_rows(project)
+    if rows is not None:
+        out["lancedb:note_graph"] = hashlib.md5(json.dumps(rows, sort_keys=True).encode()).hexdigest()
     return out
+
+
+def note_graph_rows(project):
+    db = get_db(project)
+    if "note_graph" not in db.table_names():
+        return None
+    return sorted(db.open_table("note_graph").to_arrow().to_pylist(), key=lambda row: row["source_file"])
 
 
 def drift():
@@ -88,6 +102,11 @@ if (src_ws / "graphify-out").exists():
             path.write_text(path.read_text(encoding="utf-8").replace(source, target), encoding="utf-8")
     if (projects / source / "graph_index_state.json").exists():
         shutil.copy2(projects / source / "graph_index_state.json", projects / target / "graph_index_state.json")
+# 鄰接表在 LanceDB 裡，複製 graphify-out 不會帶過去；少了它測試專案的檢索不會做圖譜擴充。
+# 列裡只有相對 workspace 的路徑，不含專案代號，可以原樣寫入。
+rows = note_graph_rows(source)
+if rows:
+    get_db(target).create_table("note_graph", data=rows, mode="overwrite")
 request = urllib.request.Request(
     "http://localhost:8100/brain/knowledge/reindex", method="POST",
     headers={"X-Internal-Token": os.environ["GATEWAY_INTERNAL_TOKEN"], "Content-Type": "application/json"},

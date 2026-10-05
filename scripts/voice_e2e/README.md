@@ -48,7 +48,7 @@ python3 scripts/project_mirror.py check   # 有差異 exit 1
 python3 scripts/project_mirror.py sync
 ```
 
-對話、記憶、夢境整理不比對，那些是使用產生的。鏡像對照表在 `scripts/project_mirror.py` 的 `MIRRORS`。
+檢索用的知識圖譜鄰接表（LanceDB `note_graph`）也要一致，`check` 會比對、`sync` 會複製。對話、記憶、夢境整理不比對，那些是使用產生的。鏡像對照表在 `scripts/project_mirror.py` 的 `MIRRORS`。
 
 | 參數 | 說明 |
 |------|------|

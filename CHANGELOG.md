@@ -7,6 +7,7 @@
 
 ### Fixed
 
+- **鶴記dev 檢索時沒有圖譜擴充**：`scripts/project_mirror.py sync` 只複製了 `graphify-out/` 檔案，檢索用的 LanceDB `note_graph` 表沒帶過去，測試專案的檢索跟正式不一樣。現在 `sync` 一併複製、`check` 一併比對（差異顯示為 `lancedb:note_graph`）；鶴記dev 已重新同步。
 - R2T2 串流實驗腳本 `scripts/experiments/r2t2/stream.py` 改讀 `.env` 的 `ASR_R2T2_SECRET_KEY`，跟正式設定同一個來源，不再在腳本裡另寫一份。
 - **voice_e2e 跑完沒有刪掉測試對話**：刪對話要專案的編輯權限，測試帳號 voice-e2e-test 只有讀取，`/api/v1/sessions/batch-delete` 一直被 Backend 回 404，對話留在鶴記dev。用 `--user` 跑時改在 api 容器裡刪（跟簽 token 一樣進容器），`--token` 打遠端時照舊走 API。
 - **合併補句時舊回答可能仍寫入 Brain**：可合併 HTTP 回合加入 `turn_id`／遞增 `turn_revision`，答案先暫存，前台完整接收目前版本後透過 `/api/v1/chat/accept` 確認，才原子寫入問題與回答並執行日誌／記憶更新。取消、被取代或未接收的答案不落庫；確認重試不重複寫入，下一輪等待上一輪確認以保留完整歷史。後台 Chat、外部 SDK 與未提供回合欄位的 API 維持既有流程。
