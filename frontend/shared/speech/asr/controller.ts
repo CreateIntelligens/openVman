@@ -30,7 +30,7 @@ import { BROWSER_ASR } from './engines'
 import type { AsrErrorCode } from './errors'
 import { isTerminalSpeechError } from './errors'
 import { ServerRecorder } from './server-recorder'
-import { VadRecognizer, type VadCommitMode } from './vad-recognizer'
+import { VadRecognizer } from './vad-recognizer'
 
 export const ASR_IDLE_TIMEOUT_MS = 10_000
 export const SERVER_ASR_MAX_CLIP_MS = 60_000
@@ -433,7 +433,6 @@ export class SpeechController {
 export interface CreateSpeechControllerOptions {
   http: HttpAdapter
   lang?: string
-  commitMode?: VadCommitMode
   silenceTimeoutMs?: number
   initialProvider?: MyAsrProvider
   onResult?: (transcript: string) => void
@@ -450,7 +449,7 @@ export function createSpeechController(
 
   const browserRecognizer = new BrowserRecognizer({
     lang: options.lang ?? 'zh-TW',
-    continuous: (options.commitMode ?? 'continuous') === 'continuous',
+    continuous: true,
     onResult: (text) => controller.handleResult(text),
     onInterim: (text) => controller.handleInterim(text),
     onError: (err) => controller.handleRecognizerError(err),
@@ -465,7 +464,6 @@ export function createSpeechController(
 
   const vadRecognizer = new VadRecognizer({
     http: options.http,
-    commitMode: options.commitMode ?? 'continuous',
     silenceTimeoutMs: options.silenceTimeoutMs,
     onResult: (text) => controller.handleResult(text),
     onError: (err) => controller.handleRecognizerError(err),

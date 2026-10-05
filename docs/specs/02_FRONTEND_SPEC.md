@@ -148,7 +148,7 @@ VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 
 >    * `asr/`：無框架辨識單元與決策大腦：
 >      * `browser-recognizer.ts`：Web Speech API 包裝，支援 interim 與 speaking 狀態信號。
 >      * `server-recorder.ts`：MediaRecorder 按鍵錄音上傳。
->      * `vad-recognizer.ts`：Silero VAD 本機端點切句上傳，支援 `per-utterance` 與 `continuous` 模式；app、admin 都用 `continuous`（app 自 2026-10-02 起，回授改由虛擬人出聲時暫停收音來擋）。
+>      * `vad-recognizer.ts`：Silero VAD 本機端點切句上傳，連續收音、講完一句上傳；回授由 app 在虛擬人出聲時暫停收音來擋（原本 app 用的 `per-utterance` 模式 2026-10-05 移除）。
 >      * `controller.ts`：統一狀態機 `SpeechController`，負責引擎判定、閒置超時、D2 降級、D8 樂觀更新與統一 UI 文案表。
 >      * `errors.ts`：統一錯誤碼與集中繁中錯誤訊息表。
 >      * `client.ts`：後端 ASR 端點通訊。

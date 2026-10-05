@@ -35,7 +35,6 @@ export function useVad({ onSpeechCommit, onSpeechStart, onAudio, enabled }: UseV
   const getOrCreateRecognizer = useCallback(() => {
     if (!recognizerRef.current || !recognizerRef.current.isAlive) {
       recognizerRef.current = new VadRecognizer({
-        commitMode: "continuous",
         silenceTimeoutMs: 1000,
         onSpeechStart: () => onSpeechStartRef.current?.(),
         onSpeechEnd: (audio) => onAudioRef.current?.(audio),

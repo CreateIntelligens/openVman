@@ -299,7 +299,6 @@ export function useChatSession() {
         request: (path, init) => apiFetch(path, init),
         parseError: (res) => parseErrorMessage(res),
       },
-      commitMode: "continuous",
       onResult: handleFinalTranscript,
       onInterim: handleInterim,
       onError: handleAsrError,

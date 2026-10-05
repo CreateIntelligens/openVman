@@ -45,12 +45,11 @@ test("encodeWav writes a header the backend's decoder will accept", async () => 
 
 test("the microphone stays open after a sentence so the user can add another", () => {
   // 2026-10-02：思考中補一句。回授改由虛擬人出聲時暫停收音來擋（useAvatarVoiceInput）。
-  assert.match(source, /commitMode:\s*['"]continuous['"]/);
   const onSpeechEnd = vadRecognizerSource.slice(
     vadRecognizerSource.indexOf("this.callbacks.onSpeechEnd = "),
     vadRecognizerSource.indexOf("this.callbacks.onVADMisfire = "),
   );
-  assert.match(onSpeechEnd, /if \(this\.commitMode === 'per-utterance'\) \{\s*this\.stop\(\)/);
+  assert.doesNotMatch(onSpeechEnd, /this\.stop\(\)/);
 });
 
 test("the model is shared with the admin console instead of duplicated", () => {

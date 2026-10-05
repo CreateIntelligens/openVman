@@ -186,7 +186,7 @@ describe('VadRecognizer (shared core)', () => {
     await vi.waitFor(() => expect(FakeMicVAD.created[0].destroy).toHaveBeenCalled())
   })
 
-  it('commitMode: per-utterance (app) 模式：講完立刻 stop()，雜音回報 transcribe-failed', async () => {
+  it('講完保持 listening，雜音安靜略過', async () => {
     const mockRequest = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ text: '（音訊轉錄失敗）' }), { status: 200 }),
     )
@@ -196,36 +196,6 @@ describe('VadRecognizer (shared core)', () => {
 
     const recognizer = new VadRecognizer({
       http,
-      commitMode: 'per-utterance',
-      onError,
-      onResult,
-    })
-
-    await recognizer.start()
-    expect(recognizer.listening).toBe(true)
-
-    const audio = new Float32Array([0.1, 0.2])
-    // 講完一句話
-    FakeMicVAD.created[0].options.onSpeechEnd(audio)
-
-    // per-utterance 會立即 stop 收音避免回授
-    expect(recognizer.listening).toBe(false)
-
-    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith('transcribe-failed'))
-    expect(onResult).not.toHaveBeenCalled()
-  })
-
-  it('commitMode: continuous (admin) 模式：講完保持 listening，雜音安靜略過', async () => {
-    const mockRequest = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ text: '（音訊轉錄失敗）' }), { status: 200 }),
-    )
-    const http: HttpAdapter = { request: mockRequest }
-    const onError = vi.fn()
-    const onResult = vi.fn()
-
-    const recognizer = new VadRecognizer({
-      http,
-      commitMode: 'continuous',
       onError,
       onResult,
     })

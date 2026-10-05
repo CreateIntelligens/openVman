@@ -7,10 +7,9 @@
  * - 實例跨次呼叫重用（pause-not-destroy，僅卸載時 destroy）
  * - 啟動中（starting）狀態與取消防護（generation 計數）
  * - 多句併發辨識計數（pending 計數器）
- * - 支援兩種收音提交模式（D4）：
- *   - 'per-utterance'：onSpeechEnd 先 stop() 放掉麥克風避免回授，再上傳；雜音回報 transcribe-failed（D5）。
- *   - 'continuous'（admin、app 用）：onSpeechEnd 異步上傳並繼續收音；雜音安靜略過（D5）。
- *     app 在虛擬人出聲時自己暫停收音來擋回授。
+ * - 連續收音：onSpeechEnd 異步上傳並繼續收音；雜音轉不出字時安靜略過。
+ *   回授由呼叫端處理（app 在虛擬人出聲時暫停收音）。原本給 app 用的
+ *   per-utterance 模式（講完就關麥克風）2026-10-05 移除，見 docs/plans/full-duplex-voice.md。
  * - 錯誤分類（採 app 版）：
  *   - 麥克風權限被拒（NotAllowedError/NotFoundError）-> 'not-allowed'，supported 維持 true。
  *   - 模型/WASM 載入失敗 -> 'vad-unavailable'，supported 轉 false。
@@ -27,8 +26,6 @@ export const ORT_WASM_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3
 export const VAD_SAMPLE_RATE = 16000
 export const DEFAULT_SILENCE_TIMEOUT_MS = 1000
 
-export type VadCommitMode = 'per-utterance' | 'continuous'
-
 export interface VadInstance {
   start: () => Promise<void> | void
   pause: () => Promise<void> | void
@@ -43,7 +40,6 @@ export interface VadCallbacks {
 
 export interface VadRecognizerOptions {
   http?: HttpAdapter
-  commitMode?: VadCommitMode
   silenceTimeoutMs?: number
   onResult?: (transcript: string, meta?: TranscriptionMeta) => void
   /** 每次上傳附加的表單欄位，例如專案與語言分流。 */
@@ -66,7 +62,6 @@ export interface VadRecognizerOptions {
 
 export class VadRecognizer {
   private http?: HttpAdapter
-  private commitMode: VadCommitMode
   private silenceTimeoutMs?: number
   private onResult?: (transcript: string, meta?: TranscriptionMeta) => void
   private formFields?: TranscribeFormFields
@@ -105,7 +100,6 @@ export class VadRecognizer {
 
   constructor(options: VadRecognizerOptions = {}) {
     this.http = options.http
-    this.commitMode = options.commitMode ?? 'continuous'
     this.silenceTimeoutMs = options.silenceTimeoutMs
     this.onResult = options.onResult
     this.formFields = options.formFields
@@ -125,7 +119,6 @@ export class VadRecognizer {
 
   public updateOptions(options: Partial<VadRecognizerOptions>): void {
     if (options.http !== undefined) this.http = options.http
-    if (options.commitMode !== undefined) this.commitMode = options.commitMode
     if (options.silenceTimeoutMs !== undefined) this.silenceTimeoutMs = options.silenceTimeoutMs
     if (options.onResult !== undefined) this.onResult = options.onResult
     if (options.formFields !== undefined) this.formFields = options.formFields
@@ -279,10 +272,6 @@ export class VadRecognizer {
           }, this.silenceTimeoutMs)
         }
 
-        if (this.commitMode === 'per-utterance') {
-          this.stop()
-        }
-
         if (this.http && audio.length > 0) {
           void this.send(audio)
         }
@@ -354,12 +343,7 @@ export class VadRecognizer {
       if (!this.alive) return
 
       const text = result.text.trim()
-      if (!text || text.includes('轉錄失敗')) {
-        if (this.commitMode === 'per-utterance') {
-          this.emitError('transcribe-failed')
-        }
-        return
-      }
+      if (!text || text.includes('轉錄失敗')) return
 
       this.onResult?.(text, { language: result.language ?? null })
     } catch {

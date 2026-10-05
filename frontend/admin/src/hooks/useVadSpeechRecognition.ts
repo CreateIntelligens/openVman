@@ -49,7 +49,6 @@ export function useVadSpeechRecognition({
   if (!recognizerRef.current) {
     recognizerRef.current = new VadRecognizer({
       http: adminHttpAdapter,
-      commitMode: "continuous",
       onSpeechStart: () => onActivityRef.current?.(),
       onResult: (text) => onFinalTranscriptRef.current(text),
       onError: (code: AsrErrorCode) => {
