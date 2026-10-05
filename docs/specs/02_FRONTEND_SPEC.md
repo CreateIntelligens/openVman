@@ -129,7 +129,7 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 前台串流引擎由共用 `STREAM_ASR_ENGINES` 定義（`gemini-live`、`r2t2-live`）。帳號選了其中一個、串流可用且台語分流關閉才使用共用 `StreamRecognizer`；開啟台語分流時維持 Breeze 批次。`r2t2-live` 顯示 Confucius4-R2T2 串流，與 `r2t2` 批次分開授權；Backend 依帳號偏好選上游，前台不傳任意上游 URL 或金鑰。失敗沿用既有批次備援。
 
-後台帳號授權與個人引擎選單由後端註冊及共用引擎名稱呈現；「試辨識」使用 `SERVER_ASR_ENGINES`，仍只有批次引擎。後台 Chat 維持批次錄音，不在本次新增串流輸入；外部 Avatar SDK 不開放 ASR。
+後台帳號授權與個人引擎選單由後端註冊及共用引擎名稱呈現；後台「語音 → 語音辨識」分頁（2026-10-05 擴充）：專案詞表（workspace 的 `ASR_PROMPT.md`，經 `/knowledge/document` 讀寫，說明行與「A→B」誤聽對照分開計數）；語言分流（只能在專案開的範圍取消或勾回，至少留一個）；批次試辨識（`SERVER_ASR_ENGINES` 可多選，錄音／VAD 自動斷句／上傳，同一段音檔依序送各引擎，帶 `project_id`、`language_routes`，顯示實際引擎、耗時、套用的分流與詞表、台語判斷，選填參考文字算錯字率，留最近 5 段可回放）；串流試聽（`STREAM_ASR_ENGINES`，`/api/v1/asr/stream?engine=` 管理員指定引擎，即時 interim 與 final）。後台 Chat 維持批次錄音，不在本次新增串流輸入；外部 Avatar SDK 不開放 ASR。
 
 VAD 的模型及 worklet 由 `/admin/vad/` 提供，ONNX Runtime WASM 目前由 `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/` 載入。離線部署需將相符版本資產自架並調整 `vad-recognizer.ts` 的來源；目前不是完全離線可用，也沒有自動 CDN 鏡像切換。模型或 WASM 載入失敗回報 `vad-unavailable`，由共用控制器處理降級。
 

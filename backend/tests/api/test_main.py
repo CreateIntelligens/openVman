@@ -1448,6 +1448,77 @@ def test_chat_transcribe_ignores_a_client_supplied_engine(monkeypatch):
     assert seen["preferred"] is None
 
 
+def _routed_asr_fixture(monkeypatch, module, routes):
+    """Fake transcribe, project routes, glossary and Taiwanese check for the routed ASR paths."""
+    seen: dict[str, object] = {}
+
+    async def _transcribe(path, trace_id, preferred=None, prompt=""):
+        seen.update(preferred=preferred, prompt=prompt, trace_id=trace_id)
+        return types.SimpleNamespace(
+            content_type="audio_transcription", content="今仔日天氣真好", provider=preferred or "breeze",
+        )
+
+    async def _routes(account, project_id, requested):
+        seen["project_id"] = project_id
+        return routes
+
+    async def _glossary(account, project_id):
+        return "沉水泵 DIVA" if project_id else ""
+
+    async def _detect(path):
+        return module.asr_routes.language_routes_mod.LanguageCheck("nan", "nan", 812)
+
+    import app.gateway.ingestion_audio as ingestion_audio
+
+    monkeypatch.setattr(ingestion_audio, "transcribe", _transcribe)
+    monkeypatch.setattr(module.asr_routes.language_routes_mod, "effective_routes", _routes)
+    monkeypatch.setattr(module.asr_routes.language_routes_mod, "detect_taiwanese", _detect)
+    monkeypatch.setattr(module.asr_routes.asr_glossary_mod, "project_asr_prompt", _glossary)
+    monkeypatch.setattr(
+        module.asr_routes, "get_tts_config",
+        lambda: _make_test_config(document_max_upload_bytes=1024 * 1024),
+    )
+    return seen
+
+
+def test_asr_preview_with_a_project_uses_its_glossary_and_taiwanese_check(monkeypatch):
+    """後台試辨識帶了專案就跟正式對話一樣套詞表、聽台語，但引擎照操作者選的跑。"""
+    module, _ = _load_main(monkeypatch)
+    seen = _routed_asr_fixture(monkeypatch, module, ["zh", "nan"])
+    client, _ = _authenticated_client(module)
+    response = client.post(
+        "/api/v1/asr/preview",
+        files={"file": ("preview.wav", b"fake-audio-bytes", "audio/wav")},
+        data={"provider": "r2t2", "project_id": "p1", "language_routes": "zh,nan"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    # 選了 R2T2 就用 R2T2，不像正式對話一樣換成 Breeze：才比得出各家聽台語的差別。
+    assert seen["preferred"] == "r2t2"
+    assert seen["prompt"] == "沉水泵 DIVA"
+    assert seen["project_id"] == "p1"
+    assert body["glossary"] == "沉水泵 DIVA"
+    assert body["language"] == "nan"
+    assert body["language_check"] == {"result": "nan", "ms": 812}
+    assert body["language_routes"] == ["zh", "nan"]
+
+
+def test_chat_transcribe_still_switches_to_breeze_on_the_taiwanese_route(monkeypatch):
+    module, _ = _load_main(monkeypatch)
+    seen = _routed_asr_fixture(monkeypatch, module, ["zh", "nan"])
+    client, _ = _authenticated_client(module, admin=False)
+    response = client.post(
+        "/api/v1/asr/transcribe",
+        files={"file": ("speech.wav", b"fake-audio-bytes", "audio/wav")},
+        data={"project_id": "p1"},
+    )
+
+    assert response.status_code == 200
+    assert seen["preferred"] == "breeze"
+    assert response.json()["language"] == "nan"
+
+
 def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
     module, _ = _load_main(monkeypatch)
     monkeypatch.setattr(

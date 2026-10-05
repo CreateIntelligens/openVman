@@ -168,6 +168,10 @@ ws.send(JSON.stringify(payload));
 
 依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、xiaomi、sensevoice、openai）。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後暫停 60 秒不排入，時間到由下一個請求再試，成功就解除；HTTP 錯誤碼代表機器還在回應，不暫停。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。
 
+### 後台試辨識（`POST /api/v1/asr/preview`，管理員）
+
+multipart：`file`、`provider`（`SERVER_ASR_PROVIDERS` 之一，空白用部署預設）、選填 `project_id`、`language_routes`（逗號分隔）。帶了專案就跟 `/api/v1/asr/transcribe` 走同一個 `_transcribe_routed()`：套專案詞表、依分流在台語時同時跑台語判斷；差別是引擎照 `provider`，不換成 Breeze，才比得出各家聽台語的差別。回傳 `text`、`provider`（實際辨識的引擎）、`elapsed_seconds`、`language`、`language_check`、`language_routes`、`glossary`（實際送給引擎的詞表）。
+
 ### 串流 ASR（`GET /api/v1/asr/stream`，WebSocket）
 
 端點依帳號保存的偏好選擇 `gemini-live` 或 `r2t2-live`，並驗證所選引擎的目前授權；嵌入金鑰不可使用。批次 `r2t2` 與串流 `r2t2-live` 分開授權，兩個串流引擎均不進 `transcribe()` 備援鏈。沒選串流或授權被撤銷回 `not_allowed`。
@@ -180,7 +184,7 @@ R2T2 使用 `ASR_R2T2_STREAM_URL`（部署值 `ws://10.9.0.37:8803/asr_stream_ap
 
 本次隔離驗證（2026-10-01）：使用本地新 Backend 串流轉接與真實 .37 上游，鶴記兩個 Edge 聲音各 10 題；單路及同時三路各 20 句，平均逐句錯字率皆為 6.91%，各 20 則定稿、無漏句或錯誤。題庫所有 `terms` 命中 19/24（此統計包含泛用詞，不與計畫的專有名詞 13/18 混算）。測試以隔離帳號與設定執行，未寫入正式偏好或部署設定；尚未驗證部署後前台與 Brain 回答命中率，需部署後按計畫以專用測試帳號跑 `scripts/voice_e2e/run.py`。
 
-前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。
+前台 ASR 引擎選 `gemini-live` 時使用（跟 `browser` 一樣不進 `transcribe()` 的 fallback chain，帳號要在帳號頁被授權；嵌入金鑰不可用）。前台送 16 kHz 單聲道 PCM16 binary frame（約每 100 ms），Backend 轉給 Gemini `ASR_GEMINI_STREAM_MODEL`（預設 gemini-3.5-transcribe-live，`inputAudioTranscription.languageCodes` 預設 zh-TW、en-US、es-ES）。回給前台：`ready`、`interim`（講話中約每 0.5 秒）、`final`（Gemini 自己判斷講完，停頓約 0.5 秒後定稿；同一連線可連續多句）、`error`（`not_allowed`／`not_configured`／`upstream_failed`，前台退回 VAD＋批次 ASR）。前台送 `{"type":"end"}` 會讓最後一句定稿。查詢參數 `engine` 只有管理員能用（後台串流試聽），指定 `STREAM_ASR_ENGINES` 之一就不看帳號偏好；一般帳號或嵌入金鑰帶了回 `not_allowed`。用量以送出音訊秒數記 `kind=asr`、provider `gemini-transcribe-live`。台語分流開著時前台不走串流（Gemini 聽不懂台語），改用 Breeze 批次。
 
 前台連線時帶 `project_id`、`language_routes`（query string）：`languageCodes` 依該專案的語言分流產生（zh→zh-TW、en→en-US、es→es-ES、ja→ja-JP、ko→ko-KR），沒帶專案才用 `ASR_GEMINI_STREAM_LANGUAGES`。Gemini 的定稿偶爾比最後的暫定字幕還差（「who am i」定稿成「OMI」、定稿成韓文）：兩者不同時 Backend 呼叫 Brain `POST /brain/internal/asr-judge`（Jev 判斷，最多等 1.5 秒），回傳的文字當 `final` 送給前台；逾時或失敗照定稿。每次判斷在 `backend/logs/asr_final_judge.jsonl` 記一行（時間、專案、兩段文字、選擇、分數、毫秒），用來拿真實資料驗證準度。
 

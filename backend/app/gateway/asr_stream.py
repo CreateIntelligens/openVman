@@ -45,6 +45,7 @@ from app import language_routes as language_routes_mod
 from app.asr_glossary import project_asr_prompt
 from app.auth.asr_selection import permitted_asr_preference
 from app.auth.dependencies import CurrentAccount, authenticate_websocket
+from app.auth.models import is_at_least_admin
 from app.auth.runtime import get_auth_runtime
 from app.config import TTSRouterConfig, get_tts_config
 from app.http_client import SharedAsyncClient
@@ -181,6 +182,19 @@ def _allowed(current) -> str:
     return chosen if chosen in _STREAM_ENGINES else ""
 
 
+def _engine_for(current, requested: str | None) -> str:
+    """後台試聽可以指定串流引擎（engine 參數）；只有管理員能用，其他人照帳號偏好與授權。"""
+    if not requested:
+        return _allowed(current)
+    if (
+        current.embed_key is None
+        and is_at_least_admin(current.user.role)
+        and requested in _STREAM_ENGINES
+    ):
+        return requested
+    return ""
+
+
 def _r2t2_stream_endpoint(cfg: TTSRouterConfig, engine: str) -> tuple[str, str] | None:
     """URL and key for this R2T2 streaming engine, or None when it is not configured."""
     url, key = (
@@ -309,7 +323,7 @@ async def asr_stream(websocket: WebSocket) -> None:
         return
     await websocket.accept()
 
-    engine = _allowed(current)
+    engine = _engine_for(current, websocket.query_params.get("engine"))
     api_key = os.environ.get("GEMINI_API_KEY", "")
     cfg = get_tts_config()
     endpoint = _r2t2_stream_endpoint(cfg, engine) if engine in _R2T2_STREAM_ENGINES else None

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **後台語音辨識分頁改成完整的測試台**：可以編輯專案詞表（`ASR_PROMPT.md`，顯示幾個詞、幾條誤聽對照）；勾語言分流；批次試辨識一次勾多個引擎、同一段音檔依序比較，輸入有錄音、VAD 自動斷句（可連續講）、上傳三種，顯示實際引擎、耗時、套用的分流與詞表、台語判斷，填參考文字就算錯字率（跟 voice_e2e 同算法），最近 5 段可回放；新增串流試聽，邊講邊出字。後端：`/api/v1/asr/preview` 多收 `project_id`、`language_routes`，跟正式對話一樣套詞表與台語判斷（引擎照選的跑），回傳 `glossary`、`language_check`、`language_routes`；`/api/v1/asr/stream` 多一個只有管理員能用的 `engine` 參數。原本錄音鈕用到不存在的 `btn-secondary` 樣式，一起改掉。
 - 講話中插話的分類端點（預設不用）：新增登入保護的 `POST /api/v1/voice/interrupt`（`{transcript, reply_text}` → `{action: "STOP" | "IGNORE"}`），先丟掉完整出現在回答裡的文字（當成喇叭回音），再交給既有 GuardAgent／Jev 判斷。前台串流辨識接好了，但開關 `INTERRUPT_WHILE_SPEAKING`（`useAvatarVoiceInput.ts`）預設關：回音過濾只擋完全相同的文字，辨識錯一個字就擋不住，現場喇叭與麥克風的回音消除還沒實測，開了可能讓虛擬人自己打斷自己。虛擬人出聲時所有引擎照舊停止收音。
 
 ### Fixed

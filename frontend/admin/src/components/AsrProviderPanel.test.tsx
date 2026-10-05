@@ -1,15 +1,33 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { fetchKnowledgeDocument, fetchKnowledgeSettings, saveKnowledgeDocument } from "../api/knowledge";
 import { previewAsr } from "../api/settings";
+import { charErrorRate } from "../utils/charErrorRate";
 import AsrProviderPanel from "./AsrProviderPanel";
+import { summarizeGlossary } from "./asr/GlossaryEditor";
+import { streamTestUrl } from "./asr/StreamTester";
 
-vi.mock("../api/settings", () => ({
-  previewAsr: vi.fn(),
+vi.mock("../api/settings", () => ({ previewAsr: vi.fn() }));
+vi.mock("../api/knowledge", () => ({
+  fetchKnowledgeSettings: vi.fn(),
+  fetchKnowledgeDocument: vi.fn(),
+  saveKnowledgeDocument: vi.fn(),
+}));
+vi.mock("../api", () => ({ getActiveProjectId: () => "proj-1" }));
+vi.mock("../hooks/useVad", () => ({
+  useVad: () => ({ speaking: false, starting: false, supported: true }),
 }));
 
 beforeEach(() => {
   vi.mocked(previewAsr).mockReset();
+  vi.mocked(fetchKnowledgeSettings).mockResolvedValue({ language_routes: ["zh", "en", "nan"] });
+  vi.mocked(fetchKnowledgeDocument).mockResolvedValue({
+    path: "ASR_PROMPT.md", content: "# 鶴記\nDIVA 沉水泵\n常見誤聽：沉睡泵→沉水泵\n",
+  } as never);
+  vi.mocked(saveKnowledgeDocument).mockResolvedValue({ status: "ok" } as never);
+  URL.createObjectURL = vi.fn(() => "blob:clip");
+  URL.revokeObjectURL = vi.fn();
 });
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -21,97 +39,118 @@ function upload(name = "clip.wav") {
   return clip;
 }
 
+function engineButton(label: RegExp) {
+  return within(screen.getByRole("group", { name: "試辨識的引擎" })).getByRole("button", { name: label });
+}
+
 describe("AsrProviderPanel", () => {
-  it("沒有全站預設引擎可以改，只剩試辨識", () => {
+  it("讀出專案詞表並分開算詞與誤聽對照", async () => {
     render(<AsrProviderPanel />);
-
-    expect(screen.queryByText("預設語音辨識引擎")).toBeNull();
-    expect(screen.queryByRole("button", { name: "改回部署設定" })).toBeNull();
-    expect(screen.getByText("試辨識")).toBeTruthy();
+    expect(await screen.findByText("1 個詞・1 條誤聽對照")).toBeTruthy();
+    expect(fetchKnowledgeDocument).toHaveBeenCalledWith("ASR_PROMPT.md");
   });
 
-  it("選單列出伺服器引擎並顯示說明", async () => {
+  it("沒建過詞表的專案當成空的，不顯示錯誤", async () => {
+    vi.mocked(fetchKnowledgeDocument).mockRejectedValue(new Error("找不到指定文件"));
     render(<AsrProviderPanel />);
-
-    fireEvent.click(screen.getByRole("combobox", { name: "試辨識的引擎" }));
-    const labels = (await screen.findAllByRole("option")).map((o) => o.textContent);
-    expect(labels).toEqual([
-      "Breeze-ASR-26", "Confucius4-R2T2", "Confucius4-R2T2 dev", "Xiaomi-CocktailASR-1", "SenseVoice-Small", "OpenAI Whisper",
-    ]);
-    // 選單上只有引擎代號的話，使用者無從判斷該選哪個。
-    fireEvent.mouseDown(screen.getByRole("option", { name: /SenseVoice-Small/ }));
-    expect(screen.getAllByText(/臺語漢字輸出/).length).toBeGreaterThan(0);
+    expect(await screen.findByText("0 個詞・0 條誤聽對照")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("用選的引擎試辨識", async () => {
-    vi.mocked(previewAsr).mockResolvedValue({ text: "今仔日天氣袂歹", provider: "sensevoice" });
+  it("改了詞表才能存，存完提醒約一分鐘生效", async () => {
     render(<AsrProviderPanel />);
+    const box = await screen.findByLabelText("專案詞表內容");
+    const save = screen.getByRole("button", { name: "儲存詞表" }) as HTMLButtonElement;
+    await waitFor(() => expect((box as HTMLTextAreaElement).value).toContain("DIVA"));
+    expect(save.disabled).toBe(true);
 
-    fireEvent.click(screen.getByRole("combobox", { name: "試辨識的引擎" }));
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /SenseVoice-Small/ }));
+    fireEvent.change(box, { target: { value: "DIVA 沉水泵 EUBL" } });
+    fireEvent.click(save);
+
+    await waitFor(() => expect(saveKnowledgeDocument).toHaveBeenCalledWith("ASR_PROMPT.md", "DIVA 沉水泵 EUBL"));
+    expect(await screen.findByText("已儲存，約一分鐘內生效。")).toBeTruthy();
+  });
+
+  it("同一段音檔依序送給勾的每個引擎，帶專案與分流", async () => {
+    vi.mocked(previewAsr)
+      .mockResolvedValueOnce({ text: "請問沉水泵", provider: "breeze", elapsed_seconds: 0.8, language_routes: ["zh", "en", "nan"], glossary: "DIVA 沉水泵", language_check: { result: "zh", ms: 900 } })
+      .mockResolvedValueOnce({ text: "請問沉睡泵", provider: "r2t2", elapsed_seconds: 0.3, language_routes: ["zh", "en", "nan"], glossary: "DIVA 沉水泵", language_check: { result: "zh", ms: 900 } });
+    render(<AsrProviderPanel />);
+    await screen.findByRole("button", { name: "台語" });
+
+    fireEvent.click(engineButton(/^Confucius4-R2T2$/));
     const clip = upload();
 
-    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.wav", "sensevoice"));
-    expect(await screen.findByText("今仔日天氣袂歹")).toBeTruthy();
-    expect(screen.queryByText(/這次由/)).toBeNull();
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledTimes(2));
+    const context = { projectId: "proj-1", languageRoutes: "zh,en,nan" };
+    expect(previewAsr).toHaveBeenNthCalledWith(1, clip, "clip.wav", "breeze", context);
+    expect(previewAsr).toHaveBeenNthCalledWith(2, clip, "clip.wav", "r2t2", context);
+    expect(await screen.findByText("請問沉水泵")).toBeTruthy();
+    expect(await screen.findByText("請問沉睡泵")).toBeTruthy();
+    expect(screen.getByText("有套用專案詞表")).toBeTruthy();
+    expect(screen.getByText(/台語判斷：不是台語（900 ms）/)).toBeTruthy();
+  });
+
+  it("填了參考文字就算錯字率", async () => {
+    vi.mocked(previewAsr).mockResolvedValue({ text: "沉睡泵最深可以放多深", provider: "breeze" });
+    render(<AsrProviderPanel />);
+    fireEvent.change(screen.getByPlaceholderText(/沉水泵最深/), { target: { value: "沉水泵最深可以放多深？" } });
+    upload();
+    expect(await screen.findByText(/錯字率 10\.0%/)).toBeTruthy();
+  });
+
+  it("取消分流會送出剩下的分流，最後一個不能取消", async () => {
+    vi.mocked(previewAsr).mockResolvedValue({ text: "hi", provider: "breeze" });
+    render(<AsrProviderPanel />);
+    const routes = within(await screen.findByRole("group", { name: "語言分流" }));
+    await routes.findByRole("button", { name: "台語" });
+    fireEvent.click(routes.getByRole("button", { name: "台語" }));
+    fireEvent.click(routes.getByRole("button", { name: "English" }));
+    expect((routes.getByRole("button", { name: "中文" }) as HTMLButtonElement).disabled).toBe(true);
+
+    upload();
+    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(
+      expect.anything(), "clip.wav", "breeze", { projectId: "proj-1", languageRoutes: "zh" },
+    ));
   });
 
   it("指定的引擎沒回應、由備援辨識時講清楚", async () => {
     vi.mocked(previewAsr).mockResolvedValue({ text: "有聽到", provider: "xiaomi" });
     render(<AsrProviderPanel />);
     upload();
-
     expect(await screen.findByText(/Breeze-ASR-26 沒有回應，這次由 Xiaomi-CocktailASR-1 辨識/)).toBeTruthy();
   });
 
-  it("上傳音檔就送辨識，不必先錄音", async () => {
-    // 同一個檔案切換引擎再試一次才能客觀比較，重錄每次都是不同輸入。
-    vi.mocked(previewAsr).mockResolvedValue({
-      text: "今仔日天氣袂歹", provider: "sensevoice",
-    });
+  it("一個引擎都沒勾就不送", async () => {
     render(<AsrProviderPanel />);
-
-    const clip = new File(["audio"], "clip.wav", { type: "audio/wav" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: [clip] } });
-
-    // 檔名要一起送：後端拿副檔名決定怎麼解這個檔，mp3 冠上 .webm 會轉檔失敗。
-    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.wav", "breeze"));
-    expect(await screen.findByText("今仔日天氣袂歹")).toBeTruthy();
+    fireEvent.click(engineButton(/^Breeze-ASR-26$/));
+    upload();
+    expect(await screen.findByText("至少勾一個引擎。")).toBeTruthy();
+    expect(previewAsr).not.toHaveBeenCalled();
   });
+});
 
-  it("清空 input 不能把選到的檔案一起清掉", async () => {
-    // 真實的 <input type=file> 一旦把 value 設成 ""，files 也會跟著變空。
-    // 先清再讀就永遠讀不到檔案，畫面只會說「未選擇任何檔案」。
-    vi.mocked(previewAsr).mockResolvedValue({ text: "有聽到", provider: "breeze" });
-    render(<AsrProviderPanel />);
-
-    const clip = new File(["audio"], "clip.mp3", { type: "audio/mpeg" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    let files: File[] = [clip];
-    Object.defineProperty(input, "files", { get: () => files, configurable: true });
-    Object.defineProperty(input, "value", {
-      get: () => (files.length ? "C:\\fakepath\\clip.mp3" : ""),
-      set: () => { files = []; },
-      configurable: true,
-    });
-    fireEvent.change(input);
-
-    await waitFor(() => expect(previewAsr).toHaveBeenCalledWith(clip, "clip.mp3", "breeze"));
+describe("串流試聽網址", () => {
+  it("帶管理員指定的引擎、專案與分流", () => {
+    const url = new URL(streamTestUrl("r2t2-dev-live", "proj-1", ["zh", "es"]));
+    expect(url.pathname).toBe("/api/v1/asr/stream");
+    expect(url.searchParams.get("engine")).toBe("r2t2-dev-live");
+    expect(url.searchParams.get("project_id")).toBe("proj-1");
+    expect(url.searchParams.get("language_routes")).toBe("zh,es");
   });
+});
 
-  it("上傳辨識失敗時顯示錯誤", async () => {
-    vi.mocked(previewAsr).mockRejectedValue(new Error("音檔超過大小限制"));
-    render(<AsrProviderPanel />);
-
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    fireEvent.change(input, {
-      target: { files: [new File(["x"], "big.wav", { type: "audio/wav" })] },
-    });
-
-    await waitFor(() => expect(
-      screen.getByRole("alert").textContent,
-    ).toContain("音檔超過大小限制"));
+describe("錯字率", () => {
+  it("跟 voice_e2e 一樣不計大小寫、標點、異體字", () => {
+    expect(charErrorRate("請問 DIVA 有攪拌器嗎？", "請問diva有攪拌器嗎?")).toBe(0);
+    expect(charErrorRate("HIPPO 污水泵", "HIPPO汙水泵")).toBe(0);
+    expect(charErrorRate("沉水泵最深可以放多深", "沉睡泵最深可以放多深")).toBeCloseTo(0.1);
+    expect(charErrorRate("沉水泵", "")).toBe(1);
   });
+});
 
+describe("詞表統計", () => {
+  it("說明行不算，誤聽對照另外算", () => {
+    expect(summarizeGlossary("# 說明\n＃全形說明\nDIVA\n\n沉睡泵->沉水泵")).toEqual({ terms: 1, mappings: 1 });
+  });
 });

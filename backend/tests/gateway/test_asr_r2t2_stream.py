@@ -215,6 +215,40 @@ def test_decoding_language_follows_a_single_route(monkeypatch, routes, language)
     assert json.loads(upstream.sent[0])["language"] == language
 
 
+@pytest.mark.parametrize(
+    ("role", "requested", "connects_to"),
+    [
+        # 後台試聽：管理員可以指定串流引擎，不用先改自己的偏好。
+        (AccountRole.ADMIN, "r2t2-dev-live", "ws://10.9.0.35:8040/asr_stream_api_v1"),
+        (AccountRole.ADMIN, "r2t2-live", "ws://10.9.0.37:8803/asr_stream_api_v1"),
+        # 一般帳號帶 engine 參數不能繞過授權。
+        (AccountRole.USER, "r2t2-dev-live", None),
+        # 不是串流引擎就不接受。
+        (AccountRole.ADMIN, "breeze", None),
+    ],
+)
+def test_engine_override_is_admin_only(monkeypatch, role, requested, connects_to):
+    account, *_ = _environment(monkeypatch, stored="", grants=[])
+    account.user.role = role
+    connected = []
+    upstream = Upstream()
+
+    def connect(url, **kwargs):
+        connected.append(url)
+        return upstream
+
+    monkeypatch.setattr(asr_stream.websockets, "connect", connect)
+    socket = ClientSocket([{"text": '{"type":"end"}'}])
+    socket.query_params = {"project_id": "project-test", "engine": requested}
+    _run(socket)
+    if connects_to:
+        assert connected == [connects_to]
+        assert socket.sent[0] == {"type": "ready"}
+    else:
+        assert connected == []
+        assert socket.sent == [{"type": "error", "code": "not_allowed"}]
+
+
 def test_empty_heartbeat_messages_do_not_end_the_stream(monkeypatch):
     # .35 辨識中會送空的 {}；原本被當成失敗，r2t2-dev-live 經過前台一句都收不到（2026-10-05）。
     _environment(monkeypatch)
