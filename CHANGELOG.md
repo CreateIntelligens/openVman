@@ -67,6 +67,7 @@
 
 ### Changed
 
+- 管理員資源上限端點（`GET`／`PUT /api/v1/users/{user_id}/scope`）與其 models 從 `backend/app/auth/routes.py` 搬到 `admin_scope_routes.py`，掛在同一個 `users_router`、路徑不變：展示機台的改動讓 `routes.py` 超過 1000 行，Contracts CI 的檔案大小檢查失敗。
 - **後台試辨識不用重傳、也能比串流和瀏覽器辨識**：音檔留在頁面上，之後再勾的引擎直接拿畫面上的幾段（最多 5 段）去跑，取消勾選只是隱藏、勾回來不重跑；每段有「重跑」，改了分流或詞表可以用同一段再比。Gemini Live、R2T2 串流也能勾：同一段音檔照真實速度送進 `/api/v1/asr/stream` 取定稿，秒數是講完到定稿（4 倍速送時文字一樣，但 R2T2 要追積壓、時間多 2～4 秒，所以不加速）。瀏覽器內建辨識只能聽麥克風，按「開始講話」時跟 VAD 一起聽，每段歸給 VAD 切出的那一句；上傳的音檔與重跑時標示不能用。`GET /api/v1/asr/engines` 多回 `stream`（設定齊全的串流引擎）。
 - **R2T2 主機與 dev 機對調**：`r2t2`／`r2t2-live` 與 `r2t2-dev`／`r2t2-dev-live` 對應的機器互換，只改部署設定（`ASR_R2T2_*`、`ASR_R2T2_DEV_*`）。引擎 id 與授權不變，已授權 `r2t2-live` 的帳號（含 80 個臨時帳號）之後都送新的主機。後台與前台的引擎說明、`.env.example`、README、Backend 規格與實驗腳本的變數對應一起改。
 - **後台語音頁搬到 `/admin/voice`**：TTS 試聽 `/admin/voice`、語音辨識 `/admin/voice/asr`（原本語音辨識掛在 `/admin/tts/asr` 底下）。舊的 `/admin/tts`、`/admin/tts/asr` 不轉址；內部頁籤 key 由 `Tts` 改為 `Voice`。
