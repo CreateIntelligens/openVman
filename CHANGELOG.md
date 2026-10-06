@@ -67,6 +67,7 @@
 
 ### Changed
 
+- **Gemini 串流辨識帶專案詞表**：連線時把專案 `ASR_PROMPT.md` 的正確詞逐詞放進 `inputAudioTranscription.customVocabulary`（最多 100 個；Brain `/brain/internal/asr-glossary` 多回 `vocabulary` 逐詞清單，以頓號、逗號、分號或換行分詞，含空白的詞如「DIVA PRO」算一個）。鶴記 20 句×4 種合成聲音×有無雜訊共 160 句，直接打 Gemini 比較：專有名詞命中率 31% → 87%、字錯率 0.39 → 0.19，定稿延遲不變；逐句比 113 句變好、9 句變差（變差的多是原本就整句聽錯，詞表詞被塞進去）。`mode: SMART` 在合成語音上沒有差別，沒有開。後台詞表說明改成這個分詞規則，不再寫 Gemini 不吃詞表。
 - 管理員資源上限端點（`GET`／`PUT /api/v1/users/{user_id}/scope`）與其 models 從 `backend/app/auth/routes.py` 搬到 `admin_scope_routes.py`，掛在同一個 `users_router`、路徑不變：展示機台的改動讓 `routes.py` 超過 1000 行，Contracts CI 的檔案大小檢查失敗。
 - **後台試辨識不用重傳、也能比串流和瀏覽器辨識**：音檔留在頁面上，之後再勾的引擎直接拿畫面上的幾段（最多 5 段）去跑，取消勾選只是隱藏、勾回來不重跑；每段有「重跑」，改了分流或詞表可以用同一段再比。Gemini Live、R2T2 串流也能勾：同一段音檔照真實速度送進 `/api/v1/asr/stream` 取定稿，秒數是講完到定稿（4 倍速送時文字一樣，但 R2T2 要追積壓、時間多 2～4 秒，所以不加速）。瀏覽器內建辨識只能聽麥克風，按「開始講話」時跟 VAD 一起聽，每段歸給 VAD 切出的那一句；上傳的音檔與重跑時標示不能用。`GET /api/v1/asr/engines` 多回 `stream`（設定齊全的串流引擎）。
 - **R2T2 主機與 dev 機對調**：`r2t2`／`r2t2-live` 與 `r2t2-dev`／`r2t2-dev-live` 對應的機器互換，只改部署設定（`ASR_R2T2_*`、`ASR_R2T2_DEV_*`）。引擎 id 與授權不變，已授權 `r2t2-live` 的帳號（含 80 個臨時帳號）之後都送新的主機。後台與前台的引擎說明、`.env.example`、README、Backend 規格與實驗腳本的變數對應一起改。

@@ -199,7 +199,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 使用者訊息語言先以規則即時判斷，短句歸主要語言；`JEV_LANGUAGE_ENABLED` 時再於背景由 Jev 校正存檔的標籤。
 - 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。
 - 每輪 system prompt 結尾指定回答語言，並依 `reply_seconds`（預設 20 秒，0 為不限制，上限 120）換算成字數上限：中日韓每秒 4 字，其他語言每秒 1.5 個單字（`core/prompt_templates.reply_length_line`）。只靠提示詞，不截斷輸出。
-- ASR 詞表：workspace 的 `ASR_PROMPT.md` 為選填，`#` 開頭為說明，其餘最多 800 字放進每輪 prompt，提醒模型訊息可能是語音辨識結果；可寫「常見誤聽：A→B」對照。`GET /brain/internal/asr-glossary` 只回正確詞（不含對照行，最多 2000 字）給 Backend 的辨識引擎。檔案缺失或讀取失敗時忽略；內容經 HTML 跳脫後放在 `<glossary>` 內，明確標示為參考資料而非指令。
+- ASR 詞表：workspace 的 `ASR_PROMPT.md` 為選填，`#` 開頭為說明，其餘最多 800 字放進每輪 prompt，提醒模型訊息可能是語音辨識結果；可寫「常見誤聽：A→B」對照。`GET /brain/internal/asr-glossary` 只回正確詞（不含對照行）給 Backend 的辨識引擎：`terms` 是整串前文（最多 2000 字），`vocabulary` 是以頓號、逗號、分號或換行切開的逐詞清單（含空白的詞算一個，去重，最多 100 個），給 Gemini 串流的 `customVocabulary`。檔案缺失或讀取失敗時忽略；內容經 HTML 跳脫後放在 `<glossary>` 內，明確標示為參考資料而非指令。
 - ASR 定稿判斷：`POST /brain/internal/asr-judge` 在 Gemini Live 串流辨識的定稿與最後暫定字幕不同時，由 Jev 判斷送哪一句；暫定字幕需明顯較佳才換，Jev 關閉、逾時或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`）。
 
 ## Jev

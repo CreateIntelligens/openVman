@@ -216,12 +216,12 @@ def _format_enriched_message(item: dict[str, Any], media_refs: list[dict[str, An
 @router.get(
     "/brain/internal/asr-glossary",
     summary="專案的語音專有名詞（給辨識引擎當前文）",
-    description="Backend 送音檔給 Breeze／OpenAI 辨識前呼叫；只回正確的詞，「常見誤聽：A→B」對照行不回（會把錯字也教給引擎）。",
+    description="Backend 送音檔給 Breeze／OpenAI／R2T2 辨識前呼叫；只回正確的詞，「常見誤聽：A→B」對照行不回（會把錯字也教給引擎）。`terms` 是一整串前文，`vocabulary` 是逐詞清單（最多 100 個，給 Gemini 串流的 customVocabulary）。",
 )
 async def internal_asr_glossary(project_id: str = "default"):
-    from core.asr_glossary import asr_terms
+    from core.asr_glossary import asr_terms, asr_vocabulary
 
-    return {"terms": asr_terms(project_id)}
+    return {"terms": asr_terms(project_id), "vocabulary": asr_vocabulary(project_id)}
 
 
 @router.post(

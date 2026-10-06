@@ -167,8 +167,16 @@ def test_asr_terms_leave_out_misheard_mappings(workspace):
         encoding="utf-8",
     )
     assert asr_glossary.asr_terms("p") == "沉水泵、污泥泵、EUBL、DIVA 揚程、泵浦"
+    assert asr_glossary.asr_vocabulary("p") == ["沉水泵", "污泥泵", "EUBL", "DIVA", "揚程", "泵浦"]
     # 對話模型要看到對照。
     assert "UNI本→污泥泵" in asr_glossary.load_glossary("p")
+
+
+def test_asr_vocabulary_keeps_spaced_terms_and_drops_duplicates(workspace):
+    (workspace / "ASR_PROMPT.md").write_text(
+        "DIVA PRO、DIVA，Q.D.C.。\nDIVA；自動著脫裝置\n", encoding="utf-8",
+    )
+    assert asr_glossary.asr_vocabulary("p") == ["DIVA PRO", "DIVA", "Q.D.C.", "自動著脫裝置"]
 
 
 def test_asr_glossary_endpoint(workspace, monkeypatch):
@@ -187,5 +195,5 @@ def test_asr_glossary_endpoint(workspace, monkeypatch):
             headers={"X-Internal-Token": get_settings().gateway_internal_token},
         )
         denied = client.get("/brain/internal/asr-glossary", params={"project_id": "p"})
-    assert ok.json() == {"terms": "沉水泵、DIVA"}
+    assert ok.json() == {"terms": "沉水泵、DIVA", "vocabulary": ["沉水泵", "DIVA"]}
     assert denied.status_code == 403

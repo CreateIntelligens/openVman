@@ -77,6 +77,11 @@ def _client(monkeypatch, *, allowed=True, embed=False, judge=None):
         return judge(interim, final) if judge else final
 
     monkeypatch.setattr(asr_stream, "_judge_final", fake_judge)
+
+    async def no_vocabulary(current, project_id):
+        return []
+
+    monkeypatch.setattr(asr_stream, "project_asr_vocabulary", no_vocabulary)
     app = FastAPI()
     app.include_router(asr_stream.router)
     client = TestClient(app)
@@ -227,6 +232,27 @@ def test_language_hints_follow_the_project_routes(monkeypatch, routes, codes):
 
     assert upstream.sent[0]["setup"]["inputAudioTranscription"]["languageCodes"] == codes
     assert seen["args"] == ("p1", ["zh", "en"])
+    assert "customVocabulary" not in upstream.sent[0]["setup"]["inputAudioTranscription"]
+
+
+def test_project_glossary_goes_to_gemini_as_custom_vocabulary(monkeypatch):
+    client, _ = _client(monkeypatch)
+    seen = {}
+
+    async def vocabulary(current, project_id):
+        seen["project_id"] = project_id
+        return ["DIVA PRO", "沉水泵"]
+
+    monkeypatch.setattr(asr_stream, "project_asr_vocabulary", vocabulary)
+    upstream = FakeUpstream()
+    monkeypatch.setattr(asr_stream.websockets, "connect", lambda *a, **kw: upstream)
+
+    with client.websocket_connect("/api/v1/asr/stream?project_id=p1") as ws:
+        assert ws.receive_json() == {"type": "ready"}
+
+    transcription = upstream.sent[0]["setup"]["inputAudioTranscription"]
+    assert transcription["customVocabulary"] == ["DIVA PRO", "沉水泵"]
+    assert seen["project_id"] == "p1"
 
 
 def test_judge_failure_keeps_the_final_and_logs_it(monkeypatch, tmp_path):

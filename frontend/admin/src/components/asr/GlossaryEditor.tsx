@@ -22,7 +22,8 @@ export function summarizeGlossary(content: string) {
 
 /**
  * 專案詞表（workspace 根目錄的 ASR_PROMPT.md）。Breeze、R2T2、OpenAI 會把正確的詞當
- * 辨識前文，對話模型另外拿到「常見誤聽」對照自己改回來；SenseVoice、小米、Gemini 串流不吃。
+ * 辨識前文，Gemini 串流逐詞拿去加權（customVocabulary），對話模型另外拿到「常見誤聽」
+ * 對照自己改回來；SenseVoice、小米不吃。
  */
 export default function GlossaryEditor({ projectId }: { projectId: string }) {
   const [content, setContent] = useState("");
@@ -92,8 +93,8 @@ export default function GlossaryEditor({ projectId }: { projectId: string }) {
         )}
       </div>
       <p className="text-xs leading-5 text-content-muted">
-        一行一個（一行也可以放幾個詞，用空白分開）。Breeze、R2T2（批次與串流）、OpenAI 會拿這些詞當辨識前文，
-        型號、品牌名比較容易聽對；SenseVoice、小米與 Gemini 串流不吃。寫成「常見誤聽：沉睡泵→沉水泵」的行只給回答的模型看，不送辨識引擎，免得把錯字也教給它。
+        一行一個，或用頓號、逗號分開；有空白的詞（例如 DIVA PRO）算一個詞。Breeze、R2T2（批次與串流）、OpenAI 會拿這些詞當辨識前文，
+        Gemini 串流取前 100 個詞加權，型號、品牌名比較容易聽對；SenseVoice、小米不吃。寫成「常見誤聽：沉睡泵→沉水泵」的行只給回答的模型看，不送辨識引擎，免得把錯字也教給它。
         「#」開頭的行是說明。
       </p>
       <textarea

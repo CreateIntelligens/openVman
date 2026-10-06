@@ -384,8 +384,8 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 
 #### 11.1a 知識庫依語言分流
 
-- 語音專有名詞：Gemini 串流辨識不吃背景知識，所以把專案 workspace 的 `ASR_PROMPT.md`（詞表與「常見誤聽：A→B」對照，「#」開頭是說明）放進每輪對話提示（`core/asr_glossary.py`，在回答語言那行前面），由模型在理解問題與寫查詢時對回誤聽；不多一次模型呼叫。
-- 同一份詞表的正確詞（不含對照行）也經 `GET /brain/internal/asr-glossary` 給 Backend，帶給 Breeze 與 OpenAI 辨識當 Whisper 前文，辨識出來的字本身就對；Gemini Live、Xiaomi、SenseVoice 不吃提示詞。
+- 語音專有名詞：Gemini 串流辨識不吃背景知識（只吃逐詞的 customVocabulary），所以也把專案 workspace 的 `ASR_PROMPT.md`（詞表與「常見誤聽：A→B」對照，「#」開頭是說明）放進每輪對話提示（`core/asr_glossary.py`，在回答語言那行前面），由模型在理解問題與寫查詢時對回誤聽；不多一次模型呼叫。
+- 同一份詞表的正確詞（不含對照行）也經 `GET /brain/internal/asr-glossary` 給 Backend，帶給 Breeze、R2T2 與 OpenAI 辨識當前文，辨識出來的字本身就對；回應另有逐詞清單 `vocabulary`（最多 100 個）給 Gemini 串流當 `customVocabulary`；Xiaomi、SenseVoice 不吃提示詞。
 
 - 檢索門檻：向量距離（LanceDB l2，即平方歐氏距離）超過 `rag_distance_cutoff`（1.0；2026-09-29 由 0.85 放寬，見 `scripts/experiments/kb-cutoff/`）的段落丟掉；關鍵字（FTS）命中的段落補算與查詢的距離，放寬到 `rag_fts_distance_cutoff`（1.1）。以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落。
 - 停用的文件（後台文件頁的啟用開關，`.doc_meta.json` 的 `enabled: false`）不會重建索引，而是在查詢時略過：向量／關鍵字檢索與知識圖譜擴充抓相鄰文件段落，兩條路都會檢查。

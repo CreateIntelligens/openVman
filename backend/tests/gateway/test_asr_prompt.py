@@ -89,3 +89,18 @@ def test_no_project_or_brain_down_means_no_prompt(brain):
     assert asyncio.run(asr_glossary.project_asr_prompt(account, "")) == ""
     assert asyncio.run(asr_glossary.project_asr_prompt(account, "p2")) == ""
     assert brain.calls == ["p2"]
+
+
+def test_vocabulary_comes_from_the_same_cached_fetch(brain):
+    brain.answer({"terms": "DIVA PRO、沉水泵", "vocabulary": ["DIVA PRO", "沉水泵", "", 3]})
+    account = types.SimpleNamespace()
+    assert asyncio.run(asr_glossary.project_asr_prompt(account, "p1")) == "DIVA PRO、沉水泵"
+    assert asyncio.run(asr_glossary.project_asr_vocabulary(account, "p1")) == ["DIVA PRO", "沉水泵"]
+    assert brain.calls == ["p1"]
+
+
+def test_vocabulary_is_empty_without_a_project_or_a_list(brain):
+    account = types.SimpleNamespace()
+    brain.answer({"terms": "沉水泵"})
+    assert asyncio.run(asr_glossary.project_asr_vocabulary(account, "")) == []
+    assert asyncio.run(asr_glossary.project_asr_vocabulary(account, "p1")) == []

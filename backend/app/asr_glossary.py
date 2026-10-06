@@ -3,7 +3,7 @@
 詞表存在 Brain 的專案 workspace（ASR_PROMPT.md）；Breeze 與 OpenAI 辨識可以把它當
 Whisper 前文，「污泥泵」「DIVA」這類專有名詞就不會被聽成同音字（Breeze 12 句合成音
 12 句修正，台語回歸沒有硬塞詞表的字）。R2T2 批次放 context、串流放 system_prompt；
-Gemini Live 串流不帶。只帶正確的詞，Brain 會把「常見誤聽」對照行拿掉。
+Gemini 串流放 customVocabulary（逐詞清單）。只帶正確的詞，Brain 會把「常見誤聽」對照行拿掉。
 """
 
 from __future__ import annotations
@@ -21,15 +21,14 @@ logger = logging.getLogger("asr_glossary")
 _INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 # 每句語音都要用；後台改詞表後最多這麼久生效。
 _CACHE_SECONDS = 60.0
-_cache: dict[str, tuple[float, str]] = {}
+_cache: dict[str, tuple[float, dict]] = {}
 _http = SharedAsyncClient(connect=2, read=2)
 
 
-async def project_asr_prompt(current: CurrentAccount, supplied_project_id: str) -> str:
-    """Correct terms for this caller's project, or "" (no project, none set, Brain down)."""
+async def _fetch(current: CurrentAccount, supplied_project_id: str) -> dict:
     project_id = resolve_project(current, supplied_project_id)
     if not project_id:
-        return ""
+        return {}
     cached = _cache.get(project_id)
     if cached and time.monotonic() - cached[0] < _CACHE_SECONDS:
         return cached[1]
@@ -41,9 +40,24 @@ async def project_asr_prompt(current: CurrentAccount, supplied_project_id: str) 
             headers={_INTERNAL_TOKEN_HEADER: cfg.gateway_internal_token},
         )
         response.raise_for_status()
-        terms = str(response.json().get("terms") or "").strip()
+        glossary = response.json()
     except Exception as exc:  # noqa: BLE001 - 詞表只是加分，拿不到照樣辨識
         logger.warning("asr glossary unavailable: %s", type(exc).__name__)
-        return ""
-    _cache[project_id] = (time.monotonic(), terms)
-    return terms
+        return {}
+    _cache[project_id] = (time.monotonic(), glossary)
+    return glossary
+
+
+async def project_asr_prompt(current: CurrentAccount, supplied_project_id: str) -> str:
+    """Correct terms for this caller's project, or "" (no project, none set, Brain down)."""
+    glossary = await _fetch(current, supplied_project_id)
+    return str(glossary.get("terms") or "").strip()
+
+
+async def project_asr_vocabulary(current: CurrentAccount, supplied_project_id: str) -> list[str]:
+    """The same terms one by one, for Gemini's customVocabulary; [] when unavailable."""
+    glossary = await _fetch(current, supplied_project_id)
+    vocabulary = glossary.get("vocabulary")
+    if not isinstance(vocabulary, list):
+        return []
+    return [term for term in vocabulary if isinstance(term, str) and term.strip()]
