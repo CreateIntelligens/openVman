@@ -1,0 +1,20 @@
+{
+  "calls": 60,
+  "schema_valid": 58,
+  "errors": [
+    {
+      "id": "Q03",
+      "repeat": 2,
+      "error": "ValueError",
+      "message": "condition 有缺少或不允許的欄位",
+      "raw": "{\n  \"scenarios\": [\n    {\n      \"name\": \"最大流量最大的型號\",\n      \"where\": {\n        \"series\": {\n          \"in\": [\n            \"EDW\",\n            \"EUB-M\"\n          ]\n        }\n      },\n      \"sort\": [\n        {\n          \"field\": \"max_flow_lpm\",\n          \"direction\": \"desc\"\n        }\n      ],\n      \"limit\": 1,\n      \"operating_point\": null\n    }\n  ]\n}"
+    },
+    {
+      "id": "Q03",
+      "repeat": 3,
+      "error": "ValueError",
+      "message": "condition 有缺少或不允許的欄位",
+      "raw": "{\n  \"scenarios\": [\n    {\n      \"name\": \"最大流量最大的型號\",\n      \"where\": {\n        \"series\": {\n          \"in\": [\n            \"EDW\",\n            \"EUB-M\"\n          ]\n        }\n      },\n      \"sort\": [\n        {\n          \"field\": \"max_flow_lpm\",\n          \"direction\": \"desc\"\n        }\n      ],\n      \"limit\": 1\n    }\n  ]\n}"
+    }
+  ]
+}

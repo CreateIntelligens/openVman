@@ -1,0 +1,1031 @@
+{
+  "status": "stopped_before_evaluation",
+  "cause": "validator rejected legitimate related-link headings and bullet markers; corrected before new generation",
+  "calls": [
+    {
+      "label": "note-80EDW-5.20S/T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1188,
+        "output_tokens": 372,
+        "total_tokens": 1560,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 2.434,
+      "content": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1, 3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S-T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 875,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EDW-5.20S/T-attempt2",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1365,
+        "output_tokens": 371,
+        "total_tokens": 1736,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.794,
+      "content": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 1246,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EDW-5.20S/T-attempt3",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1365,
+        "output_tokens": 372,
+        "total_tokens": 1737,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.955,
+      "content": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1, 3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 1246,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EDW-5.20S/T-attempt4",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1365,
+        "output_tokens": 372,
+        "total_tokens": 1737,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 2.121,
+      "content": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase:\n  - 1\n  - 3\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n    - page: 9\n      line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 1246,
+      "max_tokens": 2200
+    }
+  ],
+  "candidates": [
+    {
+      "filename": "80EDW-5.20S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1, 3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S-T]]",
+      "frontmatter": {
+        "model": "80EDW-5.20S/T",
+        "series": "EDW",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 16.4,
+        "max_flow_lpm": 820,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 11.0,
+        "current_3ph_a": 3.8,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 201,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "failed",
+        "model": "80EDW-5.20S/T",
+        "errors": [
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.20S-T|80EDW-5.20S/T]]"
+          },
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.30S-T|80EDW-5.30S-T]]"
+          },
+          {
+            "code": "body_extra",
+            "field": "body",
+            "expected": "僅含標題、四句規格、出處與相關連結",
+            "actual": "相關連結："
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EDW-5.20S/T",
+              "actual": "80EDW-5.20S/T",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_head_m",
+              "expected": 16.4,
+              "actual": 16.4,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 820.0,
+              "actual": 820,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "phase",
+              "expected": [
+                1,
+                3
+              ],
+              "actual": [
+                1,
+                3
+              ],
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 11.0,
+              "actual": 11.0,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 3.8,
+              "actual": 3.8,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 47.0,
+              "actual": 47,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 46.0,
+              "actual": 46,
+              "match": true,
+              "source_line": 201
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.footnotes[0]",
+              "page": 9,
+              "line": 208,
+              "actual_page": 9,
+              "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EDW-5.20S-T",
+              "valid": true
+            },
+            {
+              "target": "80EDW-5.30S-T",
+              "valid": true
+            }
+          ],
+          "body_remaining": "相關連結："
+        }
+      }
+    },
+    {
+      "filename": "80EDW-5.20S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "frontmatter": {
+        "model": "80EDW-5.20S/T",
+        "series": "EDW",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 16.4,
+        "max_flow_lpm": 820,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 11.0,
+        "current_3ph_a": 3.8,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 201,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      },
+      "attempt": 2,
+      "validation": {
+        "status": "failed",
+        "model": "80EDW-5.20S/T",
+        "errors": [
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.20S-T|80EDW-5.20S/T]]"
+          },
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.30S-T|80EDW-5.30S/T]]"
+          },
+          {
+            "code": "body_extra",
+            "field": "body",
+            "expected": "僅含標題、四句規格、出處與相關連結",
+            "actual": "相關連結："
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EDW-5.20S/T",
+              "actual": "80EDW-5.20S/T",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_head_m",
+              "expected": 16.4,
+              "actual": 16.4,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 820.0,
+              "actual": 820,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "phase",
+              "expected": [
+                1,
+                3
+              ],
+              "actual": [
+                1,
+                3
+              ],
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 11.0,
+              "actual": 11.0,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 3.8,
+              "actual": 3.8,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 47.0,
+              "actual": 47,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 46.0,
+              "actual": 46,
+              "match": true,
+              "source_line": 201
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.footnotes[0]",
+              "page": 9,
+              "line": 208,
+              "actual_page": 9,
+              "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EDW-5.20S-T",
+              "valid": true
+            },
+            {
+              "target": "80EDW-5.30S-T",
+              "valid": true
+            }
+          ],
+          "body_remaining": "相關連結："
+        }
+      }
+    },
+    {
+      "filename": "80EDW-5.20S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1, 3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "frontmatter": {
+        "model": "80EDW-5.20S/T",
+        "series": "EDW",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 16.4,
+        "max_flow_lpm": 820,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 11.0,
+        "current_3ph_a": 3.8,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 201,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      },
+      "attempt": 3,
+      "validation": {
+        "status": "failed",
+        "model": "80EDW-5.20S/T",
+        "errors": [
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.20S-T|80EDW-5.20S/T]]"
+          },
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.30S-T|80EDW-5.30S/T]]"
+          },
+          {
+            "code": "body_extra",
+            "field": "body",
+            "expected": "僅含標題、四句規格、出處與相關連結",
+            "actual": "相關連結："
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EDW-5.20S/T",
+              "actual": "80EDW-5.20S/T",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_head_m",
+              "expected": 16.4,
+              "actual": 16.4,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 820.0,
+              "actual": 820,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "phase",
+              "expected": [
+                1,
+                3
+              ],
+              "actual": [
+                1,
+                3
+              ],
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 11.0,
+              "actual": 11.0,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 3.8,
+              "actual": 3.8,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 47.0,
+              "actual": 47,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 46.0,
+              "actual": 46,
+              "match": true,
+              "source_line": 201
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.footnotes[0]",
+              "page": 9,
+              "line": 208,
+              "actual_page": 9,
+              "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EDW-5.20S-T",
+              "valid": true
+            },
+            {
+              "target": "80EDW-5.30S-T",
+              "valid": true
+            }
+          ],
+          "body_remaining": "相關連結："
+        }
+      }
+    },
+    {
+      "filename": "80EDW-5.20S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase:\n  - 1\n  - 3\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n    - page: 9\n      line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "frontmatter": {
+        "model": "80EDW-5.20S/T",
+        "series": "EDW",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 16.4,
+        "max_flow_lpm": 820,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 11.0,
+        "current_3ph_a": 3.8,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 201,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      },
+      "attempt": 4,
+      "validation": {
+        "status": "failed",
+        "model": "80EDW-5.20S/T",
+        "errors": [
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.20S-T|80EDW-5.20S/T]]"
+          },
+          {
+            "code": "body_extra",
+            "field": "related_links",
+            "expected": "僅含相關連結與 wikilinks",
+            "actual": "- [[80EDW-5.30S-T|80EDW-5.30S/T]]"
+          },
+          {
+            "code": "body_required",
+            "field": "rated",
+            "expected": "恰好出現一次規定句型",
+            "actual": 0
+          },
+          {
+            "code": "body_extra",
+            "field": "body",
+            "expected": "僅含標題、四句規格、出處與相關連結",
+            "actual": "額定點：揚程9.5m，流量500LPM。相關連結："
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EDW-5.20S/T",
+              "actual": "80EDW-5.20S/T",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_head_m",
+              "expected": 16.4,
+              "actual": 16.4,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 820.0,
+              "actual": 820,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "phase",
+              "expected": [
+                1,
+                3
+              ],
+              "actual": [
+                1,
+                3
+              ],
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 11.0,
+              "actual": 11.0,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 3.8,
+              "actual": 3.8,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 47.0,
+              "actual": 47,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 46.0,
+              "actual": 46,
+              "match": true,
+              "source_line": 201
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.footnotes[0]",
+              "page": 9,
+              "line": 208,
+              "actual_page": 9,
+              "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 0
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EDW-5.20S-T",
+              "valid": true
+            },
+            {
+              "target": "80EDW-5.30S-T",
+              "valid": true
+            }
+          ],
+          "body_remaining": "額定點：揚程9.5m，流量500LPM。相關連結："
+        }
+      }
+    }
+  ],
+  "mirror_before": {
+    "command": "python3 scripts/project_mirror.py check",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "mirror_after": {
+    "command": "python3 scripts/project_mirror.py check",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "notes_used_in_evaluation": 0
+}

@@ -1,0 +1,2507 @@
+{
+  "notes": [
+    {
+      "filename": "80EDW-5.20S-T.md",
+      "status": "passed",
+      "model": "80EDW-5.20S/T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EDW-5.20S/T",
+            "actual": "80EDW-5.20S/T",
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "series",
+            "expected": "EDW",
+            "actual": "EDW",
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "hp",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "kw",
+            "expected": 1.5,
+            "actual": 1.5,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 9.5,
+            "actual": 9.5,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 500.0,
+            "actual": 500,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "max_head_m",
+            "expected": 16.4,
+            "actual": 16.4,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 820.0,
+            "actual": 820,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "phase",
+            "expected": [
+              1,
+              3
+            ],
+            "actual": [
+              1,
+              3
+            ],
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": 11.0,
+            "actual": 11.0,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 3.8,
+            "actual": 3.8,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": 47.0,
+            "actual": 47,
+            "match": true,
+            "source_line": 201
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 46.0,
+            "actual": 46,
+            "match": true,
+            "source_line": 201
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 9,
+            "line": 201,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 9,
+            "line": 201,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+          },
+          {
+            "kind": "source.footnotes[0]",
+            "page": 9,
+            "line": 208,
+            "actual_page": 9,
+            "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 9,
+            "line": 201,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EDW-5.20S-T",
+            "valid": true
+          },
+          {
+            "target": "80EDW-5.30S-T",
+            "valid": true
+          },
+          {
+            "target": "100EDW-5.30S-T",
+            "valid": true
+          },
+          {
+            "target": "80EDW-5.50T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "80EDW-5.30S-T.md",
+      "status": "passed",
+      "model": "80EDW-5.30S/T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EDW-5.30S/T",
+            "actual": "80EDW-5.30S/T",
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "series",
+            "expected": "EDW",
+            "actual": "EDW",
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "hp",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "kw",
+            "expected": 2.2,
+            "actual": 2.2,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 14.5,
+            "actual": 14.5,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 500.0,
+            "actual": 500,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "max_head_m",
+            "expected": 26.5,
+            "actual": 26.5,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 980.0,
+            "actual": 980,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "phase",
+            "expected": [
+              1,
+              3
+            ],
+            "actual": [
+              1,
+              3
+            ],
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": 15.0,
+            "actual": 15.0,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 5.7,
+            "actual": 5.7,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": 46.0,
+            "actual": 46,
+            "match": true,
+            "source_line": 202
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 45.0,
+            "actual": 45,
+            "match": true,
+            "source_line": 202
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 9,
+            "line": 202,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 9,
+            "line": 202,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |"
+          },
+          {
+            "kind": "source.footnotes[0]",
+            "page": 9,
+            "line": 208,
+            "actual_page": 9,
+            "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 9,
+            "line": 202,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EDW-5.30S-T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "100EDW-5.30S-T.md",
+      "status": "passed",
+      "model": "100EDW-5.30S/T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "100EDW-5.30S/T",
+            "actual": "100EDW-5.30S/T",
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "series",
+            "expected": "EDW",
+            "actual": "EDW",
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "hp",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "kw",
+            "expected": 2.2,
+            "actual": 2.2,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 4.0,
+            "actual": 4,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 9.5,
+            "actual": 9.5,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 800.0,
+            "actual": 800,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "max_head_m",
+            "expected": 17.0,
+            "actual": 17.0,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 1200.0,
+            "actual": 1200,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "phase",
+            "expected": [
+              1,
+              3
+            ],
+            "actual": [
+              1,
+              3
+            ],
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": 15.0,
+            "actual": 15.0,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 5.7,
+            "actual": 5.7,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": 47.0,
+            "actual": 47,
+            "match": true,
+            "source_line": 203
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 46.0,
+            "actual": 46,
+            "match": true,
+            "source_line": 203
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 9,
+            "line": 203,
+            "actual_page": 9,
+            "quote": "| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 9,
+            "line": 203,
+            "actual_page": 9,
+            "quote": "| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |"
+          },
+          {
+            "kind": "source.footnotes[0]",
+            "page": 9,
+            "line": 208,
+            "actual_page": 9,
+            "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 9,
+            "line": 203,
+            "actual_page": 9,
+            "quote": "| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "100EDW-5.30S-T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "80EDW-5.50T.md",
+      "status": "passed",
+      "model": "80EDW-5.50T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EDW-5.50T",
+            "actual": "80EDW-5.50T",
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "series",
+            "expected": "EDW",
+            "actual": "EDW",
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "hp",
+            "expected": 5.0,
+            "actual": 5,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "kw",
+            "expected": 3.7,
+            "actual": 3.7,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 21.5,
+            "actual": 21.5,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 400.0,
+            "actual": 400,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "max_head_m",
+            "expected": 32.4,
+            "actual": 32.4,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 1040.0,
+            "actual": 1040,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 7.9,
+            "actual": 7.9,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 204
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 49.5,
+            "actual": 49.5,
+            "match": true,
+            "source_line": 204
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 9,
+            "line": 204,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 9,
+            "line": 204,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 9,
+            "line": 204,
+            "actual_page": 9,
+            "quote": "| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EDW-5.50T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "100EDW-5.50T.md",
+      "status": "passed",
+      "model": "100EDW-5.50T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "100EDW-5.50T",
+            "actual": "100EDW-5.50T",
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "series",
+            "expected": "EDW",
+            "actual": "EDW",
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "hp",
+            "expected": 5.0,
+            "actual": 5,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "kw",
+            "expected": 3.7,
+            "actual": 3.7,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 4.0,
+            "actual": 4,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 12.5,
+            "actual": 12.5,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 1000.0,
+            "actual": 1000,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "max_head_m",
+            "expected": 22.0,
+            "actual": 22.0,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 1680.0,
+            "actual": 1680,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 7.9,
+            "actual": 7.9,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 205
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 50.5,
+            "actual": 50.5,
+            "match": true,
+            "source_line": 205
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 9,
+            "line": 205,
+            "actual_page": 9,
+            "quote": "| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 9,
+            "line": 205,
+            "actual_page": 9,
+            "quote": "| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 9,
+            "line": 205,
+            "actual_page": 9,
+            "quote": "| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "100EDW-5.50T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "50EUB-M-5.20S.md",
+      "status": "passed",
+      "model": "50EUB-M-5.20S",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "50EUB-M-5.20S",
+            "actual": "50EUB-M-5.20S",
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "hp",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "kw",
+            "expected": 1.5,
+            "actual": 1.5,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 15.0,
+            "actual": 15,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 270.0,
+            "actual": 270,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "max_head_m",
+            "expected": 23.0,
+            "actual": 23,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 500.0,
+            "actual": 500,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "solids_mm",
+            "expected": 9.0,
+            "actual": 9,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "phase",
+            "expected": 1,
+            "actual": 1,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": 12.5,
+            "actual": 12.5,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": 27.5,
+            "actual": 27.5,
+            "match": true,
+            "source_line": 233
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 233
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 233,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 233,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 233,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "50EUB-M-5.20S",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "80EUB-M-5.20S.md",
+      "status": "passed",
+      "model": "80EUB-M-5.20S",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EUB-M-5.20S",
+            "actual": "80EUB-M-5.20S",
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "hp",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "kw",
+            "expected": 1.5,
+            "actual": 1.5,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 400.0,
+            "actual": 400,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "max_head_m",
+            "expected": 17.0,
+            "actual": 17,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 690.0,
+            "actual": 690,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "solids_mm",
+            "expected": 9.0,
+            "actual": 9,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "phase",
+            "expected": 1,
+            "actual": 1,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": 12.5,
+            "actual": 12.5,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": 27.5,
+            "actual": 27.5,
+            "match": true,
+            "source_line": 234
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 234
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 234,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 234,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 234,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EUB-M-5.20S",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "50EUB-M-5.20T.md",
+      "status": "passed",
+      "model": "50EUB-M-5.20T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "50EUB-M-5.20T",
+            "actual": "50EUB-M-5.20T",
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "hp",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "kw",
+            "expected": 1.5,
+            "actual": 1.5,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 15.0,
+            "actual": 15,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 220.0,
+            "actual": 220,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "max_head_m",
+            "expected": 21.0,
+            "actual": 21,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 450.0,
+            "actual": 450,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "solids_mm",
+            "expected": 9.0,
+            "actual": 9,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 3.5,
+            "actual": 3.5,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 235
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 26.4,
+            "actual": 26.4,
+            "match": true,
+            "source_line": 235
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 235,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 235,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 235,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "50EUB-M-5.20T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "80EUB-M-5.20T.md",
+      "status": "passed",
+      "model": "80EUB-M-5.20T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EUB-M-5.20T",
+            "actual": "80EUB-M-5.20T",
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "hp",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "kw",
+            "expected": 1.5,
+            "actual": 1.5,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 9.0,
+            "actual": 9,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 400.0,
+            "actual": 400,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "max_head_m",
+            "expected": 16.0,
+            "actual": 16,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 630.0,
+            "actual": 630,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "solids_mm",
+            "expected": 9.0,
+            "actual": 9,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 3.5,
+            "actual": 3.5,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 236
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 25.9,
+            "actual": 25.9,
+            "match": true,
+            "source_line": 236
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 236,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 236,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 236,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EUB-M-5.20T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "50EUB-M-5.30T.md",
+      "status": "passed",
+      "model": "50EUB-M-5.30T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "50EUB-M-5.30T",
+            "actual": "50EUB-M-5.30T",
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "hp",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "kw",
+            "expected": 2.2,
+            "actual": 2.2,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 2.0,
+            "actual": 2,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 15.0,
+            "actual": 15,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 330.0,
+            "actual": 330,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "max_head_m",
+            "expected": 26.0,
+            "actual": 26,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 550.0,
+            "actual": 550,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "solids_mm",
+            "expected": 9.0,
+            "actual": 9,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 5.2,
+            "actual": 5.2,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 237
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 29.8,
+            "actual": 29.8,
+            "match": true,
+            "source_line": 237
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 237,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 237,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 237,
+            "actual_page": 11,
+            "quote": "| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "50EUB-M-5.30T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "80EUB-M-5.30T.md",
+      "status": "passed",
+      "model": "80EUB-M-5.30T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EUB-M-5.30T",
+            "actual": "80EUB-M-5.30T",
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "hp",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "kw",
+            "expected": 2.2,
+            "actual": 2.2,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 500.0,
+            "actual": 500,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "max_head_m",
+            "expected": 23.0,
+            "actual": 23,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 700.0,
+            "actual": 700,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "solids_mm",
+            "expected": 9.0,
+            "actual": 9,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 5.2,
+            "actual": 5.2,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 238
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 30.0,
+            "actual": 30.0,
+            "match": true,
+            "source_line": 238
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 238,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 238,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 238,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EUB-M-5.30T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "80EUB-M-5.50T.md",
+      "status": "passed",
+      "model": "80EUB-M-5.50T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EUB-M-5.50T",
+            "actual": "80EUB-M-5.50T",
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "hp",
+            "expected": 5.0,
+            "actual": 5,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "kw",
+            "expected": 3.7,
+            "actual": 3.7,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 19.0,
+            "actual": 19,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 600.0,
+            "actual": 600,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "max_head_m",
+            "expected": 30.0,
+            "actual": 30,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 900.0,
+            "actual": 900,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 9.5,
+            "actual": 9.5,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 239
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 35.6,
+            "actual": 35.6,
+            "match": true,
+            "source_line": 239
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 239,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 239,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 239,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EUB-M-5.50T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "100EUB-M-5.50T.md",
+      "status": "passed",
+      "model": "100EUB-M-5.50T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "100EUB-M-5.50T",
+            "actual": "100EUB-M-5.50T",
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "hp",
+            "expected": 5.0,
+            "actual": 5,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "kw",
+            "expected": 3.7,
+            "actual": 3.7,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 4.0,
+            "actual": 4,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 12.5,
+            "actual": 12.5,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 800.0,
+            "actual": 800,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "max_head_m",
+            "expected": 18.5,
+            "actual": 18.5,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 1400.0,
+            "actual": 1400,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 9.5,
+            "actual": 9.5,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 240
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 34.9,
+            "actual": 34.9,
+            "match": true,
+            "source_line": 240
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 240,
+            "actual_page": 11,
+            "quote": "| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 240,
+            "actual_page": 11,
+            "quote": "| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 240,
+            "actual_page": 11,
+            "quote": "| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "100EUB-M-5.50T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "80EUB-M-5.75T.md",
+      "status": "passed",
+      "model": "80EUB-M-5.75T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "80EUB-M-5.75T",
+            "actual": "80EUB-M-5.75T",
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "hp",
+            "expected": 7.5,
+            "actual": 7.5,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "kw",
+            "expected": 5.5,
+            "actual": 5.5,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": 3,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 25.0,
+            "actual": 25,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 680.0,
+            "actual": 680,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "max_head_m",
+            "expected": 33.0,
+            "actual": 33,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 1200.0,
+            "actual": 1200,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 12.5,
+            "actual": 12.5,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 241
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 51.6,
+            "actual": 51.6,
+            "match": true,
+            "source_line": 241
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 241,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 241,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 241,
+            "actual_page": 11,
+            "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "80EUB-M-5.75T",
+            "valid": true
+          },
+          {
+            "target": "100EUB-M-5.75T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    },
+    {
+      "filename": "100EUB-M-5.75T.md",
+      "status": "passed",
+      "model": "100EUB-M-5.75T",
+      "errors": [],
+      "checked": {
+        "fields": [
+          {
+            "field": "model",
+            "expected": "100EUB-M-5.75T",
+            "actual": "100EUB-M-5.75T",
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "series",
+            "expected": "EUB-M",
+            "actual": "EUB-M",
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "hp",
+            "expected": 7.5,
+            "actual": 7.5,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "kw",
+            "expected": 5.5,
+            "actual": 5.5,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "outlet_inch",
+            "expected": 4.0,
+            "actual": 4,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "rated_head_m",
+            "expected": 16.0,
+            "actual": 16,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "rated_flow_lpm",
+            "expected": 1060.0,
+            "actual": 1060,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "max_head_m",
+            "expected": 23.0,
+            "actual": 23,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "max_flow_lpm",
+            "expected": 1900.0,
+            "actual": 1900,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "solids_mm",
+            "expected": 10.0,
+            "actual": 10,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "phase",
+            "expected": 3,
+            "actual": 3,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "current_1ph_a",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "current_3ph_a",
+            "expected": 12.5,
+            "actual": 12.5,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "weight_1ph_kg",
+            "expected": null,
+            "actual": null,
+            "match": true,
+            "source_line": 242
+          },
+          {
+            "field": "weight_3ph_kg",
+            "expected": 51.4,
+            "actual": 51.4,
+            "match": true,
+            "source_line": 242
+          }
+        ],
+        "citations": [
+          {
+            "kind": "raw_row",
+            "page": 11,
+            "line": 242,
+            "actual_page": 11,
+            "quote": "| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+          },
+          {
+            "kind": "source.row_line",
+            "page": 11,
+            "line": 242,
+            "actual_page": 11,
+            "quote": "| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+          },
+          {
+            "kind": "body.row_line",
+            "page": 11,
+            "line": 242,
+            "actual_page": 11,
+            "quote": "| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+          }
+        ],
+        "body": [
+          {
+            "block": "rated",
+            "count": 1
+          },
+          {
+            "block": "max_head",
+            "count": 1
+          },
+          {
+            "block": "max_flow",
+            "count": 1
+          },
+          {
+            "block": "independent_maxima",
+            "count": 1
+          }
+        ],
+        "wikilinks": [
+          {
+            "target": "100EUB-M-5.75T",
+            "valid": true
+          }
+        ],
+        "body_remaining": ""
+      }
+    }
+  ],
+  "accepted_note_errors": 0,
+  "rejected_attempts": 4,
+  "manual_edits": false
+}

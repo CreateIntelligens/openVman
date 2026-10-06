@@ -1,0 +1,890 @@
+{
+  "grader": "Codex independent source-based grading；獨立代理逐條原文核對，非人類驗收、無額外實驗模型自評或LLM API",
+  "rubric_source": "round3/questions.json凍結grading_rubric、各題required_points與forbidden_claims；原文round3/source_catalog.md；答案answers_for_grading_R3_Q08_Q14.json。純漏列按部分對；明示錯誤排除理由、門檻方向或數值按錯；出處品質另列。",
+  "input_sha256": "9b2e45ac65d4ec35f226b02304366fea9dea7dee4959b4d596e8930f3697b785",
+  "grades": [
+    {
+      "id": "Q08",
+      "repeat": 3,
+      "arm": "A",
+      "verdict": "部分對",
+      "reason": "30 m³/h=500 LPM及兩款EUB-M單相2HP的500、690 LPM正確。漏80EDW-5.20S/T單相版本及820 LPM，未完成三款清單。",
+      "matched_points": [
+        "30 m³/h=500 LPM",
+        "50EUB-M-5.20S：單相2HP、500 LPM",
+        "80EUB-M-5.20S：單相2HP、690 LPM"
+      ],
+      "missing_points": [
+        "80EDW-5.20S/T的S單相2HP版本：820 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        208,
+        231,
+        233,
+        234
+      ],
+      "quality_issues": [
+        "將檢索未取得EDW對應規格混稱型錄未載；原表L201實有單相2HP、820 LPM候選"
+      ]
+    },
+    {
+      "id": "Q08",
+      "repeat": 3,
+      "arm": "B",
+      "verdict": "部分對",
+      "reason": "30 m³/h=500 LPM及兩款EUB-M單相2HP的500、690 LPM正確。漏80EDW-5.20S/T單相版本及820 LPM，未完成三款清單。",
+      "matched_points": [
+        "30 m³/h=500 LPM",
+        "50EUB-M-5.20S：單相2HP、500 LPM",
+        "80EUB-M-5.20S：單相2HP、690 LPM"
+      ],
+      "missing_points": [
+        "80EDW-5.20S/T的S單相2HP版本：820 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        208,
+        231,
+        233,
+        234
+      ],
+      "quality_issues": [
+        "將檢索未取得EDW對應規格混稱型錄未載；原表L201實有單相2HP、820 LPM候選"
+      ]
+    },
+    {
+      "id": "Q08",
+      "repeat": 3,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "換算500 LPM正確，三款單相2HP候選完整。各款最大流量820、500、690 LPM均與原表一致。",
+      "matched_points": [
+        "30 m³/h等於500 LPM",
+        "完整列出80EDW-5.20S/T、50EUB-M-5.20S、80EUB-M-5.20S，皆有單相2HP版本",
+        "各款最大流量依序820、500、690 LPM，或等值49.2、30、41.4 m³/h"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        208,
+        231,
+        233,
+        234
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q08",
+      "repeat": 3,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "換算500 LPM正確，三款及最大流量820、500、690 LPM完整。EDW的S/T列可選S單相版本。",
+      "matched_points": [
+        "30 m³/h等於500 LPM",
+        "完整列出80EDW-5.20S/T、50EUB-M-5.20S、80EUB-M-5.20S，皆有單相2HP版本",
+        "各款最大流量依序820、500、690 LPM，或等值49.2、30、41.4 m³/h"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        208,
+        231,
+        233,
+        234
+      ],
+      "quality_issues": [
+        "額外3HP以上單相欄位皆為連字號應限定EUB-M；EDW兩列3HP S/T另有單相版本",
+        "16.6667為四捨五入的換算率，30 m³/h精確等於500 LPM，未作單位錯誤扣分"
+      ]
+    },
+    {
+      "id": "Q09",
+      "repeat": 3,
+      "arm": "A",
+      "verdict": "部分對",
+      "reason": "指定工作點不能保證、最大值不能拼及EDW的21.5 m/400 LPM正確。只列該EDW候選，漏三款EUB-M及其19/600、25/680、16/1060額定點。",
+      "matched_points": [
+        "不能直接保證15 m時400 LPM",
+        "最大揚程與最大流量不能拼成同一工作點",
+        "80EDW-5.50T：21.5 m @ 400 LPM"
+      ],
+      "missing_points": [
+        "80EUB-M-5.50T：19 m @ 600 LPM",
+        "80EUB-M-5.75T：25 m @ 680 LPM",
+        "100EUB-M-5.75T：16 m @ 1060 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": [
+        "80EDW-5.50省略T，但21.5 m/400 LPM可唯一對應本範圍80EDW-5.50T"
+      ]
+    },
+    {
+      "id": "Q09",
+      "repeat": 3,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "不能保證15 m/400 LPM、最大值不能拼及EDW的21.5 m/400 LPM正確。卻明說其餘型號不能在同一額定點同時達15 m及400 LPM，錯排另三個符合的EUB-M候選。",
+      "matched_points": [
+        "不能直接保證15 m時400 LPM",
+        "最大揚程與最大流量不能拼成同一工作點",
+        "80EDW-5.50T：21.5 m @ 400 LPM"
+      ],
+      "missing_points": [
+        "80EUB-M-5.50T：19 m @ 600 LPM",
+        "80EUB-M-5.75T：25 m @ 680 LPM",
+        "100EUB-M-5.75T：16 m @ 1060 LPM"
+      ],
+      "false_claims": [
+        "其餘型號未能在同一額定點同時滿足揚程≥15 m、流量≥400 LPM"
+      ],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": [
+        "80EDW-5.50省略T，但額定點可唯一對應80EDW-5.50T"
+      ]
+    },
+    {
+      "id": "Q09",
+      "repeat": 3,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "不能保證指定工作點、不能拼最大值的限定明確。四款額定點21.5/400、19/600、25/680、16/1060完整正確。",
+      "matched_points": [
+        "型錄未列15 m @ 400 LPM，不能保證指定工作點",
+        "額定點雙門檻完整候選：80EDW-5.50T、80EUB-M-5.50T、80EUB-M-5.75T、100EUB-M-5.75T",
+        "四款額定點依序21.5 m @ 400 LPM、19 m @ 600 LPM、25 m @ 680 LPM、16 m @ 1060 LPM",
+        "最大揚程與最大流量不代表同時達成；額定點候選不等於已確認15 m時流量"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q09",
+      "repeat": 3,
+      "arm": "D",
+      "verdict": "部分對",
+      "reason": "不能保證15 m/400 LPM及不能拼最大值正確。僅列80EDW-5.50T與80EUB-M-5.75T兩個正確額定點，漏另兩款。",
+      "matched_points": [
+        "不能直接保證15 m時400 LPM",
+        "最大揚程與最大流量不能拼成同一工作點",
+        "80EDW-5.50T：21.5 m @ 400 LPM",
+        "80EUB-M-5.75T：25 m @ 680 LPM"
+      ],
+      "missing_points": [
+        "80EUB-M-5.50T：19 m @ 600 LPM",
+        "100EUB-M-5.75T：16 m @ 1060 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q10",
+      "repeat": 3,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "兩系列4吋冠軍、流量及差值均未回答。原表明列100EDW-5.50T為1680 LPM、100EUB-M-5.75T為1900 LPM，相差220 LPM。",
+      "matched_points": [],
+      "missing_points": [
+        "EDW：100EDW-5.50T，最大流量1680 LPM",
+        "EUB-M：100EUB-M-5.75T，最大流量1900 LPM",
+        "EUB-M冠軍多220 LPM"
+      ],
+      "false_claims": [
+        "型錄沒有對應4吋EDW與EUB-M 2～7.5HP規格資料"
+      ],
+      "source_lines": [
+        203,
+        205,
+        240,
+        242
+      ],
+      "quality_issues": [
+        "檢索未取回規格不等於型錄沒有資料",
+        "額外4吋（100 mm或以上）未交代公稱口徑且以上不精確；未列候選，未發生錯納"
+      ]
+    },
+    {
+      "id": "Q10",
+      "repeat": 3,
+      "arm": "B",
+      "verdict": "部分對",
+      "reason": "EUB-M的4吋冠軍100EUB-M-5.75T及1900 LPM正確。漏EDW冠軍100EDW-5.50T、1680 LPM及EUB-M多220 LPM。",
+      "matched_points": [
+        "EUB-M：100EUB-M-5.75T，最大流量1900 LPM"
+      ],
+      "missing_points": [
+        "EDW：100EDW-5.50T，最大流量1680 LPM",
+        "EUB-M冠軍多220 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        203,
+        205,
+        240,
+        242
+      ],
+      "quality_issues": [
+        "把檢索未取回EDW資料混稱型錄未載；原表L205可提供比較"
+      ]
+    },
+    {
+      "id": "Q10",
+      "repeat": 3,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "4吋冠軍100EDW-5.50T/1680 LPM及100EUB-M-5.75T/1900 LPM正確。比較方向及差值EUB-M多220 LPM正確。",
+      "matched_points": [
+        "EDW：100EDW-5.50T，最大流量1680 LPM",
+        "EUB-M：100EUB-M-5.75T，最大流量1900 LPM",
+        "EUB-M冠軍多220 LPM"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        203,
+        205,
+        240,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q10",
+      "repeat": 3,
+      "arm": "D",
+      "verdict": "錯",
+      "reason": "兩系列4吋冠軍1680與1900 LPM、差值220 LPM均正確。卻明確說EUB-M符合共有三款，原表只有100EUB-M-5.50T、100EUB-M-5.75T兩款，且答案自身也只列兩款。",
+      "matched_points": [
+        "EDW：100EDW-5.50T，最大流量1680 LPM",
+        "EUB-M：100EUB-M-5.75T，最大流量1900 LPM",
+        "EUB-M冠軍多220 LPM"
+      ],
+      "missing_points": [],
+      "false_claims": [
+        "EUB-M 2～7.5HP的4吋符合型號共有三款；原表只有兩款"
+      ],
+      "source_lines": [
+        203,
+        205,
+        240,
+        242
+      ],
+      "quality_issues": [
+        "額外4吋（100 mm）未交代公稱口徑，精確換算為101.6 mm；本題未問換算，另列品質問題"
+      ]
+    },
+    {
+      "id": "Q11",
+      "repeat": 3,
+      "arm": "A",
+      "verdict": "對",
+      "reason": "明確說型錄沒有售價，無法判定最便宜款或排列價格。沒有虛構價格或用規格推定價格。",
+      "matched_points": [
+        "型錄沒有售價／價格資料",
+        "無法判定最便宜款式或排列價格"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q11",
+      "repeat": 3,
+      "arm": "B",
+      "verdict": "對",
+      "reason": "明確說型錄沒有售價，無法判定最便宜款或排列價格。沒有虛構價格或用規格推定價格。",
+      "matched_points": [
+        "型錄沒有售價／價格資料",
+        "無法判定最便宜款式或排列價格"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q11",
+      "repeat": 3,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "明確說型錄沒有售價，無法判定最便宜款或排列價格。沒有虛構價格或用規格推定價格。",
+      "matched_points": [
+        "型錄沒有售價／價格資料",
+        "無法判定最便宜款式或排列價格"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q11",
+      "repeat": 3,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "明確說型錄沒有售價，無法判定最便宜款或排列價格。沒有虛構價格或用規格推定價格。",
+      "matched_points": [
+        "型錄沒有售價／價格資料",
+        "無法判定最便宜款式或排列價格"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q12",
+      "repeat": 3,
+      "arm": "A",
+      "verdict": "對",
+      "reason": "明確說型錄未載保固年限與涵蓋項目，不能比較哪個系列保固較長。沒有虛構保固年數或條件。",
+      "matched_points": [
+        "型錄未載保固年限與保固涵蓋／條款",
+        "無法判定EDW或EUB-M哪個保固較長"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q12",
+      "repeat": 3,
+      "arm": "B",
+      "verdict": "對",
+      "reason": "明確說型錄未載保固年限與涵蓋項目，不能比較哪個系列保固較長。沒有虛構保固年數或條件。",
+      "matched_points": [
+        "型錄未載保固年限與保固涵蓋／條款",
+        "無法判定EDW或EUB-M哪個保固較長"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q12",
+      "repeat": 3,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "明確說型錄未載保固年限與涵蓋項目，不能比較哪個系列保固較長。沒有虛構保固年數或條件。",
+      "matched_points": [
+        "型錄未載保固年限與保固涵蓋／條款",
+        "無法判定EDW或EUB-M哪個保固較長"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q12",
+      "repeat": 3,
+      "arm": "D",
+      "verdict": "部分對",
+      "reason": "正確說型錄未寫EDW與EUB-M保固年限及涵蓋零件。沒有回答因此無法判定哪個系列保固較長，漏比較主結論。",
+      "matched_points": [
+        "型錄未載保固年限與保固涵蓋項目"
+      ],
+      "missing_points": [
+        "無法判定EDW或EUB-M哪個保固較長"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q13",
+      "repeat": 3,
+      "arm": "A",
+      "verdict": "部分對",
+      "reason": "兩款2HP T型的3.5 A/26.4 kg及3.5 A/25.9 kg正確，也正確說EDW三相重量皆超過30 kg。漏兩款3HP T型及5.2 A/29.8 kg、5.2 A/30.0 kg，未提出錯誤排除理由。",
+      "matched_points": [
+        "50EUB-M-5.20T：3.5 A／26.4 kg",
+        "80EUB-M-5.20T：3.5 A／25.9 kg",
+        "沒有EDW同時符合電流及重量門檻"
+      ],
+      "missing_points": [
+        "50EUB-M-5.30T：5.2 A／29.8 kg",
+        "80EUB-M-5.30T：5.2 A／30.0 kg"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        235,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q13",
+      "repeat": 3,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "四款候選及三相電流／重量完整正確，EDW無符合款結論正確。額外說EDW三相重量皆超過45 kg是錯誤數字，80EDW-5.30S/T原表恰為45 kg。",
+      "matched_points": [
+        "完整列出50EUB-M-5.20T、80EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "四款三相滿載電流／三相重量依序3.5 A／26.4 kg、3.5 A／25.9 kg、5.2 A／29.8 kg、5.2 A／30.0 kg",
+        "沒有EDW同時符合三相電流≤5.5 A與三相重量≤30 kg"
+      ],
+      "missing_points": [],
+      "false_claims": [
+        "EDW三相款重量皆超過45 kg；80EDW-5.30S/T三相重量實為45 kg"
+      ],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        235,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q13",
+      "repeat": 3,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "四款三相候選及3.5/26.4、3.5/25.9、5.2/29.8、5.2/30.0的電流／重量全部正確。明確排除無法同時符合電流及重量門檻的EDW，並納入30.0 kg邊界款。",
+      "matched_points": [
+        "完整列出50EUB-M-5.20T、80EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "四款三相滿載電流／三相重量依序3.5 A／26.4 kg、3.5 A／25.9 kg、5.2 A／29.8 kg、5.2 A／30.0 kg",
+        "沒有EDW同時符合三相電流≤5.5 A與三相重量≤30 kg"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        235,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q13",
+      "repeat": 3,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "在EDW與EUB-M範圍明列全部四款符合候選，皆屬EUB-M，完整清單表達沒有EDW同時符合。三相電流／重量3.5/26.4、3.5/25.9、5.2/29.8、5.2/30.0完整正確並保留30.0 kg邊界款。",
+      "matched_points": [
+        "完整列出50EUB-M-5.20T、80EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "四款三相滿載電流／三相重量依序3.5 A／26.4 kg、3.5 A／25.9 kg、5.2 A／29.8 kg、5.2 A／30.0 kg",
+        "沒有EDW同時符合三相電流≤5.5 A與三相重量≤30 kg"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        235,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q14",
+      "repeat": 3,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "五款EDW的kW、HP及10 mm正確，並正確納入5HP/3.7kW款。卻錯稱EUB-M全為9 mm而排除兩款5HP；L239–240實為3.7 kW、5 HP、10 mm。",
+      "matched_points": [
+        "五款EDW功率／馬力／通過粒徑正確",
+        "以3.7 kW門檻保留5 HP／3.7 kW款"
+      ],
+      "missing_points": [
+        "80EUB-M-5.50T：3.7 kW／5 HP／10 mm",
+        "100EUB-M-5.50T：3.7 kW／5 HP／10 mm"
+      ],
+      "false_claims": [
+        "EUB-M系列通過粒徑為9 mm，全部不符合10 mm門檻"
+      ],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": [
+        "EDW兩個5HP/3.7kW/10mm型號在註解有完整數字，按全文計入已提及，不算漏型號",
+        "不超過3.7kW邊界的附註含混，應直接納入剛好等於3.7kW的款式"
+      ]
+    },
+    {
+      "id": "Q14",
+      "repeat": 3,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "五款EDW的kW、HP及10 mm正確，並正確納入5HP/3.7kW款。卻錯稱EUB-M全為9 mm而排除兩款5HP；L239–240實為3.7 kW、5 HP、10 mm。",
+      "matched_points": [
+        "五款EDW功率／馬力／通過粒徑正確",
+        "以3.7 kW門檻保留5 HP／3.7 kW款"
+      ],
+      "missing_points": [
+        "80EUB-M-5.50T：3.7 kW／5 HP／10 mm",
+        "100EUB-M-5.50T：3.7 kW／5 HP／10 mm"
+      ],
+      "false_claims": [
+        "EUB-M系列通過粒徑為9 mm，全部不符合10 mm門檻"
+      ],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q14",
+      "repeat": 3,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "七款完整，各自1.5/2、2.2/3或3.7/5的kW／HP及10 mm正確。採3.7 kW門檻，沒有錯排5HP或納入9 mm及5.5 kW款。",
+      "matched_points": [
+        "完整列出五款EDW與80EUB-M-5.50T、100EUB-M-5.50T，共七款",
+        "80EDW-5.20S/T為1.5 kW／2 HP；80EDW-5.30S/T與100EDW-5.30S/T為2.2 kW／3 HP；其餘四款為3.7 kW／5 HP，七款通過粒徑皆10 mm",
+        "以3.7 kW作門檻，5 HP／3.7 kW仍符合"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q14",
+      "repeat": 3,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "七款完整，各自1.5/2、2.2/3或3.7/5的kW／HP及10 mm正確。採3.7 kW門檻，沒有錯排5HP或納入9 mm及5.5 kW款。",
+      "matched_points": [
+        "完整列出五款EDW與80EUB-M-5.50T、100EUB-M-5.50T，共七款",
+        "80EDW-5.20S/T為1.5 kW／2 HP；80EDW-5.30S/T與100EDW-5.30S/T為2.2 kW／3 HP；其餘四款為3.7 kW／5 HP，七款通過粒徑皆10 mm",
+        "以3.7 kW作門檻，5 HP／3.7 kW仍符合"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        199,
+        201,
+        202,
+        203,
+        204,
+        205,
+        231,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    }
+  ]
+}

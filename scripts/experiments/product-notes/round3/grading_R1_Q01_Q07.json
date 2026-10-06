@@ -1,0 +1,795 @@
+{
+  "grader": "independent_review_round3_note_validation",
+  "rubric_source": "answers_for_grading_R1_Q01_Q07.json#grading_rubric",
+  "input_sha256": "a81e1594b92260a3a54f60e07d7bd4550d905f5dca690cb995b0f26653749a36",
+  "grading_method": "完整閱讀28份原回答，逐條核對同檔required_points及forbidden_claims；不以expected_answer附加要求扣分。頁行與公稱口徑說明列quality_issues。",
+  "grades": [
+    {
+      "id": "Q01",
+      "repeat": 1,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "沒有列出任何符合的五款或最大揚程，只回答型錄無符合條件資料；必要篩選結論完全未答。",
+      "matched_points": [],
+      "missing_points": [
+        "完整列出五款：80EDW-5.30S/T、80EDW-5.50T、80EUB-M-5.30T、80EUB-M-5.50T、80EUB-M-5.75T",
+        "五款最大揚程依序26.5、32.4、23、30、33 m，口徑皆3吋"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        202,
+        204,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": [
+        "只列檔名或無對應資料，未提供可核對候選規格的來源行；來源品質不另扣內容分。"
+      ]
+    },
+    {
+      "id": "Q01",
+      "repeat": 1,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "80EDW-5.30S/T的3吋與26.5 m正確，但漏其餘四款並明確宣稱「型錄沒有其他符合」；原表確有另外四款，屬錯誤排除候選的主結論。",
+      "matched_points": [
+        "80EDW-5.30S/T：最大揚程26.5 m、3吋正確；另提80EUB-M-5.20S的17 m並排除，亦正確。"
+      ],
+      "missing_points": [
+        "80EDW-5.50T：32.4 m；80EUB-M-5.30T：23 m；80EUB-M-5.50T：30 m；80EUB-M-5.75T：33 m。"
+      ],
+      "false_claims": [
+        {
+          "claim": "型錄沒有其他符合 3 吋出水管且最大揚程至少 20 米的款式。",
+          "correction": "另有80EDW-5.50T及三款EUB-M符合。",
+          "source_lines": [
+            204,
+            238,
+            239,
+            241
+          ]
+        }
+      ],
+      "source_lines": [
+        202,
+        204,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q01",
+      "repeat": 1,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "五款全部列齊，33、32.4、30、26.5、23米分別對應正確；總述限定3吋，無錯納。集合題不要求型號順序。",
+      "matched_points": [
+        "完整列出五款：80EDW-5.30S/T、80EDW-5.50T、80EUB-M-5.30T、80EUB-M-5.50T、80EUB-M-5.75T",
+        "五款最大揚程依序26.5、32.4、23、30、33 m，口徑皆3吋"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        202,
+        204,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": [
+        "只引用第9／11頁，未逐款附來源行；不扣內容分。"
+      ]
+    },
+    {
+      "id": "Q01",
+      "repeat": 1,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "EDW兩款及EUB-M三款皆列齊，各自3吋與26.5、32.4、23、30、33 m皆正確；排除項也正確。",
+      "matched_points": [
+        "完整列出五款：80EDW-5.30S/T、80EDW-5.50T、80EUB-M-5.30T、80EUB-M-5.50T、80EUB-M-5.75T",
+        "五款最大揚程依序26.5、32.4、23、30、33 m，口徑皆3吋"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        202,
+        204,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q02",
+      "repeat": 1,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "只說「型錄沒有」，六款候選、HP、最大流量與三相限定均未答；無正確主結論。",
+      "matched_points": [],
+      "missing_points": [
+        "完整列出六款：80EDW-5.20S/T、80EDW-5.30S/T、100EDW-5.30S/T、80EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "六款HP／最大流量依序為2/820、3/980、3/1200、2/630、3/550、3/700，單位HP與LPM",
+        "EDW的S/T列有三相版本，EUB-M所列T款為三相"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        203,
+        208,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "只列檔名或無對應資料，未提供可核對候選規格的來源行；來源品質不另扣內容分。"
+      ]
+    },
+    {
+      "id": "Q02",
+      "repeat": 1,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "僅100EDW-5.30S/T的3 HP／1200 LPM正確；其餘三筆EUB-M S/T合併型號與700／950／1150 LPM為凍結表中不存在的規格，並錯說皆支援單相與三相。",
+      "matched_points": [
+        "100EDW-5.30S/T：3 HP、最大流量1200 LPM、支援三相。"
+      ],
+      "missing_points": [
+        "80EDW-5.20S/T 2/820、80EDW-5.30S/T 3/980、80EUB-M-5.20T 2/630、50EUB-M-5.30T 3/550、80EUB-M-5.30T 3/700均未正確列出。"
+      ],
+      "false_claims": [
+        {
+          "claim": "80EUB-M-5.20S/T，2 HP，700 LPM，單相 / 三相皆可",
+          "correction": "表中S、T分列；T款630 LPM，S款690 LPM，沒有該合併列。",
+          "source_lines": [
+            234,
+            236
+          ]
+        },
+        {
+          "claim": "80EUB-M-5.30S/T，3 HP，950 LPM，單相 / 三相皆可",
+          "correction": "表中只有80EUB-M-5.30T，3 HP、700 LPM。",
+          "source_lines": [
+            238
+          ]
+        },
+        {
+          "claim": "100EUB-M-5.30S/T，3 HP，1150 LPM，單相 / 三相皆可",
+          "correction": "不在凍結的十五列；其引用L239實為80EUB-M-5.50T，5 HP、900 LPM。",
+          "source_lines": [
+            239
+          ]
+        }
+      ],
+      "source_lines": [
+        201,
+        202,
+        203,
+        208,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "EUB-M三筆引用L237／L238／L239與所寫型號不符；引用品質另列，內容錯誤已由虛構型號與數值判定。"
+      ]
+    },
+    {
+      "id": "Q02",
+      "repeat": 1,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "完整六款及HP／最大流量2/820、3/980、3/1200、2/630、3/550、3/700均正確，單位齊全；明示S/T支援三相，其餘T款在三相候選列表內。",
+      "matched_points": [
+        "完整列出六款：80EDW-5.20S/T、80EDW-5.30S/T、100EDW-5.30S/T、80EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "六款HP／最大流量依序為2/820、3/980、3/1200、2/630、3/550、3/700，單位HP與LPM",
+        "EDW的S/T列有三相版本，EUB-M所列T款為三相"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        203,
+        208,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q02",
+      "repeat": 1,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "六款及各自HP／最大流量完整正確，EDW合併列明示三相適用；單相款與450 LPM款明確標為排除，未錯納。",
+      "matched_points": [
+        "完整列出六款：80EDW-5.20S/T、80EDW-5.30S/T、100EDW-5.30S/T、80EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "六款HP／最大流量依序為2/820、3/980、3/1200、2/630、3/550、3/700，單位HP與LPM",
+        "EDW的S/T列有三相版本，EUB-M所列T款為三相"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        203,
+        208,
+        236,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q03",
+      "repeat": 1,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "未回答100EUB-M-5.75T與1900 LPM，而以無資料拒答；必要冠軍與數字結論皆缺。",
+      "matched_points": [],
+      "missing_points": [
+        "最大流量冠軍為100EUB-M-5.75T",
+        "最大流量1900 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        203,
+        204,
+        205,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": [
+        "只列檔名或無對應資料，未提供可核對候選規格的來源行；來源品質不另扣內容分。"
+      ]
+    },
+    {
+      "id": "Q03",
+      "repeat": 1,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "沒有給出100EUB-M-5.75T冠軍或1900 LPM，以缺EDW資料拒答；兩個必要主結論均未答。",
+      "matched_points": [],
+      "missing_points": [
+        "最大流量冠軍為100EUB-M-5.75T",
+        "最大流量1900 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        203,
+        204,
+        205,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": [
+        "泛稱型錄未提供EDW資訊，無逐行規格佐證；不另按來源敘述扣分。"
+      ]
+    },
+    {
+      "id": "Q03",
+      "repeat": 1,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "明確回答最大流量冠軍100EUB-M-5.75T及1900 LPM，未混用額定流量或範圍外系列。",
+      "matched_points": [
+        "最大流量冠軍為100EUB-M-5.75T",
+        "最大流量1900 LPM"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        203,
+        204,
+        205,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q03",
+      "repeat": 1,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "冠軍100EUB-M-5.75T及1900 LPM正確；補列十五款最大流量也全數吻合，無額定／最大混用。",
+      "matched_points": [
+        "最大流量冠軍為100EUB-M-5.75T",
+        "最大流量1900 LPM"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        203,
+        204,
+        205,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q04",
+      "repeat": 1,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "以資料不足拒答，沒有四款3HP比較、數值或26.5 m冠軍結論。",
+      "matched_points": [],
+      "missing_points": [
+        "四款3HP比較清單：80EDW-5.30S/T、100EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "四款最大揚程依序26.5、17、26、23 m",
+        "最大揚程最高為80EDW-5.30S/T，26.5 m"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        202,
+        203,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "只列檔名或無對應資料，未提供可核對候選規格的來源行；來源品質不另扣內容分。"
+      ]
+    },
+    {
+      "id": "Q04",
+      "repeat": 1,
+      "arm": "B",
+      "verdict": "部分對",
+      "reason": "最高者80EDW-5.30S/T與26.5 M正確；已列三款數字均正確，但漏80EUB-M-5.30T的23 m，未完成四款比較。",
+      "matched_points": [
+        "80EDW-5.30S/T 26.5 m、50EUB-M-5.30T 26 m、100EDW-5.30S/T 17 m皆正確。",
+        "最高者80EDW-5.30S/T，26.5 m。"
+      ],
+      "missing_points": [
+        "80EUB-M-5.30T：3HP，最大揚程23 m。"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        202,
+        203,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q04",
+      "repeat": 1,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "四款3HP完整且26.5、17、26、23 M逐款對應正確；最高80EDW-5.30S/T 26.5 M正確。Q04未要求排序，不以額外排序說明扣分。",
+      "matched_points": [
+        "四款3HP比較清單：80EDW-5.30S/T、100EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T",
+        "四款最大揚程依序26.5、17、26、23 m",
+        "最大揚程最高為80EDW-5.30S/T，26.5 m"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        202,
+        203,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "宣稱「已依型號名稱排序」與實際排列不符；此題未要求排序，僅列敘述品質問題。"
+      ]
+    },
+    {
+      "id": "Q04",
+      "repeat": 1,
+      "arm": "D",
+      "verdict": "部分對",
+      "reason": "最高者與26.5 m正確，三款已列數值皆正確；漏50EUB-M-5.30T及其26 m，四款比較不完整。",
+      "matched_points": [
+        "80EDW-5.30S/T 26.5 m、80EUB-M-5.30T 23 m、100EDW-5.30S/T 17 m正確。",
+        "最高80EDW-5.30S/T，26.5 m。"
+      ],
+      "missing_points": [
+        "50EUB-M-5.30T：3HP，最大揚程26 m。"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        202,
+        203,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "「50EUB-M-5.30T在參考資料中未列出」與完整來源L237不符；視為同一遺漏的來源說明問題，不另提升內容判分。"
+      ]
+    },
+    {
+      "id": "Q05",
+      "repeat": 1,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "拒答兩系列3吋冠軍與0.6 m差距；三個必要結論均缺，沒有任何可判部分正確的規格答案。",
+      "matched_points": [],
+      "missing_points": [
+        "EDW：80EDW-5.50T，最大揚程32.4 m",
+        "EUB-M：80EUB-M-5.75T，最大揚程33 m",
+        "EUB-M冠軍高0.6 m"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        204,
+        234,
+        236,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": [
+        "只列檔名或無對應資料，未提供可核對候選規格的來源行；來源品質不另扣內容分。"
+      ]
+    },
+    {
+      "id": "Q05",
+      "repeat": 1,
+      "arm": "B",
+      "verdict": "部分對",
+      "reason": "EUB-M 3吋冠軍80EUB-M-5.75T及33 M正確；未給EDW冠軍80EDW-5.50T／32.4 m，也未算出EUB-M高0.6 m。",
+      "matched_points": [
+        "EUB-M：80EUB-M-5.75T，最大揚程33 m。"
+      ],
+      "missing_points": [
+        "EDW：80EDW-5.50T，最大揚程32.4 m。",
+        "EUB-M冠軍高0.6 m。"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        204,
+        234,
+        236,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": [
+        "將檢索不到EDW資料概括為型錄沒有EDW資料；沒有正確完成跨系列比較，按必要內容遺漏判部分對。"
+      ]
+    },
+    {
+      "id": "Q05",
+      "repeat": 1,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "EDW冠軍80EDW-5.50T 32.4 M、EUB-M冠軍80EUB-M-5.75T 33 M及EUB-M高0.6 m均完整正確；沒有說成同馬力比較。",
+      "matched_points": [
+        "EDW：80EDW-5.50T，最大揚程32.4 m",
+        "EUB-M：80EUB-M-5.75T，最大揚程33 m",
+        "EUB-M冠軍高0.6 m"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        204,
+        234,
+        236,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": [
+        "「3吋（80mm）」未明示公稱DN80、非精確mm換算；沿用第二輪Q05既有公稱口徑表述標準，不扣內容分。"
+      ]
+    },
+    {
+      "id": "Q05",
+      "repeat": 1,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "EDW冠軍80EDW-5.50T 32.4 M、EUB-M冠軍80EUB-M-5.75T 33 M及EUB-M高0.6 m均完整正確；沒有說成同馬力比較。",
+      "matched_points": [
+        "EDW：80EDW-5.50T，最大揚程32.4 m",
+        "EUB-M：80EUB-M-5.75T，最大揚程33 m",
+        "EUB-M冠軍高0.6 m"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        204,
+        234,
+        236,
+        238,
+        239,
+        241
+      ],
+      "quality_issues": [
+        "「3吋（80mm）」未明示公稱DN80、非精確mm換算；沿用第二輪Q05既有公稱口徑表述標準，不扣內容分。"
+      ]
+    },
+    {
+      "id": "Q06",
+      "repeat": 1,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "雖分甲乙標題，但兩邊均以資料不足拒答，沒有任一候選或所需最大值；情境題主結論未答。",
+      "matched_points": [],
+      "missing_points": [
+        "甲完整清單為80EDW-5.20S/T、80EUB-M-5.20S，最大流量依序820、690 LPM",
+        "乙完整清單為80EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T，最大揚程依序26.5、26、23 m",
+        "分開兩情境，正確使用甲單相／2HP／3吋及乙三相／3HP條件，EDW S/T列可取相應版本"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        208,
+        234,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "只列檔名或無對應資料，未提供可核對候選規格的來源行；來源品質不另扣內容分。"
+      ]
+    },
+    {
+      "id": "Q06",
+      "repeat": 1,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "甲80EUB-M-5.20S的單相／2HP／3吋／690 LPM正確但漏EDW；乙明確說沒有符合三相3HP且最大揚程至少23米的型號，原表有三款，屬實質錯誤空集合結論。",
+      "matched_points": [
+        "甲：80EUB-M-5.20S，單相、2HP、3吋、最大流量690 LPM。",
+        "有分開甲乙情境，未壓成AND。"
+      ],
+      "missing_points": [
+        "甲：80EDW-5.20S/T，最大流量820 LPM。",
+        "乙：80EDW-5.30S/T 26.5 m、50EUB-M-5.30T 26 m、80EUB-M-5.30T 23 m均未列。"
+      ],
+      "false_claims": [
+        {
+          "claim": "沒有符合三相、3HP 且最大揚程至少 23 米的型號（型錄沒有）。",
+          "correction": "乙有80EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T三款。",
+          "source_lines": [
+            202,
+            208,
+            237,
+            238
+          ]
+        }
+      ],
+      "source_lines": [
+        201,
+        202,
+        208,
+        234,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "3吋（80mm）未明示公稱DN80、非精確mm換算；無明確錯誤換算過程，不以此新增扣分。"
+      ]
+    },
+    {
+      "id": "Q06",
+      "repeat": 1,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "甲兩款820／690 LPM與乙三款26.5／26／23 m完整正確，分情境且相數、馬力、口徑限定正確；額外額定／最大數值亦吻合。",
+      "matched_points": [
+        "甲完整清單為80EDW-5.20S/T、80EUB-M-5.20S，最大流量依序820、690 LPM",
+        "乙完整清單為80EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T，最大揚程依序26.5、26、23 m",
+        "分開兩情境，正確使用甲單相／2HP／3吋及乙三相／3HP條件，EDW S/T列可取相應版本"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        208,
+        234,
+        237,
+        238
+      ],
+      "quality_issues": [
+        "只引用第9／11頁，未逐款列行；不扣內容分。"
+      ]
+    },
+    {
+      "id": "Q06",
+      "repeat": 1,
+      "arm": "D",
+      "verdict": "對",
+      "reason": "甲兩款與820／690 LPM、乙三款與26.5／26／23米皆完整正確；分開兩情境，S/T相應版本可用，未錯加乙3吋限制。",
+      "matched_points": [
+        "甲完整清單為80EDW-5.20S/T、80EUB-M-5.20S，最大流量依序820、690 LPM",
+        "乙完整清單為80EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T，最大揚程依序26.5、26、23 m",
+        "分開兩情境，正確使用甲單相／2HP／3吋及乙三相／3HP條件，EDW S/T列可取相應版本"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        201,
+        202,
+        208,
+        234,
+        237,
+        238
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q07",
+      "repeat": 1,
+      "arm": "A",
+      "verdict": "錯",
+      "reason": "以型錄無相關資料拒答，六款及兩欄最大值、排序均未提供，無正確主結論。",
+      "matched_points": [],
+      "missing_points": [
+        "完整順序：80EUB-M-5.75T → 80EUB-M-5.50T → 50EUB-M-5.30T → 100EUB-M-5.75T → 80EUB-M-5.30T → 50EUB-M-5.20T",
+        "依序最大揚程／最大流量為33/1200、30/900、26/550、23/1900、23/700、21/450，單位m與LPM",
+        "23 m同分時，1900 LPM先於700 LPM"
+      ],
+      "false_claims": [],
+      "source_lines": [
+        235,
+        237,
+        238,
+        239,
+        241,
+        242
+      ],
+      "quality_issues": [
+        "只列檔名或無對應資料，未提供可核對候選規格的來源行；來源品質不另扣內容分。"
+      ]
+    },
+    {
+      "id": "Q07",
+      "repeat": 1,
+      "arm": "B",
+      "verdict": "錯",
+      "reason": "50EUB-M-5.30T寫成25米／560 LPM，正確是26米／550 LPM；另明確把80EUB-M-5.30T錯說未達20米，並漏四款，屬數值與排除結論錯誤。",
+      "matched_points": [
+        "50EUB-M-5.20T：三相、最大揚程21 m、最大流量450 LPM。"
+      ],
+      "missing_points": [
+        "80EUB-M-5.75T 33/1200、80EUB-M-5.50T 30/900、100EUB-M-5.75T 23/1900、80EUB-M-5.30T 23/700未正確列出。",
+        "完整六款順序與23 m同分排序未給。"
+      ],
+      "false_claims": [
+        {
+          "claim": "50EUB-M-5.30T：最大揚程25米、最大流量560 LPM",
+          "correction": "最大揚程26 m、最大流量550 LPM。",
+          "source_lines": [
+            237
+          ]
+        },
+        {
+          "claim": "80EUB-M-5.20T、80EUB-M-5.30T 等其他型號的最大揚程未達20米，故不列入",
+          "correction": "80EUB-M-5.20T為16 m可排除；80EUB-M-5.30T為23 m，必須納入。",
+          "source_lines": [
+            236,
+            238
+          ]
+        }
+      ],
+      "source_lines": [
+        235,
+        237,
+        238,
+        239,
+        241,
+        242
+      ],
+      "quality_issues": []
+    },
+    {
+      "id": "Q07",
+      "repeat": 1,
+      "arm": "C",
+      "verdict": "對",
+      "reason": "六款及33/1200、30/900、26/550、23/1900、23/700、21/450均完整正確，23 m同分時1900 LPM排在700 LPM之前；兩最大值分欄，未聲稱同時工作點。",
+      "matched_points": [
+        "完整順序：80EUB-M-5.75T → 80EUB-M-5.50T → 50EUB-M-5.30T → 100EUB-M-5.75T → 80EUB-M-5.30T → 50EUB-M-5.20T",
+        "依序最大揚程／最大流量為33/1200、30/900、26/550、23/1900、23/700、21/450，單位m與LPM",
+        "23 m同分時，1900 LPM先於700 LPM"
+      ],
+      "missing_points": [],
+      "false_claims": [],
+      "source_lines": [
+        235,
+        237,
+        238,
+        239,
+        241,
+        242
+      ],
+      "quality_issues": [
+        "僅引用第11頁，未逐款附行；不扣內容分。"
+      ]
+    },
+    {
+      "id": "Q07",
+      "repeat": 1,
+      "arm": "D",
+      "verdict": "錯",
+      "reason": "六款與所有數值正確，但明確把23 m／700 LPM的80EUB-M-5.30T排在23 m／1900 LPM的100EUB-M-5.75T前，命中凍結forbidden_claims的同分次序顛倒，並非僅漏提排序規則。",
+      "matched_points": [
+        "六款候選完整，三相及最大揚程至少20 m條件正確。",
+        "各型號最大揚程／最大流量數字正確：33/1200、30/900、26/550、23/700、23/1900、21/450。",
+        "最大揚程第一排序由高至低正確。"
+      ],
+      "missing_points": [
+        "正確完整順序：同為23 m時100EUB-M-5.75T／1900 LPM應先於80EUB-M-5.30T／700 LPM。"
+      ],
+      "false_claims": [
+        {
+          "claim": "依「最大揚程由高到低、同分再按最大流量由大到小」排序，4為80EUB-M-5.30T、5為100EUB-M-5.75T",
+          "correction": "兩個23 m款次序應互換，1900 LPM在700 LPM之前。",
+          "source_lines": [
+            238,
+            242
+          ]
+        }
+      ],
+      "source_lines": [
+        235,
+        237,
+        238,
+        239,
+        241,
+        242
+      ],
+      "quality_issues": []
+    }
+  ]
+}

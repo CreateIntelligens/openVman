@@ -1,0 +1,4151 @@
+{
+  "notes": [
+    {
+      "filename": "80EDW-5.20S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]\n- [[100EDW-5.30S-T|100EDW-5.30S/T]]\n- [[80EDW-5.50T|80EDW-5.50T]]",
+      "frontmatter": {
+        "model": "80EDW-5.20S/T",
+        "series": "EDW",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 16.4,
+        "max_flow_lpm": 820,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 11.0,
+        "current_3ph_a": 3.8,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 201,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "80EDW-5.20S/T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EDW-5.20S/T",
+              "actual": "80EDW-5.20S/T",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_head_m",
+              "expected": 16.4,
+              "actual": 16.4,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 820.0,
+              "actual": 820,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "phase",
+              "expected": [
+                1,
+                3
+              ],
+              "actual": [
+                1,
+                3
+              ],
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 11.0,
+              "actual": 11.0,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 3.8,
+              "actual": 3.8,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 47.0,
+              "actual": 47,
+              "match": true,
+              "source_line": 201
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 46.0,
+              "actual": 46,
+              "match": true,
+              "source_line": 201
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            },
+            {
+              "kind": "source.footnotes[0]",
+              "page": 9,
+              "line": 208,
+              "actual_page": 9,
+              "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 201,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.20S/T | 2 HP / 1.5 kW | 3\" | 9.5 m @ 500 LPM | 16.4 m @ 820 LPM | 10 mm | 11.0A / 3.8A | 47 kg / 46 kg | 標準流量型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EDW-5.20S-T",
+              "valid": true
+            },
+            {
+              "target": "80EDW-5.30S-T",
+              "valid": true
+            },
+            {
+              "target": "100EDW-5.30S-T",
+              "valid": true
+            },
+            {
+              "target": "80EDW-5.50T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EDW-5.30S-T.md",
+      "markdown": "---\nmodel: 80EDW-5.30S/T\nseries: EDW\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 14.5\nrated_flow_lpm: 500\nmax_head_m: 26.5\nmax_flow_lpm: 980\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 46\nweight_3ph_kg: 45\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 202\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n# 80EDW-5.30S/T\n\n額定點：揚程 14.5 m，流量 500 LPM（同一工作點）。\n最大揚程：26.5 m。\n最大流量：980 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L202；註腳：第 9 頁，L208。\n\n相關連結：[[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "frontmatter": {
+        "model": "80EDW-5.30S/T",
+        "series": "EDW",
+        "hp": 3,
+        "kw": 2.2,
+        "outlet_inch": 3,
+        "rated_head_m": 14.5,
+        "rated_flow_lpm": 500,
+        "max_head_m": 26.5,
+        "max_flow_lpm": 980,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 15.0,
+        "current_3ph_a": 5.7,
+        "weight_1ph_kg": 46,
+        "weight_3ph_kg": 45,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 202,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "80EDW-5.30S/T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EDW-5.30S/T",
+              "actual": "80EDW-5.30S/T",
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "hp",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "kw",
+              "expected": 2.2,
+              "actual": 2.2,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 14.5,
+              "actual": 14.5,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "max_head_m",
+              "expected": 26.5,
+              "actual": 26.5,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 980.0,
+              "actual": 980,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "phase",
+              "expected": [
+                1,
+                3
+              ],
+              "actual": [
+                1,
+                3
+              ],
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 15.0,
+              "actual": 15.0,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 5.7,
+              "actual": 5.7,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 46.0,
+              "actual": 46,
+              "match": true,
+              "source_line": 202
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 45.0,
+              "actual": 45,
+              "match": true,
+              "source_line": 202
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 202,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 202,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |"
+            },
+            {
+              "kind": "source.footnotes[0]",
+              "page": 9,
+              "line": 208,
+              "actual_page": 9,
+              "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 202,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.30S/T | 3 HP / 2.2 kW | 3\" | 14.5 m @ 500 LPM | 26.5 m @ 980 LPM | 10 mm | 15.0A / 5.7A | 46 kg / 45 kg | 中揚程型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EDW-5.30S-T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "100EDW-5.30S-T.md",
+      "markdown": "---\nmodel: 100EDW-5.30S/T\nseries: EDW\nhp: 3\nkw: 2.2\noutlet_inch: 4\nrated_head_m: 9.5\nrated_flow_lpm: 800\nmax_head_m: 17.0\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 203\n  footnotes:\n    - page: 9\n      line: 208\n---\n\n# 100EDW-5.30S/T\n\n額定點：揚程 9.5 m，流量 800 LPM（同一工作點）。\n最大揚程：17.0 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L203；註腳：第 9 頁，L208。\n\n相關連結：[[100EDW-5.30S-T|100EDW-5.30S/T]]",
+      "frontmatter": {
+        "model": "100EDW-5.30S/T",
+        "series": "EDW",
+        "hp": 3,
+        "kw": 2.2,
+        "outlet_inch": 4,
+        "rated_head_m": 9.5,
+        "rated_flow_lpm": 800,
+        "max_head_m": 17.0,
+        "max_flow_lpm": 1200,
+        "solids_mm": 10,
+        "phase": [
+          1,
+          3
+        ],
+        "current_1ph_a": 15.0,
+        "current_3ph_a": 5.7,
+        "weight_1ph_kg": 47,
+        "weight_3ph_kg": 46,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 203,
+          "footnotes": [
+            {
+              "page": 9,
+              "line": 208
+            }
+          ]
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "100EDW-5.30S/T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "100EDW-5.30S/T",
+              "actual": "100EDW-5.30S/T",
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "hp",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "kw",
+              "expected": 2.2,
+              "actual": 2.2,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 4.0,
+              "actual": 4,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 800.0,
+              "actual": 800,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "max_head_m",
+              "expected": 17.0,
+              "actual": 17.0,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1200.0,
+              "actual": 1200,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "phase",
+              "expected": [
+                1,
+                3
+              ],
+              "actual": [
+                1,
+                3
+              ],
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 15.0,
+              "actual": 15.0,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 5.7,
+              "actual": 5.7,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 47.0,
+              "actual": 47,
+              "match": true,
+              "source_line": 203
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 46.0,
+              "actual": 46,
+              "match": true,
+              "source_line": 203
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 203,
+              "actual_page": 9,
+              "quote": "| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 203,
+              "actual_page": 9,
+              "quote": "| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |"
+            },
+            {
+              "kind": "source.footnotes[0]",
+              "page": 9,
+              "line": 208,
+              "actual_page": 9,
+              "quote": "> 1. 電源標記：» S 代表單相（Single Phase）；» T 代表三相（Three Phase）。"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 203,
+              "actual_page": 9,
+              "quote": "| 100EDW-5.30S/T| 3 HP / 2.2 kW | 4\" | 9.5 m @ 800 LPM | 17.0 m @ 1200 LPM | 10 mm | 15.0A / 5.7A | 47 kg / 46 kg | 中大流量型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "100EDW-5.30S-T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EDW-5.50T.md",
+      "markdown": "---\nmodel: 80EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 21.5\nrated_flow_lpm: 400\nmax_head_m: 32.4\nmax_flow_lpm: 1040\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 49.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 204\n  footnotes: []\n---\n\n# 80EDW-5.50T\n\n額定點：揚程 21.5 m，流量 400 LPM（同一工作點）。\n最大揚程：32.4 m。\n最大流量：1040 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L204。\n\n相關連結：[[80EDW-5.50T|80EDW-5.50T]]",
+      "frontmatter": {
+        "model": "80EDW-5.50T",
+        "series": "EDW",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 3,
+        "rated_head_m": 21.5,
+        "rated_flow_lpm": 400,
+        "max_head_m": 32.4,
+        "max_flow_lpm": 1040,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 7.9,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 49.5,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 204,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "80EDW-5.50T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EDW-5.50T",
+              "actual": "80EDW-5.50T",
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "hp",
+              "expected": 5.0,
+              "actual": 5,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "kw",
+              "expected": 3.7,
+              "actual": 3.7,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 21.5,
+              "actual": 21.5,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 400.0,
+              "actual": 400,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "max_head_m",
+              "expected": 32.4,
+              "actual": 32.4,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1040.0,
+              "actual": 1040,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 7.9,
+              "actual": 7.9,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 204
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 49.5,
+              "actual": 49.5,
+              "match": true,
+              "source_line": 204
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 204,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 204,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 204,
+              "actual_page": 9,
+              "quote": "| 80EDW-5.50T | 5 HP / 3.7 kW | 3\" | 21.5 m @ 400 LPM| 32.4 m @ 1040 LPM| 10 mm | - / 7.9A | - / 49.5 kg | 高揚程偏向型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EDW-5.50T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "100EDW-5.50T.md",
+      "markdown": "---\nmodel: 100EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 1000\nmax_head_m: 22.0\nmax_flow_lpm: 1680\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 50.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 205\n  footnotes: []\n---\n\n# 100EDW-5.50T\n\n額定點：揚程 12.5 m，流量 1000 LPM（同一工作點）。\n最大揚程：22.0 m。\n最大流量：1680 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L205。\n\n相關連結：\n* [[100EDW-5.50T|100EDW-5.50T]]",
+      "frontmatter": {
+        "model": "100EDW-5.50T",
+        "series": "EDW",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 4,
+        "rated_head_m": 12.5,
+        "rated_flow_lpm": 1000,
+        "max_head_m": 22.0,
+        "max_flow_lpm": 1680,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 7.9,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 50.5,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 9,
+          "row_line": 205,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "100EDW-5.50T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "100EDW-5.50T",
+              "actual": "100EDW-5.50T",
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "series",
+              "expected": "EDW",
+              "actual": "EDW",
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "hp",
+              "expected": 5.0,
+              "actual": 5,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "kw",
+              "expected": 3.7,
+              "actual": 3.7,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 4.0,
+              "actual": 4,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 1000.0,
+              "actual": 1000,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "max_head_m",
+              "expected": 22.0,
+              "actual": 22.0,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1680.0,
+              "actual": 1680,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 7.9,
+              "actual": 7.9,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 205
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 50.5,
+              "actual": 50.5,
+              "match": true,
+              "source_line": 205
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 9,
+              "line": 205,
+              "actual_page": 9,
+              "quote": "| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 9,
+              "line": 205,
+              "actual_page": 9,
+              "quote": "| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 9,
+              "line": 205,
+              "actual_page": 9,
+              "quote": "| 100EDW-5.50T | 5 HP / 3.7 kW | 4\" | 12.5 m @ 1000 LPM| 22.0 m @ 1680 LPM| 10 mm | - / 7.9A | - / 50.5 kg | 大流量偏向型 |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "100EDW-5.50T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "50EUB-M-5.20S.md",
+      "markdown": "---\nmodel: 50EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 270\nmax_head_m: 23\nmax_flow_lpm: 500\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 233\n  footnotes: []\n---\n\n# 50EUB-M-5.20S\n\n額定點：揚程 15 m，流量 270 LPM（同一工作點）。\n最大揚程：23 m。\n最大流量：500 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L233。\n\n相關連結：[[50EUB-M-5.20S|50EUB-M-5.20S]]",
+      "frontmatter": {
+        "model": "50EUB-M-5.20S",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 2,
+        "rated_head_m": 15,
+        "rated_flow_lpm": 270,
+        "max_head_m": 23,
+        "max_flow_lpm": 500,
+        "solids_mm": 9,
+        "phase": 1,
+        "current_1ph_a": 12.5,
+        "current_3ph_a": null,
+        "weight_1ph_kg": 27.5,
+        "weight_3ph_kg": null,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 233,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "50EUB-M-5.20S",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "50EUB-M-5.20S",
+              "actual": "50EUB-M-5.20S",
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 15.0,
+              "actual": 15,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 270.0,
+              "actual": 270,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "max_head_m",
+              "expected": 23.0,
+              "actual": 23,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "solids_mm",
+              "expected": 9.0,
+              "actual": 9,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "phase",
+              "expected": 1,
+              "actual": 1,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 27.5,
+              "actual": 27.5,
+              "match": true,
+              "source_line": 233
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 233
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 233,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 233,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 233,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.20S | 2 HP / 1.5 kW | 2\" | 15 m @ 270 LPM | 23 m @ 500 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "50EUB-M-5.20S",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.20S.md",
+      "markdown": "---\nmodel: 80EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 400\nmax_head_m: 17\nmax_flow_lpm: 690\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 234\n  footnotes: []\n---\n\n# 80EUB-M-5.20S\n\n額定點：揚程 10 m，流量 400 LPM（同一工作點）。\n最大揚程：17 m。\n最大流量：690 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L234。\n\n相關連結：[[80EUB-M-5.20S|80EUB-M-5.20S]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.20S",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 10,
+        "rated_flow_lpm": 400,
+        "max_head_m": 17,
+        "max_flow_lpm": 690,
+        "solids_mm": 9,
+        "phase": 1,
+        "current_1ph_a": 12.5,
+        "current_3ph_a": null,
+        "weight_1ph_kg": 27.5,
+        "weight_3ph_kg": null,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 234,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "80EUB-M-5.20S",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.20S",
+              "actual": "80EUB-M-5.20S",
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 400.0,
+              "actual": 400,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "max_head_m",
+              "expected": 17.0,
+              "actual": 17,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 690.0,
+              "actual": 690,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "solids_mm",
+              "expected": 9.0,
+              "actual": 9,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "phase",
+              "expected": 1,
+              "actual": 1,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": 27.5,
+              "actual": 27.5,
+              "match": true,
+              "source_line": 234
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 234
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 234,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 234,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 234,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.20S | 2 HP / 1.5 kW | 3\" | 10 m @ 400 LPM | 17 m @ 690 LPM | 9 mm | 12.5 A | - | 27.5 kg / - |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.20S",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "50EUB-M-5.20T.md",
+      "markdown": "---\nmodel: 50EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 220\nmax_head_m: 21\nmax_flow_lpm: 450\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 26.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 235\n  footnotes: []\n---\n\n# 50EUB-M-5.20T\n\n額定點：揚程 15 m，流量 220 LPM（同一工作點）。\n最大揚程：21 m。\n最大流量：450 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L235。\n\n相關連結：[[50EUB-M-5.20T|50EUB-M-5.20T]]",
+      "frontmatter": {
+        "model": "50EUB-M-5.20T",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 2,
+        "rated_head_m": 15,
+        "rated_flow_lpm": 220,
+        "max_head_m": 21,
+        "max_flow_lpm": 450,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 3.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 26.4,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 235,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "50EUB-M-5.20T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "50EUB-M-5.20T",
+              "actual": "50EUB-M-5.20T",
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 15.0,
+              "actual": 15,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 220.0,
+              "actual": 220,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "max_head_m",
+              "expected": 21.0,
+              "actual": 21,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 450.0,
+              "actual": 450,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "solids_mm",
+              "expected": 9.0,
+              "actual": 9,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 3.5,
+              "actual": 3.5,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 235
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 26.4,
+              "actual": 26.4,
+              "match": true,
+              "source_line": 235
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 235,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 235,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 235,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.20T | 2 HP / 1.5 kW | 2\" | 15 m @ 220 LPM | 21 m @ 450 LPM | 9 mm | - | 3.5 A | - / 26.4 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "50EUB-M-5.20T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.20T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9\nrated_flow_lpm: 400\nmax_head_m: 16\nmax_flow_lpm: 630\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 25.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 236\n  footnotes: []\n---\n\n# 80EUB-M-5.20T\n\n額定點：揚程 9 m，流量 400 LPM（同一工作點）。\n最大揚程：16 m。\n最大流量：630 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L236。\n\n相關連結：[[80EUB-M-5.20T|80EUB-M-5.20T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.20T",
+        "series": "EUB-M",
+        "hp": 2,
+        "kw": 1.5,
+        "outlet_inch": 3,
+        "rated_head_m": 9,
+        "rated_flow_lpm": 400,
+        "max_head_m": 16,
+        "max_flow_lpm": 630,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 3.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 25.9,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 236,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "80EUB-M-5.20T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.20T",
+              "actual": "80EUB-M-5.20T",
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "hp",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "kw",
+              "expected": 1.5,
+              "actual": 1.5,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 9.0,
+              "actual": 9,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 400.0,
+              "actual": 400,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "max_head_m",
+              "expected": 16.0,
+              "actual": 16,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 630.0,
+              "actual": 630,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "solids_mm",
+              "expected": 9.0,
+              "actual": 9,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 3.5,
+              "actual": 3.5,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 236
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 25.9,
+              "actual": 25.9,
+              "match": true,
+              "source_line": 236
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 236,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 236,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 236,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.20T | 2 HP / 1.5 kW | 3\" | 9 m @ 400 LPM | 16 m @ 630 LPM | 9 mm | - | 3.5 A | - / 25.9 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.20T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "50EUB-M-5.30T.md",
+      "markdown": "---\nmodel: 50EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 330\nmax_head_m: 26\nmax_flow_lpm: 550\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 29.8\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 237\n  footnotes: []\n---\n\n# 50EUB-M-5.30T\n\n額定點：揚程 15 m，流量 330 LPM（同一工作點）。\n最大揚程：26 m。\n最大流量：550 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L237。\n\n相關連結：[[50EUB-M-5.30T|50EUB-M-5.30T]]",
+      "frontmatter": {
+        "model": "50EUB-M-5.30T",
+        "series": "EUB-M",
+        "hp": 3,
+        "kw": 2.2,
+        "outlet_inch": 2,
+        "rated_head_m": 15,
+        "rated_flow_lpm": 330,
+        "max_head_m": 26,
+        "max_flow_lpm": 550,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 5.2,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 29.8,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 237,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "50EUB-M-5.30T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "50EUB-M-5.30T",
+              "actual": "50EUB-M-5.30T",
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "hp",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "kw",
+              "expected": 2.2,
+              "actual": 2.2,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 2.0,
+              "actual": 2,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 15.0,
+              "actual": 15,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 330.0,
+              "actual": 330,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "max_head_m",
+              "expected": 26.0,
+              "actual": 26,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 550.0,
+              "actual": 550,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "solids_mm",
+              "expected": 9.0,
+              "actual": 9,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 5.2,
+              "actual": 5.2,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 237
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 29.8,
+              "actual": 29.8,
+              "match": true,
+              "source_line": 237
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 237,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 237,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 237,
+              "actual_page": 11,
+              "quote": "| 50EUB-M-5.30T | 3 HP / 2.2 kW | 2\" | 15 m @ 330 LPM | 26 m @ 550 LPM | 9 mm | - | 5.2 A | - / 29.8 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "50EUB-M-5.30T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.30T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 500\nmax_head_m: 23\nmax_flow_lpm: 700\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 30.0\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 238\n  footnotes: []\n---\n\n# 80EUB-M-5.30T\n\n額定點：揚程 10 m，流量 500 LPM（同一工作點）。\n最大揚程：23 m。\n最大流量：700 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L238。\n\n相關連結：[[80EUB-M-5.30T|80EUB-M-5.30T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.30T",
+        "series": "EUB-M",
+        "hp": 3,
+        "kw": 2.2,
+        "outlet_inch": 3,
+        "rated_head_m": 10,
+        "rated_flow_lpm": 500,
+        "max_head_m": 23,
+        "max_flow_lpm": 700,
+        "solids_mm": 9,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 5.2,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 30.0,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 238,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "80EUB-M-5.30T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.30T",
+              "actual": "80EUB-M-5.30T",
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "hp",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "kw",
+              "expected": 2.2,
+              "actual": 2.2,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 500.0,
+              "actual": 500,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "max_head_m",
+              "expected": 23.0,
+              "actual": 23,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 700.0,
+              "actual": 700,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "solids_mm",
+              "expected": 9.0,
+              "actual": 9,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 5.2,
+              "actual": 5.2,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 238
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 30.0,
+              "actual": 30.0,
+              "match": true,
+              "source_line": 238
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 238,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 238,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 238,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.30T | 3 HP / 2.2 kW | 3\" | 10 m @ 500 LPM | 23 m @ 700 LPM | 9 mm | - | 5.2 A | - / 30.0 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.30T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.50T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 19\nrated_flow_lpm: 600\nmax_head_m: 30\nmax_flow_lpm: 900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 35.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 239\n  footnotes: []\n---\n\n# 80EUB-M-5.50T\n\n額定點：揚程 19 m，流量 600 LPM（同一工作點）。\n最大揚程：30 m。\n最大流量：900 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L239。\n\n相關連結：[[80EUB-M-5.50T|80EUB-M-5.50T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.50T",
+        "series": "EUB-M",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 3,
+        "rated_head_m": 19,
+        "rated_flow_lpm": 600,
+        "max_head_m": 30,
+        "max_flow_lpm": 900,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 9.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 35.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 239,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "80EUB-M-5.50T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.50T",
+              "actual": "80EUB-M-5.50T",
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "hp",
+              "expected": 5.0,
+              "actual": 5,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "kw",
+              "expected": 3.7,
+              "actual": 3.7,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 19.0,
+              "actual": 19,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 600.0,
+              "actual": 600,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "max_head_m",
+              "expected": 30.0,
+              "actual": 30,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 900.0,
+              "actual": 900,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 239
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 35.6,
+              "actual": 35.6,
+              "match": true,
+              "source_line": 239
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 239,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 239,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 239,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.50T | 5 HP / 3.7 kW | 3\" | 19 m @ 600 LPM | 30 m @ 900 LPM | 10 mm | - | 9.5 A | - / 35.6 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.50T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "100EUB-M-5.50T.md",
+      "markdown": "---\nmodel: 100EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 800\nmax_head_m: 18.5\nmax_flow_lpm: 1400\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 34.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 240\n  footnotes: []\n---\n# 100EUB-M-5.50T\n\n額定點：揚程 12.5 m，流量 800 LPM（同一工作點）。\n最大揚程：18.5 m。\n最大流量：1400 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L240。\n\n相關連結：[[100EUB-M-5.50T|100EUB-M-5.50T]]",
+      "frontmatter": {
+        "model": "100EUB-M-5.50T",
+        "series": "EUB-M",
+        "hp": 5,
+        "kw": 3.7,
+        "outlet_inch": 4,
+        "rated_head_m": 12.5,
+        "rated_flow_lpm": 800,
+        "max_head_m": 18.5,
+        "max_flow_lpm": 1400,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 9.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 34.9,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 240,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "100EUB-M-5.50T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "100EUB-M-5.50T",
+              "actual": "100EUB-M-5.50T",
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "hp",
+              "expected": 5.0,
+              "actual": 5,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "kw",
+              "expected": 3.7,
+              "actual": 3.7,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 4.0,
+              "actual": 4,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 800.0,
+              "actual": 800,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "max_head_m",
+              "expected": 18.5,
+              "actual": 18.5,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1400.0,
+              "actual": 1400,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 9.5,
+              "actual": 9.5,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 240
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 34.9,
+              "actual": 34.9,
+              "match": true,
+              "source_line": 240
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 240,
+              "actual_page": 11,
+              "quote": "| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 240,
+              "actual_page": 11,
+              "quote": "| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 240,
+              "actual_page": 11,
+              "quote": "| 100EUB-M-5.50T| 5 HP / 3.7 kW | 4\" | 12.5 m @ 800 LPM| 18.5 m @ 1400 LPM| 10 mm | - | 9.5 A | - / 34.9 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "100EUB-M-5.50T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM（同一工作點）。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：\n- [[80EUB-M-5.75T|80EUB-M-5.75T]]\n- [[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": 7.5,
+        "kw": 5.5,
+        "outlet_inch": 3,
+        "rated_head_m": 25,
+        "rated_flow_lpm": 680,
+        "max_head_m": 33,
+        "max_flow_lpm": 1200,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 241,
+          "footnotes": []
+        }
+      },
+      "attempt": 5,
+      "validation": {
+        "status": "passed",
+        "model": "80EUB-M-5.75T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.75T",
+              "actual": "80EUB-M-5.75T",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "hp",
+              "expected": 7.5,
+              "actual": 7.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "kw",
+              "expected": 5.5,
+              "actual": 5.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 25.0,
+              "actual": 25,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 680.0,
+              "actual": 680,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_head_m",
+              "expected": 33.0,
+              "actual": 33,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1200.0,
+              "actual": 1200,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 51.6,
+              "actual": 51.6,
+              "match": true,
+              "source_line": 241
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.75T",
+              "valid": true
+            },
+            {
+              "target": "100EUB-M-5.75T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "100EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 100EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 4\nrated_head_m: 16\nrated_flow_lpm: 1060\nmax_head_m: 23\nmax_flow_lpm: 1900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 242\n  footnotes: []\n---\n\n# 100EUB-M-5.75T\n\n額定點：揚程 16 m，流量 1060 LPM（同一工作點）。\n最大揚程：23 m。\n最大流量：1900 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L242。\n\n相關連結：[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "100EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": 7.5,
+        "kw": 5.5,
+        "outlet_inch": 4,
+        "rated_head_m": 16,
+        "rated_flow_lpm": 1060,
+        "max_head_m": 23,
+        "max_flow_lpm": 1900,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.4,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 242,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "passed",
+        "model": "100EUB-M-5.75T",
+        "errors": [],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "100EUB-M-5.75T",
+              "actual": "100EUB-M-5.75T",
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "hp",
+              "expected": 7.5,
+              "actual": 7.5,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "kw",
+              "expected": 5.5,
+              "actual": 5.5,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 4.0,
+              "actual": 4,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 16.0,
+              "actual": 16,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 1060.0,
+              "actual": 1060,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "max_head_m",
+              "expected": 23.0,
+              "actual": 23,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1900.0,
+              "actual": 1900,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 242
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 51.4,
+              "actual": 51.4,
+              "match": true,
+              "source_line": 242
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 242,
+              "actual_page": 11,
+              "quote": "| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 242,
+              "actual_page": 11,
+              "quote": "| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 242,
+              "actual_page": 11,
+              "quote": "| 100EUB-M-5.75T| 7.5 HP / 5.5 kW| 4\" | 16 m @ 1060 LPM | 23 m @ 1900 LPM | 10 mm | - | 12.5 A | - / 51.4 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "100EUB-M-5.75T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    }
+  ],
+  "rejected_notes": [
+    {
+      "filename": "80EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: \"7.5\"\nkw: \"5.5\"\noutlet_inch: \"3\"\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM（同一工作點）。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": "7.5",
+        "kw": "5.5",
+        "outlet_inch": "3",
+        "rated_head_m": 25,
+        "rated_flow_lpm": 680,
+        "max_head_m": 33,
+        "max_flow_lpm": 1200,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 241,
+          "footnotes": []
+        }
+      },
+      "attempt": 1,
+      "validation": {
+        "status": "failed",
+        "model": "80EUB-M-5.75T",
+        "errors": [
+          {
+            "code": "spec_value",
+            "field": "hp",
+            "expected": 7.5,
+            "actual": "7.5",
+            "source_line": 241,
+            "present": true
+          },
+          {
+            "code": "spec_value",
+            "field": "kw",
+            "expected": 5.5,
+            "actual": "5.5",
+            "source_line": 241,
+            "present": true
+          },
+          {
+            "code": "spec_value",
+            "field": "outlet_inch",
+            "expected": 3.0,
+            "actual": "3",
+            "source_line": 241,
+            "present": true
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.75T",
+              "actual": "80EUB-M-5.75T",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "hp",
+              "expected": 7.5,
+              "actual": "7.5",
+              "match": false,
+              "source_line": 241
+            },
+            {
+              "field": "kw",
+              "expected": 5.5,
+              "actual": "5.5",
+              "match": false,
+              "source_line": 241
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": "3",
+              "match": false,
+              "source_line": 241
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 25.0,
+              "actual": 25,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 680.0,
+              "actual": 680,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_head_m",
+              "expected": 33.0,
+              "actual": 33,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1200.0,
+              "actual": 1200,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 51.6,
+              "actual": 51.6,
+              "match": true,
+              "source_line": 241
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 1
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.75T",
+              "valid": true
+            },
+            {
+              "target": "100EUB-M-5.75T",
+              "valid": true
+            }
+          ],
+          "body_remaining": ""
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3.0\nrated_head_m: 25.0\nrated_flow_lpm: 680.0\nmax_head_m: 33.0\nmax_flow_lpm: 1200.0\nsolids_mm: 10.0\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": 7.5,
+        "kw": 5.5,
+        "outlet_inch": 3.0,
+        "rated_head_m": 25.0,
+        "rated_flow_lpm": 680.0,
+        "max_head_m": 33.0,
+        "max_flow_lpm": 1200.0,
+        "solids_mm": 10.0,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 241,
+          "footnotes": []
+        }
+      },
+      "attempt": 2,
+      "validation": {
+        "status": "failed",
+        "model": "80EUB-M-5.75T",
+        "errors": [
+          {
+            "code": "body_required",
+            "field": "rated",
+            "expected": "恰好出現一次規定句型",
+            "actual": 0
+          },
+          {
+            "code": "body_extra",
+            "field": "body",
+            "expected": "僅含標題、四句規格、出處與相關連結",
+            "actual": "額定點：揚程25m，流量680LPM。"
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.75T",
+              "actual": "80EUB-M-5.75T",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "hp",
+              "expected": 7.5,
+              "actual": 7.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "kw",
+              "expected": 5.5,
+              "actual": 5.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3.0,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 25.0,
+              "actual": 25.0,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 680.0,
+              "actual": 680.0,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_head_m",
+              "expected": 33.0,
+              "actual": 33.0,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1200.0,
+              "actual": 1200.0,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10.0,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 51.6,
+              "actual": 51.6,
+              "match": true,
+              "source_line": 241
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 0
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.75T",
+              "valid": true
+            },
+            {
+              "target": "100EUB-M-5.75T",
+              "valid": true
+            }
+          ],
+          "body_remaining": "額定點：揚程25m，流量680LPM。"
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": 7.5,
+        "kw": 5.5,
+        "outlet_inch": 3,
+        "rated_head_m": 25,
+        "rated_flow_lpm": 680,
+        "max_head_m": 33,
+        "max_flow_lpm": 1200,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 241,
+          "footnotes": []
+        }
+      },
+      "attempt": 3,
+      "validation": {
+        "status": "failed",
+        "model": "80EUB-M-5.75T",
+        "errors": [
+          {
+            "code": "body_required",
+            "field": "rated",
+            "expected": "恰好出現一次規定句型",
+            "actual": 0
+          },
+          {
+            "code": "body_extra",
+            "field": "body",
+            "expected": "僅含標題、四句規格、出處與相關連結",
+            "actual": "額定點：揚程25m，流量680LPM。"
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.75T",
+              "actual": "80EUB-M-5.75T",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "hp",
+              "expected": 7.5,
+              "actual": 7.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "kw",
+              "expected": 5.5,
+              "actual": 5.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 25.0,
+              "actual": 25,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 680.0,
+              "actual": 680,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_head_m",
+              "expected": 33.0,
+              "actual": 33,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1200.0,
+              "actual": 1200,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 51.6,
+              "actual": 51.6,
+              "match": true,
+              "source_line": 241
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 0
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.75T",
+              "valid": true
+            },
+            {
+              "target": "100EUB-M-5.75T",
+              "valid": true
+            }
+          ],
+          "body_remaining": "額定點：揚程25m，流量680LPM。"
+        }
+      }
+    },
+    {
+      "filename": "80EUB-M-5.75T.md",
+      "markdown": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "frontmatter": {
+        "model": "80EUB-M-5.75T",
+        "series": "EUB-M",
+        "hp": 7.5,
+        "kw": 5.5,
+        "outlet_inch": 3,
+        "rated_head_m": 25,
+        "rated_flow_lpm": 680,
+        "max_head_m": 33,
+        "max_flow_lpm": 1200,
+        "solids_mm": 10,
+        "phase": 3,
+        "current_1ph_a": null,
+        "current_3ph_a": 12.5,
+        "weight_1ph_kg": null,
+        "weight_3ph_kg": 51.6,
+        "source": {
+          "path": "knowledge/EVAK_CATALOG.md",
+          "page": 11,
+          "row_line": 241,
+          "footnotes": []
+        }
+      },
+      "attempt": 4,
+      "validation": {
+        "status": "failed",
+        "model": "80EUB-M-5.75T",
+        "errors": [
+          {
+            "code": "body_required",
+            "field": "rated",
+            "expected": "恰好出現一次規定句型",
+            "actual": 0
+          },
+          {
+            "code": "body_extra",
+            "field": "body",
+            "expected": "僅含標題、四句規格、出處與相關連結",
+            "actual": "額定點：揚程25m，流量680LPM。"
+          }
+        ],
+        "checked": {
+          "fields": [
+            {
+              "field": "model",
+              "expected": "80EUB-M-5.75T",
+              "actual": "80EUB-M-5.75T",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "series",
+              "expected": "EUB-M",
+              "actual": "EUB-M",
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "hp",
+              "expected": 7.5,
+              "actual": 7.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "kw",
+              "expected": 5.5,
+              "actual": 5.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "outlet_inch",
+              "expected": 3.0,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_head_m",
+              "expected": 25.0,
+              "actual": 25,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "rated_flow_lpm",
+              "expected": 680.0,
+              "actual": 680,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_head_m",
+              "expected": 33.0,
+              "actual": 33,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "max_flow_lpm",
+              "expected": 1200.0,
+              "actual": 1200,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "solids_mm",
+              "expected": 10.0,
+              "actual": 10,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "phase",
+              "expected": 3,
+              "actual": 3,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_1ph_a",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "current_3ph_a",
+              "expected": 12.5,
+              "actual": 12.5,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_1ph_kg",
+              "expected": null,
+              "actual": null,
+              "match": true,
+              "source_line": 241
+            },
+            {
+              "field": "weight_3ph_kg",
+              "expected": 51.6,
+              "actual": 51.6,
+              "match": true,
+              "source_line": 241
+            }
+          ],
+          "citations": [
+            {
+              "kind": "raw_row",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "source.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            },
+            {
+              "kind": "body.row_line",
+              "page": 11,
+              "line": 241,
+              "actual_page": 11,
+              "quote": "| 80EUB-M-5.75T | 7.5 HP / 5.5 kW| 3\" | 25 m @ 680 LPM | 33 m @ 1200 LPM | 10 mm | - | 12.5 A | - / 51.6 kg |"
+            }
+          ],
+          "body": [
+            {
+              "block": "rated",
+              "count": 0
+            },
+            {
+              "block": "max_head",
+              "count": 1
+            },
+            {
+              "block": "max_flow",
+              "count": 1
+            },
+            {
+              "block": "independent_maxima",
+              "count": 1
+            }
+          ],
+          "wikilinks": [
+            {
+              "target": "80EUB-M-5.75T",
+              "valid": true
+            },
+            {
+              "target": "100EUB-M-5.75T",
+              "valid": true
+            }
+          ],
+          "body_remaining": "額定點：揚程25m，流量680LPM。"
+        }
+      }
+    }
+  ],
+  "config": {
+    "model": "gemini-3.5-flash-lite",
+    "provider": "gemini",
+    "temperature": 0.3,
+    "project": "dev-c0c8fdff34",
+    "persona": "default",
+    "source_sha256": "9359d7271c6fc866868d85c9967160553d04680a07398863391195d179a80dfa",
+    "scope": "EDW第9頁五列與EUB-M第11頁十列，S/T合併列不拆分",
+    "telemetry": "僅此子程序停用寫入，正式服務設定未修改"
+  },
+  "generation_system_prompt": "你是 openVman 產品筆記編輯，只依給定規格表一列及明示註腳。\n只輸出一篇Markdown，以YAML frontmatter開頭，不加code fence。\n保留model原文，包括S/T。欄位與既有筆記相同：model,series,hp,kw,outlet_inch,\nrated_head_m,rated_flow_lpm,max_head_m,max_flow_lpm,solids_mm,\nphase,current_1ph_a,current_3ph_a,weight_1ph_kg,weight_3ph_kg,\nsource:{path:knowledge/EVAK_CATALOG.md,page:數字頁碼,row_line:數字行號,\nfootnotes:[{page:數字頁碼,line:數字行號}]}。\npage必須是9或11的整數，不是主頁字串。缺值或表中-一律null，不猜測。\nphase：只有單相=1，只有三相=3，S/T合併列=[1,3]。\n電流與重量兩相分欄，不把另一相資料補到null。\nEDW S/T合併列相數需引用第9頁L208註腳；其他型號不需註腳，footnotes填[]。\n正文除型號標題、以下四句、出處與相關連結外，不加其他摘要或解釋：\n額定點：揚程 X m，流量 Y LPM（同一工作點）。\n最大揚程：X m。\n最大流量：Y LPM。\n兩者是各自的極限值，不是同一個工作點。\nX/Y依資料填數字。正文不寫材質、用途、場景、電流、重量或推論。\n出處一行：出處：第 N 頁，LNNN。\n有註腳時寫：出處：第 9 頁，LNNN；註腳：第 9 頁，L208。\n出處只能有自己的資料列與實際用的註腳，不加header行。\n最後可寫相關連結，只用給定檔名映射，可指自身，不捏造其他型號。\n例如[[80EDW-5.20S-T|80EDW-5.20S/T]]。全程繁體中文。",
+  "calls": [
+    {
+      "label": "note-80EDW-5.20S/T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1188,
+        "output_tokens": 427,
+        "total_tokens": 1615,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 2.602,
+      "content": "---\nmodel: 80EDW-5.20S/T\nseries: EDW\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9.5\nrated_flow_lpm: 500\nmax_head_m: 16.4\nmax_flow_lpm: 820\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 11.0\ncurrent_3ph_a: 3.8\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 201\n  footnotes:\n  - page: 9\n    line: 208\n---\n# 80EDW-5.20S/T\n\n額定點：揚程 9.5 m，流量 500 LPM（同一工作點）。\n最大揚程：16.4 m。\n最大流量：820 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L201；註腳：第 9 頁，L208。\n\n相關連結：\n- [[80EDW-5.20S-T|80EDW-5.20S/T]]\n- [[80EDW-5.30S-T|80EDW-5.30S/T]]\n- [[100EDW-5.30S-T|100EDW-5.30S/T]]\n- [[80EDW-5.50T|80EDW-5.50T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 875,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EDW-5.30S/T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1190,
+        "output_tokens": 342,
+        "total_tokens": 1532,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.35,
+      "content": "---\nmodel: 80EDW-5.30S/T\nseries: EDW\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 14.5\nrated_flow_lpm: 500\nmax_head_m: 26.5\nmax_flow_lpm: 980\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 46\nweight_3ph_kg: 45\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 202\n  footnotes:\n  - page: 9\n    line: 208\n---\n\n# 80EDW-5.30S/T\n\n額定點：揚程 14.5 m，流量 500 LPM（同一工作點）。\n最大揚程：26.5 m。\n最大流量：980 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L202；註腳：第 9 頁，L208。\n\n相關連結：[[80EDW-5.30S-T|80EDW-5.30S/T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 875,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EDW-5.30S/T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1192,
+        "output_tokens": 346,
+        "total_tokens": 1538,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.374,
+      "content": "---\nmodel: 100EDW-5.30S/T\nseries: EDW\nhp: 3\nkw: 2.2\noutlet_inch: 4\nrated_head_m: 9.5\nrated_flow_lpm: 800\nmax_head_m: 17.0\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: [1,3]\ncurrent_1ph_a: 15.0\ncurrent_3ph_a: 5.7\nweight_1ph_kg: 47\nweight_3ph_kg: 46\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 203\n  footnotes:\n    - page: 9\n      line: 208\n---\n\n# 100EDW-5.30S/T\n\n額定點：揚程 9.5 m，流量 800 LPM（同一工作點）。\n最大揚程：17.0 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L203；註腳：第 9 頁，L208。\n\n相關連結：[[100EDW-5.30S-T|100EDW-5.30S/T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 877,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EDW-5.50T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1144,
+        "output_tokens": 301,
+        "total_tokens": 1445,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.359,
+      "content": "---\nmodel: 80EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 21.5\nrated_flow_lpm: 400\nmax_head_m: 32.4\nmax_flow_lpm: 1040\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 49.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 204\n  footnotes: []\n---\n\n# 80EDW-5.50T\n\n額定點：揚程 21.5 m，流量 400 LPM（同一工作點）。\n最大揚程：32.4 m。\n最大流量：1040 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L204。\n\n相關連結：[[80EDW-5.50T|80EDW-5.50T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 796,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EDW-5.50T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1146,
+        "output_tokens": 309,
+        "total_tokens": 1455,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.519,
+      "content": "---\nmodel: 100EDW-5.50T\nseries: EDW\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 1000\nmax_head_m: 22.0\nmax_flow_lpm: 1680\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 7.9\nweight_1ph_kg: null\nweight_3ph_kg: 50.5\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 9\n  row_line: 205\n  footnotes: []\n---\n\n# 100EDW-5.50T\n\n額定點：揚程 12.5 m，流量 1000 LPM（同一工作點）。\n最大揚程：22.0 m。\n最大流量：1680 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 9 頁，L205。\n\n相關連結：\n* [[100EDW-5.50T|100EDW-5.50T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 799,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-50EUB-M-5.20S-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1152,
+        "output_tokens": 303,
+        "total_tokens": 1455,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.247,
+      "content": "---\nmodel: 50EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 270\nmax_head_m: 23\nmax_flow_lpm: 500\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 233\n  footnotes: []\n---\n\n# 50EUB-M-5.20S\n\n額定點：揚程 15 m，流量 270 LPM（同一工作點）。\n最大揚程：23 m。\n最大流量：500 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L233。\n\n相關連結：[[50EUB-M-5.20S|50EUB-M-5.20S]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 804,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.20S-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1152,
+        "output_tokens": 303,
+        "total_tokens": 1455,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.316,
+      "content": "---\nmodel: 80EUB-M-5.20S\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 400\nmax_head_m: 17\nmax_flow_lpm: 690\nsolids_mm: 9\nphase: 1\ncurrent_1ph_a: 12.5\ncurrent_3ph_a: null\nweight_1ph_kg: 27.5\nweight_3ph_kg: null\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 234\n  footnotes: []\n---\n\n# 80EUB-M-5.20S\n\n額定點：揚程 10 m，流量 400 LPM（同一工作點）。\n最大揚程：17 m。\n最大流量：690 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L234。\n\n相關連結：[[80EUB-M-5.20S|80EUB-M-5.20S]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 804,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-50EUB-M-5.20T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1151,
+        "output_tokens": 302,
+        "total_tokens": 1453,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.752,
+      "content": "---\nmodel: 50EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 220\nmax_head_m: 21\nmax_flow_lpm: 450\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 26.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 235\n  footnotes: []\n---\n\n# 50EUB-M-5.20T\n\n額定點：揚程 15 m，流量 220 LPM（同一工作點）。\n最大揚程：21 m。\n最大流量：450 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L235。\n\n相關連結：[[50EUB-M-5.20T|50EUB-M-5.20T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 803,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.20T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1150,
+        "output_tokens": 300,
+        "total_tokens": 1450,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.64,
+      "content": "---\nmodel: 80EUB-M-5.20T\nseries: EUB-M\nhp: 2\nkw: 1.5\noutlet_inch: 3\nrated_head_m: 9\nrated_flow_lpm: 400\nmax_head_m: 16\nmax_flow_lpm: 630\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 3.5\nweight_1ph_kg: null\nweight_3ph_kg: 25.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 236\n  footnotes: []\n---\n\n# 80EUB-M-5.20T\n\n額定點：揚程 9 m，流量 400 LPM（同一工作點）。\n最大揚程：16 m。\n最大流量：630 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L236。\n\n相關連結：[[80EUB-M-5.20T|80EUB-M-5.20T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 802,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-50EUB-M-5.30T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1151,
+        "output_tokens": 302,
+        "total_tokens": 1453,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.798,
+      "content": "---\nmodel: 50EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 2\nrated_head_m: 15\nrated_flow_lpm: 330\nmax_head_m: 26\nmax_flow_lpm: 550\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 29.8\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 237\n  footnotes: []\n---\n\n# 50EUB-M-5.30T\n\n額定點：揚程 15 m，流量 330 LPM（同一工作點）。\n最大揚程：26 m。\n最大流量：550 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L237。\n\n相關連結：[[50EUB-M-5.30T|50EUB-M-5.30T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 803,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.30T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1151,
+        "output_tokens": 302,
+        "total_tokens": 1453,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.631,
+      "content": "---\nmodel: 80EUB-M-5.30T\nseries: EUB-M\nhp: 3\nkw: 2.2\noutlet_inch: 3\nrated_head_m: 10\nrated_flow_lpm: 500\nmax_head_m: 23\nmax_flow_lpm: 700\nsolids_mm: 9\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 5.2\nweight_1ph_kg: null\nweight_3ph_kg: 30.0\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 238\n  footnotes: []\n---\n\n# 80EUB-M-5.30T\n\n額定點：揚程 10 m，流量 500 LPM（同一工作點）。\n最大揚程：23 m。\n最大流量：700 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L238。\n\n相關連結：[[80EUB-M-5.30T|80EUB-M-5.30T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 803,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.50T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1152,
+        "output_tokens": 303,
+        "total_tokens": 1455,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.441,
+      "content": "---\nmodel: 80EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 3\nrated_head_m: 19\nrated_flow_lpm: 600\nmax_head_m: 30\nmax_flow_lpm: 900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 35.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 239\n  footnotes: []\n---\n\n# 80EUB-M-5.50T\n\n額定點：揚程 19 m，流量 600 LPM（同一工作點）。\n最大揚程：30 m。\n最大流量：900 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L239。\n\n相關連結：[[80EUB-M-5.50T|80EUB-M-5.50T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 804,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EUB-M-5.50T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1159,
+        "output_tokens": 317,
+        "total_tokens": 1476,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.703,
+      "content": "---\nmodel: 100EUB-M-5.50T\nseries: EUB-M\nhp: 5\nkw: 3.7\noutlet_inch: 4\nrated_head_m: 12.5\nrated_flow_lpm: 800\nmax_head_m: 18.5\nmax_flow_lpm: 1400\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 9.5\nweight_1ph_kg: null\nweight_3ph_kg: 34.9\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 240\n  footnotes: []\n---\n# 100EUB-M-5.50T\n\n額定點：揚程 12.5 m，流量 800 LPM（同一工作點）。\n最大揚程：18.5 m。\n最大流量：1400 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L240。\n\n相關連結：[[100EUB-M-5.50T|100EUB-M-5.50T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 808,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.75T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1156,
+        "output_tokens": 341,
+        "total_tokens": 1497,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 2.143,
+      "content": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: \"7.5\"\nkw: \"5.5\"\noutlet_inch: \"3\"\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM（同一工作點）。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 807,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.75T-attempt2",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1305,
+        "output_tokens": 346,
+        "total_tokens": 1651,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.763,
+      "content": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3.0\nrated_head_m: 25.0\nrated_flow_lpm: 680.0\nmax_head_m: 33.0\nmax_flow_lpm: 1200.0\nsolids_mm: 10.0\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 1162,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.75T-attempt3",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1257,
+        "output_tokens": 334,
+        "total_tokens": 1591,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.417,
+      "content": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 1016,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.75T-attempt4",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1257,
+        "output_tokens": 334,
+        "total_tokens": 1591,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.404,
+      "content": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：[[80EUB-M-5.75T|80EUB-M-5.75T]]、[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 1016,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-80EUB-M-5.75T-attempt5",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1304,
+        "output_tokens": 341,
+        "total_tokens": 1645,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 2.024,
+      "content": "---\nmodel: 80EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 3\nrated_head_m: 25\nrated_flow_lpm: 680\nmax_head_m: 33\nmax_flow_lpm: 1200\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.6\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 241\n  footnotes: []\n---\n\n# 80EUB-M-5.75T\n\n額定點：揚程 25 m，流量 680 LPM（同一工作點）。\n最大揚程：33 m。\n最大流量：1200 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L241。\n\n相關連結：\n- [[80EUB-M-5.75T|80EUB-M-5.75T]]\n- [[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 1084,
+      "max_tokens": 2200
+    },
+    {
+      "label": "note-100EUB-M-5.75T-attempt1",
+      "requested_model": "gemini-3.5-flash-lite",
+      "model": "gemini-3.5-flash-lite",
+      "usage": {
+        "input_tokens": 1159,
+        "output_tokens": 314,
+        "total_tokens": 1473,
+        "cached_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "elapsed_seconds": 1.669,
+      "content": "---\nmodel: 100EUB-M-5.75T\nseries: EUB-M\nhp: 7.5\nkw: 5.5\noutlet_inch: 4\nrated_head_m: 16\nrated_flow_lpm: 1060\nmax_head_m: 23\nmax_flow_lpm: 1900\nsolids_mm: 10\nphase: 3\ncurrent_1ph_a: null\ncurrent_3ph_a: 12.5\nweight_1ph_kg: null\nweight_3ph_kg: 51.4\nsource:\n  path: knowledge/EVAK_CATALOG.md\n  page: 11\n  row_line: 242\n  footnotes: []\n---\n\n# 100EUB-M-5.75T\n\n額定點：揚程 16 m，流量 1060 LPM（同一工作點）。\n最大揚程：23 m。\n最大流量：1900 LPM。\n兩者是各自的極限值，不是同一個工作點。\n\n出處：第 11 頁，L242。\n\n相關連結：[[100EUB-M-5.75T|100EUB-M-5.75T]]",
+      "system_sha256": "ce08877d2c4eca5da12f922feb0fcca418ea92969e990284f41e20367e9126e4",
+      "user_chars": 809,
+      "max_tokens": 2200
+    }
+  ],
+  "usage": {
+    "llm_calls": 19,
+    "provider_attempts": 2,
+    "provider_attempts_unrecorded_calls": 17,
+    "missing_usage_calls": 0,
+    "tokens": {
+      "input_tokens": 22516,
+      "output_tokens": 6167,
+      "total_tokens": 28683,
+      "cached_tokens": 0,
+      "reasoning_tokens": 0
+    }
+  },
+  "route_attempts": [
+    {
+      "trace_id": "product-notes-round3-note-80EUB-M-5.75T-attempt5",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1705.1534252166748,
+      "chain_length": 1
+    },
+    {
+      "trace_id": "product-notes-round3-note-100EUB-M-5.75T-attempt1",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "hop_index": 0,
+      "result": "success",
+      "latency_ms": 1559.6134824752808,
+      "chain_length": 1
+    }
+  ],
+  "integrity": {
+    "file_count_before": 2921,
+    "file_count_after": 2921,
+    "digest_before": "4672b4c7f057477ea2dfc2102bc11e91176218be72ca7df3477bd7dc7218b175",
+    "digest_after": "4672b4c7f057477ea2dfc2102bc11e91176218be72ca7df3477bd7dc7218b175",
+    "changed": []
+  }
+}
