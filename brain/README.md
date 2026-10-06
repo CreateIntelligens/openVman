@@ -1,664 +1,294 @@
 # Brain
 
-`brain/` 是目前這個專案的本地 AI console 與知識中樞。它把人格設定、工具描述、長短期記憶、知識檢索、聊天生成、文件管理與向量索引收斂成一套可直接跑的系統。
+Brain 是 openVman 的認知層：讀取各專案的人設與知識庫，執行檢索、工具呼叫與 LLM 生成，並管理對話記憶、用量帳本與 Gemini Live 會話。它只對 Backend 開放，瀏覽器與外部客戶端一律經 Backend 的 `/api/v1/*` 存取。
 
-目前架構已經不是純 skeleton，而是可用狀態：
+設計規格見 [docs/specs/03_BRAIN_SPEC.md](../docs/specs/03_BRAIN_SPEC.md)，與 Backend 的介面見 [01_BACKEND_SPEC.md](../docs/specs/01_BACKEND_SPEC.md)，部署見 [docs/operations/11_DEPLOYMENT.md](../docs/operations/11_DEPLOYMENT.md)。
 
-- 有前端 console，可直接聊天、查 health、測 embedding、查向量搜尋、寫 memory、管理 workspace 文件
-- 有後端 API，支援同步生成、SSE 串流生成、知識重建索引、文件上傳/編輯/搬移
-- 有 workspace 檔案系統，承載 `SOUL`、`AGENTS`、`TOOLS`、`MEMORY`、每日對話日誌與 learnings
-- 有 LanceDB 向量資料庫，維護 `knowledge` 與 `memories` 兩張表
-- 支援 Gemini 作為 LLM，並透過獨立 embedding gateway 取得向量
-- 支援 2md 即時網路搜尋與 URL／文件讀取，服務順序為 `2md.aiurl.tw` → `2md.glsoft.ai` → `create360.ai`
-- 支援 David888 Wiki 長篇報告發布；回應只保留公開 `shareUrl`
-
-## 入口與 Gemini Live 分工
-
-`api/main.py` 只組裝 FastAPI、路由與 middleware。`api/startup.py` 管理專案遷移、Privacy Filter 失敗降級、台語判斷先行預熱、embedding／LanceDB 逐專案預熱，以及備份／dreaming 背景任務的啟停；`api/safety/server_http.py` 管理 logging、HTTP trace 與 metrics。預熱成功／失敗釋放 readiness 的規則維持原樣。
-
-`api/live/gemini_live.py` 的 `GeminiLiveSession` 保留會話、重連、每輪語言、持久化與用量協調介面；`gemini_transport.py` 擁有 JSON WebSocket 傳輸，`gemini_payloads.py` 擁有 setup、轉錄及 PCM／WAV 編碼，`gemini_tool_execution.py` 擁有專案／persona 範圍內的工具執行與搜尋。工具開關、明確記憶授權、台語文件優先、citations 與既有回傳格式維持原樣。本次不改 Backend／Brain API 合約、DB schema、外部工具供應商或部署設定。
-
-單元測試的 patch 位置跟隨真正責任模組；可用 `cd brain/api && python -m pytest tests/ -m "not integration" -q` 驗證。根目錄 `tests/test_entry_boundaries.py` 同時保護兩個 Python 入口與自有正式程式檔行數邊界。
-
-## Security boundaries
-
-- `ASR_PROMPT.md` 是可選詞表：不存在或無法讀取時忽略，不阻擋對話；讀取錯誤僅記錄錯誤類型。快取比對 `st_mtime_ns`、`st_size`、`st_ctime_ns`、`st_ino`。內容經 HTML 跳脫後置於 `<glossary>`，明確標示為參考資料而非指令；此提示邊界不能取代工具與資料 API 的權限檢查。
-- 詞表快取仍依賴檔案 metadata；若檔案系統讓以上四項完全相同，不能保證偵測內容變化。部署詞表宜採原子替換，避免保留全部 metadata 的原地覆寫。
-
-- Brain 的 project data 路由由 Backend 先做 project resource authorization；dreaming、session export/delete、memory mutation 等寫入性操作需要更高權限。
-- `search_knowledge`、`search_memory` 與其他工具的回傳值一律視為不可信資料，不能授權另一個工具執行；`save_memory` 需要目前使用者明確要求記憶——由 Jev 判斷（沒設 `TYPESAFE_API_KEY` 或失敗時退回關鍵字規則），文字與 Gemini Live 兩條路徑都檢查。
-- `main.py` 是 operator-managed skill source，不能透過技能檔案 API 上傳或替換。生產環境的 shared/project skill source 應維持唯讀並走 code review。
-- `read_web_page` 只接受可解析到公開網路位址的 HTTP(S) URL；private、loopback、link-local、reserved、multicast、unspecified 位址會被拒絕。
-- 2md endpoint 預設順序由不可變的 `TWO_MD_BASE_URLS` 統一管理；同一 logical request 只會序列呼叫一個 endpoint，並共用整條 fallback chain 的 deadline。
-- 2md 失敗時使用 bounded full-jitter、local single-flight 與可選 Redis circuit／half-open lease；Redis 不可用時降級為 process-local coordination，不保存網頁正文。
-- Embedding gateway 沒有設定 Bearer token 時會 fail closed；瀏覽器 CORS 必須由 `EMBEDDING_ALLOWED_ORIGINS` 明確列出 origin。
-- A2A tools 只透過 Backend internal facade 執行；Brain 不讀取 Backend 的 A2A credential file，也不會接觸 Hub agent token。Peer 內容一律視為 untrusted input。
-
-## 1. 系統目標
-
-`brain` 的角色不是單純聊天 API，而是：
-
-- 讀取核心人格與規則文件
-- 管理可編輯的知識工作區
-- 將 markdown / txt / csv 內容轉成可檢索知識
-- 依照當前對話檢索 `knowledge` 與 `memories`
-- 組 prompt 後呼叫 LLM 生成回覆
-- 把 session 對話保存在短期記憶，並在每日歸檔
-- 從互動中提取穩定偏好與錯誤，寫回 `.learnings`
-
-## 2. 目前架構總覽
+## 架構與執行元件
 
 ```text
-browser
-  -> nginx (:8787 public entry)
-    -> web (Vite frontend)
-    -> api (FastAPI, internal :8100)
-      -> workspace files (/data/workspace in container)
-      -> LanceDB (/data/projects/default/lancedb in container)
-      -> embedding gateway (internal :8009 or explicit external URL)
-        -> BGE-M3 / Gemini / OpenAI / Voyage providers
-      -> Gemini / OpenAI-compatible LLM endpoint
+Backend (/api/v1/*)
+  -> Brain API  (compose 服務 api，容器內 :8100，只在內部網路)
+       -> 專案資料    brain/data/projects/<project_id>/（workspace、LanceDB、sessions.db）
+       -> Embedding gateway（compose 服務 embedding，:8009，或外部 EMBEDDING_SERVICE_URL）
+       -> LLM providers（Gemini、OpenAI、Groq、NEN 等，依 fallback chain）
+       -> 外部工具：2md（搜尋／讀網頁）、David888 Wiki、Jev（TypeSafe）
+       -> Redis（2md circuit 協調，選用）
 ```
 
-### Runtime components
-
-- `nginx`
-  - 對外唯一入口
-  - 將 `/brain/*` 代理到 `api:8100`
-  - 將前端頁面與靜態資源對外提供
-- `web`
-  - 使用者操作介面
-  - 目前是單頁 console，包含 `Chat / Health / Embed / Search / Memory / Workspace`
-- `api`
-  - 真正的大腦服務
-  - 負責透過 HTTP 取得 embedding、檢索、記憶寫入、聊天生成、workspace 管理、索引重建
-  - 不載入 BGE 權重，也不直接建立 embedding provider client
-- `embedding`
-  - 獨立的 embedding gateway
-  - 負責 BGE-M3 推論、remote provider fallback、模型 readiness 與回傳 embedding identity
-- `workspace`
-  - 可編輯知識來源與核心設定區
-- `lancedb`
-  - 向量檢索層
-
-## 3. 目錄結構
-
-```text
-brain/
-├── api/                      # FastAPI backend
-├── embedding/                # 獨立 embedding gateway
-├── web/                      # Vite frontend console
-├── nginx/                    # Reverse proxy
-├── data/
-│   └── workspace/
-│       ├── SOUL.md
-│       ├── AGENTS.md
-│       ├── TOOLS.md
-│       ├── MEMORY.md
-│       ├── hospital_education/
-│       ├── memory/
-│       │   └── YYYY-MM-DD.md
-│       ├── .learnings/
-│       │   ├── LEARNINGS.md
-│       │   └── ERRORS.md
-│       └── ...
-├── docker-compose.yml
-├── .env
-└── .env.example
-```
-
-### 重要資料夾說明
-
-- `brain/api`
-  - 後端主程式與業務邏輯
-- `brain/embedding`
-  - embedding gateway 與 BGE-M3 / remote provider adapters
-- `brain/web`
-  - 前端 console
-- `brain/data/workspace`
-  - Brain 的核心工作區
-  - host 路徑，會掛進容器內的 `/data/workspace`
-  - 這裡的 `.md / .txt / .csv` 文件是知識來源與行為設定來源
-- `/data/projects/default/lancedb`
-  - API 的 LanceDB 預設資料路徑
-  - 在 Docker compose 中對應到 `brain-data` volume
-
-## 4. Workspace 模型
-
-目前 `workspace` 是整個系統最重要的內容層。這不是純資料夾，而是 Brain 的可編輯知識與規則面。
-
-如果核心文件不存在，API 啟動時會自動建立 scaffold 與預設模板。
-
-### 核心文件
-
-- `SOUL.md`
-  - 人格、語氣、價值觀、長期風格限制
-- `AGENTS.md`
-  - 任務分派、外部系統或流程角色定義
-- `TOOLS.md`
-  - 可用工具與其 schema / 使用規則
-- `MEMORY.md`
-  - 長期核心記憶
-
-這四份文件會在生成 prompt 時直接讀入，不走向量索引。
-
-### 對話與學習
-
-- `memory/YYYY-MM-DD.md`
-  - 每日對話歸檔
-- `.learnings/LEARNINGS.md`
-  - 從互動中提取的穩定偏好、表達習慣、長期傾向
-- `.learnings/ERRORS.md`
-  - 生成或輸入失敗的記錄
-
-### 知識文件
-
-除了上述核心文件外，其餘符合規則的 markdown / txt / csv 文件都可以被視為可索引知識來源，例如：
-
-- `hospital_education/*.md`
-- 其他手動建立或上傳的工作文件
-
-### 目前索引排除規則
-
-以下內容不會進入 `knowledge` 向量索引：
-
-- `SOUL.md`
-- `AGENTS.md`
-- `TOOLS.md`
-- `MEMORY.md`
-- `.learnings/LEARNINGS.md`
-- `.learnings/ERRORS.md`
-- `memory/` 底下的每日對話日誌
-
-原因是這些內容不是一般知識庫，而是 prompt 組裝或歸檔資料來源。
-
-## 5. Backend 模組分工
-
-### `api/main.py`
-
-FastAPI 入口。負責：
-
-- 啟動時建立 workspace scaffold
-- 初始化 LanceDB 連線
-- 背景 warmup remote embedding gateway 與資料表
-- 暴露 REST / SSE endpoints
-
-### `api/config.py`
-
-集中管理環境變數與 LLM/embedding gateway 設定。包含：
-
-- LLM provider
-- LLM model
-- API key
-- embedding gateway URL / token / timeout
-- 預期 embedding specification、write identity 與 legacy identity mapping
-- LanceDB 路徑
-- 記憶與輸入長度限制
-
-### `api/db.py`
-
-封裝 LanceDB 連線與資料表初始化。
-
-目前主要表：
-
-- `knowledge`
-- `memories`
-
-### `api/memory/embedder.py`
-
-負責呼叫 remote embedding gateway 並驗證向量契約。支援：
-
-- pooled HTTP client 與 bounded chunking
-- query/document input semantics
-- acceptable identity 與 write identity 約束
-- 跨 chunk identity/specification 一致性驗證
-- 啟動後背景 warmup remote gateway 與 LanceDB 查詢路徑
-
-### `api/retrieval.py`
-
-負責向量搜尋：
-
-- `knowledge` 檢索
-- `memories` 檢索
-- 結果格式清洗與分數整理
-
-### `api/memory.py`
-
-負責記憶系統：
-
-- `memories` 表寫入
-- session 對話暫存
-- 每日 markdown 歸檔
-
-### `api/prompt_builder.py`
-
-將下列資訊組成最終 prompt：
-
-- `SOUL.md`
-- `AGENTS.md`
-- `TOOLS.md`
-- `MEMORY.md`
-- `.learnings/LEARNINGS.md`
-- session context
-- `knowledge` / `memories` 檢索結果
-- 使用者本輪輸入
-
-### `api/chat_service.py`
-
-協調整個生成流程：
-
-1. 驗證輸入
-2. 載入 session
-3. 寫入本輪 user message
-4. 產生 query embedding
-5. 查 `knowledge` 與 `memories`
-6. 建 prompt
-7. 呼叫 LLM
-8. 寫回 assistant message
-9. 歸檔 daily memory
-10. 抽取 learnings / errors
-
-### `api/llm_client.py`
-
-封裝 LLM 呼叫，目前支援：
-
-- 一般同步生成
-- SSE 串流生成
-- OpenAI-compatible base URL 介面
-- Gemini provider
-
-### `api/workspace.py`
-
-負責 workspace 的檔案規則：
-
-- scaffold 建立
-- 路徑解析
-- 判斷文件是否可索引
-- 列出可管理文件
-
-### `api/indexer.py`
-
-將 workspace 文件重建到 `knowledge` 向量表。支援：
-
-- markdown 文件 chunking
-- QA 形式 markdown 解析
-- QA 形式 csv 解析
-- 重建時覆寫 `knowledge` 表
-
-### `api/knowledge_admin.py`
-
-後台文件管理 API：
-
-- 列表
-- 讀取
-- 編輯
-- 搬移
-- 上傳
-- reindex
-
-### `api/learnings.py`
-
-負責：
-
-- 提取穩定偏好並追加到 `LEARNINGS.md`
-- 記錄錯誤到 `ERRORS.md`
-
-## 6. Frontend Console
-
-前端位於 `brain/web`，目前是一個整合型 console。
-
-### `Chat`
-
-主要聊天介面，支援：
-
-- 同步生成與串流生成
-- session 保存
-- evidence / citation 卡片
-- learnings 顯示
-- stop 中斷
-
-### `Health`
-
-檢查系統狀態，例如：
-
-- API 健康度
-- table 狀態
-- workspace 文件數量
-- LLM / embedding model 名稱
-
-### `Embed`
-
-直接測試文字 embedding，用於確認模型與裝置是否正常。
-
-### `Search`
-
-直接查 `knowledge` / `memories` 的向量檢索結果。
-
-### `Memory`
-
-手動新增 memory 到 `memories` 表。
-
-### `Workspace`
-
-後台文件管理台，支援：
-
-- 文件列表與分組
-- 編輯 markdown
-- 調整 `Relative Path` 以搬移/改名
-- 上傳文件
-- 觸發 reindex
-- 快速開啟 `LEARNINGS.md` / `ERRORS.md`
-
-## 7. Chat 與 RAG 流程
-
-### 同步生成
-
-```text
-user input
-  -> validate
-  -> session read
-  -> build prompt from workspace + persona + history
-  -> LLM call 1（tool_choice=required：模型一次決定要查哪些；search_knowledge 未叫會自動補上，需要時同時叫 search_web）
-  -> 平行執行第一輪的所有工具（知識庫：AI 改寫 queries + 原句各自檢索後 RRF 融合；網路：search_web）
-  -> LLM call 2+（不再提供 search_knowledge，其他工具照常；模型可再查網路後作答，串流走這些回合）
-  -> append user + assistant reply
-  -> archive daily memory
-  -> capture learnings / errors
-```
-
-### 思考中補句與回答接收確認
-
-虛擬人前台在文字模式等待回答時，可將補充句以換行合併重送。`POST /api/v1/chat`
-（內部 `/brain/chat`）額外提供 `turn_id`（1–128 字）、`turn_revision`（正整數）
-及固定的 `session_id`；同一輪補句沿用 ID、版本加一。兩個回合欄位必須一起提供。
-這類回答先暫存於該專案 session SQLite 的 `chat_turns`，回應包含
-`requires_accept: true`、`turn_id`、`turn_revision`；此時尚未寫入對話、每日
-日誌或自動記憶。模型與工具已開始的工作可能繼續執行，這不是模型呼叫的取消保證。
-
-前台完整收到並接受目前版本後，送 `POST /api/v1/chat/accept`（內部
-`/brain/chat/accept`），JSON 為 `project_id`、`persona_id`、`session_id`、
-`turn_id`、`turn_revision`。成功回一般 Chat 回應與 `requires_accept: false`；
-版本已被取代、回合不存在／尚未生成或主體不符回 `409 TURN_SUPERSEDED`。
-確認具冪等性，重試不重複寫入對話、日誌與記憶；版本比對、兩則訊息寫入與確認標記
-在同一個 SQLite 交易內完成，涵蓋多 worker 及重啟。收到答案但確認尚未完成時，
-下一輪需等待確認後才生成，才能讀到完整歷史。
-
-這兩個公開端點沿用 Backend 帳號登入與專案讀取授權；Brain 需要
-`X-Internal-Token`，回合另外綁定 Backend 注入的 principal type／ID 與人設。
-未提供回合欄位的後台 Chat、外部 SDK 及既有 API 呼叫維持直接落庫；視覺事件與
-Live WebSocket 不使用這個確認流程。未確認的答案隨空 session／session TTL
-清理，session 刪除也連帶刪除暫存回合。每個 session 的回合收據最多保留
-`max_session_rounds × 2` 筆（至少 20 筆），超出歷史視窗的確認回 `409`。
-部署此功能需更新 api、backend、avatar；舊 Brain 忽略回合欄位時仍能回答，
-但不具有未接收答案不落庫的保護。
-
-一般使用者回合固定是「先查、再答」兩次呼叫。行為由根目錄 `.env` 控制：
-
-- `CHAT_FORCE_KNOWLEDGE_SEARCH`（預設 `true`）：第一次呼叫必須使用工具（`tool_choice=required`），模型一次決定要查哪些；沒叫 `search_knowledge` 會自動補上，知識庫與網路在同一輪平行查。
-  只在該工具真的註冊給當前 persona/project 時生效；slash command 指定的工具永遠優先。
-- `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`（預設 `1`）：第一輪之後最多再追加幾輪工具，超過就收掉工具逼模型作答；一般問題兩次呼叫、最壞三次。
-- `CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`（預設 `true`）：查完知識庫後的回合拿掉 `search_knowledge`，其他工具（`search_web`、wiki、技能）照常可用，所以問天氣仍會上網查；回合數仍受 `AGENT_LOOP_MAX_ROUNDS` 限制。
-
-兩者都關閉即退回舊的 `tool_choice=auto` 多輪行為。若 provider 忽略強制設定直接回文字，
-該文字會被接受為答案並記一筆 warning，不會卡在迴圈裡。
-
-模型呼叫這一輪沒有提供的工具（例如 fast 模式查完知識庫後工具已收回，它仍照提示叫 `search_web`）時，那筆呼叫不執行，記一筆 warning，並請模型直接用文字作答。參數正確也不執行，否則等於繞過模式的上網限制。同一回合如果已有文字，就把文字當成答案。
-
-## 8. API 一覽
-
-### Core API
-
-- `GET /brain/health`
-  - 回傳服務健康狀態
-- `POST /brain/embed`
-  - 將文字轉成 embedding
-- `POST /brain/search`
-  - 對 `knowledge` 或 `memories` 搜尋
-- `POST /brain/memories`
-  - 寫入 memory
-- `POST /brain/chat`
-  - 取得完整回答（含 tool call 執行結果與本次模型呼叫的 `usage` 彙總）
-- `POST /brain/chat/accept`
-  - 確認已接收目前版本的可合併回答，才寫入對話與自動記憶
-- `GET /brain/chat/history`
-  - 讀取當前 session history
-- `GET /brain/sessions`、`GET /brain/sessions/export`
-  - 對話列表與匯出，可用 `language=zh|en|es` 篩選（語言取最後一則使用者訊息，規則即時判、Jev 背景校正）
-- 專案 workspace 的 `ASR_PROMPT.md`（選填）：語音專有名詞詞表，「#」開頭是說明、其餘整份（最多 800 字）放進每輪對話提示，告訴模型訊息可能是語音辨識結果、專有名詞可能被聽成同音字，理解問題與寫知識庫查詢時先對回。可加「常見誤聽：UNI本→污泥泵」這類對照。實測見 `scripts/experiments/asr-glossary/`
-- `GET /brain/internal/asr-glossary?project_id=`
-  - 回 `{"terms": "..."}`：專案 `ASR_PROMPT.md` 裡正確的專有名詞（去掉「#」說明與「常見誤聽：A→B」對照行，最多 2000 字）；Backend 語音辨識前取來帶給 Breeze（`/transcribe` 的 `prompt`）與 OpenAI 辨識
-- `POST /brain/internal/asr-judge`
-  - body `{"project_id", "languages", "interim", "final"}`（`languages` 是這條連線實際生效的分流，前台臨時關掉的語言不算；沒給用後台設定），回 `{"text", "chosen": "interim"|"final", "scores", "reason"}`；Backend 的 Gemini Live 串流辨識定稿跟最後暫定字幕不同時呼叫。兩段文字各自問 Jev「像不像正確辨識的一句話」（情境帶專案名稱與語言分流），暫定字幕高出 0.2 以上才換，否則、Jev 關閉或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`；離線驗證見 `scripts/experiments/asr-final-judge/`）
-- `POST /brain/internal/audio-language`
-  - body 是 WAV，回 `{"language": "nan"|"zh"|...|null}`；Backend ASR 在台語分流時呼叫（gemini-3.5-flash-lite 聽聲音）
-- `GET/PUT /brain/knowledge/settings`
-  - 知識庫語言分流（`language_routes`：zh、en、es、nan＝台語、ja、ko，至少一條、不必含 zh，順序＝優先順序、第一條是主要語言）；只有一條不分流；多條時所有文件都查得到，使用者語言的文件優先、不夠用主要語言再用其他語言補；勾台語才聽台語；回答長度（`reply_seconds`，回答要在幾秒內念完，預設 20、0＝不限制、上限 120；只送分流不帶秒數時保留原值）。GET／PUT 回應另附 `speech_rates`（每秒字數／單字數），後台用它即時換算
-- `PATCH /brain/knowledge/document/meta`
-  - 文件啟用、來源與語言（`language=zh|en|es|auto`）。知識庫依使用者語言讓同語言文件優先，不夠再用主要語言與其他語言補
-- `GET /brain/backups/sessions`、`POST /brain/backups/sessions`
-  - 對話備份列表與立即備份（`{"dry_run": true}` 只算數量）；每天 03:00 自動依語言分檔備份到 `/data/backups/sessions`。只收 internal token，對外經 Backend 限 ROOT。預覽與備份以單一 SQLite 查詢讀取每個專案的摘要和訊息，不執行 TTL 清理；尚存於資料庫的過期對話也會保留在備份。
-
-### Token Usage API
-
-Brain 將每次 LLM 呼叫的 provider、model、延遲與 token 數寫入
-`/data/usage.db`。這是跨專案共用的 append-only SQLite ledger；事件仍保留
-`user_id`、`project_id`、`session_id`、`trace_id` 與呼叫類型，供查詢時篩選。
-
-除了 LLM，Gemini Live（按音訊秒數）與 Backend 的 TTS（按字元數）也記進同一本
-帳。帳本由 Brain 單一擁有：Backend 不直接開這個 SQLite 檔，而是 POST 到下面的
-`/brain/usage/events`，與它代理讀取的方向對稱。
-
-- `GET /brain/usage/summary`
-  - 依 `model`、`user`、`project`、`kind` 或 `session` 彙總
-- `GET /brain/usage/events`
-  - 依帳號、專案、session、trace、類型與時間區間查詢事件
-- `GET /brain/usage/timeseries`
-  - `bucket=hour|day|month`、選填 `group_by`、`limit=1..50`（預設 8），支援與 summary 相同的資料篩選
-  - `report_timezone=UTC|Asia/Taipei`（預設 UTC），先轉報表時區再分桶；不支援的值回傳 400
-  - 回傳 `bucket`、`report_timezone`、`group_by`、`periods`、`series`、`points`；有分組時用 `series`，否則用 `points`，其餘低用量分組併成 `__other__`
-- `POST /brain/usage/events`
-  - 給其他服務寫入非 LLM 的用量事件；Backend 的 TTS 走這條路徑
-  - 必填 `provider`、`unit_type`、`units`；其餘歸屬欄位（`user_id`、`principal_type`、
-    `project_id`…）由呼叫端帶入，Brain 不自行推斷
-  - 成功回 201 `{"recorded": true}`；`provider` 空白或 `units` 為負回 400
-  - Backend 端用 `usage_scope_for(current)` 產生歸屬欄位，主體判定與
-    `brain_proxy._trusted_upstream_headers()` 同一套規則：帶 embed key 的請求記成
-    `principal_type=embed_key`（`principal_id` 為金鑰 ID，`user_id` 仍保留），
-    其餘記成 `user`。所以 TTS 與 LLM 的用量可以用同一組維度彙總。
-
-#### 計量單位（`unit_type` / `units`）
-
-不是所有用量都按 token 計價，所以帳本用 `unit_type` 標示單位，`units` 存數量：
-
-| `unit_type` | 誰在用 | `units` 的意義 |
+| 元件 | 位置 | 說明 |
 |---|---|---|
-| `tokens`（預設） | LLM 呼叫 | 0；實際數字在既有的 `input_tokens` / `output_tokens` / `total_tokens` |
-| `chars` | TTS | 送去合成的字元數 |
-| `seconds` | Gemini Live | 音訊秒數，輸入與輸出分開記（費率不同，合併就無法還原成本） |
+| Brain API | `brain/api/` | FastAPI；`main.py` 只組裝路由與 middleware，生命週期在 `startup.py` |
+| Embedding gateway | `brain/embedding/` | 獨立服務，負責 BGE-M3 推論與 Gemini／OpenAI／Voyage 備援；Brain 不載入模型權重 |
+| 共用技能 | `brain/skills/` | 掛載到容器 `/skills`（唯讀），所有專案共用 |
+| 執行期資料 | `brain/data/` | 掛載到容器 `/data`，gitignored |
 
-Live 秒數事件沿用 Backend 驗證後的 `user_id`、`role`、`principal_type`、
-`principal_id`，因此帳號與 Embed key 篩選也涵蓋 Live。正常回合完成或連線關閉
-都會清算未記錄的音訊；取消 listener 時會等待已開始的入帳，不重複計算同一段。
+Edge nginx 對 `/brain/` 一律回 404。除了 `GET /brain/health` 與 `GET /brain/health/ready`，所有路由都要求 `X-Internal-Token`（值為 `GATEWAY_INTERNAL_TOKEN`）。Backend 先做帳號與專案授權，再以 `X-OpenVMan-User-ID`、`X-OpenVMan-Role`、`X-OpenVMan-Project-ID`、`X-Principal-Type`、`X-Principal-Id` 傳入身分。
 
-每輪 system prompt 最後指定回答語言，並以「念多久」限制長度：秒數由各專案在後台知識庫設定填（`reply_seconds`，預設 20 秒、0＝不限制），依實測語速換成每秒中日韓 4 字、英西 1.5 個單字，寫成硬上限「每次回覆嚴格不超過 N 字，超過即違規」，一次問好幾件事時每件只講重點（`core/prompt_templates.reply_length_line`；不給「要詳細規格可以更長」的例外，模型會拿它當理由寫長；只靠提示詞，不截斷）。fast 模式模型想再查資料被擋下時，催促訊息後面也會再附一次這行。
+### 啟動流程
 
-知識庫語言分流不過濾文件，只排先後：使用者語言的文件優先進 top_k，不夠再用主要語言、
-其他語言補。使用者語言有勾分流時會逐次擴大候選窗，直到同語言結果足夠或候選耗盡。擴展詞向量在同一次查詢內快取。語言尚未存成索引
-欄位，因此大型知識庫缺少目標語言時可能需檢查全部候選。Live 文字新回合會清除
-前一回合的語音語言判定，避免台語標記沿用到新的英文或中文文字提問。
+`startup.lifespan` 依序：
 
-查詢時要**依 `unit_type` 分開加總**——把字元數和 token 相加不具意義。舊資料
-在 migration 後一律是 `tokens`，既有的 token 欄位不受影響。
+1. 建立 default 專案 workspace scaffold，執行一次性的舊目錄遷移（`scripts/migrate_to_projects.py`）。
+2. `PRIVACY_FILTER_ENABLED` 時載入 Privacy Filter 模型；GPU 失敗改用 CPU，CPU 也失敗就停用過濾，不擋啟動。
+3. 背景預熱：先預熱台語語音判斷的 Gemini client，再依序對每個有資料的專案建立資料表，並對 `knowledge` 與 `memories` 各跑一次實際檢索。預熱失敗只記 warning。
+4. `DREAMING_ENABLED` 時啟動 dreaming 排程；啟動每日對話備份排程。
 
-`/brain/usage/summary` 的 `totals` 與每個 `groups` 列都會多出 `chars` 與
-`seconds` 兩個欄位（各自只加總對應 `unit_type` 的事件，其餘為 0），所以同一份
-回應可以同時呈現三種單位而不會互相污染。
+Embedding gateway 不可達、回傳未授權的 identity 或向量規格不符時，Brain fail closed，不會在 API process 內自行改用其他 provider。
 
-這些 Brain endpoint 只接受 `X-Internal-Token`。瀏覽器與外部客戶端應改用
-Backend 的 `/api/v1/usage/summary`、`/api/v1/usage/timeseries` 與 `/api/v1/usage/events`；Backend 允許正式管理員
-查詢指定帳號，其餘帳號固定只能查詢自己的資料。
+## 目錄結構
 
-帳本以 UTC 儲存，查詢採 `since <= created_at < until`。Admin 報表以
-`Asia/Taipei` 為業務日：將開始日午夜及結束日次日午夜轉成 UTC 邊界，
-日期預設值、趨勢分桶及事件時間皆採台北時間，不受瀏覽器或容器時區影響。
+| 路徑 | 職責 |
+|---|---|
+| `api/core/` | 對話主流程：`chat_service`、`agent_loop`、`prompt_builder`、`prompt_templates`、`reply_modes`、`chat_turns`、`llm_client`、`provider_router`／`fallback_chain`、`usage`、`jev_client`、`two_md` |
+| `api/knowledge/` | workspace 規則、索引（`indexer`、`chunking`、`qa_csv`）、文件管理、語言與文件中繼資料、知識圖譜、產品規格表 |
+| `api/memory/` | embedding client、檢索與融合、session store、記憶治理、auto recall、dreaming、語言判斷、對話備份、ASR 定稿判斷 |
+| `api/tools/` | 工具註冊、執行、技能管理；內建工具在 `tools/builtin/` |
+| `api/live/` | Gemini Live：會話協調、WebSocket 傳輸、payload 編碼、工具執行 |
+| `api/privacy/` | Privacy Filter 模型載入、偵測與稽核 |
+| `api/infra/` | LanceDB、專案路徑、用量帳本、錯誤紀錄 |
+| `api/routes/`、`api/internal_routes.py` | HTTP 與內部 WebSocket 路由 |
+| `api/safety/` | 內部驗證、guardrails、logging、metrics |
+| `api/scripts/` | 遷移與維運腳本（例如 `reindex_knowledge.py`） |
 
-### Dreaming 日期與每日防重
+## 專案資料與 Workspace
 
-Dreaming 以 `DREAMING_TIMEZONE`（預設 `Asia/Taipei`）判斷今天是否已完成。
-`completed_at` 仍以 UTC 儲存，比較前先轉成設定時區；沒有 offset 的舊時間戳按 UTC 解讀。
-每次 cycle 使用開始時的當地日期產生每日記憶與報告，避免跨午夜或容器 `TZ`
-不同時分散到不同日期。`force=false` 略過當地同日已完成的 cycle，`force=true` 仍可強制執行。
+每個專案的資料在 `brain/data/projects/<project_id>/`（容器內 `/data/projects/<project_id>/`）：
 
-### 即時外部工具
+| 路徑 | 內容 |
+|---|---|
+| `workspace/` | 人設、知識文件與日誌，見下表 |
+| `lancedb/` | `knowledge` 與 `memories` 向量表（含 FTS 索引） |
+| `sessions.db` | 對話 session、訊息與待確認回合（SQLite） |
+| `knowledge_index_state*.json` | 各 embedding identity 的文件 fingerprint |
 
-- `search_web(query, top_k?)`
-  - 透過 2md 執行即時公開網路搜尋
-- `read_web_page(url)`
-  - 透過 2md 讀取網頁、PDF 或其他支援文件並轉成 Markdown
-- `publish_wiki(path, markdown, append?, public?, share?, theme?)`
-  - 發布長篇報告至 David888 Wiki；成功後只回傳公開 `shareUrl`
+跨專案共用：`brain/data/usage.db`（用量帳本）與 `brain/data/backups/sessions/`（對話備份）。
 
-三個外部工具預設啟用，也可透過根目錄 `.env` 個別停用；停用後不會註冊給 HTTP Chat 或宣告給 Gemini Live：
+### Workspace 內容
 
-- `URL2MD_SEARCH_ENABLED=true|false`
-- `URL2MD_READ_ENABLED=true|false`
-- `WIKI_PUBLISH_ENABLED=true|false`
+workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板。
 
-修改開關後需重啟 Brain container／服務才會重新載入設定。
+| 路徑 | 用途 |
+|---|---|
+| `IDENTITY.md`、`SOUL.md`、`AGENTS.md`、`TOOLS.md`、`MEMORY.md` | 核心文件，每輪直接放進 system prompt，不進向量索引 |
+| `.learnings/LEARNINGS.md`、`.learnings/ERRORS.md` | 同樣放進 prompt；`ERRORS.md` 由 `infra/learnings.record_error_event` 寫入並輪替，`LEARNINGS.md` 由人工維護 |
+| `personas/<persona_id>/` | 人設覆寫：同名核心文件優先於 workspace 根目錄 |
+| `knowledge/` | 知識文件；`knowledge/products/` 是產品規格表 |
+| `raw/` | 上傳的原始檔，採納後轉成 Markdown 放進 `knowledge/` |
+| `memory/<persona_id>/YYYY-MM-DD.md` | 每日對話日誌 |
+| `ASR_PROMPT.md` | 選填的語音專有名詞詞表，見「語言分流與回答長度」 |
+| `.kb_settings.json` | 語言分流與回答秒數 |
+| `.doc_meta.json` | 文件啟用狀態、來源與語言 |
+| `graphify-out/` | 知識圖譜產物 |
 
-2md 的 fallback 順序固定為：
+### 索引規則
 
-1. `https://2md.aiurl.tw`
-2. `https://2md.glsoft.ai`
-3. `https://create360.ai`
+- 可索引副檔名：`.md`、`.txt`、`.csv`，以及常見程式碼與設定檔（`.py`、`.ts`、`.yaml` 等，見 `knowledge/workspace.py`）。
+- 不進索引：核心文件與人設核心文件，以及 `memory/`、`.learnings/`、`.normalization-backups/`、`graphify-out/`、`dreaming/`、`raw/`、`archive/` 底下的檔案。
+- 在 `.doc_meta.json` 停用的文件不會出現在檢索結果。
 
-TypeScript-facing consumers use the same immutable declaration:
+## 知識索引與檢索
 
-```ts
-export const TWO_MD_BASE_URLS = [
-  'https://2md.aiurl.tw',
-  'https://2md.glsoft.ai',
-  'https://create360.ai',
-] as const;
-```
+索引（`knowledge/indexer.py`）：
 
-可用 `URL2MD_BASE_URLS` 以完整逗號分隔清單覆寫；若未設定，才相容讀取舊的
-`URL2MD_PRIMARY_URL` 與 `URL2MD_FALLBACK_URLS`。一個 request 不會平行打三個 endpoint，
-也不會把網頁正文寫入 Redis。正式部署建議保留 `REDIS_URL`，讓多個 Brain worker 共用
-circuit 與 half-open probe lease；Redis 暫時不可用時服務仍會以 local single-flight、
-sequential fallback 與 bounded deadline 執行。
+- 依 SHA-256 fingerprint 增量重建，只重算有變動的文件，並移除已刪除文件的段落。
+- Markdown 依標題切段（`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO`）；QA 形式的 Markdown 與 CSV 每題一段。
+- 向量寫入目前的 write identity 對應的資料表，並建立 FTS 索引。
+- 知識圖譜由 `POST /brain/knowledge/graph/rebuild` 在背景以 graphify 建立，產物在 `graphify-out/`。
 
-Retryable network error、timeout、HTTP 408/425/429/5xx 才會進入下一個 endpoint；
-其他 4xx 會立即結束。retry delay 使用 full-jitter，且計入 `URL2MD_TOTAL_BUDGET_S`。
-動態頁面或 deep crawl 不應透過同步聊天工具執行，需另行設計 async job 與資源限制。
+檢索（`memory/retrieval.py`、`tools/builtin/knowledge_tools.py`）：
 
-這些工具同時提供給一般 HTTP Chat 與 Gemini Live。Weather 不另設即時 API；天氣查詢走 `search_web`。
+- Hybrid：向量檢索與 FTS 以 RRF 融合（`RAG_RRF_K`），再依距離門檻過濾（`RAG_DISTANCE_CUTOFF`；FTS 命中用較寬的 `RAG_FTS_DISTANCE_CUTOFF`）。
+- `search_knowledge` 對模型改寫的每條查詢與使用者原句各檢索一次，融合後保留 `KNOWLEDGE_SEARCH_MERGE_LIMIT` 筆（依回覆模式覆寫）。
+- 依知識圖譜帶入一跳內相關文件的段落，放在結果的 `related`。
+- 每筆結果標記 `trust_boundary: untrusted_reference_data`，並產生 citations。
 
-目前 2md 與 Wiki 呼叫不攜帶專案側認證；Wiki 若是受保護頁面，需另行加入環境變數密鑰與 Authorization／password 設定。外部服務的 HTTP、格式或執行錯誤會包成 tool error，交由 agent loop 繼續處理；不得把密鑰放入 tool arguments 或 Markdown 內容。
+## 對話流程
 
-正式 Docker 部署直接使用根目錄的 `docker-compose.yml`；它預設從公開的 `tbdavid2019/openvman-*` repositories 拉取 image，並啟動 Watchtower。Worktree 開發則疊加 `docker-compose.dev.yml`，恢復 Brain API source mount 與 `ENV=dev`，同時停用 dev container 的 Watchtower 更新。Brain API 與 Embedding image 目前為 CUDA/PyTorch amd64 image；ARM64 部署可使用多平台的 Backend、Admin 與 Avatar image，但需要另外提供 ARM64 相容的 GPU inference service。
+`POST /brain/chat` 的處理順序：
 
-### Workspace Admin API
+1. 驗證輸入、載入 session、解析 slash command（`/skill_id ...` 會強制呼叫該技能的工具）。
+2. 組 system prompt：核心文件、auto recall 摘要、請求情境、歷史摘要、回答規則、ASR 詞表、本輪回答語言與長度。知識與記憶不直接注入，由工具取得。
+3. 執行 agent loop（`core/agent_loop.py`）。
+4. 寫入對話與每日日誌，背景執行記憶治理與回覆的 PII 掃描。
+5. 回應附上 `tool_steps`、citations、`response_time_s` 與本輪 `usage` 彙總。
 
-- `GET /brain/knowledge/documents`
-  - 列出可管理文件
-- `GET /brain/knowledge/document`
-  - 讀取單一文件
-- `PUT /brain/knowledge/document`
-  - 儲存文件內容
-- `POST /brain/knowledge/move`
-  - 移動或重新命名文件
-- `POST /brain/knowledge/upload`
-  - 上傳新文件
-- `POST /brain/knowledge/reindex`
-  - 重建 knowledge index
+### Agent loop
 
-## 9. Docker 與 Port 規則
+- 第一次 LLM 呼叫必須使用工具（`CHAT_FORCE_KNOWLEDGE_SEARCH`，僅在 `search_knowledge` 有註冊時生效）。模型一次決定要查哪些，沒叫 `search_knowledge` 就自動補一筆；同一輪的工具平行執行。slash command 指定的工具優先。
+- 之後的回合拿掉 `search_knowledge`（`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`），其他工具照常；最多再追加 `CHAT_MAX_FOLLOWUP_TOOL_ROUNDS` 輪，之後不給工具、只能作答。總回合數受 `AGENT_LOOP_MAX_ROUNDS` 限制。
+- 模型呼叫本輪沒提供的工具時，該呼叫不執行並記 warning，要求模型直接用文字回答，避免繞過回覆模式的限制。
+- provider 忽略強制 tool_choice 直接回文字時，該文字當作答案。空回覆或把工具呼叫寫成文字時各重試一次。
 
-目前設計是：
+### 回覆模式
 
-- Docker edge 的 HTTP host port 使用 `PORT`，預設 `8786`
-- Docker edge 的 HTTPS host port 使用 `HTTPS_PORT`，預設 `8787`
-- Brain API 容器內部 port 固定 `8100`，不直接暴露到 host
+請求欄位 `mode` 選擇深度，未知值退回 `standard`。`GET /brain/chat/modes` 列出目前設定。
 
-### Port 邏輯
+| 模式 | 追加工具輪 | 知識融合筆數 | 網路搜尋 | `read_web_page` 網址上限 |
+|---|---|---|---|---|
+| `fast` | 0 | 3 | 不提供網路工具 | 1 |
+| `standard`（預設） | 1 | 5 | 最多 8 筆 | 3 |
+| `deep` | 4 | 10 | 最多 12 筆 | 5 |
 
-- `.env`
-  - `PORT=8786`
-  - `HTTPS_PORT=8787`
-- Docker edge nginx
-  - container `80` / `443`
-- `docker-compose.yml`
-  - host `${PORT}:80`
-  - host `${HTTPS_PORT}:443`
-- `api`
-  - internal `8100`
-- `nginx upstream`
-  - 固定 proxy 到 `api:8100`
+模式值透過 `core/reply_modes.ModeSettings` 覆寫設定，不修改全域 settings。
 
-也就是說：
+### 可合併回合（`turn_id`）
 
-- 外部正式流量由 host nginx 的 `443` 轉送到 Docker edge `8787`
-- 內部 API port 是實作細節，不開放配置
+前台在等待回答時可把補充句合併重送：請求帶相同 `session_id`、`turn_id`（1–128 字）與遞增的 `turn_revision`。這類回答先暫存在 `sessions.db`，回應帶 `requires_accept: true`，尚未寫入對話、日誌或記憶。前台收到後呼叫 `POST /brain/chat/accept` 確認；版本已被取代、回合不存在或主體不符時回 `409 TURN_SUPERSEDED`。確認具冪等性，版本比對與寫入在同一個 SQLite 交易內完成。未帶 `turn_id` 的呼叫照常直接寫入；視覺事件不支援這個流程。
 
-## 10. 環境變數
+## 工具
 
-參考根目錄 `.env.example`。正式部署預設 `ENV=prod`；疊加 `docker-compose.dev.yml` 時，Brain API、Backend 與 Gateway Worker 會強制使用 `ENV=dev`。
+內建工具由 `tools/builtin/__init__.py` 註冊，再依回覆模式與專案篩選（`agent_loop._tools_for_mode`、`_tools_for_project`）。工具回傳值一律視為不可信資料，不能授權另一個工具執行。
 
-### 主要變數
+| 工具 | 用途 | 條件 |
+|---|---|---|
+| `search_knowledge` | 檢索專案知識庫，參數 `queries`（陣列）、`top_k` | 一般回合第一輪必定執行 |
+| `get_document` | 讀取 workspace 內單一文件（`TOOL_DOCUMENT_CHAR_LIMIT` 截斷） | |
+| `filter_products` | 依產品規格表篩選、排序產品 | 專案有 `knowledge/products/_catalog.yaml` 才提供 |
+| `search_memory` | 檢索 `memories` 表 | |
+| `save_memory` | 寫入長期記憶 | 僅在使用者本輪明確要求記住時執行 |
+| `search_web` | 透過 2md 搜尋公開網路，結果以 embedding 對原句重排並過濾 | `URL2MD_SEARCH_ENABLED`；`fast` 模式不提供 |
+| `read_web_page` | 透過 2md 將網頁、PDF 等轉成 Markdown，參數 `urls` 一次帶多個 | `URL2MD_READ_ENABLED`；`fast` 模式不提供 |
+| `publish_wiki` | 發布長篇報告到 David888 Wiki，只回傳公開 `shareUrl` | `WIKI_PUBLISH_ENABLED` |
+| `graph_query`、`graph_explain`、`graph_status` | 查詢專案知識圖譜；未建圖時提示使用者到後台重建 | |
+| `request_action` | 向使用者提議動作卡片（`rebuild_graph` 需確認、`open_graph_view` 切換頁面），工具本身不執行 | |
+| `query_faq`、`query_order` | 示範用工具，讀 `tools/mock_data.py` 的假資料 | |
 
-```env
-ENV=prod
-PORT=8786
-HTTPS_PORT=8787
+停用的網路與 Wiki 工具不會註冊給 HTTP Chat，也不會宣告給 Gemini Live。修改開關後需重啟 Brain。天氣等即時資訊走 `search_web`，沒有另設 API。
 
-LLM_PROVIDER=gemini
-GEMINI_API_KEY=
-LLM_MODEL=gemini-3.5-flash-lite
-LLM_FALLBACK_CHAIN=gemini:gemini-3.5-flash-lite,openai:gpt-4.1-mini,groq:openai/gpt-oss-120b,nen:gemini-3.5-flash-lite
-GROQ_API_KEY=
-NEN_API_KEY=
-NEN_BASE_URL=https://nen.com.tw/v1
-LLM_STREAM_INCLUDE_USAGE=true
+技能（skills）放在 `brain/skills/<id>/`（共用）或 `brain/data/projects/<project_id>/skills/<id>/`（專案），各含 `skill.yaml` 與 `main.py`，工具動態註冊。技能檔案 API 不能上傳或替換 `main.py`，正式環境的技能原始碼應唯讀並經 code review。內建技能有 `graphify`、`weather`、`joke` 與 `a2a`；`a2a` 經 Backend internal facade 呼叫，Backend 的 `A2A_ENABLED` 預設關閉，正式環境未啟用。
 
-COMPOSE_PROFILES=embedding,vlm
-EMBEDDING_SERVICE_URL=
-EMBEDDING_SERVICE_TOKEN=
-EMBEDDING_EXPECTED_DIMENSION=1024
-LANCEDB_PATH=/data/projects/default/lancedb
+### 產品規格篩選（`filter_products`）
 
-SHORT_TERM_MEMORY_ROUNDS=20
-RAG_TOP_K=5
-MAX_SESSION_ROUNDS=100
-MAX_SESSION_TTL_MINUTES=30
-MAX_INPUT_LENGTH=500
-ENABLE_CONTENT_FILTER=true
-```
+選型問題（「3 吋、揚程 20 米以上有哪幾款」）需要完整清單，相似度檢索容易漏款或排錯，因此另以規格表篩選。專案在 `knowledge/products/` 放：
 
-`LLM_FALLBACK_CHAIN` 有值時，其排列順序就是實際呼叫順序。NEN 是獨立的 `nen` provider，但沿用 OpenAI-compatible chat-completions transport；不得以 `LLM_PROVIDER=openai`、`LLM_BASE_URL` 或 `OPENAI_API_KEY` 代替 NEN 專屬設定，否則 fallback metrics 與 usage ledger 會把 NEN 流量錯記成 OpenAI。
+- `_catalog.yaml`：`title`、`key`（產品代號欄位，預設 `model`，型別須為 text）、`fields`（每欄 `label`、`type` 為 `number`／`text`／`number_set`、`unit`、`description`）、`notes`（給模型的注意事項，例如單位換算）。欄位由各專案自訂。
+- 每個產品一篇 Markdown，YAML frontmatter 放規格值，缺值填 `null`；正文照常進知識索引。停用的文件不列入；格式不對的筆記略過，並在結果的 `skipped_notes` 回報。
 
-### 建議
+參數 `query` 是 JSON 字串：`{"scenarios":[{"name","where","sort","limit"}]}`。`where` 為 `{"field","op","value"}`，或以 `all`／`any` 巢狀組合；運算子 `eq ne lt lte gt gte in contains`；條件值不得為 null。每個情境回傳：
 
-- 本機開發用 `.env`
-- repo 保留 `.env.example`
-- 真實 API key 不要放進版控
-- 未設定外部 `EMBEDDING_SERVICE_URL` 時，`COMPOSE_PROFILES` 必須包含 `embedding`
-- 外部 gateway 由 `EMBEDDING_SERVICE_URL` 選取，Brain 不需要啟用本機 embedding profile
-- `EMBEDDING_MODEL`、`EMBEDDING_DEVICE` 與 `EMBEDDING_USE_FP16` 屬於獨立 gateway，不是 Brain API 的 in-process model 設定
-- `.env.example` 是範本值，實際部署可依機器能力調整
+- `matches`：符合的產品，只列條件與排序用到的欄位及文件路徑；排序欄缺值的排最後。
+- `unknown`：用到的欄位是 null，不能視為不符合。
+- `excluded_count`：確定不符合的數量。
 
-## 11. 啟動方式
+工具說明會帶入該專案的欄位與單位；模型在第一輪與 `search_knowledge` 平行呼叫，`fast` 模式也可用。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
 
-### 1. 準備設定
+### 網路工具（2md）
 
-複製 `.env.example` 為 `.env`，填入至少：
+- 端點順序定義在 `core/two_md_defaults.TWO_MD_BASE_URLS`：`https://2md.aiurl.tw` → `https://2md.glsoft.ai` → `https://create360.ai`。`URL2MD_BASE_URLS` 可整份覆寫；未設定時才讀舊的 `URL2MD_PRIMARY_URL`、`URL2MD_FALLBACK_URLS`。
+- 同一個請求依序嘗試端點，不平行呼叫；整條鏈共用 `URL2MD_TOTAL_BUDGET_S`。只有網路錯誤、逾時與 HTTP 408／425／429／5xx 才換下一台，其他 4xx 立即結束；重試間隔為 full-jitter。
+- 連續失敗的端點暫停 `URL2MD_CIRCUIT_COOLDOWN_S` 秒。設定 `REDIS_URL` 時多個 worker 共用 circuit 與 half-open lease；Redis 不可用時退回 process-local，不會把網頁正文寫進 Redis。
+- `read_web_page` 只接受解析到公開位址的 HTTP(S) URL，拒絕 private、loopback、link-local、reserved、multicast 與 unspecified 位址。
+- 2md 與 Wiki 呼叫目前不帶認證。外部錯誤包成 tool error 交回 agent loop；密鑰不得放進工具參數或發布內容。
 
-- 所選 provider 的 API key（例如 `GEMINI_API_KEY`）
-- 需要的 LLM 與 embedding gateway 路由參數
+## 記憶
 
-### 2. 啟動
+- 短期記憶：session 與訊息存在專案的 `sessions.db`。prompt 帶最近的對話並附上較早歷史的摘要（`SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`）；超過 `MAX_SESSION_TTL_MINUTES` 未更新的 session 與空 session 會被清理。
+- 每日日誌：每輪對話的摘要追加到 `memory/<persona_id>/YYYY-MM-DD.md`（以 fingerprint 去重），記憶維護再把每日摘要整理進 `memories` 表。
+- 長期記憶：`memories` 表。`save_memory` 只在使用者明確要求時執行，判斷由 Jev 負責；未設 `TYPESAFE_API_KEY`、`JEV_MEMORY_GATE_ENABLED=false` 或呼叫失敗時改用關鍵字規則。文字對話與 Gemini Live 都會檢查。
+- 記憶治理（`memory/memory_governance.py`）：最多每 `MEMORY_MAINTENANCE_INTERVAL_SECONDS` 秒執行一次，負責每日摘要入庫、衰減、去重與相似記憶合併。
+- Auto recall（`AUTO_RECALL_ENABLED`，程式預設開）：生成前依本輪訊息檢索記憶並摘要放進 prompt；有 Jev 時先由 Jev 篩選相關記憶（`AUTO_RECALL_USE_JEV_FILTER`），失敗才用 LLM 摘要。單一 session 可用 `POST /brain/sessions/{id}/recall-toggle` 關閉。
+- Dreaming（`DREAMING_ENABLED`，預設關）：依 `DREAMING_CRON` 執行 Light → Deep → REM 記憶整合。以 `DREAMING_TIMEZONE` 判斷當天是否已執行，`force=true` 可強制重跑。
+- 對話備份：每天 `SESSION_BACKUP_HOUR` 點（台北時間）把所有專案的對話依語言分檔備份到 `/data/backups/sessions`，保留 `SESSION_BACKUP_KEEP` 份；也可由 `POST /brain/backups/sessions` 立即執行（`{"dry_run": true}` 只計數）。
 
-本機 embedding image 與 Brain API 都需要建置時，依序執行，避免同時進行重型 build：
+## 語言分流與回答長度
+
+- 支援語言：`zh`、`en`、`es`、`nan`（台語）、`ja`、`ko`。每個專案在 `.kb_settings.json` 設定 `language_routes`（至少一條，順序即優先序，第一條為主要語言），由 `GET/PUT /brain/knowledge/settings` 讀寫。
+- 只有一條分流時不分流。多條時文件不會被過濾，只排先後：使用者語言的文件優先，不足再以主要語言與其他語言補；候選窗逐次擴大直到同語言結果足夠。圖譜帶入的相關段落只保留命中段落有的語言。
+- 文件語言存在 `.doc_meta.json`，可由 `PATCH /brain/knowledge/document/meta` 指定（`zh|en|es|auto`）。
+- 使用者訊息語言先以規則即時判斷，短句歸主要語言；`JEV_LANGUAGE_ENABLED` 時再於背景由 Jev 校正存檔的標籤。
+- 台語：分流含 `nan` 時，Backend 的 ASR 以 `POST /brain/internal/audio-language` 判斷語音是否為台語（模型 `LIVE_AUDIO_LANGUAGE_ID_MODEL`），判定為台語時以台語文件優先檢索。
+- 每輪 system prompt 結尾指定回答語言，並依 `reply_seconds`（預設 20 秒，0 為不限制，上限 120）換算成字數上限：中日韓每秒 4 字，其他語言每秒 1.5 個單字（`core/prompt_templates.reply_length_line`）。只靠提示詞，不截斷輸出。
+- ASR 詞表：workspace 的 `ASR_PROMPT.md` 為選填，`#` 開頭為說明，其餘最多 800 字放進每輪 prompt，提醒模型訊息可能是語音辨識結果；可寫「常見誤聽：A→B」對照。`GET /brain/internal/asr-glossary` 只回正確詞（不含對照行，最多 2000 字）給 Backend 的辨識引擎。檔案缺失或讀取失敗時忽略；內容經 HTML 跳脫後放在 `<glossary>` 內，明確標示為參考資料而非指令。
+- ASR 定稿判斷：`POST /brain/internal/asr-judge` 在 Gemini Live 串流辨識的定稿與最後暫定字幕不同時，由 Jev 判斷送哪一句；暫定字幕需明顯較佳才換，Jev 關閉、逾時或失敗都照定稿（`ASR_FINAL_JUDGE_ENABLED`、`ASR_FINAL_JUDGE_TIMEOUT_SECONDS`）。
+
+## Jev
+
+Jev（TypeSafe System One，`core/jev_client.py`）需要 `TYPESAFE_API_KEY`，網址為 `JEV_BASE_URL`（舊名 `JEV_SHADOW_BASE_URL` 仍可讀）。用途只有四項：記憶寫入把關、訊息語言背景校正、ASR 定稿判斷、auto recall 相關性篩選，各有獨立開關，未設定或失敗時都有規則或 LLM 的退路。每次呼叫以 `provider=typesafe`、`kind=jev_<用途>` 記入用量帳本。
+
+## 隱私過濾
+
+`PRIVACY_FILTER_ENABLED`（預設開）時，Brain 以 OpenAI Privacy Filter 模型（`privacy/`）掃描送往 LLM 的 user 與 tool 訊息（`PRIVACY_FILTER_INCLUDE_SYSTEM` 可納入 system）及模型回覆。掃描在背景執行、不修改送出的內容：偵測結果寫入稽核事件，回覆的偵測結果另存到該訊息的 `privacy_warning` 中繼資料；命中 `PRIVACY_FILTER_BLOCK_CATEGORIES`（預設 `secret`）時記 warning。模型裝置由 `PRIVACY_FILTER_DEVICE` 指定，載入失敗時依啟動流程降級。
+
+## 用量帳本
+
+`brain/data/usage.db` 是跨專案共用的 append-only SQLite 帳本，由 Brain 單一擁有。每筆事件記錄 provider、model、延遲、token 數，以及 `user_id`、`principal_type`、`principal_id`、`project_id`、`session_id`、`trace_id` 與 `kind`。
+
+| `unit_type` | 來源 | `units` 的意義 |
+|---|---|---|
+| `tokens`（預設） | LLM 呼叫 | 0；數字在 `input_tokens`／`output_tokens`／`total_tokens` |
+| `chars` | Backend 的 TTS | 送去合成的字元數 |
+| `seconds` | Gemini Live | 音訊秒數，輸入與輸出分開記 |
+
+不同 `unit_type` 要分開加總。`/brain/usage/summary` 的 `totals` 與每個分組都附 `chars`、`seconds` 欄位，各自只加總對應單位。
+
+| 端點 | 說明 |
+|---|---|
+| `GET /brain/usage/summary` | 依 `model`、`user`、`project`、`kind` 或 `session` 彙總 |
+| `GET /brain/usage/timeseries` | `bucket=hour\|day\|month`、選填 `group_by`、`limit=1..50`（預設 8）、`report_timezone=UTC\|Asia/Taipei`；有分組時回 `series`，否則回 `points`，低用量分組併成 `__other__` |
+| `GET /brain/usage/events` | 依帳號、專案、session、trace、類型與時間區間查事件 |
+| `POST /brain/usage/events` | 其他服務寫入非 LLM 用量；必填 `provider`、`unit_type`、`units`，歸屬欄位由呼叫端帶入；成功回 201 |
+
+帳本以 UTC 儲存，查詢區間為 `since <= created_at < until`。瀏覽器與外部客戶端改用 Backend 的 `/api/v1/usage/*`。
+
+## Gemini Live
+
+Backend 透過內部 WebSocket `/brain/internal/live/{relay_session_id}` 轉接 Gemini Live 會話。`live/gemini_live.py` 協調會話、重連、每輪語言、持久化與用量；`gemini_transport.py` 負責 WebSocket，`gemini_payloads.py` 負責 setup、轉錄與 PCM／WAV 編碼，`gemini_tool_execution.py` 在專案與人設範圍內執行工具。Live 宣告的工具為 `search_knowledge`、`search_memory`、`save_memory`、`get_chat_history`、`search_web`、`read_web_page`、`publish_wiki`（依開關篩選）。模型與轉錄語言由 `LIVE_GEMINI_*` 設定。
+
+## HTTP 介面
+
+所有路徑前綴 `/brain`，Backend 對外以 `/api/v1/*` 代理。完整 schema 見 Brain 的 OpenAPI（`/brain/docs`，需內部存取）。
+
+| 分類 | 端點 |
+|---|---|
+| 健康與監控 | `GET /health`（liveness，免驗證）、`GET /health/ready`（readiness，免驗證）、`GET /health/detailed`、`GET /metrics`、`GET /metrics/prometheus`、`GET /identity` |
+| 對話 | `POST /chat`、`POST /chat/accept`、`GET /chat/modes`、`GET /chat/history` |
+| Session | `GET /sessions`、`GET /sessions/export`（皆可用 `language` 篩選）、`DELETE /sessions/{id}`、`POST /sessions/batch-delete`、`POST /sessions/{id}/recall-toggle` |
+| 檢索與記憶 | `POST /search`、`GET/POST/DELETE /memories`、`POST /memories/maintain` |
+| 知識文件 | `GET /knowledge/documents`、`GET /knowledge/base/documents`、`GET/PUT/DELETE /knowledge/document`、`PATCH /knowledge/document/meta`、`POST /knowledge/move`、`POST/DELETE /knowledge/directory`、`POST /knowledge/upload`、`POST /knowledge/note`、`POST /knowledge/reindex` |
+| 原始檔採納 | `POST /knowledge/raw/upload`、`POST /knowledge/raw/commit`（背景執行）、`GET /knowledge/raw/commit/status`、`POST /knowledge/renormalize[/preview\|/apply]` |
+| 知識設定 | `GET/PUT /knowledge/settings`（語言分流、`reply_seconds`，回應附 `speech_rates`） |
+| QA 知識 | `GET /knowledge/qa`，以及 `/knowledge/qa/nodes*`、`/knowledge/qa/images*` |
+| 知識圖譜 | `POST /knowledge/graph/rebuild`、`GET /knowledge/graph`、`GET /knowledge/graph/status`、`/summary`、`/html` |
+| 專案與人設 | `GET/POST/DELETE /projects`、`GET /projects/{id}`、`GET/POST/DELETE /personas`、`POST /personas/clone`、`POST /personas/avatar` |
+| 工具與技能 | `GET /tools`、`POST /skills`、`PATCH /skills/{id}/toggle`、`GET/PUT /skills/{id}/files`、`DELETE /skills/{id}`、`POST /skills/reload` |
+| 用量與備份 | `/usage/*`（見上節）、`GET/POST /backups/sessions` |
+| Dreaming | `GET /dreaming/status`、`POST /dreaming/run`、`GET /dreaming/candidates`、`GET /dreaming/report` |
+| 內部 | `GET /internal/asr-glossary`、`POST /internal/asr-judge`、`POST /internal/audio-language`、WebSocket `/internal/live/{relay_session_id}`；另有不帶前綴的 `POST /internal/enrich`（把外部內容以 system 訊息寫入 session） |
+| 協定 | `POST /protocol/validate` |
+
+Brain 沒有 SSE 端點：`POST /chat` 一次回傳完整結果，即時語音走 Live WebSocket。
+
+## 設定
+
+Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/api/config.py` 與根目錄 `.env.example`。
+
+| 類別 | 主要變數 |
+|---|---|
+| 環境 | `ENV`（`prod`／`dev`）、`GATEWAY_INTERNAL_TOKEN` |
+| LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`、`NEN_API_KEY`、`NEN_BASE_URL` |
+| Embedding | `EMBEDDING_SERVICE_URL`、`EMBEDDING_SERVICE_TOKEN`、`EMBEDDING_EXPECTED_MODEL`／`_DIMENSION`／`_REVISION`、`EMBEDDING_WRITE_IDENTITY`、`EMBEDDING_IDENTITY_ALIASES`、`EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES` |
+| 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`RAG_DISTANCE_CUTOFF`、`RAG_FTS_DISTANCE_CUTOFF`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
+| Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
+| 記憶 | `SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`、`MAX_SESSION_TTL_MINUTES`、`AUTO_RECALL_ENABLED`、`DREAMING_ENABLED`、`DREAMING_CRON`、`DREAMING_TIMEZONE`、`SESSION_BACKUP_ENABLED`、`SESSION_BACKUP_HOUR`、`SESSION_BACKUP_KEEP` |
+| Jev | `TYPESAFE_API_KEY`、`JEV_BASE_URL`、`JEV_MEMORY_GATE_ENABLED`、`JEV_LANGUAGE_ENABLED`、`JEV_GATE_TIMEOUT_SECONDS`、`AUTO_RECALL_USE_JEV_FILTER`、`ASR_FINAL_JUDGE_ENABLED` |
+| 網路工具 | `URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`URL2MD_BASE_URLS`、`URL2MD_TOTAL_BUDGET_S`、`URL2MD_CIRCUIT_COOLDOWN_S`、`REDIS_URL`、`WEB_SEARCH_BLOCKED_DOMAINS`、`WEB_SEARCH_MIN_RELEVANCE` |
+| Wiki | `WIKI_PUBLISH_ENABLED`、`WIKI_API_BASE_URL`、`WIKI_PUBLISH_MAX_CHARS` |
+| 隱私 | `PRIVACY_FILTER_ENABLED`、`PRIVACY_FILTER_DEVICE`、`PRIVACY_FILTER_INCLUDE_SYSTEM`、`PRIVACY_FILTER_BLOCK_CATEGORIES` |
+| 安全 | `MAX_INPUT_LENGTH`、`ENABLE_CONTENT_FILTER`、`BLOCK_PROMPT_INJECTION`、`REQUEST_RATE_LIMIT_PER_MINUTE`、`ALLOWED_CHANNELS` |
+| Live | `LIVE_GEMINI_MODEL`、`LIVE_GEMINI_TOOLS_ENABLED`、`LIVE_GEMINI_TRANSCRIPTION_LANGUAGES`、`LIVE_AUDIO_LANGUAGE_ID_MODEL` |
+
+注意事項：
+
+- `LLM_FALLBACK_CHAIN` 有值時，其順序就是實際呼叫順序。NEN 是獨立的 `nen` provider（沿用 OpenAI 相容傳輸），不可用 `LLM_PROVIDER=openai` 或 `OPENAI_API_KEY` 代替，否則 metrics 與用量帳本會把它記成 OpenAI。
+- 未設定外部 `EMBEDDING_SERVICE_URL` 時，`COMPOSE_PROFILES` 必須包含 `embedding`。`EMBEDDING_MODEL`、`EMBEDDING_DEVICE`、`EMBEDDING_USE_FP16` 屬於 gateway，不是 Brain API 的設定。
+- Embedding gateway 沒有 Bearer token 時 fail closed；瀏覽器 CORS 必須以 `EMBEDDING_ALLOWED_ORIGINS` 明確列出 origin。
+
+## 本機執行與部署
+
+正式環境使用根目錄 `docker-compose.yml`，image 由 CI 建置並由 Watchtower 更新。Worktree 開發疊加 `docker-compose.dev.yml`，掛載原始碼並強制 `ENV=dev`。Brain API 與 embedding image 為 CUDA／amd64。
+
+需要在本機建置時一次只建一個，等它完成再啟動：
 
 ```bash
 docker compose build embedding
@@ -666,163 +296,13 @@ docker compose build api
 docker compose up -d
 ```
 
-### 3. 檢查健康度
+## 測試
 
 ```bash
-curl -s http://127.0.0.1:8787/brain/health
+cd brain/api
+python -m pytest tests/ -m "not integration" -q   # 單元測試
+python -m pytest tests/ -m integration -v         # 需要模型與外部服務
+cd ../embedding && python -m pytest tests/ -q     # embedding gateway
 ```
 
-預期至少應看到：
-
-- `status: ok`
-- `tables: ["knowledge", "memories"]`
-- `chat_enabled: true`
-
-## 12. 常見操作
-
-### 重建知識索引
-
-當你新增、上傳、修改可索引文件後，需要 reindex：
-
-```bash
-curl -s -X POST http://127.0.0.1:8787/brain/knowledge/reindex
-```
-
-### 新增長期記憶
-
-```bash
-curl -s -X POST http://127.0.0.1:8787/brain/memories \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"使用者偏好繁體中文、簡短回答"}'
-```
-
-### 測試向量搜尋
-
-```bash
-curl -s -X POST http://127.0.0.1:8787/brain/search \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"糖尿病常見症狀","target":"knowledge"}'
-```
-
-### 同步聊天
-
-```bash
-curl -s -X POST http://127.0.0.1:8787/brain/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"請根據目前知識簡短說明糖尿病常見症狀"}'
-```
-
-## 13. 上傳與知識管理建議
-
-### 建議資料放置方式
-
-- 原始來源檔
-  - 可先放在 `brain/data/raw/...`
-- 實際提供 Brain 使用的工作文件
-  - 放在 `brain/data/workspace/...`
-
-### 文件類型建議
-
-- 核心規則：`SOUL.md`、`AGENTS.md`、`TOOLS.md`、`MEMORY.md`
-- 一般知識：markdown 為主
-- QA 資料：csv 或 markdown 都可以
-
-### 醫院衛教資料
-
-目前 repo 已有一批醫院衛教 markdown 放在 `workspace/hospital_education/`，可作為：
-
-- RAG corpus 範例
-- 後台文件管理範例
-- reindex 壓力測試素材
-
-## 14. 目前限制與注意事項
-
-### 1. Embedding gateway 是必要相依服務
-
-API 啟動後會背景預熱，最先做台語判斷：載入 google-genai、建好共用的 Gemini client，並呼叫一次 `models.get`（不花 token）。這一步只在設定了 `GEMINI_API_KEY` 時做，失敗只記 warning。部署重啟後的第一句台語原本要多等約 1.4 秒（載入套件 1.2 秒、建 client 0.17 秒），會超過 Backend 的 2.5 秒上限。接著呼叫 remote embedding gateway 並預熱資料表。gateway 不可達、回傳未授權 identity 或向量規格不相容時，Brain 會 fail closed，不會在 API process 內重建 provider fallback 或載入 BGE。
-
-可使用下列端點區分 process liveness 與 dependency readiness：
-
-- `GET /brain/health`
-- `GET /brain/health/ready`
-- `GET /brain/health/detailed`
-
-### 2. Session store 目前是 process memory
-
-短期 session 目前存在 API process memory 內：
-
-- 適合本地單機
-- 不適合多實例水平擴展
-
-若未來要正式上線，應把 session store 外部化，例如 Redis。
-
-### 3. Knowledge reindex 是 overwrite 模式
-
-目前 `knowledge` 重建採整表覆寫：
-
-- 邏輯簡單
-- 適合現階段
-- 未來若文件量變大，可能需要增量索引
-
-### 4. Learnings 目前是規則式提取
-
-`.learnings` 目前已可自動寫入，但還不是完整知識治理系統：
-
-- 適合保存穩定偏好
-- 還需要人工檢視與編修流程
-
-## 15. 接下來適合做的事
-
-如果要把 `brain` 往更完整的產品推，下一批最值得做的是：
-
-1. 強化 embedding gateway outage 與 identity mismatch 的操作告警
-2. learnings / errors 後台專用檢視與人工編修
-3. workspace 樹狀目錄、批次搬移與批次上傳
-4. session store 外部化
-5. knowledge 增量索引與文件版本追蹤
-
-## 16. 心智模型
-
-可以把這套系統理解成三層：
-
-### 內容層
-
-- `workspace/*.md`
-- `.learnings/*`
-- `memory/*.md`
-
-### 檢索層
-
-- `knowledge`
-- `memories`
-- embedding + LanceDB
-
-### 生成層
-
-- prompt builder
-- chat service
-- llm client
-- web chat UI
-
-`brain` 的價值不是單一模型呼叫，而是把這三層接成一個可維護、可編輯、可操作的本地大腦系統。
-
-
-## 語意分流評估
-
-[Jev API 評估](../scripts/experiments/jev/REPORT.md)在 48 筆繁體中文合成案例上 96/96、零順序翻轉。先前的 SemIf 本機模型實驗因順序敏感不採用，結論與逐筆結果保留在 [`semif-evidence/`](../scripts/experiments/semif-evidence/REPORT.md)。兩者都尚未接入 Brain 正式路由，也不取代強制知識庫搜尋或權限判斷；接入計畫（影子觀測 → RAG 證據判斷）見 [docs/plans/jev-decision-layer.md](../docs/plans/jev-decision-layer.md)。
-
-Jev 影子觀測與知識庫段落的 Jev 篩選已於 2026-10-02 移除：兩者預設關閉、正式環境從未開啟，影子還會把對話送到外部。Jev 目前用在記憶寫入把關、訊息語言背景校正、Gemini Live 串流定稿判斷，以及自動記憶召回的相關性篩選（召回本身預設關）。每次呼叫（成功或失敗）都以 `provider=typesafe`、`kind=jev_<用途>` 記進 `usage.db`（`core/jev_client.jev_nouls`），用來看各功能每天打幾次。Jev 網址設定改名 `JEV_BASE_URL`，舊名 `JEV_SHADOW_BASE_URL` 照讀。
-
-BGE embedding 意圖影子（用 centroid 相似度猜意圖）已移除：單句 64 筆 52/64，但 2026-09-23 dev 多輪對話實測只有 9/19，並有一筆知識庫問題誤判閒聊——embedding 相似度會被前一輪主題拉走，不適合做意圖判斷。embedding 本身仍負責知識庫檢索，不受影響。評估結果保留在 [評估報告](../scripts/experiments/intent-shadow/REPORT.md)。
-
-## A2A 工具輸入驗證
-
-a2a_send_task 的 target_agent_id 與 message、a2a_broadcast_group 的 group_id 與 message 必須是非空白字串，不再將數字、布林值、陣列或物件轉成字串送出。ID 去除前後空白後最多 256 字元，message 去除前後空白後最多 1048576 UTF-8 bytes（中文可能先達到位元組限制）。
-
-a2a_send_task 的 context_id 可省略或為 null；字串去除前後空白後最多 256 字元，空白視為未指定。hop_count 必須是 0–10 的整數，true／false 不算整數；Backend 仍會依部署設定套用更嚴格的 hop 上限。
-
-驗證失敗回傳 {"error": "..."}，例如 target_agent_id is required、context_id is too long，不發出 HTTP 請求。合法請求仍透過既有 Backend internal facade 與 X-Internal-Token；不改 Hub 憑證、派工或群組政策。a2a_list_peers 的 state 為 all／online／offline，省略時不加狀態條件。
-
-A2A 真實往返已於 2026-09-20 在隔離私有圈驗證：Brain skill → 隔離 Backend facade → 真實 Hub／SSE → 已部署 Brain → Hub 回覆，約 9.55 秒。正式 A2A 開關未啟用；範圍、清理與原始證據見 [實測紀錄](../scripts/experiments/a2a-live/README.md)。
-
-A2A 驗證共用缺值／空白與長度判斷；整理後保留原有錯誤字串、驗證順序與送出 payload。派工與廣播的非字串回歸測試共用案例表，context_id 正規化則以明列的輸入／預期結果驗證。
+根目錄 `tests/test_entry_boundaries.py` 檢查 Python 入口檔與正式程式檔的行數上限。單元測試 patch 的位置應指向實際負責的模組。

@@ -1,454 +1,213 @@
-# openVman — 虛擬人系統架構總覽 (Architecture Index)
+# openVman
 
-> **版本**：v0.10.1
-> **最後更新**：2026-09-02
-> **用途**：本文件為整體架構的導覽入口，匯整各層級 Spec 的關係與技術選型。
+openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色進行語音與文字對話，後台管理知識庫、角色、語音與帳號，回答由 Brain 以 RAG、記憶與工具產生。
 
----
+## 系統架構
 
-## 一、文件導覽 (Document Map)
+| 服務（compose） | 位置 | 技術 | 職責 |
+|---|---|---|---|
+| `admin` | `frontend/admin/` | React、Vite、Tailwind、nginx | 管理後台，並作為整個 stack 唯一對外的 edge nginx |
+| `avatar` | `frontend/app/` | Vue 3、Vite | 虛擬人前台：角色舞台、語音輸入、播放與對嘴 |
+| `backend` | `backend/` | FastAPI | 對外 API、帳號與權限、ASR／TTS 路由、Gemini Live 中繼、Brain 代理 |
+| `gateway-worker` | `backend/app/gateway/` | arq + Redis | 文件轉換、爬蟲與其他非同步媒體處理 |
+| `api` | `brain/api/` | FastAPI | Brain：LLM 路由、RAG、記憶、工具、用量帳本；僅供內部呼叫 |
+| `embedding` | `brain/embedding/` | BGE-M3（GPU） | 向量嵌入服務，Brain 與其他 stack 共用 |
+| `redis` | — | Redis 7 | gateway 佇列、快取與跨 worker 狀態 |
+| `prometheus`、`grafana` | `infra/` | — | 指標收集與監控儀表板 |
+| `watchtower` | — | — | 自動拉取 Docker Hub 上的新版 image |
 
-完整分類見 **[文件總覽](docs/README.md)**。常用入口：
+```
+瀏覽器 ── HTTPS ──> 主機 nginx（Let's Encrypt，compose 外）
+                      └──> admin（edge nginx）
+                             ├── /            → avatar 前台
+                             ├── /admin/      → 管理後台
+                             ├── /api/        → backend ──> api（Brain）──> embedding、LanceDB
+                             │                    ├──> ASR／TTS 外部節點、Gemini Live
+                             │                    └──> redis ──> gateway-worker
+                             └── /grafana/    → grafana ──> prometheus
+```
 
-| 需求 | 文件 |
-|------|------|
-| 了解架構與協定 | [架構與規格](docs/README.md#架構與規格) |
-| 部署與維運 | [部署手冊](docs/operations/11_DEPLOYMENT.md)、[帳號管理](docs/operations/account-administration.md) |
-| 整合 Avatar | [JavaScript SDK](docs/guides/avatar-embed/README.md) |
-| 文件匯入與 QA | [解析手冊](docs/operations/05_DOCLING_RUNBOOK.md)、[型錄 QA SOP](docs/guides/PDF_CATALOG_TO_QA_SOP.md) |
-| 查計畫與實驗 | [計畫與實驗](docs/README.md#計畫與實驗) |
-| 查早期討論與任務 | [歷史資料](docs/archive/README.md) |
-| 查版本變更 | [CHANGELOG](CHANGELOG.md) |
+前台有兩種對話模式。文字模式：辨識結果送 `POST /api/v1/chat`，Backend 轉給 Brain 產生回答，再經 TTS 串流（`/api/v1/tts/stream`）播放並驅動對嘴。Live 模式：前台經 `/api/v1/ws` 連線，由 Gemini Live 直接以語音回答，工具呼叫在 Brain 執行。Brain 不對外開放（`/brain/` 一律 404），公開 API 以 Backend 的 `/docs` 為準。
 
-## 入口與模組責任
+協定與各層細節見 [系統架構](docs/specs/00_SYSTEM_ARCHITECTURE.md) 與 [核心協定](docs/specs/00_CORE_PROTOCOL.md)。
 
-`frontend/app/src/main.ts` 掛載登入外殼，`App.vue` 組裝畫面與各領域 composable：回答播放（`useAvatarConversation`）、語音輸入及恢復（`useAvatarVoiceInput`）、引擎偏好（`useAsrPreferences`）、角色舞台、鏡頭、沉浸模式與設定切換。前後台共用 `frontend/shared/speech` 的辨識及音訊底層；後台使用共用 `SpeechController`，前台由專用 composable 協調串流與回答後收音。後台 `App.tsx` 維持導航及權限閘門。
+## 主要功能
 
-Backend `app/main.py` 僅建立 FastAPI、掛載 middleware／lifespan／OpenAPI、依原順序註冊路由與啟動 server。`routes/tts.py`、`routes/asr.py`、`routes/documents.py` 各自擁有 HTTP 流程；`lifecycle.py`、`openapi.py`、`http_metrics.py`、`server_logging.py` 管理基礎設施。Brain `api/main.py` 同樣負責組裝；`startup.py` 管理遷移、預熱及排程器，`safety/server_http.py` 管理追蹤與監控。Gemini Live 傳輸、payload 與工具執行的責任見 [Brain 文件](brain/README.md)。
+### 虛擬人前台
 
-[入口邊界測試](tests/test_entry_boundaries.py) 防止業務端點／語音計時回到入口、檢查 Backend catch-all 最後註冊，以及自有正式程式碼每檔不超過 1000 實體行。第三方與測試不受此行數限制；Contracts CI 在相關程式變更時也會執行此檢查。重構不改路由、wire schema、資料儲存或外部 SDK；正式部署仍依原有 CI／watchtower 流程。[拆分計畫](docs/plans/thin-entry-refactor.md) 保持 Draft，待使用者確認。
+- 角色舞台：2D 影片角色（WASM 對嘴）與 3D VRM 角色，可切換背景。
+- 語音輸入：VAD 自動斷句，支援批次與串流辨識；虛擬人說話時暫停收音、講完自動恢復，送出鈕在回答中變為「停止」（也可按 Esc）。
+- 快速問答：舞台上的「快速問題」選單，以及開口前輸入框上方的推薦問題，都取自後台的問答節點，點選直接送出。
+- 前台設定（專案、人設、聲音、模式、背景、VRM）存在帳號裡，換裝置登入沿用。
+- 訪客模式／展示機台：隱藏設定與登出、以「點一下開始對話」解鎖音訊、閒置 2 分鐘自動清空對話換下一位來賓。三種啟用方式擇一即可：
+  - 前台設定的「切換成展示機台」（記在這台裝置）
+  - 後台帳號頁勾選「展示機台」（該帳號登入一律為訪客模式）
+  - 網址加 `?kiosk=1`（`?kiosk=0` 取消），供自動化部署使用
 
-## 對外接入
+  現場人員長按標題 3 秒並輸入帳號密碼，可暫時叫出設定與登出。
 
-### 語音可靠性
+### 管理後台
 
-Gemini Live 與 Confucius4-R2T2 串流 ASR 僅做轉錄，回答仍由 Brain 產生。串流連線等待 ready 最多 10 秒，失敗沿用既有批次辨識備援；停止收音會立即釋放麥克風，最多再等 5 秒接最後定稿。重新開始或卸載後，舊連線不能再送出文字。每則回答獨立攜帶辨識語言，視覺回答與一般打字不沿用前一句台語分流。語音授權與 VAD 部署要求見 [前端規格](docs/specs/02_FRONTEND_SPEC.md#6-asr-與語音輸入-speech-recognition)。
+後台每頁都有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/accounts/temporary`），以 `?project=<id>` 指定專案，公開子路徑部署時加 `/openvman` 前綴。完整路由表見 [Canonical Routes](docs/guides/admin-canonical-routes.md)。
 
-批次引擎多了 Confucius4-R2T2（`r2t2`，設 `ASR_R2T2_URL=http://10.9.0.35:8040`，2026-10-05 起 .35 為主機；.37 另設 `ASR_R2T2_DEV_URL` 成為獨立引擎 `r2t2-dev`，選了才用）：一次性轉寫、帶專案詞表，照專案語言分流指定解碼語言（只開一種語言就帶該語言，多種語言帶 `zhen`，沒有分流或只有台語當華語），中文輸出轉繁體，鶴記合成語音實測準確度與 Breeze 相當、快約 3 倍（`scripts/experiments/r2t2/REPORT.md`）。前台選 `r2t2-live` 可使用 Confucius4-R2T2 邊講邊出字；它與批次 `r2t2` 分開授權。部署需設定 `ASR_R2T2_STREAM_URL=ws://10.9.0.35:8040/asr_stream_api_v1` 與 `ASR_R2T2_SECRET_KEY`（由服務管理者提供，不寫入版本控制），並由管理者在帳號頁授權。專案詞表會送給 R2T2；暫定字幕累加、定稿以整句 `final_text` 轉繁體，不經 Jev。台語分流開啟時維持 Breeze 批次。後台授權與個人引擎選單共用此選項；後台「試辨識」仍只提供批次引擎，後台 Chat 維持原有批次輸入。外部 Avatar SDK 不暴露 ASR。
+| 群組 | 頁面 | 用途 |
+|---|---|---|
+| Workspace | 對話 | 文字／語音對話測試；AI 回答可一鍵「修正成 QA」寫回知識庫 |
+| | 語音 | TTS 試聽（`/admin/voice`）；ASR 測試台（`/admin/voice/asr`）：專案詞表、語言分流、多引擎同句比較與錯字率 |
+| | 對話紀錄、知識庫搜尋、工作區 | 檢視 session、測試檢索、編輯 workspace 文件 |
+| Knowledge | 知識庫 | 文件上傳與轉換、問答節點與快速問答、語言分流、知識圖譜、多選批次移動／設定語言／刪除 |
+| | 記憶管理、角色管理 | 長期記憶與人設 |
+| | Avatar | 2D 角色、背景，以及嵌入網站右下角的小助理 |
+| | 工具與技能 | Brain 工具與 skills 狀態 |
+| System | 專案管理 | 建立與列出專案 |
+| | 帳號管理 | 正式帳號、臨時帳號批次、資源與引擎授權、展示機台旗標 |
+| | Embed 金鑰 | 外部網站嵌入 Avatar 用的金鑰 |
+| | 用量 | 依帳號、專案、session 彙總的模型與 token 用量 |
+| | 系統健康、系統監控 | 服務健康檢查與 Grafana 儀表板 |
 
-正式環境由 push 後的 CI／watchtower 部署；本機測試不代表正式已套用。變更正式 `.env`、授權或修改真人帳號偏好前須取得使用者同意。部署後以專用測試帳號執行 [語音端到端驗收](scripts/voice_e2e/README.md)，設定偏好為 `r2t2-live`，測鶴記兩個 Edge 聲音與同時三路，不修改真人帳號。
+### Brain
 
-第三方網站透過無 API Key 的 Avatar JavaScript SDK 載入角色，並以 `playAudio(Blob | ArrayBuffer)` 或 `pushPcm(Int16Array)` 提供自己的音訊。SDK 不開放 Brain、Chat、ASR 或 TTS；串接流程與公開錯誤碼請參閱 [虛擬人外部整合指南](docs/guides/avatar-embed/README.md)。
+- RAG：知識文件轉為 Markdown 後以 BGE-M3 向量化，存於 LanceDB；問答節點與 CSV 轉換的 QA 同樣索引。
+- 記憶：workspace 核心文件（`SOUL.md`、`MEMORY.md` 等）直接進 prompt，對話歸檔與夜間記憶整理（dreaming）。
+- 工具：知識檢索、圖譜、記憶、網路搜尋與網頁轉 Markdown（2md）、Wiki 發布，以及依專案 `knowledge/products/_catalog.yaml` 啟用的產品規格篩選 `filter_products`。
+- 模型路由：`LLM_PROVIDER` 指定主要供應商（目前為 Gemini），失敗時依 `LLM_FALLBACK_CHAIN` 依序切換。
+- 隱私：送給 LLM 的訊息先偵測個資，記錄稽核事件並在後台對話顯示提醒，不改寫內容（`PRIVACY_FILTER_ENABLED`）。
+- 用量帳本：每次模型呼叫記錄 token 與歸屬，供後台用量頁查詢。
 
-Admin 也可將已上傳且素材完整的影片角色登記為右下角小助理。這類小助理同時檢查 mascot 與 avatar character 授權；宿主播放 TTS 時，會以 PCM 另行驅動嘴型，避免重複出聲。
+工具清單、API 與環境變數見 [Brain 文件](brain/README.md) 與 [Brain 規格](docs/specs/03_BRAIN_SPEC.md)。
 
-### 管理介面導覽
+### 語音引擎
 
-管理介面的 Workspace、Knowledge、System 群組可點擊標題展開／收合，桌面側欄與手機選單共用狀態，並依登入帳號記住偏好。首次只展開目前頁面的群組；重新載入或切換頁面時會展開目的群組。側欄縮成窄版時，仍可透過 W／K／S 群組標題操作。
+| 類型 | 引擎（設定 id） | 設定 |
+|---|---|---|
+| 批次 ASR | Breeze-ASR（`breeze`）、Confucius4-R2T2（`r2t2`）、SenseVoice（`sensevoice`）、OpenAI Whisper（`openai`） | `ASR_BREEZE_URL`、`ASR_R2T2_URL`、`ASR_SENSEVOICE_URL`、`WHISPER_API_KEY` |
+| 串流 ASR | Confucius4-R2T2 串流（`r2t2-live`）、Gemini Live（`gemini-live`） | `ASR_R2T2_STREAM_URL`、`ASR_R2T2_SECRET_KEY`、`GEMINI_API_KEY` |
+| 開發節點 | `r2t2-dev`、`r2t2-dev-live`（帳號選了才用，不進備援） | `ASR_R2T2_DEV_URL`、`ASR_R2T2_DEV_STREAM_URL`、`ASR_R2T2_DEV_SECRET_KEY` |
+| 瀏覽器 | 瀏覽器內建辨識（`browser`） | 無 |
+| TTS | VoxCPM、CosyVoice、Edge TTS、Gemini TTS（台語分流改用 VoxCPM 或 CosyVoice） | `TTS_VOXCPM_URL`、`TTS_COSYVOICE_URL`、`TTS_EDGE_*`、`TTS_GEMINI_URL` |
 
-### 管理介面網址
+- 未自選引擎的帳號使用 `ASR_PROVIDER`；每個帳號可選哪些引擎由帳號頁授權。
+- 專案可設定語言分流與 ASR 詞表；開啟台語分流的專案一律改用 Breeze 批次辨識並判斷是否為台語。
+- TTS 依帳號授權選擇供應商與聲音，主要節點失敗時自動改用下一家。
 
-管理介面具備 [Canonical Routes](docs/guides/admin-canonical-routes.md)：每頁與子頁有固定網址（例如 `/admin/voice/asr`、`/admin/knowledge/graph`、`/admin/avatar/mascots`、`/admin/accounts/temporary`），支援重新整理、上一頁／下一頁與 `/openvman` 公開前綴。`?project=demo` 指定專案，省略時採用 default；舊 `?view=` 網址自動正規化，側欄連結可開新分頁。
-若帳號無法存取 default，後台會先從可用專案清單選擇可存取的專案，再載入頁面並更新網址。
-從非預設專案的對話紀錄按「開啟」會把目前專案一併帶入 Chat，側欄的新分頁連結也會保留目前專案。
+語音輸入與串流細節見 [前端規格](docs/specs/02_FRONTEND_SPEC.md)，TTS 與中斷處理見 [Backend 規格](docs/specs/01_BACKEND_SPEC.md)。
 
-### 聊天測試一鍵修正成 QA
+### 對外嵌入
 
-後台「對話」文字模式下，AI 回答的操作列有「修正成 QA」：帶入那一輪的提問與回答，改好正確答案、
-選要存的問答節點後儲存，沿用知識庫「手動輸入問答」同一條 API（`PUT /knowledge/qa/nodes/{id}/merged`），
-寫回節點既有的 `knowledge/qa/manual_<節點>_*.md`（沒有就新建），約數秒重建索引後重新提問即可驗證。
-同一題已在節點裡就只改答案。預設不出現在前台快速問題按鈕，只進知識庫；要當按鈕就勾「新增時顯示為預設問題按鈕」。
+第三方網站以 Avatar JavaScript SDK（`frontend/avatar-sdk/`，發布於 `/static/sdk/openvman-avatar-sdk.js`）搭配 Embed 金鑰載入角色，以 `playAudio()` 或 `pushPcm()` 提供自己的音訊驅動對嘴。SDK 不開放 Brain、Chat、ASR 或 TTS。整合方式見 [Avatar 外部整合指南](docs/guides/avatar-embed/README.md)。
 
-### 知識庫批次操作
+同一個 edge nginx 也以 Bearer token 對其他 stack 提供 Embedding 端點（`/api/embedding`、OpenAI 相容的 `/api/embedding/v1/embeddings`），設定見 [GPU 服務共用指南](docs/operations/gpu-service-sharing.md)。
 
-後台知識庫檔案樹按「多選」，勾選多個檔案（資料夾一次勾底下全部）後可以批次移動到資料夾、設定語言或刪除。逐檔執行並顯示進度；部分失敗（例如目標已有同名檔、文件掛在快速問答樹上）照樣做完並列出原因，失敗的保持勾選可直接重試。
+## 部署
 
-### TTS 試聽
+### 環境變數
 
-管理介面側欄的「語音 → TTS 試聽」（`/admin/voice`，公開子路徑為 `/openvman/admin/voice`）可選擇帳號已授權的供應商與聲音，輸入最多 1000 字後直接播放。可停止請求／播放，並以播放器重播；若瀏覽器未允許自動播放，按播放器的播放鍵即可。此功能不建立對話紀錄，也不修改對話頁的聲音偏好。若後端改用備援供應商，頁面會標示實際供應商。
+所有服務共用根目錄唯一一份 `.env`：compose 的 `${VAR}` 插值與 `api`、`backend`、`gateway-worker` 的 `env_file` 都讀它。
 
-聲音清單沿用 `GET /api/v1/tts/providers`，試聽沿用登入驗證的 `POST /v1/audio/speech`（`input`、`provider`、`voice`）；依回應 `Content-Type` 播放 WAV／MP3，並讀取 `X-TTS-Provider` 與 `X-TTS-Fallback`。供應商與聲音權限仍由後端執行。
+```bash
+cp .env.example .env
+```
 
-### 共用推論服務端點
+| 類別 | 主要變數 |
+|---|---|
+| Compose | `PORT`、`HTTPS_PORT`、`COMPOSE_PROFILES`（目前為 `embedding`）、`OPENVMAN_IMAGE_TAG` |
+| 公開網域 | `PUBLIC_DOMAIN`、`LETSENCRYPT_EMAIL` |
+| 安全 | `GATEWAY_INTERNAL_TOKEN`、`SESSION_JWT_SECRET`、`AUTH_TEMPORARY_PASSWORD_SECRET`、`GRAFANA_PASSWORD` |
+| LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`GEMINI_API_KEY` 及各供應商金鑰 |
+| 語音 | 見上方語音引擎表 |
 
-其他 stack（JTAI、測試環境）可透過邊界 nginx 共用同一組模型權重，避免重複載入顯存。兩個服務都掛在 `/api/<service>` 底下，以 Bearer token 驗證並套用速率／連線限制：
+缺少的內部 token、session secret 與 Grafana 密碼由 `./scripts/up.sh` 自動產生（也可單獨執行 `./scripts/ensure-runtime-secrets.sh`）。外部服務金鑰向服務管理者取得，不寫入版本控制。
 
-| 服務 | 端點 | 認證 |
-| --- | --- | --- |
-| Embedding（jtai 格式） | `POST /api/embedding` | Bearer |
-| Embedding（OpenAI 相容） | `POST /api/embedding/v1/embeddings` | Bearer |
-| VLM（OpenAI 相容） | `POST /api/vlm/v1/chat/completions` | Bearer |
-| 存活檢查 | `GET /api/{embedding,vlm}/health` | 公開 |
-| 就緒檢查 | `GET /api/embedding/health/ready` | Bearer |
+### 啟動
 
-base URL 本身就是 embed 端點，不需要再疊 `/embed`。OpenAI 相容路徑可直接餵給現成的 OpenAI client（base URL 設為 `.../api/embedding/v1`）。Consumer 設定與現有 edge 路由見 [GPU 服務共用指南](docs/operations/gpu-service-sharing.md)。
+```bash
+./scripts/up.sh --remove-orphans
+```
 
-### 888a2a Agent-to-Agent 網絡整合
+`up.sh` 等同 `docker compose up -d`，另外會先建立資料目錄、修正擁有者並補齊 runtime secrets，三者皆冪等。它只啟動不建置；需要自行建置時一次只 build 一個服務，完成後再 `up`。
 
-openVman 支援接入 [888a2a-lite Hub](https://a2a.david888.com) 成為 A2A 網絡中的具身虛擬人 Agent：
-- **Inbound Bridge Daemon**：後端常駐 SSE 監聽行程，支援 deployment-injected 私有圈金鑰（註冊時才送 `X-Hub-Key`）、憑證持久化與金鑰輪替自動重新註冊、durable enqueue-before-ACK 與防迴音風暴機制（`[[A2A_NO_REPLY]]`）。
-- **Outbound Brain Skills**：大腦具備同儕發現（`a2a_list_peers`）、任務派工（`a2a_send_task`）與群組廣播（`a2a_broadcast_group`）能力。
-- **設定啟用**：在 secret store 注入 `A2A_ENABLED=true` 與 `A2A_HUB_KEY=<private-circle-secret>`（預設關閉）；若要加入 public circle，必須明確設定 `A2A_ALLOW_PUBLIC_CIRCLE=true`。詳情請參閱 [04_GATEWAY_SPEC.md](docs/specs/04_GATEWAY_SPEC.md)。
+### 對外 HTTPS
 
-## 環境變數 (.env)
+edge nginx 監聽 `PORT`（預設 8786，HTTP）與 `HTTPS_PORT`（預設 8787，自簽憑證）。正式網域由主機 nginx 終止 TLS 後轉入，這層不在 compose 內：
 
-所有服務統一使用**根目錄唯一一份 `.env`**：`docker-compose.yml` 對 `api`、`backend` 服務都用 `env_file: ./.env` 注入，同時 compose 本身的 `${VAR}` 插值（port mapping、`HF_TOKEN`、`VLM_*`、`GRAFANA_PASSWORD`、`INDEXTTS_*` 等）也讀這份檔案。部署時先執行 `cp .env.example .env` 並填入外部服務設定；缺少的內部 token、session secret 與 Grafana 管理密碼由 `./scripts/up.sh` 啟動時自動安全產生（也可單獨執行 `./scripts/ensure-runtime-secrets.sh`），不用分開維護多份。Grafana 預設不開放匿名瀏覽，所有部署都必須設定唯一的高熵 `GRAFANA_PASSWORD`。
+```bash
+./scripts/setup-public-https.sh            # 首次：產生 vhost、申請憑證、設定續期
+./infra/nginx/native/deploy.sh             # 修改 openvman.conf.template 後推送（--check 只比對）
+```
 
-LLM 的明確 fallback 順序由 `LLM_FALLBACK_CHAIN` 決定。NEN 必須以 `nen:<model>` 加入鏈，並使用 `NEN_API_KEY` 與 `NEN_BASE_URL`；它雖採用 OpenAI-compatible transport，但不得占用 `OPENAI_API_KEY` 或共用的 `LLM_BASE_URL`。
-安全審查流程固定在 `.agents/skills/security-audit/`，並由 `skills-lock.json` 記錄來源與 hash；`.claude` 與 `.kilocode` 下的本機 symlink 只供個人 agent runtime 使用，不提交到 repository。
+只在內網測試可略過，直接連 `https://<host>:8787`。
 
 ### 初始 ROOT
 
-空白安裝的唯一 ROOT 固定為帳號 `ai360`。服務啟動後，在 Backend 容器執行一次：
+空白安裝的唯一 ROOT 帳號固定為 `ai360`，服務啟動後執行一次：
 
 ```bash
 docker compose exec -e BOOTSTRAP_ADMIN_PASSWORD=ai360 backend \
   python -m app.scripts.create_user --username ai360
 ```
 
-指令不接受其他 ROOT 名稱，也不會建立或取代第二個 ROOT。`ai360` 僅適合開發環境；正式部署必須在首次登入後立即更換密碼。既有兩層帳號資料庫會將原 `ai360` 原地升級為 ROOT，保留帳號 ID、密碼 hash、ownership 與 grants，但會撤銷 migration 前的 session。完整操作與 rollback 注意事項請見 [帳號管理手冊](docs/operations/account-administration.md)。
+正式部署須在首次登入後立即更換密碼。帳號層級、臨時帳號與備份方式見 [帳號管理手冊](docs/operations/account-administration.md)。
 
-帳號管理的「編輯／管理」分頁可依狀態查詢臨時批次，並查看與複製新版批次的登入密碼。密碼以加密形式保存；舊批次無法還原。`AUTH_TEMPORARY_PASSWORD_SECRET` 可獨立設定加密祕密值，未設時沿用 session 祕密；備份與金鑰輪替方式見 [帳號管理手冊](docs/operations/account-administration.md#臨時登入密碼保存與查閱)。
+### 更新流程
 
-管理員的「資源上限」是 ROOT 指定的資源白名單；範圍解析失敗會中止存取。知識庫與 workspace 上傳則讀取 Backend 的 `DOCUMENT_MAX_UPLOAD_BYTES`，並由 Backend 對原始檔與文字檔一致執行每檔檢查，預設 100 MiB。API 契約見 [Gateway 規格](docs/specs/04_GATEWAY_SPEC.md#34-文件轉換與知識上傳-document-conversion--knowledge-upload)。
+正式環境只透過 CI 更新：push 到 `main` → GitHub Actions（`docker-publish.yml`）建置並推送 `tbdavid2019/openvman-*` image → watchtower 每 5 分鐘檢查並換上新版。在正式目錄本機 build 的 image 會被 watchtower 拉回遠端版本。服務增刪或 ports、volumes、environment 等結構變更，需更新 repository 後重新執行 `./scripts/up.sh --remove-orphans`。
 
-### 部署與啟動
+開發請使用 worktree 並疊加 `docker-compose.dev.yml`（掛載原始碼、前端 HMR、停用 watchtower）。首次部署、疑難排解、CI 細節與 worktree 流程見 [部署手冊](docs/operations/11_DEPLOYMENT.md)。
+
+### 選用元件
+
+以下元件保留在 compose 或程式中，但目前部署未啟用：
+
+- IndexTTS 本地語音合成（`indextts` profile）
+- VLM 本地視覺模型（`vlm` profile）
+- A2A Agent-to-Agent 網絡（`A2A_ENABLED`，預設關閉）
+
+## 開發與測試
+
+`backend/` 與 `brain/api/` 是兩個獨立的 Python runtime，各有 `requirements.txt`，不可互相 import。
 
 ```bash
-./scripts/up.sh --remove-orphans
+# Backend
+cd backend && python -m pytest tests/ -v
+
+# Brain（略過需要模型與外部服務的整合測試）
+cd brain/api && python -m pytest tests/ -m "not integration" -v
+
+# 入口邊界檢查（repo 根目錄）
+python -m pytest tests/ -q
+
+# 管理後台
+cd frontend/admin && pnpm install && pnpm test && pnpm build
+
+# 虛擬人前台
+cd frontend/app && pnpm install && pnpm test && pnpm build
+
+# Avatar SDK
+cd frontend/avatar-sdk && pnpm install && pnpm test
 ```
 
-`up.sh` 等同 `docker compose up -d`，但會先建立缺少的資料目錄、修正擁有者，並補齊
-缺少的 runtime secrets——三者都冪等，沒事做時完全安靜。直接 `docker compose up -d`
-仍可運作，只是這些前置條件要自己顧：缺少的 bind mount 目錄會被 Docker 以 root 建立，
-而容器以非 root 執行，稍後才拋出難以追查的 `Permission denied`。
+協定契約由 `contracts/schemas/v1/` 產生 TypeScript 與 Python 型別，修改 schema 後必須重新產生，CI 會檢查是否過期：
 
-完整流程（首次部署、日常更新、主機 nginx、疑難排解、建置節奏、worktree、CI/CD）見
-**[11_DEPLOYMENT.md](docs/operations/11_DEPLOYMENT.md)**。
-
-### 對外 HTTPS：主機 nginx（compose 之外）
-
-`up.sh` 啟動的 Compose stack 含一個 **Docker 邊緣 nginx**（`8786` HTTP / `8787`
-HTTPS，自簽憑證）。對外的正式 HTTPS 由**主機自己的 nginx** 終止，再轉進來：
-
-```
-瀏覽器 ──HTTPS 443──> 主機 nginx（Let's Encrypt）
-                        └──HTTPS 8787──> Docker nginx（自簽）
-                             └──> avatar / admin / backend
+```bash
+python contracts/scripts/generate_protocol_contracts.py          # 重新產生
+python contracts/scripts/generate_protocol_contracts.py --check  # CI 檢查
 ```
 
-**這層不能塞進 compose**：主機 nginx 佔用 80/443 且由同機其他站台共用，容器要接管
-得用 `network_mode: host` 並停掉它；憑證申請也需要 80 埠做 ACME 驗證，同樣會撞。
+語音端到端驗收（以合成語音跑完整一輪辨識、回答與 TTS）見 [voice_e2e](scripts/voice_e2e/README.md)。開發代理的工作規則見 [AGENTS.md](AGENTS.md)。
 
-因此它是獨立的部署目標，有自己的更新流程。改了
-`infra/nginx/native/openvman.conf.template` 不會影響線上，必須執行
-`./infra/nginx/native/deploy.sh` 推送出去（`--check` 可只比對）。
+## 文件
 
-只想在內網測試可跳過這層，直接連 `https://<host>:8787`（自簽，瀏覽器會警告）。
-
-### 其他部署主題
-
-Docker Hub CI/CD 與 Watchtower、Worktree 開發與 HMR、建置節奏與 I/O 注意事項、
-GitHub Actions runtime 需求，均見 **[11_DEPLOYMENT.md](docs/operations/11_DEPLOYMENT.md)**。
-
-### AI Coding 餵檔策略
-
-| 撰寫目標 | 餵入哪些文件 |
-|----------|-------------|
-| 後端網路通訊 | `00` + `01` |
-| 大腦 RAG 邏輯 | `01` + `03` |
-| 知識文件解析 | `03` + `04` + `05` |
-| 網頁前端渲染 | `00` + `02` |
-| 全端整合/Debug | `00` + `01` + `02` + `03` |
-
----
-
-## 二、系統全景圖 (System Overview)
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        openVman 虛擬人系統                               │
-│                     三層解耦架構 (3-Tier Decoupled)                       │
-└─────────────────────────────────────────────────────────────────────────┘
-
-  ┌──────────────────────┐    WebSocket (JSON)    ┌──────────────────────┐
-  │   🖥️  前端表現層       │◄════════════════════►│   ⚙️  後端通訊層       │
-  │   (Frontend/Client)  │   client_init          │   (Backend/Nervous)  │
-  │                      │   user_speak ──────►   │                      │
-  │  ┌────────────────┐  │   client_interrupt ─►  │  ┌────────────────┐  │
-  │  │ <video>        │  │                        │  │ Session Mgr    │  │
-  │  │  idle.mp4 循環  │  │   ◄── stream_chunk    │  └────────────────┘  │
-  │  │  (底層背景)     │  │   ◄── server_error    │  ┌────────────────┐  │
-  │  ├────────────────┤  │   ◄── ping / pong ──►  │  │ **Guard Agent**  │  │
-  │  │ <canvas>       │  │                        │  │ (快速中斷判定)   │  │
-  │  │  DINet/WebGL   │  │   ┌────────────────┐   │  └────────────────┘  │
-  │  │  (AI 對嘴渲染)  │  │   │   🛡️ 網關層     │   │  ┌────────────────┐  │
-  │  ├────────────────┤  │   │ (Gateway/Async)│   │  │ **TTS Chunker**  │  │
-  │  │ Web Audio API  │  │   │  Media / Task  │   │  │ (標點符號截斷)    │  │
-  │  │  播放+對時時鐘  │  │   │  Plugins       │   │  └────────────────┘  │
-  │  ├────────────────┤  │   └──────┬─────────┘   │  ┌────────────────┐  │
-  │  │ ASR 語音辨識   │  │          │             │  │ TTS Router     │  │
-  │  └────────┬───────┘          │ upload      │  └────────────────┘  │
-  │           └──────────────────┘             │  ┌────────────────┐  │
-  │                                            │  │ /health 端點   │  │
-  │                                            │  └────────────────┘  │
-  └──────────────────────┘                     └─────────┬────────────┘
-                                                            │
-                                                  async generate_response_stream()
-                                                  (純文字 Token Iterator)
-                                                            │
-                                                ┌───────────▼────────────┐
-                                                │   🧠 大腦認知層         │
-                                                │   (Brain/Cognitive)    │
-                                                │                        │
-                                                │  ┌────────────────┐    │
-                                                │  │ bge-m3 Embed   │    │
-                                                │  │ (本地模型)      │    │
-                                                │  ├────────────────┤    │
-                                                │  │ LanceDB 嵌入式  │    │
-                                                │  │ 向量資料庫       │    │
-                                                │  ├────────────────┤    │
-                                                │  │ Prompt Assembly │    │
-                                                │  │ SOUL + MEMORY  │    │
-                                                │  │ + Tools + Hist │    │
-                                                │  ├────────────────┤    │
-                                                │  │ Tool Calling   │    │
-                                                │  │ CRM / 電商 API │    │
-                                                │  ├────────────────┤    │
-                                                │  │ Sleep/Reflect  │    │
-                                                │  │ 記憶整理 Cron   │    │
-                                                │  └────────────────┘    │
-                                                │                        │
-                                                │  ~/.openclaw/          │
-                                                │  ├── workspace/        │
-                                                │  │   ├── SOUL.md       │
-                                                │  │   ├── MEMORY.md     │
-                                                │  │   ├── TOOLS.md      │
-                                                │  │   ├── AGENTS.md     │
-                                                │  │   ├── memory/       │
-                                                │  │   └── .learnings/   │
-                                                │  └── lancedb/          │
-                                                │      ├── memories.lance│
-                                                │      └── knowledge.lance│
-                                                └────────────────────────┘
-```
-
----
-
-## 三、端到端資料流 (End-to-End Data Flow)
-
-```
-使用者說話
-    │
-    ▼
-┌─────────┐  ASR 辨識   ┌─────────┐ user_speak  ┌─────────┐  user_input   ┌─────────┐
-│  麥克風  │───────────►│  前端    │────────────►│  後端    │─────────────►│  大腦    │
-│  (Mic)  │            │ Browser │  (WebSocket) │ Server  │  (async fn)  │ (Brain) │
-└─────────┘            └─────────┘              └─────────┘              └─────────┘
-                                                     │                       │
-                                                     │ ◄── Token Stream ─────┘
-                                                     │     (逐 token 回傳)
-                                                     │
-                                                     ▼
-                                              ┌─────────────┐
-                                              │ 標點截斷器    │
-                                              │ (Chunker)   │
-                                              └──────┬──────┘
-                                                     │ 短句
-                                                     ▼
-                                              ┌─────────────┐
-                                              │ TTS 音訊合成 │
-                                              │   引擎       │
-                                              └──────┬──────┘
-                                                     │ audio_base64
-                                                     ▼
-                           stream_chunk        ┌─────────────┐
-┌─────────┐  ◄─────────────────────────────────│  WebSocket   │
-│  前端    │   { audio, text,                   │   下發       │
-│ Browser │     emotion, is_final }            └─────────────┘
-└────┬────┘
-     │
-     ▼
-┌──────────────────────────────────────┐
-│  AudioContext 解碼 → 播放佇列         │
-│  requestAnimationFrame + currentTime │
-│  → Wav2Lip / DINet / WebGL 渲染      │
-└──────────────────────────────────────┘
-     │
-     ▼
-  使用者看到虛擬人「說話」
-```
-
----
-
-## 四、前端狀態機 (Frontend State Machine)
-
-```
-                    ┌─────────────────────┐
-                    │      ❶ IDLE         │
-                    │  Canvas 清空         │
-                    │  <video> 播 idle.mp4 │
-                    └──────────┬──────────┘
-                               │  使用者說話
-                               │  送出 user_speak
-                               ▼
-                    ┌─────────────────────┐
-                    │    ❷ THINKING       │
-                    │  等待大腦回應         │
-                    │  (可播思考動畫/音效)  │
-                    └──────────┬──────────┘
-                               │  收到第一個
-                               │  stream_chunk
-                               ▼
-                    ┌─────────────────────┐
-       使用者插話 ──►│    ❸ SPEAKING       │◄── server_error ──► ❹ ERROR
-      client_int   │  AudioContext 播放   │                     (顯示提示)
-        ─rupt      │  Canvas 對嘴繪製     │                     retry →
-          │        └──────────┬──────────┘                     回到 IDLE
-          │                   │  is_final:true
-          │                   │  且佇列播完
-          ▼                   ▼
-          └──────────► 回到 ❶ IDLE
-```
-
----
-
-## 五、各文件涵蓋範圍
-
-| 文件 | 章節數 | 涵蓋範圍 |
-|------|--------|----------|
-| `00_CORE_PROTOCOL` | 6 章 | 三層架構總覽 · WebSocket 協定 · Lip-Sync 技術 · 狀態機 · **錯誤事件 (6 種錯誤碼)** · **Ping/Pong 心跳** · **Init Ack** · **協定版本管理 (SemVer)** · **連線認證** |
-| `01_BACKEND_SPEC` | 14 章 | Session 管理 · **訊息處理層** · LLM Chunking · **zh-TW TTS** · **Provider / Key Fallback** · 中斷處理 · **環境變數配置** · **健康檢查 /health** · **Prometheus 效能指標 (6 項)** · **優雅關機 SIGTERM** · **結構化 JSON 日誌** |
-| `02_FRONTEND_SPEC` | 11 章 | DOM 結構 · Audio Queue · Golden Sync Loop · Canvas Sprite · ASR · 狀態機 · **素材 Manifest (含定位座標)** · **RWD 響應式 (4 種場景)** · **指數退避斷線重連** · **server_error 前端行為表** |
-| `03_BRAIN_SPEC` | 14 章 | **LanceDB 嵌入式向量 DB** · **bge-m3 本地 Embedding (1024 維)** · 知識庫結構 · 知識索引管線 (Chunk→Embed→Lance) · RAG 檢索 · **Message Handling Layer** · **Key / Model Fallback** · **Token 預算管理** · Tool Calling · 反思機制 · **多角色切換 (persona_id)** · **安全防護 (Guardrails)** · 環境變數 · HTTP/SSE 介面 |
-
----
-
-## 六、核心技術選型摘要
-
-| 層級 | 關鍵技術 | 說明 |
-|------|----------|------|
-| 前端 | `video.currentTime` + `AudioContext` | 高精度對嘴時鐘源，解決影音漂移 |
-| 前端 | 渲染策略切換 (`LipSyncManager`) | 支援三大引擎流：`Wav2Lip` (WebGPU) / `DINet` (Edge 推論) / `WebGL` (.ktx2 CSR) |
-| 前端 | **ONNX Runtime Web / WebGL** | 依設備能力選用高速引擎，捨棄舊版 Viseme 常數映射 |
-| 後端 | 標點符號截斷 (Punctuation Chunking) | LLM 串流 → 短句 → TTS，最小化延遲 |
-| 後端 | **智能中斷 (Smart Barge-in)** | 輕量 Guard Agent 判定插話，立即停止 ASR/TTS 任務 |
-| 後端 | IndexTTS / VoxCPM zh-TW / CosyVoice 臺灣台語 | 優先使用自建語音節點，並具備 Gemini / GCP / AWS / Edge-TTS fallback；VoxCPM 合成前先查 `/api/v1/health`，推論 worker 死掉（503）或連不上就直接換下一家，不等合成逾時；VoxCPM 與 CosyVoice 聲線由外部 CastAgent 相容介面同步 |
-| 後端 | Message Layer + Provider Router | 正規化訊息、排程回應、處理金鑰與模型 fallback |
-| 網關 | **BullMQ + Redis 佇列** | 非同步處理多模態素材 (影像/語音) 的 CPU 密集型預處理管線 |
-| 網關 | **Gateway Plugin System** | 提供 Camera Live 即時視覺感知、文件處理與 Web Crawler 等前置工具能力 |
-| 網關 | **pdf-inspector + Docling + AnyDoc** | PDF 安全 fast path、Office 文件主轉換與 Rust-backed fallback；Brain 只索引 canonical Markdown |
-| 大腦 | **LanceDB** (嵌入式向量 DB) | 無服務端、低延遲、本地部署 |
-| 大腦 | **BAAI/bge-m3** (本地 Embedding) | 1024 維、多語言、Dense+Sparse 混合檢索 |
-| 大腦 | Markdown 檔案系統 | 人類可讀、Git 可追蹤的知識庫 |
-| 大腦 | SQLite Token Usage Ledger | 逐次記錄模型與 token 用量，並以帳號、專案、session 與 trace 歸屬；Admin 日期篩選、趨勢與事件顯示統一採 Asia/Taipei，帳本仍存 UTC |
-| 大腦 | **2md Web Tools** | 以 `2md.aiurl.tw` 為主力、`2md.glsoft.ai` 與 `create360.ai` 為 fallback，提供即時搜尋與 URL / 文件轉 Markdown |
-| 大腦 | **David888 Wiki Publisher** | 由 `publish_wiki` 發布長篇 Markdown，回傳公開 `shareUrl`，不暴露內部編輯 URL |
-| 通訊 | WebSocket + JSON (Base64 音頻) | 全雙工、即時推流 |
-
----
-
-## 七、計畫與歷史資料
-
-目前文件入口見 [文件總覽](docs/README.md)。早期的文件待辦與功能宣稱保留於 [README 歷史快照](docs/archive/notes/readme-planning-snapshot.md)，不作為目前驗收清單。
-
----
-
-## 八、授權協議 (License)
-
-本專案採用 **GNU General Public License v3.0 (GPLv3)** 授權。詳情請參閱 [LICENSE](./LICENSE) 檔案。
-
-
-### 語意分流可行性實驗
-
-[Jev API 評估](scripts/experiments/jev/REPORT.md)在 48 筆繁體中文合成案例上驗證分流與語音打斷（96/96、零順序翻轉）。先前的 SemIf 本機模型實驗因選項順序敏感（21/32 題隨排列改答案）不採用，證據保留在 [`scripts/experiments/semif-evidence/`](scripts/experiments/semif-evidence/REPORT.md)。兩者都不是正式功能開關，不改變既有聊天或授權流程；接入計畫見 [Jev 決策層](docs/plans/jev-decision-layer.md)。
-
-
-### 語音插話與停止控制
-
-一般聊天的共用語音控制器以「停止說話後 10 秒」判定 continuous 模式閒置，
-持續說話不會被截斷；VAD 無法啟動時會切換按鍵錄音，保留正確收音狀態與
-60 秒錄音上限。ASR worker 與設定 API 共用授權判定，撤權後不再採用帳號的
-舊引擎偏好，改用部署設定的 `ASR_PROVIDER` 與既有 fallback 鏈；連不上的引擎會暫停 60 秒不排入。後台沒有「全站預設
-引擎」可以改：沒選過引擎的人一律用 `ASR_PROVIDER`，每個人在聊天室或前台設定自己選
-（能選哪些由帳號頁授權）；後台「語音 → 語音辨識」（`/admin/voice/asr`）可以編輯專案詞表、勾語言分流，批次試辨識一次比較多個引擎（收音一律走 VAD，講完一句自動送出；也可上傳，可填參考文字算錯字率、看台語判斷），同一句同時送給勾選的引擎，只列這個部署設定齊全的引擎（`GET /api/v1/asr/engines`，批次 `engines`、串流 `stream`）；串流引擎與瀏覽器內建辨識也能一起比，後勾的引擎直接用畫面上的音檔跑、每段可重跑，不用重傳；也能串流試聽 Gemini／R2T2 的即時字幕；都只影響這一次，不改任何人的設定。
-虛擬人在想或在講時，前台的送出鈕會變成「停止」，沒開視窗時按 Esc 也能打斷；講話中麥克風會暫停（避免收到自己的聲音），所以不能用開口打斷；講完會自動恢復收音，6 秒沒開口才關麥克風。
-開了台語分流的專案一律改用 Breeze 批次辨識（Gemini Live 辨識聽不懂台語），並同時判斷是不是台語；
-判斷最多等 `ASR_LANGUAGE_CHECK_TIMEOUT_SECONDS`（預設 2.5 秒），逾時當不是台語，細節見 `docs/specs/03_BRAIN_SPEC.md`。
-
-### 前台設定跟著帳號
-
-虛擬人前台設定視窗按「套用」的選擇（專案、人設、聲音、模式、背景、VRM 等）存在帳號裡，
-換電腦登入同一個帳號會沿用；瀏覽器也留一份，後端暫時連不到時照用。嵌入金鑰不存。
-API 見 `docs/specs/01_BACKEND_SPEC.md`「前台設定跟著帳號」。
-
-### 展示機台（訪客模式）
-
-前台網址加 `?kiosk=1` 進入訪客模式（`?kiosk=0` 關閉；同一個分頁重新整理會記得）：
-
-- 藏起「設定」與底部的帳號列、登出，來賓改不到專案、人設、引擎，也登出不了；現場人員在標題上連點三下可暫時叫出，重新整理又藏起來。
-- 先顯示「點一下開始對話」：瀏覽器沒被點過不肯出聲，來賓一碰就解鎖音訊、先連線並開始收音。
-- 閒置 2 分鐘（虛擬人沒在回答、沒人點畫面或講話）就換下一位來賓：清空對話、關麥克風、回到「點一下開始」，下一位不會看到上一個人問了什麼。
-
-不論哪種模式，標題都顯示角色名稱（預設角色時顯示專案名稱）與狀態（在線、聆聽中、思考中、說話中），
-收音時輸入框右側有即時音量條；還沒開口前，輸入框上方列出快速問答的推薦問題（各主題輪流取題、最多 4 題，手機只顯示 2 題；
-第一層是語言分類時取中文），點了直接送出。手機上點輸入框時舞台縮成一小條，讓出位置給鍵盤與對話，收起鍵盤就恢復。聊天出錯時只顯示白話說明，原始錯誤碼寫在瀏覽器 console。
-
-### 整輪延遲量測
-
-文字模式的虛擬人前台在思考中保持收音，可補一句並合併回答；開始合成、播放或
-顯示回答字幕時暫停收音（串流辨識關閉連線，其他引擎暫停），結束後自動恢復。
-瀏覽器內建辨識仍一次一句。快速問答保留獨立出處，不與其他句子合併。
-
-講話中插話已有分類端點，但前台預設不用：登入保護的 `POST /api/v1/voice/interrupt`，
-請求 `{transcript, reply_text}`，回應 `{action: "STOP" | "IGNORE"}`；先丟掉完整
-出現在回答裡的文字（喇叭回音），再由 GuardAgent 規則判定，模糊長句問 Jev，
-未設定或失敗判 STOP。前台開關是 `useAvatarVoiceInput.ts` 的
-`INTERRUPT_WHILE_SPEAKING`（預設 false）：回音過濾只擋完全相同的文字，現場
-喇叭／麥克風的回音消除實測過再開，見 `docs/plans/full-duplex-voice.md` 階段 B。
-合併回合由 Brain 先暫存答案，前台收到目前版本後再經 `/api/v1/chat/accept`
-確認寫入，避免被取消的舊回答留在對話或自動記憶。API 契約見
-[Brain README](brain/README.md#思考中補句與回答接收確認)。
-
-前台每一輪對話記下時間點，開始播放（或被打斷、出錯）時送到 Backend
-`POST /api/v1/metrics/turn`，每輪一行 JSON 寫進 `backend/logs/turn_timing.jsonl`
-（主機掛載目錄，部署重建容器也不會消失；可用 `TURN_TIMING_LOG` 改路徑）。
-
-| 時間點 | 意思 |
+| 主題 | 文件 |
 |---|---|
-| `speech_start`／`speech_end` | VAD 或瀏覽器辨識偵測到開始講話／講完 |
-| `asr_done` | 辨識文字回到前台 |
-| `sent` | 送出給 Brain（要先建連線時與 `asr_done` 會有差距） |
-| `reply_done` | Brain 回覆完整文字 |
-| `tts_start`／`first_audio` | 送出 TTS／收到第一段聲音（Live 模式是 Gemini 的第一段聲音） |
-| `playback_start` | 真的開始播放 |
+| 文件總覽 | [docs/README.md](docs/README.md) |
+| 架構與協定 | [系統架構](docs/specs/00_SYSTEM_ARCHITECTURE.md)、[核心協定](docs/specs/00_CORE_PROTOCOL.md) |
+| 各層規格 | [Backend](docs/specs/01_BACKEND_SPEC.md)、[Frontend](docs/specs/02_FRONTEND_SPEC.md)、[Brain](docs/specs/03_BRAIN_SPEC.md)、[Gateway](docs/specs/04_GATEWAY_SPEC.md) |
+| 部署與維運 | [部署手冊](docs/operations/11_DEPLOYMENT.md)、[帳號管理](docs/operations/account-administration.md)、[GPU 服務共用](docs/operations/gpu-service-sharing.md) |
+| 文件匯入與 QA | [文件解析手冊](docs/operations/05_DOCLING_RUNBOOK.md)、[型錄 PDF 轉 QA SOP](docs/guides/PDF_CATALOG_TO_QA_SOP.md) |
+| 外部整合 | [Avatar JavaScript SDK](docs/guides/avatar-embed/README.md) |
+| Brain | [brain/README.md](brain/README.md) |
+| 版本變更 | [CHANGELOG.md](CHANGELOG.md) |
 
-`durations_ms` 已算好分段：`asr`（講完到辨識回來）、`send`、`brain`、`tts_first_audio`、
-`to_playback`、`total`（講完話到開始播放；打字是送出到開始播放）。`outcome` 為
-`played`／`interrupted`／`error`／`superseded`／`merged`（思考中補一句，前一輪併入下一輪重送）。按鍵錄音與 Gemini Live 辨識沒有講完的時間點，
-`total` 改從送出算。
+## 授權
 
-```bash
-# 最近 20 輪語音：分段與總等待（毫秒）
-jq -c 'select(.input=="voice" and .outcome=="played")
-  | {started_at, asr_engine, tts_provider, reply_chars, d: .durations_ms}' \
-  backend/logs/turn_timing.jsonl | tail -20
-# 平均總等待
-jq -s '[.[] | select(.outcome=="played") | .durations_ms.total] | add / length' \
-  backend/logs/turn_timing.jsonl
-```
-
-Live 用量會帶上已驗證帳號／Embed key 的歸屬，中途關閉也清算音訊秒數。
-對話備份與預覽不會觸發 TTL 刪除；詳細行為見 [Brain 文件](brain/README.md)。
-
-停止操作不需要 ASR 文字即可中斷後端工作。帶辨識文字的插話以本地規則處理：「停」立即中斷，「不用停，繼續說」、附和與已識別的引用背景話不誤停；句中另有新問題或修正要求仍會中斷。規則判不出的長句改問 Jev（`JEV_INTERRUPT_ENABLED` 預設開，需 `TYPESAFE_API_KEY`；逾時 600 ms 或失敗仍中斷），附和與對旁人說話不再誤停；設 false 退回一律中斷。行為與邊界見 [中斷機制](docs/specs/01_BACKEND_SPEC.md#8-打斷機制處理-interruption-handling)。
-
-### 意圖觀測
-
-[Jev 影子模式](scripts/experiments/jev/OPERATIONS.md)可抽樣呼叫 TypeSafe Jev 記錄建議分類，預設關閉，不影響正式 RAG 決策。先前的 BGE embedding 影子已移除（多輪對話只有 9/19，[評估保留](scripts/experiments/intent-shadow/REPORT.md)）。
-
-### 前端小模型實驗
-
-瀏覽器模型相容性調查與後續驗證項目，見 [P0 相容性紀錄](scripts/experiments/browser-intent/P0-COMPATIBILITY.md)。實驗紀錄不代表已整合正式環境。
-
-回復正式版本：`docker compose -f docker-compose.yml up -d --no-build --no-deps api backend gateway-worker avatar`。
+本專案採用 GNU General Public License v3.0（GPLv3），詳見 [LICENSE](LICENSE)。
