@@ -45,6 +45,7 @@ export default function ChatMessage({
   showAssistantActions,
   onActionConfirmed,
   onActionCancelled,
+  onCorrectAsQa,
 }: {
   message: RenderableChatMessage;
   createdAt?: string | number;
@@ -58,6 +59,7 @@ export default function ChatMessage({
   showAssistantActions?: boolean;
   onActionConfirmed?: (request: ActionRequest) => void;
   onActionCancelled?: (request: ActionRequest) => void;
+  onCorrectAsQa?: () => void;
 }) {
   const isUserMessage = message.role === "user";
   const isAssistantMessage = message.role === "assistant";
@@ -119,6 +121,17 @@ export default function ChatMessage({
             >
               <span className="material-symbols-outlined text-[0.875rem]">content_copy</span>
             </button>
+            {onCorrectAsQa && (
+              <button
+                type="button"
+                onClick={onCorrectAsQa}
+                className="text-content-subtle hover:text-content "
+                title="修正成 QA"
+                aria-label="修正成 QA"
+              >
+                <span className="material-symbols-outlined text-[0.875rem]">edit_note</span>
+              </button>
+            )}
           </div>
         )}
       </div>

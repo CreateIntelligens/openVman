@@ -1,24 +1,24 @@
 import { useState } from "react";
 import type { KnowledgeDocumentSummary } from "../../api";
+import { fileNameOf, parentDirOf } from "./helpers";
 import { useModalDismiss } from "./useModalDismiss";
 
+const LISTED_SOURCE_LIMIT = 3;
+
 export default function MoveModal({
-  sourcePath,
+  sourcePaths,
   allDocuments,
   serverDirs,
   onMove,
   onClose,
 }: {
-  sourcePath: string;
+  sourcePaths: string[];
   allDocuments: KnowledgeDocumentSummary[];
   serverDirs: string[];
-  onMove: (source: string, targetDir: string) => void;
+  onMove: (targetDir: string) => void;
   onClose: () => void;
 }) {
-  const [selectedDir, setSelectedDir] = useState(() => {
-    const parts = sourcePath.split("/");
-    return parts.slice(0, -1).join("/") || "";
-  });
+  const [selectedDir, setSelectedDir] = useState(() => parentDirOf(sourcePaths[0] ?? ""));
 
   const dirs = new Set<string>();
   dirs.add("knowledge");
@@ -36,8 +36,12 @@ export default function MoveModal({
     }
   }
   const sortedDirs = [...dirs].sort();
-  const sourceDir = sourcePath.split("/").slice(0, -1).join("/");
-  const filename = sourcePath.split("/").pop() || "";
+  const isBatch = sourcePaths.length > 1;
+  const sourceDir = isBatch ? null : parentDirOf(sourcePaths[0] ?? "");
+  const filename = isBatch ? "" : fileNameOf(sourcePaths[0] ?? "");
+  const allInSelectedDir = sourcePaths.every((path) => parentDirOf(path) === selectedDir);
+  const listedNames = sourcePaths.slice(0, LISTED_SOURCE_LIMIT).map(fileNameOf).join("、");
+  const unlistedCount = sourcePaths.length - LISTED_SOURCE_LIMIT;
   const dismiss = useModalDismiss(onClose);
 
   return (
@@ -49,7 +53,9 @@ export default function MoveModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2 min-w-0">
             <span className="material-symbols-outlined text-primary text-[1.25rem]">drive_file_move</span>
-            <span className="text-sm font-semibold text-content ">移動文件</span>
+            <span className="text-sm font-semibold text-content ">
+              {isBatch ? `移動 ${sourcePaths.length} 個文件` : "移動文件"}
+            </span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-content-muted hover:text-content hover:bg-surface-sunken transition-colors">
             <span className="material-symbols-outlined text-[1.125rem]">close</span>
@@ -57,7 +63,11 @@ export default function MoveModal({
         </div>
         <div className="px-5 py-3 border-b border-border ">
           <p className="text-xs text-content-subtle mb-1">檔案</p>
-          <p className="text-sm text-content font-mono truncate">{filename}</p>
+          <p className="text-sm text-content font-mono truncate">
+            {isBatch
+              ? `${listedNames}${unlistedCount > 0 ? `，另有 ${unlistedCount} 個` : ""}`
+              : filename}
+          </p>
         </div>
         <div className="flex-1 overflow-y-auto py-2">
           <p className="px-5 py-1 text-xs text-content-subtle font-semibold uppercase tracking-wider">選擇目標資料夾</p>
@@ -89,8 +99,8 @@ export default function MoveModal({
               取消
             </button>
             <button
-              onClick={() => onMove(sourcePath, selectedDir)}
-              disabled={selectedDir === sourceDir}
+              onClick={() => onMove(selectedDir)}
+              disabled={allInSelectedDir}
               className="px-4 py-1.5 rounded-lg bg-primary text-sm font-bold text-white hover:bg-primary/90 transition-all disabled:opacity-30"
             >
               移動

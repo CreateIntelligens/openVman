@@ -267,4 +267,129 @@ describe("TreeView", () => {
     expect(onToggleQaNodeHidden).toHaveBeenCalledWith("returns", false);
     expect(onDeleteQaNode).toHaveBeenCalledWith("returns");
   });
+
+  describe("multi-select mode", () => {
+    const fileDoc = (path: string, isCore = false) => ({
+      path,
+      title: path,
+      category: "knowledge",
+      extension: ".md",
+      size: 1,
+      updated_at: "",
+      is_core: isCore,
+      is_indexable: true,
+      is_indexed: true,
+      preview: "",
+      source_type: "manual" as const,
+      source_url: null,
+      enabled: true,
+      created_at: "",
+    });
+    const fileNode = (path: string, isCore = false): TreeNode => ({
+      name: path.split("/").pop() ?? path,
+      path,
+      type: "file",
+      doc: fileDoc(path, isCore),
+      children: [],
+    });
+    const selectableTree: TreeNode = {
+      name: "knowledge",
+      path: "knowledge",
+      type: "folder",
+      children: [
+        {
+          name: "faq",
+          path: "knowledge/faq",
+          type: "folder",
+          children: [fileNode("knowledge/faq/a.md"), fileNode("knowledge/faq/b.md")],
+        },
+        fileNode("knowledge/core.md", true),
+      ],
+    };
+    const expanded = new Set(["knowledge", "knowledge/faq"]);
+
+    it("toggles a file's selection on row click instead of opening it", () => {
+      const onToggleChecked = vi.fn();
+      const { props } = renderTreeView({
+        node: selectableTree,
+        expandedDirs: expanded,
+        multiSelect: true,
+        checkedPaths: new Set<string>(),
+        onToggleChecked,
+      });
+
+      fireEvent.click(screen.getByRole("treeitem", { name: "a.md" }));
+
+      expect(onToggleChecked).toHaveBeenCalledWith(["knowledge/faq/a.md"], true);
+      expect(props.onSelect).not.toHaveBeenCalled();
+    });
+
+    it("unchecks an already selected file and reflects it in aria-selected", () => {
+      const onToggleChecked = vi.fn();
+      renderTreeView({
+        node: selectableTree,
+        expandedDirs: expanded,
+        multiSelect: true,
+        checkedPaths: new Set(["knowledge/faq/a.md"]),
+        onToggleChecked,
+      });
+
+      const row = screen.getByRole("treeitem", { name: "a.md" });
+      expect(row.getAttribute("aria-selected")).toBe("true");
+      expect((screen.getByRole("checkbox", { name: "選取 a.md" }) as HTMLInputElement).checked).toBe(true);
+
+      fireEvent.keyDown(row, { key: " " });
+
+      expect(onToggleChecked).toHaveBeenCalledWith(["knowledge/faq/a.md"], false);
+      expect(onToggleChecked).toHaveBeenCalledTimes(1);
+    });
+
+    it("toggles via the checkbox without double-firing the row click", () => {
+      const onToggleChecked = vi.fn();
+      renderTreeView({
+        node: selectableTree,
+        expandedDirs: expanded,
+        multiSelect: true,
+        checkedPaths: new Set<string>(),
+        onToggleChecked,
+      });
+
+      fireEvent.click(screen.getByRole("checkbox", { name: "選取 b.md" }));
+
+      expect(onToggleChecked).toHaveBeenCalledTimes(1);
+      expect(onToggleChecked).toHaveBeenCalledWith(["knowledge/faq/b.md"], true);
+    });
+
+    it("selects every file under a folder from its checkbox and skips core files", () => {
+      const onToggleChecked = vi.fn();
+      renderTreeView({
+        node: selectableTree,
+        expandedDirs: expanded,
+        multiSelect: true,
+        checkedPaths: new Set(["knowledge/faq/a.md"]),
+        onToggleChecked,
+      });
+
+      const folderBox = screen.getByRole("checkbox", { name: "選取 faq 內的所有檔案" }) as HTMLInputElement;
+      expect(folderBox.indeterminate).toBe(true);
+      fireEvent.click(folderBox);
+
+      expect(onToggleChecked).toHaveBeenCalledWith(["knowledge/faq/a.md", "knowledge/faq/b.md"], true);
+      expect(screen.queryByRole("checkbox", { name: "選取 core.md" })).toBeNull();
+    });
+
+    it("hides drag and folder-delete actions while multi-selecting", () => {
+      renderTreeView({
+        node: selectableTree,
+        expandedDirs: expanded,
+        multiSelect: true,
+        checkedPaths: new Set<string>(),
+        onToggleChecked: vi.fn(),
+      });
+
+      expect(screen.queryAllByRole("button", { name: "使用鍵盤移動" })).toHaveLength(0);
+      expect(screen.queryByRole("button", { name: "刪除資料夾 knowledge/faq" })).toBeNull();
+      expect(screen.getByRole("treeitem", { name: "a.md" }).getAttribute("draggable")).toBe("false");
+    });
+  });
 });

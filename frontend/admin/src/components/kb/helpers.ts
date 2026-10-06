@@ -1,4 +1,4 @@
-import type { KnowledgeDocumentSummary } from "../../api";
+import type { KnowledgeDocumentSummary, KnowledgeLanguage } from "../../api";
 import type { QaNode } from "../../hooks/useQaNodes";
 
 /* ── Types ── */
@@ -46,6 +46,14 @@ export const SOURCE_MODE_COPY: Record<SourceMode, string> = {
   upload: "上傳本地文件到目前資料夾。",
   web: "貼網址後擷取頁面內容。",
   manual: "手動建立筆記，支援純文字與 QA 問答格式。",
+};
+export const KNOWLEDGE_LANGUAGE_LABELS: Record<KnowledgeLanguage, string> = {
+  zh: "中文",
+  en: "English",
+  es: "Español",
+  nan: "台語",
+  ja: "日本語",
+  ko: "한국어",
 };
 
 /* ── Formatters ── */
@@ -358,4 +366,71 @@ export function getQaNodeAncestors(nodes: QaNode[], targetId: string, ancestors:
     }
   }
   return null;
+}
+
+/* ── 批次操作 ── */
+
+export interface BatchFailure {
+  path: string;
+  reason: string;
+}
+
+export interface BatchResult {
+  succeeded: string[];
+  failed: BatchFailure[];
+}
+
+const BATCH_SUMMARY_FAILURE_LIMIT = 5;
+
+export function fileNameOf(path: string): string {
+  return path.split("/").pop() || path;
+}
+
+export function parentDirOf(path: string): string {
+  return path.split("/").slice(0, -1).join("/");
+}
+
+// 核心文件單檔也不能刪或移，批次一樣排除；QA 樹的虛擬節點不是檔案。
+export function isBatchSelectableFile(node: TreeNode): boolean {
+  return node.type === "file" && !node.virtual && !node.treeKind && !!node.doc && !node.doc.is_core;
+}
+
+export function collectBatchSelectableFiles(node: TreeNode): string[] {
+  if (node.type === "file") {
+    return isBatchSelectableFile(node) ? [node.path] : [];
+  }
+  if (node.virtual) return [];
+  return node.children.flatMap(collectBatchSelectableFiles);
+}
+
+// 逐檔依序呼叫：後端搬移／刪除會排背景重建索引，同時打多支容易互相踩到。
+export async function runBatchSequentially(
+  paths: string[],
+  action: (path: string) => Promise<unknown>,
+  onProgress?: (done: number, total: number) => void,
+): Promise<BatchResult> {
+  const succeeded: string[] = [];
+  const failed: BatchFailure[] = [];
+  for (const [index, path] of paths.entries()) {
+    try {
+      await action(path);
+      succeeded.push(path);
+    } catch (error) {
+      failed.push({ path, reason: error instanceof Error ? error.message : String(error) });
+    }
+    onProgress?.(index + 1, paths.length);
+  }
+  return { succeeded, failed };
+}
+
+export function formatBatchSummary(actionLabel: string, result: BatchResult, note?: string): string {
+  let message = `${actionLabel}完成 ${result.succeeded.length} 個`;
+  if (note) message += `，${note}`;
+  if (result.failed.length === 0) return message;
+  const listed = result.failed
+    .slice(0, BATCH_SUMMARY_FAILURE_LIMIT)
+    .map((failure) => `${fileNameOf(failure.path)}（${failure.reason}）`)
+    .join("、");
+  const rest = result.failed.length - BATCH_SUMMARY_FAILURE_LIMIT;
+  return `${message}，${result.failed.length} 個失敗：${listed}${rest > 0 ? `，另有 ${rest} 個` : ""}`;
 }

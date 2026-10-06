@@ -5,6 +5,8 @@ import ChatHeader from "../components/chat/ChatHeader";
 import ChatInput from "../components/chat/ChatInput";
 import ChatMessage from "../components/chat/ChatMessage";
 import QuickQaModal from "../components/chat/QuickQaModal";
+import CorrectQaModal from "../components/chat/CorrectQaModal";
+import { findPrecedingUserQuestion } from "../components/chat/helpers";
 import ChatSidebar from "../components/chat/ChatSidebar";
 import { useProject } from "../context/ProjectContext";
 import { useMascot } from "../context/MascotContext";
@@ -43,6 +45,7 @@ export default function Chat() {
   );
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [quickQaOpen, setQuickQaOpen] = useState(false);
+  const [correctionTarget, setCorrectionTarget] = useState<{ question: string; answer: string } | null>(null);
   const { projectId } = useProject();
   const { isClosed } = useMascot();
   const {
@@ -427,22 +430,31 @@ export default function Chat() {
 
             {mode === "text" && messages.length > 0 && (
               <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-                {messages.map((message, index) => (
-                  <ChatMessage
-                    key={`${message.role}-${index}-${message.created_at ?? ""}`}
-                    message={message}
-                    createdAt={message.created_at}
-                    index={index}
-                    playingIndex={playingIndex}
-                    ttsPrefetching={ttsPrefetching}
-                    isLastMessage={index === messages.length - 1}
-                    onPlayTts={playTts}
-                    privacyWarningsVisible={privacyWarningsVisible}
-                    showAssistantActions
-                    onActionConfirmed={handleActionConfirmed}
-                    onActionCancelled={handleActionCancelled}
-                  />
-                ))}
+                {messages.map((message, index) => {
+                  const isLast = index === messages.length - 1;
+                  const correctionQuestion = message.role === "assistant" && message.content && !(sending && isLast)
+                    ? findPrecedingUserQuestion(messages, index)
+                    : null;
+                  return (
+                    <ChatMessage
+                      key={`${message.role}-${index}-${message.created_at ?? ""}`}
+                      message={message}
+                      createdAt={message.created_at}
+                      index={index}
+                      playingIndex={playingIndex}
+                      ttsPrefetching={ttsPrefetching}
+                      isLastMessage={isLast}
+                      onPlayTts={playTts}
+                      privacyWarningsVisible={privacyWarningsVisible}
+                      showAssistantActions
+                      onActionConfirmed={handleActionConfirmed}
+                      onActionCancelled={handleActionCancelled}
+                      onCorrectAsQa={correctionQuestion
+                        ? () => setCorrectionTarget({ question: correctionQuestion, answer: message.content })
+                        : undefined}
+                    />
+                  );
+                })}
               </div>
             )}
 
@@ -551,6 +563,13 @@ export default function Chat() {
         open={quickQaOpen}
         onClose={() => setQuickQaOpen(false)}
         onSelectQuestion={handleSelectQuickQaQuestion}
+      />
+
+      <CorrectQaModal
+        open={correctionTarget !== null}
+        question={correctionTarget?.question ?? ""}
+        answer={correctionTarget?.answer ?? ""}
+        onClose={() => setCorrectionTarget(null)}
       />
 
       <ConfirmModal

@@ -3,6 +3,8 @@ import type { KeyboardEvent, MouseEvent } from "react";
 
 import type { TreeNode } from "./helpers";
 import {
+  collectBatchSelectableFiles,
+  isBatchSelectableFile,
   parseQaEntryDragPath,
   parseQaNodeDragPath,
   qaEntryDragPath,
@@ -121,6 +123,9 @@ export default function TreeView({
   onOrderQaNode,
   canDropQaNode,
   canDropQaEntry,
+  multiSelect = false,
+  checkedPaths,
+  onToggleChecked,
 }: {
   node: TreeNode;
   depth: number;
@@ -144,6 +149,9 @@ export default function TreeView({
   onOrderQaNode?: (parentNodeId: string | null) => void;
   canDropQaNode?: (draggedPath: string, targetPath: string) => boolean;
   canDropQaEntry?: (draggedPath: string, targetPath: string) => boolean;
+  multiSelect?: boolean;
+  checkedPaths?: ReadonlySet<string>;
+  onToggleChecked?: (paths: string[], checked: boolean) => void;
 }) {
   const instructionsId = useId();
   const isExpanded = expandedDirs.has(node.path);
@@ -164,7 +172,22 @@ export default function TreeView({
     : isQaEntry && qaNodeId
       ? qaEntryDragPath(qaNodeId, node.qaEntryQuestion ?? node.name)
       : node.path;
-  const isDraggable = (node.type === "file" && !node.virtual) || isQaNode || isQaEntry;
+  const isDraggable = !multiSelect &&
+    ((node.type === "file" && !node.virtual) || isQaNode || isQaEntry);
+  const isCheckableFile = multiSelect && isBatchSelectableFile(node);
+  const folderFiles = multiSelect && node.type === "folder" && !node.virtual
+    ? collectBatchSelectableFiles(node)
+    : [];
+  const checkedFolderFileCount = folderFiles.filter((path) => checkedPaths?.has(path)).length;
+  const isChecked = isCheckableFile
+    ? !!checkedPaths?.has(node.path)
+    : folderFiles.length > 0 && checkedFolderFileCount === folderFiles.length;
+  const isPartiallyChecked = checkedFolderFileCount > 0 && !isChecked;
+  const showCheckbox = isCheckableFile || folderFiles.length > 0;
+  const toggleChecked = () => {
+    if (!onToggleChecked) return;
+    onToggleChecked(isCheckableFile ? [node.path] : folderFiles, !isChecked);
+  };
   const isDraggingThisNode = draggingPath === nodeDragPath;
   const effectiveDropDir = node.type === "folder" ? node.path : node.path.split("/").slice(0, -1).join("/");
   let dropTargetKey: string;
@@ -187,7 +210,8 @@ export default function TreeView({
         ? (isQaEntry && !!canDropQaEntry && canDropQaEntry(draggingPath, dropTargetKey))
       : (isQaRoot || isQaNode || isQaEntry || (!node.virtual && effectiveDropDir !== sourceDragDir)));
   const isDropTarget = dropTargetPath === dropTargetKey && !!draggingPath;
-  const canDeleteFolder = node.type === "folder" && node.path !== "knowledge" && !node.virtual;
+  const canDeleteFolder = !multiSelect &&
+    node.type === "folder" && node.path !== "knowledge" && !node.virtual;
   const isTreeTabStop = isSelected ||
     (depth === 0 && !hasVisibleSelectedNode(node, selectedPath, expandedDirs));
 
@@ -209,6 +233,12 @@ export default function TreeView({
     }
     if ((isQaNode || isQaEntry) && qaNodeId && onSelectQaNode) {
       onSelectQaNode(qaNodeId);
+      return;
+    }
+    // 多選模式下點列只切換勾選或展開，不開檔，也不觸發收起手機版檔案樹。
+    if (multiSelect) {
+      if (isCheckableFile) toggleChecked();
+      else if (node.type === "folder") onToggle(node.path);
       return;
     }
     onSelect(node);
@@ -294,24 +324,29 @@ export default function TreeView({
       role={depth === 0 ? "tree" : "none"}
       aria-label={depth === 0 ? "知識庫目錄" : undefined}
       aria-describedby={depth === 0 ? instructionsId : undefined}
+      aria-multiselectable={depth === 0 && multiSelect ? true : undefined}
     >
       {depth === 0 && (
         <span id={instructionsId} className="sr-only">
-          使用方向鍵巡覽，Enter 或空白鍵開啟。選擇「使用鍵盤移動」後，移至目標並按 Enter 或空白鍵放置，Escape 取消。
+          {multiSelect
+            ? "多選模式：使用方向鍵巡覽，Enter 或空白鍵選取或取消選取檔案。"
+            : "使用方向鍵巡覽，Enter 或空白鍵開啟。選擇「使用鍵盤移動」後，移至目標並按 Enter 或空白鍵放置，Escape 取消。"}
         </span>
       )}
       <div
         role="treeitem"
         aria-expanded={node.type === "folder" ? isExpanded : undefined}
-        aria-selected={isSelected}
+        aria-selected={isCheckableFile ? isChecked : isSelected}
         aria-level={depth + 1}
         aria-label={node.name}
         tabIndex={isTreeTabStop ? 0 : -1}
         className={`group relative flex cursor-pointer items-center px-2 py-1 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
           isDropTarget
             ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
-            : isSelected
+            : isSelected && !multiSelect
               ? "bg-primary/15 text-primary"
+              : isCheckableFile && isChecked
+              ? "bg-primary/10 text-content"
               : "hover:bg-surface-sunken text-content-muted hover:text-content "
         } ${isDraggingThisNode ? "ring-1 ring-inset ring-primary/40" : ""}`}
         style={{ paddingLeft: `${depth * 0.875 + 0.5}rem` }}
@@ -389,6 +424,21 @@ export default function TreeView({
             </span>
           ) : null}
         </div>
+
+        {showCheckbox && (
+          <input
+            type="checkbox"
+            tabIndex={-1}
+            aria-label={node.type === "folder" ? `選取 ${node.name} 內的所有檔案` : `選取 ${node.name}`}
+            checked={isChecked}
+            ref={(element) => {
+              if (element) element.indeterminate = isPartiallyChecked;
+            }}
+            onClick={(event) => event.stopPropagation()}
+            onChange={toggleChecked}
+            className="ml-0.5 h-3.5 w-3.5 shrink-0 accent-primary"
+          />
+        )}
 
         {/* Icon */}
         <div className="w-5 h-5 flex items-center justify-center shrink-0 ml-0.5">
@@ -556,6 +606,9 @@ export default function TreeView({
               onOrderQaNode={onOrderQaNode}
               canDropQaNode={canDropQaNode}
               canDropQaEntry={canDropQaEntry}
+              multiSelect={multiSelect}
+              checkedPaths={checkedPaths}
+              onToggleChecked={onToggleChecked}
             />
           ))}
         </div>

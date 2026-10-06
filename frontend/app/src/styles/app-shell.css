@@ -276,6 +276,18 @@
     height: clamp(16rem, 48svh, 28rem);
     padding: 0.625rem;
     border-radius: 0.75rem;
+    transition: height 0.25s ease;
+  }
+
+  /* 打字時舞台縮成一小條，讓出位置給鍵盤與對話；收起鍵盤就恢復。 */
+  .app-shell.composing .stage-card {
+    height: clamp(6rem, 20svh, 9rem);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage-card {
+      transition: none;
+    }
   }
 
   .chat-area {

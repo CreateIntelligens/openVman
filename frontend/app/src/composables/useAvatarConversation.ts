@@ -8,6 +8,7 @@ import type { useLanguageRoutes } from "./useLanguageRoutes";
 import type { useTurnTiming } from "./useTurnTiming";
 import type { useSettingsStore } from "../stores/useSettingsStore";
 import type StatusToast from "../components/StatusToast.vue";
+import { serverErrorText } from "../utils/serverErrorText";
 
 interface ConversationOptions {
   settings: ReturnType<typeof useSettingsStore>;
@@ -189,14 +190,16 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
         chat.setPersona(settings.personaId);
         chat.reinit(settings.personaId);
       } else if (FATAL_ERROR_CODES.has(code)) {
-        fatalError.value = { code, message };
+        console.warn(`[chat] ${code}: ${message}`);
+        fatalError.value = { code, message: serverErrorText(code, message) };
       } else {
-        const suffix = retryAfterMs ? `（${Math.round(retryAfterMs / 1000)}s 後重試）` : '';
-        statusToastRef.value?.show(`${code}: ${message}${suffix}`, { persistent: false });
+        console.warn(`[chat] ${code}: ${message}`);
+        statusToastRef.value?.show(serverErrorText(code, message, retryAfterMs), { persistent: false });
       }
     },
     onGatewayStatus: (plugin, status, message) => {
-      const text = message || `${plugin} → ${status}`;
+      if (!message) console.warn(`[gateway] ${plugin} → ${status}`);
+      const text = message || "部分功能暫時無法使用，其他功能照常。";
       statusToastRef.value?.show(text, { persistent: status === 'degraded' });
     },
   });
@@ -226,6 +229,34 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
   interface ComposerSendResult {
     accepted: boolean;
     message?: string;
+  }
+
+  /**
+   * 訪客模式的「點一下開始」：瀏覽器要使用者先點過才肯出聲，趁這一下解鎖音訊並先連線，
+   * 第一句話就不用等連線。失敗不擋畫面，送第一句時會再試一次。
+   */
+  async function handleStart(): Promise<boolean> {
+    try {
+      await audio.resumeContext();
+      if (!isStarted.value || !chat.sessionId.value) {
+        await chat.connect();
+        isStarted.value = true;
+      }
+      return true;
+    } catch (e) {
+      console.warn("[App] start failed:", e);
+      return false;
+    }
+  }
+
+  /** 展示機台換下一位來賓：停掉回答、斷線、清空畫面上的對話，下一句會開新的對話。 */
+  function resetForNextVisitor(): void {
+    chat.interrupt();
+    chat.disconnect();
+    audio.stopAll();
+    chat.messages.value = [];
+    isTyping.value = false;
+    isStarted.value = false;
   }
 
   async function handleSend(
@@ -324,5 +355,5 @@ export function useAvatarConversation({ settings, stage, languageRoutes, turnTim
 
   onUnmounted(clearUnderrunTimer);
 
-  return { chat, audio, isStarted, isTyping, avatarSpeaking, avatarResponding, spokenReply, canSend, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
+  return { chat, audio, isStarted, isTyping, avatarSpeaking, avatarResponding, spokenReply, canSend, handleStart, resetForNextVisitor, handleSend, handleComposerSend, handleStopResponse, handleSettingsApply, handleFatalRetry };
 }

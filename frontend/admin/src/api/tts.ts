@@ -1,4 +1,4 @@
-import { apiFetch, fetchJson } from "./common";
+import { apiFetch, fetchJson, parseErrorMessage } from "./common";
 
 export interface TtsProvider {
   id: string;
@@ -35,7 +35,7 @@ export async function synthesizeSpeechPreview(
     signal,
   });
   if (!response.ok) {
-    throw new Error(`語音產生失敗（HTTP ${response.status}），請稍後重試。`);
+    throw new Error(`語音產生失敗：${await parseErrorMessage(response)}`);
   }
   // 各供應商可能回傳 WAV 或 MP3，保留伺服器實際的 MIME type。
   const audio = await response.blob();
@@ -104,7 +104,7 @@ export async function synthesizeSpeech(
     signal: opts?.signal,
   });
   if (!res.ok) {
-    throw new Error(`Synthesis failed: ${res.status}`);
+    throw new Error(await parseErrorMessage(res));
   }
   const audio = await res.arrayBuffer();
   const fallbackReason = res.headers.get("X-TTS-Fallback-Reason") || undefined;

@@ -89,6 +89,25 @@
       </div>
     </div>
 
+    <!-- 還沒開口前，給來賓幾個能問的題目；問過一題後就收起來，想看更多用快速問題。 -->
+    <div
+      v-if="!compact && messages.length === 0 && suggestions.length"
+      class="suggestion-row"
+      role="group"
+      aria-label="推薦問題"
+    >
+      <button
+        v-for="item in suggestions"
+        :key="item.message"
+        type="button"
+        class="suggestion-chip"
+        :disabled="!canSend"
+        @click="emit('suggest', item.message, item.sourcePath)"
+      >
+        {{ item.label }}
+      </button>
+    </div>
+
     <div class="chat-input-bar">
       <AsrButton
         :is-listening="asrListening"
@@ -101,6 +120,7 @@
       <span class="composer-status" role="status" aria-live="polite">{{ asrStatusText }}</span>
       <label class="composer-shell" :class="{ 'composer-shell--listening': asrStatusText }">
         <span class="composer-label">輸入問題</span>
+        <MicLevel v-if="asrListening" class="composer-mic-level" :level="micLevel" />
         <input
           ref="inputRef"
           v-model="inputText"
@@ -110,6 +130,8 @@
           :aria-describedby="feedbackMessage ? 'chat-composer-feedback' : undefined"
           @input="feedbackMessage = ''"
           @keydown.enter="handleSend"
+          @focus="handleComposerFocus"
+          @blur="emit('composing', false)"
         />
       </label>
       <!-- 回覆中且沒打字時，送出鈕變成停止；打了字直接送出也會先停掉目前的回答。 -->
@@ -147,6 +169,8 @@ import type { ChatMessage } from "../../composables/useAvatarChat";
 import { useStickToBottom } from "../../composables/useStickToBottom";
 import TypewriterText from "./TypewriterText.vue";
 import AsrButton from "./AsrButton.vue";
+import MicLevel from "./MicLevel.vue";
+import type { SuggestedQuestion } from "../controls/quickQaText";
 
 const props = withDefaults(defineProps<{
   messages: ChatMessage[]
@@ -170,9 +194,14 @@ const props = withDefaults(defineProps<{
   /** 虛擬人正在想或在講；送出鈕換成停止。 */
   responding?: boolean
   compact?: boolean
+  /** 收音時的即時音量（0～1），讓使用者知道麥克風有收到聲音。 */
+  micLevel?: number
+  suggestions?: SuggestedQuestion[]
 }>(), {
   canSend: true,
   asrSupported: true,
+  micLevel: 0,
+  suggestions: () => [],
 })
 
 interface ComposerSendResult {
@@ -184,7 +213,16 @@ const emit = defineEmits<{
   send: [text: string, done: (result: ComposerSendResult) => void]
   'asr-toggle': []
   stop: []
+  suggest: [message: string, sourcePath?: string]
+  /** 輸入框聚焦中：手機上外層會縮小舞台，讓出位置給鍵盤。 */
+  composing: [active: boolean]
 }>()
+
+function handleComposerFocus(): void {
+  emit("composing", true)
+  // 舞台縮小加上鍵盤彈出要一點時間，等版面穩定再把輸入框捲進畫面。
+  window.setTimeout(() => inputRef.value?.scrollIntoView({ block: "nearest" }), 320)
+}
 
 const inputText = ref("")
 const localFeedback = ref("")
@@ -306,6 +344,38 @@ useStickToBottom(messagesRef, contentRef)
 .chat-panel__header,
 .chat-input-bar {
   flex-shrink: 0;
+}
+
+.suggestion-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  /* 左右對齊下面的輸入列。 */
+  padding: 0 1.25rem 0.75rem;
+}
+
+.suggestion-chip {
+  max-width: 100%;
+  padding: 0.55rem 1rem;
+  border: var(--hairline) solid color-mix(in srgb, var(--primary) 35%, var(--line));
+  border-radius: 999rem;
+  background: color-mix(in srgb, var(--primary) 6%, var(--bg));
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.suggestion-chip:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg));
+}
+.suggestion-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .chat-panel__eyebrow {
@@ -597,6 +667,20 @@ useStickToBottom(messagesRef, contentRef)
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* 疊在輸入框右側，收音時不讓版面跳動。 */
+.composer-mic-level {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.composer-shell--listening input {
+  padding-right: 2.75rem;
 }
 
 .composer-label {
@@ -720,6 +804,11 @@ useStickToBottom(messagesRef, contentRef)
 }
 
 @media (max-width: 48rem) {
+  /* 手機一題常佔一整行，四題會把輸入框擠出第一屏，只留兩題。 */
+  .suggestion-chip:nth-child(n + 3) {
+    display: none;
+  }
+
   .chat-panel {
     flex: none;
     height: auto;

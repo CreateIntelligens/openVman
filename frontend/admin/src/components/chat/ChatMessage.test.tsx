@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import ChatMessage from "./ChatMessage";
 
@@ -79,5 +79,46 @@ describe("ChatMessage privacy warning rendering", () => {
     );
 
     expect(screen.queryByRole("link", { name: "開啟相關連結" })).toBeNull();
+  });
+});
+
+describe("ChatMessage correct-as-QA action", () => {
+  const actionProps = { index: 1, onPlayTts: vi.fn(), showAssistantActions: true };
+
+  it("shows the action on assistant messages and calls the handler", () => {
+    const onCorrectAsQa = vi.fn();
+    render(
+      <ChatMessage
+        message={{ role: "assistant", content: "錯的答案" }}
+        {...actionProps}
+        onCorrectAsQa={onCorrectAsQa}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "修正成 QA" }));
+    expect(onCorrectAsQa).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the action when no handler is given", () => {
+    render(
+      <ChatMessage
+        message={{ role: "assistant", content: "沒有提問的回答" }}
+        {...actionProps}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "修正成 QA" })).toBeNull();
+  });
+
+  it("never shows the action on user messages", () => {
+    render(
+      <ChatMessage
+        message={{ role: "user", content: "使用者提問" }}
+        {...actionProps}
+        onCorrectAsQa={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "修正成 QA" })).toBeNull();
   });
 });

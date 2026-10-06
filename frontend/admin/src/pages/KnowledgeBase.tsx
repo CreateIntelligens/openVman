@@ -10,6 +10,7 @@ import {
 import { useUnsavedChanges } from "../context/NavigationGuardContext";
 import ConfirmModal from "../components/ConfirmModal";
 import StatusAlert from "../components/StatusAlert";
+import BatchActionBar, { type BatchActionKind } from "../components/kb/BatchActionBar";
 import FileView from "../components/kb/FileView";
 import GraphView from "../components/kb/GraphView";
 import MoveModal from "../components/kb/MoveModal";
@@ -126,6 +127,9 @@ export default function KnowledgeBase() {
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
+  const [multiSelect, setMultiSelect] = useState(false);
+  const [checkedFilePaths, setCheckedFilePaths] = useState<string[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
   const mobileTreeOpenerRef = useRef<HTMLButtonElement | null>(null);
   const mobileTreePanelRef = useRef<HTMLElement | null>(null);
   const [activeTab, setActiveTab] = useAdminSubView<KnowledgeTab>(
@@ -179,6 +183,63 @@ export default function KnowledgeBase() {
   useEffect(() => {
     void fetchQaTree().catch(() => undefined);
   }, [fetchQaTree, projectId]);
+
+  useEffect(() => {
+    setMultiSelect(false);
+    setCheckedFilePaths([]);
+  }, [projectId]);
+
+  // 已被移走或刪掉的路徑不再算選取，避免「已選 N 個」數字與樹上勾選不一致。
+  const batchSelectedPaths = useMemo(() => {
+    const existing = new Set(documents.map((document) => document.path));
+    return checkedFilePaths.filter((path) => existing.has(path));
+  }, [checkedFilePaths, documents]);
+
+  const checkedPathSet = useMemo(
+    () => new Set(batchSelectedPaths),
+    [batchSelectedPaths],
+  );
+
+  const handleToggleMultiSelect = useCallback(() => {
+    if (batchRunning) return;
+    setMultiSelect((current) => !current);
+    setCheckedFilePaths([]);
+  }, [batchRunning]);
+
+  const handleToggleChecked = useCallback(
+    (paths: string[], checked: boolean) => {
+      if (batchRunning) return;
+      setCheckedFilePaths((current) => {
+        if (checked) return [...new Set([...current, ...paths])];
+        const removed = new Set(paths);
+        return current.filter((path) => !removed.has(path));
+      });
+    },
+    [batchRunning],
+  );
+
+  const handleBatchFinished = useCallback(
+    async (
+      action: BatchActionKind,
+      succeeded: string[],
+      targetPathOf: (path: string) => string,
+    ) => {
+      await loadDocuments();
+      const openPath = openDocument?.path;
+      if (openPath && succeeded.includes(openPath)) {
+        if (action === "delete") {
+          closeFileView();
+        } else {
+          handleTreeSelect({ type: "file", path: targetPathOf(openPath) });
+        }
+      }
+      // 搬移與刪除都可能改到 QA 文件，後端會同步改問答樹的來源。
+      if (action !== "language") {
+        await fetchQaTree().catch(() => undefined);
+      }
+    },
+    [closeFileView, fetchQaTree, handleTreeSelect, loadDocuments, openDocument],
+  );
 
   useEffect(() => {
     setSelectedQaNodeId(readScoped(`kb-selected-qa-node-id:${projectId}`));
@@ -793,6 +854,23 @@ export default function KnowledgeBase() {
               onOrderQaNode={handleOpenOrderModal}
               canDropQaNode={canDropQaNode}
               canDropQaEntry={canDropQaEntry}
+              multiSelect={multiSelect}
+              onToggleMultiSelect={handleToggleMultiSelect}
+              multiSelectDisabled={batchRunning}
+              checkedPaths={checkedPathSet}
+              onToggleChecked={handleToggleChecked}
+              batchBar={
+                <BatchActionBar
+                  selectedPaths={batchSelectedPaths}
+                  documents={documents}
+                  serverDirs={serverDirs}
+                  onClearSelection={() => setCheckedFilePaths([])}
+                  onSelectionChange={setCheckedFilePaths}
+                  onFinished={handleBatchFinished}
+                  onStatus={setStatus}
+                  onRunningChange={setBatchRunning}
+                />
+              }
             />
 
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -868,10 +946,10 @@ export default function KnowledgeBase() {
 
       {movingPath && (
         <MoveModal
-          sourcePath={movingPath}
+          sourcePaths={[movingPath]}
           allDocuments={documents}
           serverDirs={serverDirs}
-          onMove={handleMove}
+          onMove={(targetDir) => handleMove(movingPath, targetDir)}
           onClose={() => setMovingPath(null)}
         />
       )}

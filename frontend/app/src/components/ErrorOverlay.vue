@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { fatalErrorTitle } from "../utils/serverErrorText";
+
 defineProps<{
   code: string
   message: string
@@ -32,7 +34,7 @@ const emit = defineEmits<{
         <path d="M12 9v4" />
         <path d="M12 17h.01" />
       </svg>
-      <h2 id="fatal-error-code" class="error-overlay__code">{{ code }}</h2>
+      <h2 id="fatal-error-code" class="error-overlay__code" :data-code="code">{{ fatalErrorTitle(code) }}</h2>
       <p id="fatal-error-message" class="error-overlay__msg">{{ message }}</p>
       <button type="button" class="error-overlay__btn" autofocus @click="emit('retry')">
         重試

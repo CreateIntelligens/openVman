@@ -1,7 +1,7 @@
 <template>
   <div
     class="app-shell"
-    :class="{ immersive, 'camera-active': webcam.active.value }"
+    :class="{ immersive, 'camera-active': webcam.active.value, composing }"
     :style="cameraPreviewStyle"
   >
     <p v-if="selectionNotices.length > 0" class="authorization-notice" role="status">
@@ -17,6 +17,10 @@
         :camera-available="visionAvailable === true"
         :immersive="immersive"
         :camera-preview-scale="settings.cameraPreviewScale"
+        :settings-visible="visitor.settingsVisible.value"
+        :title="stageTitle"
+        :listening="activeAsr.isListening.value"
+        @title-tap="visitor.handleTitleTap"
         @open-settings="showSettings = true"
         @toggle-camera="handleToggleCamera"
         @toggle-immersive="handleToggleImmersive"
@@ -100,6 +104,10 @@
         :asr-error="asrError"
         :compact="immersive"
         :responding="avatarResponding"
+        :mic-level="micLevel"
+        :suggestions="suggestions"
+        @suggest="handleSend"
+        @composing="composing = $event"
         @send="handleComposerSend"
         @asr-toggle="handleAsrToggle"
         @stop="handleStopResponse"
@@ -153,6 +161,13 @@
       @apply="handleSettingsApply"
     />
 
+    <StartOverlay
+      v-if="!started"
+      :title="stageTitle"
+      :can-speak="activeAsr.isSupported.value"
+      @start="handleVisitorStart"
+    />
+
     <!-- Fatal error overlay -->
     <ErrorOverlay
       v-if="fatalError"
@@ -164,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { BROWSER_ASR } from "@shared/speech";
 import AvatarCanvas from "./components/avatar/AvatarCanvas.vue";
 import CameraPreview from "./components/avatar/CameraPreview.vue";
@@ -173,6 +188,7 @@ import ControlBar from "./components/controls/ControlBar.vue";
 import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
+import StartOverlay from "./components/StartOverlay.vue";
 import QuickQaPanel from "./components/controls/QuickQaPanel.vue";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { useAsrPreferences } from "./composables/useAsrPreferences";
@@ -184,11 +200,17 @@ import { useImmersiveView } from "./composables/useImmersiveView";
 import { useAvatarSettings } from "./composables/useAvatarSettings";
 import { useLanguageRoutes } from "./composables/useLanguageRoutes";
 import { useTurnTiming } from "./composables/useTurnTiming";
+import { useVisitorMode } from "./composables/useVisitorMode";
+import { useIdleReset } from "./composables/useIdleReset";
+import { useMicLevel } from "./composables/useMicLevel";
+import { useSuggestedQuestions } from "./composables/useSuggestedQuestions";
 import { settingsReady, useSettingsStore } from "./stores/useSettingsStore";
 
 const settings = useSettingsStore();
 const showSettings = ref(false);
 const showQuickQa = ref(false);
+// 手機打字時縮小舞台：鍵盤會佔掉半個螢幕，虛擬人照原大小會把輸入框和對話擠出去。
+const composing = ref(false);
 const statusToastRef = ref<InstanceType<typeof StatusToast> | null>(null);
 const showMessage = (message: string, options?: { persistent: boolean }) =>
   statusToastRef.value?.show(message, options);
@@ -215,7 +237,7 @@ const turnTiming = useTurnTiming({ context: () => ({
 }) });
 const conversation = useAvatarConversation({ settings, stage, languageRoutes,
   turnTiming, ttsProviders, statusToastRef, fetchPersonas: bootstrap.fetchPersonas });
-const { chat, canSend, isTyping, avatarResponding, handleSend,
+const { chat, canSend, isTyping, avatarResponding, handleStart, resetForNextVisitor, handleSend,
   handleComposerSend, handleStopResponse, handleSettingsApply,
   handleFatalRetry } = conversation;
 const voice = useAvatarVoiceInput({ conversation, preferences, stage,
@@ -228,6 +250,37 @@ const { webcam, visionAvailable, cameraPreviewStyle,
 const { immersive, handleToggleImmersive } = useImmersiveView(
   showSettings, showQuickQa, avatarResponding, handleStopResponse,
 );
+const visitor = useVisitorMode();
+const { level: micLevel } = useMicLevel(computed(() => activeAsr.value.isListening.value));
+const { suggestions } = useSuggestedQuestions(() => settings.projectId);
+// 給來賓看的是角色名稱；沒取名（預設角色）就用專案名稱。
+const stageTitle = computed(() => {
+  const persona = personas.value.find((item) => item.persona_id === settings.personaId);
+  if (persona && persona.persona_id !== "default") return persona.label;
+  return projects.value.find((item) => item.project_id === settings.projectId)?.label ?? "";
+});
+// 只有訪客模式要先點一下：瀏覽器沒被點過不肯出聲，來賓也需要一個明確的開始。
+const started = ref(!visitor.kiosk.value);
+async function handleVisitorStart(): Promise<void> {
+  started.value = true;
+  const ready = await handleStart();
+  if (ready && activeAsr.value.isSupported.value && !activeAsr.value.isListening.value) {
+    handleAsrToggle();
+  }
+}
+// 展示機台閒置 2 分鐘就換下一位來賓：清掉上一個人的對話、關麥克風、回到開始畫面。
+const VISITOR_IDLE_MS = 2 * 60 * 1000;
+useIdleReset({
+  enabled: () => visitor.kiosk.value && started.value,
+  busy: () => avatarResponding.value,
+  activity: () => [chat.messages.value.length, asrInterim.value, asrSpeaking.value],
+  timeoutMs: VISITOR_IDLE_MS,
+  onIdle: () => {
+    if (activeAsr.value.isListening.value) handleAsrToggle();
+    resetForNextVisitor();
+    started.value = false;
+  },
+});
 const { handleTtsChange, handleTtsVoiceChange, handleProjectPreviewChange,
   handleProjectChange, handlePersonaChange, handleVoiceModeChange,
   handleReplyModeChange } = useAvatarSettings(settings, bootstrap, showSettings);

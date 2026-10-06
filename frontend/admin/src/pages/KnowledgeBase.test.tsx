@@ -329,6 +329,31 @@ describe("KnowledgeBase merged tree", () => {
 
 
 
+  it("toggles file selection in multi-select mode without opening the file", () => {
+    render(<KnowledgeBase />);
+
+    expect(screen.queryByText(/已選/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /多選/ }));
+    expect(screen.getByText("已選 0 個檔案")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("treeitem", { name: "guide.md" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "選取 faq.md" }));
+
+    expect(screen.getByText("已選 2 個檔案")).toBeTruthy();
+    expect(knowledgeBaseMocks.handleTreeSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("treeitem", { name: "guide.md" }));
+    expect(screen.getByText("已選 1 個檔案")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "全部取消" }));
+    expect(screen.getByText("已選 0 個檔案")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /多選/ }));
+    expect(screen.queryByText(/已選/)).toBeNull();
+    fireEvent.click(screen.getByRole("treeitem", { name: "guide.md" }));
+    expect(knowledgeBaseMocks.handleTreeSelect).toHaveBeenCalled();
+  });
+
   it("opens the note composer immediately when the source panel is reopened in manual mode", () => {
     knowledgeBaseMocks.activeSourceMode = "manual";
 

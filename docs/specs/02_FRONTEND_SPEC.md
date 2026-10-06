@@ -123,6 +123,16 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 `App.vue` 保留畫面組裝與事件綁定，不再內含語音計時與流程策略。`useAvatarConversation` 管理回答、打字機、TTS／播放、停止與錯誤協調；`useAvatarVoiceInput` 管理四種辨識、降級、閒置計時、回答時暫停與回答後恢復；`useAsrPreferences` 管理帳號引擎選單及偏好儲存。角色舞台、鏡頭、沉浸模式與設定切換分別由 `useAvatarStage`、`useAvatarCamera`、`useImmersiveView`、`useAvatarSettings` 管理。各自用 lifecycle hooks 清理持有資源；`App.vue` 組裝時以延遲 callback 銜接會話與計時上下文。原有路由、wire schema、台語分流、語音引擎、字幕與角色行為維持。後台入口、批次試辨識與外部 Avatar SDK 無需變更。
 
+### 5.2 訪客模式與迎賓（2026-10-06）
+
+展示機台用 `?kiosk=1` 開啟訪客模式（`?kiosk=0` 關閉，記在 sessionStorage），狀態由 `useVisitorMode` 整頁共用：
+
+* 藏起設定鈕（`ControlBar`）與帳號列、登出（`Root.vue`）；標題連點三下暫時叫出，重新整理後又藏起來。
+* `StartOverlay` 先要來賓點一下：`useAvatarConversation.handleStart` 解鎖 AudioContext、先連線，再開始收音。非訪客模式不顯示。
+* `useIdleReset` 在虛擬人沒在回答、2 分鐘沒有點擊／按鍵／辨識活動時呼叫 `resetForNextVisitor`（停止回答、斷線、清空訊息），並關麥克風、回到開始畫面。
+
+不分模式：標題顯示角色名稱（預設角色時用專案名稱）與狀態 pill（在線／聆聽中／思考中／說話中／連線中／暫停服務）；收音時 `useMicLevel` 另開一條麥克風串流量音量，`MicLevel` 疊在輸入框右側；還沒開口前 `useSuggestedQuestions` 從 `GET /api/v1/knowledge/qa/nodes` 依主題輪流挑最多 4 題（第一層是語言分類時取中文）顯示在輸入框上方，手機寬度只顯示 2 題，點了照快速問答的格式送出（主題＋題目、帶 `source_path`）。手機寬度下輸入框聚焦時 `ChatPanel` 送出 `composing`，`app-shell` 加 `composing` class 把舞台縮到 `clamp(6rem, 20svh, 9rem)`；viewport 設 `interactive-widget=resizes-content`。
+
 ### 6. ASR 與語音輸入 (Speech Recognition)
 
 **授權邊界與部署（2026-09-30）**：前端的引擎選擇只是偏好，不是授權；Backend 必須依帳號允許的引擎重新驗證，串流端點也不可略過。不得信任前端傳入的 provider 或語言分流來取得未授權引擎。
@@ -314,12 +324,14 @@ ws.onclose = () => { reconnect(); };
 
 > **現況更新（2026-07-01）**：`App.vue` 的 `onServerError` handler 確實存在，但對七個 `error_code` 多數沒有做規格表格裡的差異化畫面——大部分走同一條「toast + `retry_after_ms` 秒數提示」的籠統路徑（`statusToastRef.value?.show(...)`）。目前有特殊處理的只有：`RATE_LIMITED`（倒數 toast）、`SESSION_EXPIRED`（重新 `reinit`）、`BRAIN_UNAVAILABLE`/`AUTH_FAILED`（列入 `FATAL_ERROR_CODES`，觸發 `ErrorOverlay.vue` 全螢幕遮罩）。`TTS_TIMEOUT`、`LLM_OVERLOAD`、`GATEWAY_TIMEOUT`、`UPLOAD_FAILED` 目前沒有規格描述的專屬文案與圖示，只落入通用 toast 分支。
 
+> **現況更新（2026-10-06）**：toast 與全螢幕遮罩改用 `frontend/app/src/utils/serverErrorText.ts` 的白話文案，各錯誤碼有自己的說明（例如 `LLM_OVERLOAD`「現在詢問的人比較多，請稍候再問一次」），文字聊天走 HTTP 的 `BRAIN_ERROR` 依狀態碼（401/403、429、408/504）與網路錯誤分開說明；畫面不再出現錯誤碼或 `HTTP 500`，原文寫在 console。遮罩標題依錯誤碼顯示「需要重新登入」「虛擬人載入失敗」「暫時無法使用」。
+
 ### 12. 知識庫管理面板 (Knowledge Base Admin Panel)
 
 前端提供一個 IDE 風格的「雙欄式」管理介面 (`/admin/knowledge`)，用於管理 AI 的知識儲備。
 
 #### 12.1 佈局設計 (Split-Pane Layout)
-* **左側面板 (Workspace Tree)**：遞迴顯示工作區目錄結構，支援資料夾建立、重新命名與刪除。
+* **左側面板 (Workspace Tree)**：遞迴顯示工作區目錄結構，支援資料夾建立、重新命名與刪除。標題列「多選」進入批次模式（2026-10-06）：檔案與資料夾出現勾選框（資料夾一次勾底下全部檔案），批次列可「移動到…」（沿用 `MoveModal`，保留檔名）、「設定語言」、「刪除」（`ConfirmModal` 列出數量與前 5 個檔名）。逐檔呼叫既有的 `moveKnowledgeDocument`、`updateKnowledgeDocumentMeta`、`deleteKnowledgeDocument`，執行中顯示進度、結束只重整一次；失敗（例如目標已有同名檔、文件掛在問答樹上不能移動）照樣繼續，摘要列出原因，失敗的保持勾選可重試。
 * **右側面板 (Main Content)**：
     * **資料夾視角**：顯示檔案列表與大範圍的「拖拽上傳區 (Dropzone)」。
     * **文件視角**：開啟全螢幕 Markdown 編輯器（左側原始碼，右側即時渲染）。
@@ -341,6 +353,8 @@ ws.onclose = () => { reconnect(); };
 
 * **Slash Autocomplete (`/skill`)**：在輸入框輸入 `/` 時彈出 `SlashDropdown`，從 `skill_manager` 動態取得的技能清單即時過濾。支援 ↑/↓ 選擇、Enter / Tab 確認、Esc 關閉。選定技能後會被組裝為 forced tool call，Brain 端直接路由到該技能。
 * **Input History (↑/↓)**：以 `useInputHistory` 保存當前 session 的使用者訊息，當游標位於輸入起點或輸入框為空時，↑/↓ 循環帶入歷史訊息；輸入框仍有文字且 slash dropdown 顯示中時，歷史捕獲優先讓位給 slash autocomplete。
+* **修正成 QA**：文字模式的 AI 回答操作列有「修正成 QA」，`CorrectQaModal` 帶入該輪提問與回答，改好後選問答節點，以 `GET`／`PUT /knowledge/qa/nodes/{id}/merged` 寫回（同題只改答案，新題併入節點既有的 `knowledge/qa/manual_<節點>_*.md` 或新建），Brain 存檔後排程重建索引。預設 `hidden`，只進知識庫、不出現在前台快速問題按鈕。
+* **錯誤訊息**：`api/common.ts` 的 `parseErrorMessage` 優先用後端說明；沒有說明、回應是 HTML 錯誤頁或欄位驗證錯誤時，依狀態碼（`statusMessage`）或欄位名稱講人話，連不上伺服器時說網路。
 * **Action Request Card**：當 Brain 回傳 `action_request` 事件時，前端以 `ActionRequestCard` 呈現工具調用提案（名稱、參數、說明）；操作者可逐案核可/拒絕，核可後才真正執行工具。
 * **TTS / ASR 控制集中化**：TTS provider / voice、ASR 開關、Live 麥克風鍵皆整併至輸入列，降低視覺雜訊。TTS fallback 會以 toast 提示。
 * **統一導覽 (`NavigationContext`)**：`AppSidebar`、`ChatSidebar`、各頁面共享單一導覽狀態，切換角色 (persona)、載入歷史 session、建立新對話都透過同一份 context 管理。

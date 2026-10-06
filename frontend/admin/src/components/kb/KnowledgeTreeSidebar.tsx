@@ -1,4 +1,4 @@
-import type { FormEvent, RefObject } from "react";
+import type { FormEvent, ReactNode, RefObject } from "react";
 import TreeView from "./TreeView";
 import type { TreeNode } from "./helpers";
 import { parseQaEntryDragPath, parseQaNodeDragPath } from "./helpers";
@@ -43,6 +43,13 @@ interface KnowledgeTreeSidebarProps {
   onOrderQaNode: (parentNodeId: string | null) => void;
   canDropQaNode: (draggedPath: string, targetPath: string) => boolean;
   canDropQaEntry: (draggedPath: string, targetPath: string) => boolean;
+  multiSelect: boolean;
+  /** 批次操作執行中：不能切換多選，避免勾選清單在半途被清掉。 */
+  multiSelectDisabled?: boolean;
+  onToggleMultiSelect: () => void;
+  checkedPaths: ReadonlySet<string>;
+  onToggleChecked: (paths: string[], checked: boolean) => void;
+  batchBar?: ReactNode;
 }
 
 export default function KnowledgeTreeSidebar({
@@ -85,6 +92,12 @@ export default function KnowledgeTreeSidebar({
   onOrderQaNode,
   canDropQaNode,
   canDropQaEntry,
+  multiSelect,
+  onToggleMultiSelect,
+  multiSelectDisabled = false,
+  checkedPaths,
+  onToggleChecked,
+  batchBar,
 }: KnowledgeTreeSidebarProps) {
   return (
     <>
@@ -118,13 +131,30 @@ export default function KnowledgeTreeSidebar({
                 </span>
               )}
             </div>
-            <button
-              onClick={onStartNewFolder}
-              className="p-1 rounded-md text-content-subtle hover:text-primary hover:bg-primary/10 transition-colors"
-              title="新增資料夾"
-            >
-              <span className="material-symbols-outlined text-[1rem]">create_new_folder</span>
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={onToggleMultiSelect}
+                aria-pressed={multiSelect}
+                disabled={multiSelectDisabled}
+                className={`flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  multiSelect
+                    ? "bg-primary/15 text-primary"
+                    : "text-content-subtle hover:bg-primary/10 hover:text-primary"
+                }`}
+                title={multiSelect ? "結束多選" : "多選檔案以批次移動、刪除或設定語言"}
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[1rem]">checklist</span>
+                多選
+              </button>
+              <button
+                onClick={onStartNewFolder}
+                className="p-1 rounded-md text-content-subtle hover:text-primary hover:bg-primary/10 transition-colors"
+                title="新增資料夾"
+              >
+                <span className="material-symbols-outlined text-[1rem]">create_new_folder</span>
+              </button>
+            </div>
             <button
               type="button"
               onClick={onCloseMobileTree}
@@ -134,6 +164,8 @@ export default function KnowledgeTreeSidebar({
               <span className="material-symbols-outlined text-[1.125rem]">close</span>
             </button>
           </div>
+
+          {multiSelect && batchBar}
 
           <div className="border-b border-border px-3 py-2.5">
             <div className="relative">
@@ -229,6 +261,9 @@ export default function KnowledgeTreeSidebar({
                 onOrderQaNode={onOrderQaNode}
                 canDropQaNode={canDropQaNode}
                 canDropQaEntry={canDropQaEntry}
+                multiSelect={multiSelect}
+                checkedPaths={checkedPaths}
+                onToggleChecked={onToggleChecked}
               />
             )}
             {/* Empty area drop zone — drops to root */}

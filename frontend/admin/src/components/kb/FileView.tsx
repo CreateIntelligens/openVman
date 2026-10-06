@@ -3,19 +3,15 @@ import { useState } from "react";
 import type { KnowledgeDocument, KnowledgeDocumentSummary, KnowledgeLanguage } from "../../api";
 import MarkdownPreview from "../MarkdownPreview";
 import Select from "../Select";
-import { formatSize, formatDate, isUploadDerivedKnowledgeFile } from "./helpers";
+import {
+  formatSize,
+  formatDate,
+  isUploadDerivedKnowledgeFile,
+  KNOWLEDGE_LANGUAGE_LABELS,
+} from "./helpers";
 import QaDocEditor from "./QaDocEditor";
 import StatusDot from "./StatusDot";
 import SourceBadge from "./SourceBadge";
-
-const LANGUAGE_LABELS: Record<KnowledgeLanguage, string> = {
-  zh: "中文",
-  en: "English",
-  es: "Español",
-  nan: "台語",
-  ja: "日本語",
-  ko: "한국어",
-};
 
 export default function FileView({
   document,
@@ -99,7 +95,7 @@ export default function FileView({
                 onChange={(value) => onChangeLanguage(document, value as KnowledgeLanguage | "auto")}
                 ariaLabel="文件語言"
                 options={[
-                  { value: "auto", label: `自動（${LANGUAGE_LABELS[document.language ?? "zh"]}）` },
+                  { value: "auto", label: `自動（${KNOWLEDGE_LANGUAGE_LABELS[document.language ?? "zh"]}）` },
                   { value: "zh", label: "中文" },
                   { value: "en", label: "English" },
                   { value: "es", label: "Español" },

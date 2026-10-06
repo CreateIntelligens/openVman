@@ -56,6 +56,16 @@ function findLastUserMessageIndex(messages: ChatMessage[]): number {
   return -1;
 }
 
+// 只往回找到上一則 assistant 為止：中間隔著別的回答，就不算這則回答的提問。
+export function findPrecedingUserQuestion(messages: ChatMessage[], index: number): string | null {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.role === "assistant") return null;
+    if (message.role === "user") return message.content.trim() || null;
+  }
+  return null;
+}
+
 export function attachPrivacyWarningToLastUserMessage(
   messages: ChatMessage[],
   warning: PiiWarningSummary,

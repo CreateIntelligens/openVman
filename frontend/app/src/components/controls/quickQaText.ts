@@ -77,3 +77,60 @@ export function quickQaCopy(language: QuickQaLanguage): QuickQaCopy {
 export function visibleNodes<T extends { hidden?: boolean }>(nodes: T[] | undefined): T[] {
   return (nodes ?? []).filter((node) => !node.hidden);
 }
+
+export interface SuggestedQuestion {
+  /** 按鈕上顯示的題目。 */
+  label: string;
+  /** 實際送出的文字：跟快速問答面板一樣前面帶主題，檢索才找得到同一題。 */
+  message: string;
+  sourcePath?: string;
+}
+
+interface SuggestionNode {
+  label?: string;
+  node_id?: string;
+  order?: number;
+  hidden?: boolean;
+  qa_entries?: Array<{ question: string; source_path?: string; hidden?: boolean }>;
+  children?: SuggestionNode[];
+}
+
+/**
+ * 輸入框上方的推薦問題：從快速問答各主題輪流挑題，讓來賓一眼看到能問什麼。
+ *
+ * 每個主題先拿第一題，不夠再回頭拿第二題：主題多時各取一題，只有一個主題（例如鶴記
+ * 94 題都在同一類）時也湊得滿。第一層是語言分類時只看中文那一類（沒有中文就看第一個），
+ * 不然中英西混在一起。
+ */
+export function suggestedQuestions(nodes: SuggestionNode[] | undefined, limit = 4): SuggestedQuestion[] {
+  const byOrder = (list: SuggestionNode[] | undefined) =>
+    [...visibleNodes(list)].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  let roots = byOrder(nodes);
+  const languages = roots.filter((node) => languageOfLabel(node.label ?? ""));
+  if (languages.length) {
+    const chinese = languages.find((node) => languageOfLabel(node.label ?? "") === "zh") ?? languages[0];
+    roots = byOrder(chinese.children);
+  }
+  const topics: Array<{ topic: string; entries: Array<{ question: string; source_path?: string }> }> = [];
+  const walk = (list: SuggestionNode[]) => {
+    for (const node of list) {
+      const entries = (node.qa_entries ?? []).filter((item) => !item.hidden);
+      if (entries.length) topics.push({ topic: (node.label || node.node_id || "").trim(), entries });
+      walk(byOrder(node.children));
+    }
+  };
+  walk(roots);
+  const picked: SuggestedQuestion[] = [];
+  for (let round = 0; picked.length < limit && topics.some((t) => t.entries.length > round); round++) {
+    for (const { topic, entries } of topics) {
+      const entry = entries[round];
+      if (!entry || picked.length >= limit) continue;
+      picked.push({
+        label: entry.question,
+        message: topic ? `${topic} ${entry.question}` : entry.question,
+        sourcePath: entry.source_path,
+      });
+    }
+  }
+  return picked;
+}

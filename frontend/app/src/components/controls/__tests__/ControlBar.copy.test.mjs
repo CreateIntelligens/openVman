@@ -7,8 +7,12 @@ import { dirname, resolve } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(resolve(__dirname, "../ControlBar.vue"), "utf8");
 
-test("control bar presents one merged virtual human console title", () => {
-  assert.match(source, /<h2>openVman 控制台<\/h2>/);
+test("control bar shows the character's name and status, not an engineering console title", () => {
+  // 來賓看到的是角色，不是「控制台」（2026-10-06 UX 審查）。
+  assert.doesNotMatch(source, /控制台/);
+  assert.match(source, /\{\{ title \|\| "openVman" \}\}/);
+  assert.match(source, /label: "聆聽中"/);
+  assert.match(source, /label: "思考中"/);
   assert.doesNotMatch(source, /Reception Console/);
   assert.doesNotMatch(source, /control-bar__eyebrow/);
 });
@@ -36,4 +40,9 @@ test("settings button can stay enabled while renderer actions are disabled", () 
   assert.match(source, /settingsDisabled\?:\s*boolean/);
   assert.match(source, /class="control-btn settings-btn"[\s\S]*?:disabled="settingsDisabled"/);
   assert.match(source, /:disabled="disabled"/);
+});
+
+test("visitor mode can hide the settings button", () => {
+  assert.match(source, /v-if="settingsVisible !== false"/);
+  assert.match(source, /@click="\$emit\('titleTap'\)"/);
 });

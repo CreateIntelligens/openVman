@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { apiFetch, apiUrl, projectUrl } from "../../api/common";
+import { apiFetch, apiUrl, parseErrorMessage, projectUrl } from "../../api/common";
+import { errorMessage } from "../../utils/errorMessage";
 import type { ActionRequest, ActionRisk } from "../../api";
 import { useNavigation } from "../../context/NavigationContext";
 import type { Tab } from "../app/navigation";
@@ -61,13 +62,13 @@ export default function ActionRequestCard({
         body: JSON.stringify(request.params ?? {}),
       });
       if (!res.ok) {
-        throw new Error(`${res.status} ${res.statusText}`);
+        throw new Error(await parseErrorMessage(res));
       }
       setStatus("confirmed");
       onConfirmed?.(request);
     } catch (err) {
       setStatus("error");
-      setErrorMsg(String(err));
+      setErrorMsg(errorMessage(err, "執行失敗，請稍後再試。"));
     }
   };
 

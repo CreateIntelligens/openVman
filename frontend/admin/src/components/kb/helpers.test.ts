@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatBatchSummary,
+  runBatchSequentially,
   QUICK_QA_TREE_PATH,
   findNodeReferencingSource,
   findQaNode,
@@ -154,5 +156,43 @@ describe("QA 節點樹的走訪", () => {
   it("逐層列出檔案的上層目錄", () => {
     expect(getFileParentPaths("a/b/c.md")).toEqual(["a", "a/b"]);
     expect(getFileParentPaths("top.md")).toEqual([]);
+  });
+});
+
+describe("批次操作", () => {
+  it("依序逐檔執行，遇到失敗繼續做完並記下原因", async () => {
+    const order: string[] = [];
+    const progress: Array<[number, number]> = [];
+    const result = await runBatchSequentially(
+      ["a.md", "b.md", "c.md"],
+      async (path) => {
+        order.push(path);
+        if (path === "b.md") throw new Error("目標路徑已存在");
+      },
+      (done, total) => progress.push([done, total]),
+    );
+
+    expect(order).toEqual(["a.md", "b.md", "c.md"]);
+    expect(result).toEqual({
+      succeeded: ["a.md", "c.md"],
+      failed: [{ path: "b.md", reason: "目標路徑已存在" }],
+    });
+    expect(progress).toEqual([[1, 3], [2, 3], [3, 3]]);
+  });
+
+  it("摘要列出失敗的檔名與原因，太多時只列前幾個", () => {
+    expect(formatBatchSummary("移動", { succeeded: ["x", "y"], failed: [] })).toBe("移動完成 2 個");
+    expect(
+      formatBatchSummary("移動", {
+        succeeded: ["knowledge/ok.md"],
+        failed: [{ path: "knowledge/sub/a.md", reason: "目標路徑已存在" }],
+      }, "1 個原本就在目標資料夾"),
+    ).toBe("移動完成 1 個，1 個原本就在目標資料夾，1 個失敗：a.md（目標路徑已存在）");
+
+    const failed = Array.from({ length: 7 }, (_, i) => ({ path: `f${i}.md`, reason: "錯誤" }));
+    const summary = formatBatchSummary("刪除", { succeeded: [], failed });
+    expect(summary.startsWith("刪除完成 0 個，7 個失敗：f0.md（錯誤）、")).toBe(true);
+    expect(summary).not.toContain("f5.md");
+    expect(summary.endsWith("，另有 2 個")).toBe(true);
   });
 });

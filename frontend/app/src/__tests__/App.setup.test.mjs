@@ -41,6 +41,8 @@ test("the full App setup resolves real catalog and timing callbacks after compos
   globalThis.window = {
     location: { pathname: "/", search: "" }, history: { replaceState() {} },
     localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+    // 訪客模式的閒置計時會聽點擊、按鍵。
+    addEventListener() {}, removeEventListener() {},
   };
   globalThis.fetch = async (input, init = {}) => {
     const path = String(input).split("?")[0];

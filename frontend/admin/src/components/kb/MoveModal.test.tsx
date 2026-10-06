@@ -7,7 +7,7 @@ import MoveModal from "./MoveModal";
 describe("MoveModal", () => {
   function renderMoveModal() {
     const props = {
-      sourcePath: "knowledge/faq/source.md",
+      sourcePaths: ["knowledge/faq/source.md"],
       allDocuments: [] as KnowledgeDocumentSummary[],
       serverDirs: ["knowledge", "knowledge/faq"],
       onMove: vi.fn(),

@@ -1,7 +1,12 @@
 <template>
   <div class="control-bar">
     <div class="control-bar__left">
-      <h2>openVman 控制台</h2>
+      <!-- 訪客模式下連點三下標題叫出設定，給現場人員用，所以不做成按鈕外觀。 -->
+      <h2 @click="$emit('titleTap')">{{ title || "openVman" }}</h2>
+      <span class="status-pill" :class="`status-pill--${status.tone}`" role="status">
+        <span class="status-pill__dot" aria-hidden="true" />
+        {{ status.label }}
+      </span>
     </div>
 
     <div class="control-bar__right">
@@ -46,6 +51,7 @@
       </label>
 
       <button
+        v-if="settingsVisible !== false"
         class="control-btn settings-btn"
         :disabled="settingsDisabled"
         aria-label="系統設定"
@@ -106,16 +112,32 @@ const props = defineProps<{
   /** 視覺服務可用時才顯示鏡頭按鈕；未啟用就整個不出現。 */
   cameraAvailable?: boolean
   settingsDisabled?: boolean
+  /** 訪客模式藏起設定；沒傳就照舊顯示。 */
+  settingsVisible?: boolean
+  /** 角色或專案名稱，給訪客看的，不是產品名。 */
+  title?: string
+  listening?: boolean
   immersive?: boolean
   cameraPreviewScale?: number
 }>()
 
 const emit = defineEmits<{
   openSettings: []
+  titleTap: []
   toggleCamera: []
   toggleImmersive: []
   cameraPreviewScaleChange: [scale: number]
 }>()
+
+const status = computed(() => {
+  if (props.state === "CONNECTING" || props.state === "RECONNECTING") return { label: "連線中", tone: "busy" }
+  if (props.state === "ERROR") return { label: "暫停服務", tone: "error" }
+  if (props.state === "THINKING") return { label: "思考中", tone: "busy" }
+  if (props.state === "SPEAKING") return { label: "說話中", tone: "active" }
+  if (props.listening) return { label: "聆聽中", tone: "active" }
+  // 還沒開始對話時是 DISCONNECTED（第一句才連線），對來賓來說就是在等他開口。
+  return { label: "在線", tone: "idle" }
+})
 
 const cameraTitle = computed(() =>
   props.cameraActive ? "關閉攝影機" : "開啟攝影機"
@@ -144,6 +166,42 @@ function handleCameraPreviewScaleInput(event: Event): void {
 .control-bar__left {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999rem;
+  border: var(--hairline) solid var(--line);
+  background: var(--bg);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.status-pill__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status-pill--idle { color: rgb(var(--ov-color-success)); }
+.status-pill--active { color: var(--primary); }
+.status-pill--busy { color: var(--text-soft); }
+.status-pill--busy .status-pill__dot { animation: status-pulse 1.2s ease-in-out infinite; }
+.status-pill--error { color: rgb(var(--ov-color-danger)); }
+
+@keyframes status-pulse {
+  50% { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pill--busy .status-pill__dot { animation: none; }
 }
 
 .control-bar h2 {
