@@ -22,13 +22,6 @@ const MAX_CLIPS = 5;
 const UPLOAD_STREAM_SPEED = 4;
 /** VAD 斷句後再等瀏覽器辨識這麼久：它的定稿通常比 VAD 晚一點到。 */
 const BROWSER_SETTLE_MS = 1_500;
-/**
- * 同一台機器的引擎：同一段音檔要一個做完再送下一個。同一台同時收到批次和串流會排隊，
- * 量到的秒數是排隊時間不是辨識時間（2026-10-06 後台實測批次多等了 20 幾秒）。
- */
-const SAME_HOST: Record<string, string> = {
-  r2t2: "r2t2", "r2t2-live": "r2t2", "r2t2-dev": "r2t2-dev", "r2t2-dev-live": "r2t2-dev",
-};
 const BROWSER_LANGS: Record<string, string> = {
   zh: "zh-TW", en: "en-US", es: "es-ES", ja: "ja-JP", ko: "ko-KR",
 };
@@ -208,21 +201,12 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
     else void runEngine(clip, engine);
   }
 
-  /** 不同機器同時送；同一台的依序送，避免互相排隊。 */
+  /**
+   * 全部同時送，跟正式環境多人同時講話一樣。同一台機器同時收到批次和串流時，
+   * 秒數會含排隊時間。
+   */
   function runEngines(clip: Clip, chosen: string[]) {
-    // 排在後面的先顯示成辨識中，不然要等前一個做完才冒出來。
-    chosen.forEach((engine) => setRow(clip.id, { engine, run: 0, state: "pending" }));
-    const lanes = new Map<string, string[]>();
-    chosen.forEach((engine) => {
-      const lane = SAME_HOST[engine] ?? engine;
-      lanes.set(lane, [...(lanes.get(lane) ?? []), engine]);
-    });
-    lanes.forEach((lane) => {
-      void lane.reduce(
-        (previous, engine) => previous.then(() => runEngine(clip, engine)),
-        Promise.resolve(),
-      );
-    });
+    chosen.forEach((engine) => void runEngine(clip, engine));
   }
 
   function runClip(blob: Blob, label: string, filename?: string, fromMic = false) {

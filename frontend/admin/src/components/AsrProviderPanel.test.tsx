@@ -208,23 +208,18 @@ describe("AsrProviderPanel", () => {
     expect(screen.getByText(/0\.60 秒（4 倍速送）/)).toBeTruthy();
   });
 
-  it("同一台機器的批次和串流依序送，R2T2 串流等關線才收", async () => {
+  it("同一台機器的批次和串流也同時送，R2T2 串流等關線才收", async () => {
     vi.mocked(fetchAsrEngines).mockResolvedValue({ engines: ["breeze", "r2t2"], stream: ["r2t2-live"] });
-    let releaseBatch: () => void = () => {};
-    vi.mocked(previewAsr).mockImplementation((_clip, _name, engine) => (engine === "r2t2"
-      ? new Promise((resolve) => { releaseBatch = () => resolve({ text: "批次好了", provider: "r2t2" }); })
-      : Promise.resolve({ text: "Breeze 好了", provider: "breeze" })));
+    vi.mocked(previewAsr).mockImplementation(() => new Promise(() => {}));
     vi.mocked(streamClip).mockResolvedValue({ text: "串流好了", elapsedSeconds: 0.2 });
     render(<AsrProviderPanel />);
     fireEvent.click(await waitFor(() => engineButton(/^Confucius4-R2T2$/)));
     fireEvent.click(engineButton(/^Confucius4-R2T2 串流$/));
     upload();
 
-    // 不同機器同時送：Breeze 不用等。
-    expect(await screen.findByText("Breeze 好了")).toBeTruthy();
-    expect(streamClip).not.toHaveBeenCalled();
-    releaseBatch();
+    // 批次還沒回來，串流照樣送出、照樣出結果。
     expect(await screen.findByText("串流好了")).toBeTruthy();
+    expect(previewAsr).toHaveBeenCalledTimes(2);
     expect(vi.mocked(streamClip).mock.calls[0][2]).toMatchObject({ waitForClose: true, speed: 4 });
   });
 
