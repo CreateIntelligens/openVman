@@ -165,13 +165,13 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - `_catalog.yaml`：`title`、`key`（產品代號欄位，預設 `model`，型別須為 text）、`fields`（每欄 `label`、`type` 為 `number`／`text`／`number_set`、`unit`、`description`）、`notes`（給模型的注意事項，例如單位換算）。欄位由各專案自訂。
 - 每個產品一篇 Markdown，YAML frontmatter 放規格值，缺值填 `null`；正文照常進知識索引。停用的文件不列入；格式不對的筆記略過，並在結果的 `skipped_notes` 回報。
 
-參數 `query` 是 JSON 字串：`{"scenarios":[{"name","where","sort","limit"}]}`。`where` 為 `{"field","op","value"}`，或以 `all`／`any` 巢狀組合；運算子 `eq ne lt lte gt gte in contains`；條件值不得為 null。每個情境回傳：
+參數是結構化的 `scenarios[]`，每個情境有 `name`、`conditions[]`（`{field, op, value}`，全部成立才算符合）、`sort[]`（`{field, direction}`，`direction` 為 `asc`／`desc`）與選填的 `limit`。運算子 `eq ne lt lte gt gte in contains`；`value` 一律是字串，依欄位型別轉成數字，`in` 用逗號分隔（例如 `"1,3"`）。「A 或 B」在同一欄位用 `in`，跨欄位或不同需求（例如兩個現場）拆成不同情境。`field` 以該專案的欄位做 enum。每個情境回傳：
 
-- `matches`：符合的產品，只列條件與排序用到的欄位及文件路徑；排序欄缺值的排最後。
+- `matches`：符合的產品，附全部規格值與文件路徑（模型常只篩不排序，題目要的數字仍要在結果裡）；排序欄缺值的排最後。
 - `unknown`：用到的欄位是 null，不能視為不符合。
 - `excluded_count`：確定不符合的數量。
 
-工具說明會帶入該專案的欄位與單位；模型在第一輪與 `search_knowledge` 平行呼叫，`fast` 模式也可用。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
+工具說明會帶入該專案的欄位與單位；有規格表的專案，系統提示另有一條規則，要求選型、比較、極值類問題在第一輪同時呼叫 `filter_products` 與 `search_knowledge`，並以 `matches` 為準列產品，所以 `fast` 模式（不准追加工具）也用得到。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
 
 ### 網路工具（2md）
 

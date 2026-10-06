@@ -184,15 +184,16 @@ def _sort(rows: list[dict[str, Any]], orders: list[dict[str, str]]) -> None:
 
 
 def filter_products(query: Any, catalog: ProductCatalog) -> dict[str, Any]:
-    """Run each scenario over the catalog; matches show the fields the scenario used."""
+    """Run each scenario over the catalog; every row carries the product's full spec.
+
+    原本只回條件與排序用到的欄位，fast 實測模型篩了 hp=3 卻沒依揚程排序時，
+    結果裡沒有揚程，就回「型錄未提及」；實驗 C 組也是回全規格。
+    """
     scenarios = validate_query(query, catalog)
     results = []
     for scenario in scenarios:
         where = scenario.get("where", {"all": []})
         orders = scenario.get("sort") or []
-        shown = list(dict.fromkeys(
-            [catalog.key, *_referenced_fields(where), *(o["field"] for o in orders)]
-        ))
         matches: list[dict[str, Any]] = []
         unknown: list[dict[str, Any]] = []
         excluded = 0
@@ -202,7 +203,7 @@ def filter_products(query: Any, catalog: ProductCatalog) -> dict[str, Any]:
                 excluded += 1
                 continue
             row = {
-                "values": {name: product.values.get(name) for name in shown},
+                "values": {name: product.values.get(name) for name in catalog.fields},
                 "path": product.path,
             }
             if status is None:

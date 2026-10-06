@@ -71,6 +71,16 @@ def test_filter_lists_every_match_and_keeps_unknowns_apart(workspace):
     assert result["notes"].startswith("最大揚程")
 
 
+def test_rows_carry_the_full_spec_not_just_the_filtered_fields(workspace):
+    catalog = load_product_catalog("p")
+    result = filter_products({"scenarios": [
+        {"name": "三馬力", "where": {"field": "hp", "op": "eq", "value": 3}},
+    ]}, catalog)
+    rows = {row["values"]["model"]: row["values"] for row in result["scenarios"][0]["matches"]}
+    assert rows["80EDW-5.30S/T"]["max_head_m"] == 26.5
+    assert rows["80EUB-M-5.30T"]["max_flow_lpm"] == 1000
+
+
 def test_null_is_unknown_not_a_mismatch(workspace):
     catalog = load_product_catalog("p")
     scenario = filter_products({"scenarios": [{
@@ -159,9 +169,11 @@ def test_tool_is_dropped_without_a_catalog_and_lists_fields_with_one(workspace, 
         {"type": "function", "function": {"name": "filter_products", "description": "base"}},
     ]
     fitted = agent_loop._tools_for_project(tools, "p")
-    description = fitted[1]["function"]["description"]
-    assert "測試泵浦，共 4 款" in description
-    assert "max_head_m（最大揚程，數字，單位 m）" in description
+    function = fitted[1]["function"]
+    assert "測試泵浦，共 4 款" in function["description"]
+    assert "max_head_m（最大揚程，數字，單位 m）" in function["description"]
+    condition = function["parameters"]["properties"]["scenarios"]["items"]["properties"]["conditions"]
+    assert condition["items"]["properties"]["field"]["enum"][:2] == ["model", "series"]
 
     monkeypatch.setattr(product_tools, "load_product_catalog", lambda _project: None)
     assert [tool["function"]["name"] for tool in agent_loop._tools_for_project(tools, "p")] == [
@@ -169,17 +181,48 @@ def test_tool_is_dropped_without_a_catalog_and_lists_fields_with_one(workspace, 
     ]
 
 
-def test_tool_handler_parses_the_json_query(workspace):
+def _run_tool(args):
     from tools.builtin.product_tools import filter_products_tool
     from tools.context import active_project_id
 
     token = active_project_id.set("p")
     try:
-        result = filter_products_tool().handler({"query": json.dumps({"scenarios": [
-            {"name": "七點五馬力", "where": {"field": "hp", "op": "eq", "value": 7.5}},
-        ]})})
-        with pytest.raises(FilterError, match="不是合法的 JSON"):
-            filter_products_tool().handler({"query": "{oops"})
+        return filter_products_tool().handler(args)
     finally:
         active_project_id.reset(token)
-    assert _models(result["scenarios"][0]["matches"]) == ["80EUB-M-5.75T"]
+
+
+def test_tool_takes_structured_scenarios_with_string_values(workspace):
+    result = _run_tool({"scenarios": [
+        {"name": "三吋二十米", "conditions": [
+            {"field": "outlet_inch", "op": "eq", "value": "3"},
+            {"field": "max_head_m", "op": "gte", "value": "20"},
+            {"field": "series", "op": "in", "value": "EDW, EUB-M"},
+        ], "sort": [{"field": "max_head_m", "direction": "desc"}]},
+        {"name": "流量最大", "conditions": [], "sort": [{"field": "max_flow_lpm", "direction": "desc"}],
+         "limit": 1.0},
+        {"name": "單相或三相", "conditions": [{"field": "phase", "op": "in", "value": "1,3"}], "limit": 0},
+    ]})
+    first, top, phases = result["scenarios"]
+    assert _models(first["matches"]) == ["80EUB-M-5.75T", "80EDW-5.30S/T", "80EUB-M-5.30T"]
+    assert _models(top["matches"]) == ["80EUB-M-5.75T"]
+    assert len(phases["matches"]) == 4
+
+
+def test_tool_reports_a_non_numeric_value_with_the_unit(workspace):
+    with pytest.raises(FilterError, match="max_head_m 的條件值必須是數字（單位 m"):
+        _run_tool({"scenarios": [{"name": "x", "conditions": [
+            {"field": "max_head_m", "op": "gte", "value": "20 米"},
+        ]}]})
+    with pytest.raises(FilterError, match="沒有欄位 'head'"):
+        _run_tool({"scenarios": [{"name": "x", "conditions": [
+            {"field": "head", "op": "gte", "value": "20"},
+        ]}]})
+
+
+def test_prompt_line_only_for_projects_with_a_catalog(workspace, monkeypatch):
+    from tools.builtin import product_tools
+
+    assert "第一輪必須同時呼叫 filter_products" in product_tools.product_prompt_line("p")
+    monkeypatch.setattr(product_tools, "load_product_catalog", lambda _project: None)
+    assert product_tools.product_prompt_line("p") == ""

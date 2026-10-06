@@ -2,7 +2,7 @@
 
 狀態：Draft（2026-10-06）。使用者確認前維持 Draft。
 
-進度（2026-10-06）：第一階段程式完成，未部署。`knowledge/product_catalog.py`、`knowledge/product_filter.py`、`tools/builtin/product_tools.py`、`agent_loop._tools_for_project`；單元測試 15 項、Brain 全套 1118 項通過。範例規格表 `scripts/experiments/product-notes/catalog/_catalog.yaml` 載入第三輪 15 篇筆記全數通過，第 1 題篩選結果與凍結答案一致。待辦：部署後放進鶴記dev，用 20 題經正式聊天路徑（fast）驗收。
+進度（2026-10-06）：第一階段程式已部署（7c15ec5）。鶴記dev 驗收時發現正式聊天路徑上模型很少叫這個工具、參數也常寫壞，已改程式（未提交、未部署），見下方「鶴記dev 驗收」。待辦：提交部署後，用 `/api/v1/chat` 再跑一次 20 題×3 次確認；正式鶴記是否放入規格表等使用者決定。
 
 ## 為什麼要做
 
@@ -26,9 +26,9 @@
    - 每個產品一篇 Markdown，YAML frontmatter 放規格值；沒有的值留 `null`，正文照常給檢索用。
    - 停用的文件不列入（跟檢索一致）。
 2. Brain 內建工具 `filter_products`：
-   - 參數：`scenarios[]`，每個情境有 `name`、`where`（`all`／`any` 巢狀條件，運算子 `eq`／`ne`／`lt`／`lte`／`gt`／`gte`／`in`／`contains`）、`sort`（多欄）、`limit`。
+   - 參數：`scenarios[]`，每個情境有 `name`、`conditions`（AND；運算子 `eq`／`ne`／`lt`／`lte`／`gt`／`gte`／`in`／`contains`）、`sort`（多欄）、`limit`。原本是 `where` 巢狀 `all`／`any` 的 JSON 字串，驗收後改成結構化參數（見「鶴記dev 驗收」）。
    - 多個需求情境分開放，不合併成 AND（第一輪實驗的錯誤）。
-   - 回傳每個情境的 `matches`（符合，含被引用欄位的值與文件路徑）、`unknown`（條件引用的欄位是 null，不能當成不符合）、`excluded_count`。
+   - 回傳每個情境的 `matches`（符合，含全部規格值與文件路徑）、`unknown`（條件引用的欄位是 null，不能當成不符合）、`excluded_count`。
    - 欄位與運算子對照專案的 `_catalog.yaml` 驗證，錯的回清楚的中文錯誤讓模型改參數。
 3. 工具只在有 `_catalog.yaml` 的專案出現，說明裡帶該專案的欄位清單與單位：在 agent loop 組工具清單時處理，跟 fast 模式拿掉上網工具同一個位置。第一輪可以跟 `search_knowledge` 同時呼叫，所以 fast 模式（不准追加工具）也用得到。
 4. 測試：篩選語意（null 是未知、多情境、多欄排序、`number_set` 如 `phase: [1, 3]`）、catalog 驗證、工具註冊與依專案隱藏。
@@ -44,7 +44,31 @@
 - 單元測試全過，Brain 全套不退步。
 - 鶴記dev 放入 15 篇筆記與 `_catalog.yaml` 後，用實驗第三輪的 20 題經正式聊天路徑（fast 模式）跑一次，對照 C 組 55／2／3。
 
+## 鶴記dev 驗收（2026-10-06）
+
+15 篇筆記與 `_catalog.yaml` 放進鶴記dev 的 `knowledge/products/` 並重建索引，第三輪 20 題、fast 模式。評分照 `round3/questions.json` 的凍結規則（required_points／forbidden_claims），由獨立的子代理逐份評。
+
+| 版本 | 路徑 | 份數 | 對／部分對／錯 |
+|---|---|---|---|
+| 已部署的 7c15ec5 | `/api/v1/chat` | 20 題×1 | 5／5／10 |
+| 改後 | 容器內同一套 prompt 與 agent loop | 20 題×3 | 40／15／5 |
+| 實驗 C 組（參考） | 實驗腳本，強制產生條件 | 20 題×3 | 55／2／3 |
+
+已部署版本的問題與改法：
+
+1. 模型很少叫：工具說明寫了「與 search_knowledge 同一輪呼叫」，但系統提示的工具規則只說「search_knowledge 一定要叫」。需要篩選的 16 題，`/api/v1/chat` 20 題只有 7 題叫；容器內 16 題×2 次只有 9 次。改法：有規格表的專案，系統提示多一條規則，要求選型、比較、極值類問題第一輪同時呼叫篩選與檢索，產品清單以 `matches` 為準（`product_prompt_line`）。只加這條：23／32 次。
+2. 參數常寫壞：`query` 要模型把巢狀 JSON 寫在字串裡，flash-lite 約三成呼叫被退回（JSON 語法錯、排序寫成 `op` 少了 `direction`、`or` 當鍵）。fast 不准追加工具，退回就沒有第二次機會。改法：參數改成結構化的 `scenarios[]`／`conditions[]`／`sort[]`／`limit`，`field` 用專案欄位做 enum、`op`／`direction` 用 enum，`value` 收字串再依欄位型別轉；巢狀 `all`／`any` 不再對模型開放，同一欄位多選用 `in`，其他 OR 拆情境。改後 48 次呼叫退回 0～1 次，需要篩選的 48 次有 43～45 次拿到篩選結果，不需要篩選的 12 次有 3 次也叫了（無害）。
+3. 結果缺數字：`matches` 原本只回條件與排序用到的欄位，模型篩 `hp=3` 卻沒依揚程排序時拿不到揚程，就回「型錄未提及」（Q04 三次全錯）。改法：每列附全部規格（實驗 C 組也是全規格）。這一項把 36／15／9 提到 40／15／5。
+
+試過但拿掉的：fast 第一輪漏叫或被退回時，收工具那輪只留 `filter_products` 讓模型補叫。字串參數時救回 13 次；改成結構化參數後救回 0 次，反而讓模型在那一輪叫 `search_knowledge` 被丟掉、多一輪 LLM，所以拿掉。
+
+跟 C 組還差的地方（改後 60 份）：
+
+- 錯 5：空回覆 2（`LLMEmptyReplyError`，容器內直接呼叫 agent loop，沒有經過正式路徑的備援；經 `/api/v1/chat` 時會不會變成備援回答待確認）、拿到清單仍回「型錄未記載」2（Q01、Q18 各一次）、漏款又寫錯粒徑 1（Q14）。
+- 部分對 15：多數是語音長度限制下省略逐款數字（Q14、Q16 只給範圍），或缺資料題沒有把「因此無法判定」講出來（Q11、Q12、Q19）。C 組的回答沒有語音長度限制，兩者不完全可比。
+- 延遲：中位數 4.6 秒、p90 約 6～10 秒（容器內、不含 backend 與 TTS）。
+
 ## 風險
 
-- 模型可能不呼叫工具：工具說明要寫清楚「列出、比較、篩選、排序」類問題要用；必要時之後再加意圖判斷。
+- 模型可能不呼叫工具：已實測，只靠工具說明不夠，要系統提示規則加結構化參數（見上）；仍有約一成需要篩選的題目沒叫，必要時之後再加意圖判斷。
 - 欄位單位：條件值要先換成 catalog 的單位，說明裡寫明單位與換算提示（例如 1 m³/h = 1000/60 LPM）。

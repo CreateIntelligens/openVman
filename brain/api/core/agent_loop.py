@@ -22,6 +22,7 @@ from core.llm_client import (
 )
 from core.reply_modes import ModeSettings, ReplyMode, resolve_mode
 from core.usage import current_usage_scope
+from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, fit_product_tool
 from tools.tool_executor import execute_tool_call
 from tools.tool_registry import bind_tool_context, get_tool_registry
 
@@ -200,18 +201,15 @@ def _tools_for_project(tools: list[dict[str, Any]], project_id: str) -> list[dic
 
     工具是全域註冊的，但欄位每個專案不同；沒有產品規格表的專案給了只會讓模型白叫一次。
     """
-    from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, product_tool_description
-
-    if not any(tool.get("function", {}).get("name") == FILTER_PRODUCTS_TOOL for tool in tools):
-        return tools
-    description = product_tool_description(project_id)
     fitted: list[dict[str, Any]] = []
     for tool in tools:
         function = tool.get("function", {})
         if function.get("name") != FILTER_PRODUCTS_TOOL:
             fitted.append(tool)
-        elif description is not None:
-            fitted.append({**tool, "function": {**function, "description": description}})
+            continue
+        function = fit_product_tool(function, project_id)
+        if function is not None:
+            fitted.append({**tool, "function": function})
     return fitted
 
 

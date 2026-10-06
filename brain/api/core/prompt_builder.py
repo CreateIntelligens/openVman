@@ -18,6 +18,7 @@ from infra.reflection import (
     summarize_message_history,
 )
 from knowledge.workspace import load_core_workspace_context
+from tools.builtin.product_tools import product_prompt_line
 from .prompt_templates import (
     DEFAULT_ANSWER_RULES,
     DEFAULT_TOOL_INSTRUCTIONS,
@@ -93,6 +94,7 @@ def build_chat_messages(
         for block in [
             "你是 `openVman Brain` 的對話核心。回答時要遵守以下上下文，且不要編造不存在的資訊。",
             tool_instructions,
+            product_prompt_line(project_id) if allow_tools else "",
             *workspace_blocks,
             _format_request_context(request_context),
             history_summary,
