@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 from app.config import TTSRouterConfig, get_tts_config
 
+from .attempt_limiter import FailedAttemptLimiter
 from .database import AuthDatabase
 from .repositories import (
     AccountAccessRepository,
@@ -36,6 +37,10 @@ class AuthRuntime:
     tokens: SessionTokenService
     settings: SystemSettingsRepository
     temporary_passwords: TemporaryPasswordCipher
+    # 每個 runtime 各自一份，測試與重建 runtime 時不會共用失敗次數。
+    password_verify_attempts: FailedAttemptLimiter = field(
+        default_factory=FailedAttemptLimiter,
+    )
 
 
 def build_auth_runtime(config: TTSRouterConfig) -> AuthRuntime:

@@ -289,6 +289,9 @@ export default function TemporaryBatchPanel({
                         <span className="chip">
                           {batch.admin_portal_access ? "可進管理後台" : "不可進管理後台"}
                         </span>
+                        {batch.kiosk && (
+                          <span className="chip border-primary/30 text-primary">展示機台</span>
+                        )}
                         <span className="text-xs text-content-subtle">{batch.account_count ?? 5} 組</span>
                       </div>
                       {batch.expires_at && (

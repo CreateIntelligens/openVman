@@ -98,6 +98,7 @@ def test_login_me_bearer_cookie_logout_and_generic_failures(client, runtime):
         "remaining_seconds": None,
         "defaults": None,
         "admin_portal_access": True,
+        "kiosk": False,
     }
     assert login["token"]
 

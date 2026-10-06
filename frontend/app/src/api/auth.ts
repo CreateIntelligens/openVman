@@ -24,6 +24,8 @@ export interface AccountProfile {
   remaining_seconds?: number | null
   defaults?: AccountDefaults | null
   admin_portal_access?: boolean
+  /** 展示機台帳號：登入後一律是訪客模式（藏設定與登出）。 */
+  kiosk?: boolean
 }
 
 interface AccountResponse extends Partial<AccountProfile> {
@@ -72,5 +74,18 @@ export async function getCurrentAccount(): Promise<AccountProfile> {
 
 export async function logout(): Promise<void> {
   const response = await apiFetch("/api/v1/auth/logout", { method: "POST" })
+  if (!response.ok) await parseJson<unknown>(response)
+}
+
+/**
+ * 展示機台解鎖：核對目前帳號的密碼，不換 session。
+ * 密碼錯回 400（不能用 401，那會被當成登入過期而把機台登出）。
+ */
+export async function verifyPassword(password: string): Promise<void> {
+  const response = await apiFetch("/api/v1/auth/verify-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  })
   if (!response.ok) await parseJson<unknown>(response)
 }

@@ -46,6 +46,7 @@ export default function AccountRoleDialog({
         grants: account.grants,
         defaults: account.defaults,
         admin_portal_access: account.admin_portal_access ?? false,
+        kiosk: account.kiosk ?? false,
       }
       : undefined,
     // 只有降級才會顯示授權欄位，提升為管理員時不必抓選項。

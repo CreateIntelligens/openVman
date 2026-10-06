@@ -435,6 +435,11 @@ export default function Accounts() {
                                 目前帳號
                               </span>
                             )}
+                            {account.kiosk && (
+                              <span className="chip border-primary/30 text-primary">
+                                展示機台
+                              </span>
+                            )}
                             {account.disabled && (
                               <span className="chip border-danger/30 text-danger">
                                 已停用

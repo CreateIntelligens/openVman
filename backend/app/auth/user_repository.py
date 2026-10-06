@@ -62,6 +62,7 @@ class UserRepository:
         grants: Iterable[tuple[ResourceType, str]] | None = None,
         defaults: tuple[str, str, str, str] | None = None,
         admin_portal_access: bool = False,
+        kiosk: bool = False,
     ) -> UserRecord:
         if role is AccountRole.ROOT:
             raise AccountPolicyError("ROOT accounts cannot be created")
@@ -106,8 +107,8 @@ class UserRepository:
                     INSERT INTO users(
                         id, username, username_normalized, password_hash, role,
                         account_type, disabled, token_version, created_at,
-                        updated_at, created_by, admin_portal_access
-                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)
+                        updated_at, created_by, admin_portal_access, kiosk
+                    ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
@@ -120,6 +121,7 @@ class UserRepository:
                         now,
                         created_by,
                         int(admin_portal_access),
+                        int(kiosk),
                     ),
                 )
                 if normalized_access is not None:
@@ -152,6 +154,7 @@ class UserRepository:
                         metadata={
                             "account_type": account_type.value,
                             "admin_portal_access": admin_portal_access,
+                            "kiosk": kiosk,
                             "role": role.value,
                         },
                         now=now,
@@ -420,6 +423,7 @@ class UserRepository:
         grants: Iterable[tuple[ResourceType, str]] | None = None,
         defaults: tuple[str, ...] | None = None,
         admin_portal_access: bool = False,
+        kiosk: bool | None = None,
     ) -> UserRecord:
         if (grants is None) != (defaults is None):
             raise InvalidResourceGrantError(
@@ -478,6 +482,11 @@ class UserRepository:
                     user_id,
                 ),
             )
+            if kiosk is not None:
+                connection.execute(
+                    "UPDATE users SET kiosk = ? WHERE id = ?",
+                    (int(kiosk), user_id),
+                )
             _append_auth_audit(
                 connection,
                 action="account_role_changed",

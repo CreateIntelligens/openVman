@@ -81,6 +81,9 @@ class UserRecord:
     updated_at: str
     created_by: str | None
     admin_portal_access: bool = False
+    # 展示機台：前台登入後一律進訪客模式（藏設定與登出），現場人員輸入本帳號
+    # 密碼才能解鎖。只影響前台行為，不是權限，所以切換時不撤銷既有 session。
+    kiosk: bool = False
 
 
 @dataclass(frozen=True, slots=True)

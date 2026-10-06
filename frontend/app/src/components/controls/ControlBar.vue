@@ -1,8 +1,14 @@
 <template>
   <div class="control-bar">
     <div class="control-bar__left">
-      <!-- 訪客模式下連點三下標題叫出設定，給現場人員用，所以不做成按鈕外觀。 -->
-      <h2 @click="$emit('titleTap')">{{ title || "openVman" }}</h2>
+      <!-- 訪客模式下長按標題叫出解鎖，給現場人員用，所以不做成按鈕外觀。 -->
+      <h2
+        @pointerdown="startHold"
+        @pointerup="cancelHold"
+        @pointerleave="cancelHold"
+        @pointercancel="cancelHold"
+        @contextmenu.prevent
+      >{{ title || "openVman" }}</h2>
       <span class="status-pill" :class="`status-pill--${status.tone}`" role="status">
         <span class="status-pill__dot" aria-hidden="true" />
         {{ status.label }}
@@ -95,7 +101,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onUnmounted } from "vue";
+import { UNLOCK_HOLD_MS } from "../../composables/useVisitorMode";
 
 import type { AvatarState } from "../../composables/useAvatarChat";
 
@@ -123,11 +130,30 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   openSettings: []
-  titleTap: []
+  unlockRequest: []
   toggleCamera: []
   toggleImmersive: []
   cameraPreviewScaleChange: [scale: number]
 }>()
+
+let holdTimer: ReturnType<typeof setTimeout> | null = null
+
+function cancelHold(): void {
+  if (holdTimer !== null) clearTimeout(holdTimer)
+  holdTimer = null
+}
+
+// 長按而不是連點：來賓隨手點幾下不會誤觸，現場人員知道要按住。
+function startHold(): void {
+  if (props.settingsVisible !== false) return
+  cancelHold()
+  holdTimer = setTimeout(() => {
+    holdTimer = null
+    emit("unlockRequest")
+  }, UNLOCK_HOLD_MS)
+}
+
+onUnmounted(cancelHold)
 
 const status = computed(() => {
   if (props.state === "CONNECTING" || props.state === "RECONNECTING") return { label: "連線中", tone: "busy" }

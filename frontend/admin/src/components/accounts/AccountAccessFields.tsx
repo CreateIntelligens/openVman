@@ -34,6 +34,7 @@ const EMPTY_ACCESS: AccountAccessInput = {
     background_id: "",
   },
   admin_portal_access: false,
+  kiosk: false,
 };
 
 const GROUPS: Array<{
@@ -150,6 +151,7 @@ function accessFromOptions(
       background_id: initialDefault(current?.defaults.background_id, backgrounds),
     },
     admin_portal_access: current?.admin_portal_access ?? false,
+    kiosk: current?.kiosk ?? false,
   };
 }
 
@@ -200,6 +202,10 @@ export function useAccountAccessForm(
       ...current,
       admin_portal_access: enabled,
     }));
+  }
+
+  function setKiosk(enabled: boolean) {
+    setAccess((current) => ({ ...current, kiosk: enabled }));
   }
 
   function setDefault(grantType: GrantType, value: string) {
@@ -343,6 +349,7 @@ export function useAccountAccessForm(
     options,
     reload,
     setAdminPortalAccess,
+    setKiosk,
     setDefault,
     toggle,
     setSelection,
@@ -390,6 +397,22 @@ export default function AccountAccessFields({
           <span className="block text-sm font-semibold">允許進入管理後台</span>
           <span className="mt-1 block text-xs leading-5 text-content-muted">
             預設不允許；開啟後可檢視並編輯下方授權的專案，但不會取得帳號管理或專案建立／刪除權限。
+          </span>
+        </span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 border-b border-border bg-surface-sunken px-5 py-4">
+        <input
+          className="mt-1 h-4 w-4 accent-primary"
+          type="checkbox"
+          checked={form.access.kiosk ?? false}
+          onChange={(event) => form.setKiosk(event.target.checked)}
+        />
+        <span>
+          <span className="block text-sm font-semibold">
+            展示機台：登入後自動進入訪客模式（藏起設定與登出）
+          </span>
+          <span className="mt-1 block text-xs leading-5 text-content-muted">
+            給現場無人看管的螢幕用；現場人員輸入這個帳號的密碼即可暫時解鎖設定。
           </span>
         </span>
       </label>

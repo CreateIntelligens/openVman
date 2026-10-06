@@ -41,6 +41,7 @@ class AccountAccessRepository:
         grants: Iterable[tuple[ResourceType, str]],
         defaults: tuple[str, ...],
         admin_portal_access: bool = False,
+        kiosk: bool | None = None,
     ) -> tuple[tuple[ResourceGrantRecord, ...], AccountDefaultsRecord]:
         normalized_grants, normalized_defaults = _normalize_account_access(
             grants,
@@ -92,12 +93,23 @@ class AccountAccessRepository:
                     user_id,
                 ),
             )
+            metadata: dict[str, bool] = {
+                "admin_portal_access": admin_portal_access,
+            }
+            if kiosk is not None:
+                # 展示機台只改前台行為，不動 token_version：改了會把正在現場
+                # 運作的機台直接登出。
+                connection.execute(
+                    "UPDATE users SET kiosk = ? WHERE id = ?",
+                    (int(kiosk), user_id),
+                )
+                metadata["kiosk"] = kiosk
             _append_auth_audit(
                 connection,
                 action="account_access_updated",
                 actor_user_id=granted_by,
                 target_user_id=user_id,
-                metadata={"admin_portal_access": admin_portal_access},
+                metadata=metadata,
                 now=now,
             )
 

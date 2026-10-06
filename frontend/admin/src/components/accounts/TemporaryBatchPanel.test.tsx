@@ -105,6 +105,19 @@ describe("TemporaryBatchPanel", () => {
     expect(createTemporaryBatch).toHaveBeenCalledOnce();
   });
 
+  it("badges kiosk batches in the history", async () => {
+    vi.mocked(listTemporaryBatches).mockResolvedValue([
+      batch("kiosk-batch", { kiosk: true }),
+      batch("plain-batch"),
+    ]);
+    render(<TemporaryBatchPanel view="manage" />);
+
+    const kioskRow = (await screen.findByText("kiosk-batch")).closest("article");
+    const plainRow = screen.getByText("plain-batch").closest("article");
+    expect(kioskRow?.textContent).toContain("展示機台");
+    expect(plainRow?.textContent).not.toContain("展示機台");
+  });
+
   it.each([
     ["unused", "尚未啟用"],
     ["active", "使用中"],

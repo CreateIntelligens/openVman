@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.config import get_tts_config
 
 from .dependencies import (
+    AuthTransport,
     CurrentAccount,
     get_current_account,
     require_admin,
@@ -181,6 +182,8 @@ class AccountProfile(_StrictModel):
     remaining_seconds: int | None = None
     defaults: AccountDefaultsProfile | None = None
     admin_portal_access: bool
+    # 前台據此決定登入後是否強制進訪客模式。
+    kiosk: bool
 
     @classmethod
     def from_record(
@@ -218,6 +221,7 @@ class AccountProfile(_StrictModel):
             expires_at=expires_at,
             remaining_seconds=remaining_seconds,
             admin_portal_access=has_admin_portal_access(user),
+            kiosk=user.kiosk,
             defaults=(
                 AccountDefaultsProfile.from_record(defaults)
                 if defaults is not None
@@ -257,6 +261,10 @@ class TemporaryLoginRequest(_StrictModel):
     password: str
 
 
+class VerifyPasswordRequest(_StrictModel):
+    password: str
+
+
 class ChangeOwnPasswordRequest(_StrictModel):
     current_password: str
     new_password: str
@@ -280,6 +288,8 @@ class UpdateAccountAccessRequest(_StrictModel):
     grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
     admin_portal_access: bool = False
+    # None 表示不變更：沿用舊版前端送來、不知道這個欄位的請求不會把它清掉。
+    kiosk: bool | None = None
 
 
 
@@ -605,6 +615,47 @@ def admin_me(
     )
 
 
+_PASSWORD_MISMATCH = "密碼不正確"
+_TOO_MANY_PASSWORD_ATTEMPTS = "嘗試太多次，請稍後再試"
+
+
+@auth_router.post(
+    "/verify-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="確認目前帳號的密碼（展示機台解鎖設定用）",
+)
+def verify_current_password(
+    body: VerifyPasswordRequest,
+    current: CurrentAccount = Depends(get_current_account),
+    runtime: AuthRuntime = Depends(get_auth_runtime),
+) -> Response:
+    """Check the password of the signed-in account without touching the session.
+
+    打錯回 400 而不是 401：前台把 401 當成 session 失效並登出，現場人員打錯
+    一次就會把展示機台登出。臨時帳號的 password_hash 就是它的臨時密碼雜湊，
+    所以兩種帳號走同一條比對。
+    """
+    if current.transport is AuthTransport.EMBED_KEY:
+        raise HTTPException(status_code=403, detail="此身分沒有可驗證的密碼")
+    limiter = runtime.password_verify_attempts
+    key = current.user.id
+    retry_after = limiter.retry_after(key)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=_TOO_MANY_PASSWORD_ATTEMPTS,
+            headers={"Retry-After": str(retry_after)},
+        )
+    if not verify_password(body.password, current.user.password_hash):
+        limiter.record_failure(key)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_PASSWORD_MISMATCH,
+        )
+    limiter.reset(key)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @auth_router.post("/password", response_model=LoginResponse)
 def change_own_password(
     body: ChangeOwnPasswordRequest,
@@ -728,6 +779,7 @@ def update_account_access(
             grants=_resource_grants(body.grants),
             defaults=_defaults_tuple(body.defaults),
             admin_portal_access=body.admin_portal_access,
+            kiosk=body.kiosk,
         )
     except UserNotFoundError as exc:
         raise HTTPException(
@@ -830,6 +882,7 @@ def create_account(
             grants=_resource_grants(access.grants) if access is not None else None,
             defaults=_defaults_tuple(access.defaults) if access is not None else None,
             admin_portal_access=bool(access and access.admin_portal_access),
+            kiosk=bool(access and access.kiosk),
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -921,6 +974,7 @@ def change_account_role(
             grants=_resource_grants(access.grants) if access is not None else None,
             defaults=_defaults_tuple(access.defaults) if access is not None else None,
             admin_portal_access=bool(access and access.admin_portal_access),
+            kiosk=access.kiosk if access is not None else None,
         )
     except UserNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Account not found") from exc

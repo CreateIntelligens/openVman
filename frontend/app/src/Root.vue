@@ -113,7 +113,7 @@ onUnmounted(() => {
   </main>
   <div v-else class="authenticated-app">
     <App />
-    <!-- 訪客模式不給來賓看到帳號、也不讓他按到登出；標題連點三下會跟設定一起出現。 -->
+    <!-- 訪客模式不給來賓看到帳號、也不讓他按到登出；長按標題輸入密碼後會跟設定一起出現。 -->
     <div v-if="visitor.settingsVisible.value" class="session-toolbar">
       <span v-if="isTemporary" class="temporary-session">
         <strong>臨時存取</strong>

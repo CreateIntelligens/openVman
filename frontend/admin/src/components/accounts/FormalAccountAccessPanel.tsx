@@ -30,6 +30,7 @@ export default function FormalAccountAccessPanel({
         grants: account.grants,
         defaults: account.defaults,
         admin_portal_access: account.admin_portal_access ?? false,
+        kiosk: account.kiosk ?? false,
       }
       : undefined
   );

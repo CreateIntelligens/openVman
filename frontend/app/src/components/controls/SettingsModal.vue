@@ -45,6 +45,9 @@ export interface VrmCharacterSummary {
 }
 
 const props = defineProps<{
+  /** 展示機台狀態：off 可開啟、device 這台開著可關、account 帳號固定。 */
+  kioskSource?: 'off' | 'device' | 'account'
+
   open: boolean
   characters: Character[]
   vrmCharacters: VrmCharacterSummary[]
@@ -96,6 +99,8 @@ const emit = defineEmits<{
     backgroundFit: AvatarBackgroundFit,
   ]
   apply: []
+  enterKiosk: []
+  leaveKiosk: []
 }>()
 
 type BackgroundOption = {
@@ -653,6 +658,16 @@ function handleDialogClick(event: MouseEvent): void {
           </div>
 
           <div class="modal-footer">
+            <!-- 展示機台開關：整台裝置切換，不必等「套用」。帳號固定的關不掉，只說明。 -->
+            <p v-if="kioskSource === 'account'" class="kiosk-note">這個帳號固定是展示機台</p>
+            <button
+              v-else
+              type="button"
+              class="btn-cancel btn-kiosk"
+              @click="kioskSource === 'device' ? emit('leaveKiosk') : emit('enterKiosk')"
+            >
+              {{ kioskSource === 'device' ? '結束展示機台模式' : '切換成展示機台' }}
+            </button>
             <button type="button" class="btn-cancel" @click="close">取消</button>
             <button
               type="button"

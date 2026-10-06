@@ -218,6 +218,7 @@ def test_v3_migration_promotes_ai360_in_place_and_preserves_related_data(
         "created_by": "usr_creator",
         "account_type": "formal",
         "admin_portal_access": 0,
+        "kiosk": 0,
     }
     assert ai360["updated_at"] != "2025-02-02T00:00:00+00:00"
     assert [dict(row) for row in owned] == [

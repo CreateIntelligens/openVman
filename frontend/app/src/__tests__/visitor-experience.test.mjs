@@ -19,11 +19,12 @@ const fakeVue = `const ref = (value) => ({ value });
 const computed = (get) => ({ get value() { return get(); } });`;
 const { readKioskFlag } = await load("../composables/useVisitorMode.ts", [
   [/import \{ computed, ref \} from "vue";/, fakeVue],
+  [/import \{ useAuth \} from "\.\/useAuth";/, "const useAuth = () => ({ account: { value: null } });"],
 ]);
 const { suggestedQuestions } = await load("../components/controls/quickQaText.ts");
 const app = read("../App.vue");
 
-test("visitor mode is turned on and off from the URL and remembered for the tab", () => {
+test("visitor mode is turned on and off from the URL and remembered for the device", () => {
   assert.equal(readKioskFlag("?kiosk=1", null), true);
   assert.equal(readKioskFlag("?project=a&kiosk=true", null), true);
   assert.equal(readKioskFlag("?kiosk=0", "1"), false);
@@ -132,4 +133,26 @@ test("typing on a phone shrinks the stage so the keyboard does not push the comp
   const mobile = shell.slice(shell.indexOf("@media (max-width: 48rem) {"));
   assert.match(mobile, /\.app-shell\.composing \.stage-card \{\s*height: clamp\(6rem, 20svh, 9rem\);/);
   assert.match(read("../../index.html"), /interactive-widget=resizes-content/);
+});
+
+test("kiosk mode comes from the account flag, the device setting, or the URL", () => {
+  const mode = read("../composables/useVisitorMode.ts");
+  assert.match(mode, /const kiosk = computed\(\(\) => accountKiosk\.value \|\| deviceKiosk\.value\)/);
+  assert.match(mode, /localStorage\.setItem\(STORAGE_KEY, "1"\)/);
+  assert.match(read("../api/auth.ts"), /kiosk\?: boolean/);
+});
+
+test("settings can switch this device into kiosk mode, and staff unlock with the account password", () => {
+  const modal = read("../components/controls/SettingsModal.vue");
+  assert.match(modal, /切換成展示機台/);
+  assert.match(modal, /結束展示機台模式/);
+  assert.match(modal, /這個帳號固定是展示機台/);
+  assert.match(app, /@enter-kiosk="handleEnterKiosk"/);
+  assert.match(app, /visitor\.enterDeviceKiosk\(\);\s*started\.value = false;/);
+  assert.match(app, /@unlock-request="showUnlock = true"/);
+  assert.match(app, /@unlocked="visitor\.unlock"/);
+  const dialog = read("../components/controls/UnlockDialog.vue");
+  assert.match(dialog, /await verifyPassword\(password\.value\)/);
+  // 密碼錯不能回 401：apiFetch 會把 401 當登入過期，機台就被登出了。
+  assert.match(read("../api/auth.ts"), /\/api\/v1\/auth\/verify-password/);
 });

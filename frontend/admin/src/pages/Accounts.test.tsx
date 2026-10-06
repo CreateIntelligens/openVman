@@ -149,12 +149,58 @@ describe("Accounts", () => {
           background_id: "",
         },
         admin_portal_access: false,
+        kiosk: false,
       },
     }));
     await waitFor(() => {
       expect(listAccounts).toHaveBeenCalledTimes(2);
       expect(fetchAccountAccessOptions).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it("creates a kiosk account when the 展示機台 box is checked", async () => {
+    render(<Accounts />);
+
+    const kiosk = await screen.findByRole("checkbox", {
+      name: /展示機台：登入後自動進入訪客模式（藏起設定與登出）/,
+    });
+    expect((kiosk as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(kiosk);
+    expect((kiosk as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("帳號"), {
+      target: { value: "lobby" },
+    });
+    fireEvent.change(screen.getByLabelText("密碼"), {
+      target: { value: "correct horse battery staple" },
+    });
+    const submit = await screen.findByRole("button", {
+      name: "建立正式帳號",
+    });
+    await waitFor(() => expect(submit.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(createAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "lobby",
+        access: expect.objectContaining({ kiosk: true }),
+      }),
+    ));
+  });
+
+  it("badges kiosk accounts in the account list", async () => {
+    vi.mocked(listAccounts).mockResolvedValue([
+      { ...formalAccount("user-k", "lobby", "user", "admin-a"), kiosk: true },
+      formalAccount("user-a", "alice", "user", "admin-a"),
+    ]);
+
+    render(<Accounts />);
+    switchToManageTab();
+
+    const kioskRow = (await screen.findByText("lobby")).closest("article");
+    const plainRow = screen.getByText("alice").closest("article");
+    expect(kioskRow?.textContent).toContain("展示機台");
+    expect(plainRow?.textContent).not.toContain("展示機台");
   });
 
   it("shows one account creation flow at a time", async () => {
@@ -418,6 +464,7 @@ describe("Accounts", () => {
             background_id: "",
           },
           admin_portal_access: false,
+          kiosk: false,
         },
       },
     ));

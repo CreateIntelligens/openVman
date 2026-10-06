@@ -48,6 +48,8 @@ class CreateTemporaryBatchRequest(_StrictModel):
     grants: AccountResourceGrants
     defaults: AccountDefaultsProfile
     admin_portal_access: bool = False
+    # 活動用的整批帳號可以直接開成展示機台。
+    kiosk: bool = False
 
 
 class SetAdminPortalAccessRequest(_StrictModel):
@@ -65,6 +67,7 @@ class TemporaryBatchCreated(_StrictModel):
     credentials: list[TemporaryCredentialCreated]
     created_at: str
     admin_portal_access: bool
+    kiosk: bool = False
 
 
 class TemporaryAccountAudit(_StrictModel):
@@ -79,6 +82,7 @@ class TemporaryAccountAudit(_StrictModel):
     grants: list[ResourceGrantProfile]
     defaults: AccountDefaultsProfile
     admin_portal_access: bool
+    kiosk: bool = False
 
 
 class TemporaryBatchAudit(_StrictModel):
@@ -94,6 +98,7 @@ class TemporaryBatchAudit(_StrictModel):
     defaults: AccountDefaultsProfile
     accounts: list[TemporaryAccountAudit]
     admin_portal_access: bool
+    kiosk: bool = False
 
 
 def _new_temporary_password() -> tuple[str, str]:
@@ -143,6 +148,7 @@ def _temporary_account_audit(
         grants=[ResourceGrantProfile.from_record(grant) for grant in account.grants],
         defaults=AccountDefaultsProfile.from_record(account.defaults),
         admin_portal_access=account.user.admin_portal_access,
+        kiosk=account.user.kiosk,
     )
 
 
@@ -189,6 +195,7 @@ def _temporary_batch_audit(
         defaults=AccountDefaultsProfile.from_record(first_account.defaults),
         accounts=accounts,
         admin_portal_access=first_account.user.admin_portal_access,
+        kiosk=first_account.user.kiosk,
     )
 
 
@@ -235,6 +242,7 @@ def create_temporary_batch(
             defaults=_defaults_tuple(body.defaults),
             duration_seconds=_TEMPORARY_DURATION_SECONDS,
             admin_portal_access=body.admin_portal_access,
+            kiosk=body.kiosk,
         )
     except AccountPolicyError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -255,6 +263,7 @@ def create_temporary_batch(
         ],
         created_at=batch.batch.created_at,
         admin_portal_access=body.admin_portal_access,
+        kiosk=body.kiosk,
     )
 
 

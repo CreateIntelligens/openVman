@@ -31,6 +31,8 @@ export interface AccountProfile {
   remaining_seconds?: number | null;
   defaults?: AccountDefaults | null;
   admin_portal_access?: boolean;
+  /** 展示機台：前台登入後一律進訪客模式。 */
+  kiosk?: boolean;
 }
 
 export interface Account extends AccountProfile {
@@ -77,6 +79,7 @@ function safeAccountProfile(account: AccountProfile): AccountProfile {
     remaining_seconds: account.remaining_seconds,
     defaults: safeAccountDefaults(account.defaults),
     admin_portal_access: account.admin_portal_access,
+    kiosk: account.kiosk,
   };
 }
 
@@ -163,6 +166,7 @@ export interface AccountAccessInput {
   grants: AccountResourceGrants;
   defaults: AccountDefaults;
   admin_portal_access: boolean;
+  kiosk?: boolean;
 }
 
 export interface TemporaryCredential {
@@ -176,6 +180,7 @@ export interface TemporaryBatchResult {
   credentials: TemporaryCredential[];
   created_at: string;
   admin_portal_access: boolean;
+  kiosk?: boolean;
 }
 
 export interface TemporaryBatchAudit {
@@ -190,6 +195,7 @@ export interface TemporaryBatchAudit {
   defaults?: AccountDefaults;
   accounts?: TemporaryAccountAudit[];
   admin_portal_access?: boolean;
+  kiosk?: boolean;
 }
 
 export interface TemporaryAccountAudit {

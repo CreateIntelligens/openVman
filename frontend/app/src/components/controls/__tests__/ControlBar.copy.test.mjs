@@ -42,7 +42,11 @@ test("settings button can stay enabled while renderer actions are disabled", () 
   assert.match(source, /:disabled="disabled"/);
 });
 
-test("visitor mode can hide the settings button", () => {
+test("visitor mode hides settings and unlocks only on a long press of the title", () => {
   assert.match(source, /v-if="settingsVisible !== false"/);
-  assert.match(source, /@click="\$emit\('titleTap'\)"/);
+  // 長按才解鎖：來賓隨手點幾下不會誤觸（2026-10-06 改掉連點三下）。
+  assert.match(source, /@pointerdown="startHold"/);
+  assert.match(source, /@pointerup="cancelHold"/);
+  assert.match(source, /emit\("unlockRequest"\)/);
+  assert.doesNotMatch(source, /titleTap/);
 });

@@ -113,6 +113,7 @@ def _user_from_row(row: sqlite3.Row) -> UserRecord:
         updated_at=row["updated_at"],
         created_by=row["created_by"],
         admin_portal_access=bool(row["admin_portal_access"]),
+        kiosk=bool(row["kiosk"]),
     )
 
 

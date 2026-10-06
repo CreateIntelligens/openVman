@@ -125,9 +125,9 @@ async function generateLipSyncFrame(audioBuffer, currentTime) {
 
 ### 5.2 訪客模式與迎賓（2026-10-06）
 
-展示機台用 `?kiosk=1` 開啟訪客模式（`?kiosk=0` 關閉，記在 sessionStorage），狀態由 `useVisitorMode` 整頁共用：
+訪客模式由 `useVisitorMode` 整頁共用，帳號的 `kiosk`（後台勾選，前台關不掉）或這台裝置的設定（設定視窗「切換成展示機台」、或網址 `?kiosk=1`／`?kiosk=0`，存在 localStorage）任一成立即生效：
 
-* 藏起設定鈕（`ControlBar`）與帳號列、登出（`Root.vue`）；標題連點三下暫時叫出，重新整理後又藏起來。
+* 藏起設定鈕（`ControlBar`）與帳號列、登出（`Root.vue`）；長按標題 3 秒開 `UnlockDialog`，以 `POST /api/v1/auth/verify-password` 核對目前帳號密碼後暫時解鎖，重新整理後又藏起來。密碼錯回 400（401 會被 `apiFetch` 當成登入過期）。
 * `StartOverlay` 先要來賓點一下：`useAvatarConversation.handleStart` 解鎖 AudioContext、先連線，再開始收音。非訪客模式不顯示。
 * `useIdleReset` 在虛擬人沒在回答、2 分鐘沒有點擊／按鍵／辨識活動時呼叫 `resetForNextVisitor`（停止回答、斷線、清空訊息），並關麥克風、回到開始畫面。
 

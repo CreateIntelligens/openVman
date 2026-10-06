@@ -20,7 +20,7 @@
         :settings-visible="visitor.settingsVisible.value"
         :title="stageTitle"
         :listening="activeAsr.isListening.value"
-        @title-tap="visitor.handleTitleTap"
+        @unlock-request="showUnlock = true"
         @open-settings="showSettings = true"
         @toggle-camera="handleToggleCamera"
         @toggle-immersive="handleToggleImmersive"
@@ -159,6 +159,16 @@
       @vrm-character-change="handleVrmAvatarChange"
       @background-change="handleBackgroundChange"
       @apply="handleSettingsApply"
+      :kiosk-source="visitor.kioskSource.value"
+      @enter-kiosk="handleEnterKiosk"
+      @leave-kiosk="visitor.leaveDeviceKiosk"
+    />
+
+    <UnlockDialog
+      :open="showUnlock"
+      :username="account?.username ?? ''"
+      @close="showUnlock = false"
+      @unlocked="visitor.unlock"
     />
 
     <StartOverlay
@@ -189,6 +199,8 @@ import SettingsModal from "./components/controls/SettingsModal.vue";
 import StatusToast from "./components/StatusToast.vue";
 import ErrorOverlay from "./components/ErrorOverlay.vue";
 import StartOverlay from "./components/StartOverlay.vue";
+import UnlockDialog from "./components/controls/UnlockDialog.vue";
+import { useAuth } from "./composables/useAuth";
 import QuickQaPanel from "./components/controls/QuickQaPanel.vue";
 import { useAvatarBootstrap } from "./composables/useAvatarBootstrap";
 import { useAsrPreferences } from "./composables/useAsrPreferences";
@@ -251,6 +263,8 @@ const { immersive, handleToggleImmersive } = useImmersiveView(
   showSettings, showQuickQa, avatarResponding, handleStopResponse,
 );
 const visitor = useVisitorMode();
+const { account } = useAuth();
+const showUnlock = ref(false);
 const { level: micLevel } = useMicLevel(computed(() => activeAsr.value.isListening.value));
 const { suggestions } = useSuggestedQuestions(() => settings.projectId);
 // 給來賓看的是角色名稱；沒取名（預設角色）就用專案名稱。
@@ -281,6 +295,14 @@ useIdleReset({
     started.value = false;
   },
 });
+// 設定裡切成展示機台：關掉設定，回到開始畫面，等來賓點一下。
+function handleEnterKiosk(): void {
+  showSettings.value = false;
+  if (activeAsr.value.isListening.value) handleAsrToggle();
+  resetForNextVisitor();
+  visitor.enterDeviceKiosk();
+  started.value = false;
+}
 const { handleTtsChange, handleTtsVoiceChange, handleProjectPreviewChange,
   handleProjectChange, handlePersonaChange, handleVoiceModeChange,
   handleReplyModeChange } = useAvatarSettings(settings, bootstrap, showSettings);

@@ -227,6 +227,8 @@ _TEMPORARY_USERNAME_SCHEMA_VERSION = 6
 _TEMPORARY_USERNAME_MIGRATION_NAME = "redact_temporary_credential_locators_v2"
 _ADMIN_PORTAL_ACCESS_SCHEMA_VERSION = 7
 _ADMIN_PORTAL_ACCESS_MIGRATION_NAME = "add_admin_portal_access"
+_KIOSK_SCHEMA_VERSION = 16
+_KIOSK_MIGRATION_NAME = "add_users_kiosk"
 _EMBED_KEY_SCHEMA_VERSION = 8
 _EMBED_KEY_MIGRATION_NAME = "embed_keys_and_daily_usage"
 
@@ -451,6 +453,46 @@ class AuthDatabase:
         self._migrate_asr_engine_resource_type()
         self._redact_temporary_usernames()
         self._add_admin_portal_access()
+        self._add_kiosk_flag()
+
+    def _add_kiosk_flag(self) -> None:
+        """Add the default-off kiosk flag after the ROOT rebuild of users.
+
+        不能放進 _MIGRATIONS：全新資料庫會先跑完那串，再由 ROOT 遷移重建
+        users 表，重建時沒帶的欄位會整個消失。
+        """
+        with self.transaction(write=True) as connection:
+            applied = connection.execute(
+                "SELECT 1 FROM schema_migrations WHERE version = ?",
+                (_KIOSK_SCHEMA_VERSION,),
+            ).fetchone()
+            if applied is not None:
+                return
+            user_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "kiosk" not in user_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN kiosk INTEGER NOT NULL DEFAULT 0
+                    CHECK (kiosk IN (0, 1))
+                    """
+                )
+            connection.execute(
+                """
+                INSERT INTO schema_migrations(version, details_json)
+                VALUES (?, ?)
+                """,
+                (
+                    _KIOSK_SCHEMA_VERSION,
+                    json.dumps(
+                        {"name": _KIOSK_MIGRATION_NAME},
+                        separators=(",", ":"),
+                    ),
+                ),
+            )
 
     def _add_admin_portal_access(self) -> None:
         """Add the default-deny portal capability after rebuilding users."""
