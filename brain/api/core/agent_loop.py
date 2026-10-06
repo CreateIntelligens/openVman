@@ -195,6 +195,26 @@ def _tools_for_mode(tools: list[dict[str, Any]], mode: ReplyMode) -> list[dict[s
     ]
 
 
+def _tools_for_project(tools: list[dict[str, Any]], project_id: str) -> list[dict[str, Any]]:
+    """Fit filter_products to this project: drop it without a catalog, list the fields otherwise.
+
+    工具是全域註冊的，但欄位每個專案不同；沒有產品規格表的專案給了只會讓模型白叫一次。
+    """
+    from tools.builtin.product_tools import FILTER_PRODUCTS_TOOL, product_tool_description
+
+    if not any(tool.get("function", {}).get("name") == FILTER_PRODUCTS_TOOL for tool in tools):
+        return tools
+    description = product_tool_description(project_id)
+    fitted: list[dict[str, Any]] = []
+    for tool in tools:
+        function = tool.get("function", {})
+        if function.get("name") != FILTER_PRODUCTS_TOOL:
+            fitted.append(tool)
+        elif description is not None:
+            fitted.append({**tool, "function": {**function, "description": description}})
+    return fitted
+
+
 def _run_tool_phase(
     messages: list[dict[str, Any]],
     persona_id: str,
@@ -214,7 +234,7 @@ def _run_tool_phase(
     working_messages = [dict(message) for message in messages]
     tool_steps: list[dict[str, Any]] = []
     registry = get_tool_registry()
-    tools = _tools_for_mode(registry.build_openai_tools(), mode)
+    tools = _tools_for_project(_tools_for_mode(registry.build_openai_tools(), mode), project_id)
     hallucination_pattern = _build_hallucination_pattern(tools)
     hallucination_retried = False
     first_forced = _resolve_forced_first_tool(

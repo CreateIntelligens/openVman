@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Brain 產品規格篩選工具 `filter_products`**：專案在 `knowledge/products/` 放 `_catalog.yaml`（欄位、型別、單位由專案自訂）與每個產品一篇帶 YAML frontmatter 的筆記，模型在第一輪與 `search_knowledge` 平行呼叫，依條件篩選、多情境、多欄排序，缺值列為未知而非不符合；沒有規格表的專案不會看到這個工具。語意沿用產品筆記實驗第三輪驗證過的篩選引擎（C 組 55／2／3）。附鶴記 EDW、EUB-M 的範例規格表 `scripts/experiments/product-notes/catalog/_catalog.yaml`，15 篇實驗筆記可直接載入、篩選結果與凍結答案一致。計畫 `docs/plans/product-spec-filter.md`（Draft）。
 - **展示機台帳號與解鎖 API**：`users.kiosk`（預設關，遷移在 `auth/database.py` 的 `_add_kiosk_flag`，schema 版本 16）；`/auth/me`、各登入回應與 `GET /api/v1/users` 帶 `kiosk`；`PUT /api/v1/users/{id}/access`、`POST /api/v1/users`、角色調整與 `POST /api/v1/temporary-accounts/batches` 可設定，權限沿用帳號管理規則，改了不會把使用中的機台登出。新增 `POST /api/v1/auth/verify-password`（`{password}` → 204；錯誤回 400 不回 401，免得前台當成登入過期把機台登出；5 分鐘內錯 5 次回 429 並帶 `Retry-After`，記在記憶體、每個帳號分開算；不換 session；embed key 身分 403）。
 - **知識庫文件批次操作**：檔案樹「多選」後可勾選多個檔案（資料夾一次勾底下全部），批次移動到資料夾、設定語言或刪除。逐檔呼叫既有 API、不新增端點；顯示進度，部分失敗照樣做完並列出原因（例如目標已有同名檔），失敗的保持勾選可重試。
 - **前台訪客模式與迎賓體驗**（UX 審查 2026-10-06）：前台設定「切換成展示機台」（這台裝置記住）、後台帳號勾「展示機台」（登入即進入，正式帳號與臨時批次都可設）或網址 `?kiosk=1` 進入；藏起設定與帳號列、登出，現場人員長按標題 3 秒輸入帳號密碼可暫時叫出、先顯示「點一下開始對話」解鎖音訊並開始收音；標題改成角色名稱加狀態（在線／聆聽中／思考中／說話中），不再是「openVman 控制台」；收音時輸入框右側有即時音量條（另開一條麥克風串流只量音量）；還沒開口前在輸入框上方列出快速問答的推薦問題（各主題輪流取題、最多 4 題，手機 2 題）；訪客模式閒置 2 分鐘清空對話、關麥克風、回到開始畫面，下一位來賓看不到上一個人的對話；手機點輸入框時舞台縮成一小條讓出位置給鍵盤（viewport 加 `interactive-widget=resizes-content`）。

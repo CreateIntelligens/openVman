@@ -11,6 +11,7 @@ def list_builtin_tools():
     from tools.builtin.business_tools import query_faq_tool, query_order_tool
     from tools.builtin.graph_tools import graph_explain_tool, graph_query_tool, graph_status_tool
     from tools.builtin.actions_tools import request_action_tool
+    from tools.builtin.product_tools import filter_products_tool
 
     tools = [
         get_document_tool(),
@@ -26,6 +27,7 @@ def list_builtin_tools():
         graph_explain_tool(),
         graph_status_tool(),
         request_action_tool(),
+        filter_products_tool(),
     ]
     cfg = get_settings()
     if not getattr(cfg, "url2md_search_enabled", True):

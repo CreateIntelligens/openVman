@@ -1,0 +1,24 @@
+# 鶴記 EVAK 沉水泵浦規格表（EDW、EUB-M 2～7.5HP），給 Brain 的 filter_products 用。
+# 跟 round3/notes/ 的 15 篇筆記一起放進專案的 knowledge/products/。
+title: EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）
+key: model
+fields:
+  model: {label: 型號, type: text}
+  series: {label: 系列, type: text, description: EDW 或 EUB-M}
+  hp: {label: 馬力, type: number, unit: HP}
+  kw: {label: 功率, type: number, unit: kW}
+  outlet_inch: {label: 出水口徑, type: number, unit: 吋}
+  rated_head_m: {label: 額定揚程, type: number, unit: m}
+  rated_flow_lpm: {label: 額定流量, type: number, unit: LPM}
+  max_head_m: {label: 最大揚程, type: number, unit: m}
+  max_flow_lpm: {label: 最大流量, type: number, unit: LPM}
+  solids_mm: {label: 通過粒徑, type: number, unit: mm}
+  phase: {label: 電源相數, type: number_set, description: "1 是單相、3 是三相；同一列單三相合併時是 [1, 3]"}
+  current_1ph_a: {label: 單相電流, type: number, unit: A}
+  current_3ph_a: {label: 三相電流, type: number, unit: A}
+  weight_1ph_kg: {label: 單相重量, type: number, unit: kg}
+  weight_3ph_kg: {label: 三相重量, type: number, unit: kg}
+notes: >-
+  額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。
+  問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。
+  流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。
