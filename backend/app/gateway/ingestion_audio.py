@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 import tempfile
 import time
@@ -44,7 +45,14 @@ async def _transcribe_openai(file_path: str, trace_id: str, prompt: str = "") ->
             file=audio_file,
             **extra,
         )
-    return response.text
+    text = response.text.strip()
+    # 中文會回簡體，要跟其他家一樣轉繁；有假名就是日文，轉了會把「学校」改成「學校」。
+    if _KANA.search(text):
+        return text
+    return convert_to_traditional(text)
+
+
+_KANA = re.compile(r"[\u3040-\u30ff]")
 
 
 # 引擎能直接吃的容器格式。瀏覽器 MediaRecorder 錄出來的是 webm/opus，

@@ -18,15 +18,24 @@ import { streamClip } from "./streamClip";
 
 /** 留最近幾段，太多會讓頁面一直變長；每段都佔一個 object URL。 */
 const MAX_CLIPS = 5;
+/** 上傳的音檔串流引擎用這個倍速送：文字一樣，不用乾等整段長度，但秒數不是真實手感。 */
+const UPLOAD_STREAM_SPEED = 4;
 /** VAD 斷句後再等瀏覽器辨識這麼久：它的定稿通常比 VAD 晚一點到。 */
 const BROWSER_SETTLE_MS = 1_500;
+/**
+ * 同一台機器的引擎：同一段音檔要一個做完再送下一個。同一台同時收到批次和串流會排隊，
+ * 量到的秒數是排隊時間不是辨識時間（2026-10-06 後台實測批次多等了 20 幾秒）。
+ */
+const SAME_HOST: Record<string, string> = {
+  r2t2: "r2t2", "r2t2-live": "r2t2", "r2t2-dev": "r2t2-dev", "r2t2-dev-live": "r2t2-dev",
+};
 const BROWSER_LANGS: Record<string, string> = {
   zh: "zh-TW", en: "en-US", es: "es-ES", ja: "ja-JP", ko: "ko-KR",
 };
 
 // run 是這次請求的序號：重跑時舊請求晚回來不能蓋掉新結果。
 type Row = { engine: string; run: number } & (
-  | { state: "pending" }
+  | { state: "pending"; partial?: string }
   | { state: "done"; preview: AsrPreview }
   | { state: "error"; message: string }
 );
@@ -37,6 +46,8 @@ interface Clip {
   url: string;
   blob: Blob;
   filename?: string;
+  /** 麥克風講的（照真實速度送串流）；上傳的用 UPLOAD_STREAM_SPEED 倍速送。 */
+  fromMic: boolean;
   /** 每個引擎跑過的結果；取消勾選只是不顯示，勾回來不用重跑。 */
   results: Record<string, Row>;
 }
@@ -141,14 +152,18 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
     }));
   }
 
-  async function runEngine(clip: Pick<Clip, "id" | "blob" | "filename">, engine: string) {
+  async function runEngine(clip: Pick<Clip, "id" | "blob" | "filename" | "fromMic">, engine: string) {
     const { projectId: project, routes: picked } = contextRef.current;
     const run = nextRun.current++;
     setRow(clip.id, { engine, run, state: "pending" });
     setPending((count) => count + 1);
     try {
       const preview = isStreamAsrEngine(engine)
-        ? await streamClip(streamTestUrl(engine, project, picked), clip.blob).then(
+        ? await streamClip(streamTestUrl(engine, project, picked), clip.blob, {
+          waitForClose: engine !== "gemini-live",
+          speed: clip.fromMic ? 1 : UPLOAD_STREAM_SPEED,
+          onPartial: (partial) => setRow(clip.id, { engine, run, state: "pending", partial }, run),
+        }).then(
           ({ text, elapsedSeconds }): AsrPreview => ({ text, provider: engine, elapsed_seconds: elapsedSeconds }),
         )
         : await previewAsr(clip.blob, clip.filename, engine, {
@@ -193,6 +208,23 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
     else void runEngine(clip, engine);
   }
 
+  /** 不同機器同時送；同一台的依序送，避免互相排隊。 */
+  function runEngines(clip: Clip, chosen: string[]) {
+    // 排在後面的先顯示成辨識中，不然要等前一個做完才冒出來。
+    chosen.forEach((engine) => setRow(clip.id, { engine, run: 0, state: "pending" }));
+    const lanes = new Map<string, string[]>();
+    chosen.forEach((engine) => {
+      const lane = SAME_HOST[engine] ?? engine;
+      lanes.set(lane, [...(lanes.get(lane) ?? []), engine]);
+    });
+    lanes.forEach((lane) => {
+      void lane.reduce(
+        (previous, engine) => previous.then(() => runEngine(clip, engine)),
+        Promise.resolve(),
+      );
+    });
+  }
+
   function runClip(blob: Blob, label: string, filename?: string, fromMic = false) {
     const { engines: chosen } = contextRef.current;
     if (!chosen.length) {
@@ -200,16 +232,19 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
       return;
     }
     setError("");
-    const clip: Clip = { id: nextId.current++, label, url: URL.createObjectURL(blob), blob, filename, results: {} };
+    const clip: Clip = {
+      id: nextId.current++, label, url: URL.createObjectURL(blob), blob, filename, fromMic, results: {},
+    };
     setClips((current) => {
       const kept = [clip, ...current];
       kept.slice(MAX_CLIPS).forEach((old) => URL.revokeObjectURL(old.url));
       return kept.slice(0, MAX_CLIPS);
     });
-    chosen.forEach((engine) => {
-      if (engine === BROWSER_ASR && fromMic && browserRef.current) takeBrowserResult(clip);
-      else runEngineOrBrowser(clip, engine);
-    });
+    if (chosen.includes(BROWSER_ASR)) {
+      if (fromMic && browserRef.current) takeBrowserResult(clip);
+      else markBrowserUnavailable(clip);
+    }
+    runEngines(clip, chosen.filter((engine) => engine !== BROWSER_ASR));
   }
 
   function toggleEngine(id: string) {
@@ -225,7 +260,7 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
   }
 
   function rerun(clip: Clip) {
-    engines.filter((engine) => engine !== BROWSER_ASR).forEach((engine) => void runEngine(clip, engine));
+    runEngines(clip, engines.filter((engine) => engine !== BROWSER_ASR));
   }
 
   useEffect(() => () => {
@@ -237,7 +272,7 @@ export default function BatchTester({ projectId, routes }: BatchTesterProps) {
       <div className="flex flex-col gap-1">
         <h2 id="asr-batch-title" className="text-sm font-semibold">試辨識</h2>
         <p className="text-xs leading-5 text-content-muted">
-          勾幾個引擎，按「開始講話」直接講，每講完一句會自動送出，同一句同時給每一家辨識、結果並排比較；也可以上傳音檔。之後再勾的引擎會直接拿下面的音檔去跑；改了分流或詞表按「重跑」。串流引擎照真實速度送，秒數是講完到定稿；瀏覽器內建辨識只在「開始講話」時一起聽。
+          勾幾個引擎，按「開始講話」直接講，每講完一句會自動送出，同一句同時給每一家辨識、結果並排比較；也可以上傳音檔。之後再勾的引擎會直接拿下面的音檔去跑；改了分流或詞表按「重跑」。串流引擎的秒數是講完到定稿：麥克風講的照真實速度送，上傳的檔案用 4 倍速送（文字一樣，不用乾等整段，但秒數比實際慢一點）；瀏覽器內建辨識只在「開始講話」時一起聽。
           跟正式對話一樣套專案詞表與語言分流；開台語分流時另外聽是不是台語，但引擎照勾的跑（正式對話會換成 Breeze）。
           只影響這一次，不會改任何人的設定。
         </p>
@@ -374,11 +409,14 @@ function ClipResult({ clip, rows, reference, onRerun }: {
               {row.state === "done" && (
                 <span className="text-xs text-content-muted">
                   {row.preview.elapsed_seconds !== undefined && `${row.preview.elapsed_seconds.toFixed(2)} 秒`}
+                  {isStreamAsrEngine(row.engine) && !clip.fromMic && `（${UPLOAD_STREAM_SPEED} 倍速送）`}
                   {reference.trim() && `・錯字率 ${(charErrorRate(reference, row.preview.text) * 100).toFixed(1)}%`}
                 </span>
               )}
             </div>
-            {row.state === "pending" && <span className="text-sm text-content-muted">辨識中…</span>}
+            {row.state === "pending" && (
+              <span className="text-sm text-content-muted">{row.partial || "辨識中…"}</span>
+            )}
             {row.state === "error" && <span className="text-sm text-danger">{row.message}</span>}
             {row.state === "done" && (
               <>

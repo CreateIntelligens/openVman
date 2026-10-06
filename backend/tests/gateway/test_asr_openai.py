@@ -13,7 +13,7 @@ class _FakeTranscriptions:
 
     async def create(self, **kwargs):
         self.sink["create"] = {k: v for k, v in kwargs.items() if k != "file"}
-        return types.SimpleNamespace(text="¿A qué hora abren?")
+        return types.SimpleNamespace(text=self.sink.get("reply", "¿A qué hora abren?"))
 
 
 @pytest.fixture
@@ -68,3 +68,19 @@ async def test_project_glossary_is_sent_as_the_prompt(monkeypatch, openai_calls)
     assert openai_calls["create"]["prompt"] == "沉水泵、DIVA"
     await ingestion_audio._transcribe_openai(openai_calls["path"], "t")
     assert "prompt" not in openai_calls["create"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reply", "text"),
+    [
+        # 後台試辨識看到 Whisper 一整段簡體，其他家都是繁體（2026-10-06）。
+        ("我有一支枪，扛在肩膀上", "我有一支槍，扛在肩膀上"),
+        # 日文的漢字不是簡體，轉了會把「学校」改成「學校」。
+        ("学校のポンプ", "学校のポンプ"),
+    ],
+)
+async def test_chinese_output_is_converted_to_traditional(monkeypatch, openai_calls, reply, text):
+    _use_config(monkeypatch)
+    openai_calls["reply"] = reply
+    assert await ingestion_audio._transcribe_openai(openai_calls["path"], "t") == text

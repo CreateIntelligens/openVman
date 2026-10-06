@@ -4,14 +4,17 @@ import { blobToPcm16Chunks } from "../../utils/liveAudioUtils";
 
 /** 100 ms 一塊，跟前台串流送的大小一樣。 */
 const CHUNK_BYTES = (VAD_SAMPLE_RATE / 10) * 2;
-// 照真實速度送：4 倍速時 Gemini、R2T2 的文字一樣，但 R2T2 要追積壓，講完到定稿多出
-// 2～4 秒，量出來的時間就跟實際講話對不上（2026-10-05 實測）。
+// 預設照真實速度送。4 倍速時 Gemini、R2T2 的文字一樣，但 R2T2 要追積壓，講完到定稿
+// 多出 2～4 秒，時間就跟實際講話對不上（2026-10-05 實測）；上傳的長檔照真實速度又要
+// 乾等整首的長度，所以讓呼叫端選。
 const CHUNK_INTERVAL_MS = 100;
 /** 尾端補的靜音，讓引擎判斷講完了。 */
 const TAIL_SILENCE_CHUNKS = 10;
 const READY_TIMEOUT_MS = 10_000;
 /** 送完 end 之後最多等多久定稿；定稿之後再靜一下沒新的就收。 */
 const FINAL_TIMEOUT_MS = 10_000;
+/** R2T2 收到 EOS 一定回最後一則定稿再關線；機器在忙時可能要等十幾秒。 */
+const CLOSE_TIMEOUT_MS = 30_000;
 const QUIET_AFTER_FINAL_MS = 1_500;
 /** 送完 end 時定稿可能早就到齊（Gemini 停頓就定稿），沒新定稿就等這麼久收。 */
 const QUIET_AFTER_END_MS = 3_000;
@@ -27,7 +30,24 @@ export interface StreamClipResult {
  *
  * 後台比較用：串流引擎平常邊講邊送，這裡拿同一段音檔整段送，才能跟批次引擎並排比。
  */
-export async function streamClip(url: string, clip: Blob): Promise<StreamClipResult> {
+export interface StreamClipOptions {
+  /**
+   * 等串流端關線才收：R2T2 送完 EOS 後一定回最後一則定稿再關，機器忙時後面幾句會晚到，
+   * 用「靜一陣子就收」會把它截掉（2026-10-06 後台實測少了最後三分之一）。
+   * Gemini 不會自己關，只能等靜下來。
+   */
+  waitForClose?: boolean;
+  /** 送的倍速；1 是真實速度。 */
+  speed?: number;
+  /** 邊辨識邊回報目前聽到的字（已定稿的加上講到一半的暫定字幕），給畫面做串流效果。 */
+  onPartial?: (text: string) => void;
+}
+
+export async function streamClip(
+  url: string,
+  clip: Blob,
+  { waitForClose = false, speed = 1, onPartial }: StreamClipOptions = {},
+): Promise<StreamClipResult> {
   const context = new AudioContext();
   let chunks: ArrayBuffer[];
   try {
@@ -76,16 +96,20 @@ export async function streamClip(url: string, clip: Blob): Promise<StreamClipRes
       for (const chunk of chunks) {
         if (socket.readyState !== WebSocket.OPEN) return;
         socket.send(chunk);
-        await new Promise((wait) => window.setTimeout(wait, CHUNK_INTERVAL_MS));
+        await new Promise((wait) => window.setTimeout(wait, CHUNK_INTERVAL_MS / speed));
       }
       const silence = new ArrayBuffer(CHUNK_BYTES);
       for (let i = 0; i < TAIL_SILENCE_CHUNKS && socket.readyState === WebSocket.OPEN; i++) {
         socket.send(silence);
-        await new Promise((wait) => window.setTimeout(wait, CHUNK_INTERVAL_MS));
+        await new Promise((wait) => window.setTimeout(wait, CHUNK_INTERVAL_MS / speed));
       }
       if (socket.readyState !== WebSocket.OPEN) return;
       socket.send(JSON.stringify({ type: "end" }));
       endedAt = performance.now();
+      if (waitForClose) {
+        finalTimer = window.setTimeout(done, CLOSE_TIMEOUT_MS);
+        return;
+      }
       finalTimer = window.setTimeout(done, FINAL_TIMEOUT_MS);
       quietTimer = window.setTimeout(done, QUIET_AFTER_END_MS);
     }
@@ -100,10 +124,13 @@ export async function streamClip(url: string, clip: Blob): Promise<StreamClipRes
       if (data.type === "ready") {
         window.clearTimeout(readyTimer);
         void send();
+      } else if (data.type === "interim" && data.text) {
+        onPartial?.(finals.join("") + data.text);
       } else if (data.type === "final" && data.text) {
         finals.push(data.text);
+        onPartial?.(finals.join(""));
         lastFinalAt = performance.now();
-        if (endedAt) {
+        if (endedAt && !waitForClose) {
           window.clearTimeout(quietTimer);
           quietTimer = window.setTimeout(done, QUIET_AFTER_FINAL_MS);
         }
