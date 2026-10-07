@@ -1,0 +1,1243 @@
+{
+ "date": "2026-10-06",
+ "path": "部署後經正式 Backend /api/v1/asr/stream（engine=gemini-live、鶴記測試專案），含 Jev 定稿判斷",
+ "commit": "d39d935",
+ "rows": [
+  {
+   "id": "diva-agitator",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "請問 DIVA 有攪拌器嗎？",
+   "text": "請問 DIVA 有攪拌器嗎？",
+   "terms": [
+    "DIVA"
+   ],
+   "heard": [
+    "DIVA"
+   ],
+   "cer": 0.0,
+   "ms": 432,
+   "error": null
+  },
+  {
+   "id": "diva-agitator",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "請問 DIVA 有攪拌器嗎？",
+   "text": "請問 DIVA 有攪拌器嗎？",
+   "terms": [
+    "DIVA"
+   ],
+   "heard": [
+    "DIVA"
+   ],
+   "cer": 0.0,
+   "ms": 681,
+   "error": null
+  },
+  {
+   "id": "diva-agitator",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "請問 DIVA 有攪拌器嗎？",
+   "text": "請問 DIVA 絞碎泵嗎？",
+   "terms": [
+    "DIVA"
+   ],
+   "heard": [
+    "DIVA"
+   ],
+   "cer": 0.36363636363636365,
+   "ms": 1878,
+   "error": null
+  },
+  {
+   "id": "diva-agitator",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "請問 DIVA 有攪拌器嗎？",
+   "text": "請問 DIVA 汙泥絞碎泵",
+   "terms": [
+    "DIVA"
+   ],
+   "heard": [
+    "DIVA"
+   ],
+   "cer": 0.45454545454545453,
+   "ms": 1771,
+   "error": null
+  },
+  {
+   "id": "submersible-depth",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "沉水泵最深可以放多深？",
+   "text": "沉水泵最深可以放多深？",
+   "terms": [
+    "沉水泵"
+   ],
+   "heard": [
+    "沉水泵"
+   ],
+   "cer": 0.0,
+   "ms": 991,
+   "error": null
+  },
+  {
+   "id": "submersible-depth",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "沉水泵最深可以放多深？",
+   "text": "沉水泵最深可以放多深？",
+   "terms": [
+    "沉水泵"
+   ],
+   "heard": [
+    "沉水泵"
+   ],
+   "cer": 0.0,
+   "ms": 508,
+   "error": null
+  },
+  {
+   "id": "submersible-depth",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "沉水泵最深可以放多深？",
+   "text": "沉水泵，也就是一般說的排水泵。",
+   "terms": [
+    "沉水泵"
+   ],
+   "heard": [
+    "沉水泵"
+   ],
+   "cer": 1.0,
+   "ms": 1567,
+   "error": null
+  },
+  {
+   "id": "submersible-depth",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "沉水泵最深可以放多深？",
+   "text": "沉水泵上漆，可以幫我上漆？",
+   "terms": [
+    "沉水泵"
+   ],
+   "heard": [
+    "沉水泵"
+   ],
+   "cer": 0.6,
+   "ms": 1698,
+   "error": null
+  },
+  {
+   "id": "eubl-hp",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "EUBL 有哪些馬力規格？",
+   "text": "EUBL 有哪些馬力規格？",
+   "terms": [
+    "EUBL"
+   ],
+   "heard": [
+    "EUBL"
+   ],
+   "cer": 0.0,
+   "ms": 491,
+   "error": null
+  },
+  {
+   "id": "eubl-hp",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "EUBL 有哪些馬力規格？",
+   "text": "EUBL 有哪些馬力規格？",
+   "terms": [
+    "EUBL"
+   ],
+   "heard": [
+    "EUBL"
+   ],
+   "cer": 0.0,
+   "ms": 1733,
+   "error": null
+  },
+  {
+   "id": "eubl-hp",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "EUBL 有哪些馬力規格？",
+   "text": "EUBL 有搭載機械軸封。",
+   "terms": [
+    "EUBL"
+   ],
+   "heard": [
+    "EUBL"
+   ],
+   "cer": 0.5454545454545454,
+   "ms": 1698,
+   "error": null
+  },
+  {
+   "id": "eubl-hp",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "EUBL 有哪些馬力規格？",
+   "text": "EUBL 五代改機械軸封。",
+   "terms": [
+    "EUBL"
+   ],
+   "heard": [
+    "EUBL"
+   ],
+   "cer": 0.6363636363636364,
+   "ms": 1684,
+   "error": null
+  },
+  {
+   "id": "eusr-outlet",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "50EUSR 的出水口徑是多少？",
+   "text": "51 EUSR 的出水口徑是多少？",
+   "terms": [
+    "EUSR"
+   ],
+   "heard": [
+    "EUSR"
+   ],
+   "cer": 0.07142857142857142,
+   "ms": 714,
+   "error": null
+  },
+  {
+   "id": "eusr-outlet",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "50EUSR 的出水口徑是多少？",
+   "text": "50 EUS 的出水口徑是多少？",
+   "terms": [
+    "EUSR"
+   ],
+   "heard": [],
+   "cer": 0.07142857142857142,
+   "ms": 903,
+   "error": null
+  },
+  {
+   "id": "eusr-outlet",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "50EUSR 的出水口徑是多少？",
+   "text": "50 EUS 的出水 口徑是多大?",
+   "terms": [
+    "EUSR"
+   ],
+   "heard": [],
+   "cer": 0.14285714285714285,
+   "ms": 1514,
+   "error": null
+  },
+  {
+   "id": "eusr-outlet",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "50EUSR 的出水口徑是多少？",
+   "text": "這臺 EUSR 沉水泵是打鐵。",
+   "terms": [
+    "EUSR"
+   ],
+   "heard": [
+    "EUSR"
+   ],
+   "cer": 0.5714285714285714,
+   "ms": 1614,
+   "error": null
+  },
+  {
+   "id": "hippo-flow",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "HIPPO 污水泵最大流量是多少？",
+   "text": "HIPPO 汙水泵最大流量是多少？",
+   "terms": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "heard": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "cer": 0.0,
+   "ms": 412,
+   "error": null
+  },
+  {
+   "id": "hippo-flow",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "HIPPO 污水泵最大流量是多少？",
+   "text": "HIPPO 汙水泵最大流量是多少？",
+   "terms": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "heard": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "cer": 0.0,
+   "ms": 794,
+   "error": null
+  },
+  {
+   "id": "hippo-flow",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "HIPPO 污水泵最大流量是多少？",
+   "text": "HIPPO 汙水泵最大流量是多少？",
+   "terms": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "heard": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "cer": 0.0,
+   "ms": 1134,
+   "error": null
+  },
+  {
+   "id": "hippo-flow",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "HIPPO 污水泵最大流量是多少？",
+   "text": "HIPPO 汙水泵上大流量是幾瓦？",
+   "terms": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "heard": [
+    "HIPPO",
+    "污水泵"
+   ],
+   "cer": 0.2,
+   "ms": 1515,
+   "error": null
+  },
+  {
+   "id": "alligator-cut",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+   "text": "ALLIGATOR 絞碎泵可以絞碎石嗎？",
+   "terms": [
+    "ALLIGATOR",
+    "絞碎泵"
+   ],
+   "heard": [
+    "ALLIGATOR",
+    "絞碎泵"
+   ],
+   "cer": 0.1111111111111111,
+   "ms": 527,
+   "error": null
+  },
+  {
+   "id": "alligator-cut",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+   "text": "ALLIGATOR 絞碎泵可以絞碎石嗎？",
+   "terms": [
+    "ALLIGATOR",
+    "絞碎泵"
+   ],
+   "heard": [
+    "ALLIGATOR",
+    "絞碎泵"
+   ],
+   "cer": 0.1111111111111111,
+   "ms": 787,
+   "error": null
+  },
+  {
+   "id": "alligator-cut",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+   "text": "耐爾克高水泵可以高水什麼？",
+   "terms": [
+    "ALLIGATOR",
+    "絞碎泵"
+   ],
+   "heard": [],
+   "cer": 0.7222222222222222,
+   "ms": 1517,
+   "error": null
+  },
+  {
+   "id": "alligator-cut",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "ALLIGATOR 絞碎泵可以絞碎什麼？",
+   "text": "ALLIGATOR 攪碎泵 能夠攪碎什麼？",
+   "terms": [
+    "ALLIGATOR",
+    "絞碎泵"
+   ],
+   "heard": [
+    "ALLIGATOR"
+   ],
+   "cer": 0.2222222222222222,
+   "ms": 1721,
+   "error": null
+  },
+  {
+   "id": "slurry-pick",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "text": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "terms": [
+    "泥漿泵"
+   ],
+   "heard": [
+    "泥漿泵"
+   ],
+   "cer": 0.0,
+   "ms": 448,
+   "error": null
+  },
+  {
+   "id": "slurry-pick",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "text": "工 地 要 抽 泥 漿 , 推 薦 哪 一 款 泥 漿 泵 ?",
+   "terms": [
+    "泥漿泵"
+   ],
+   "heard": [
+    "泥漿泵"
+   ],
+   "cer": 0.0,
+   "ms": 849,
+   "error": null
+  },
+  {
+   "id": "slurry-pick",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "text": "工廠愛用泥漿泵，推薦多款泥漿泵。",
+   "terms": [
+    "泥漿泵"
+   ],
+   "heard": [
+    "泥漿泵"
+   ],
+   "cer": 0.42857142857142855,
+   "ms": 1368,
+   "error": null
+  },
+  {
+   "id": "slurry-pick",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "工地要抽泥漿，推薦哪一款泥漿泵？",
+   "text": "工廠愛用你這款億發泵。",
+   "terms": [
+    "泥漿泵"
+   ],
+   "heard": [],
+   "cer": 0.7857142857142857,
+   "ms": 1845,
+   "error": null
+  },
+  {
+   "id": "head-meaning",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "泵浦的揚程是什麼意思？",
+   "text": "泵浦的揚程是什麼意思？",
+   "terms": [
+    "泵浦",
+    "揚程"
+   ],
+   "heard": [
+    "泵浦",
+    "揚程"
+   ],
+   "cer": 0.0,
+   "ms": 911,
+   "error": null
+  },
+  {
+   "id": "head-meaning",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "泵浦的揚程是什麼意思？",
+   "text": "泵浦的揚程是什麼意思？",
+   "terms": [
+    "泵浦",
+    "揚程"
+   ],
+   "heard": [
+    "泵浦",
+    "揚程"
+   ],
+   "cer": 0.0,
+   "ms": 398,
+   "error": null
+  },
+  {
+   "id": "head-meaning",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "泵浦的揚程是什麼意思？",
+   "text": "泵浦揚程是什麼意思？",
+   "terms": [
+    "泵浦",
+    "揚程"
+   ],
+   "heard": [
+    "泵浦",
+    "揚程"
+   ],
+   "cer": 0.1,
+   "ms": 1281,
+   "error": null
+  },
+  {
+   "id": "head-meaning",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "泵浦的揚程是什麼意思？",
+   "text": "泵浦的揚程是什麼意思？",
+   "terms": [
+    "泵浦",
+    "揚程"
+   ],
+   "heard": [
+    "泵浦",
+    "揚程"
+   ],
+   "cer": 0.0,
+   "ms": 1265,
+   "error": null
+  },
+  {
+   "id": "qdc-install",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "自動著脫裝置要怎麼安裝？",
+   "text": "自動著脫裝置要怎麼安裝？",
+   "terms": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "heard": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "cer": 0.0,
+   "ms": 531,
+   "error": null
+  },
+  {
+   "id": "qdc-install",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "自動著脫裝置要怎麼安裝？",
+   "text": "自動著脫裝置要怎麼安裝？",
+   "terms": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "heard": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "cer": 0.0,
+   "ms": 425,
+   "error": null
+  },
+  {
+   "id": "qdc-install",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "自動著脫裝置要怎麼安裝？",
+   "text": "自動著脫裝置要按怎安裝？",
+   "terms": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "heard": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "cer": 0.18181818181818182,
+   "ms": 1441,
+   "error": null
+  },
+  {
+   "id": "qdc-install",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "自動著脫裝置要怎麼安裝？",
+   "text": "自動著脫裝置要按怎安裝？",
+   "terms": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "heard": [
+    "自動著脫裝置|自動脫著裝置"
+   ],
+   "cer": 0.18181818181818182,
+   "ms": 1534,
+   "error": null
+  },
+  {
+   "id": "chit-who",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "你好，請問你是誰？",
+   "text": "你好，請問你是誰？",
+   "terms": [],
+   "heard": [],
+   "cer": 0.0,
+   "ms": 526,
+   "error": null
+  },
+  {
+   "id": "chit-who",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "你好，請問你是誰？",
+   "text": "你好，請問你是誰？",
+   "terms": [],
+   "heard": [],
+   "cer": 0.0,
+   "ms": 534,
+   "error": null
+  },
+  {
+   "id": "chit-who",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "你好，請問你是誰？",
+   "text": "你好，請問你是誰？",
+   "terms": [],
+   "heard": [],
+   "cer": 0.0,
+   "ms": 1419,
+   "error": null
+  },
+  {
+   "id": "chit-who",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "你好，請問你是誰？",
+   "text": "你好，請問你是誰？",
+   "terms": [],
+   "heard": [],
+   "cer": 0.0,
+   "ms": 1388,
+   "error": null
+  },
+  {
+   "id": "leopard",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "LEOPARD 切割泵適合用在哪裡？",
+   "text": "LEOPARD 切割泵是用在哪裡？",
+   "terms": [
+    "LEOPARD",
+    "切割泵"
+   ],
+   "heard": [
+    "LEOPARD",
+    "切割泵"
+   ],
+   "cer": 0.125,
+   "ms": 917,
+   "error": null
+  },
+  {
+   "id": "leopard",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "LEOPARD 切割泵適合用在哪裡？",
+   "text": "LEOPARD 沉水泵適合用在哪裡？",
+   "terms": [
+    "LEOPARD",
+    "切割泵"
+   ],
+   "heard": [
+    "LEOPARD"
+   ],
+   "cer": 0.125,
+   "ms": 824,
+   "error": null
+  },
+  {
+   "id": "leopard",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "LEOPARD 切割泵適合用在哪裡？",
+   "text": "LEOPARD 切割泵適合用在哪裡？",
+   "terms": [
+    "LEOPARD",
+    "切割泵"
+   ],
+   "heard": [
+    "LEOPARD",
+    "切割泵"
+   ],
+   "cer": 0.0,
+   "ms": 1079,
+   "error": null
+  },
+  {
+   "id": "leopard",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "LEOPARD 切割泵適合用在哪裡？",
+   "text": "LEOPARD 切割泵適合用在",
+   "terms": [
+    "LEOPARD",
+    "切割泵"
+   ],
+   "heard": [
+    "LEOPARD",
+    "切割泵"
+   ],
+   "cer": 0.125,
+   "ms": 1592,
+   "error": null
+  },
+  {
+   "id": "divapro",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+   "text": "DIVA PRO 跟 DIVA 差在哪裡？",
+   "terms": [
+    "DIVA PRO"
+   ],
+   "heard": [
+    "DIVA PRO"
+   ],
+   "cer": 0.0,
+   "ms": 458,
+   "error": null
+  },
+  {
+   "id": "divapro",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+   "text": "DIVA PRO 跟 DIVA 在哪裡？",
+   "terms": [
+    "DIVA PRO"
+   ],
+   "heard": [
+    "DIVA PRO"
+   ],
+   "cer": 0.0625,
+   "ms": 369,
+   "error": null
+  },
+  {
+   "id": "divapro",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+   "text": "DIVA PRO 和 DIVA 差別在哪裡？",
+   "terms": [
+    "DIVA PRO"
+   ],
+   "heard": [
+    "DIVA PRO"
+   ],
+   "cer": 0.125,
+   "ms": 1598,
+   "error": null
+  },
+  {
+   "id": "divapro",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "DIVA PRO 跟 DIVA 差在哪裡？",
+   "text": "第 1 條，第 2 條，第 3 條。",
+   "terms": [
+    "DIVA PRO"
+   ],
+   "heard": [],
+   "cer": 1.0,
+   "ms": 1678,
+   "error": null
+  },
+  {
+   "id": "steel-seal",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "STEEL 系列的機械軸封是什麼材質？",
+   "text": "STEEL 系列的機械軸封是什麼材質？",
+   "terms": [
+    "STEEL",
+    "機械軸封"
+   ],
+   "heard": [
+    "STEEL",
+    "機械軸封"
+   ],
+   "cer": 0.0,
+   "ms": 559,
+   "error": null
+  },
+  {
+   "id": "steel-seal",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "STEEL 系列的機械軸封是什麼材質？",
+   "text": "STEEL 系列的機械軸封是什麼材質？",
+   "terms": [
+    "STEEL",
+    "機械軸封"
+   ],
+   "heard": [
+    "STEEL",
+    "機械軸封"
+   ],
+   "cer": 0.0,
+   "ms": 410,
+   "error": null
+  },
+  {
+   "id": "steel-seal",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "STEEL 系列的機械軸封是什麼材質？",
+   "text": "STEEL 系列的機械軸封是什麼材質？",
+   "terms": [
+    "STEEL",
+    "機械軸封"
+   ],
+   "heard": [
+    "STEEL",
+    "機械軸封"
+   ],
+   "cer": 0.0,
+   "ms": 1575,
+   "error": null
+  },
+  {
+   "id": "steel-seal",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "STEEL 系列的機械軸封是什麼材質？",
+   "text": "STEEL 鶴記企業的抽風是什麼東西？",
+   "terms": [
+    "STEEL",
+    "機械軸封"
+   ],
+   "heard": [
+    "STEEL"
+   ],
+   "cer": 0.5294117647058824,
+   "ms": 1723,
+   "error": null
+  },
+  {
+   "id": "residual",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "殘水泵可以抽到多低的水位？",
+   "text": "沉水泵可以抽到多低的水位？",
+   "terms": [
+    "殘水泵"
+   ],
+   "heard": [],
+   "cer": 0.08333333333333333,
+   "ms": 844,
+   "error": null
+  },
+  {
+   "id": "residual",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "殘水泵可以抽到多低的水位？",
+   "text": "沉水泵可以抽到多低的水位？",
+   "terms": [
+    "殘水泵"
+   ],
+   "heard": [],
+   "cer": 0.08333333333333333,
+   "ms": 461,
+   "error": null
+  },
+  {
+   "id": "residual",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "殘水泵可以抽到多低的水位？",
+   "text": "沉水泵 的 裝置 位",
+   "terms": [
+    "殘水泵"
+   ],
+   "heard": [],
+   "cer": 0.75,
+   "ms": 1452,
+   "error": null
+  },
+  {
+   "id": "residual",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "殘水泵可以抽到多低的水位？",
+   "text": "沉水泵 能夠抽取 固體 的水",
+   "terms": [
+    "殘水泵"
+   ],
+   "heard": [],
+   "cer": 0.5833333333333334,
+   "ms": 1680,
+   "error": null
+  },
+  {
+   "id": "eubm-edw",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+   "text": "EUB-M 跟 EDW 哪 一 款 比 較 省 電 ?",
+   "terms": [
+    "EUB-M",
+    "EDW"
+   ],
+   "heard": [
+    "EUB-M",
+    "EDW"
+   ],
+   "cer": 0.0,
+   "ms": 579,
+   "error": null
+  },
+  {
+   "id": "eubm-edw",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+   "text": "EUB-M 跟 EDW 哪 一 款 比 較 省 電 ?",
+   "terms": [
+    "EUB-M",
+    "EDW"
+   ],
+   "heard": [
+    "EUB-M",
+    "EDW"
+   ],
+   "cer": 0.0,
+   "ms": 292,
+   "error": null
+  },
+  {
+   "id": "eubm-edw",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+   "text": "EUB-M 跟 EDW 哪一款比較省電？",
+   "terms": [
+    "EUB-M",
+    "EDW"
+   ],
+   "heard": [
+    "EUB-M",
+    "EDW"
+   ],
+   "cer": 0.0,
+   "ms": 1252,
+   "error": null
+  },
+  {
+   "id": "eubm-edw",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "EUB-M 跟 EDW 哪一款比較省電？",
+   "text": "EUB-M 跟 EDW 哪一款比較省電？",
+   "terms": [
+    "EUB-M",
+    "EDW"
+   ],
+   "heard": [
+    "EUB-M",
+    "EDW"
+   ],
+   "cer": 0.0,
+   "ms": 1556,
+   "error": null
+  },
+  {
+   "id": "overload",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "過載保護器跳掉了要怎麼處理？",
+   "text": "過載保護器跳掉了要怎麼處理？",
+   "terms": [
+    "過載保護器"
+   ],
+   "heard": [
+    "過載保護器"
+   ],
+   "cer": 0.0,
+   "ms": 443,
+   "error": null
+  },
+  {
+   "id": "overload",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "過載保護器跳掉了要怎麼處理？",
+   "text": "過載保護器跳掉了要怎麼處理？",
+   "terms": [
+    "過載保護器"
+   ],
+   "heard": [
+    "過載保護器"
+   ],
+   "cer": 0.0,
+   "ms": 580,
+   "error": null
+  },
+  {
+   "id": "overload",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "過載保護器跳掉了要怎麼處理？",
+   "text": "櫃檯把好幾條調了，欲按怎處理？",
+   "terms": [
+    "過載保護器"
+   ],
+   "heard": [],
+   "cer": 0.7692307692307693,
+   "ms": 1670,
+   "error": null
+  },
+  {
+   "id": "overload",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "過載保護器跳掉了要怎麼處理？",
+   "text": "櫃檯幫浦跳掉啊，要按怎處理？",
+   "terms": [
+    "過載保護器"
+   ],
+   "heard": [],
+   "cer": 0.6153846153846154,
+   "ms": 1791,
+   "error": null
+  },
+  {
+   "id": "impeller",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "葉輪卡住的話耐磨板要換嗎？",
+   "text": "葉輪卡住的話耐磨板要換嗎？",
+   "terms": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "heard": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "cer": 0.0,
+   "ms": 549,
+   "error": null
+  },
+  {
+   "id": "impeller",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "葉輪卡住的話耐磨板要換嗎？",
+   "text": "葉輪卡住了，耐磨板要換嗎？",
+   "terms": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "heard": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "cer": 0.16666666666666666,
+   "ms": 943,
+   "error": null
+  },
+  {
+   "id": "impeller",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "葉輪卡住的話耐磨板要換嗎？",
+   "text": "葉輪卡到異物，耐磨板要換嗎？",
+   "terms": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "heard": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "cer": 0.25,
+   "ms": 1538,
+   "error": null
+  },
+  {
+   "id": "yamada",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+   "text": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+   "terms": [
+    "億發泵浦",
+    "Yamada"
+   ],
+   "heard": [
+    "億發泵浦",
+    "Yamada"
+   ],
+   "cer": 0.0,
+   "ms": 670,
+   "error": null
+  },
+  {
+   "id": "impeller",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "葉輪卡住的話耐磨板要換嗎？",
+   "text": "葉輪 卡到 壞, 耐磨板 壞掉。",
+   "terms": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "heard": [
+    "葉輪",
+    "耐磨板"
+   ],
+   "cer": 0.5,
+   "ms": 1863,
+   "error": null
+  },
+  {
+   "id": "yamada",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+   "text": "億發泵浦的機械軸封泵有現貨嗎？",
+   "terms": [
+    "億發泵浦",
+    "Yamada"
+   ],
+   "heard": [
+    "億發泵浦"
+   ],
+   "cer": 0.4444444444444444,
+   "ms": 458,
+   "error": null
+  },
+  {
+   "id": "yamada",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+   "text": "億發泵浦的 Yamada 絞碎泵會很貴嗎？",
+   "terms": [
+    "億發泵浦",
+    "Yamada"
+   ],
+   "heard": [
+    "億發泵浦",
+    "Yamada"
+   ],
+   "cer": 0.2777777777777778,
+   "ms": 1487,
+   "error": null
+  },
+  {
+   "id": "yamada",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "億發泵浦的 Yamada 隔膜泵有現貨嗎？",
+   "text": "億發泵浦的 Yamada 絞碎泵會壞嗎？",
+   "terms": [
+    "億發泵浦",
+    "Yamada"
+   ],
+   "heard": [
+    "億發泵浦",
+    "Yamada"
+   ],
+   "cer": 0.2777777777777778,
+   "ms": 1613,
+   "error": null
+  },
+  {
+   "id": "lpm",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "排水泵的流量單位 LPM 是什麼意思？",
+   "text": "排水泵的流量單位 LPM 是什麼意思？",
+   "terms": [
+    "排水泵",
+    "LPM"
+   ],
+   "heard": [
+    "排水泵",
+    "LPM"
+   ],
+   "cer": 0.0,
+   "ms": 723,
+   "error": null
+  },
+  {
+   "id": "lpm",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "排水泵的流量單位 LPM 是什麼意思？",
+   "text": "排水泵的流量單位 LPM 是什麼意思？",
+   "terms": [
+    "排水泵",
+    "LPM"
+   ],
+   "heard": [
+    "排水泵",
+    "LPM"
+   ],
+   "cer": 0.0,
+   "ms": 443,
+   "error": null
+  },
+  {
+   "id": "lpm",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "排水泵的流量單位 LPM 是什麼意思？",
+   "text": "沉水泵的流量單位 LPM 是什麼意思？",
+   "terms": [
+    "排水泵",
+    "LPM"
+   ],
+   "heard": [
+    "LPM"
+   ],
+   "cer": 0.0625,
+   "ms": 1479,
+   "error": null
+  },
+  {
+   "id": "lpm",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "排水泵的流量單位 LPM 是什麼意思？",
+   "text": "排水泵的流量單位 LPM 是什麼意思？",
+   "terms": [
+    "排水泵",
+    "LPM"
+   ],
+   "heard": [
+    "排水泵",
+    "LPM"
+   ],
+   "cer": 0.0,
+   "ms": 1081,
+   "error": null
+  },
+  {
+   "id": "heji",
+   "voice": "edge-tts:zh-TW-HsiaoChenNeural",
+   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "text": "我 想 找 鶴 記 企 業 的 業 務 問 EVAK 的 報 價 。",
+   "terms": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "heard": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "cer": 0.0,
+   "ms": 850,
+   "error": null
+  },
+  {
+   "id": "heji",
+   "voice": "edge-tts:zh-TW-YunJheNeural",
+   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "text": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "terms": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "heard": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "cer": 0.0,
+   "ms": 609,
+   "error": null
+  },
+  {
+   "id": "heji",
+   "voice": "voxcpm:voxcpm2-cosy-young-male-01",
+   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "text": "我想找 鶴記企業 的 業務 問 EVAK 的 報價。",
+   "terms": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "heard": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "cer": 0.0,
+   "ms": 1426,
+   "error": null
+  },
+  {
+   "id": "heji",
+   "voice": "voxcpm:voxcpm2-cosy-senior-female-01",
+   "ref": "我想找鶴記企業的業務問 EVAK 的報價。",
+   "text": "我想要找鶴記企業的泵浦 EVAK 的報價。",
+   "terms": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "heard": [
+    "鶴記企業",
+    "EVAK"
+   ],
+   "cer": 0.2222222222222222,
+   "ms": 1563,
+   "error": null
+  }
+ ]
+}

@@ -1,0 +1,1208 @@
+{
+ "date": "2026-10-06",
+ "commit": "7c15ec5",
+ "path": "/api/v1/chat，fast，鶴記測試專案，20 題×1",
+ "rubric": "scripts/experiments/product-notes/round3/questions.json（凍結題目、required_points、forbidden_claims、grading_rubric）",
+ "grader": "獨立子代理逐份對照 required_points／forbidden_claims 評分",
+ "verdict_counts": {
+  "錯": 10,
+  "對": 5,
+  "部分對": 5
+ },
+ "answers": [
+  {
+   "id": "Q01",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 10.3,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "3吋EDW系列符合最大揚程至少20米的款式為80EDW-5.50T，最大揚程為32.4米。EUB-M系列3吋款式最大揚程未達20米，故無符合型號。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 4272.71,
+    "input_tokens": 18918,
+    "output_tokens": 131,
+    "total_tokens": 19049,
+    "cached_tokens": 8104,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 4272.71,
+      "input_tokens": 18918,
+      "output_tokens": 131,
+      "total_tokens": 19049,
+      "cached_tokens": 8104,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 651.59,
+      "ended_at_ms": 2084.64
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 6472.26,
+      "ended_at_ms": 7479.43
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 7802.17,
+      "ended_at_ms": 9634.66
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q02",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 9.3,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "filter_calls": [
+    {
+     "arguments": "{\"query\":\"{\\\"scenarios\\\":[{\\\"name\\\":\\\"三相3HP以下最大流量500LPM以上\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[3]},{\\\"field\\\":\\\"hp\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":3},{\\\"field\\\":\\\"max_flow_lpm\\\",\\\"op\\\":\\\"gte\\\",\\\"value\\\":500}]},\\\"sort\\\":[{\\\"field\\\":\\\"hp\\\",\\\"op\\\":\\\"asc\\\"}],\\\"limit\\\":null}]}\"}",
+     "result": "{\"status\": \"error\", \"tool_name\": \"filter_products\", \"data\": {}, \"error\": \"工具執行失敗：sort 每項要有 field 與 direction\"}"
+    }
+   ],
+   "reply": "型錄資料未提及此規格。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 4101.82,
+    "input_tokens": 21183,
+    "output_tokens": 150,
+    "total_tokens": 21333,
+    "cached_tokens": 8106,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 4101.82,
+      "input_tokens": 21183,
+      "output_tokens": 150,
+      "total_tokens": 21333,
+      "cached_tokens": 8106,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 706.66,
+      "ended_at_ms": 2214.75
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 6138.16,
+      "ended_at_ms": 7368.57
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 7699.69,
+      "ended_at_ms": 9063.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q03",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 5.1,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "在這批 EUB-M 系列中，最大流量最大的是 150EUB-M-5.100 型號，其最大流量可達 2250 LPM。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 2343.81,
+    "input_tokens": 12665,
+    "output_tokens": 69,
+    "total_tokens": 12734,
+    "cached_tokens": 4044,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 2343.81,
+      "input_tokens": 12665,
+      "output_tokens": 69,
+      "total_tokens": 12734,
+      "cached_tokens": 4044,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 740.48,
+      "ended_at_ms": 1907.71
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 3750.98,
+      "ended_at_ms": 4927.56
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q04",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 10.3,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "型錄資料未提及各系列 3HP 的詳細最大揚程對比，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 3937.87,
+    "input_tokens": 19224,
+    "output_tokens": 105,
+    "total_tokens": 19329,
+    "cached_tokens": 8104,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 3937.87,
+      "input_tokens": 19224,
+      "output_tokens": 105,
+      "total_tokens": 19329,
+      "cached_tokens": 8104,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 907.05,
+      "ended_at_ms": 2158.4
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 6332.07,
+      "ended_at_ms": 7448.96
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 7845.18,
+      "ended_at_ms": 9414.8
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q05",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 8.1,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "EDW系列為80EDW-5.50T，最大揚程32.4米；EUB-M系列為80EUB-M-5.30T，最大揚程23米。兩者相差9.4米。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 4399.1,
+    "input_tokens": 18767,
+    "output_tokens": 129,
+    "total_tokens": 18896,
+    "cached_tokens": 8104,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 4399.1,
+      "input_tokens": 18767,
+      "output_tokens": 129,
+      "total_tokens": 18896,
+      "cached_tokens": 8104,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 926.74,
+      "ended_at_ms": 2422.26
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 4755.03,
+      "ended_at_ms": 5708.08
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5962.45,
+      "ended_at_ms": 7912.98
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q06",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 6.3,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "filter_calls": [
+    {
+     "arguments": "{\"query\":\"{\\\"scenarios\\\":[{\\\"name\\\":\\\"甲現場\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[1,1,3]},{\\\"field\\\":\\\"hp\\\",\\\"op\\\":\\\"eq\\\",\\\"value\\\":2},{\\\"field\\\":\\\"outlet_inch\\\",\\\"op\\\":\\\"eq\\\",\\\"value\\\":3},{\\\"field\\\":\\\"max_flow_lpm\\\",\\\"op\\\":\\\"gte\\\",\\\"value\\\":650}]},\\\"sort\\\":[],\\\"limit\\\":null},{\\\"name\\\":\\\"乙現場\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[3,1,3]},{\\\"field\\\":\\\"hp\\\",\\\"op\\\":\\\"eq\\\",\\\"value\\\":3},{\\\"field\\\":\\\"max_head_m\\\",\\\"op\\\":\\\"gte\\\",\\\"value\\\":23}]},\\\"sort\\\":[],\\\"limit\\\":null}]}\"}",
+     "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲現場\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"80EDW-5.20S/T\", \"phase\": [1, 3], \"hp\": 2, \"outlet_inch\": 3, \"max_flow_lpm\": 820}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"phase\": [1], \"hp\": 2, \"outlet_inch\": 3, \"max_flow_lpm\": 690}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"乙現場\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.30T\", \"phase\": [3], \"hp\": 3, \"max_head_m\": 26}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"phase\": [1, 3], \"hp\": 3, \"max_head_m\": 26.5}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"phase\": [3], \"hp\": 3, \"max_head_m\": 23}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+    }
+   ],
+   "reply": "甲現場符合型號有 80EDW-5.20S/T 最大流量 820 LPM 與 80EUB-M-5.20S 最大流量 690 LPM。乙現場符合型號有 50EUB-M-5.30T 最大揚程 26 米、80EDW-5.30S/T 最大揚程 26.5 米與 80EUB-M-5.30T 最大揚程 23 米。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 3643.12,
+    "input_tokens": 13924,
+    "output_tokens": 279,
+    "total_tokens": 14203,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 3643.12,
+      "input_tokens": 13924,
+      "output_tokens": 279,
+      "total_tokens": 14203,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 1155.46,
+      "ended_at_ms": 2681.12
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 3990.21,
+      "ended_at_ms": 6107.66
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q07",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 7.3,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "filter_calls": [
+    {
+     "arguments": "{\"query\":\"{\\\"scenarios\\\":[{\\\"name\\\":\\\"EUB-M三相最大揚程20米以上\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"series\\\",\\\"op\\\":\\\"eq\\\",\\\"value\\\":\\\"EUB-M\\\"},{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[3]},{\\\"field\\\":\\\"max_head_m\\\",\\\"op\\\":\\\"gte\\\",\\\"value\\\":20}]},\\\"sort\\\":[{\\\"field\\\":\\\"max_head_m\\\",\\\"direction\\\":\\\"desc\\\"},{\\\"field\\\":\\\"max_flow_lpm\\\",\\\"direction\\\":\\\"desc\\\"}],\\\"limit\\\":null}]}\"}",
+     "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EUB-M三相最大揚程20米以上\", \"match_count\": 6, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"phase\": [3], \"max_head_m\": 33, \"max_flow_lpm\": 1200}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"phase\": [3], \"max_head_m\": 30, \"max_flow_lpm\": 900}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"phase\": [3], \"max_head_m\": 26, \"max_flow_lpm\": 550}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"phase\": [3], \"max_head_m\": 23, \"max_flow_lpm\": 1900}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"phase\": [3], \"max_head_m\": 23, \"max_flow_lpm\": 700}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"phase\": [3], \"max_head_m\": 21, \"max_flow_lpm\": 450}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 9}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+    }
+   ],
+   "reply": "80EUB-M-5.75T 最大揚程 33 M 最大流量 1200 LPM，80EUB-M-5.50T 最大揚程 30 M 最大流量 900 LPM，50EUB-M-5.30T 最大揚程 26 M 最大流量 550 LPM，100EUB-M-5.75T 最大揚程 23 M 最大流量 1900 LPM，80EUB-M-5.30T 最大揚程 23 M 最大流量 700 LPM，50EUB-M-5.20T 最大揚程 21 M 最大流量 450 LPM。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 3544.78,
+    "input_tokens": 13645,
+    "output_tokens": 310,
+    "total_tokens": 13955,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 3544.78,
+      "input_tokens": 13645,
+      "output_tokens": 310,
+      "total_tokens": 13955,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 1538.27,
+      "ended_at_ms": 3125.69
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5022.13,
+      "ended_at_ms": 6979.49
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q08",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 8.9,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "每小時30立方米相當於500LPM。單相2HP符合的有50EUB-M-5.20S與80EUB-M-5.20S，最大流量均為500LPM；EDW系列無對應型號。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 4086.87,
+    "input_tokens": 19488,
+    "output_tokens": 177,
+    "total_tokens": 19665,
+    "cached_tokens": 8106,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 4086.87,
+      "input_tokens": 19488,
+      "output_tokens": 177,
+      "total_tokens": 19665,
+      "cached_tokens": 8106,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 829.8,
+      "ended_at_ms": 2003.38
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5443.84,
+      "ended_at_ms": 6564.99
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 6875.93,
+      "ended_at_ms": 8668.08
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q09",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 8.3,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "光看表無法保證特定型號；最大揚程與最大流量是獨立極限，不能直接拼成工作點。資料中暫無同時達到十五米與四百公升的額定點型號。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 4041.69,
+    "input_tokens": 20286,
+    "output_tokens": 153,
+    "total_tokens": 20439,
+    "cached_tokens": 8108,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 4041.69,
+      "input_tokens": 20286,
+      "output_tokens": 153,
+      "total_tokens": 20439,
+      "cached_tokens": 8108,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 1120.39,
+      "ended_at_ms": 2443.73
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5157.5,
+      "ended_at_ms": 6289.15
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 6557.13,
+      "ended_at_ms": 8143.85
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q10",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 7.3,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "型錄未完全記載4吋款各別最大流量，請洽詢原廠工程業務團隊。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 3351.72,
+    "input_tokens": 18815,
+    "output_tokens": 85,
+    "total_tokens": 18900,
+    "cached_tokens": 8104,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 3351.72,
+      "input_tokens": 18815,
+      "output_tokens": 85,
+      "total_tokens": 18900,
+      "cached_tokens": 8104,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 800.64,
+      "ended_at_ms": 2144.05
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 4843.94,
+      "ended_at_ms": 5678.03
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5964.16,
+      "ended_at_ms": 7138.36
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q11",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 5.1,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "型錄未提供售價與價格表。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 2717.29,
+    "input_tokens": 12667,
+    "output_tokens": 39,
+    "total_tokens": 12706,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 2717.29,
+      "input_tokens": 12667,
+      "output_tokens": 39,
+      "total_tokens": 12706,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 723.11,
+      "ended_at_ms": 2039.79
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 3354.08,
+      "ended_at_ms": 4754.7
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q12",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 6.6,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "型錄資料未提及保固年限與保固項目。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 2222.59,
+    "input_tokens": 12618,
+    "output_tokens": 60,
+    "total_tokens": 12678,
+    "cached_tokens": 4044,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 2222.59,
+      "input_tokens": 12618,
+      "output_tokens": 60,
+      "total_tokens": 12678,
+      "cached_tokens": 4044,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 1086.35,
+      "ended_at_ms": 2210.69
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5219.97,
+      "ended_at_ms": 6318.23
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q13",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 5.5,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "filter_calls": [
+    {
+     "arguments": "{\"query\":\"{\\\"scenarios\\\":[{\\\"name\\\":\\\"三相泵電流小於等於5.5A且重量小於等於30公斤\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"series\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[\\\"EDW\\\",\\\"EUB-M\\\"]},{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[3]},{\\\"field\\\":\\\"current_3ph_a\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":5.5},{\\\"field\\\":\\\"weight_3ph_kg\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":30}]},\\\"sort\\\":[],\\\"limit\\\":null}]}\"}",
+     "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相泵電流小於等於5.5A且重量小於等於30公斤\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"phase\": [3], \"current_3ph_a\": 3.5, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"phase\": [3], \"current_3ph_a\": 5.2, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"phase\": [3], \"current_3ph_a\": 3.5, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"phase\": [3], \"current_3ph_a\": 5.2, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+    }
+   ],
+   "reply": "符合三相、電流小於等於5.5A且重量小於等於30公斤的型號皆為EUB-M系列：\n50EUB-M-5.20T電流3.5A、重26.4公斤。\n50EUB-M-5.30T電流5.2A、重29.8公斤。\n80EUB-M-5.20T電流3.5A、重25.9公斤。\n80EUB-M-5.30T電流5.2A、重30公斤。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 3323.49,
+    "input_tokens": 15130,
+    "output_tokens": 254,
+    "total_tokens": 15384,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 3323.49,
+      "input_tokens": 15130,
+      "output_tokens": 254,
+      "total_tokens": 15384,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 469.27,
+      "ended_at_ms": 1977.83
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 3543.22,
+      "ended_at_ms": 5358.15
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q14",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 7.7,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "filter_calls": [
+    {
+     "arguments": "{\"query\":\"{\\\"scenarios\\\":[{\\\"name\\\":\\\"EDW和EUBM篩選\\\",\\\"where\\\":{\\\"all\\\":[{\\\"all\\\":[{\\\"field\\\":\\\"series\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[\\\"EDW\\\",\\\"EUB-M\\\"]},{\\\"field\\\":\\\"solids_mm\\\",\\\"op\\\":\\\"gte\\\",\\\"value\\\":10},{\\\"field\\\":\\\"kw\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":3.7}]}]},\\\"sort\\\":[],\\\"limit\\\":null}]}\"}",
+     "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW和EUBM篩選\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"solids_mm\": 10, \"kw\": 2.2}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"solids_mm\": 10, \"kw\": 3.7}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"solids_mm\": 10, \"kw\": 3.7}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"solids_mm\": 10, \"kw\": 1.5}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"solids_mm\": 10, \"kw\": 2.2}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"solids_mm\": 10, \"kw\": 3.7}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"solids_mm\": 10, \"kw\": 3.7}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+    }
+   ],
+   "reply": "符合的EDW型號有80EDW與100EDW系列，功率2.2至3.7kW，3至5HP，通過粒徑10mm。EUB-M部分規格未達10mm。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 4840.43,
+    "input_tokens": 21748,
+    "output_tokens": 253,
+    "total_tokens": 22001,
+    "cached_tokens": 8107,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 4840.43,
+      "input_tokens": 21748,
+      "output_tokens": 253,
+      "total_tokens": 22001,
+      "cached_tokens": 8107,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 483.38,
+      "ended_at_ms": 2200.85
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 4233.9,
+      "ended_at_ms": 5670.11
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5872.57,
+      "ended_at_ms": 7559.32
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q15",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 8.3,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "filter_calls": [
+    {
+     "arguments": "{\"query\":\"{\\\"scenarios\\\":[{\\\"name\\\":\\\"三相功率不超過2.2kW\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[3]},{\\\"field\\\":\\\"kw\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":2.2}]},\\\"sort\\\":[{\\\"field\\\":\\\"current_3ph_a\\\",\\\"direction\\\":\\\"asc\\\"},{\\\"field\\\":\\\"weight_3ph_kg\\\",\\\"direction\\\":\\\"asc\\\"}],\\\"limit\\\":null}]}\"}",
+     "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相功率不超過2.2kW\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.20T\", \"phase\": [3], \"kw\": 1.5, \"current_3ph_a\": 3.5, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"phase\": [3], \"kw\": 1.5, \"current_3ph_a\": 3.5, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"phase\": [1, 3], \"kw\": 1.5, \"current_3ph_a\": 3.8, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"phase\": [3], \"kw\": 2.2, \"current_3ph_a\": 5.2, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"phase\": [3], \"kw\": 2.2, \"current_3ph_a\": 5.2, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"phase\": [1, 3], \"kw\": 2.2, \"current_3ph_a\": 5.7, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"phase\": [1, 3], \"kw\": 2.2, \"current_3ph_a\": 5.7, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+    }
+   ],
+   "reply": "符合條件的三相泵浦共七款，依電流及重量排序如下：80EUB-M-5.20T為1.5 kW、電流3.5 A、重量25.9 kg；50EUB-M-5.20T為1.5 kW、電流3.5 A、重量26.4 kg；80EDW-5.20S/T為1.5 kW、電流3.8 A、重量46 kg；50EUB-M-5.30T為2.2 kW、電流5.2 A、重量29.8 kg；80EUB-M-5.30T為2.2 kW、電流5.2 A、重量30 kg；80EDW-5.30S/T為2.2 kW、電流5.7 A、重量45 kg；100EDW-5.30S/T為2.2 kW、電流5.7 A、重量46 kg。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 4151.0,
+    "input_tokens": 14361,
+    "output_tokens": 323,
+    "total_tokens": 14684,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 4151.0,
+      "input_tokens": 14361,
+      "output_tokens": 323,
+      "total_tokens": 14684,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 938.89,
+      "ended_at_ms": 2361.17
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5039.24,
+      "ended_at_ms": 7767.96
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q16",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 6.7,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "filter_calls": [
+    {
+     "arguments": "{\"query\":\"{\\\"scenarios\\\":[{\\\"name\\\":\\\"甲現場\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[3]},{\\\"field\\\":\\\"current_3ph_a\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":8},{\\\"field\\\":\\\"weight_3ph_kg\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":50},{\\\"field\\\":\\\"solids_mm\\\",\\\"op\\\":\\\"gte\\\",\\\"value\\\":10}]},\\\"sort\\\":[],\\\"limit\\\":null},{\\\"name\\\":\\\"乙現場\\\",\\\"where\\\":{\\\"all\\\":[{\\\"field\\\":\\\"phase\\\",\\\"op\\\":\\\"in\\\",\\\"value\\\":[1]},{\\\"field\\\":\\\"weight_1ph_kg\\\",\\\"op\\\":\\\"lte\\\",\\\"value\\\":28},{\\\"field\\\":\\\"solids_mm\\\",\\\"op\\\":\\\"gte\\\",\\\"value\\\":9}]},\\\"sort\\\":[],\\\"limit\\\":null}]}\"}",
+     "result": "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲現場\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"phase\": [1, 3], \"current_3ph_a\": 5.7, \"weight_3ph_kg\": 46, \"solids_mm\": 10}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"phase\": [1, 3], \"current_3ph_a\": 3.8, \"weight_3ph_kg\": 46, \"solids_mm\": 10}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"phase\": [1, 3], \"current_3ph_a\": 5.7, \"weight_3ph_kg\": 45, \"solids_mm\": 10}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"phase\": [3], \"current_3ph_a\": 7.9, \"weight_3ph_kg\": 49.5, \"solids_mm\": 10}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 11}, {\"name\": \"乙現場\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"phase\": [1], \"weight_1ph_kg\": 27.5, \"solids_mm\": 9}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"phase\": [1], \"weight_1ph_kg\": 27.5, \"solids_mm\": 9}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+    }
+   ],
+   "reply": "甲現場三相機型：100EDW-5.30S/T電流5.7A、重46kg、粒徑10mm；80EDW-5.20S/T電流3.8A、重46kg、粒徑10mm；80EDW-5.30S/T電流5.7A、重45kg、粒徑10mm；80EDW-5.50T電流7.9A、重49.5kg、粒徑10mm。乙現場單相機型：50EUB-M-5.20S重27.5kg、粒徑9mm；80EUB-M-5.20S重27.5kg、粒徑9mm。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 3803.66,
+    "input_tokens": 14833,
+    "output_tokens": 342,
+    "total_tokens": 15175,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 3803.66,
+      "input_tokens": 14833,
+      "output_tokens": 342,
+      "total_tokens": 15175,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 951.42,
+      "ended_at_ms": 2497.1
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 4081.08,
+      "ended_at_ms": 6339.05
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q17",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 9.8,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "型錄資料未提及此規格，請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 3912.45,
+    "input_tokens": 19060,
+    "output_tokens": 102,
+    "total_tokens": 19162,
+    "cached_tokens": 8105,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 3912.45,
+      "input_tokens": 19060,
+      "output_tokens": 102,
+      "total_tokens": 19162,
+      "cached_tokens": 8105,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 922.86,
+      "ended_at_ms": 2261.41
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 6593.28,
+      "ended_at_ms": 7792.65
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 8067.41,
+      "ended_at_ms": 9441.94
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q18",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 10.4,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "型錄未記載12.5米與1000 LPM之額定點。候選資料不足無法列出。無法保證符合目標。最大揚程與最大流量不能同時達到。",
+   "usage": {
+    "calls": 3,
+    "latency_ms": 4344.11,
+    "input_tokens": 21147,
+    "output_tokens": 146,
+    "total_tokens": 21293,
+    "cached_tokens": 8110,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 3,
+      "latency_ms": 4344.11,
+      "input_tokens": 21147,
+      "output_tokens": 146,
+      "total_tokens": 21293,
+      "cached_tokens": 8110,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 1225.2,
+      "ended_at_ms": 2732.62
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 7229.16,
+      "ended_at_ms": 8418.0
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 8631.1,
+      "ended_at_ms": 10278.94
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q19",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 7.1,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "型錄未提及 CH 選配後的揚程、流量與重量增加數值，也未提供 CH 款重量清單。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 3104.54,
+    "input_tokens": 12973,
+    "output_tokens": 66,
+    "total_tokens": 13039,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 3104.54,
+      "input_tokens": 12973,
+      "output_tokens": 66,
+      "total_tokens": 13039,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 607.91,
+      "ended_at_ms": 2034.4
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5307.58,
+      "ended_at_ms": 6985.63
+     }
+    ]
+   }
+  },
+  {
+   "id": "Q20",
+   "repeat": 1,
+   "status": 200,
+   "elapsed_s": 6.6,
+   "tools": [
+    "search_knowledge"
+   ],
+   "filter_calls": [],
+   "reply": "不行，橫線代表該型號未提供三相規格。這兩款實際為單相 1 相，滿載電流 12.5 A，重量 27.5 公斤。無三相規格，無法憑型號補出數字。",
+   "usage": {
+    "calls": 2,
+    "latency_ms": 2545.5,
+    "input_tokens": 13268,
+    "output_tokens": 119,
+    "total_tokens": 13387,
+    "cached_tokens": 4045,
+    "reasoning_tokens": 0,
+    "by_model": {
+     "gemini/gemini-3.5-flash-lite": {
+      "calls": 2,
+      "latency_ms": 2545.5,
+      "input_tokens": 13268,
+      "output_tokens": 119,
+      "total_tokens": 13387,
+      "cached_tokens": 4045,
+      "reasoning_tokens": 0
+     }
+    },
+    "timeline": [
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 762.04,
+      "ended_at_ms": 2015.68
+     },
+     {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "started_at_ms": 5138.8,
+      "ended_at_ms": 6430.67
+     }
+    ]
+   }
+  }
+ ],
+ "grades": [
+  {
+   "id": "Q01",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "錯說 EUB-M 3 吋沒有一款達到 20 m，還漏了 80EDW-5.30S/T 和三款 EUB-M。"
+  },
+  {
+   "id": "Q02",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "型錄其實有這些數據，卻回答型錄沒提到，六款都沒列。"
+  },
+  {
+   "id": "Q03",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "把範圍外的 150EUB-M-5.100（2250 LPM）當成冠軍，正確應為 100EUB-M-5.75T 的 1900 LPM。"
+  },
+  {
+   "id": "Q04",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "型錄其實有這些數據，卻回答型錄沒提到，四款 3HP 和冠軍都沒給。"
+  },
+  {
+   "id": "Q05",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "EUB-M 冠軍選錯（80EUB-M-5.30T 23 m），差距 9.4 m 也錯，正確是 80EUB-M-5.75T 33 m、差 0.6 m。"
+  },
+  {
+   "id": "Q06",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "甲乙分開列，五款型號和數字都正確。"
+  },
+  {
+   "id": "Q07",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "六款順序、數字和同分次序都正確。"
+  },
+  {
+   "id": "Q08",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "80EUB-M-5.20S最大流量誤寫為500 LPM（應690），且錯稱EDW無單相2HP款而漏80EDW-5.20S/T。"
+  },
+  {
+   "id": "Q09",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "錯稱無符合額定點雙門檻的型號，漏列全部四款候選與額定點。"
+  },
+  {
+   "id": "Q10",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "錯稱型錄未記載4吋最大流量，未答出冠軍、流量與差值。"
+  },
+  {
+   "id": "Q11",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "只說型錄無售價，未明確說明因此無法判定最便宜或排序。"
+  },
+  {
+   "id": "Q12",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "指出型錄未載保固年限與項目，但未明確說明無法判定哪個系列保固較長。"
+  },
+  {
+   "id": "Q13",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "四款與電流、重量完整正確，並指出全為EUB-M（EDW無符合）。"
+  },
+  {
+   "id": "Q14",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "未逐款列名，EDW功率範圍漏1.5 kW款且未列兩款EUB-M 5.50T，亦未說明3.7 kW門檻含5 HP款。"
+  },
+  {
+   "id": "Q15",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "七款順序、kW、三相電流與重量皆正確。"
+  },
+  {
+   "id": "Q16",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "甲乙清單與數值正確，但乙兩款漏列單相滿載電流12.5 A。"
+  },
+  {
+   "id": "Q17",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "誤稱型錄未提及，未答出兩款最輕型號與重量差。"
+  },
+  {
+   "id": "Q18",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "誤稱型錄未記載12.5 m @1000 LPM額定點，未指出100EDW-5.50T及候選。"
+  },
+  {
+   "id": "Q19",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "指出CH增量與重量缺資料，但未明確回答無法挑出最輕CH款。"
+  },
+  {
+   "id": "Q20",
+   "arm": "P",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "不能當0、單相12.5 A／27.5 kg、不能憑型號補三相數字皆正確。"
+  }
+ ]
+}

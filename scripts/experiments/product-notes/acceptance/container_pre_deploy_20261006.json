@@ -1,0 +1,1480 @@
+{
+ "date": "2026-10-06",
+ "commit": "f223ca2 部署前（容器內載入修改後模組，直接呼叫 build_chat_messages＋run_agent_loop）",
+ "path": "容器內 agent loop，fast，20 題×3",
+ "rubric": "scripts/experiments/product-notes/round3/questions.json（凍結題目、required_points、forbidden_claims、grading_rubric）",
+ "grader": "獨立子代理逐份對照 required_points／forbidden_claims 評分",
+ "verdict_counts": {
+  "錯": 5,
+  "對": 40,
+  "部分對": 15
+ },
+ "answers": [
+  {
+   "id": "Q01",
+   "elapsed_s": 8.7,
+   "tools": [],
+   "rounds": [],
+   "reply": "型錄未記載EDW與EUB-M系列中3吋出水且最大揚程達20米以上的詳細型號規格。請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 1
+  },
+  {
+   "id": "Q02",
+   "tools": [],
+   "reply": "",
+   "error": "LLMEmptyReplyError('LLM 沒有回傳內容')",
+   "repeat": 1
+  },
+  {
+   "id": "Q03",
+   "elapsed_s": 13.6,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "這批EDW與EUB-M系列中，最大流量最大的是100EUB-M-5.75T，最大流量達到1900 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW與EUB-M全系列流量排序\", \"match_count\": 15, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 0}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"sort\":[{\"field\":\"max_flow_lpm\",\"direction\":\"desc\"}],\"name\":\"EDW與EUB-M全系列流量排序\",\"conditions\":[]}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q04",
+   "tools": [],
+   "reply": "",
+   "error": "LLMEmptyReplyError('LLM 沒有回傳內容')",
+   "repeat": 1
+  },
+  {
+   "id": "Q05",
+   "elapsed_s": 10.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW系列最大揚程最高是80EDW-5.50T，最大揚程32.4米；EUB-M系列最高是80EUB-M-5.75T，最大揚程33米。兩邊相差0.6米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW_3吋\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}], \"unknown\": [], \"excluded_count\": 12}, {\"name\": \"EUBM_3吋\", \"match_count\": 5, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 10}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"sort\":[{\"field\":\"max_head_m\",\"direction\":\"desc\"}],\"name\":\"EDW_3吋\",\"conditions\":[{\"value\":\"3\",\"op\":\"eq\",\"field\":\"outlet_inch\"},{\"value\":\"EDW\",\"op\":\"eq\",\"field\":\"series\"}]},{\"name\":\"EUBM_3吋\",\"sort\":[{\"field\":\"max_head_m\",\"direction\":\"desc\"}],\"conditions\":[{\"field\":\"outlet_inch\",\"value\":\"3\",\"op\":\"eq\"},{\"value\":\"EUB-M\",\"field\":\"series\",\"op\":\"eq\"}]}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q06",
+   "elapsed_s": 6.7,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "甲現場符合型號有 80EDW-5.20S 最大流量 820 LPM 與 80EUB-M-5.20S 最大流量 690 LPM。乙現場符合型號有 50EUB-M-5.30T 最大揚程 26 米、80EDW-5.30T 最大揚程 26.5 米及 80EUB-M-5.30T 最大揚程 23 米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲現場\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"乙現場\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"op\":\"eq\",\"field\":\"phase\",\"value\":\"1\"},{\"op\":\"eq\",\"field\":\"hp\",\"value\":\"2\"},{\"field\":\"outlet_inch\",\"value\":\"3\",\"op\":\"eq\"},{\"field\":\"max_flow_lpm\",\"value\":\"650\",\"op\":\"gte\"}],\"name\":\"甲現場\"},{\"conditions\":[{\"field\":\"phase\",\"op\":\"eq\",\"value\":\"3\"},{\"value\":\"3\",\"op\":\"eq\",\"field\":\"hp\"},{\"op\":\"gte\",\"field\":\"max_head_m\",\"value\":\"23\"}],\"name\":\"乙現場\"}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q07",
+   "elapsed_s": 6.3,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "80EUB-M-5.75T 最大揚程33米 最大流量1200LPM\n80EUB-M-5.50T 最大揚程30米 最大流量900LPM\n50EUB-M-5.30T 最大揚程26米 最大流量550LPM\n100EUB-M-5.75T 最大揚程23米 最大流量1900LPM\n80EUB-M-5.30T 最大揚程23米 最大流量700LPM\n50EUB-M-5.20T 最大揚程21米 最大流量450LPM",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EUBM三相最大揚程20米以上\", \"match_count\": 6, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 9}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"sort\":[{\"field\":\"max_head_m\",\"direction\":\"desc\"},{\"direction\":\"desc\",\"field\":\"max_flow_lpm\"}],\"name\":\"EUBM三相最大揚程20米以上\",\"conditions\":[{\"op\":\"eq\",\"value\":\"EUB-M\",\"field\":\"series\"},{\"op\":\"contains\",\"field\":\"phase\",\"value\":\"3\"},{\"op\":\"gte\",\"field\":\"max_head_m\",\"value\":\"20\"}]}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q08",
+   "elapsed_s": 10.7,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "每小時30立方米等於 500 LPM。符合單相 2HP 且最大流量達 500 LPM 以上的型號包含 80EDW-5.20S/T，最大流量 820 LPM；80EUB-M-5.20S，最大流量 690 LPM；50EUB-M-5.20S，最大流量 500 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"single_phase_2hp_flow\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"single_phase_2hp_flow\",\"conditions\":[{\"field\":\"phase\",\"value\":\"1\",\"op\":\"contains\"},{\"op\":\"eq\",\"field\":\"hp\",\"value\":\"2\"},{\"op\":\"gte\",\"value\":\"500\",\"field\":\"max_flow_lpm\"}]}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q09",
+   "elapsed_s": 9.8,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "無法僅看表保證。最大揚程與最大流量是極限值，不能拼成工作點。\n\n額定點揚程至少15米且流量至少400 LPM的型號有：\n80EDW-5.50T（額定點 21.5米 400LPM）\n80EUB-M-5.50T（額定點 19米 600LPM）\n80EUB-M-5.75T（額定點 25米 680LPM）\n100EUB-M-5.75T（額定點 16米 1060LPM）",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"rated_point\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"15\",\"op\":\"gte\",\"field\":\"rated_head_m\"},{\"field\":\"rated_flow_lpm\",\"value\":\"400\",\"op\":\"gte\"}],\"name\":\"rated_point\"}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q10",
+   "elapsed_s": 10.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "4吋出水口中，EDW系列最大流量為100EDW-5.50T的1680 LPM，EUB-M系列為100EUB-M-5.75T的1900 LPM。EUB-M比EDW多220 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"EUB-M4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"EDW4吋\",\"conditions\":[{\"value\":\"4\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"value\":\"EDW\",\"field\":\"series\",\"op\":\"eq\"}],\"sort\":[{\"direction\":\"desc\",\"field\":\"max_flow_lpm\"}]},{\"conditions\":[{\"value\":\"4\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"op\":\"eq\",\"value\":\"EUB-M\",\"field\":\"series\"}],\"sort\":[{\"field\":\"max_flow_lpm\",\"direction\":\"desc\"}],\"name\":\"EUB-M4吋\"}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q11",
+   "elapsed_s": 11.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "型錄無售價資料。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"all_edw_eubm\", \"match_count\": 15, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 0}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[],\"name\":\"all_edw_eubm\"}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q12",
+   "elapsed_s": 5.6,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "型錄資料未提及保固年限與保固零件相關資訊。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 1
+  },
+  {
+   "id": "Q13",
+   "elapsed_s": 6.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合條件的型號包含 50EUB-M-5.20T、50EUB-M-5.30T、80EUB-M-5.20T 與 80EUB-M-5.30T 四款。電流與重量分別為：50EUB-M-5.20T 電流 3.5 A 重量 26.4 公斤；50EUB-M-5.30T 電流 5.2 A 重量 29.8 公斤；80EUB-M-5.20T 電流 3.5 A 重量 25.9 公斤；80EUB-M-5.30T 電流 5.2 A 重量 30 公斤。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相限流限重泵浦\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"3\",\"field\":\"phase\",\"op\":\"contains\"},{\"op\":\"lte\",\"value\":\"5.5\",\"field\":\"current_3ph_a\"},{\"field\":\"weight_3ph_kg\",\"value\":\"30\",\"op\":\"lte\"}],\"name\":\"三相限流限重泵浦\"}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q14",
+   "elapsed_s": 5.2,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合通過粒徑至少10毫米且功率不超過3.7kW的型號包含80EDW-5.20S/T、80EDW-5.30S/T、100EDW-5.30S/T、80EDW-5.50T、100EDW-5.50T、80EUB-M-5.50T及100EUB-M-5.50T。這些款式功率介於1.5至3.7kW，馬力為2至5HP，通過粒徑皆為10毫米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"filter1\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"op\":\"gte\",\"value\":\"10\",\"field\":\"solids_mm\"},{\"value\":\"3.7\",\"field\":\"kw\",\"op\":\"lte\"}],\"name\":\"filter1\"}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q15",
+   "elapsed_s": 5.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合條件的型號依電流與重量排序如下：\n1. 80EUB-M-5.20T：1.5 kW，電流 3.5 A，重量 25.9 kg\n2. 50EUB-M-5.20T：1.5 kW，電流 3.5 A，重量 26.4 kg\n3. 80EDW-5.20S/T：1.5 kW，電流 3.8 A，重量 46 kg\n4. 50EUB-M-5.30T：2.2 kW，電流 5.2 A，重量 29.8 kg\n5. 80EUB-M-5.30T：2.2 kW，電流 5.2 A，重量 30.0 kg\n6. 80EDW-5.30S/T：2.2 kW，電流 5.7 A，重量 45 kg\n7. 100EDW-5.30S/T：2.2 kW，電流 5.7 A，重量 46 kg",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相功率不超過2.2kW\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"三相功率不超過2.2kW\",\"sort\":[{\"direction\":\"asc\",\"field\":\"current_3ph_a\"},{\"field\":\"weight_3ph_kg\",\"direction\":\"asc\"}],\"conditions\":[{\"field\":\"kw\",\"value\":\"2.2\",\"op\":\"lte\"},{\"op\":\"contains\",\"value\":\"3\",\"field\":\"phase\"}]}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q16",
+   "elapsed_s": 5.5,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "甲現場符合型號有80EDW-5.20S/T電流3.8A重量46公斤粒徑10毫米，80EDW-5.30S/T電流5.7A重量45公斤粒徑10毫米，100EDW-5.30S/T電流5.7A重量46公斤粒徑10毫米，80EDW-5.50T電流7.9A重量49.5公斤粒徑10毫米。乙現場符合型號有50EUB-M-5.20S重量27.5公斤粒徑9毫米，80EUB-M-5.20S重量27.5公斤粒徑9毫米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲現場\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 11}, {\"name\": \"乙現場\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"value\":\"3\",\"op\":\"contains\"},{\"op\":\"lte\",\"field\":\"current_3ph_a\",\"value\":\"8\"},{\"value\":\"50\",\"op\":\"lte\",\"field\":\"weight_3ph_kg\"},{\"field\":\"solids_mm\",\"op\":\"gte\",\"value\":\"10\"}],\"name\":\"甲現場\"},{\"name\":\"乙現場\",\"conditions\":[{\"op\":\"contains\",\"value\":\"1\",\"field\":\"phase\"},{\"op\":\"lte\",\"value\":\"28\",\"field\":\"weight_1ph_kg\"},{\"value\":\"9\",\"op\":\"gte\",\"field\":\"solids_mm\"}]}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q17",
+   "elapsed_s": 4.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW最輕為100EDW-5.30S/T的46公斤，EUB-M最輕為100EUB-M-5.50T的34.9公斤，兩邊相差11.1公斤。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW三相4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"EUBM三相4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"EDW\",\"field\":\"series\",\"op\":\"eq\"},{\"op\":\"contains\",\"value\":\"3\",\"field\":\"phase\"},{\"op\":\"eq\",\"value\":\"4\",\"field\":\"outlet_inch\"}],\"sort\":[{\"direction\":\"asc\",\"field\":\"weight_3ph_kg\"}],\"name\":\"EDW三相4吋\"},{\"sort\":[{\"direction\":\"asc\",\"field\":\"weight_3ph_kg\"}],\"name\":\"EUBM三相4吋\",\"conditions\":[{\"op\":\"eq\",\"field\":\"series\",\"value\":\"EUB-M\"},{\"field\":\"phase\",\"value\":\"3\",\"op\":\"contains\"},{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"4\"}]}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q18",
+   "elapsed_s": 4.8,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "100EDW-5.50T明列12.5米與1000 LPM。額定揚程至少12米且流量至少750 LPM的候選有100EDW-5.50T（12.5米/1000LPM）、100EUB-M-5.50T（12.5米/800LPM）、100EUB-M-5.75T（16米/1060LPM）。其他候選無法保證。最大揚程與最大流量是各自極限點，無法同時達到。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"match1\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"match2\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"match1\",\"conditions\":[{\"field\":\"rated_head_m\",\"op\":\"gte\",\"value\":\"12.5\"},{\"value\":\"1000\",\"field\":\"rated_flow_lpm\",\"op\":\"gte\"}]},{\"conditions\":[{\"field\":\"rated_head_m\",\"op\":\"gte\",\"value\":\"12\"},{\"value\":\"750\",\"op\":\"gte\",\"field\":\"rated_flow_lpm\"}],\"name\":\"match2\"}]}"
+   ],
+   "repeat": 1
+  },
+  {
+   "id": "Q19",
+   "elapsed_s": 4.2,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "型錄資料未提及CH選配後增加的最大揚程、最大流量與重量數值，也無法挑出最輕的CH款。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 1
+  },
+  {
+   "id": "Q20",
+   "elapsed_s": 4.0,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "兩款型號結尾的 S 代表單相，型錄僅提供單相規格。橫線代表無此規格，不能當作零或自行推算。兩款實際皆為單相 1 相，滿載電流 12.5 安培，重量 27.5 公斤。三相數值無法僅憑型號補出。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 1
+  },
+  {
+   "id": "Q01",
+   "elapsed_s": 5.1,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合三吋出水管且最大揚程達二十米以上的款式如下。EDW系列有80EDW-5.30S/T最大揚程26.5米、80EDW-5.50T最大揚程32.4米。EUB-M系列有80EUB-M-5.30T最大揚程23米、80EUB-M-5.50T最大揚程30米、80EUB-M-5.75T最大揚程33米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"edw_3in_20m\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"eubm_3in_20m\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"3\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"op\":\"gte\",\"field\":\"max_head_m\",\"value\":\"20\"},{\"value\":\"EDW\",\"field\":\"series\",\"op\":\"eq\"}],\"name\":\"edw_3in_20m\"},{\"conditions\":[{\"op\":\"eq\",\"value\":\"3\",\"field\":\"outlet_inch\"},{\"op\":\"gte\",\"value\":\"20\",\"field\":\"max_head_m\"},{\"value\":\"EUB-M\",\"field\":\"series\",\"op\":\"eq\"}],\"name\":\"eubm_3in_20m\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q02",
+   "elapsed_s": 4.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合三相、3HP以下且最大流量500 LPM以上的型號如下。EDW系列：80EDW為2HP、最大流量820 LPM；80EDW為3HP、最大流量980 LPM；100EDW為3HP、最大流量1200 LPM。EUB-M系列：80EUB-M為2HP、最大流量630 LPM；80EUB-M為3HP、最大流量700 LPM；50EUB-M為3HP、最大流量550 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相3HP以下最大流量500以上\", \"match_count\": 6, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 9}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"三相3HP以下最大流量500以上\",\"conditions\":[{\"value\":\"3\",\"field\":\"phase\",\"op\":\"contains\"},{\"op\":\"lte\",\"value\":\"3\",\"field\":\"hp\"},{\"op\":\"gte\",\"value\":\"500\",\"field\":\"max_flow_lpm\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q03",
+   "elapsed_s": 4.0,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "在這批型號中，最大流量最大的是 100EUB-M-5.75T，最大流量達到 1900 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"all_EDW_EUB\", \"match_count\": 15, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 0}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"sort\":[{\"field\":\"max_flow_lpm\",\"direction\":\"desc\"}],\"name\":\"all_EDW_EUB\",\"conditions\":[]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q04",
+   "elapsed_s": 4.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "3HP中最大揚程最高的是80EDW-5.30S/T，最大揚程達26.5公尺。其他3HP款最大揚程分別為：50EUB-M-5.30T為26公尺、80EUB-M-5.30T為23公尺、100EDW-5.30S/T為17公尺。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"3HP泵浦清單\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"field\":\"hp\",\"value\":\"3\",\"op\":\"eq\"}],\"name\":\"3HP泵浦清單\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q05",
+   "elapsed_s": 4.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW系列最大揚程最高為 80EDW-5.50T，最大揚程 32.4 米；EUB-M系列最高為 80EUB-M-5.75T，最大揚程 33 米。兩者相差 0.6 米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW 3吋\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}], \"unknown\": [], \"excluded_count\": 12}, {\"name\": \"EUB-M 3吋\", \"match_count\": 5, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 10}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"sort\":[{\"direction\":\"desc\",\"field\":\"max_head_m\"}],\"name\":\"EDW 3吋\",\"conditions\":[{\"op\":\"eq\",\"value\":\"3\",\"field\":\"outlet_inch\"},{\"op\":\"eq\",\"field\":\"series\",\"value\":\"EDW\"}]},{\"name\":\"EUB-M 3吋\",\"sort\":[{\"direction\":\"desc\",\"field\":\"max_head_m\"}],\"conditions\":[{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"3\"},{\"field\":\"series\",\"value\":\"EUB-M\",\"op\":\"eq\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q06",
+   "elapsed_s": 4.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "甲現場型號：80EDW-5.20S/T最大流量820 LPM、80EUB-M-5.20S最大流量690 LPM。乙現場型號：50EUB-M-5.30T最大揚程26米、80EDW-5.30S/T最大揚程26.5米、80EUB-M-5.30T最大揚程23米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲現場\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"乙現場\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"op\":\"eq\",\"field\":\"phase\",\"value\":\"1\"},{\"op\":\"eq\",\"value\":\"2\",\"field\":\"hp\"},{\"field\":\"outlet_inch\",\"value\":\"3\",\"op\":\"eq\"},{\"value\":\"650\",\"field\":\"max_flow_lpm\",\"op\":\"gte\"}],\"name\":\"甲現場\"},{\"conditions\":[{\"field\":\"phase\",\"value\":\"3\",\"op\":\"eq\"},{\"value\":\"3\",\"field\":\"hp\",\"op\":\"eq\"},{\"op\":\"gte\",\"field\":\"max_head_m\",\"value\":\"23\"}],\"name\":\"乙現場\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q07",
+   "elapsed_s": 4.6,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "80EUB-M-5.75T 最大揚程33米 最大流量1200 LPM\n80EUB-M-5.50T 最大揚程30米 最大流量900 LPM\n50EUB-M-5.30T 最大揚程26米 最大流量550 LPM\n100EUB-M-5.75T 最大揚程23米 最大流量1900 LPM\n80EUB-M-5.30T 最大揚程23米 最大流量700 LPM\n50EUB-M-5.20T 最大揚程21米 最大流量450 LPM",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EUB-M三相最大揚程20米以上\", \"match_count\": 6, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 9}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"EUB-M三相最大揚程20米以上\",\"sort\":[{\"field\":\"max_head_m\",\"direction\":\"desc\"},{\"direction\":\"desc\",\"field\":\"max_flow_lpm\"}],\"conditions\":[{\"op\":\"eq\",\"value\":\"EUB-M\",\"field\":\"series\"},{\"field\":\"phase\",\"value\":\"3\",\"op\":\"in\"},{\"value\":\"20\",\"op\":\"gte\",\"field\":\"max_head_m\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q08",
+   "elapsed_s": 4.7,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "每小時30立方米相當於500LPM。符合單相2HP且最大流量達500LPM以上的型號有：50EUB-M-5.20S最大流量500LPM、80EUB-M-5.20S最大流量690LPM、80EDW-5.20S最大流量820LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"single_phase_2hp_max_flow\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"single_phase_2hp_max_flow\",\"conditions\":[{\"op\":\"eq\",\"field\":\"hp\",\"value\":\"2\"},{\"op\":\"in\",\"field\":\"phase\",\"value\":\"1,1,3\"},{\"field\":\"max_flow_lpm\",\"value\":\"500\",\"op\":\"gte\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q09",
+   "elapsed_s": 5.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "光看表無法保證單一機型，最大揚程與最大流量是各自極限，不能拼成工作點。額定點達15米與400 LPM以上的候選有80EDW-5.50T（21.5米、400LPM）、80EUB-M-5.50T（19米、600LPM）、80EUB-M-5.75T（25米、680LPM）、100EUB-M-5.75T（16米、1060LPM）。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"rated_condition\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"rated_condition\",\"conditions\":[{\"value\":\"15\",\"op\":\"gte\",\"field\":\"rated_head_m\"},{\"op\":\"gte\",\"value\":\"400\",\"field\":\"rated_flow_lpm\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q10",
+   "elapsed_s": 4.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW系列4吋最大為100EDW-5.50T，1680 LPM；EUB-M系列4吋最大為100EUB-M-5.75T，1900 LPM。EUB-M比EDW多220 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW_4inch\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"EUB_4inch\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"op\":\"eq\",\"field\":\"series\",\"value\":\"EDW\"},{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"4\"}],\"name\":\"EDW_4inch\"},{\"conditions\":[{\"op\":\"eq\",\"field\":\"series\",\"value\":\"EUB-M\"},{\"op\":\"eq\",\"value\":\"4\",\"field\":\"outlet_inch\"}],\"name\":\"EUB_4inch\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q11",
+   "elapsed_s": 4.1,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "型錄未提供售價，無法進行價格排序與比較。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW與EUB-M系列產品\", \"match_count\": 15, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 0}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"field\":\"series\",\"value\":\"EDW,EUB-M\",\"op\":\"in\"}],\"name\":\"EDW與EUB-M系列產品\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q12",
+   "elapsed_s": 3.8,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "型錄資料未提及保固年限與保固零件相關資訊。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 2
+  },
+  {
+   "id": "Q13",
+   "elapsed_s": 4.5,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合條件的型號有四款 EUB-M 系列：\n1. 50EUB-M-5.20T：三相電流 3.5 A，重量 26.4 公斤\n2. 80EUB-M-5.20T：三相電流 3.5 A，重量 25.9 公斤\n3. 50EUB-M-5.30T：三相電流 5.2 A，重量 29.8 公斤\n4. 80EUB-M-5.30T：三相電流 5.2 A，重量 30.0 公斤",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"符合三相電流與重量限制的EDW與EUB-M泵浦\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"op\":\"contains\",\"value\":\"3\",\"field\":\"phase\"},{\"op\":\"lte\",\"value\":\"5.5\",\"field\":\"current_3ph_a\"},{\"op\":\"lte\",\"value\":\"30\",\"field\":\"weight_3ph_kg\"}],\"name\":\"符合三相電流與重量限制的EDW與EUB-M泵浦\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q14",
+   "elapsed_s": 3.7,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合通過粒徑至少10毫米且功率不超過3.7kW的EDW系列有80EDW與100EDW各型號（2HP至5HP、1.5至3.7kW、粒徑10毫米）；EUB-M系列則僅有5HP（3.7kW、粒徑10毫米）款式符合。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"條件符合\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"10\",\"op\":\"gte\",\"field\":\"solids_mm\"},{\"field\":\"kw\",\"value\":\"3.7\",\"op\":\"lte\"}],\"name\":\"條件符合\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q15",
+   "elapsed_s": 4.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合條件的機型依電流與重量排序如下：\n80EUB-M-5.20T: 1.5 kW, 3.5 A, 25.9 kg\n50EUB-M-5.20T: 1.5 kW, 3.5 A, 26.4 kg\n80EDW-5.20S/T: 1.5 kW, 3.8 A, 46 kg\n50EUB-M-5.30T: 2.2 kW, 5.2 A, 29.8 kg\n80EUB-M-5.30T: 2.2 kW, 5.2 A, 30.0 kg\n80EDW-5.30S/T: 2.2 kW, 5.7 A, 45 kg\n100EDW-5.30S/T: 2.2 kW, 5.7 A, 46 kg",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相功率不超過2.2kW\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"三相功率不超過2.2kW\",\"sort\":[{\"field\":\"current_3ph_a\",\"direction\":\"asc\"},{\"direction\":\"asc\",\"field\":\"weight_3ph_kg\"}],\"conditions\":[{\"op\":\"contains\",\"field\":\"phase\",\"value\":\"3\"},{\"op\":\"lte\",\"field\":\"kw\",\"value\":\"2.2\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q16",
+   "elapsed_s": 5.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "甲場地三相規格：\n80EDW-5.20S/T：電流3.8A、重量46公斤、粒徑10毫米\n80EDW-5.30S/T：電流5.7A、重量45公斤、粒徑10毫米\n100EDW-5.30S/T：電流5.7A、重量46公斤、粒徑10毫米\n80EDW-5.50T：電流7.9A、重量49.5公斤、粒徑10毫米\n\n乙場地單相規格：\n50EUB-M-5.20S：電流12.5A、重量27.5公斤、粒徑9毫米\n80EUB-M-5.20S：電流12.5A、重量27.5公斤、粒徑9毫米",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲場地三相規格\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 11}, {\"name\": \"乙場地單相規格\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"3\",\"field\":\"phase\",\"op\":\"contains\"},{\"value\":\"8\",\"op\":\"lte\",\"field\":\"current_3ph_a\"},{\"op\":\"lte\",\"field\":\"weight_3ph_kg\",\"value\":\"50\"},{\"field\":\"solids_mm\",\"value\":\"10\",\"op\":\"gte\"}],\"name\":\"甲場地三相規格\"},{\"conditions\":[{\"field\":\"phase\",\"op\":\"contains\",\"value\":\"1\"},{\"field\":\"weight_1ph_kg\",\"op\":\"lte\",\"value\":\"28\"},{\"op\":\"gte\",\"field\":\"solids_mm\",\"value\":\"9\"}],\"name\":\"乙場地單相規格\"}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q17",
+   "elapsed_s": 4.1,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW系列最輕為100EDW-5.30S/T的三相重量46公斤，EUB-M系列最輕為100EUB-M-5.50T的三相重量34.9公斤，兩者相差11.1公斤。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW三相4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"EUB-M三相4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"sort\":[{\"direction\":\"asc\",\"field\":\"weight_3ph_kg\"}],\"name\":\"EDW三相4吋\",\"conditions\":[{\"value\":\"EDW\",\"op\":\"eq\",\"field\":\"series\"},{\"op\":\"contains\",\"field\":\"phase\",\"value\":\"3\"},{\"value\":\"4\",\"op\":\"eq\",\"field\":\"outlet_inch\"}]},{\"conditions\":[{\"value\":\"EUB-M\",\"op\":\"eq\",\"field\":\"series\"},{\"field\":\"phase\",\"op\":\"contains\",\"value\":\"3\"},{\"field\":\"outlet_inch\",\"op\":\"eq\",\"value\":\"4\"}],\"name\":\"EUB-M三相4吋\",\"sort\":[{\"direction\":\"asc\",\"field\":\"weight_3ph_kg\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q18",
+   "elapsed_s": 5.3,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "明列此額定點的是 100EDW-5.50T。符合揚程至少12米、流量至少750 LPM的候選有 100EDW-5.50T（12.5米 1000 LPM）、100EUB-M-5.50T（12.5米 800 LPM）與 100EUB-M-5.75T（16米 1060 LPM）。其他候選無法直接保證符合。最大揚程與最大流量是曲線極限值，不能同時達到。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"target1\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"target2\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"field\":\"rated_head_m\",\"op\":\"gte\",\"value\":\"12.5\"},{\"value\":\"1000\",\"op\":\"gte\",\"field\":\"rated_flow_lpm\"}],\"name\":\"target1\"},{\"name\":\"target2\",\"conditions\":[{\"field\":\"rated_head_m\",\"op\":\"gte\",\"value\":\"12\"},{\"op\":\"gte\",\"value\":\"750\",\"field\":\"rated_flow_lpm\"}]}]}"
+   ],
+   "repeat": 2
+  },
+  {
+   "id": "Q19",
+   "elapsed_s": 4.2,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "型錄未記載EDW系列換裝CH選配後的揚程、流量與重量增加數值，且未提供各個CH款的重量明細。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 2
+  },
+  {
+   "id": "Q20",
+   "elapsed_s": 4.8,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "不行。型號帶有 S 代表單相，三相欄位為橫線代表該型號無此規格，不能當作零電流與零重量。此二型號僅提供單相，無法光靠型號補出三相數據。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 2
+  },
+  {
+   "id": "Q01",
+   "elapsed_s": 4.7,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合三吋出水管且最大揚程達二十米以上的型號如下：EDW系列有80EDW-5.30S/T最大揚程26.5米與80EDW-5.50T最大揚程32.4米；EUB-M系列有80EUB-M-5.30T最大揚程23米、80EUB-M-5.50T最大揚程30米及80EUB-M-5.75T最大揚程33米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW_EUBM_3inch_20m\", \"match_count\": 5, \"matches\": [{\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 10}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"3\",\"field\":\"outlet_inch\",\"op\":\"eq\"},{\"value\":\"20\",\"field\":\"max_head_m\",\"op\":\"gte\"},{\"value\":\"EDW,EUB-M\",\"field\":\"series\",\"op\":\"in\"}],\"name\":\"EDW_EUBM_3inch_20m\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q02",
+   "elapsed_s": 4.4,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合三相、3HP以下且最大流量至少500 LPM的有兩款：EDW系列的80EDW-5.20S/T，馬力2 HP，最大流量820 LPM；EUB-M系列的80EUB-M-5.20T，馬力2 HP，最大流量630 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相3HP以下最大流量500以上\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"三相3HP以下最大流量500以上\",\"conditions\":[{\"op\":\"contains\",\"field\":\"phase\",\"value\":\"3\"},{\"field\":\"hp\",\"op\":\"lt\",\"value\":\"3\"},{\"field\":\"max_flow_lpm\",\"op\":\"gte\",\"value\":\"500\"}]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q03",
+   "elapsed_s": 3.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "這批EDW與EUB-M系列中，最大流量最大的是100EUB-M-5.75T型號，最大流量達1900 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"all\", \"match_count\": 15, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 0}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[],\"sort\":[{\"direction\":\"desc\",\"field\":\"max_flow_lpm\"}],\"name\":\"all\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q04",
+   "elapsed_s": 4.6,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "3HP中最大揚程最高為80EDW-5.30S/T，達26.5M。各款最大揚程分別為：80EDW為26.5M、50EUB-M-5.30T為26M、80EUB-M-5.30T為23M、100EDW-5.30S/T為17M。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"3HP所有款式\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"3HP所有款式\",\"conditions\":[{\"op\":\"eq\",\"field\":\"hp\",\"value\":\"3\"}]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q05",
+   "elapsed_s": 3.6,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW系列三吋最高為80EDW-5.50T，最大揚程32.4米。EUB-M系列三吋最高為80EUB-M-5.75T，最大揚程33米。兩者差0.6米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"edw_3inch\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}], \"unknown\": [], \"excluded_count\": 12}, {\"name\": \"eub_3inch\", \"match_count\": 5, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 10}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"sort\":[{\"direction\":\"desc\",\"field\":\"max_head_m\"}],\"conditions\":[{\"field\":\"outlet_inch\",\"value\":\"3\",\"op\":\"eq\"},{\"field\":\"series\",\"value\":\"EDW\",\"op\":\"eq\"}],\"name\":\"edw_3inch\"},{\"sort\":[{\"field\":\"max_head_m\",\"direction\":\"desc\"}],\"conditions\":[{\"field\":\"outlet_inch\",\"op\":\"eq\",\"value\":\"3\"},{\"value\":\"EUB-M\",\"field\":\"series\",\"op\":\"eq\"}],\"name\":\"eub_3inch\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q06",
+   "elapsed_s": 4.6,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "甲現場：80EDW-5.20S/T最大流量820 LPM，80EUB-M-5.20S最大流量690 LPM。乙現場：50EUB-M-5.30T最大揚程26米，80EDW-5.30S/T最大揚程26.5米，80EUB-M-5.30T最大揚程23米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲現場\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"乙現場\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"1\",\"op\":\"eq\",\"field\":\"phase\"},{\"value\":\"2\",\"field\":\"hp\",\"op\":\"eq\"},{\"value\":\"3\",\"op\":\"eq\",\"field\":\"outlet_inch\"},{\"op\":\"gte\",\"field\":\"max_flow_lpm\",\"value\":\"650\"}],\"name\":\"甲現場\"},{\"name\":\"乙現場\",\"conditions\":[{\"op\":\"eq\",\"field\":\"phase\",\"value\":\"3\"},{\"value\":\"3\",\"field\":\"hp\",\"op\":\"eq\"},{\"value\":\"23\",\"field\":\"max_head_m\",\"op\":\"gte\"}]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q07",
+   "elapsed_s": 4.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "80EUB-M-5.75T 最大揚程 33米 最大流量 1200 LPM\n80EUB-M-5.50T 最大揚程 30米 最大流量 900 LPM\n50EUB-M-5.30T 最大揚程 26米 最大流量 550 LPM\n100EUB-M-5.75T 最大揚程 23米 最大流量 1900 LPM\n80EUB-M-5.30T 最大揚程 23米 最大流量 700 LPM\n50EUB-M-5.20T 最大揚程 21米 最大流量 450 LPM",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"eubm_3ph_20m\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"eubm_3ph_20m\",\"conditions\":[{\"op\":\"eq\",\"field\":\"series\",\"value\":\"EUB-M\"},{\"value\":\"3,1,3\",\"op\":\"in\",\"field\":\"phase\"},{\"value\":\"20\",\"op\":\"gte\",\"field\":\"max_head_m\"}],\"sort\":[{\"direction\":\"desc\",\"field\":\"max_head_m\"},{\"field\":\"max_flow_lpm\",\"direction\":\"desc\"}]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q08",
+   "elapsed_s": 4.4,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "每小時30立方米相當於500LPM。符合條件的單相2HP型號有：50EUB-M-5.20S最大流量500LPM，80EDW-5.20S最大流量820LPM，80EUB-M-5.20S最大流量690LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"single_phase_2hp_flow\", \"match_count\": 3, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 12}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"op\":\"contains\",\"value\":\"1\"},{\"op\":\"eq\",\"field\":\"hp\",\"value\":\"2\"},{\"op\":\"in\",\"value\":\"EDW,EUB-M\",\"field\":\"series\"},{\"op\":\"gte\",\"value\":\"500\",\"field\":\"max_flow_lpm\"}],\"name\":\"single_phase_2hp_flow\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q09",
+   "elapsed_s": 4.3,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "無法保證。最大揚程與最大流量是各自的極限，不能拼成工作點。\n\n符合額定揚程不低於15米且流量不低於400 LPM的型號有：\n80EDW-5.50T（額定點21.5米、400 LPM）\n80EUB-M-5.50T（額定點19米、600 LPM）\n80EUB-M-5.75T（額定點25米、680 LPM）\n100EUB-M-5.75T（額定點16米、1060 LPM）",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"rated_cond\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"op\":\"gte\",\"field\":\"rated_head_m\",\"value\":\"15\"},{\"field\":\"rated_flow_lpm\",\"value\":\"400\",\"op\":\"gte\"}],\"name\":\"rated_cond\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q10",
+   "elapsed_s": 3.9,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW系列4吋最大流量最多的是100EDW-5.50T，達1680 LPM。EUB-M系列4吋最大流量最多的是100EUB-M-5.75T，達1900 LPM。EUB-M比EDW多出220 LPM。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"EUBM4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"EDW\",\"field\":\"series\",\"op\":\"eq\"},{\"value\":\"4\",\"field\":\"outlet_inch\",\"op\":\"eq\"}],\"name\":\"EDW4吋\"},{\"conditions\":[{\"op\":\"eq\",\"value\":\"EUB-M\",\"field\":\"series\"},{\"op\":\"eq\",\"field\":\"outlet_inch\",\"value\":\"4\"}],\"name\":\"EUBM4吋\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q11",
+   "elapsed_s": 3.4,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "型錄未記載各型號售價與價格表，無法提供價格排序。請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"all\", \"match_count\": 15, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 3, \"rated_head_m\": 25, \"rated_flow_lpm\": 680, \"max_head_m\": 33, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.6}, \"path\": \"knowledge/products/80EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 0}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"all\",\"conditions\":[]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q12",
+   "elapsed_s": 3.5,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "型錄資料未提及保固年限與保固範圍。請洽詢鶴記企業或億發泵浦原廠工程業務團隊。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 3
+  },
+  {
+   "id": "Q13",
+   "elapsed_s": 4.6,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合條件的型號共四款，均屬於 EUB-M 系列：\n\n1. 50EUB-M-5.20T：三相電流 3.5A，重量 26.4 公斤\n2. 50EUB-M-5.30T：三相電流 5.2A，重量 29.8 公斤\n3. 80EUB-M-5.20T：三相電流 3.5A，重量 25.9 公斤\n4. 80EUB-M-5.30T：三相電流 5.2A，重量 30.0 公斤",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相電流與重量條件\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}], \"unknown\": [], \"excluded_count\": 11}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"value\":\"3\",\"op\":\"contains\"},{\"field\":\"current_3ph_a\",\"value\":\"5.5\",\"op\":\"lte\"},{\"op\":\"lte\",\"field\":\"weight_3ph_kg\",\"value\":\"30\"}],\"name\":\"三相電流與重量條件\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q14",
+   "elapsed_s": 3.6,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合條件的EDW系列全數通過粒徑10毫米且功率不大於3.7kW。EUB-M系列中僅100EUB-M-5.50T符合5 HP、3.7 kW、粒徑10毫米。其餘EUB-M粒徑為9毫米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"filter_1\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 19, \"rated_flow_lpm\": 600, \"max_head_m\": 30, \"max_flow_lpm\": 900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 35.6}, \"path\": \"knowledge/products/80EUB-M-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"value\":\"10\",\"op\":\"gte\",\"field\":\"solids_mm\"},{\"field\":\"kw\",\"value\":\"3.7\",\"op\":\"lte\"}],\"name\":\"filter_1\"}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q15",
+   "elapsed_s": 5.3,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "符合的三相泵浦如下：\n80EUB-M-5.20T: 1.5 kW, 3.5 A, 25.9 kg\n50EUB-M-5.20T: 1.5 kW, 3.5 A, 26.4 kg\n80EDW-5.20S/T: 1.5 kW, 3.8 A, 46 kg\n50EUB-M-5.30T: 2.2 kW, 5.2 A, 29.8 kg\n80EUB-M-5.30T: 2.2 kW, 5.2 A, 30 kg\n80EDW-5.30S/T: 2.2 kW, 5.7 A, 45 kg\n100EDW-5.30S/T: 2.2 kW, 5.7 A, 46 kg",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"三相功率不超過2.2kW\", \"match_count\": 7, \"matches\": [{\"values\": {\"model\": \"80EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9, \"rated_flow_lpm\": 400, \"max_head_m\": 16, \"max_flow_lpm\": 630, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 25.9}, \"path\": \"knowledge/products/80EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.20T\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 220, \"max_head_m\": 21, \"max_flow_lpm\": 450, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 3.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 26.4}, \"path\": \"knowledge/products/50EUB-M-5.20T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"50EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 330, \"max_head_m\": 26, \"max_flow_lpm\": 550, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 29.8}, \"path\": \"knowledge/products/50EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EUB-M-5.30T\", \"series\": \"EUB-M\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 500, \"max_head_m\": 23, \"max_flow_lpm\": 700, \"solids_mm\": 9, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 5.2, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 30.0}, \"path\": \"knowledge/products/80EUB-M-5.30T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}], \"unknown\": [], \"excluded_count\": 8}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"name\":\"三相功率不超過2.2kW\",\"conditions\":[{\"value\":\"3\",\"field\":\"phase\",\"op\":\"contains\"},{\"op\":\"lte\",\"field\":\"kw\",\"value\":\"2.2\"}],\"sort\":[{\"direction\":\"asc\",\"field\":\"current_3ph_a\"},{\"direction\":\"asc\",\"field\":\"weight_3ph_kg\"}]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q16",
+   "elapsed_s": 4.8,
+   "tools": [
+    "filter_products",
+    "search_knowledge"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "甲現場符合型號有 100EDW-5.30S/T、80EDW-5.20S/T、80EDW-5.30S/T、80EDW-5.50T，三相電流 3.8 至 7.9A，重量 45 至 49.5公斤，粒徑 10毫米。乙現場符合型號有 50EUB-M-5.20S、80EUB-M-5.20S，單相重量 27.5公斤，粒徑 9毫米。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"甲現場三相\", \"match_count\": 4, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.20S/T\", \"series\": \"EDW\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 500, \"max_head_m\": 16.4, \"max_flow_lpm\": 820, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 11.0, \"current_3ph_a\": 3.8, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/80EDW-5.20S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 3, \"rated_head_m\": 14.5, \"rated_flow_lpm\": 500, \"max_head_m\": 26.5, \"max_flow_lpm\": 980, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 46, \"weight_3ph_kg\": 45}, \"path\": \"knowledge/products/80EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"80EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 3, \"rated_head_m\": 21.5, \"rated_flow_lpm\": 400, \"max_head_m\": 32.4, \"max_flow_lpm\": 1040, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 49.5}, \"path\": \"knowledge/products/80EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 11}, {\"name\": \"乙現場單相\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"50EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 2, \"rated_head_m\": 15, \"rated_flow_lpm\": 270, \"max_head_m\": 23, \"max_flow_lpm\": 500, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/50EUB-M-5.20S.md\"}, {\"values\": {\"model\": \"80EUB-M-5.20S\", \"series\": \"EUB-M\", \"hp\": 2, \"kw\": 1.5, \"outlet_inch\": 3, \"rated_head_m\": 10, \"rated_flow_lpm\": 400, \"max_head_m\": 17, \"max_flow_lpm\": 690, \"solids_mm\": 9, \"phase\": [1], \"current_1ph_a\": 12.5, \"current_3ph_a\": null, \"weight_1ph_kg\": 27.5, \"weight_3ph_kg\": null}, \"path\": \"knowledge/products/80EUB-M-5.20S.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"field\":\"phase\",\"value\":\"3\",\"op\":\"in\"},{\"field\":\"current_3ph_a\",\"value\":\"8\",\"op\":\"lte\"},{\"op\":\"lte\",\"field\":\"weight_3ph_kg\",\"value\":\"50\"},{\"op\":\"gte\",\"value\":\"10\",\"field\":\"solids_mm\"}],\"name\":\"甲現場三相\"},{\"name\":\"乙現場單相\",\"conditions\":[{\"op\":\"in\",\"value\":\"1\",\"field\":\"phase\"},{\"op\":\"lte\",\"field\":\"weight_1ph_kg\",\"value\":\"28\"},{\"op\":\"gte\",\"value\":\"9\",\"field\":\"solids_mm\"}]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q17",
+   "elapsed_s": 4.3,
+   "tools": [
+    "search_knowledge",
+    "filter_products"
+   ],
+   "rounds": [
+    0,
+    0
+   ],
+   "reply": "EDW最輕為100EDW-5.30S/T，46公斤；EUB-M最輕為100EUB-M-5.50T，34.9公斤。兩者相差11.1公斤。",
+   "filter_results": [
+    "{\"status\": \"ok\", \"tool_name\": \"filter_products\", \"data\": {\"catalog\": \"EVAK 沉水泵浦（EDW、EUB-M 2～7.5HP）\", \"product_count\": 15, \"scenarios\": [{\"name\": \"EDW三相4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EDW-5.30S/T\", \"series\": \"EDW\", \"hp\": 3, \"kw\": 2.2, \"outlet_inch\": 4, \"rated_head_m\": 9.5, \"rated_flow_lpm\": 800, \"max_head_m\": 17.0, \"max_flow_lpm\": 1200, \"solids_mm\": 10, \"phase\": [1, 3], \"current_1ph_a\": 15.0, \"current_3ph_a\": 5.7, \"weight_1ph_kg\": 47, \"weight_3ph_kg\": 46}, \"path\": \"knowledge/products/100EDW-5.30S-T.md\"}, {\"values\": {\"model\": \"100EDW-5.50T\", \"series\": \"EDW\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 1000, \"max_head_m\": 22.0, \"max_flow_lpm\": 1680, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 7.9, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 50.5}, \"path\": \"knowledge/products/100EDW-5.50T.md\"}], \"unknown\": [], \"excluded_count\": 13}, {\"name\": \"EUBM三相4吋\", \"match_count\": 2, \"matches\": [{\"values\": {\"model\": \"100EUB-M-5.50T\", \"series\": \"EUB-M\", \"hp\": 5, \"kw\": 3.7, \"outlet_inch\": 4, \"rated_head_m\": 12.5, \"rated_flow_lpm\": 800, \"max_head_m\": 18.5, \"max_flow_lpm\": 1400, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 9.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 34.9}, \"path\": \"knowledge/products/100EUB-M-5.50T.md\"}, {\"values\": {\"model\": \"100EUB-M-5.75T\", \"series\": \"EUB-M\", \"hp\": 7.5, \"kw\": 5.5, \"outlet_inch\": 4, \"rated_head_m\": 16, \"rated_flow_lpm\": 1060, \"max_head_m\": 23, \"max_flow_lpm\": 1900, \"solids_mm\": 10, \"phase\": [3], \"current_1ph_a\": null, \"current_3ph_a\": 12.5, \"weight_1ph_kg\": null, \"weight_3ph_kg\": 51.4}, \"path\": \"knowledge/products/100EUB-M-5.75T.md\"}], \"unknown\": [], \"excluded_count\": 13}], \"skipped_notes\": [], \"notes\": \"額定揚程與額定流量是同一個工作點；最大揚程、最大流量是各自的極限，不能當成同時達到。 問「在 X 米揚程下抽 Y LPM」時，額定揚程 ≥ X 且額定流量 ≥ Y 的只是候選，要說明需看性能曲線確認。 流量換算：1 m³/h = 1000/60 LPM（30 m³/h = 500 LPM）。\"}, \"error\": \"\"}"
+   ],
+   "filter_args": [
+    "{\"scenarios\":[{\"conditions\":[{\"op\":\"eq\",\"field\":\"series\",\"value\":\"EDW\"},{\"field\":\"phase\",\"op\":\"contains\",\"value\":\"3\"},{\"field\":\"outlet_inch\",\"op\":\"eq\",\"value\":\"4\"}],\"name\":\"EDW三相4吋\",\"sort\":[{\"field\":\"weight_3ph_kg\",\"direction\":\"asc\"}]},{\"name\":\"EUBM三相4吋\",\"conditions\":[{\"field\":\"series\",\"op\":\"eq\",\"value\":\"EUB-M\"},{\"op\":\"contains\",\"field\":\"phase\",\"value\":\"3\"},{\"field\":\"outlet_inch\",\"value\":\"4\",\"op\":\"eq\"}],\"sort\":[{\"direction\":\"asc\",\"field\":\"weight_3ph_kg\"}]}]}"
+   ],
+   "repeat": 3
+  },
+  {
+   "id": "Q18",
+   "elapsed_s": 4.5,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "型錄無此額定點。無候選符合。其他候選無法直接保證符合。最大揚程與最大流量不能同時達到。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 3
+  },
+  {
+   "id": "Q19",
+   "elapsed_s": 3.1,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "型錄未提供CH選配增加的最大揚程、最大流量與重量數據，也無法挑出最輕的CH款。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 3
+  },
+  {
+   "id": "Q20",
+   "elapsed_s": 3.3,
+   "tools": [
+    "search_knowledge"
+   ],
+   "rounds": [
+    0
+   ],
+   "reply": "不能當作零。這兩款實際為單相 1 相，滿載電流 12.5 安培，重量 27.5 公斤。型號中的 S 代表單相，無法憑空補出三相數值。橫線代表無此規格。",
+   "filter_results": [],
+   "filter_args": [],
+   "repeat": 3
+  }
+ ],
+ "grades": [
+  {
+   "id": "Q01",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "聲稱型錄未記載符合款式，但型錄有五款3吋且最大揚程≥20 m的型號。"
+  },
+  {
+   "id": "Q02",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "空回覆（LLMEmptyReplyError）。"
+  },
+  {
+   "id": "Q03",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "正確答出100EUB-M-5.75T，最大流量1900 LPM。"
+  },
+  {
+   "id": "Q04",
+   "repeat": 1,
+   "verdict": "錯",
+   "reason": "空回覆（LLMEmptyReplyError）。"
+  },
+  {
+   "id": "Q05",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "兩系列3吋冠軍、32.4 m與33 m及差0.6 m皆正確。"
+  },
+  {
+   "id": "Q06",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "兩現場分開列出完整清單且數字正確，EDW以S／T對應版本命名可接受。"
+  },
+  {
+   "id": "Q07",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "六款排序、數字與23 m同分次序皆正確。"
+  },
+  {
+   "id": "Q01",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "五款與最大揚程26.5、32.4、23、30、33 m皆正確。"
+  },
+  {
+   "id": "Q02",
+   "repeat": 2,
+   "verdict": "部分對",
+   "reason": "六款數字正確，但型號只寫80EDW／100EDW／80EUB-M等系列口徑前綴而非完整型號，也未說明EDW S/T列具三相版本。"
+  },
+  {
+   "id": "Q03",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "正確答出100EUB-M-5.75T，最大流量1900 LPM。"
+  },
+  {
+   "id": "Q04",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "四款3HP最大揚程與冠軍80EDW-5.30S/T 26.5 m皆正確。"
+  },
+  {
+   "id": "Q05",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "兩系列冠軍、最大揚程與差0.6 m皆正確。"
+  },
+  {
+   "id": "Q06",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "甲乙兩現場完整清單與數字皆正確。"
+  },
+  {
+   "id": "Q07",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "六款排序、數字與同分次序皆正確。"
+  },
+  {
+   "id": "Q01",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "五款與最大揚程皆正確。"
+  },
+  {
+   "id": "Q02",
+   "repeat": 3,
+   "verdict": "部分對",
+   "reason": "只列80EDW-5.20S/T與80EUB-M-5.20T兩款，漏列80EDW-5.30S/T、100EDW-5.30S/T、50EUB-M-5.30T、80EUB-M-5.30T。"
+  },
+  {
+   "id": "Q03",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "正確答出100EUB-M-5.75T，最大流量1900 LPM。"
+  },
+  {
+   "id": "Q04",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "四款3HP最大揚程與冠軍皆正確。"
+  },
+  {
+   "id": "Q05",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "兩系列3吋冠軍、最大揚程與差0.6 m皆正確。"
+  },
+  {
+   "id": "Q06",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "甲乙兩現場完整清單與數字皆正確。"
+  },
+  {
+   "id": "Q07",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "六款排序、數字與同分次序皆正確。"
+  },
+  {
+   "id": "Q08",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "500 LPM換算正確，三款單相2HP型號與最大流量820/500/690 LPM皆正確完整。"
+  },
+  {
+   "id": "Q08",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "500 LPM換算正確，三款單相2HP型號與最大流量820/500/690 LPM皆正確完整。"
+  },
+  {
+   "id": "Q08",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "500 LPM換算正確，三款單相2HP型號與最大流量820/500/690 LPM皆正確完整。"
+  },
+  {
+   "id": "Q09",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "說明無法保證且最大值不能拼成工作點，四款額定點候選與數值完整正確。"
+  },
+  {
+   "id": "Q09",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "說明無法保證且最大值不能拼成工作點，四款額定點候選與數值完整正確。"
+  },
+  {
+   "id": "Q09",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "說明無法保證且最大值不能拼成工作點，四款額定點候選與數值完整正確。"
+  },
+  {
+   "id": "Q10",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "兩系列4吋冠軍、1680/1900 LPM及差值220 LPM皆正確。"
+  },
+  {
+   "id": "Q10",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "兩系列4吋冠軍、1680/1900 LPM及差值220 LPM皆正確。"
+  },
+  {
+   "id": "Q10",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "兩系列4吋冠軍、1680/1900 LPM及差值220 LPM皆正確。"
+  },
+  {
+   "id": "Q11",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "正確指出型錄無售價，但未明說因此無法判定最便宜款式或排序。"
+  },
+  {
+   "id": "Q11",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "指出型錄無售價且無法排序比較，未虛構價格。"
+  },
+  {
+   "id": "Q11",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "指出型錄無售價且無法排序，並建議洽原廠報價，未虛構價格。"
+  },
+  {
+   "id": "Q12",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "正確指出型錄未載保固年限與範圍，但未明說因此無法判定哪個系列保固較長。"
+  },
+  {
+   "id": "Q12",
+   "repeat": 2,
+   "verdict": "部分對",
+   "reason": "正確指出型錄未載保固年限與範圍，但未明說因此無法判定哪個系列保固較長。"
+  },
+  {
+   "id": "Q12",
+   "repeat": 3,
+   "verdict": "部分對",
+   "reason": "正確指出型錄未載保固年限與範圍，但未明說因此無法判定哪個系列保固較長。"
+  },
+  {
+   "id": "Q13",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "四款型號及三相電流／重量皆正確，但未說明EDW無款式符合。"
+  },
+  {
+   "id": "Q13",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "四款型號與三相電流／重量正確，並指明符合者皆為EUB-M。"
+  },
+  {
+   "id": "Q13",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "四款型號與三相電流／重量正確，並指明符合者均屬EUB-M。"
+  },
+  {
+   "id": "Q14",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "七款型號完整，但只給1.5～3.7 kW、2～5 HP範圍，未逐款列出kW與HP。"
+  },
+  {
+   "id": "Q14",
+   "repeat": 2,
+   "verdict": "部分對",
+   "reason": "未逐一列出型號名稱（EUB-M兩款5HP未點名），也未逐款列kW／HP。"
+  },
+  {
+   "id": "Q14",
+   "repeat": 3,
+   "verdict": "錯",
+   "reason": "漏列80EUB-M-5.50T，並錯稱其餘EUB-M粒徑皆為9 mm（80EUB-M-5.50T與5.75T款為10 mm）。"
+  },
+  {
+   "id": "Q15",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "七款完整、順序正確，kW／電流／重量全對。"
+  },
+  {
+   "id": "Q16",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "甲四款與數值正確，但乙兩款漏列單相滿載電流12.5 A。"
+  },
+  {
+   "id": "Q17",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "兩系列最輕款、46 kg／34.9 kg與差值11.1 kg皆正確。"
+  },
+  {
+   "id": "Q18",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "明列款、三款候選與額定點、不能保證、最大值不可拼點皆正確。"
+  },
+  {
+   "id": "Q19",
+   "repeat": 1,
+   "verdict": "部分對",
+   "reason": "未說明型錄確有CH選配記載，也未指出需CH版性能與重量數據、不能以標準款代用。"
+  },
+  {
+   "id": "Q20",
+   "repeat": 1,
+   "verdict": "對",
+   "reason": "明列單相12.5 A／27.5 kg，橫線不可當0，三相數值不能憑型號補出。"
+  },
+  {
+   "id": "Q15",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "七款完整、順序正確，kW／電流／重量全對。"
+  },
+  {
+   "id": "Q16",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "甲乙分列，六款與各自電流、重量、粒徑全部正確。"
+  },
+  {
+   "id": "Q17",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "兩系列最輕款、三相重量與差值11.1 kg皆正確。"
+  },
+  {
+   "id": "Q18",
+   "repeat": 2,
+   "verdict": "對",
+   "reason": "明列款、三款候選與額定點、不能保證、最大值不可同時達成皆正確。"
+  },
+  {
+   "id": "Q19",
+   "repeat": 2,
+   "verdict": "部分對",
+   "reason": "未明確回答無法挑出最輕CH款，也未說明CH選配確有記載及需CH版數據、不能以標準款代用。"
+  },
+  {
+   "id": "Q20",
+   "repeat": 2,
+   "verdict": "部分對",
+   "reason": "結論正確，但漏列表上實際的單相滿載電流12.5 A與重量27.5 kg。"
+  },
+  {
+   "id": "Q15",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "七款完整、順序正確，kW／電流／重量全對（30 kg與30.0 kg等值）。"
+  },
+  {
+   "id": "Q16",
+   "repeat": 3,
+   "verdict": "部分對",
+   "reason": "型號集合正確且分開列，但甲只給電流與重量範圍未逐款列值，乙漏單相電流12.5 A。"
+  },
+  {
+   "id": "Q17",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "兩系列最輕款、46 kg／34.9 kg與差值11.1 kg皆正確。"
+  },
+  {
+   "id": "Q18",
+   "repeat": 3,
+   "verdict": "錯",
+   "reason": "聲稱型錄無此額定點且無候選，但100EDW-5.50T明列12.5 m @1000 LPM，另有三款候選。"
+  },
+  {
+   "id": "Q19",
+   "repeat": 3,
+   "verdict": "部分對",
+   "reason": "未說明型錄確有CH選配記載，也未指出需CH版性能與重量數據、不能以標準款代用。"
+  },
+  {
+   "id": "Q20",
+   "repeat": 3,
+   "verdict": "對",
+   "reason": "明列單相12.5 A／27.5 kg，橫線不可當0，三相數值不能憑型號補出。"
+  }
+ ]
+}

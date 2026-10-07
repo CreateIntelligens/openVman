@@ -9,6 +9,7 @@ AI 讀型錄、為每個型號產生 Obsidian 式筆記，看能不能改善跨�
 | `round1/` | 第一輪（EUS 5 組型號、10 題）：腳本、`notes/`、`questions.json`、`results.json`、核對與評分 |
 | `round2/` | 第二輪（EUB-M＋EDW 15 列、12 題）：同上，另有 `filter_engine.py` 與它的單元測試 |
 | `round3/` | 第三輪（同15列、20題、A／B／C／D各3次）：生成／評測／凍結／驗證腳本、15篇合格筆記、240筆回答與評分、唯讀摘要 |
+| `acceptance/` | `filter_products` 正式路徑驗收（2026-10-06）：部署前 `/api/v1/chat` 20 題×1、容器內 20 題×3、部署後 `/api/v1/chat` 20 題×3 的原始回答與評分，評分規則沿用 `round3/questions.json`；結論在 `docs/plans/product-spec-filter.md` |
 | `round3/freeze_questions.py` | 前12題與評分規則原樣沿用，新增8題手算及raw cells獨立驗證；生成回答前凍結雜湊，重跑只核對 |
 | `round3/note_validation.py`、`test_note_validation.py` | frontmatter、額定點／獨立最大值、禁止額外推論與頁碼／逐行來源的生成閘門與測試 |
 | `round3/generation_preflight.json` | 前置4次驗證失敗回覆與usage；候選未參與評測，但呼叫及token納入總量 |
