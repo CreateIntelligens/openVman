@@ -25,11 +25,12 @@ class TestEmbeddingSettings:
 
         assert cfg.session_db_resolved_path.endswith("/data/projects/default/sessions.db")
 
-    def test_defaults_prefer_bge_chain(self):
+    def test_defaults_prefer_gemma_then_bge(self):
         cfg = BrainSettings()
 
-        assert cfg.resolved_embedding_active_version == "bge"
+        assert cfg.resolved_embedding_active_version == "gemma"
         assert cfg.resolved_embedding_version_order == [
+            "gemma",
             "bge",
             "gemini",
             "openai",
@@ -37,9 +38,9 @@ class TestEmbeddingSettings:
         ]
 
         backend = cfg.resolve_embedding_backend()
-        assert backend.version == "bge"
-        assert backend.provider == "bge"
-        assert backend.model == "BAAI/bge-m3"
+        assert backend.version == "gemma"
+        assert backend.provider == "gemma"
+        assert backend.model == "google/embeddinggemma-2"
         assert backend.api_key == cfg.embedding_service_token
 
     def test_active_version_is_prepended_once(self):

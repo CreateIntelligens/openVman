@@ -6,6 +6,8 @@ from pathlib import Path
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from memory.thresholds import SimilarityThresholds, thresholds_for
+
 API_INTERNAL_PORT = 8100
 
 
@@ -72,8 +74,10 @@ class BrainSettings(BaseSettings):
     live_audio_language_id_model: str = "gemini-3.5-flash-lite"
 
     # === Embedding 設定 ===
-    embedding_active_version: str = "bge"
-    embedding_version_order: str = "bge,gemini,openai,voyage"
+    # 2026-10 起預設 EmbeddingGemma 2；BGE-M3 的表保留，新版本索引建好前查詢自動退回 BGE
+    # （scripts/experiments/embeddinggemma2/、scripts/migrate_embedding_version.py）。
+    embedding_active_version: str = "gemma"
+    embedding_version_order: str = "gemma,bge,gemini,openai,voyage"
     embedding_service_url: str = ""
     embedding_service_token: str = ""
     embedding_service_timeout: float = 30.0
@@ -87,6 +91,9 @@ class BrainSettings(BaseSettings):
     embedding_write_identity: str = ""
     embedding_identity_aliases: str = ""
     embedding_compatible_legacy_identities: str = ""
+    embedding_gemma_model: str = "google/embeddinggemma-2"
+    embedding_gemma_dimensions: int = 768
+    embedding_gemma_revision: str = "914f7f89142e33e77833254d9c9b90c3cef7303b"
     embedding_gemini_model: str = "gemini-embedding-001"
     embedding_gemini_dimensions: int = 0
     embedding_openai_model: str = "text-embedding-3-small"
@@ -97,24 +104,17 @@ class BrainSettings(BaseSettings):
     knowledge_index_state_path: str = "/data/knowledge_index_state.json"
     chunk_char_limit: int = 500
     chunk_overlap_ratio: float = 0.15
-    chunk_semantic_threshold: float = 0.65
+    # 向量門檻（檢索、去重、記憶合併、夢境整理、語意切段）一律是 cosine 相似度，
+    # 每個 embedding 版本一組，寫在 memory/thresholds.py。要調整時填 JSON，
+    # 依版本覆寫部分欄位，例如 {"gemma": {"retrieval": 0.68}}。
+    embedding_thresholds: str = ""
 
     # === 記憶設定 ===
     short_term_memory_rounds: int = 20
     rag_knowledge_top_k: int = 5
     rag_memory_top_k: int = 3
     rag_rerank_candidate_multiplier: int = 4
-    # 2026-09-29 由 0.85 放寬：鶴記中英西 36 題相關提問 0.85 命中 34、1.0 全中，
-    # 跨語言或短問句的正確段落常落在 0.86–1.0；無關閒聊多帶幾段由模型自己判斷
-    # 不採用，top_k 仍是上限（scripts/experiments/kb-cutoff/）。
-    rag_distance_cutoff: float = 1.0
-    # 關鍵字（FTS）命中的段落放寬距離門檻，但不是無條件：知識庫有西語文件後，
-    # 「qué」這種常見字會讓任何西語問題都命中。實測（鶴記，bge-m3 l2）相關的
-    # 跨語言型號命中約 0.94，無關的 1.15 以上。
-    rag_fts_distance_cutoff: float = 1.1
-    rag_memory_distance_bonus: float = 0.02
     rag_rrf_k: int = 60
-    rag_dedup_similarity_threshold: float = 0.95
     rag_query_expansion_enabled: bool = False
     rag_query_expansion_max_terms: int = 3
     rag_query_expansion_model: str = ""
@@ -123,7 +123,6 @@ class BrainSettings(BaseSettings):
     session_db_path: str = "/data/projects/default/sessions.db"
     memory_maintenance_interval_seconds: int = 300
     memory_decay_rate_per_day: float = 0.005
-    memory_merge_similarity_threshold: float = 0.92
     memory_importance_weight: float = 0.03
 
     # === Auto Recall 設定 ===
@@ -161,7 +160,6 @@ class BrainSettings(BaseSettings):
     dreaming_min_recall_count: int = 3
     dreaming_min_unique_queries: int = 3
     dreaming_candidate_limit: int = 100
-    dreaming_similarity_threshold: float = 0.90
 
     # === 對話備份（VH-389）===
     # 每天在 session_backup_hour 點（台北時間）把所有專案的對話依語言匯出成檔案，
@@ -219,10 +217,6 @@ class BrainSettings(BaseSettings):
     url2md_read_enabled: bool = True
     web_search_max_chars: int = 3000
     web_search_max_results: int = 8
-    # 2md 回什麼就給什麼會撈到維基百科這類泛用頁；用 embedding 對原句重排並丟掉低分的。
-    # min_relevance 是絕對下限，relevance_ratio 是相對最佳結果的比例，兩者取較嚴者。
-    web_search_min_relevance: float = 0.15
-    web_search_relevance_ratio: float = 0.7
     # 逗號分隔的網域黑名單，子網域一併排除；例如 zh.wikipedia.org
     web_search_blocked_domains: str = ""
     # read_web_page 一次最多帶幾個網址：2md /v1/batch 讓多頁併成一個請求，
@@ -309,6 +303,13 @@ class BrainSettings(BaseSettings):
                 "document",
                 self.embedding_expected_revision,
             ),
+            "gemma": self._embedding_identity(
+                "gemma",
+                self.embedding_gemma_model,
+                self.embedding_gemma_dimensions,
+                "document",
+                self.embedding_gemma_revision,
+            ),
             "gemini": self._embedding_identity(
                 "gemini",
                 self.embedding_gemini_model,
@@ -394,6 +395,17 @@ class BrainSettings(BaseSettings):
             self._validate_embedding_identity(normalized)
             identities.add(normalized)
         return identities
+
+    def similarity_thresholds(self, version_or_identity: str | None = None) -> SimilarityThresholds:
+        """Cosine thresholds for the embedding version that produced the vectors at hand.
+
+        查詢可能退回另一個版本的索引（切換模型、新版本還沒重建完），門檻要跟著
+        實際查的那個版本，不是跟著設定的 active 版本。
+        """
+        return thresholds_for(
+            version_or_identity or self.resolved_embedding_active_version,
+            self.embedding_thresholds,
+        )
 
     @property
     def resolved_embedding_query_identities(self) -> list[str]:
@@ -530,6 +542,10 @@ class BrainSettings(BaseSettings):
             version or self.embedding_active_version
         )
         provider_models = {
+            "gemma": (
+                self.embedding_gemma_model,
+                self.embedding_gemma_dimensions,
+            ),
             "gemini": (
                 self.embedding_gemini_model,
                 self.embedding_gemini_dimensions or 768,
@@ -569,7 +585,7 @@ class BrainSettings(BaseSettings):
 
     def _normalize_embedding_version(self, value: str | None) -> str:
         normalized = (value or "").strip().lower()
-        if normalized in {"bge", "gemini", "openai", "voyage"}:
+        if normalized in {"bge", "gemma", "gemini", "openai", "voyage"}:
             return normalized
         raise ValueError(f"embedding version 不支援: {value}")
 

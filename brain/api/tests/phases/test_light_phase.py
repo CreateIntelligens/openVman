@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from memory.thresholds import thresholds_for
 
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
@@ -25,7 +26,9 @@ def _stub_deps(monkeypatch, tmp_path):
         dreaming_min_score = 0.45
         dreaming_min_recall_count = 2
         dreaming_candidate_limit = 100
-        dreaming_similarity_threshold = 0.90
+
+        def similarity_thresholds(self, _version=None):
+            return thresholds_for("bge")
 
     fake_config = types.ModuleType("config")
     fake_config.get_settings = lambda: FakeSettings()

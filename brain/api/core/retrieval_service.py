@@ -11,6 +11,7 @@ from config import get_settings
 from infra.db import parse_record_metadata
 from memory.embedder import QueryEmbeddingRoute, encode_query_with_fallback
 from memory.retrieval import search_records
+from memory.thresholds import distance_for
 from safety.observability import log_event
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,6 @@ def retrieve_context(
     cfg = get_settings()
     memory_top_k = cfg.rag_memory_top_k
     candidate_multiplier = cfg.rag_rerank_candidate_multiplier
-    distance_bonus = cfg.rag_memory_distance_bonus
     decay_rate = cfg.memory_decay_rate_per_day
     importance_weight = cfg.memory_importance_weight
 
@@ -50,6 +50,7 @@ def retrieve_context(
         table_names=("memories",),
     )
     query_vector = embedding_route.vector
+    thresholds = cfg.similarity_thresholds(embedding_route.version)
 
     memory_candidates = _safe_search(
         "memories",
@@ -63,12 +64,13 @@ def retrieve_context(
 
     reranked_memory = _rerank_by_distance(
         memory_candidates,
-        distance_bonus=distance_bonus,
+        # 相似度加 x 等於 L2 平方距離減 2x。
+        distance_bonus=2.0 * thresholds.memory_bonus,
         decay_rate_per_day=decay_rate,
         importance_weight=importance_weight,
     )
 
-    cutoff = cfg.rag_distance_cutoff
+    cutoff = distance_for(thresholds.retrieval)
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(

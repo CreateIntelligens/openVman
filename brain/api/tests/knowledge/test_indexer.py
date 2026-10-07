@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from memory.thresholds import thresholds_for
 
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
@@ -88,7 +89,7 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     )
     fake_config.chunk_char_limit = 500
     fake_config.chunk_overlap_ratio = 0.15
-    fake_config.chunk_semantic_threshold = 0.65
+    fake_config.similarity_thresholds = lambda _version=None: thresholds_for("bge")
     fake_config.resolved_embedding_write_identity = write_identity
     fake_settings_mod = types.ModuleType("config")
     fake_settings_mod.get_settings = lambda: fake_config

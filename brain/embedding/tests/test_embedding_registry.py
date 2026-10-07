@@ -10,8 +10,8 @@ import pytest
 
 try:
     from brain.embedding.identity import EmbeddingSpec, make_canonical_identity
+    from brain.embedding.local_providers import BgeLocalProvider
     from brain.embedding.registry import (
-        BgeLocalProvider,
         GeminiApiProvider,
         OpenAiApiProvider,
         ProviderRegistry,
@@ -21,8 +21,8 @@ try:
     )
 except ModuleNotFoundError:
     from identity import EmbeddingSpec, make_canonical_identity
+    from local_providers import BgeLocalProvider
     from registry import (
-        BgeLocalProvider,
         GeminiApiProvider,
         OpenAiApiProvider,
         ProviderRegistry,

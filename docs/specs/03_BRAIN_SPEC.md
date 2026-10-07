@@ -7,42 +7,38 @@
 採用基於檔案系統 (File-system as truth) 與 **LanceDB 向量資料庫**的混合檢索架構。設計上需參考 OpenClaw 的大腦：除了 RAG 與 Prompt 組裝外，還要有 **message handling layer** 與 **API key / model fallback router**。與 `01_BACKEND_SPEC.md` 解耦：本層不處理 WebSocket 或語音合成，但會處理訊息語義、上下文、工具與模型路由。
 
 * **為什麼選 LanceDB**：LanceDB 是嵌入式向量資料庫（Embedded），無需獨立部署服務端，直接運行在應用行程內。比傳統 RAG 方案（如 ChromaDB、Pinecone）更輕量、更低延遲，且原生支援 Lance 格式的高效列存儲，適合本地部署場景。
-* **為什麼選 bge-m3**：BAAI/bge-m3 是目前最強的開源多語言 Embedding 模型，原生支援中文、英文、日文等 100+ 語言，且支援 Dense + Sparse + ColBERT 三種檢索模式，在 MTEB 排行榜上表現優異。本地部署無需依賴外部 API，保障資料隱私。
+* **為什麼選 EmbeddingGemma 2**：Google 2026-10 釋出的開源（Apache 2.0）多語言 Embedding 模型，100+ 語言，768 維（可截短到 512／256／128）。2026-10 起取代 BAAI/bge-m3：要逐步移除中國來源的元件，而鶴記實測兩者打平（89 題實際問答盲測 16 勝 16 負 57 平；跨語言與一次撈多個型號較好，閒聊帶進的雜訊較多），見 `scripts/experiments/embeddinggemma2/`。本地部署無需依賴外部 API。
 
 ### 2. 技術選型 (Tech Stack)
 
 | 組件 | 選型 | 說明 |
 |------|------|------|
 | 向量資料庫 | **LanceDB** (嵌入式) | 無服務端、低延遲、原生 Python/JS SDK |
-| Embedding 模型 | **BAAI/bge-m3** (本地) | 多語言、Dense+Sparse 混合檢索 |
+| Embedding 模型 | **google/embeddinggemma-2** (本地) | 多語言、768 維 Dense；全文檢索由 LanceDB FTS 負責 |
 | LLM | Gemini / Groq / NEN / OpenAI / Claude / vLLM | 依 `LLM_PROVIDER` 或 `LLM_FALLBACK_CHAIN` 路由 |
 | 短期記憶 | Redis 或 In-memory Dict | Session 級別的對話歷史 |
 | 知識庫格式 | Markdown + Raw (多模態) | 人類可讀、保留原始檔，並以 Markdown 作為可編輯 canonical form |
 | 解析引擎 | **Gateway (pdf-inspector + Docling + AnyDoc)** | Gateway 負責 fast path、主轉換與 fallback，再透過 API 注入 Markdown |
 | 路由層 | Provider Router + Key Pool | Key fallback、模型切換、限流保護 |
 
-#### 2.1 bge-m3 部署方式
+#### 2.1 EmbeddingGemma 2 部署方式
+
+由獨立的 embedding gateway（`brain/embedding/`，compose 服務 `embedding`）載入，Brain 只透過 HTTP 取得向量：
 
 ```python
-# 安裝依賴
-# pip install FlagEmbedding lancedb
+from sentence_transformers import SentenceTransformer
+import torch
 
-from FlagEmbedding import BGEM3FlagModel
-
-# 載入模型（首次會自動下載 ~2.2GB）
-model = BGEM3FlagModel('BAAI/bge-m3', use_fp16=True)
-
-# 生成向量 (Dense Embedding, 1024 維)
-embeddings = model.encode([
-    "這套架構採用三層解耦設計",
-    "虛擬人的記憶系統基於 LanceDB"
-])['dense_vecs']
-
-# embeddings.shape = (2, 1024)
+# bf16；官方說明 fp16 會出 NaN
+model = SentenceTransformer("google/embeddinggemma-2", model_kwargs={"torch_dtype": torch.bfloat16})
+query = model.encode(["task: question answering | query: 沉水泵最深可以放多深？"], normalize_embeddings=True)
+docs = model.encode(["title: EVAK_CATALOG | text: 最大潛水深度 10 m ..."], normalize_embeddings=True)
+# shape = (1, 768)
 ```
 
-* **硬體需求**：GPU 推薦 (VRAM ≥ 4GB)，CPU 可用但速度較慢（約 50ms/句 vs GPU 5ms/句）。
-* **維度**：1024 維 (Dense)，相較 OpenAI text-embedding-3-small 的 1536 維更緊湊。
+* **前綴**：非對稱模型，查詢與文件要加不同前綴才在同一空間裡可比；gateway 依 `input_type` 自動加，文件標題由 Brain 以 `titles` 傳入（知識段落用檔名）。
+* **硬體需求**：RTX A4000 bf16 顯存峰值約 2.9 GB；710 段約 10 秒，單句查詢約 80 ms。
+* **維度**：768 維 (Dense)。
 * **fp16 模式**：啟用半精度以節省 VRAM，精度損失可忽略。
 
 #### 2.2 LanceDB 初始化
@@ -92,7 +88,7 @@ memories_table = db.open_table("memories")
 系統啟動時（或知識庫檔案有變動時），必須將 Markdown 知識庫索引到 LanceDB 中：
 
 ```
-┌──────────────┐     Chunking      ┌──────────────┐    bge-m3     ┌──────────────┐
+┌──────────────┐     Chunking      ┌──────────────┐  Embedding   ┌──────────────┐
 │  Markdown    │───────────────────►│  文字片段     │──────────────►│  LanceDB     │
 │  檔案系統     │   (按段落/標題切分)  │  (Chunks)    │  Embedding   │  knowledge   │
 │  workspace/  │                    │  ~200-500字/段│              │  .lance      │
@@ -103,7 +99,7 @@ memories_table = db.open_table("memories")
 1. **Prepare (Gateway)**: Gateway 接收檔案或爬取網頁，先保存原始檔至 `workspace/raw/`。PDF 會先嘗試 **pdf-inspector** text-based fast path；不適合 fast path 的 PDF 與 Office 文件使用 in-process **Docling** 轉為 Markdown；Docling 失敗且 fallback 啟用時改用 Rust-backed **AnyDoc**。`.md`、`.txt`、`.csv` 在知識上傳路徑直接轉發，不經文件解析器。
 2. **Ingest API (Brain)**: Gateway 將 Markdown 寫入 `workspace/knowledge/`，並呼叫 Brain 既有知識寫入 / reindex 流程。
 3. **Chunking**: 大腦使用 `HeaderBasedChunker` 切分片段 (200-500 字)。
-4. **Index**: 透過 bge-m3 生成向量並存入 LanceDB。
+4. **Index**: 透過 embedding gateway（EmbeddingGemma 2）生成向量並存入 LanceDB。
 5. **FTS Refresh**: 更新全文本索引。
 
 ### 5. 記憶檢索與注入機制 (Hybrid Search)
@@ -123,7 +119,7 @@ user_input
     │       提取該 Session 最近 10-20 輪對話
     │
     ├──► ② LanceDB 語意檢索 (Semantic Search)
-    │       user_input → bge-m3 → 向量化
+    │       user_input → EmbeddingGemma 2 → 向量化
     │       → LanceDB memories 表 Top-K 檢索
     │       → LanceDB knowledge 表 Top-K 檢索
     │       → 合併 + Re-rank (依分數排序)
@@ -335,7 +331,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 * **執行動作**：
   1. 呼叫 LLM 總結當日的短期對話內容。
   2. 將總結寫入 `memory/YYYY-MM-DD.md`。
-  3. 將該 Markdown 進行 Chunking → bge-m3 Embedding → 存入 LanceDB `memories` 表。
+  3. 將該 Markdown 進行 Chunking → Embedding → 存入 LanceDB `memories` 表。
   4. 識別對話中學到的新知識，更新至 `.learnings/LEARNINGS.md`。
   5. 檢測並清理 LanceDB 中重複度過高的向量記錄（去重）。
 
@@ -387,9 +383,9 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 - 語音專有名詞：Gemini 串流辨識不吃背景知識（只吃逐詞的 customVocabulary），所以也把專案 workspace 的 `ASR_PROMPT.md`（詞表與「常見誤聽：A→B」對照，「#」開頭是說明）放進每輪對話提示（`core/asr_glossary.py`，在回答語言那行前面），由模型在理解問題與寫查詢時對回誤聽；不多一次模型呼叫。
 - 同一份詞表的正確詞（不含對照行）也經 `GET /brain/internal/asr-glossary` 給 Backend，帶給 Breeze、R2T2 與 OpenAI 辨識當前文，辨識出來的字本身就對；回應另有逐詞清單 `vocabulary`（最多 100 個）給 Gemini 串流當 `customVocabulary`；Xiaomi、SenseVoice 不吃提示詞。
 
-- 檢索門檻：向量距離（LanceDB l2，即平方歐氏距離）超過 `rag_distance_cutoff`（1.0；2026-09-29 由 0.85 放寬，見 `scripts/experiments/kb-cutoff/`）的段落丟掉；關鍵字（FTS）命中的段落補算與查詢的距離，放寬到 `rag_fts_distance_cutoff`（1.1）。以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落。
+- 檢索門檻：跟問題的 cosine 相似度低於門檻的段落丟掉；關鍵字（FTS）命中的段落補算相似度，用較寬的門檻（以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落）。所有向量門檻（檢索、FTS、去重、記憶合併、夢境整理、語意切段、網路結果重排）都寫成 cosine 相似度、每個 embedding 版本一組（`memory/thresholds.py`）：EmbeddingGemma 2 檢索 0.68、FTS 0.63；BGE-M3 0.50、0.45（即原本的 L2 平方距離 1.0、1.1，`scripts/experiments/kb-cutoff/`）。LanceDB 回的是 L2 平方距離，向量已正規化，距離 = 2 − 2 × 相似度。
 - 停用的文件（後台文件頁的啟用開關，`.doc_meta.json` 的 `enabled: false`）不會重建索引，而是在查詢時略過：向量／關鍵字檢索與知識圖譜擴充抓相鄰文件段落，兩條路都會檢查。
-- 跨語言提問靠同一份內容的多語版本（例如鶴記型錄中英西三版，翻譯版手動標語言），不在查詢時翻譯：bge-m3 跨語言距離比同語言高約 0.25，西語問中文型錄會被當時的 0.85 門檻全擋掉；有西語版後西語提問 0.65–0.79 查到正確頁。
+- 跨語言提問靠同一份內容的多語版本（例如鶴記型錄中英西三版，翻譯版手動標語言），不在查詢時翻譯：跨語言相似度比同語言低，bge-m3 時西語問中文型錄會被當時的門檻全擋掉，有西語版後才查得到。EmbeddingGemma 2 跨語言較好（英西日韓問、只有中文文件時前 3 名 47/48，bge-m3 42/48），多語版本仍保留，回答用使用者語言的原文。
 
 同一份內容可準備中、英、西三個版本的文件（例如鶴記的型錄），使用者用哪種語言問就用那個版本的原文回答，不靠模型翻譯。
 
@@ -446,8 +442,8 @@ NEN_BASE_URL=https://nen.com.tw/v1
 LLM_STREAM_INCLUDE_USAGE=true
 
 # === Embedding 設定 ===
-EMBEDDING_MODEL=BAAI/bge-m3     # 本地 Embedding 模型
-EMBEDDING_USE_FP16=true
+EMBEDDING_ACTIVE_VERSION=gemma  # Brain 用哪個 embedding 版本
+EMBEDDING_GEMMA_MODEL=google/embeddinggemma-2   # gateway 載入的模型
 EMBEDDING_DEVICE=cuda            # cuda | cpu
 LANCEDB_PATH=/data/projects/default/lancedb
 
@@ -486,7 +482,7 @@ async def generate_response_stream(
     1. 先將輸入正規化為 message envelope
     2. 注入 enriched_context (來自 Gateway 的視覺/檔案描述)
     3. 從短期記憶提取對話歷史
-    4. 將 user_input 透過 bge-m3 向量化
+    4. 將 user_input 透過 embedding gateway 向量化
     5. 在 LanceDB 中執行 Top-K 語意檢索
     6. 根據 Token Budget 組裝完整 Prompt
     7. 透過 provider router 做 key/model fallback

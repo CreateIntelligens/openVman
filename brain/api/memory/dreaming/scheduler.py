@@ -248,7 +248,7 @@ def _build_status_config(cfg: Any) -> dict[str, Any]:
         "min_score": cfg.dreaming_min_score,
         "min_recall_count": cfg.dreaming_min_recall_count,
         "candidate_limit": cfg.dreaming_candidate_limit,
-        "similarity_threshold": cfg.dreaming_similarity_threshold,
+        "similarity_threshold": cfg.similarity_thresholds().dreaming_dedup,
     }
 
 

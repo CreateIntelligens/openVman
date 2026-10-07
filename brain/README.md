@@ -19,7 +19,7 @@ Backend (/api/v1/*)
 | 元件 | 位置 | 說明 |
 |---|---|---|
 | Brain API | `brain/api/` | FastAPI；`main.py` 只組裝路由與 middleware，生命週期在 `startup.py` |
-| Embedding gateway | `brain/embedding/` | 獨立服務，負責 BGE-M3 推論與 Gemini／OpenAI／Voyage 備援；Brain 不載入模型權重 |
+| Embedding gateway | `brain/embedding/` | 獨立服務，負責 EmbeddingGemma 2 推論（BGE-M3 暫留給尚未遷移的專案與共用端點使用者）與 Gemini／OpenAI／Voyage；Brain 不載入模型權重 |
 | 共用技能 | `brain/skills/` | 掛載到容器 `/skills`（唯讀），所有專案共用 |
 | 執行期資料 | `brain/data/` | 掛載到容器 `/data`，gitignored |
 
@@ -93,12 +93,14 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 - 依 SHA-256 fingerprint 增量重建，只重算有變動的文件，並移除已刪除文件的段落。
 - Markdown 依標題切段（`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO`）；QA 形式的 Markdown 與 CSV 每題一段。
-- 向量寫入目前的 write identity 對應的資料表，並建立 FTS 索引。
+- 向量寫入目前的 write identity 對應的資料表（每個 embedding 版本一組，例如 `knowledge__gemma`），並建立 FTS 索引。EmbeddingGemma 2 是非對稱模型：查詢加 question answering 前綴，文件帶檔名當標題（`titles` 欄位送給 gateway）。
+- 換 embedding 版本：改 `EMBEDDING_ACTIVE_VERSION` 後執行 `docker exec -w /app openvman-api-1 python -m scripts.migrate_embedding_version --from bge`（先加 `--dry-run` 看要做什麼），每個專案重建知識庫索引、長期記憶逐筆用新模型重算後寫入新表。新表建好前查詢自動退回有索引的舊版本；舊表不動，改回設定即可退回。
 - 知識圖譜由 `POST /brain/knowledge/graph/rebuild` 在背景以 graphify 建立，產物在 `graphify-out/`。
 
 檢索（`memory/retrieval.py`、`tools/builtin/knowledge_tools.py`）：
 
-- Hybrid：向量檢索與 FTS 以 RRF 融合（`RAG_RRF_K`），再依距離門檻過濾（`RAG_DISTANCE_CUTOFF`；FTS 命中用較寬的 `RAG_FTS_DISTANCE_CUTOFF`）。
+- Hybrid：向量檢索與 FTS 以 RRF 融合（`RAG_RRF_K`），再依相似度門檻過濾；FTS 也命中的段落用較寬的門檻。
+- 向量門檻（檢索、FTS 命中、去重、長期記憶合併、夢境整理、無標題 Markdown 的語意切段）一律是 cosine 相似度（0–1，越大越像），每個 embedding 版本一組，定義在 `memory/thresholds.py`；查詢退回另一個版本的索引時，用那個版本的門檻。要調整用 `EMBEDDING_THRESHOLDS` 依版本覆寫，例如 `{"gemma": {"retrieval": 0.68}}`。
 - `search_knowledge` 對模型改寫的每條查詢與使用者原句各檢索一次，融合後保留 `KNOWLEDGE_SEARCH_MERGE_LIMIT` 筆（依回覆模式覆寫）。
 - 依知識圖譜帶入一跳內相關文件的段落，放在結果的 `related`。
 - 每筆結果標記 `trust_boundary: untrusted_reference_data`，並產生 citations。
@@ -267,12 +269,12 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 |---|---|
 | 環境 | `ENV`（`prod`／`dev`）、`GATEWAY_INTERNAL_TOKEN` |
 | LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`、`NEN_API_KEY`、`NEN_BASE_URL` |
-| Embedding | `EMBEDDING_SERVICE_URL`、`EMBEDDING_SERVICE_TOKEN`、`EMBEDDING_EXPECTED_MODEL`／`_DIMENSION`／`_REVISION`、`EMBEDDING_WRITE_IDENTITY`、`EMBEDDING_IDENTITY_ALIASES`、`EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES` |
-| 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`RAG_DISTANCE_CUTOFF`、`RAG_FTS_DISTANCE_CUTOFF`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
+| Embedding | `EMBEDDING_ACTIVE_VERSION`（預設 `gemma`）、`EMBEDDING_GEMMA_MODEL`／`_REVISION`／`_DIMENSIONS`、`EMBEDDING_SERVICE_URL`、`EMBEDDING_SERVICE_TOKEN`、`EMBEDDING_EXPECTED_MODEL`／`_DIMENSION`／`_REVISION`（BGE）、`EMBEDDING_WRITE_IDENTITY`、`EMBEDDING_IDENTITY_ALIASES`、`EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES` |
+| 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`EMBEDDING_THRESHOLDS`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
 | Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
 | 記憶 | `SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`、`MAX_SESSION_TTL_MINUTES`、`AUTO_RECALL_ENABLED`、`DREAMING_ENABLED`、`DREAMING_CRON`、`DREAMING_TIMEZONE`、`SESSION_BACKUP_ENABLED`、`SESSION_BACKUP_HOUR`、`SESSION_BACKUP_KEEP` |
 | Jev | `TYPESAFE_API_KEY`、`JEV_BASE_URL`、`JEV_MEMORY_GATE_ENABLED`、`JEV_LANGUAGE_ENABLED`、`JEV_GATE_TIMEOUT_SECONDS`、`AUTO_RECALL_USE_JEV_FILTER`、`ASR_FINAL_JUDGE_ENABLED` |
-| 網路工具 | `URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`URL2MD_BASE_URLS`、`URL2MD_TOTAL_BUDGET_S`、`URL2MD_CIRCUIT_COOLDOWN_S`、`REDIS_URL`、`WEB_SEARCH_BLOCKED_DOMAINS`、`WEB_SEARCH_MIN_RELEVANCE` |
+| 網路工具 | `URL2MD_SEARCH_ENABLED`、`URL2MD_READ_ENABLED`、`URL2MD_BASE_URLS`、`URL2MD_TOTAL_BUDGET_S`、`URL2MD_CIRCUIT_COOLDOWN_S`、`REDIS_URL`、`WEB_SEARCH_BLOCKED_DOMAINS`（結果重排門檻在 `EMBEDDING_THRESHOLDS`） |
 | Wiki | `WIKI_PUBLISH_ENABLED`、`WIKI_API_BASE_URL`、`WIKI_PUBLISH_MAX_CHARS` |
 | 隱私 | `PRIVACY_FILTER_ENABLED`、`PRIVACY_FILTER_DEVICE`、`PRIVACY_FILTER_INCLUDE_SYSTEM`、`PRIVACY_FILTER_BLOCK_CATEGORIES` |
 | 安全 | `MAX_INPUT_LENGTH`、`ENABLE_CONTENT_FILTER`、`BLOCK_PROMPT_INJECTION`、`REQUEST_RATE_LIMIT_PER_MINUTE`、`ALLOWED_CHANNELS` |

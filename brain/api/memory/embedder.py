@@ -59,6 +59,7 @@ class TextEmbedder(Protocol):
         input_type: str = "document",
         acceptable_identities: list[str] | None = None,
         forced_identity: str | None = None,
+        titles: list[str] | None = None,
     ) -> tuple[list[list[float]], dict[str, Any], list[dict[str, Any]]]:
         ...
 
@@ -336,9 +337,13 @@ class GatewayRemoteTextEmbedder:
         input_type: str = "document",
         acceptable_identities: list[str] | None = None,
         forced_identity: str | None = None,
+        titles: list[str] | None = None,
     ) -> tuple[list[list[float]], dict[str, Any], list[dict[str, Any]]]:
+        """*titles*：每段文件的標題（跟 texts 等長），EmbeddingGemma 會一起嵌入，其他模型忽略。"""
         if not texts:
             return [], {}, []
+        if titles is not None and len(titles) != len(texts):
+            raise ValueError("titles must have the same length as texts")
 
         client = self._get_client()
         all_vectors: list[list[float]] = []
@@ -354,6 +359,8 @@ class GatewayRemoteTextEmbedder:
                 "texts": chunk,
                 "input_type": input_type,
             }
+            if titles is not None:
+                payload["titles"] = titles[i : i + self.chunk_size]
             if active_identity:
                 payload["identity"] = active_identity
             elif acceptable_identities:

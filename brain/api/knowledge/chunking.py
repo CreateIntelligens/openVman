@@ -273,7 +273,7 @@ def _semantic_chunk_text(content: str, char_limit: int) -> list[str]:
     if not sentences:
         return []
 
-    groups = _semantic_split_sentences(sentences, cfg.chunk_semantic_threshold)
+    groups = _semantic_split_sentences(sentences, cfg.similarity_thresholds().chunk_split)
 
     # Merge/split groups to respect char_limit
     segments: list[str] = []

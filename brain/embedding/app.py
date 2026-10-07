@@ -1,4 +1,4 @@
-"""Standalone dense embedding service and provider gateway for BGE-M3 and compatible models."""
+"""Standalone dense embedding service and provider gateway for EmbeddingGemma 2, BGE-M3 and compatible models."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from identity import EmbeddingSpec
+from local_providers import BgeLocalProvider, GemmaLocalProvider
 from registry import (
-    BgeLocalProvider,
     GeminiApiProvider,
     OpenAiApiProvider,
     ProviderRegistry,
@@ -65,6 +65,13 @@ MAX_LENGTH = int(os.getenv("EMBEDDING_MAX_LENGTH", "8192"))
 MAX_CONCURRENCY = int(os.getenv("EMBEDDING_MAX_CONCURRENCY", "1"))
 COOLDOWN_SECONDS = float(os.getenv("EMBEDDING_COOLDOWN_SECONDS", "60.0"))
 
+# Local EmbeddingGemma 2 Configuration
+GEMMA_MODEL = os.getenv("EMBEDDING_GEMMA_MODEL", "google/embeddinggemma-2")
+GEMMA_REVISION = os.getenv("EMBEDDING_GEMMA_REVISION", "default")
+GEMMA_DIMENSIONS = int(os.getenv("EMBEDDING_GEMMA_DIMENSIONS", "768"))
+GEMMA_BATCH_SIZE = int(os.getenv("EMBEDDING_GEMMA_BATCH_SIZE", "16"))
+GEMMA_MAX_LENGTH = int(os.getenv("EMBEDDING_GEMMA_MAX_LENGTH", "2048"))
+
 # External Provider Configuration
 GEMINI_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
 GEMINI_MODEL = os.getenv("EMBEDDING_GEMINI_MODEL", "gemini-embedding-001")
@@ -111,6 +118,19 @@ def _get_registry() -> ProviderRegistry:
                 use_fp16=USE_FP16,
                 batch_size=BATCH_SIZE,
                 max_length=MAX_LENGTH,
+                max_concurrency=MAX_CONCURRENCY,
+            ),
+        )
+        # Register EmbeddingGemma 2 local
+        reg.register(
+            "gemma",
+            GemmaLocalProvider(
+                model_name=GEMMA_MODEL,
+                model_revision=GEMMA_REVISION,
+                device=DEVICE,
+                dimensions=GEMMA_DIMENSIONS,
+                batch_size=GEMMA_BATCH_SIZE,
+                max_length=GEMMA_MAX_LENGTH,
                 max_concurrency=MAX_CONCURRENCY,
             ),
         )
@@ -225,6 +245,10 @@ class JtaiEmbedRequest(BaseModel):
     identity: str | None = Field(
         None, description="Explicitly requested canonical identity (for multi-chunk locking)"
     )
+    titles: list[str] | None = Field(
+        None,
+        description="Optional per-text document titles, same length as texts; used by providers that embed titles (EmbeddingGemma)",
+    )
 
 
 class JtaiEmbedResponse(BaseModel):
@@ -334,6 +358,12 @@ async def jtai_embed(
             detail=f"Batch size {len(payload.texts)} exceeds maximum {MAX_REQUEST_TEXTS}",
         )
 
+    if payload.titles is not None and len(payload.titles) != len(payload.texts):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="titles must have the same length as texts",
+        )
+
     reg = _get_registry()
 
     # Handle empty batch
@@ -367,6 +397,7 @@ async def jtai_embed(
             input_type=payload.input_type,
             acceptable_identities=payload.acceptable_identities,
             requested_identity=payload.identity,
+            titles=payload.titles,
         )
         return JtaiEmbedResponse(
             vectors=vectors,

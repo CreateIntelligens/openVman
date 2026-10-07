@@ -105,6 +105,9 @@ services:
       - EMBEDDING_MODEL_REVISION=${EMBEDDING_MODEL_REVISION:-5617a9f61b028005a4858fdac845db406aefb181}
       - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cuda}
       - EMBEDDING_USE_FP16=${EMBEDDING_USE_FP16:-true}
+      - EMBEDDING_GEMMA_MODEL=${EMBEDDING_GEMMA_MODEL:-google/embeddinggemma-2}
+      - EMBEDDING_GEMMA_REVISION=${EMBEDDING_GEMMA_REVISION:-914f7f89142e33e77833254d9c9b90c3cef7303b}
+      - EMBEDDING_GEMMA_DIMENSIONS=${EMBEDDING_GEMMA_DIMENSIONS:-768}
       - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-8}
       - EMBEDDING_MAX_LENGTH=${EMBEDDING_MAX_LENGTH:-8192}
       - EMBEDDING_MAX_CONCURRENCY=${EMBEDDING_MAX_CONCURRENCY:-1}
@@ -123,7 +126,7 @@ services:
       - EMBEDDING_VOYAGE_DIMENSIONS=${EMBEDDING_VOYAGE_DIMENSIONS:-1024}
       - EMBEDDING_VOYAGE_BASE_URL=${EMBEDDING_VOYAGE_BASE_URL:-https://api.voyageai.com/v1}
       - EMBEDDING_PROVIDER_TIMEOUT=${EMBEDDING_PROVIDER_TIMEOUT:-30.0}
-      - EMBEDDING_PROVIDER_FALLBACKS=${EMBEDDING_PROVIDER_FALLBACKS:-bge,gemini,openai,voyage}
+      - EMBEDDING_PROVIDER_FALLBACKS=${EMBEDDING_PROVIDER_FALLBACKS:-bge,gemma,gemini,openai,voyage}
     healthcheck:
       test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('EMBEDDING_BEARER_TOKEN',''); req=urllib.request.Request('http://localhost:8009/health/ready', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
       interval: 15s

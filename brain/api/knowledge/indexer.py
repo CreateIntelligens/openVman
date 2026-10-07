@@ -304,6 +304,7 @@ def _build_knowledge_records(chunk_specs: list[ChunkSpec]) -> list[dict[str, Any
             texts,
             input_type="document",
             forced_identity=expected_identity,
+            titles=[str(chunk.metadata.get("title") or "") for chunk in chunk_specs],
         )
         if spec.get("identity") != expected_identity:
             raise RuntimeError("Gateway returned an identity outside the write lease")

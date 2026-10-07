@@ -40,6 +40,7 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY identity.py /app/identity.py
 COPY registry.py /app/registry.py
+COPY local_providers.py /app/local_providers.py
 COPY app.py /app/app.py
 COPY tests /app/tests
 

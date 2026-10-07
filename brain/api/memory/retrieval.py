@@ -20,6 +20,7 @@ from memory.dreaming.recall_tracker import record_trace
 from memory.embedder import encode_text
 from memory.fusion import deduplicate, min_max_normalize, rrf_fuse
 from memory.language_detect import DEFAULT_LANGUAGE
+from memory.thresholds import distance_for
 from personas.personas import normalize_persona_id
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ def search_records(
     persona_id: str = "default",
     project_id: str = "default",
     embedding_version: str | None = None,
-    distance_cutoff: float | None = None,
+    min_similarity: float | None = None,
     expansion_terms: list[str] | None = None,
     language: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -63,15 +64,16 @@ def search_records(
     *expansion_terms*(語意擴展詞,通常由 memory.query_expansion 產生)
     每個詞會額外跑 vector + FTS 檢索,所有名次表一起進 RRF 融合。
 
-    Results with _distance > distance_cutoff are dropped, unless they
-    were also matched by FTS. 候選會先做去重(exact text + embedding
-    餘弦相似度)。top_k is an upper cap.
+    跟問題的 cosine 相似度低於門檻（*min_similarity*，預設依查詢用的 embedding
+    版本）的段落丟掉；FTS 也命中的用較寬的門檻。候選會先做去重(exact text +
+    embedding 餘弦相似度)。top_k is an upper cap.
     """
     from config import get_settings
 
     cfg = get_settings()
-    cutoff = distance_cutoff if distance_cutoff is not None else cfg.rag_distance_cutoff
-    fts_cutoff = max(cutoff, cfg.rag_fts_distance_cutoff)
+    thresholds = cfg.similarity_thresholds(embedding_version)
+    cutoff = distance_for(min_similarity if min_similarity is not None else thresholds.retrieval)
+    fts_cutoff = max(cutoff, distance_for(thresholds.retrieval_fts))
 
     normalized_persona = normalize_persona_id(persona_id)
     limit = max(top_k, 1)
@@ -124,7 +126,7 @@ def search_records(
             visible = sorted(visible, key=rank)
         deduped = deduplicate(
             visible,
-            similarity_threshold=cfg.rag_dedup_similarity_threshold,
+            similarity_threshold=thresholds.dedup,
         )
         enough = rank is not None and sum(rank(r) == 0 for r in deduped) >= limit
         if not expand or exhausted or enough:

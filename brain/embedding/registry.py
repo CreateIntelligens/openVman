@@ -1,4 +1,4 @@
-"""Provider registry, local BGE inference, and external embedding adapters."""
+"""Provider registry and external embedding adapters; local GPU providers live in local_providers."""
 
 from __future__ import annotations
 
@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import logging
-import math
-import os
 import random
 import time
 from typing import Any, Sequence
@@ -17,9 +15,9 @@ from urllib.parse import urlparse, urlunparse
 import httpx
 
 from identity import EmbeddingSpec, make_canonical_identity
+from local_providers import _l2_normalize
 
 logger = logging.getLogger("embedding_gateway.registry")
-_RELEASE_LOG_THRESHOLD_BYTES = 64 * 2**20
 
 
 def _sanitize_url(url: str) -> str:
@@ -35,17 +33,6 @@ def _sanitize_url(url: str) -> str:
         return urlunparse((parsed.scheme, netloc, parsed.path, "", "", "")).rstrip("/")
     except Exception:
         return url.split("?")[0]
-
-
-def _l2_normalize(vectors: Sequence[Sequence[float]]) -> list[list[float]]:
-    normalized_vectors: list[list[float]] = []
-    for vec in vectors:
-        norm = math.sqrt(sum(float(x) * float(x) for x in vec))
-        if norm > 1e-12:
-            normalized_vectors.append([float(x) / norm for x in vec])
-        else:
-            normalized_vectors.append([float(x) for x in vec])
-    return normalized_vectors
 
 
 def _parse_retry_after(retry_after_val: str | None, max_delay: float) -> float | None:
@@ -135,225 +122,6 @@ async def _post_with_retry(
     if last_exc is not None:
         raise last_exc
     raise RuntimeError(f"Request to {url} exhausted retries")
-
-
-class BgeLocalProvider:
-    """Lazy-loaded in-process BGE dense embedding provider with single-flight init."""
-
-    def __init__(
-        self,
-        model_name: str = "BAAI/bge-m3",
-        model_revision: str = "default",
-        device: str = "cuda",
-        use_fp16: bool = True,
-        batch_size: int = 32,
-        max_length: int = 8192,
-        max_concurrency: int = 1,
-    ) -> None:
-        self.model_name = model_name
-        self.model_revision = model_revision
-        self.device = device
-        self.use_fp16 = use_fp16
-        self.batch_size = batch_size
-        self.max_length = max_length
-        self._dimensions = 1024
-        self._semaphore = asyncio.Semaphore(max_concurrency)
-        self._init_lock = asyncio.Lock()
-        self._model: Any = None
-        self._is_ready = False
-        self._warmup_complete = False
-
-    @property
-    def is_configured(self) -> bool:
-        return True
-
-    def spec(self, input_semantics: str = "document") -> EmbeddingSpec:
-        identity = make_canonical_identity(
-            provider="bge",
-            model=self.model_name,
-            dimensions=self._dimensions,
-            dtype="float32",
-            normalization="l2",
-            input_semantics=input_semantics,
-            model_revision=self.model_revision,
-        )
-        return EmbeddingSpec(
-            identity=identity,
-            provider="bge",
-            model=self.model_name,
-            dimensions=self._dimensions,
-            dtype="float32",
-            normalized=True,
-            normalization="l2",
-            input_semantics=input_semantics,
-            model_revision=self.model_revision,
-            service_revision="1.0.0",
-        )
-
-    async def _get_or_load_model(self) -> Any:
-        if self._model is not None:
-            return self._model
-
-        async with self._init_lock:
-            if self._model is not None:
-                return self._model
-
-            loop = asyncio.get_running_loop()
-
-            def _load() -> Any:
-                logger.info(
-                    "Initializing BGE model '%s' on %s (fp16=%s)...",
-                    self.model_name,
-                    self.device,
-                    self.use_fp16,
-                )
-                from FlagEmbedding import BGEM3FlagModel
-                from huggingface_hub import snapshot_download
-
-                kwargs: dict[str, Any] = {
-                    "use_fp16": self.use_fp16,
-                    "device": self.device,
-                }
-                model_source = self.model_name
-                if (
-                    self.model_revision not in {"", "default"}
-                    and not os.path.isdir(self.model_name)
-                ):
-                    model_source = snapshot_download(
-                        repo_id=self.model_name,
-                        revision=self.model_revision,
-                    )
-                return BGEM3FlagModel(model_source, **kwargs)
-
-            self._model = await loop.run_in_executor(None, _load)
-            self._is_ready = True
-            logger.info("BGE model '%s' loaded successfully.", self.model_name)
-            return self._model
-
-    async def is_ready(self) -> bool:
-        try:
-            await self._get_or_load_model()
-            return self._is_ready
-        except Exception:
-            return False
-
-    async def warmup(self) -> None:
-        if self._warmup_complete:
-            return
-        model = await self._get_or_load_model()
-        loop = asyncio.get_running_loop()
-
-        def _warm():
-            if hasattr(model, "encode_dense"):
-                model.encode_dense(["warmup probe"], batch_size=1, max_length=128)
-            else:
-                res = model.encode(["warmup probe"], batch_size=1, max_length=128)
-                if isinstance(res, dict) and "dense_vecs" in res:
-                    _ = res["dense_vecs"]
-
-        async with self._semaphore:
-            await loop.run_in_executor(None, _warm)
-        self._warmup_complete = True
-
-    async def encode(
-        self,
-        texts: list[str],
-        *,
-        input_type: str = "document",
-    ) -> list[list[float]]:
-        if not texts:
-            return []
-
-        model = await self._get_or_load_model()
-        loop = asyncio.get_running_loop()
-
-        def _do_encode() -> list[list[float]]:
-            try:
-                if hasattr(model, "encode_dense"):
-                    raw = model.encode_dense(
-                        texts,
-                        batch_size=self.batch_size,
-                        max_length=self.max_length,
-                    )
-                else:
-                    raw = model.encode(
-                        texts,
-                        batch_size=self.batch_size,
-                        max_length=self.max_length,
-                    )
-            except Exception as e:
-                is_oom = "out of memory" in str(e).lower() or e.__class__.__name__ == "OutOfMemoryError"
-                if is_oom and len(texts) > 1:
-                    logger.warning(
-                        "BGE local provider hit CUDA OOM with batch_size=%d (texts=%d), clearing CUDA cache and retrying with batch_size=1...",
-                        self.batch_size,
-                        len(texts),
-                    )
-                    try:
-                        import torch
-                        torch.cuda.empty_cache()
-                    except Exception:
-                        pass
-                    if hasattr(model, "encode_dense"):
-                        raw = model.encode_dense(
-                            texts,
-                            batch_size=1,
-                            max_length=self.max_length,
-                        )
-                    else:
-                        raw = model.encode(
-                            texts,
-                            batch_size=1,
-                            max_length=self.max_length,
-                        )
-                else:
-                    raise
-            if isinstance(raw, dict):
-                raw = raw.get("dense_vecs", raw)
-            if hasattr(raw, "tolist"):
-                return raw.tolist()
-            return [list(x) for x in raw]
-
-        async with self._semaphore:
-            try:
-                vectors = await loop.run_in_executor(None, _do_encode)
-            finally:
-                # PyTorch 會把大批次的峰值記憶體留在快取裡不還；一次長段落匯入
-                # 就能讓常駐 VRAM 從 2 GB 漲到近 5 GB，擠掉同卡的其他服務。
-                # 還在 semaphore 內，沒有別的請求在用，釋放是安全的。
-                await loop.run_in_executor(
-                    None, self._release_cuda_cache, len(texts),
-                )
-
-        return _l2_normalize(vectors)
-
-    def _release_cuda_cache(self, text_count: int = 0) -> None:
-        if not str(self.device).startswith("cuda"):
-            return
-        try:
-            import torch
-
-            before = torch.cuda.memory_reserved()
-            torch.cuda.empty_cache()
-            after = torch.cuda.memory_reserved()
-        except Exception:
-            logger.debug("CUDA cache release failed", exc_info=True)
-            return
-        # 只記有實際釋放的大批次；一般查詢每次都記會洗版。留著這筆紀錄才看得出
-        # 常駐量是否仍隨時間上漲（例如權重以外還有東西在漏）。
-        if before - after >= _RELEASE_LOG_THRESHOLD_BYTES:
-            logger.info(
-                "CUDA cache released texts=%d reserved_mb=%.0f->%.0f allocated_mb=%.0f",
-                text_count, before / 2**20, after / 2**20,
-                torch.cuda.memory_allocated() / 2**20,
-            )
-
-    async def shutdown(self) -> None:
-        async with self._init_lock:
-            self._model = None
-            self._is_ready = False
-            self._warmup_complete = False
-        logger.info("BGE local provider shut down cleanly.")
 
 
 class GeminiApiProvider:
@@ -875,13 +643,15 @@ class ProviderRegistry:
         input_type: str = "document",
         acceptable_identities: Sequence[str] | None = None,
         requested_identity: str | None = None,
+        titles: Sequence[str] | None = None,
     ) -> tuple[list[list[float]], EmbeddingSpec, list[dict[str, Any]]]:
         """Resolve suitable provider, execute encoding, and return attempt diagnostics."""
         now = time.time()
         attempts: list[dict[str, Any]] = []
         errors: list[str] = []
 
-        acceptable_set = {ident.strip() for ident in acceptable_identities} if acceptable_identities else None
+        acceptable_list = [ident.strip() for ident in acceptable_identities] if acceptable_identities else None
+        acceptable_set = set(acceptable_list) if acceptable_list is not None else None
 
         candidate_names: list[str] = []
         for name in self.fallback_order:
@@ -904,6 +674,15 @@ class ProviderRegistry:
                     continue
 
             candidate_names.append(name)
+
+        if acceptable_list:
+            # 呼叫端列的順序就是偏好：Brain 把 active 版本排第一，換模型後不能被
+            # 這裡的 fallback 順序（BGE 在前）搶走。
+            def _preference(provider_name: str) -> int:
+                identity = self._providers[provider_name].instance.spec(input_semantics=input_type).identity
+                return acceptable_list.index(identity)
+
+            candidate_names.sort(key=_preference)
 
         if not candidate_names:
             msg = (
@@ -929,7 +708,8 @@ class ProviderRegistry:
                 continue
 
             try:
-                vectors = await provider.encode(texts, input_type=input_type)
+                extra = {"titles": list(titles)} if titles and getattr(provider, "accepts_titles", False) else {}
+                vectors = await provider.encode(texts, input_type=input_type, **extra)
                 # Verify vector dimensions
                 if vectors and len(vectors[0]) != spec.dimensions:
                     raise ValueError(

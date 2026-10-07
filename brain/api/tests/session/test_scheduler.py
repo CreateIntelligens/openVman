@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import sys
 from datetime import datetime, timedelta, timezone
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from memory.thresholds import thresholds_for
 
 # ---------------------------------------------------------------------------
 # Module stubs — prevent heavy imports during testing
@@ -45,10 +49,10 @@ _cfg_mock.dreaming_min_score = 0.45
 _cfg_mock.dreaming_min_recall_count = 2
 _cfg_mock.dreaming_min_unique_queries = 2
 _cfg_mock.dreaming_candidate_limit = 100
-_cfg_mock.dreaming_similarity_threshold = 0.90
 _cfg_mock.max_session_ttl_minutes = 30 * 24 * 60
-_cfg_mock.rag_distance_cutoff = 1.2
-_cfg_mock.rag_fts_distance_cutoff = 1.2
+_cfg_mock.similarity_thresholds = lambda _version=None: replace(
+    thresholds_for("bge"), retrieval=0.4, retrieval_fts=0.4,
+)
 _cfg_mock.gateway_internal_token = "test-internal-token"
 
 for mod_name, stub in _STUBS.items():

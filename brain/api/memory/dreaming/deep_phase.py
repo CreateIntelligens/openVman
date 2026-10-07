@@ -23,6 +23,7 @@ from memory.dreaming.paths import (
 )
 from memory.dreaming.scoring import passes_threshold
 from memory.embedder import get_embedder
+from memory.thresholds import similarity_for
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ def run_deep_phase(
         return {"status": "ok", "promoted_count": 0, "total_candidates": len(candidates)}
 
     # 3. Semantic dedup against existing memories
-    promotable = _dedup_against_memories(qualified, project_id, cfg.dreaming_similarity_threshold)
+    promotable = _dedup_against_memories(qualified, project_id, cfg.similarity_thresholds().dreaming_dedup)
     logger.info("deep phase: %d candidates remain after semantic dedup", len(promotable))
 
     # 4. Promote to memories table
@@ -116,15 +117,13 @@ def _dedup_against_memories(
     embedder = get_embedder()
     candidate_vectors = embedder.encode([c["text"] for c in candidates])
 
-    # Convert similarity threshold to distance threshold.
-    # LanceDB uses L2 distance by default; cosine similarity ≈ 1 - (dist²/2).
-    # For a conservative check, we search for the nearest neighbour and compare.
+    # LanceDB 回 L2 平方距離；門檻是 cosine 相似度，用最近的一筆換算比較。
     result = []
     for c, vec in zip(candidates, candidate_vectors):
         c["_vector"] = vec
         try:
             hits = table.search(vec).limit(1).to_list()
-            if hits and (1.0 - hits[0].get("_distance", 1.0)) >= threshold:
+            if hits and similarity_for(hits[0].get("_distance", 2.0)) >= threshold:
                 continue
         except Exception:
             pass  # table may be empty or incompatible; keep the candidate

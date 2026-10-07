@@ -11,7 +11,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
 | `backend` | `backend/` | FastAPI | 對外 API、帳號與權限、ASR／TTS 路由、Gemini Live 中繼、Brain 代理 |
 | `gateway-worker` | `backend/app/gateway/` | arq + Redis | 文件轉換、爬蟲與其他非同步媒體處理 |
 | `api` | `brain/api/` | FastAPI | Brain：LLM 路由、RAG、記憶、工具、用量帳本；僅供內部呼叫 |
-| `embedding` | `brain/embedding/` | BGE-M3（GPU） | 向量嵌入服務，Brain 與其他 stack 共用 |
+| `embedding` | `brain/embedding/` | EmbeddingGemma 2（GPU） | 向量嵌入服務，Brain 與其他 stack 共用；BGE-M3 暫留給尚未遷移的使用者 |
 | `redis` | — | Redis 7 | gateway 佇列、快取與跨 worker 狀態 |
 | `prometheus`、`grafana` | `infra/` | — | 指標收集與監控儀表板 |
 | `watchtower` | — | — | 自動拉取 Docker Hub 上的新版 image |
@@ -67,7 +67,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
 
 ### Brain
 
-- RAG：知識文件轉為 Markdown 後以 BGE-M3 向量化，存於 LanceDB；問答節點與 CSV 轉換的 QA 同樣索引。
+- RAG：知識文件轉為 Markdown 後以 EmbeddingGemma 2 向量化，存於 LanceDB；問答節點與 CSV 轉換的 QA 同樣索引。
 - 記憶：workspace 核心文件（`SOUL.md`、`MEMORY.md` 等）直接進 prompt，對話歸檔與夜間記憶整理（dreaming）。
 - 工具：知識檢索、圖譜、記憶、網路搜尋與網頁轉 Markdown（2md）、Wiki 發布，以及依專案 `knowledge/products/_catalog.yaml` 啟用的產品規格篩選 `filter_products`。
 - 模型路由：`LLM_PROVIDER` 指定主要供應商（目前為 Gemini），失敗時依 `LLM_FALLBACK_CHAIN` 依序切換。

@@ -10,6 +10,9 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from dataclasses import replace
+
+from memory.thresholds import thresholds_for
 
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
@@ -79,9 +82,9 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, *, knowledge=None, memories=None
     fake_cfg.rag_knowledge_top_k = 3
     fake_cfg.rag_memory_top_k = 2
     fake_cfg.rag_rerank_candidate_multiplier = 4
-    fake_cfg.rag_distance_cutoff = 1.2
-    fake_cfg.rag_fts_distance_cutoff = 1.2
-    fake_cfg.rag_memory_distance_bonus = 0.02
+    fake_cfg.similarity_thresholds = lambda _version=None: replace(
+        thresholds_for("bge"), retrieval=0.4, retrieval_fts=0.4, memory_bonus=0.01,
+    )
     fake_cfg.memory_decay_rate_per_day = 0.005
     fake_cfg.memory_importance_weight = 0.03
     fake_config_mod = types.ModuleType("config")

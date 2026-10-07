@@ -240,3 +240,32 @@ def test_remote_adapter_non_retryable_400_fails_immediately(monkeypatch):
         adapter.encode(["test text"])
     assert "Embedding gateway call failed" in str(exc_info.value)
     assert calls == 1  # 400 must fail immediately without retrying
+
+
+def test_remote_adapter_sends_titles_per_chunk(monkeypatch):
+    payloads: list[dict] = []
+
+    def mock_post(self, endpoint, json=None, **kwargs):
+        payloads.append(json)
+        request = httpx.Request("POST", f"http://test{endpoint}", json=json)
+        return httpx.Response(
+            200,
+            json={
+                "vectors": [[0.1] * 768 for _ in json["texts"]],
+                "model": "google/embeddinggemma-2",
+                "embedding_spec": {"identity": "gemma:google/embeddinggemma-2:768:float32:l2:document:r", "dimensions": 768},
+                "attempts": [],
+            },
+            request=request,
+        )
+
+    monkeypatch.setattr(httpx.Client, "post", mock_post)
+    adapter = GatewayRemoteTextEmbedder(base_url="http://fake-embedding:8009", chunk_size=2, expected_dimension=768)
+    adapter.encode_with_metadata(["a", "b", "c"], titles=["T1", "T2", "T3"])
+    assert [p["titles"] for p in payloads] == [["T1", "T2"], ["T3"]]
+
+    payloads.clear()
+    adapter.encode_with_metadata(["a"])
+    assert "titles" not in payloads[0]
+    with pytest.raises(ValueError):
+        adapter.encode_with_metadata(["a", "b"], titles=["only one"])

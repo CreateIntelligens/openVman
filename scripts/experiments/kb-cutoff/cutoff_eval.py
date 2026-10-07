@@ -36,7 +36,7 @@ emb = get_embedder()
 def run(project, lang, q, cutoff):
     vec = list(map(float, emb.encode([q])[0]))
     rows = retrieval.search_records("knowledge", vec, top_k=5, query_text=q, query_type="hybrid",
-                                    project_id=project, language=lang, distance_cutoff=cutoff)
+                                    project_id=project, language=lang, min_similarity=1 - cutoff / 2)
     return [(r.get("_distance"), r.get("path"), str(r.get("text",""))) for r in rows]
 
 out = {}

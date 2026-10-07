@@ -645,8 +645,9 @@ def _rerank_web_results(
     撈到麥當勞的維基百科就是這樣來的。用 embedding 對原句重排，低於門檻的丟掉。
     embedding 失敗時維持原順序，寧可多給也不讓搜尋整個失敗。
     """
-    floor = float(getattr(cfg, "web_search_min_relevance", 0) or 0)
-    ratio = float(getattr(cfg, "web_search_relevance_ratio", 0) or 0)
+    # 2md 回什麼就給什麼會撈到維基百科這類泛用頁；門檻跟著 embedding 版本（memory/thresholds.py）。
+    thresholds = cfg.similarity_thresholds()
+    floor, ratio = thresholds.web_min_relevance, thresholds.web_relevance_ratio
     if not results or (floor <= 0 and ratio <= 0):
         return results
     try:

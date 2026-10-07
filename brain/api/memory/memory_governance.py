@@ -512,7 +512,7 @@ def _persona_id_from_memory_path(path: Path, memory_dir: Path) -> str:
 def _semantic_dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Remove near-duplicate memory records using cosine similarity."""
     cfg = get_settings()
-    threshold = cfg.memory_merge_similarity_threshold
+    threshold = cfg.similarity_thresholds().memory_merge
 
     groups: dict[str, list[tuple[int, dict[str, Any]]]] = {}
     for idx, record in enumerate(records):

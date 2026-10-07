@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from memory.thresholds import thresholds_for
 
 API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
@@ -95,7 +96,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     # Stub config
     fake_cfg = MagicMock()
     fake_cfg.memory_maintenance_interval_seconds = 0
-    fake_cfg.memory_merge_similarity_threshold = 0.92
+    fake_cfg.similarity_thresholds = lambda _version=None: thresholds_for("bge")
     fake_cfg.transcript_retention_days = 30
     fake_cfg.resolved_embedding_write_identity = (
         "bge:BAAI/bge-m3:1024:float32:l2:document:test"

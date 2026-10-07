@@ -35,7 +35,7 @@ print("== 鶴記檢索（門檻 1.0，現有中英西文件）")
 for lang, q, expect in Q:
     vec = list(map(float, emb.encode([q])[0]))
     rows = retrieval.search_records("knowledge", vec, top_k=3, query_text=q, query_type="hybrid",
-                                    project_id=HEKEE, distance_cutoff=1.0)
+                                    project_id=HEKEE, min_similarity=0.5)
     best = min([r.get("_distance") or 9 for r in rows] or [9])
     hit = any(any(k in str(r.get("text", "")) for k in expect.split("|")) for r in rows)
     out["retrieval"].append({"q": q, "best": best, "n": len(rows), "hit": hit,

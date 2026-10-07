@@ -9,6 +9,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from memory.thresholds import thresholds_for
+
 from memory.session_store import (
     DuplicateMessageError,
     InflightError,
@@ -288,7 +290,7 @@ class _FakeSettings:
             "session_db_resolved_path": "/tmp/test.db",
             "memory_maintenance_interval_seconds": 300,
             "memory_decay_rate_per_day": 0.005,
-            "memory_merge_similarity_threshold": 0.92,
+            "similarity_thresholds": lambda _version=None: thresholds_for("bge"),
             "memory_importance_weight": 0.03,
             "request_rate_limit_per_minute": 60,
         }
