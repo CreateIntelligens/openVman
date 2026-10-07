@@ -121,10 +121,10 @@ describe("AsrProviderPanel", () => {
   });
 
   it("指定的引擎沒回應、由備援辨識時講清楚", async () => {
-    vi.mocked(previewAsr).mockResolvedValue({ text: "有聽到", provider: "xiaomi" });
+    vi.mocked(previewAsr).mockResolvedValue({ text: "有聽到", provider: "sensevoice" });
     render(<AsrProviderPanel />);
     upload();
-    expect(await screen.findByText(/Breeze-ASR-26 沒有回應，這次由 Xiaomi-CocktailASR-1 辨識/)).toBeTruthy();
+    expect(await screen.findByText(/Breeze-ASR-26 沒有回應，這次由 SenseVoice-Small 辨識/)).toBeTruthy();
   });
 
   it("沒設定的引擎不列出來", async () => {

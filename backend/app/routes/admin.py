@@ -213,10 +213,9 @@ _ASR_ENGINE_LABELS = {
     "breeze": "Breeze-ASR-26（臺語轉華語）",
     "r2t2": "Confucius4-R2T2（.35，華英混合，自動轉繁）",
     "r2t2-dev": "Confucius4-R2T2 dev（.37）",
-    "xiaomi": "Xiaomi-CocktailASR-1（臺語轉華語，自動轉繁）",
     "sensevoice": "SenseVoice-Small（臺語漢字）",
     "openai": "OpenAI Whisper（語音送往外部服務）",
-    "browser": "瀏覽器內建辨識（語音留在使用者裝置）",
+    "browser": "瀏覽器內建辨識（由瀏覽器廠商處理，不經本站伺服器）",
     "r2t2-live": "Confucius4-R2T2 串流辨識（.35，邊講邊出字，帶專案詞表）",
     "r2t2-dev-live": "Confucius4-R2T2 dev 串流辨識（.37）",
     "gemini-live": "Gemini 串流辨識（邊講邊出字，語音送往 Google）",
@@ -239,6 +238,26 @@ def sync_asr_engines(runtime: AuthRuntime) -> None:
             )
         except Exception as exc:
             logger.warning("failed to register asr engine %s: %s", engine_id, exc)
+    _drop_retired_asr_engines(runtime)
+
+
+def _drop_retired_asr_engines(runtime: AuthRuntime) -> None:
+    """Forget engines removed from the code, along with their grants and choices.
+
+    upsert 只會新增不會刪：拿掉的引擎（例如 xiaomi）會一直留在後台授權清單，
+    帳號存的偏好也還指著它。刪資源時 resource_grants 與 admin_resource_scopes
+    靠外鍵 ON DELETE CASCADE 一起清掉；偏好改回空字串，等於沒選過、用部署預設。
+    """
+    try:
+        for record in runtime.resources.list_by_type(ResourceType.ASR_ENGINE):
+            if record.resource_id not in _ASR_ENGINE_LABELS:
+                runtime.resources.unregister(ResourceType.ASR_ENGINE, record.resource_id)
+                logger.info("removed retired asr engine %s", record.resource_id)
+        cleared = runtime.account_access.clear_asr_providers_except(_ASR_ENGINE_LABELS)
+        if cleared:
+            logger.info("cleared %d asr preferences naming a retired engine", cleared)
+    except Exception as exc:
+        logger.warning("failed to drop retired asr engines: %s", exc)
 
 
 async def sync_tts_custom_voices(runtime: AuthRuntime) -> None:

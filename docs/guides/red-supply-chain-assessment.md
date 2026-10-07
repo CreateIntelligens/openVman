@@ -98,7 +98,8 @@ D-ID 企業自架可用官方角色或製作專屬角色，錄製規格由 D-ID 
 | Qwen VLM | 啟用 `vlm` profile 才使用 | 阿里巴巴，該模型標 Apache-2.0 [^qwen] | Google Gemma、Microsoft Phi，或雲端圖片理解服務 |
 | IndexTTS | 啟用服務後使用 | 專案內模型協議要求商用書面許可；官方模型頁標 Apache-2.0，兩份內容不同 [^index] | 已接 GCP TTS／Gemini TTS／AWS Polly |
 | VoxCPM、CosyVoice | 外部 TTS 服務，CosyVoice adapter 用於臺語 | OpenBMB／ModelBest／清華、阿里巴巴；聲音與客製模型授權要查 [^vox][^cosy] | 華語可改 GCP；臺語要先試聽替代服務 |
-| Xiaomi ASR、SenseVoice | 可選語音辨識，也可能在主服務失敗時接手 | 小米、阿里巴巴；模型授權與實際備援設定要查 [^xiaomi][^sense] | 已接臺灣 MediaTek Breeze、OpenAI；自架可用 Whisper |
+| Xiaomi-CocktailASR-1 | 已移除（2026-10-07） | 小米 [^xiaomi] | 主機停機、部署設定早已停用；引擎、帳號授權與存著它的偏好一併清掉 |
+| SenseVoice | 可選語音辨識，也可能在主服務失敗時接手 | 阿里巴巴；模型授權與實際備援設定要查 [^sense] | 已接臺灣 MediaTek Breeze、OpenAI；自架可用 Whisper |
 | ModelScope | 部分模型／tokenizer 下載來源 | 建置與啟動時可能下載外部檔案 | 先下載到公司管理的儲存庫，固定版本與檔案校驗值 |
 | OpenCC、jieba、中文文字處理 | 繁簡轉換、數字讀法等 | 個人／社群套件，依實際套件查發布者與授權 [^text] | 核准後保留，或重寫專案需要的規則 |
 
@@ -112,7 +113,7 @@ Brain 預設文字模型供應商是 Gemini；ASR 預設是 Breeze。其他服�
 | BGE 向量模型（已完成） | 重建全部知識庫與記憶索引，查詢也用新模型；向量門檻依模型重新校正 | 同一個相似度數字在不同模型意思不同，門檻不能沿用（`scripts/experiments/embeddinggemma2/`） |
 | 自架 E5 | 新增接法，處理它要求的文字前綴與長度限制 [^e5] | 中文搜尋品質與完整重建索引 |
 | Qwen 圖片模型 | 更換服務，測中文字、表格與照片 [^vlmalt] | GPU 記憶體和文字辨識品質 |
-| ASR | 更換網址或服務，測專有名詞、噪音、臺語 | Xiaomi 的特定說話者辨識與一般轉錄有功能差異 |
+| ASR | 更換網址或服務，測專有名詞、噪音、臺語 | 臺語轉成華語還是保留臺語漢字，各家不同 |
 | TTS | 換聲音或服務，測漏字、讀音、延遲與停止播放 | 原本聲音克隆和臺語效果需要重新比較 |
 | 自架 Chatterbox | 新增服務接法、準備聲音素材 | 官方列有 CosyVoice 等引用組件，來源仍要逐項查 [^chatter] |
 | AvatarForge | 可研究 ETH 的真人影片生成程式 | 官方描述為批次產片；訓練需數小時，套件也含中國來源組件 [^avatarforge] |
@@ -121,7 +122,7 @@ Brain 預設文字模型供應商是 Gemini；ASR 預設是 Breeze。其他服�
 
 ## 備援也要一起改
 
-語音辨識的備援順序包含 `Breeze → Xiaomi → SenseVoice → OpenAI`，程式會依主供應商、偏好與啟用服務調整。只要 Xiaomi／SenseVoice 的網址仍有設定，主服務失敗時就可能送到它們。
+語音辨識的備援順序包含 `Breeze → R2T2 → SenseVoice → OpenAI`，程式會依主供應商、偏好與啟用服務調整。只要 SenseVoice 的網址仍有設定，主服務失敗時就可能送到它。
 
 TTS 自動選擇順序包含 `IndexTTS → VoxCPM → CosyVoice → Gemini TTS → GCP TTS → AWS Polly → Edge-TTS`，只使用已啟用的服務。
 

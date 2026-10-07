@@ -14,7 +14,7 @@ export function isStreamAsrEngine(provider: string): boolean {
  * 在伺服器上跑、音檔要上傳的引擎（跟後端 SERVER_ASR_PROVIDERS 同一組）。沒選過
  * 引擎的人用部署設定的 ASR_PROVIDER，後台已經沒有「全站預設」可以改。
  */
-export const SERVER_ASR_ENGINES = ["breeze", "r2t2", "r2t2-dev", "xiaomi", "sensevoice", "openai"] as const;
+export const SERVER_ASR_ENGINES = ["breeze", "r2t2", "r2t2-dev", "sensevoice", "openai"] as const;
 
 /** ASR 引擎的顯示名稱與說明。後台「語音」頁、前端設定與聊天室的引擎選單共用。 */
 export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> = {
@@ -30,10 +30,6 @@ export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> =
     label: "Confucius4-R2T2 dev",
     note: ".37。只有選它才用，不當其他引擎的備援。",
   },
-  xiaomi: {
-    label: "Xiaomi-CocktailASR-1",
-    note: "臺語轉寫成華語，輸出簡體會自動轉繁。吵雜環境的辨識較穩。",
-  },
   sensevoice: {
     label: "SenseVoice-Small",
     note: "以臺語漢字輸出臺語語音，要保留臺語用字才選它。",
@@ -44,7 +40,7 @@ export const ASR_ENGINE_NOTES: Record<string, { label: string; note: string }> =
   },
   browser: {
     label: "瀏覽器內建辨識",
-    note: "在使用者裝置上辨識，語音不會送到伺服器；部分瀏覽器不支援。",
+    note: "由瀏覽器廠商的服務辨識（Chrome 會送到 Google），不經過本站伺服器、不帶專案詞表；部分瀏覽器不支援。",
   },
   "gemini-live": {
     label: "Gemini Live",

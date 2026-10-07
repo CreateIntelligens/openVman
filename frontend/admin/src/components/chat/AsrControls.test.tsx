@@ -40,7 +40,7 @@ describe("AsrControls", () => {
   it("在用的引擎沒授權給這個帳號時也列出來，選單不會一片空白", () => {
     render(
       <AsrControls
-        provider={{ value: "", effective: "breeze", allowed: ["sensevoice", "xiaomi"] }}
+        provider={{ value: "", effective: "breeze", allowed: ["sensevoice", "openai"] }}
         onChange={() => {}}
       />,
     );
@@ -84,7 +84,7 @@ describe("AsrControls", () => {
   it("選過的引擎被收回授權時，顯示實際生效的那個", () => {
     render(
       <AsrControls
-        provider={{ value: "xiaomi", effective: "breeze", allowed: ["breeze", "sensevoice"] }}
+        provider={{ value: "openai", effective: "breeze", allowed: ["breeze", "sensevoice"] }}
         onChange={() => {}}
       />,
     );

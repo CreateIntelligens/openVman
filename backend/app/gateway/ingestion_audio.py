@@ -1,4 +1,4 @@
-"""Audio ingestion — Breeze-ASR, Confucius4-R2T2, Xiaomi, SenseVoice, or the OpenAI Whisper API."""
+"""Audio ingestion — Breeze-ASR, Confucius4-R2T2, SenseVoice, or the OpenAI Whisper API."""
 
 from __future__ import annotations
 
@@ -173,44 +173,6 @@ def collapse_repeated_transcript(text: str) -> str:
     return text
 
 
-async def _transcribe_xiaomi(file_path: str, trace_id: str, prompt: str = "") -> str:
-    """Transcribe via Xiaomi-CocktailASR-1 (POST /transcribe, target + ref).
-
-    這是目標語者模型：要一段參考聲紋 ``ref``，只轉錄 ``ref`` 那個人的聲音，
-    對不上就回空字串（``rejected``）。我們沒有聲紋註冊流程，所以把同一個音檔
-    同時當 target 與 ref 送出——自己跟自己 100% 吻合，語者閘門必然放行，效果
-    等同一般 ASR。實測 ref 換成別人的聲音仍會 rejected，閘門沒有被繞過。
-
-    輸出是簡體，轉成繁體才能跟其他 provider 一致。
-    """
-    cfg = get_tts_config()
-    url = cfg.asr_xiaomi_url.rstrip("/")
-    if not url:
-        raise RuntimeError("ASR_XIAOMI_URL is not configured")
-
-    source, scratch = _as_wav(file_path)
-    try:
-        payload = Path(source).read_bytes()
-        name = Path(source).name
-        response = await _http.get().post(
-            f"{url}/transcribe",
-            files={
-                "target": (name, payload),
-                "ref": (name, payload),
-            },
-        )
-    finally:
-        if scratch:
-            Path(scratch).unlink(missing_ok=True)
-    response.raise_for_status()
-    body = response.json()
-    # rejected 代表語者閘門擋下來。self-reference 下不該發生，真的發生就是
-    # 音檔有問題，回空字串會讓 chain 誤以為成功，所以往上拋讓它 fallback。
-    if body.get("rejected"):
-        raise RuntimeError("Xiaomi ASR rejected the clip (speaker gate)")
-    return convert_to_traditional(str(body.get("text", "")).strip())
-
-
 async def _transcribe_r2t2(
     file_path: str, trace_id: str, prompt: str = "",
     language: str = language_routes_mod.R2T2_CHINESE,
@@ -282,7 +244,6 @@ _TRANSCRIBERS: dict[str, object] = {
     "breeze": _transcribe_breeze,
     "r2t2": _transcribe_r2t2,
     "r2t2-dev": _transcribe_r2t2_dev,
-    "xiaomi": _transcribe_xiaomi,
     "sensevoice": _transcribe_sensevoice,
     "openai": _transcribe_openai,
 }
@@ -319,8 +280,8 @@ def _resolve_chain(cfg, preferred: str | None = None) -> list[str]:
     return ordered
 
 
-# 連不上的引擎暫停這麼久，期間直接跳過：小米那台（.19）停機後，Breeze 一掛每句話
-# 都要先白等 3.3 秒連線失敗才換 SenseVoice。時間到讓下一個請求去試，通了就恢復原順序。
+# 連不上的引擎暫停這麼久，期間直接跳過：備援裡有一台停機時，主引擎一掛每句話
+# 都要先白等 3 秒多連線失敗才換下一家。時間到讓下一個請求去試，通了就恢復原順序。
 # 每個 worker 各記各的，重啟就清空，最多多試一次。
 _UNREACHABLE_COOLDOWN_SECONDS = 60.0
 _unreachable_until: dict[str, float] = {}
@@ -361,8 +322,6 @@ def _provider_ready(cfg, name: str) -> bool:
         return bool(cfg.asr_sensevoice_url)
     if name == "breeze":
         return bool(cfg.asr_breeze_url)
-    if name == "xiaomi":
-        return bool(cfg.asr_xiaomi_url)
     if name == "r2t2":
         return bool(cfg.asr_r2t2_url)
     if name == "r2t2-dev":
@@ -377,7 +336,7 @@ async def transcribe(
     """Transcribe audio, falling back through the other configured providers.
 
     ``prompt`` 是專案的專有名詞詞表；Breeze、OpenAI（prompt）與 R2T2（context）會用，
-    SenseVoice、小米忽略。``routes`` 是專案生效的語言分流，R2T2 照它決定解碼語言；
+    SenseVoice 忽略。``routes`` 是專案生效的語言分流，R2T2 照它決定解碼語言；
     沒給（例如聊天附件）就當華語。
 
     Returns IngestionResult with content_type="audio_transcription".

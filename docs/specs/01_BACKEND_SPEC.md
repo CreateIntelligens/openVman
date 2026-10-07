@@ -166,7 +166,7 @@ ws.send(JSON.stringify(payload));
 
 ### 批次 ASR 備援（`transcribe()`）
 
-依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、xiaomi、sensevoice、openai）。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後暫停 60 秒不排入，時間到由下一個請求再試，成功就解除；HTTP 錯誤碼代表機器還在回應，不暫停。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。
+依序試：使用者選的引擎 → `ASR_PROVIDER` → 其餘已設定網址或金鑰的引擎（breeze、r2t2、sensevoice、openai；r2t2-dev 只在被選或設成 `ASR_PROVIDER` 時排入）。沒填網址的不排入。某個引擎連線失敗（`httpx.ConnectError`、`httpx.ConnectTimeout`、`openai.APIConnectionError`）後暫停 60 秒不排入，時間到由下一個請求再試，成功就解除；HTTP 錯誤碼代表機器還在回應，不暫停。全部都在暫停中時照樣全部試過一輪，不直接失敗。暫停狀態是每個 worker 各自記在記憶體，重啟就清空。
 
 ### 後台試辨識（`POST /api/v1/asr/preview`，管理員）
 

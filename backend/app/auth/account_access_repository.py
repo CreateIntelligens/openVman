@@ -160,6 +160,19 @@ class AccountAccessRepository:
                 (user_id, provider),
             )
 
+    def clear_asr_providers_except(self, known: Iterable[str]) -> int:
+        """Reset choices naming an engine this build no longer has; return how many."""
+        engines = sorted(set(known))
+        placeholders = ",".join("?" for _ in engines) or "''"
+        with self.database.transaction(write=True) as connection:
+            return connection.execute(
+                f"""
+                UPDATE account_defaults SET asr_provider = ''
+                WHERE asr_provider != '' AND asr_provider NOT IN ({placeholders})
+                """,
+                engines,
+            ).rowcount
+
     def get_preferences(self, user_id: str) -> dict[str, str]:
         """Return this account's saved front-end settings; {} when none."""
         with self.database.transaction() as connection:

@@ -1389,7 +1389,7 @@ def test_asr_engines_lists_only_configured_engines(monkeypatch):
 
     cfg = _make_test_config(
         asr_breeze_url="http://breeze", asr_r2t2_url="http://r2t2", asr_r2t2_dev_url="",
-        asr_xiaomi_url="", asr_sensevoice_url="", whisper_api_key="",
+        asr_sensevoice_url="", whisper_api_key="",
         asr_r2t2_stream_url="ws://r2t2", asr_r2t2_secret_key="k",
         asr_r2t2_dev_stream_url="", asr_r2t2_dev_secret_key="",
     )
@@ -1562,13 +1562,23 @@ def test_asr_preview_rejects_a_clip_over_the_upload_limit(monkeypatch):
     assert response.status_code == 413
 
 
+def _flat_routes(routes):
+    # FastAPI 0.142 起 include_router 的路由包在 _IncludedRouter 裡，app.routes 不再攤平。
+    for route in routes:
+        included = getattr(route, "original_router", None)
+        if included is not None:
+            yield from _flat_routes(included.routes)
+        else:
+            yield route
+
+
 def test_session_backup_routes_are_root_only(monkeypatch):
     module, _ = _load_main(monkeypatch, max_upload_bytes=1024)
     from app.auth.dependencies import require_root
 
     routes = {
         (route.path, method): route
-        for route in module.app.routes
+        for route in _flat_routes(module.app.routes)
         if getattr(route, "path", "") == "/api/v1/backups/sessions"
         for method in route.methods
     }
@@ -1642,7 +1652,7 @@ def test_asr_uses_breeze_and_reports_taiwanese_when_route_is_on(monkeypatch, tmp
         return "沉水泵、污泥泵"
 
     monkeypatch.setattr(ingestion_audio, "transcribe", fake_transcribe)
-    monkeypatch.setattr(worker, "_account_asr_provider", lambda _: "xiaomi")
+    monkeypatch.setattr(worker, "_account_asr_provider", lambda _: "sensevoice")
     monkeypatch.setattr(module.asr_routes.language_routes_mod, "effective_routes", fake_routes)
     monkeypatch.setattr(module.asr_routes.language_routes_mod, "detect_taiwanese", fake_detect)
     monkeypatch.setattr(module.asr_routes.asr_glossary_mod, "project_asr_prompt", fake_prompt)

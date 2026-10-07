@@ -34,7 +34,7 @@ STREAM_ASR_PROVIDERS = frozenset({
 })
 
 # 伺服器端引擎：音檔會送上來，走 transcribe() 與 fallback chain。
-SERVER_ASR_PROVIDERS = frozenset({"breeze", "r2t2", "r2t2-dev", "xiaomi", "sensevoice", "openai"})
+SERVER_ASR_PROVIDERS = frozenset({"breeze", "r2t2", "r2t2-dev", "sensevoice", "openai"})
 
 # 使用者可以在聊天室選哪些引擎，由管理者決定（例如 openai 會把語音送到
 # 外部服務，不一定想開放給每個人）。空集合代表不開放使用者自選。

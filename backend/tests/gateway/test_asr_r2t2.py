@@ -85,7 +85,7 @@ def test_r2t2_error_status_falls_back_instead_of_returning_nothing(r2t2):
 def test_r2t2_joins_the_chain_only_when_configured():
     cfg = ingestion_audio.get_tts_config().model_copy(update={
         "asr_provider": "breeze", "asr_breeze_url": "http://b", "asr_r2t2_url": "",
-        "asr_xiaomi_url": "", "asr_sensevoice_url": "", "whisper_api_key": "",
+        "asr_sensevoice_url": "", "whisper_api_key": "",
     })
     assert "r2t2" not in ingestion_audio._resolve_chain(cfg)
     configured = cfg.model_copy(update={"asr_r2t2_url": "http://r2t2"})
@@ -131,7 +131,7 @@ def test_dev_engine_is_only_used_when_chosen():
     """測試機不當別人的備援：沒選它就不會排進順序。"""
     cfg = ingestion_audio.get_tts_config().model_copy(update={
         "asr_provider": "breeze", "asr_breeze_url": "http://b", "asr_r2t2_url": "http://r",
-        "asr_r2t2_dev_url": "http://dev", "asr_xiaomi_url": "", "asr_sensevoice_url": "",
+        "asr_r2t2_dev_url": "http://dev", "asr_sensevoice_url": "",
         "whisper_api_key": "",
     })
     assert ingestion_audio._resolve_chain(cfg) == ["breeze", "r2t2"]

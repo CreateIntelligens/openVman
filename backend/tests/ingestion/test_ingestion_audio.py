@@ -36,7 +36,6 @@ def _asr_cfg(provider: str, **overrides) -> MagicMock:
         "asr_provider": provider,
         "asr_sensevoice_url": "",
         "asr_breeze_url": "",
-        "asr_xiaomi_url": "",
         "asr_r2t2_url": "",
         "asr_r2t2_dev_url": "",
         "whisper_api_key": "",
@@ -51,10 +50,6 @@ def _sensevoice_cfg(url: str = "http://asr:50002/") -> MagicMock:
 
 def _breeze_cfg(url: str = "http://asr:8801/") -> MagicMock:
     return _asr_cfg("breeze", asr_breeze_url=url)
-
-
-def _xiaomi_cfg(url: str = "http://asr:8802/") -> MagicMock:
-    return _asr_cfg("xiaomi", asr_xiaomi_url=url)
 
 
 def _stub_post(handler, seen: dict):
@@ -194,63 +189,6 @@ class TestBreezeTranscription:
         assert result.content == "（音訊轉錄失敗）"
 
 
-class TestXiaomiTranscription:
-    """目標語者模型：同一個音檔同時當 target 與 ref，閘門才會放行。"""
-
-    @pytest.mark.asyncio
-    async def test_sends_the_same_clip_as_both_target_and_ref(self, fake_audio):
-        seen: dict = {}
-        def handler(url):
-            return httpx.Response(
-                200,
-                json={"text": " 你好请回复我 ", "rejected": False},
-                request=httpx.Request("POST", url),
-            )
-        with patch.object(
-            ingestion_audio, "get_tts_config", return_value=_xiaomi_cfg(),
-        ), patch.object(
-            ingestion_audio, "_http", _stub_post(handler, seen),
-        ):
-            result = await transcribe(fake_audio, "trace-xm")
-
-        assert seen["url"] == "http://asr:8802/transcribe"
-        # 少送 ref 會被當成「目標語者沒開口」而回空字串，這兩個欄位缺一不可。
-        assert set(seen["files"]) == {"target", "ref"}
-        assert seen["files"]["target"][1] == seen["files"]["ref"][1]
-        # 簡體要轉繁，否則跟其他 provider 的輸出不一致。s2t 的「复」一律對到
-        # 「復」，回覆的「覆」要靠詞庫才分得出來，這裡不苛求。
-        assert result.content == "你好請回復我"
-
-    @pytest.mark.asyncio
-    async def test_rejected_clip_falls_through_instead_of_returning_empty(
-        self, fake_audio,
-    ):
-        """rejected 回空字串，當成成功會讓使用者「說了一句空話」。"""
-        def handler(url):
-            return httpx.Response(
-                200,
-                json={"text": "", "rejected": True},
-                request=httpx.Request("POST", url),
-            )
-        with patch.object(
-            ingestion_audio, "get_tts_config", return_value=_xiaomi_cfg(),
-        ), patch.object(
-            ingestion_audio, "_http", _stub_post(handler, {}),
-        ):
-            result = await transcribe(fake_audio, "trace-xm-rej")
-
-        assert result.content == "（音訊轉錄失敗）"
-
-    @pytest.mark.asyncio
-    async def test_missing_url_reports_failure(self, fake_audio):
-        with patch.object(
-            ingestion_audio, "get_tts_config", return_value=_xiaomi_cfg(url=""),
-        ):
-            result = await transcribe(fake_audio, "trace-xm-nourl")
-
-        assert result.content == "（音訊轉錄失敗）"
-
-
 class TestProviderFallbackChain:
     """一台 ASR 掛掉要換下一台，不是把「音訊轉錄失敗」當成使用者說的話。"""
 
@@ -352,22 +290,22 @@ class TestUnreachableProviders:
         monkeypatch.setattr(ingestion_audio.time, "monotonic", lambda: self.now[0])
 
     def _cfg(self):
-        return _asr_cfg("breeze", asr_breeze_url="http://b:8801", asr_xiaomi_url="http://x:8802",
+        return _asr_cfg("breeze", asr_breeze_url="http://b:8801", asr_r2t2_url="http://r:8803",
                         asr_sensevoice_url="http://s:50002", whisper_api_key="k")
 
-    async def _run(self, fake_audio, engines, preferred="xiaomi"):
+    async def _run(self, fake_audio, engines, preferred="r2t2"):
         with patch.object(ingestion_audio, "get_tts_config", return_value=self._cfg()), patch.dict(
             ingestion_audio._TRANSCRIBERS, engines,
         ):
             return await transcribe(fake_audio, "trace-down", preferred)
 
     @staticmethod
-    def _engines(tried, *, xiaomi_error=None):
-        async def xiaomi(path, trace, prompt=""):
-            tried.append("xiaomi")
-            if xiaomi_error:
-                raise xiaomi_error
-            return "小米"
+    def _engines(tried, *, r2t2_error=None):
+        async def r2t2(path, trace, prompt="", language=""):
+            tried.append("r2t2")
+            if r2t2_error:
+                raise r2t2_error
+            return "孔子"
 
         async def breeze(path, trace, prompt=""):
             tried.append("breeze")
@@ -377,27 +315,27 @@ class TestUnreachableProviders:
             tried.append("sensevoice")
             return "森"
 
-        return {"xiaomi": xiaomi, "breeze": breeze, "sensevoice": sensevoice}
+        return {"r2t2": r2t2, "breeze": breeze, "sensevoice": sensevoice}
 
     @pytest.mark.asyncio
     async def test_a_provider_that_cannot_connect_is_skipped_next_time(self, fake_audio):
         tried: list[str] = []
         down = httpx.ConnectError("connection refused")
-        first = await self._run(fake_audio, self._engines(tried, xiaomi_error=down))
-        second = await self._run(fake_audio, self._engines(tried, xiaomi_error=down))
+        first = await self._run(fake_audio, self._engines(tried, r2t2_error=down))
+        second = await self._run(fake_audio, self._engines(tried, r2t2_error=down))
 
         assert (first.provider, second.provider) == ("breeze", "breeze")
-        assert tried == ["xiaomi", "breeze", "breeze"]
+        assert tried == ["r2t2", "breeze", "breeze"]
 
     @pytest.mark.asyncio
     async def test_it_is_tried_again_after_the_cooldown(self, fake_audio):
         tried: list[str] = []
-        await self._run(fake_audio, self._engines(tried, xiaomi_error=httpx.ConnectTimeout("t")))
+        await self._run(fake_audio, self._engines(tried, r2t2_error=httpx.ConnectTimeout("t")))
         self.now[0] += ingestion_audio._UNREACHABLE_COOLDOWN_SECONDS
         result = await self._run(fake_audio, self._engines(tried))
 
-        assert result.provider == "xiaomi"
-        assert tried == ["xiaomi", "breeze", "xiaomi"]
+        assert result.provider == "r2t2"
+        assert tried == ["r2t2", "breeze", "r2t2"]
 
     @pytest.mark.asyncio
     async def test_an_http_error_does_not_pause_the_provider(self, fake_audio):
@@ -405,10 +343,10 @@ class TestUnreachableProviders:
         tried: list[str] = []
         error = httpx.HTTPStatusError("500", request=httpx.Request("POST", "http://x"),
                                       response=httpx.Response(500))
-        await self._run(fake_audio, self._engines(tried, xiaomi_error=error))
-        await self._run(fake_audio, self._engines(tried, xiaomi_error=error))
+        await self._run(fake_audio, self._engines(tried, r2t2_error=error))
+        await self._run(fake_audio, self._engines(tried, r2t2_error=error))
 
-        assert tried == ["xiaomi", "breeze", "xiaomi", "breeze"]
+        assert tried == ["r2t2", "breeze", "r2t2", "breeze"]
 
     @pytest.mark.asyncio
     async def test_openai_connection_errors_pause_it_too(self, fake_audio):
@@ -430,14 +368,14 @@ class TestUnreachableProviders:
 
     @pytest.mark.asyncio
     async def test_when_every_provider_is_paused_they_are_tried_anyway(self, fake_audio):
-        for name in ("xiaomi", "breeze", "sensevoice", "openai"):
+        for name in ("r2t2", "breeze", "sensevoice", "openai"):
             ingestion_audio._unreachable_until[name] = self.now[0] + 30
         tried: list[str] = []
         result = await self._run(fake_audio, self._engines(tried))
 
-        assert result.provider == "xiaomi"
+        assert result.provider == "r2t2"
         # 成功就解除暫停，不必等冷卻時間。
-        assert "xiaomi" not in ingestion_audio._unreachable_until
+        assert "r2t2" not in ingestion_audio._unreachable_until
 
 
 class TestDeploymentDefault:
@@ -542,6 +480,16 @@ class TestPreferredProvider:
         """選了一個沒設 URL 的引擎，不該白等一次連線逾時。"""
         cfg = _asr_cfg("breeze", asr_breeze_url="http://b:8801")
         with patch.object(ingestion_audio, "get_tts_config", return_value=cfg):
+            chain = ingestion_audio._resolve_chain(cfg, "sensevoice")
+
+        assert chain == ["breeze"]
+
+    @pytest.mark.asyncio
+    async def test_a_removed_engine_preference_is_ignored(self):
+        """xiaomi 已移除：舊資料還存著它時照部署預設辨識，不會因為找不到函式而出錯。"""
+        cfg = _asr_cfg("breeze", asr_breeze_url="http://b:8801")
+        with patch.object(ingestion_audio, "get_tts_config", return_value=cfg):
             chain = ingestion_audio._resolve_chain(cfg, "xiaomi")
 
+        assert "xiaomi" not in ingestion_audio._TRANSCRIBERS
         assert chain == ["breeze"]

@@ -140,9 +140,9 @@ class TestAsrProviderAlias:
 
     def test_reads_the_new_name(self, tmp_path: Path):
         env_file = tmp_path / ".env"
-        env_file.write_text("ASR_PROVIDER=xiaomi\n", encoding="utf-8")
+        env_file.write_text("ASR_PROVIDER=openai\n", encoding="utf-8")
 
-        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "xiaomi"
+        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "openai"
 
     def test_still_reads_the_legacy_whisper_name(self, tmp_path: Path):
         """WHISPER_PROVIDER 是舊名，既有 .env 還在用，不能只留在註解裡承諾。"""
@@ -154,10 +154,10 @@ class TestAsrProviderAlias:
     def test_the_new_name_wins_when_both_are_set(self, tmp_path: Path):
         env_file = tmp_path / ".env"
         env_file.write_text(
-            "ASR_PROVIDER=xiaomi\nWHISPER_PROVIDER=sensevoice\n", encoding="utf-8",
+            "ASR_PROVIDER=openai\nWHISPER_PROVIDER=sensevoice\n", encoding="utf-8",
         )
 
-        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "xiaomi"
+        assert TTSRouterConfig(_env_file=str(env_file)).asr_provider == "openai"
 
     def test_defaults_to_breeze(self, tmp_path: Path):
         """預設要是輸出華語的引擎。"""

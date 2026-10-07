@@ -137,7 +137,7 @@ def test_the_removed_site_asr_default_is_dropped_on_upgrade(env):
     with env["database"].transaction(write=True) as connection:
         connection.execute(
             "INSERT INTO system_settings(key, value, updated_by, updated_at) "
-            "VALUES ('asr_provider', 'xiaomi', ?, '2026-09-01T00:00:00Z')",
+            "VALUES ('asr_provider', 'sensevoice', ?, '2026-09-01T00:00:00Z')",
             (env["root"].id,),
         )
         connection.execute("DELETE FROM schema_migrations WHERE version = 14")
