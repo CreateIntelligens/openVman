@@ -70,14 +70,7 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
         project_id,
         write_identity,
     ).to_arrow().to_pylist()
-    compatible_legacy = (
-        get_settings().resolved_embedding_compatible_legacy_identities
-    )
-    _assert_memory_records_identity(
-        existing_records,
-        write_identity,
-        compatible_legacy,
-    )
+    _assert_memory_records_identity(existing_records, write_identity)
     existing_records = _normalize_memory_record_identities(
         existing_records,
         write_identity,
@@ -129,17 +122,12 @@ def run_memory_maintenance(project_id: str = "default") -> dict[str, Any]:
 def _assert_memory_records_identity(
     records: list[dict[str, Any]],
     expected_identity: str,
-    compatible_legacy: set[str],
 ) -> None:
     for record in records:
         identity = str(
             parse_record_metadata(record).get("embedding_identity", "")
         ).strip()
-        if (
-            identity
-            and identity != expected_identity
-            and identity not in compatible_legacy
-        ):
+        if identity and identity != expected_identity:
             raise RuntimeError(
                 "Memory table contains an incompatible embedding identity"
             )

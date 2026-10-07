@@ -44,7 +44,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     fake_embedder.encode_with_metadata.side_effect = lambda texts, **kwargs: (
         [[0.1] * 128 for _ in texts],
         {
-            "identity": "bge:BAAI/bge-m3:1024:float32:l2:document:test",
+            "identity": "gemma:google/embeddinggemma-2:768:float32:l2:document:test",
             "dimensions": 128,
         },
         [],
@@ -96,14 +96,11 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     # Stub config
     fake_cfg = MagicMock()
     fake_cfg.memory_maintenance_interval_seconds = 0
-    fake_cfg.similarity_thresholds = lambda _version=None: thresholds_for("bge")
+    fake_cfg.similarity_thresholds = lambda _version=None: thresholds_for("gemma")
     fake_cfg.transcript_retention_days = 30
     fake_cfg.resolved_embedding_write_identity = (
-        "bge:BAAI/bge-m3:1024:float32:l2:document:test"
+        "gemma:google/embeddinggemma-2:768:float32:l2:document:test"
     )
-    fake_cfg.resolved_embedding_compatible_legacy_identities = {
-        "bge:BAAI/bge-m3:1024:float32:l2:document:default"
-    }
     fake_config_mod = types.ModuleType("config")
     fake_config_mod.get_settings = lambda: fake_cfg
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)

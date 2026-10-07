@@ -28,9 +28,9 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, *, knowledge=None, memories=None
     # Stub embedder
     fake_embedder_mod = types.ModuleType("memory.embedder")
     fake_route = embedding_route or types.SimpleNamespace(
-        version="bge",
+        version="gemma",
         vector=[0.1] * 128,
-        attempted_versions=[{"version": "bge", "status": "selected"}],
+        attempted_versions=[{"version": "gemma", "status": "selected"}],
     )
     fake_embedder_mod.QueryEmbeddingRoute = types.SimpleNamespace
     fake_embedder = MagicMock()
@@ -83,7 +83,7 @@ def _stub_deps(monkeypatch: pytest.MonkeyPatch, *, knowledge=None, memories=None
     fake_cfg.rag_memory_top_k = 2
     fake_cfg.rag_rerank_candidate_multiplier = 4
     fake_cfg.similarity_thresholds = lambda _version=None: replace(
-        thresholds_for("bge"), retrieval=0.4, retrieval_fts=0.4, memory_bonus=0.01,
+        thresholds_for("gemma"), retrieval=0.4, retrieval_fts=0.4, memory_bonus=0.01,
     )
     fake_cfg.memory_decay_rate_per_day = 0.005
     fake_cfg.memory_importance_weight = 0.03
@@ -277,7 +277,7 @@ class TestRetrievalService:
             version="gemini",
             vector=[0.9, 0.8],
             attempted_versions=[
-                {"version": "bge", "status": "error", "reason": "RuntimeError"},
+                {"version": "gemma", "status": "error", "reason": "RuntimeError"},
                 {"version": "gemini", "status": "selected"},
             ],
         )

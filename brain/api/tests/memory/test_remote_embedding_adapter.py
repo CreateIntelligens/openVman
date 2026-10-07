@@ -33,19 +33,19 @@ def test_remote_adapter_chunks_requests_and_leases_identity(monkeypatch):
     def mock_post(self, endpoint, json=None, **kwargs):
         texts = json.get("texts", [])
         recorded_batches.append(texts)
-        vectors = [[0.1 * (i + 1)] * 1024 for i in range(len(texts))]
+        vectors = [[0.1 * (i + 1)] * 768 for i in range(len(texts))]
         request = httpx.Request("POST", f"http://test{endpoint}", json=json)
         return httpx.Response(
             200,
             json={
                 "vectors": vectors,
-                "model": "BAAI/bge-m3",
+                "model": "google/embeddinggemma-2",
                 "embedding_spec": {
-                    "identity": "bge:BAAI/bge-m3:1024:float32:l2:1.0.0",
-                    "provider": "bge",
-                    "dimensions": 1024,
+                    "identity": "gemma:google/embeddinggemma-2:768:float32:l2:document:default",
+                    "provider": "gemma",
+                    "dimensions": 768,
                 },
-                "attempts": [{"provider": "bge", "status": "selected"}],
+                "attempts": [{"provider": "gemma", "status": "selected"}],
             },
             request=request,
         )
@@ -55,7 +55,7 @@ def test_remote_adapter_chunks_requests_and_leases_identity(monkeypatch):
     adapter = GatewayRemoteTextEmbedder(
         base_url="http://fake-embedding:8009",
         chunk_size=2,
-        expected_dimension=1024,
+        expected_dimension=768,
     )
     texts = ["t1", "t2", "t3", "t4", "t5"]
     vectors, spec, attempts = adapter.encode_with_metadata(texts, input_type="document")
@@ -63,22 +63,22 @@ def test_remote_adapter_chunks_requests_and_leases_identity(monkeypatch):
     assert len(vectors) == 5
     assert len(recorded_batches) == 3
     assert recorded_batches == [["t1", "t2"], ["t3", "t4"], ["t5"]]
-    assert len(vectors[0]) == 1024
-    assert spec["identity"] == "bge:BAAI/bge-m3:1024:float32:l2:1.0.0"
+    assert len(vectors[0]) == 768
+    assert spec["identity"] == "gemma:google/embeddinggemma-2:768:float32:l2:document:default"
     assert len(attempts) >= 1
 
 
 def test_remote_adapter_rejects_dimension_mismatch(monkeypatch):
     def mock_post(self, endpoint, json=None, **kwargs):
         texts = json.get("texts", [])
-        # Return 512-dim vector when 1024 expected
+        # Return 512-dim vector when 768 expected
         vectors = [[0.1] * 512 for _ in texts]
         request = httpx.Request("POST", f"http://test{endpoint}", json=json)
         return httpx.Response(
             200,
             json={
                 "vectors": vectors,
-                "embedding_spec": {"dimensions": 1024, "identity": "fake"},
+                "embedding_spec": {"dimensions": 768, "identity": "fake"},
             },
             request=request,
         )
@@ -87,7 +87,7 @@ def test_remote_adapter_rejects_dimension_mismatch(monkeypatch):
 
     adapter = GatewayRemoteTextEmbedder(
         base_url="http://fake-embedding:8009",
-        expected_dimension=1024,
+        expected_dimension=768,
     )
     with pytest.raises(ValueError) as exc:
         adapter.encode(["test query"])
@@ -114,18 +114,14 @@ def test_readiness_incompatible_model(monkeypatch):
             json={
                 "status": "ready",
                 "model": "wrong/model-v1",
-                "dimension": 1024,
+                "dimension": 768,
             },
             request=req,
         )
 
     monkeypatch.setattr(httpx.Client, "get", mock_get)
 
-    cfg = BrainSettings(
-        embedding_active_version="bge",
-        embedding_service_url="http://shared:8009",
-        embedding_expected_model="BAAI/bge-m3",
-    )
+    cfg = BrainSettings(embedding_service_url="http://shared:8009")
     ok, info = check_embedding_service_readiness(cfg)
     assert ok is False
     assert info["status"] == "incompatible"
@@ -139,7 +135,7 @@ def test_readiness_incompatible_dimension(monkeypatch):
             200,
             json={
                 "status": "ready",
-                "model": "BAAI/bge-m3",
+                "model": "google/embeddinggemma-2",
                 "dimension": 512,
             },
             request=req,
@@ -147,15 +143,34 @@ def test_readiness_incompatible_dimension(monkeypatch):
 
     monkeypatch.setattr(httpx.Client, "get", mock_get)
 
-    cfg = BrainSettings(
-        embedding_active_version="bge",
-        embedding_service_url="http://shared:8009",
-        embedding_expected_dimension=1024,
-    )
+    cfg = BrainSettings(embedding_service_url="http://shared:8009")
     ok, info = check_embedding_service_readiness(cfg)
     assert ok is False
     assert info["status"] == "incompatible"
     assert "Dimension mismatch" in info["error"]
+
+
+def test_readiness_accepts_the_active_gemma_backend(monkeypatch):
+    def mock_get(self, url, **kwargs):
+        req = httpx.Request("GET", url)
+        return httpx.Response(
+            200,
+            json={
+                "status": "ready",
+                "model": "google/embeddinggemma-2",
+                "dimension": 768,
+            },
+            request=req,
+        )
+
+    monkeypatch.setattr(httpx.Client, "get", mock_get)
+
+    ok, info = check_embedding_service_readiness(
+        BrainSettings(embedding_service_url="http://shared:8009")
+    )
+    assert ok is True
+    assert info["status"] == "ready"
+    assert info["model"] == "google/embeddinggemma-2"
 
 
 def test_remote_adapter_retries_429_and_succeeds(monkeypatch):
@@ -171,12 +186,12 @@ def test_remote_adapter_retries_429_and_succeeds(monkeypatch):
         return httpx.Response(
             200,
             json={
-                "vectors": [[0.1] * 1024 for _ in texts],
+                "vectors": [[0.1] * 768 for _ in texts],
                 "embedding_spec": {
-                    "identity": "bge:BAAI/bge-m3:1024:float32:l2:document:default",
-                    "dimensions": 1024,
+                    "identity": "gemma:google/embeddinggemma-2:768:float32:l2:document:default",
+                    "dimensions": 768,
                 },
-                "attempts": [{"provider": "bge", "status": "selected"}],
+                "attempts": [{"provider": "gemma", "status": "selected"}],
             },
             request=req,
         )
@@ -188,11 +203,11 @@ def test_remote_adapter_retries_429_and_succeeds(monkeypatch):
         max_retries=2,
         retry_base_delay=0.01,
         retry_max_delay=0.05,
-        expected_dimension=1024,
+        expected_dimension=768,
     )
     vectors = adapter.encode(["test text"])
     assert len(vectors) == 1
-    assert len(vectors[0]) == 1024
+    assert len(vectors[0]) == 768
     assert calls == 2
 
 

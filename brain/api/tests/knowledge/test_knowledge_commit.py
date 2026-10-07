@@ -161,7 +161,7 @@ async def test_commit_route_trigger_and_status(workspace, monkeypatch):
     import memory.embedder
     class FakeEmbedder:
         def encode(self, texts, **kwargs):
-            return [[0.1] * 1024 for _ in texts]
+            return [[0.1] * 768 for _ in texts]
     fake_emb = FakeEmbedder()
     monkeypatch.setattr(memory.embedder, "get_embedder", lambda *args, **kwargs: fake_emb)
     monkeypatch.setattr(knowledge.indexer, "get_embedder", lambda *args, **kwargs: fake_emb)

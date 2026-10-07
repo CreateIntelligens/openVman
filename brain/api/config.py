@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from memory.thresholds import SimilarityThresholds, thresholds_for
 
 API_INTERNAL_PORT = 8100
+GEMMA_DIMENSIONS = 768
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,10 +75,10 @@ class BrainSettings(BaseSettings):
     live_audio_language_id_model: str = "gemini-3.5-flash-lite"
 
     # === Embedding 設定 ===
-    # 2026-10 起預設 EmbeddingGemma 2；BGE-M3 的表保留，新版本索引建好前查詢自動退回 BGE
-    # （scripts/experiments/embeddinggemma2/、scripts/migrate_embedding_version.py）。
+    # EmbeddingGemma 2（2026-10 取代 BGE-M3，scripts/experiments/embeddinggemma2/）。版本機制保留：
+    # 換模型時新版本寫進另一組資料表，建好前查詢退回有索引的版本。
     embedding_active_version: str = "gemma"
-    embedding_version_order: str = "gemma,bge,gemini,openai,voyage"
+    embedding_version_order: str = "gemma"
     embedding_service_url: str = ""
     embedding_service_token: str = ""
     embedding_service_timeout: float = 30.0
@@ -85,20 +86,10 @@ class BrainSettings(BaseSettings):
     embedding_service_max_retries: int = 3
     embedding_service_retry_base_delay: float = 0.25
     embedding_service_retry_max_delay: float = 8.0
-    embedding_expected_model: str = "BAAI/bge-m3"
-    embedding_expected_dimension: int = 1024
-    embedding_expected_revision: str = "5617a9f61b028005a4858fdac845db406aefb181"
     embedding_write_identity: str = ""
     embedding_identity_aliases: str = ""
-    embedding_compatible_legacy_identities: str = ""
     embedding_gemma_model: str = "google/embeddinggemma-2"
     embedding_gemma_revision: str = "914f7f89142e33e77833254d9c9b90c3cef7303b"
-    embedding_gemini_model: str = "gemini-embedding-001"
-    embedding_gemini_dimensions: int = 0
-    embedding_openai_model: str = "text-embedding-3-small"
-    embedding_openai_dimensions: int = 0
-    embedding_voyage_model: str = "voyage-3-large"
-    embedding_voyage_dimensions: int = 0
     lancedb_path: str = "/data/projects/default/lancedb"
     knowledge_index_state_path: str = "/data/knowledge_index_state.json"
     chunk_char_limit: int = 500
@@ -295,40 +286,12 @@ class BrainSettings(BaseSettings):
     def resolved_embedding_identity_aliases(self) -> dict[str, str]:
         """Return explicit legacy alias to document-identity mappings."""
         aliases = {
-            "bge": self._embedding_identity(
-                "bge",
-                self.embedding_expected_model,
-                self.embedding_expected_dimension or 1024,
-                "document",
-                self.embedding_expected_revision,
-            ),
             "gemma": self._embedding_identity(
                 "gemma",
                 self.embedding_gemma_model,
-                768,
+                GEMMA_DIMENSIONS,
                 "document",
                 self.embedding_gemma_revision,
-            ),
-            "gemini": self._embedding_identity(
-                "gemini",
-                self.embedding_gemini_model,
-                self.embedding_gemini_dimensions or 768,
-                "document",
-                "provider-managed",
-            ),
-            "openai": self._embedding_identity(
-                "openai",
-                self.embedding_openai_model,
-                self.embedding_openai_dimensions or 1536,
-                "document",
-                "provider-managed",
-            ),
-            "voyage": self._embedding_identity(
-                "voyage",
-                self.embedding_voyage_model,
-                self.embedding_voyage_dimensions or 1024,
-                "document",
-                "provider-managed",
             ),
         }
         raw = self.embedding_identity_aliases.strip()
@@ -356,44 +319,6 @@ class BrainSettings(BaseSettings):
         return self.resolved_embedding_identity_aliases[
             self.resolved_embedding_active_version
         ]
-
-    @property
-    def resolved_embedding_compatible_legacy_identities(self) -> set[str]:
-        """Return identities proven equivalent to the pinned write identity."""
-        identities: set[str] = set()
-        if (
-            self.embedding_expected_model == "BAAI/bge-m3"
-            and self.embedding_expected_dimension == 1024
-            and self.embedding_expected_revision
-            == "5617a9f61b028005a4858fdac845db406aefb181"
-        ):
-            identities.add(
-                self._embedding_identity(
-                    "bge",
-                    "BAAI/bge-m3",
-                    1024,
-                    "document",
-                    "default",
-                )
-            )
-        raw = self.embedding_compatible_legacy_identities.strip()
-        if not raw:
-            return identities
-        try:
-            configured = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                "EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES 必須是 JSON array"
-            ) from exc
-        if not isinstance(configured, list):
-            raise ValueError(
-                "EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES 必須是 JSON array"
-            )
-        for identity in configured:
-            normalized = str(identity).strip()
-            self._validate_embedding_identity(normalized)
-            identities.add(normalized)
-        return identities
 
     def similarity_thresholds(self, version_or_identity: str | None = None) -> SimilarityThresholds:
         """Cosine thresholds for the embedding version that produced the vectors at hand.
@@ -540,36 +465,7 @@ class BrainSettings(BaseSettings):
         resolved_version = self._normalize_embedding_version(
             version or self.embedding_active_version
         )
-        provider_models = {
-            "gemma": (
-                self.embedding_gemma_model,
-                768,
-            ),
-            "gemini": (
-                self.embedding_gemini_model,
-                self.embedding_gemini_dimensions or 768,
-            ),
-            "openai": (
-                self.embedding_openai_model,
-                self.embedding_openai_dimensions or 1536,
-            ),
-            "voyage": (
-                self.embedding_voyage_model,
-                self.embedding_voyage_dimensions or 1024,
-            ),
-            "bge": (
-                self.embedding_expected_model,
-                self.embedding_expected_dimension or 1024,
-            ),
-        }
-        model, dimensions = provider_models.get(
-            resolved_version,
-            (
-                self.embedding_expected_model,
-                self.embedding_expected_dimension or 1024,
-            ),
-        )
-
+        model, dimensions = self.embedding_gemma_model, GEMMA_DIMENSIONS
         return EmbeddingBackend(
             version=resolved_version,
             provider=resolved_version,
@@ -584,7 +480,7 @@ class BrainSettings(BaseSettings):
 
     def _normalize_embedding_version(self, value: str | None) -> str:
         normalized = (value or "").strip().lower()
-        if normalized in {"bge", "gemma", "gemini", "openai", "voyage"}:
+        if normalized in {"gemma"}:
             return normalized
         raise ValueError(f"embedding version 不支援: {value}")
 

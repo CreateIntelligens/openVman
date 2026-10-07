@@ -92,13 +92,10 @@ services:
       com.centurylinklabs.watchtower.enable: "true"
     volumes:
       - hf-cache:/home/appuser/.cache/huggingface
-    # 其餘設定的預設值都在 brain/embedding/app.py，不在這裡重複；要覆寫才加。
+    # 其餘設定（EmbeddingGemma 2 的模型、revision、批次大小）的預設值都在 brain/embedding/app.py；要覆寫才加。
     environment:
       - HF_HOME=/home/appuser/.cache/huggingface
       - EMBEDDING_BEARER_TOKEN=${EMBEDDING_SERVICE_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
     healthcheck:
       test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('EMBEDDING_BEARER_TOKEN',''); req=urllib.request.Request('http://localhost:8009/health/ready', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
       interval: 15s

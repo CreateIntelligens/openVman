@@ -19,9 +19,9 @@ def test_build_health_payload_reports_dependency_checks_and_session_runtime():
             llm_provider="gemini",
             llm_model="gemini-2.0-flash",
             resolve_embedding_backend=lambda: SimpleNamespace(
-                version="bge",
-                provider="bge",
-                model="BAAI/bge-m3",
+                version="gemma",
+                provider="gemma",
+                model="google/embeddinggemma-2",
             ),
         )
         get_db.return_value = SimpleNamespace(table_names=lambda: ["knowledge", "memories"])
@@ -61,9 +61,9 @@ def test_build_health_payload_degrades_when_dependency_probe_fails():
             llm_provider="gemini",
             llm_model="gemini-2.0-flash",
             resolve_embedding_backend=lambda: SimpleNamespace(
-                version="bge",
-                provider="bge",
-                model="BAAI/bge-m3",
+                version="gemma",
+                provider="gemma",
+                model="google/embeddinggemma-2",
             ),
         )
         get_metrics_store.return_value.snapshot.return_value = {

@@ -120,9 +120,9 @@ def _make_fake_embedder() -> types.ModuleType:
     _mock_enc = MagicMock(encode=lambda texts: [[0.1] for _ in texts])
     mod.get_embedder = lambda embedding_version=None: _mock_enc
     mod.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): types.SimpleNamespace(
-        version="bge",
+        version="gemma",
         vector=[0.1],
-        attempted_versions=[{"version": "bge", "status": "selected"}],
+        attempted_versions=[{"version": "gemma", "status": "selected"}],
     )
     return mod
 

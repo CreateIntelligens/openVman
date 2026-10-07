@@ -20,7 +20,7 @@ from memory.thresholds import thresholds_for
 _fake_embedder = ModuleType("memory.embedder")
 _fake_embedder.get_embedder = lambda embedding_version=None: MagicMock(encode=lambda texts: [[0.1] for _ in texts])  # type: ignore[attr-defined]
 _fake_embedder.encode_text = lambda text, embedding_version=None: [0.1]  # type: ignore[attr-defined]
-_fake_embedder.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): MagicMock(version="bge", vector=[0.1], attempted_versions=[])  # type: ignore[attr-defined]
+_fake_embedder.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): MagicMock(version="gemma", vector=[0.1], attempted_versions=[])  # type: ignore[attr-defined]
 
 _fake_importance = ModuleType("memory.importance")
 _fake_importance.score_importance = lambda text: MagicMock(score=0.5, level="medium", signals=())  # type: ignore[attr-defined]
@@ -51,7 +51,7 @@ _cfg_mock.dreaming_min_unique_queries = 2
 _cfg_mock.dreaming_candidate_limit = 100
 _cfg_mock.max_session_ttl_minutes = 30 * 24 * 60
 _cfg_mock.similarity_thresholds = lambda _version=None: replace(
-    thresholds_for("bge"), retrieval=0.4, retrieval_fts=0.4,
+    thresholds_for("gemma"), retrieval=0.4, retrieval_fts=0.4,
 )
 _cfg_mock.gateway_internal_token = "test-internal-token"
 

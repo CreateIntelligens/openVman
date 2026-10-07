@@ -83,12 +83,26 @@ class TestDataRoot:
 
 
 class TestEmbeddingIndexStatePath:
-    def test_bge_version_keeps_legacy_path(self):
-        ctx = resolve_project_context("default")
+    def test_default_write_identity_uses_the_gemma_path(self):
+        path = resolve_embedding_index_state_path("default")
 
-        assert resolve_embedding_index_state_path("default", "bge") == ctx.index_state_path
+        assert path.name == "knowledge_index_state__gemma.json"
 
-    def test_non_bge_version_uses_namespaced_path(self):
-        path = resolve_embedding_index_state_path("default", "gemini")
+    def test_alias_and_its_identity_share_the_namespaced_path(self):
+        from config import get_settings
 
-        assert path.name == "knowledge_index_state__gemini.json"
+        identity = get_settings().resolved_embedding_write_identity
+
+        assert resolve_embedding_index_state_path("default", "gemma").name == (
+            "knowledge_index_state__gemma.json"
+        )
+        assert resolve_embedding_index_state_path("default", identity).name == (
+            "knowledge_index_state__gemma.json"
+        )
+
+    def test_unknown_identity_gets_an_isolated_path(self):
+        path = resolve_embedding_index_state_path(
+            "default", "bge:BAAI/bge-m3:1024:float32:l2:document:default"
+        )
+
+        assert path.name.startswith("knowledge_index_state__emb_")

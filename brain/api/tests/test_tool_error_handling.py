@@ -54,9 +54,9 @@ def _load_agent_loop(monkeypatch: pytest.MonkeyPatch):
     fake_embedder = types.ModuleType("memory.embedder")
     fake_embedder.encode_text = lambda text, embedding_version=None: [0.1]
     fake_embedder.encode_query_with_fallback = lambda query, *, project_id="default", table_names=("knowledge", "memories"): types.SimpleNamespace(
-        version="bge",
+        version="gemma",
         vector=[0.1],
-        attempted_versions=[{"version": "bge", "status": "selected"}],
+        attempted_versions=[{"version": "gemma", "status": "selected"}],
     )
 
     fake_retrieval = types.ModuleType("memory.retrieval")

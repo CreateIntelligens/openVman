@@ -25,88 +25,62 @@ class TestEmbeddingSettings:
 
         assert cfg.session_db_resolved_path.endswith("/data/projects/default/sessions.db")
 
-    def test_defaults_prefer_gemma_then_bge(self):
+    def test_defaults_use_gemma_only(self):
         cfg = BrainSettings()
 
         assert cfg.resolved_embedding_active_version == "gemma"
-        assert cfg.resolved_embedding_version_order == [
-            "gemma",
-            "bge",
-            "gemini",
-            "openai",
-            "voyage",
-        ]
+        assert cfg.resolved_embedding_version_order == ["gemma"]
 
         backend = cfg.resolve_embedding_backend()
         assert backend.version == "gemma"
         assert backend.provider == "gemma"
         assert backend.model == "google/embeddinggemma-2"
+        assert backend.dimensions == 768
         assert backend.api_key == cfg.embedding_service_token
 
     def test_active_version_is_prepended_once(self):
         cfg = BrainSettings(
-            embedding_active_version="openai",
-            embedding_version_order="gemini, openai, voyage",
+            embedding_active_version="gemma",
+            embedding_version_order="gemma, GEMMA",
         )
 
-        assert cfg.resolved_embedding_version_order == [
-            "openai",
-            "gemini",
-            "voyage",
-        ]
+        assert cfg.resolved_embedding_version_order == ["gemma"]
 
-    def test_provider_models_and_keys_resolve(self):
-        cfg = BrainSettings(
-            embedding_service_token="gateway-token",
-            gemini_api_key="gk",
-            openai_api_key="ok",
-            voyage_api_key="vk",
-            embedding_gemini_model="gemini-embedding-001",
-            embedding_openai_model="text-embedding-3-small",
-            embedding_voyage_model="voyage-3-large",
-        )
+    def test_backend_uses_the_gateway_token(self):
+        cfg = BrainSettings(embedding_service_token="gateway-token")
 
-        gemini = cfg.resolve_embedding_backend("gemini")
-        assert gemini.provider == "gemini"
-        assert gemini.model == "gemini-embedding-001"
-        assert gemini.api_key == "gateway-token"
-
-        openai = cfg.resolve_embedding_backend("openai")
-        assert openai.provider == "openai"
-        assert openai.model == "text-embedding-3-small"
-        assert openai.api_key == "gateway-token"
-
-        voyage = cfg.resolve_embedding_backend("voyage")
-        assert voyage.provider == "voyage"
-        assert voyage.model == "voyage-3-large"
-        assert voyage.api_key == "gateway-token"
+        backend = cfg.resolve_embedding_backend("gemma")
+        assert backend.provider == "gemma"
+        assert backend.api_key == "gateway-token"
 
     def test_write_and_query_identities_are_canonical_and_explicit(self):
-        cfg = BrainSettings(
-            embedding_active_version="bge",
-            embedding_version_order="bge,gemini",
-        )
+        cfg = BrainSettings()
 
-        assert cfg.resolved_embedding_write_identity.endswith(
-            ":document:5617a9f61b028005a4858fdac845db406aefb181"
+        assert cfg.resolved_embedding_write_identity == (
+            "gemma:google/embeddinggemma-2:768:float32:l2:document:"
+            "914f7f89142e33e77833254d9c9b90c3cef7303b"
         )
         assert cfg.resolved_embedding_query_identities == [
-            cfg.resolve_embedding_identity("bge", input_semantics="query"),
-            cfg.resolve_embedding_identity("gemini", input_semantics="query"),
+            cfg.resolve_embedding_identity("gemma", input_semantics="query"),
         ]
+        assert cfg.resolved_embedding_query_identities[0].split(":")[5] == "query"
 
     def test_explicit_write_identity_is_not_reinterpreted_by_provider_alias(self):
-        identity = "bge:BAAI/bge-m3:1024:float32:l2:document:rev-two"
+        identity = "gemma:google/embeddinggemma-2:768:float32:l2:document:rev-two"
         cfg = BrainSettings(embedding_write_identity=identity)
 
         assert cfg.resolved_embedding_write_identity == identity
 
-    def test_pinned_bge_explicitly_accepts_the_parity_verified_legacy_identity(self):
-        cfg = BrainSettings()
+    def test_identity_alias_override_replaces_the_gemma_identity(self):
+        identity = "gemma:google/embeddinggemma-2:768:float32:l2:document:rev-two"
+        cfg = BrainSettings(embedding_identity_aliases=f'{{"gemma": "{identity}"}}')
 
-        assert cfg.resolved_embedding_compatible_legacy_identities == {
-            "bge:BAAI/bge-m3:1024:float32:l2:document:default"
-        }
+        assert cfg.resolved_embedding_write_identity == identity
+
+    def test_removed_versions_are_rejected(self):
+        for version in ("bge", "gemini", "openai", "voyage"):
+            with pytest.raises(ValueError, match="embedding"):
+                BrainSettings(embedding_active_version=version).resolve_embedding_backend()
 
     def test_unknown_embedding_version_raises(self):
         cfg = BrainSettings(

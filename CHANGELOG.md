@@ -279,6 +279,7 @@
 
 ### Removed
 
+- **BGE-M3 與雲端 embedding 備援**：EmbeddingGemma 2 上線、全部專案重建索引，共用 embedding 端點的 jtai 也切換完成後，移除 BGE-M3（BAAI，供應鏈政策）：gateway 的 BGE 提供者、FlagEmbedding、joblib、Gemini／OpenAI／Voyage embedding 轉接與它們的設定，Brain 的 `bge`／`gemini`／`openai`／`voyage` 版本與 `EMBEDDING_EXPECTED_*`、`EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES`、`EMBEDDING_GEMINI_*`／`OPENAI_*`／`VOYAGE_*` 設定，以及只為這次遷移寫的 `scripts/migrate_embedding_version.py`。Gateway 只剩 `gemma`，沒指定 identity 的呼叫也拿到 Gemma；Brain 的版本機制（新版本寫進另一組資料表、建好前查詢退回）保留給下次換模型。Brain readiness 改成一律檢查 gateway 的模型與維度（原本只在 BGE 時檢查）。各專案舊的 BGE 資料表（`knowledge`、`memories`）Brain 已不再讀寫。
 - **BGE embedding 意圖影子**（`core/intent_shadow.py`、`INTENT_SHADOW_*` 設定、
   `scripts/experiments/intent-shadow/evaluate.py` 與 `OPERATIONS.md`）：用 centroid
   相似度猜意圖，2026-09-23 dev 多輪對話實測只有 9/19，並有一筆知識庫問題誤判閒聊。

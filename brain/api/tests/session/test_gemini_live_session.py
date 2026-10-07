@@ -45,7 +45,7 @@ def _load_module():
     )
     sys.modules["memory.embedder"] = types.SimpleNamespace(
         encode_query_with_fallback=lambda *args, **kwargs: types.SimpleNamespace(
-            version="bge",
+            version="gemma",
             vector=[0.1, 0.2],
         )
     )
@@ -465,7 +465,7 @@ async def test_gemini_live_session_search_tool_runs_in_thread(monkeypatch):
     payload = response["response"]
     assert payload["table"] == "knowledge"
     assert payload["queries"] == ["退款政策"]
-    assert payload["embedding_versions"] == ["bge"]
+    assert payload["embedding_versions"] == ["gemma"]
     assert len(payload["results"]) == 1
     assert payload["results"][0]["text"] == "result"
     assert payload["results"][0]["matched_queries"] == ["退款政策"]

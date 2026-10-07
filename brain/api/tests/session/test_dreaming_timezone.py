@@ -24,7 +24,7 @@ def dreaming(monkeypatch, tmp_path):
         dreaming_min_score=0,
         dreaming_min_recall_count=0,
         dreaming_min_unique_queries=0,
-        similarity_thresholds=lambda _version=None: thresholds_for("bge"),
+        similarity_thresholds=lambda _version=None: thresholds_for("gemma"),
     )
     clock = SimpleNamespace(now=datetime(2026, 9, 9, 19, tzinfo=timezone.utc))
 

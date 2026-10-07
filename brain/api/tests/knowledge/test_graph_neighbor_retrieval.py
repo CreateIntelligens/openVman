@@ -125,7 +125,7 @@ def test_search_one_uses_hybrid_chunk_retrieval(monkeypatch):
     fake_embedder = types.ModuleType("memory.embedder")
     fake_embedder.encode_query_with_fallback = lambda *a, **k: types.SimpleNamespace(
         vector=[0.1, 0.2],
-        version="bge",
+        version="gemma",
     )
     fake_retrieval = types.ModuleType("memory.retrieval")
 
@@ -146,7 +146,7 @@ def test_search_one_uses_hybrid_chunk_retrieval(monkeypatch):
     )
 
     assert records == [{"chunk_id": "hit", "text": "PRP"}]
-    assert version == "bge"
+    assert version == "gemma"
     assert vector == [0.1, 0.2]
     assert calls[0]["query_type"] == "hybrid"
 

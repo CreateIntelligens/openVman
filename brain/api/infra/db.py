@@ -163,15 +163,7 @@ def resolve_vector_table_name(
         or cfg.resolved_embedding_active_version
     )
     version = raw_version.lower()
-    if version == "default":
-        version = "bge"
-
     aliases = getattr(cfg, "resolved_embedding_identity_aliases", {})
-    compatible_legacy = getattr(
-        cfg,
-        "resolved_embedding_compatible_legacy_identities",
-        set(),
-    )
     if version in aliases:
         canonical = aliases[version]
     elif ":" in raw_version:
@@ -186,12 +178,7 @@ def resolve_vector_table_name(
             identities.add(identity_with_semantics(document_identity, "query"))
             identities.add(identity_with_semantics(document_identity, "symmetric"))
         if canonical in identities:
-            if alias == "bge":
-                return logical_name
             return f"{logical_name}__{alias}"
-
-    if canonical in compatible_legacy or version == "bge":
-        return logical_name
 
     if ":" not in canonical:
         return f"{logical_name}__{version}"

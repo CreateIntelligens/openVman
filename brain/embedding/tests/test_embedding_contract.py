@@ -11,7 +11,7 @@ try:
     from brain.embedding.identity import EmbeddingSpec, make_canonical_identity
     from brain.embedding.registry import ProviderRegistry
     from brain.embedding.tests.fixtures.embedding_fixtures import (
-        EXPECTED_BGE_MODEL,
+        EXPECTED_MODEL,
         EXPECTED_DENSE_DIMENSION,
         validate_vector_contract,
     )
@@ -23,7 +23,7 @@ except ModuleNotFoundError:
     from identity import EmbeddingSpec, make_canonical_identity
     from registry import ProviderRegistry
     from tests.fixtures.embedding_fixtures import (
-        EXPECTED_BGE_MODEL,
+        EXPECTED_MODEL,
         EXPECTED_DENSE_DIMENSION,
         validate_vector_contract,
     )
@@ -60,10 +60,10 @@ class MockProvider:
 @pytest.fixture(autouse=True)
 def mock_registry(monkeypatch):
     reg = ProviderRegistry(cooldown_seconds=10.0)
-    bge_spec = EmbeddingSpec(
-        identity=make_canonical_identity("bge", EXPECTED_BGE_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
-        provider="bge",
-        model=EXPECTED_BGE_MODEL,
+    gemma_spec = EmbeddingSpec(
+        identity=make_canonical_identity("gemma", EXPECTED_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
+        provider="gemma",
+        model=EXPECTED_MODEL,
         dimensions=EXPECTED_DENSE_DIMENSION,
         dtype="float32",
         normalized=True,
@@ -72,7 +72,7 @@ def mock_registry(monkeypatch):
         model_revision="default",
         service_revision="1.0.0",
     )
-    reg.register("bge", MockProvider(bge_spec))
+    reg.register("gemma", MockProvider(gemma_spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
     monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "embedding-test-token")
 
@@ -92,7 +92,7 @@ def test_v1_models_endpoint():
     assert data["object"] == "list"
     assert len(data["data"]) >= 1
     m0 = data["data"][0]
-    assert m0["id"] == EXPECTED_BGE_MODEL
+    assert m0["id"] == EXPECTED_MODEL
     assert m0["dimensions"] == EXPECTED_DENSE_DIMENSION
     assert "identity" in m0
 
@@ -108,9 +108,9 @@ def test_jtai_embed_endpoint():
     data = response.json()
     assert "vectors" in data
     assert "embedding_spec" in data
-    assert data["model"] == EXPECTED_BGE_MODEL
+    assert data["model"] == EXPECTED_MODEL
     assert data["embedding_spec"]["dimensions"] == EXPECTED_DENSE_DIMENSION
-    assert data["embedding_spec"]["provider"] == "bge"
+    assert data["embedding_spec"]["provider"] == "gemma"
     assert len(data["attempts"]) == 1
     assert data["attempts"][0]["status"] == "selected"
 
@@ -126,7 +126,7 @@ def test_jtai_embed_empty_batch():
     assert response.status_code == 200
     data = response.json()
     assert data["vectors"] == []
-    assert data["model"] == EXPECTED_BGE_MODEL
+    assert data["model"] == EXPECTED_MODEL
     assert "embedding_spec" in data
 
 
@@ -146,7 +146,7 @@ def test_openai_embeddings_single_string():
     client = TestClient(embedding_app.app, headers={"Authorization": "Bearer embedding-test-token"})
     payload = {
         "input": "測試單一字串嵌入",
-        "model": EXPECTED_BGE_MODEL,
+        "model": EXPECTED_MODEL,
     }
     response = client.post("/v1/embeddings", json=payload)
     assert response.status_code == 200
@@ -155,7 +155,7 @@ def test_openai_embeddings_single_string():
     assert len(data["data"]) == 1
     assert data["data"][0]["index"] == 0
     assert len(data["data"][0]["embedding"]) == EXPECTED_DENSE_DIMENSION
-    assert data["model"] == EXPECTED_BGE_MODEL
+    assert data["model"] == EXPECTED_MODEL
     assert "openvman_embedding_spec" in data
     assert data["openvman_embedding_spec"]["dimensions"] == EXPECTED_DENSE_DIMENSION
 

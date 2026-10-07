@@ -104,7 +104,7 @@ def test_warmup_retrieval_path_warms_knowledge_and_memories(monkeypatch):
 
     class _Route:
         vector = [0.0]
-        version = "bge"
+        version = "gemma"
 
     monkeypatch.setattr(
         startup,
@@ -136,7 +136,7 @@ def test_warmup_retrieval_path_one_table_failure_does_not_block_other(monkeypatc
 
     class _Route:
         vector = [0.0]
-        version = "bge"
+        version = "gemma"
 
     import memory.embedder as embedder
     import memory.retrieval as retrieval

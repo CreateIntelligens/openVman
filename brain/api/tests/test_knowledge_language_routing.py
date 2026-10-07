@@ -16,7 +16,7 @@ def test_search_knowledge_passes_user_language(monkeypatch):
     seen: list[str | None] = []
     monkeypatch.setattr(
         embedder, "encode_query_with_fallback",
-        lambda *a, **kw: types.SimpleNamespace(vector=[0.1], version="bge"),
+        lambda *a, **kw: types.SimpleNamespace(vector=[0.1], version="gemma"),
     )
     monkeypatch.setattr(retrieval, "search_records", lambda *a, **kw: seen.append(kw.get("language")) or [])
     monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a: [])
@@ -39,7 +39,7 @@ def test_short_greeting_searches_in_the_primary_language(monkeypatch):
     seen: list[str | None] = []
     monkeypatch.setattr(
         embedder, "encode_query_with_fallback",
-        lambda *a, **kw: types.SimpleNamespace(vector=[0.1], version="bge"),
+        lambda *a, **kw: types.SimpleNamespace(vector=[0.1], version="gemma"),
     )
     monkeypatch.setattr(retrieval, "search_records", lambda *a, **kw: seen.append(kw.get("language")) or [])
     monkeypatch.setattr(knowledge_tools, "_expand_via_graph", lambda merged, *a: [])

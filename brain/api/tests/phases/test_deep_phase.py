@@ -29,7 +29,7 @@ def _stub_deps(monkeypatch, tmp_path):
         dreaming_candidate_limit = 100
 
         def similarity_thresholds(self, _version=None):
-            return thresholds_for("bge")
+            return thresholds_for("gemma")
 
     fake_config = types.ModuleType("config")
     fake_config.get_settings = lambda: FakeSettings()

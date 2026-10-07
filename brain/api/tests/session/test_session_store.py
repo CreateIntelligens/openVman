@@ -290,7 +290,7 @@ class _FakeSettings:
             "session_db_resolved_path": "/tmp/test.db",
             "memory_maintenance_interval_seconds": 300,
             "memory_decay_rate_per_day": 0.005,
-            "similarity_thresholds": lambda _version=None: thresholds_for("bge"),
+            "similarity_thresholds": lambda _version=None: thresholds_for("gemma"),
             "memory_importance_weight": 0.03,
             "request_rate_limit_per_minute": 60,
         }

@@ -7,9 +7,8 @@ cosine 與「1 − 距離」三種寫法。LanceDB 回的是 L2 平方距離；�
 不同模型的相似度分布差很多（鶴記同一批段落兩兩相似度中位數：BGE-M3 0.50、
 EmbeddingGemma 2 0.74），同一個數字放到另一個模型上意思完全不同，所以門檻
 跟著 embedding 版本走，一個版本一組。來源：
-- bge：原本的設定值換算成相似度（kb-cutoff 2026-09-29 等）。
 - gemma：scripts/experiments/embeddinggemma2/。檢索門檻用鶴記 170 題實測校正；
-  去重、合併、切段沒有標準答案，以 BGE 門檻在同一批資料上的分位數換算。
+  去重、合併、切段沒有標準答案，以當時 BGE-M3 的門檻（原設定值）在同一批資料上的分位數換算。
 """
 
 from __future__ import annotations
@@ -40,17 +39,6 @@ class SimilarityThresholds:
 
 
 _PROFILES: dict[str, SimilarityThresholds] = {
-    "bge": SimilarityThresholds(
-        retrieval=0.50,
-        retrieval_fts=0.45,
-        dedup=0.95,
-        memory_merge=0.92,
-        dreaming_dedup=0.95,
-        chunk_split=0.65,
-        memory_bonus=0.01,
-        web_min_relevance=0.15,
-        web_relevance_ratio=0.7,
-    ),
     # 檢索門檻在正式檢索路徑（混合檢索、語言排序、去重）上掃過：0.68 時鶴記中英西 36/36、
     # 跨語言 47/48、語音辨識打錯字 30/57（BGE 36、46、25），但「你好」「hola」這類招呼語
     # 會帶進幾段；0.72 才沒有雜訊，命中卻全面低於 BGE。
@@ -66,8 +54,7 @@ _PROFILES: dict[str, SimilarityThresholds] = {
         web_relevance_ratio=0.87,
     ),
 }
-# 雲端 embedding 沒有校正過，沿用 BGE 的值（跟改寫前的行為一樣）。
-_FALLBACK = "bge"
+_FALLBACK = "gemma"
 
 
 def distance_for(similarity: float) -> float:

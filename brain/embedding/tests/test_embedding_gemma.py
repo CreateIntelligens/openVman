@@ -98,30 +98,30 @@ async def test_registry_passes_titles_only_to_providers_that_take_them(fake_st):
 
 @pytest.mark.asyncio
 async def test_caller_order_of_acceptable_identities_wins_over_fallback_order(fake_st):
-    registry = ProviderRegistry(fallback_order=["bge", "gemma"])
+    registry = ProviderRegistry(fallback_order=["other", "gemma"])
 
-    class Bge:
+    class Other:
         is_configured = True
 
         def spec(self, input_semantics="document"):
             return GemmaLocalProvider(device="cpu").spec(input_semantics).__class__(
-                identity=f"bge:BAAI/bge-m3:1024:float32:l2:{input_semantics}:r", provider="bge",
-                model="BAAI/bge-m3", dimensions=1024,
+                identity=f"other:m:2:float32:l2:{input_semantics}:r", provider="other",
+                model="m", dimensions=2,
             )
 
         async def encode(self, texts, *, input_type="document"):
-            return [[1.0] + [0.0] * 1023 for _ in texts]
+            return [[1.0, 0.0] for _ in texts]
 
-    registry.register("bge", Bge())
+    registry.register("other", Other())
     registry.register("gemma", GemmaLocalProvider(device="cpu"))
     gemma_query = GemmaLocalProvider(device="cpu").spec("query").identity
-    bge_query = Bge().spec("query").identity
+    other_query = Other().spec("query").identity
 
     _, spec, _ = await registry.resolve_and_encode(
-        ["q"], input_type="query", acceptable_identities=[gemma_query, bge_query],
+        ["q"], input_type="query", acceptable_identities=[gemma_query, other_query],
     )
     assert spec.provider == "gemma"
     _, spec, _ = await registry.resolve_and_encode(
-        ["q"], input_type="query", acceptable_identities=[bge_query, gemma_query],
+        ["q"], input_type="query", acceptable_identities=[other_query, gemma_query],
     )
-    assert spec.provider == "bge"
+    assert spec.provider == "other"

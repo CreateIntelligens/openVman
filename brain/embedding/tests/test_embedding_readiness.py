@@ -11,7 +11,7 @@ try:
     from brain.embedding.identity import EmbeddingSpec, make_canonical_identity
     from brain.embedding.registry import ProviderRegistry
     from brain.embedding.tests.fixtures.embedding_fixtures import (
-        EXPECTED_BGE_MODEL,
+        EXPECTED_MODEL,
         EXPECTED_DENSE_DIMENSION,
     )
 except ModuleNotFoundError:
@@ -22,7 +22,7 @@ except ModuleNotFoundError:
     from identity import EmbeddingSpec, make_canonical_identity
     from registry import ProviderRegistry
     from tests.fixtures.embedding_fixtures import (
-        EXPECTED_BGE_MODEL,
+        EXPECTED_MODEL,
         EXPECTED_DENSE_DIMENSION,
     )
 
@@ -80,12 +80,12 @@ class MockFailingWarmupProvider:
 def test_health_ready_metadata(monkeypatch):
     reg = ProviderRegistry()
     spec = EmbeddingSpec(
-        identity=make_canonical_identity("bge", EXPECTED_BGE_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
-        provider="bge",
-        model=EXPECTED_BGE_MODEL,
+        identity=make_canonical_identity("gemma", EXPECTED_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
+        provider="gemma",
+        model=EXPECTED_MODEL,
         dimensions=EXPECTED_DENSE_DIMENSION,
     )
-    reg.register("bge", MockHealthyProvider(spec))
+    reg.register("gemma", MockHealthyProvider(spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
     monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "embedding-test-token")
 
@@ -94,7 +94,7 @@ def test_health_ready_metadata(monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ready"
-    assert data["model"] == EXPECTED_BGE_MODEL
+    assert data["model"] == EXPECTED_MODEL
     assert data["dimension"] == EXPECTED_DENSE_DIMENSION
     assert data["normalization"] == "l2"
     assert "embedding_spec" in data
@@ -104,12 +104,12 @@ def test_health_ready_metadata(monkeypatch):
 def test_health_ready_failure_on_warmup_error(monkeypatch):
     reg = ProviderRegistry()
     spec = EmbeddingSpec(
-        identity=make_canonical_identity("bge", EXPECTED_BGE_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
-        provider="bge",
-        model=EXPECTED_BGE_MODEL,
+        identity=make_canonical_identity("gemma", EXPECTED_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
+        provider="gemma",
+        model=EXPECTED_MODEL,
         dimensions=EXPECTED_DENSE_DIMENSION,
     )
-    reg.register("bge", MockFailingWarmupProvider(spec))
+    reg.register("gemma", MockFailingWarmupProvider(spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
     monkeypatch.setattr(embedding_app, "BEARER_TOKEN", "embedding-test-token")
 
@@ -117,7 +117,7 @@ def test_health_ready_failure_on_warmup_error(monkeypatch):
     response = client.get("/health/ready")
     assert response.status_code == 503
     detail = response.json()["detail"]
-    assert detail["providers"]["bge"]["error_type"] == "RuntimeError"
+    assert detail["providers"]["gemma"]["error_type"] == "RuntimeError"
     assert "CUDA out of memory" not in str(detail)
 
 
@@ -126,23 +126,23 @@ async def test_readiness_failure_uses_cooldown_without_repeating_warmup():
     reg = ProviderRegistry(cooldown_seconds=60.0)
     spec = EmbeddingSpec(
         identity=make_canonical_identity(
-            "openai",
-            "text-embedding-3-small",
-            1536,
+            "gemma",
+            EXPECTED_MODEL,
+            EXPECTED_DENSE_DIMENSION,
             input_semantics="document",
         ),
-        provider="openai",
-        model="text-embedding-3-small",
-        dimensions=1536,
+        provider="gemma",
+        model=EXPECTED_MODEL,
+        dimensions=EXPECTED_DENSE_DIMENSION,
     )
     provider = MockFailingWarmupProvider(spec)
-    reg.register("openai", provider)
+    reg.register("gemma", provider)
 
     first = await reg.inspect_readiness()
     second = await reg.inspect_readiness()
 
-    assert first["providers"]["openai"]["status"] == "error"
-    assert second["providers"]["openai"]["status"] == "cooldown"
+    assert first["providers"]["gemma"]["status"] == "error"
+    assert second["providers"]["gemma"]["status"] == "cooldown"
     assert provider.warmup_calls == 1
 
 
@@ -152,12 +152,12 @@ def test_bearer_token_enforcement(monkeypatch):
 
     reg = ProviderRegistry()
     spec = EmbeddingSpec(
-        identity=make_canonical_identity("bge", EXPECTED_BGE_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
-        provider="bge",
-        model=EXPECTED_BGE_MODEL,
+        identity=make_canonical_identity("gemma", EXPECTED_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
+        provider="gemma",
+        model=EXPECTED_MODEL,
         dimensions=EXPECTED_DENSE_DIMENSION,
     )
-    reg.register("bge", MockHealthyProvider(spec))
+    reg.register("gemma", MockHealthyProvider(spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
 
     client = TestClient(embedding_app.app)
@@ -200,12 +200,12 @@ def test_bearer_token_ready_endpoint(monkeypatch):
 
     reg = ProviderRegistry()
     spec = EmbeddingSpec(
-        identity=make_canonical_identity("bge", EXPECTED_BGE_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
-        provider="bge",
-        model=EXPECTED_BGE_MODEL,
+        identity=make_canonical_identity("gemma", EXPECTED_MODEL, EXPECTED_DENSE_DIMENSION, "float32", "l2", "document", "default"),
+        provider="gemma",
+        model=EXPECTED_MODEL,
         dimensions=EXPECTED_DENSE_DIMENSION,
     )
-    reg.register("bge", MockHealthyProvider(spec))
+    reg.register("gemma", MockHealthyProvider(spec))
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: reg)
 
     client = TestClient(embedding_app.app)

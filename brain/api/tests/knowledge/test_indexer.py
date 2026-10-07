@@ -40,7 +40,7 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         return vectors
 
     fake_embedder.encode.side_effect = _fake_encode
-    write_identity = "bge:BAAI/bge-m3:1024:float32:l2:document:test"
+    write_identity = "gemma:google/embeddinggemma-2:768:float32:l2:document:test"
     fake_embedder.encode_with_metadata.side_effect = lambda texts, **kwargs: (
         fake_embedder.encode(texts),
         {"identity": write_identity, "dimensions": 128},
@@ -89,7 +89,7 @@ def _load_indexer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     )
     fake_config.chunk_char_limit = 500
     fake_config.chunk_overlap_ratio = 0.15
-    fake_config.similarity_thresholds = lambda _version=None: thresholds_for("bge")
+    fake_config.similarity_thresholds = lambda _version=None: thresholds_for("gemma")
     fake_config.resolved_embedding_write_identity = write_identity
     fake_settings_mod = types.ModuleType("config")
     fake_settings_mod.get_settings = lambda: fake_config

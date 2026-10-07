@@ -63,7 +63,7 @@ class _FakeConfig:
 
     def similarity_thresholds(self, _version=None):
         # 距離 0.85／1.1 換成相似度。
-        return replace(thresholds_for("bge"), retrieval=0.575, retrieval_fts=0.45, dedup=0.95)
+        return replace(thresholds_for("gemma"), retrieval=0.575, retrieval_fts=0.45, dedup=0.95)
 
 
 def _rec(text: str, distance: float | None = None, vector=None, **extra):

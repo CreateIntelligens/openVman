@@ -11,13 +11,10 @@ API_ROOT = Path(__file__).resolve().parents[1]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
+GEMMA_IDENTITY = "gemma:google/embeddinggemma-2:768:float32:l2:document:rev-one"
 
-def _load_db(monkeypatch, *, active_version: str):
-    bge_identity = "bge:BAAI/bge-m3:1024:float32:l2:document:rev-one"
-    gemini_identity = (
-        "gemini:gemini-embedding-001:768:float32:l2:document:provider-managed"
-    )
 
+def _load_db(monkeypatch):
     def identity_with_semantics(identity, semantics):
         parts = identity.split(":")
         parts[5] = semantics
@@ -25,17 +22,9 @@ def _load_db(monkeypatch, *, active_version: str):
 
     fake_config_mod = types.ModuleType("config")
     fake_config_mod.get_settings = lambda: types.SimpleNamespace(
-        resolved_embedding_active_version=active_version,
-        resolved_embedding_write_identity=(
-            bge_identity if active_version == "bge" else gemini_identity
-        ),
-        resolved_embedding_identity_aliases={
-            "bge": bge_identity,
-            "gemini": gemini_identity,
-        },
-        resolved_embedding_compatible_legacy_identities={
-            "bge:BAAI/bge-m3:1024:float32:l2:document:default"
-        },
+        resolved_embedding_active_version="gemma",
+        resolved_embedding_write_identity=GEMMA_IDENTITY,
+        resolved_embedding_identity_aliases={"gemma": GEMMA_IDENTITY},
         _identity_with_semantics=identity_with_semantics,
     )
     monkeypatch.setitem(sys.modules, "config", fake_config_mod)
@@ -49,43 +38,36 @@ def _load_db(monkeypatch, *, active_version: str):
 
 
 class TestVectorTableNaming:
-    def test_bge_uses_legacy_table_names(self, monkeypatch):
-        db = _load_db(monkeypatch, active_version="bge")
+    def test_active_version_uses_namespaced_tables(self, monkeypatch):
+        db = _load_db(monkeypatch)
 
-        assert db.resolve_vector_table_name("knowledge") == "knowledge"
-        assert db.resolve_vector_table_name("memories") == "memories"
+        assert db.resolve_vector_table_name("knowledge") == "knowledge__gemma"
+        assert db.resolve_vector_table_name("memories") == "memories__gemma"
 
-    def test_non_bge_versions_use_namespaced_tables(self, monkeypatch):
-        db = _load_db(monkeypatch, active_version="gemini")
+    def test_alias_routes_to_its_namespaced_table(self, monkeypatch):
+        db = _load_db(monkeypatch)
 
-        assert db.resolve_vector_table_name("knowledge") == "knowledge__gemini"
-        assert db.resolve_vector_table_name("memories") == "memories__gemini"
+        assert db.resolve_vector_table_name("knowledge", "gemma") == "knowledge__gemma"
 
     def test_known_query_identity_routes_to_its_document_table(self, monkeypatch):
-        db = _load_db(monkeypatch, active_version="bge")
-        query_identity = (
-            "bge:BAAI/bge-m3:1024:float32:l2:query:rev-one"
-        )
+        db = _load_db(monkeypatch)
+        query_identity = GEMMA_IDENTITY.replace(":document:", ":query:")
 
-        assert db.resolve_vector_table_name("knowledge", query_identity) == "knowledge"
+        assert db.resolve_vector_table_name("knowledge", query_identity) == "knowledge__gemma"
 
     def test_unknown_revision_gets_an_isolated_table(self, monkeypatch):
-        db = _load_db(monkeypatch, active_version="bge")
-        new_identity = (
-            "bge:BAAI/bge-m3:1024:float32:l2:document:rev-two"
-        )
+        db = _load_db(monkeypatch)
+        new_identity = "gemma:google/embeddinggemma-2:768:float32:l2:document:rev-two"
 
         table_name = db.resolve_vector_table_name("knowledge", new_identity)
         assert table_name.startswith("knowledge__emb_")
-        assert table_name != "knowledge"
+        assert len(table_name) == len("knowledge__emb_") + 16
+        assert table_name == db.resolve_vector_table_name("knowledge", new_identity)
 
-    def test_parity_verified_legacy_identity_keeps_the_legacy_table(self, monkeypatch):
-        db = _load_db(monkeypatch, active_version="bge")
-        legacy_identity = (
-            "bge:BAAI/bge-m3:1024:float32:l2:document:default"
+    def test_removed_bge_identity_no_longer_maps_to_the_unsuffixed_table(self, monkeypatch):
+        db = _load_db(monkeypatch)
+        legacy_identity = "bge:BAAI/bge-m3:1024:float32:l2:document:default"
+
+        assert db.resolve_vector_table_name("knowledge", legacy_identity).startswith(
+            "knowledge__emb_"
         )
-
-        assert db.resolve_vector_table_name(
-            "knowledge",
-            legacy_identity,
-        ) == "knowledge"

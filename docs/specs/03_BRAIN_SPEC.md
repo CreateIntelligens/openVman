@@ -7,7 +7,7 @@
 採用基於檔案系統 (File-system as truth) 與 **LanceDB 向量資料庫**的混合檢索架構。設計上需參考 OpenClaw 的大腦：除了 RAG 與 Prompt 組裝外，還要有 **message handling layer** 與 **API key / model fallback router**。與 `01_BACKEND_SPEC.md` 解耦：本層不處理 WebSocket 或語音合成，但會處理訊息語義、上下文、工具與模型路由。
 
 * **為什麼選 LanceDB**：LanceDB 是嵌入式向量資料庫（Embedded），無需獨立部署服務端，直接運行在應用行程內。比傳統 RAG 方案（如 ChromaDB、Pinecone）更輕量、更低延遲，且原生支援 Lance 格式的高效列存儲，適合本地部署場景。
-* **為什麼選 EmbeddingGemma 2**：Google 2026-10 釋出的開源（Apache 2.0）多語言 Embedding 模型，100+ 語言，768 維。2026-10 起取代 BAAI/bge-m3：要逐步移除中國來源的元件，而鶴記實測兩者打平（89 題實際問答盲測 16 勝 16 負 57 平；跨語言與一次撈多個型號較好，閒聊帶進的雜訊較多），見 `scripts/experiments/embeddinggemma2/`。本地部署無需依賴外部 API。
+* **為什麼選 EmbeddingGemma 2**：Google 2026-10 釋出的開源（Apache 2.0）多語言 Embedding 模型，100+ 語言，768 維。2026-10-07 取代 BAAI/bge-m3（已移除）：要逐步移除中國來源的元件，而鶴記實測兩者打平（89 題實際問答盲測 16 勝 16 負 57 平；跨語言與一次撈多個型號較好，閒聊帶進的雜訊較多），見 `scripts/experiments/embeddinggemma2/`。本地部署無需依賴外部 API。
 
 ### 2. 技術選型 (Tech Stack)
 
@@ -383,7 +383,7 @@ async def handle_tool_call(tool_name: str, arguments: dict):
 - 語音專有名詞：Gemini 串流辨識不吃背景知識（只吃逐詞的 customVocabulary），所以也把專案 workspace 的 `ASR_PROMPT.md`（詞表與「常見誤聽：A→B」對照，「#」開頭是說明）放進每輪對話提示（`core/asr_glossary.py`，在回答語言那行前面），由模型在理解問題與寫查詢時對回誤聽；不多一次模型呼叫。
 - 同一份詞表的正確詞（不含對照行）也經 `GET /brain/internal/asr-glossary` 給 Backend，帶給 Breeze、R2T2 與 OpenAI 辨識當前文，辨識出來的字本身就對；回應另有逐詞清單 `vocabulary`（最多 100 個）給 Gemini 串流當 `customVocabulary`；Xiaomi、SenseVoice 不吃提示詞。
 
-- 檢索門檻：跟問題的 cosine 相似度低於門檻的段落丟掉；關鍵字（FTS）命中的段落補算相似度，用較寬的門檻（以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落）。所有向量門檻（檢索、FTS、去重、記憶合併、夢境整理、語意切段、網路結果重排）都寫成 cosine 相似度、每個 embedding 版本一組（`memory/thresholds.py`）：EmbeddingGemma 2 檢索 0.68、FTS 0.63；BGE-M3 0.50、0.45（即原本的 L2 平方距離 1.0、1.1，`scripts/experiments/kb-cutoff/`）。LanceDB 回的是 L2 平方距離，向量已正規化，距離 = 2 − 2 × 相似度。
+- 檢索門檻：跟問題的 cosine 相似度低於門檻的段落丟掉；關鍵字（FTS）命中的段落補算相似度，用較寬的門檻（以前 FTS 命中一律放行，知識庫有西語文件後「qué」這類常見字會讓任何西語問題都撈到無關段落）。所有向量門檻（檢索、FTS、去重、記憶合併、夢境整理、語意切段、網路結果重排）都寫成 cosine 相似度、每個 embedding 版本一組（`memory/thresholds.py`）：EmbeddingGemma 2 檢索 0.68、FTS 0.63（`scripts/experiments/embeddinggemma2/`）。LanceDB 回的是 L2 平方距離，向量已正規化，距離 = 2 − 2 × 相似度。
 - 停用的文件（後台文件頁的啟用開關，`.doc_meta.json` 的 `enabled: false`）不會重建索引，而是在查詢時略過：向量／關鍵字檢索與知識圖譜擴充抓相鄰文件段落，兩條路都會檢查。
 - 跨語言提問靠同一份內容的多語版本（例如鶴記型錄中英西三版，翻譯版手動標語言），不在查詢時翻譯：跨語言相似度比同語言低，bge-m3 時西語問中文型錄會被當時的門檻全擋掉，有西語版後才查得到。EmbeddingGemma 2 跨語言較好（英西日韓問、只有中文文件時前 3 名 47/48，bge-m3 42/48），多語版本仍保留，回答用使用者語言的原文。
 

@@ -27,7 +27,7 @@ def _settings(**overrides):
         "url2md_circuit_cooldown_s": 60.0,
     }
     thresholds = replace(
-        thresholds_for("bge"),
+        thresholds_for("gemma"),
         web_min_relevance=overrides.pop("web_search_min_relevance", 0.15),
         web_relevance_ratio=overrides.pop("web_search_relevance_ratio", 0.7),
     )

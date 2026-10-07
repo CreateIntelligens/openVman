@@ -30,10 +30,8 @@ def check_embedding_service_readiness(cfg: Any = None) -> tuple[bool, dict[str, 
     if cfg is None:
         cfg = get_settings()
 
-    active_version = cfg.resolved_embedding_active_version
-    if active_version != "bge":
-        return True, {"status": "skipped", "version": active_version}
-
+    backend = cfg.resolve_embedding_backend()
+    expected_model, expected_dimension = backend.model, backend.dimensions
     url = f"{cfg.resolved_embedding_service_url.rstrip('/')}/health/ready"
     headers = {}
     if cfg.embedding_service_token:
@@ -57,27 +55,21 @@ def check_embedding_service_readiness(cfg: Any = None) -> tuple[bool, dict[str, 
         data = resp.json()
         model = data.get("model")
         dimension = data.get("dimension")
-        if (
-            cfg.embedding_expected_model
-            and model != cfg.embedding_expected_model
-        ):
+        if expected_model and model != expected_model:
             return False, {
                 "status": "incompatible",
                 "route": route_type,
                 "url": cfg.resolved_embedding_service_url,
-                "error": f"Model mismatch: expected {cfg.embedding_expected_model}, got {model}",
+                "error": f"Model mismatch: expected {expected_model}, got {model}",
                 "model": model,
                 "dimension": dimension,
             }
-        if (
-            cfg.embedding_expected_dimension
-            and dimension != cfg.embedding_expected_dimension
-        ):
+        if expected_dimension and dimension != expected_dimension:
             return False, {
                 "status": "incompatible",
                 "route": route_type,
                 "url": cfg.resolved_embedding_service_url,
-                "error": f"Dimension mismatch: expected {cfg.embedding_expected_dimension}, got {dimension}",
+                "error": f"Dimension mismatch: expected {expected_dimension}, got {dimension}",
                 "model": model,
                 "dimension": dimension,
             }

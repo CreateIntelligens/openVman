@@ -11,7 +11,7 @@ openVman 是可自行部署的虛擬人對話系統：前台以 2D／3D 角色�
 | `backend` | `backend/` | FastAPI | 對外 API、帳號與權限、ASR／TTS 路由、Gemini Live 中繼、Brain 代理 |
 | `gateway-worker` | `backend/app/gateway/` | arq + Redis | 文件轉換、爬蟲與其他非同步媒體處理 |
 | `api` | `brain/api/` | FastAPI | Brain：LLM 路由、RAG、記憶、工具、用量帳本；僅供內部呼叫 |
-| `embedding` | `brain/embedding/` | EmbeddingGemma 2（GPU） | 向量嵌入服務，Brain 與其他 stack 共用；BGE-M3 暫留給尚未遷移的使用者 |
+| `embedding` | `brain/embedding/` | EmbeddingGemma 2（GPU） | 向量嵌入服務，Brain 與其他 stack 共用 |
 | `redis` | — | Redis 7 | gateway 佇列、快取與跨 worker 狀態 |
 | `prometheus`、`grafana` | `infra/` | — | 指標收集與監控儀表板 |
 | `watchtower` | — | — | 自動拉取 Docker Hub 上的新版 image |

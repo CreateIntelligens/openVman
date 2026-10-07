@@ -19,7 +19,7 @@ Backend (/api/v1/*)
 | 元件 | 位置 | 說明 |
 |---|---|---|
 | Brain API | `brain/api/` | FastAPI；`main.py` 只組裝路由與 middleware，生命週期在 `startup.py` |
-| Embedding gateway | `brain/embedding/` | 獨立服務，負責 EmbeddingGemma 2 推論（BGE-M3 暫留給尚未遷移的專案與共用端點使用者）與 Gemini／OpenAI／Voyage；Brain 不載入模型權重 |
+| Embedding gateway | `brain/embedding/` | 獨立服務，負責 EmbeddingGemma 2 推論；Brain 不載入模型權重 |
 | 共用技能 | `brain/skills/` | 掛載到容器 `/skills`（唯讀），所有專案共用 |
 | 執行期資料 | `brain/data/` | 掛載到容器 `/data`，gitignored |
 
@@ -94,7 +94,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - 依 SHA-256 fingerprint 增量重建，只重算有變動的文件，並移除已刪除文件的段落。
 - Markdown 依標題切段（`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO`）；QA 形式的 Markdown 與 CSV 每題一段。
 - 向量寫入目前的 write identity 對應的資料表（每個 embedding 版本一組，例如 `knowledge__gemma`），並建立 FTS 索引。EmbeddingGemma 2 是非對稱模型：查詢加 question answering 前綴，文件帶檔名當標題（`titles` 欄位送給 gateway）。Gateway 另有 `input_type: "search_query"`（search result 前綴），給共用端點上檢索效果較好的其他 stack（jtai）用。
-- 換 embedding 版本：改 `EMBEDDING_ACTIVE_VERSION` 後執行 `docker exec -w /app openvman-api-1 python -m scripts.migrate_embedding_version --from bge`（先加 `--dry-run` 看要做什麼），每個專案重建知識庫索引、長期記憶逐筆用新模型重算後寫入新表。新表建好前查詢自動退回有索引的舊版本；舊表不動，改回設定即可退回。
+- 換 embedding 模型時，新版本寫進另一組資料表、索引與記憶要用新模型重算，建好之前查詢退回有索引的版本；2026-10 從 BGE-M3 換到 EmbeddingGemma 2 的做法與數據見 `scripts/experiments/embeddinggemma2/`。
 - 知識圖譜由 `POST /brain/knowledge/graph/rebuild` 在背景以 graphify 建立，產物在 `graphify-out/`。
 
 檢索（`memory/retrieval.py`、`tools/builtin/knowledge_tools.py`）：
@@ -269,7 +269,7 @@ Brain 由 compose 讀取根目錄 `.env`，完整清單與預設值見 `brain/ap
 |---|---|
 | 環境 | `ENV`（`prod`／`dev`）、`GATEWAY_INTERNAL_TOKEN` |
 | LLM | `LLM_PROVIDER`、`LLM_MODEL`、`LLM_FALLBACK_CHAIN`、`LLM_API_KEYS`、`LLM_REQUEST_TIMEOUT_SECONDS`、`LLM_DISABLE_MODEL_DISCOVERY`、`LLM_STREAM_INCLUDE_USAGE`、`GEMINI_API_KEY`、`OPENAI_API_KEY`、`GROQ_API_KEY`、`NEN_API_KEY`、`NEN_BASE_URL` |
-| Embedding | `EMBEDDING_ACTIVE_VERSION`（預設 `gemma`）、`EMBEDDING_THRESHOLDS`、`EMBEDDING_SERVICE_URL`（外部 gateway 才填）、`EMBEDDING_SERVICE_TOKEN`；模型與 identity 的預設值在 `config.py` |
+| Embedding | `EMBEDDING_THRESHOLDS`、`EMBEDDING_SERVICE_URL`（外部 gateway 才填）、`EMBEDDING_SERVICE_TOKEN`；模型與 identity 的預設值在 `config.py` |
 | 檢索 | `RAG_KNOWLEDGE_TOP_K`、`RAG_MEMORY_TOP_K`、`EMBEDDING_THRESHOLDS`、`RAG_RRF_K`、`KNOWLEDGE_SEARCH_MERGE_LIMIT`、`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO` |
 | Agent | `AGENT_LOOP_MAX_ROUNDS`、`CHAT_FORCE_KNOWLEDGE_SEARCH`、`CHAT_MAX_FOLLOWUP_TOOL_ROUNDS`、`CHAT_ANSWER_PASS_EXCLUDES_KNOWLEDGE_SEARCH`、`TOOL_CALL_TIMEOUT_SECONDS`、`TOOL_DOCUMENT_CHAR_LIMIT` |
 | 記憶 | `SHORT_TERM_MEMORY_ROUNDS`、`MAX_SESSION_ROUNDS`、`MAX_SESSION_TTL_MINUTES`、`AUTO_RECALL_ENABLED`、`DREAMING_ENABLED`、`DREAMING_CRON`、`DREAMING_TIMEZONE`、`SESSION_BACKUP_ENABLED`、`SESSION_BACKUP_HOUR`、`SESSION_BACKUP_KEEP` |
