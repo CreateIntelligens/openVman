@@ -1,4 +1,4 @@
-"""EmbeddingGemma 2 provider: prefixes, Matryoshka truncation, titles and identity."""
+"""EmbeddingGemma 2 provider: prefixes, normalization, titles and identity."""
 
 from __future__ import annotations
 
@@ -57,17 +57,12 @@ async def test_queries_and_documents_get_their_own_prefixes(fake_st):
 
 
 @pytest.mark.asyncio
-async def test_truncated_vectors_are_renormalized(fake_st):
-    provider = GemmaLocalProvider(device="cpu", dimensions=256)
+async def test_vectors_are_768_dimensional_and_normalized(fake_st):
+    provider = GemmaLocalProvider(device="cpu")
     [vector] = await provider.encode(["x"], input_type="query")
-    assert len(vector) == 256
+    assert len(vector) == 768
     assert math.isclose(sum(v * v for v in vector), 1.0, rel_tol=1e-6)
-    assert provider.spec("query").identity == "gemma:google/embeddinggemma-2:256:float32:l2:query:default"
-
-
-def test_only_matryoshka_dimensions_are_allowed():
-    with pytest.raises(ValueError):
-        GemmaLocalProvider(dimensions=1024)
+    assert provider.spec("query").identity == "gemma:google/embeddinggemma-2:768:float32:l2:query:default"
 
 
 @pytest.mark.asyncio

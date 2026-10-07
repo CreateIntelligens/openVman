@@ -60,7 +60,7 @@ MODEL_REVISION = os.getenv(
 )
 DEVICE = os.getenv("EMBEDDING_DEVICE", "cuda")
 USE_FP16 = os.getenv("EMBEDDING_USE_FP16", "true").lower() in ("true", "1", "yes")
-BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
+BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "8"))
 MAX_LENGTH = int(os.getenv("EMBEDDING_MAX_LENGTH", "8192"))
 MAX_CONCURRENCY = int(os.getenv("EMBEDDING_MAX_CONCURRENCY", "1"))
 COOLDOWN_SECONDS = float(os.getenv("EMBEDDING_COOLDOWN_SECONDS", "60.0"))
@@ -68,7 +68,6 @@ COOLDOWN_SECONDS = float(os.getenv("EMBEDDING_COOLDOWN_SECONDS", "60.0"))
 # Local EmbeddingGemma 2 Configuration
 GEMMA_MODEL = os.getenv("EMBEDDING_GEMMA_MODEL", "google/embeddinggemma-2")
 GEMMA_REVISION = os.getenv("EMBEDDING_GEMMA_REVISION", "914f7f89142e33e77833254d9c9b90c3cef7303b")
-GEMMA_DIMENSIONS = int(os.getenv("EMBEDDING_GEMMA_DIMENSIONS", "768"))
 GEMMA_BATCH_SIZE = int(os.getenv("EMBEDDING_GEMMA_BATCH_SIZE", "16"))
 GEMMA_MAX_LENGTH = int(os.getenv("EMBEDDING_GEMMA_MAX_LENGTH", "2048"))
 
@@ -95,7 +94,8 @@ EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "3"))
 EMBEDDING_RETRY_BASE_DELAY = float(os.getenv("EMBEDDING_RETRY_BASE_DELAY", "0.25"))
 EMBEDDING_RETRY_MAX_DELAY = float(os.getenv("EMBEDDING_RETRY_MAX_DELAY", "8.0"))
 
-raw_order = os.getenv("EMBEDDING_PROVIDER_FALLBACKS", "bge,gemini,openai,voyage")
+# 沒指定 identity 的呼叫端拿第一個；BGE 暫時排第一，等共用端點的其他 stack 換成 Gemma 後移除。
+raw_order = os.getenv("EMBEDDING_PROVIDER_FALLBACKS", "bge,gemma,gemini,openai,voyage")
 FALLBACK_ORDER = [p.strip().lower() for p in raw_order.split(",") if p.strip()]
 
 MAX_REQUEST_TEXTS = 512
@@ -128,7 +128,6 @@ def _get_registry() -> ProviderRegistry:
                 model_name=GEMMA_MODEL,
                 model_revision=GEMMA_REVISION,
                 device=DEVICE,
-                dimensions=GEMMA_DIMENSIONS,
                 batch_size=GEMMA_BATCH_SIZE,
                 max_length=GEMMA_MAX_LENGTH,
                 max_concurrency=MAX_CONCURRENCY,
@@ -186,13 +185,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     reg = _get_registry()
     # 啟動就在背景載入模型並預熱，第一個請求不用等載入（EmbeddingGemma 從磁碟載入要幾十秒，
     # 會超過呼叫端的逾時）。原本只靠 compose healthcheck 打 /health/ready 觸發。
-    warmup = (
-        asyncio.create_task(reg.inspect_readiness())
-        if os.getenv("EMBEDDING_WARMUP_ON_START", "true").lower() in ("true", "1", "yes")
-        else None
-    )
+    warmup = asyncio.create_task(reg.inspect_readiness())
     yield
-    if warmup is not None and not warmup.done():
+    if not warmup.done():
         warmup.cancel()
     logger.info("Shutting down embedding-service gateway...")
     await reg.shutdown()

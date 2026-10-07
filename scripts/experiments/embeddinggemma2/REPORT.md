@@ -1,6 +1,6 @@
 # EmbeddingGemma 2 對 BGE-M3（2026-10-07）
 
-EmbeddingGemma 2（google/embeddinggemma-2，2026-10-06 釋出，Apache 2.0，768 維可截短）能不能取代 BGE-M3。全部唯讀：正式鶴記知識庫 710 段的文字與 BGE 向量從 api 容器匯出，查詢的 BGE 向量走正式 embedding 服務；EmbeddingGemma 2 在用完即刪的容器裡（openvman-embedding image 加裝 transformers 5.19、sentence-transformers 6.1，bf16）重算全部 710 段與查詢。兩邊各自用自己的文件向量，不混用。
+EmbeddingGemma 2（google/embeddinggemma-2，2026-10-06 釋出，Apache 2.0，768 維）能不能取代 BGE-M3。全部唯讀：正式鶴記知識庫 710 段的文字與 BGE 向量從 api 容器匯出，查詢的 BGE 向量走正式 embedding 服務；EmbeddingGemma 2 在用完即刪的容器裡（openvman-embedding image 加裝 transformers 5.19、sentence-transformers 6.1，bf16）重算全部 710 段與查詢。兩邊各自用自己的文件向量，不混用。
 
 題目（`queries.json`、`extra_queries.json`）：
 

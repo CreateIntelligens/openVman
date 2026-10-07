@@ -7,7 +7,7 @@
 採用基於檔案系統 (File-system as truth) 與 **LanceDB 向量資料庫**的混合檢索架構。設計上需參考 OpenClaw 的大腦：除了 RAG 與 Prompt 組裝外，還要有 **message handling layer** 與 **API key / model fallback router**。與 `01_BACKEND_SPEC.md` 解耦：本層不處理 WebSocket 或語音合成，但會處理訊息語義、上下文、工具與模型路由。
 
 * **為什麼選 LanceDB**：LanceDB 是嵌入式向量資料庫（Embedded），無需獨立部署服務端，直接運行在應用行程內。比傳統 RAG 方案（如 ChromaDB、Pinecone）更輕量、更低延遲，且原生支援 Lance 格式的高效列存儲，適合本地部署場景。
-* **為什麼選 EmbeddingGemma 2**：Google 2026-10 釋出的開源（Apache 2.0）多語言 Embedding 模型，100+ 語言，768 維（可截短到 512／256／128）。2026-10 起取代 BAAI/bge-m3：要逐步移除中國來源的元件，而鶴記實測兩者打平（89 題實際問答盲測 16 勝 16 負 57 平；跨語言與一次撈多個型號較好，閒聊帶進的雜訊較多），見 `scripts/experiments/embeddinggemma2/`。本地部署無需依賴外部 API。
+* **為什麼選 EmbeddingGemma 2**：Google 2026-10 釋出的開源（Apache 2.0）多語言 Embedding 模型，100+ 語言，768 維。2026-10 起取代 BAAI/bge-m3：要逐步移除中國來源的元件，而鶴記實測兩者打平（89 題實際問答盲測 16 勝 16 負 57 平；跨語言與一次撈多個型號較好，閒聊帶進的雜訊較多），見 `scripts/experiments/embeddinggemma2/`。本地部署無需依賴外部 API。
 
 ### 2. 技術選型 (Tech Stack)
 

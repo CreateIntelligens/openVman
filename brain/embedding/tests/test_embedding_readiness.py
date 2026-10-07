@@ -239,13 +239,6 @@ def test_startup_warms_providers_in_the_background(monkeypatch):
             calls.append("shutdown")
 
     monkeypatch.setattr(embedding_app, "_get_registry", lambda: Registry())
-    monkeypatch.setenv("EMBEDDING_WARMUP_ON_START", "true")
     with TestClient(embedding_app.app):
         pass
     assert calls[0] == "warm" and calls[-1] == "shutdown"
-
-    calls.clear()
-    monkeypatch.setenv("EMBEDDING_WARMUP_ON_START", "false")
-    with TestClient(embedding_app.app):
-        pass
-    assert calls == ["shutdown"]

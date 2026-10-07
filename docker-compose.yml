@@ -56,14 +56,7 @@ services:
       - HOME=/home/appuser
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       - OPF_MOE_TRITON=false
-      - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://embedding:8009}
       - EMBEDDING_SERVICE_TOKEN=${EMBEDDING_SERVICE_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}
-      - EMBEDDING_EXPECTED_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
-      - EMBEDDING_EXPECTED_DIMENSION=${EMBEDDING_EXPECTED_DIMENSION:-1024}
-      - EMBEDDING_EXPECTED_REVISION=${EMBEDDING_MODEL_REVISION:-5617a9f61b028005a4858fdac845db406aefb181}
-      - EMBEDDING_WRITE_IDENTITY=${EMBEDDING_WRITE_IDENTITY:-}
-      - EMBEDDING_IDENTITY_ALIASES=${EMBEDDING_IDENTITY_ALIASES:-}
-      - EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES=${EMBEDDING_COMPATIBLE_LEGACY_IDENTITIES:-}
       - NEN_API_KEY=${NEN_API_KEY:-}
       - NEN_BASE_URL=${NEN_BASE_URL:-https://nen.com.tw/v1}
     healthcheck:
@@ -99,34 +92,13 @@ services:
       com.centurylinklabs.watchtower.enable: "true"
     volumes:
       - hf-cache:/home/appuser/.cache/huggingface
+    # 其餘設定的預設值都在 brain/embedding/app.py，不在這裡重複；要覆寫才加。
     environment:
       - HF_HOME=/home/appuser/.cache/huggingface
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-m3}
-      - EMBEDDING_MODEL_REVISION=${EMBEDDING_MODEL_REVISION:-5617a9f61b028005a4858fdac845db406aefb181}
-      - EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cuda}
-      - EMBEDDING_USE_FP16=${EMBEDDING_USE_FP16:-true}
-      - EMBEDDING_GEMMA_MODEL=${EMBEDDING_GEMMA_MODEL:-google/embeddinggemma-2}
-      - EMBEDDING_GEMMA_REVISION=${EMBEDDING_GEMMA_REVISION:-914f7f89142e33e77833254d9c9b90c3cef7303b}
-      - EMBEDDING_GEMMA_DIMENSIONS=${EMBEDDING_GEMMA_DIMENSIONS:-768}
-      - EMBEDDING_BATCH_SIZE=${EMBEDDING_BATCH_SIZE:-8}
-      - EMBEDDING_MAX_LENGTH=${EMBEDDING_MAX_LENGTH:-8192}
-      - EMBEDDING_MAX_CONCURRENCY=${EMBEDDING_MAX_CONCURRENCY:-1}
-      - EMBEDDING_COOLDOWN_SECONDS=${EMBEDDING_COOLDOWN_SECONDS:-60.0}
       - EMBEDDING_BEARER_TOKEN=${EMBEDDING_SERVICE_TOKEN:-${GATEWAY_INTERNAL_TOKEN:-}}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
-      - EMBEDDING_GEMINI_MODEL=${EMBEDDING_GEMINI_MODEL:-gemini-embedding-001}
-      - EMBEDDING_GEMINI_DIMENSIONS=${EMBEDDING_GEMINI_DIMENSIONS:-768}
-      - EMBEDDING_GEMINI_BASE_URL=${EMBEDDING_GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
-      - EMBEDDING_OPENAI_MODEL=${EMBEDDING_OPENAI_MODEL:-text-embedding-3-small}
-      - EMBEDDING_OPENAI_DIMENSIONS=${EMBEDDING_OPENAI_DIMENSIONS:-1536}
-      - EMBEDDING_OPENAI_BASE_URL=${EMBEDDING_OPENAI_BASE_URL:-https://api.openai.com/v1}
-      - EMBEDDING_VOYAGE_MODEL=${EMBEDDING_VOYAGE_MODEL:-voyage-3-large}
-      - EMBEDDING_VOYAGE_DIMENSIONS=${EMBEDDING_VOYAGE_DIMENSIONS:-1024}
-      - EMBEDDING_VOYAGE_BASE_URL=${EMBEDDING_VOYAGE_BASE_URL:-https://api.voyageai.com/v1}
-      - EMBEDDING_PROVIDER_TIMEOUT=${EMBEDDING_PROVIDER_TIMEOUT:-30.0}
-      - EMBEDDING_PROVIDER_FALLBACKS=${EMBEDDING_PROVIDER_FALLBACKS:-bge,gemma,gemini,openai,voyage}
     healthcheck:
       test: ["CMD", "python3", "-c", "import os, urllib.request, sys; token=os.getenv('EMBEDDING_BEARER_TOKEN',''); req=urllib.request.Request('http://localhost:8009/health/ready', headers={'Authorization': f'Bearer {token}'} if token else {}); res=urllib.request.urlopen(req, timeout=8); sys.exit(0 if res.status == 200 else 1)"]
       interval: 15s

@@ -92,7 +92,6 @@ class BrainSettings(BaseSettings):
     embedding_identity_aliases: str = ""
     embedding_compatible_legacy_identities: str = ""
     embedding_gemma_model: str = "google/embeddinggemma-2"
-    embedding_gemma_dimensions: int = 768
     embedding_gemma_revision: str = "914f7f89142e33e77833254d9c9b90c3cef7303b"
     embedding_gemini_model: str = "gemini-embedding-001"
     embedding_gemini_dimensions: int = 0
@@ -306,7 +305,7 @@ class BrainSettings(BaseSettings):
             "gemma": self._embedding_identity(
                 "gemma",
                 self.embedding_gemma_model,
-                self.embedding_gemma_dimensions,
+                768,
                 "document",
                 self.embedding_gemma_revision,
             ),
@@ -544,7 +543,7 @@ class BrainSettings(BaseSettings):
         provider_models = {
             "gemma": (
                 self.embedding_gemma_model,
-                self.embedding_gemma_dimensions,
+                768,
             ),
             "gemini": (
                 self.embedding_gemini_model,

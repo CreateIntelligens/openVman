@@ -270,19 +270,16 @@ class GemmaLocalProvider:
         model_name: str = "google/embeddinggemma-2",
         model_revision: str = "default",
         device: str = "cuda",
-        dimensions: int = 768,
         batch_size: int = 16,
         max_length: int = 2048,
         max_concurrency: int = 1,
     ) -> None:
-        if dimensions not in (768, 512, 256, 128):
-            raise ValueError("EmbeddingGemma 2 dimensions must be 768, 512, 256 or 128")
         self.model_name = model_name
         self.model_revision = model_revision
         self.device = device
         self.batch_size = batch_size
         self.max_length = max_length
-        self._dimensions = dimensions
+        self._dimensions = 768
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._init_lock = asyncio.Lock()
         self._model: Any = None
@@ -385,8 +382,7 @@ class GemmaLocalProvider:
                 normalize_embeddings=False,
                 show_progress_bar=False,
             )
-            # Matryoshka：取前 N 維；截短後一定要重新正規化，下面的 _l2_normalize 會做。
-            return vectors[:, : self._dimensions].astype("float32").tolist()
+            return vectors.astype("float32").tolist()
 
         async with self._semaphore:
             try:
