@@ -93,7 +93,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 
 - 依 SHA-256 fingerprint 增量重建，只重算有變動的文件，並移除已刪除文件的段落。
 - Markdown 依標題切段（`CHUNK_CHAR_LIMIT`、`CHUNK_OVERLAP_RATIO`）；QA 形式的 Markdown 與 CSV 每題一段。
-- 向量寫入目前的 write identity 對應的資料表（每個 embedding 版本一組，例如 `knowledge__gemma`），並建立 FTS 索引。EmbeddingGemma 2 是非對稱模型：查詢加 question answering 前綴，文件帶檔名當標題（`titles` 欄位送給 gateway）。
+- 向量寫入目前的 write identity 對應的資料表（每個 embedding 版本一組，例如 `knowledge__gemma`），並建立 FTS 索引。EmbeddingGemma 2 是非對稱模型：查詢加 question answering 前綴，文件帶檔名當標題（`titles` 欄位送給 gateway）。Gateway 另有 `input_type: "search_query"`（search result 前綴），給共用端點上檢索效果較好的其他 stack（jtai）用。
 - 換 embedding 版本：改 `EMBEDDING_ACTIVE_VERSION` 後執行 `docker exec -w /app openvman-api-1 python -m scripts.migrate_embedding_version --from bge`（先加 `--dry-run` 看要做什麼），每個專案重建知識庫索引、長期記憶逐筆用新模型重算後寫入新表。新表建好前查詢自動退回有索引的舊版本；舊表不動，改回設定即可退回。
 - 知識圖譜由 `POST /brain/knowledge/graph/rebuild` 在背景以 graphify 建立，產物在 `graphify-out/`。
 

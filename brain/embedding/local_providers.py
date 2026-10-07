@@ -254,8 +254,11 @@ class BgeLocalProvider:
 # EmbeddingGemma 2 是非對稱模型：查詢與文件要加不同的前綴，向量才在同一個空間裡可比。
 # 查詢用 question answering 而不是 search result：鶴記 57 句語音辨識打錯字的查詢，
 # 純向量前 3 名命中 35 對 32（scripts/experiments/embeddinggemma2/）。
+# search_query 給 jtai：它的口語改寫題用 search result 前綴前 5 名命中 80、question answering 75
+# （BGE 83），所以兩種查詢語意都提供，文件端共用。
 _GEMMA_PREFIXES = {
     "query": "task: question answering | query: ",
+    "search_query": "task: search result | query: ",
     "symmetric": "task: sentence similarity | query: ",
 }
 

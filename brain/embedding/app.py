@@ -240,8 +240,9 @@ def verify_bearer_token(authorization: str | None = Header(None)) -> None:
 # --- Request/Response Schemas ---
 class JtaiEmbedRequest(BaseModel):
     texts: list[str] = Field(..., description="List of strings to embed")
-    input_type: Literal["document", "query", "symmetric"] = Field(
-        "document", description="Embedding input semantics"
+    input_type: Literal["document", "query", "search_query", "symmetric"] = Field(
+        "document",
+        description="Embedding input semantics; EmbeddingGemma prefixes query with question answering and search_query with search result",
     )
     acceptable_identities: list[str] | None = Field(
         None, description="List of canonical identities the caller can accept"

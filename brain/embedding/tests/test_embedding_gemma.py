@@ -49,11 +49,14 @@ async def test_queries_and_documents_get_their_own_prefixes(fake_st):
     await provider.encode(["沉水泵多深"], input_type="query")
     await provider.encode(["內文"], input_type="document", titles=["EVAK_CATALOG"])
     await provider.encode(["沒有標題"], input_type="document")
+    await provider.encode(["這種針劑"], input_type="search_query")
     assert fake_st.calls == [
         ["task: question answering | query: 沉水泵多深"],
         ["title: EVAK_CATALOG | text: 內文"],
         ["title: none | text: 沒有標題"],
+        ["task: search result | query: 這種針劑"],
     ]
+    assert provider.spec("search_query").identity.endswith(":search_query:default")
 
 
 @pytest.mark.asyncio
