@@ -67,7 +67,7 @@ COOLDOWN_SECONDS = float(os.getenv("EMBEDDING_COOLDOWN_SECONDS", "60.0"))
 
 # Local EmbeddingGemma 2 Configuration
 GEMMA_MODEL = os.getenv("EMBEDDING_GEMMA_MODEL", "google/embeddinggemma-2")
-GEMMA_REVISION = os.getenv("EMBEDDING_GEMMA_REVISION", "default")
+GEMMA_REVISION = os.getenv("EMBEDDING_GEMMA_REVISION", "914f7f89142e33e77833254d9c9b90c3cef7303b")
 GEMMA_DIMENSIONS = int(os.getenv("EMBEDDING_GEMMA_DIMENSIONS", "768"))
 GEMMA_BATCH_SIZE = int(os.getenv("EMBEDDING_GEMMA_BATCH_SIZE", "16"))
 GEMMA_MAX_LENGTH = int(os.getenv("EMBEDDING_GEMMA_MAX_LENGTH", "2048"))
@@ -184,7 +184,16 @@ def _get_registry() -> ProviderRegistry:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting embedding-service gateway (revision %s)", SERVICE_REVISION)
     reg = _get_registry()
+    # 啟動就在背景載入模型並預熱，第一個請求不用等載入（EmbeddingGemma 從磁碟載入要幾十秒，
+    # 會超過呼叫端的逾時）。原本只靠 compose healthcheck 打 /health/ready 觸發。
+    warmup = (
+        asyncio.create_task(reg.inspect_readiness())
+        if os.getenv("EMBEDDING_WARMUP_ON_START", "true").lower() in ("true", "1", "yes")
+        else None
+    )
     yield
+    if warmup is not None and not warmup.done():
+        warmup.cancel()
     logger.info("Shutting down embedding-service gateway...")
     await reg.shutdown()
     logger.info("Embedding service stopped cleanly.")

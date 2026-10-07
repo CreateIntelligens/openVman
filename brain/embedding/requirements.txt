@@ -2,7 +2,7 @@ fastapi==0.141.1
 uvicorn[standard]==0.52.3
 pydantic==2.13.4
 httpx==0.28.1
-huggingface_hub==1.28.0
+huggingface_hub==1.33.0
 torch==2.13.0
 transformers==5.19.0
 sentence-transformers[image]==6.1.0
