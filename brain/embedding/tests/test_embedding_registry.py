@@ -96,6 +96,49 @@ async def test_failed_provider_is_skipped_while_in_cooldown():
 
 
 @pytest.mark.asyncio
+async def test_only_provider_is_probed_while_in_cooldown(monkeypatch):
+    """只剩一家時冷卻不能整段擋請求：GPU 暫時 OOM 後，每秒放一個請求去試。"""
+    clock = [1000.0]
+    monkeypatch.setattr("time.time", lambda: clock[0])
+    reg = ProviderRegistry(cooldown_seconds=60.0, fallback_order=["gemma"])
+    gemma = FakeProvider(_spec("gemma", 4), fail=True)
+    reg.register("gemma", gemma)
+
+    with pytest.raises(RuntimeError):
+        await reg.resolve_and_encode(["a"], input_type="query")
+    gemma.fail = False
+
+    clock[0] += 0.5
+    with pytest.raises(RuntimeError):
+        await reg.resolve_and_encode(["b"], input_type="query")
+    assert gemma.encode_calls == 1
+
+    clock[0] += 0.6
+    _, spec, attempts = await reg.resolve_and_encode(["c"], input_type="query")
+    assert spec.provider == "gemma"
+    assert [(a["provider"], a["status"]) for a in attempts] == [("gemma", "selected")]
+    assert gemma.encode_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_concurrent_requests_share_one_probe(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr("time.time", lambda: clock[0])
+    reg = ProviderRegistry(cooldown_seconds=60.0, fallback_order=["gemma"])
+    gemma = FakeProvider(_spec("gemma", 4), fail=True)
+    reg.register("gemma", gemma)
+    with pytest.raises(RuntimeError):
+        await reg.resolve_and_encode(["a"], input_type="query")
+
+    clock[0] += 2.0
+    for text in ("b", "c", "d"):
+        with pytest.raises(RuntimeError):
+            await reg.resolve_and_encode([text], input_type="query")
+
+    assert gemma.encode_calls == 2
+
+
+@pytest.mark.asyncio
 async def test_registry_respects_acceptable_identities():
     reg, primary, _ = _registry()
 

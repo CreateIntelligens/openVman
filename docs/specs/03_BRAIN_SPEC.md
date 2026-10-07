@@ -45,6 +45,8 @@
 | `symmetric` | `task: sentence similarity \| query: ` | 對稱比較 |
 
 * **設定**：模型、revision、批次大小（`EMBEDDING_GEMMA_BATCH_SIZE`，預設 16）、最大長度（`EMBEDDING_GEMMA_MAX_LENGTH`，預設 2048）與裝置（`EMBEDDING_DEVICE`，預設 `cuda`）的預設值都在 `brain/embedding/app.py`。
+* **排程與合批**：請求進兩條佇列，查詢（`query`、`search_query`）先算，文件（`document`）其次；有文件在等時，連續 4 批查詢後先算一批文件。GPU 一次只跑一批（`EMBEDDING_MAX_CONCURRENCY`，預設 1，是同時跑的批數），忙的時候排隊的請求合成一批：最多 64 段、合計 16,000 字，放不下的留給下一批，順序不變。短查詢的時間幾乎都是固定開銷（1 句與 32 句相差不到 10 ms），所以合批主要加快查詢；前向批次大小照 `EMBEDDING_GEMMA_BATCH_SIZE`，全是 256 字以內的短句時一次 64 句，VRAM 峰值不因合批變大。合批失敗時逐一重算，只有出問題的那個請求回錯。每批算完都釋放 CUDA 快取，閒置時只留模型權重。
+* **失敗與冷卻**：provider 失敗後冷卻 `EMBEDDING_COOLDOWN_SECONDS`（預設 60 秒），期間改用下一家；所有 provider 都在冷卻時（只有 Gemma 一家時一失敗就是）每秒放一個請求去試，成功就解除，其餘請求直接回 503。CUDA OOM 會先釋放快取、改成一次一段重試。壓測與 OOM 實驗見 `scripts/experiments/embedding-load/`。
 * **Brain 端 client**（`memory/embedder.py`）：每批 `EMBEDDING_SERVICE_CHUNK_SIZE`（32）段，逾時 `EMBEDDING_SERVICE_TIMEOUT`（30 秒），最多重試 `EMBEDDING_SERVICE_MAX_RETRIES`（3）次。Gateway 不可達、回傳未授權的 identity 或向量規格不符時，Brain fail closed，不在 API process 內自行改用其他 provider。
 
 #### 2.2 Embedding 版本與 identity

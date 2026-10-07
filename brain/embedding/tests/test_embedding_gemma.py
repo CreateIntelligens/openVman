@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 import sys
 import types
@@ -125,3 +126,107 @@ async def test_caller_order_of_acceptable_identities_wins_over_fallback_order(fa
         ["q"], input_type="query", acceptable_identities=[other_query, gemma_query],
     )
     assert spec.provider == "other"
+
+
+class _IndexedModel:
+    """Each vector encodes its input text's length, so split results can be checked."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def encode(self, inputs, **_kwargs):
+        self.calls.append(list(inputs))
+        if any("BAD" in text for text in inputs):
+            raise RuntimeError("bad input")
+        return np.array([[float(len(text)), 1.0] + [0.0] * 766 for text in inputs], dtype=np.float32)
+
+
+async def _loaded_provider(fake_st) -> tuple[GemmaLocalProvider, _IndexedModel]:
+    provider = GemmaLocalProvider(device="cpu")
+    await provider.encode(["warm"], input_type="query")
+    model = _IndexedModel()
+    provider._model = model
+    return provider, model
+
+
+def _length_of(vector: list[float]) -> float:
+    # 向量是 [len, 1, 0...] 正規化後的結果，比例還原長度。
+    return round(vector[0] / vector[1])
+
+
+@pytest.mark.asyncio
+async def test_queued_requests_share_one_model_call(fake_st):
+    provider, model = await _loaded_provider(fake_st)
+
+    results = await asyncio.gather(
+        provider.encode(["a"], input_type="document"),
+        provider.encode(["bb", "ccc"], input_type="document"),
+        provider.encode(["dddd"], input_type="document"),
+    )
+
+    assert len(model.calls) == 1
+    prefix = len("title: none | text: ")
+    assert [[_length_of(v) - prefix for v in vectors] for vectors in results] == [[1], [2, 3], [4]]
+    await provider.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_a_failing_request_does_not_fail_the_rest_of_its_batch(fake_st):
+    provider, model = await _loaded_provider(fake_st)
+
+    results = await asyncio.gather(
+        provider.encode(["ok one"], input_type="query"),
+        provider.encode(["BAD"], input_type="query"),
+        provider.encode(["ok two"], input_type="query"),
+        return_exceptions=True,
+    )
+
+    assert isinstance(results[1], RuntimeError)
+    assert not isinstance(results[0], Exception) and not isinstance(results[2], Exception)
+    assert len(model.calls) == 4  # 合批一次失敗，再逐一重算三次
+    await provider.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_batches_stop_at_the_size_limit(fake_st, monkeypatch):
+    import local_providers
+
+    monkeypatch.setattr(local_providers, "_MERGE_MAX_TEXTS", 3)
+    provider, model = await _loaded_provider(fake_st)
+
+    await asyncio.gather(*(provider.encode([str(i)], input_type="query") for i in range(5)))
+
+    assert [len(call) for call in model.calls] == [3, 2]
+    await provider.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_queries_run_before_queued_documents(fake_st):
+    provider, model = await _loaded_provider(fake_st)
+
+    await asyncio.gather(
+        provider.encode(["doc"], input_type="document"),
+        provider.encode(["q1"], input_type="search_query"),
+        provider.encode(["q2"], input_type="query"),
+    )
+
+    assert model.calls[0] == ["task: search result | query: q1", "task: question answering | query: q2"]
+    assert model.calls[1] == ["title: none | text: doc"]
+    await provider.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_documents_are_not_starved_by_a_stream_of_queries(fake_st, monkeypatch):
+    import local_providers
+
+    monkeypatch.setattr(local_providers, "_MERGE_MAX_TEXTS", 1)
+    provider, model = await _loaded_provider(fake_st)
+
+    await asyncio.gather(
+        provider.encode(["doc"], input_type="document"),
+        *(provider.encode([f"q{i}"], input_type="query") for i in range(8)),
+    )
+
+    order = [call[0] for call in model.calls]
+    assert order.index("title: none | text: doc") == local_providers._QUERY_BATCHES_BEFORE_DOCUMENTS
+    await provider.shutdown()

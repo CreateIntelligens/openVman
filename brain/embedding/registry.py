@@ -19,6 +19,7 @@ class _ProviderState:
     instance: Any
     failure_count: int = 0
     last_failure_time: float = 0.0
+    last_probe_time: float = 0.0
 
 
 class ProviderRegistry:
@@ -27,9 +28,11 @@ class ProviderRegistry:
     def __init__(
         self,
         cooldown_seconds: float = 60.0,
+        probe_interval_seconds: float = 1.0,
         fallback_order: Sequence[str] | None = None,
     ) -> None:
         self.cooldown_seconds = cooldown_seconds
+        self.probe_interval_seconds = probe_interval_seconds
         self.fallback_order = list(fallback_order or ["gemma"])
         self._providers: dict[str, _ProviderState] = {}
         self._readiness_lock = asyncio.Lock()
@@ -66,6 +69,23 @@ class ProviderRegistry:
         if state.failure_count == 0:
             return False
         return (now - state.last_failure_time) < self.cooldown_seconds
+
+
+    def _all_in_cooldown(self, names: list[str], now: float) -> bool:
+        return bool(names) and all(self._is_in_cooldown(self._providers[name], now) for name in names)
+
+    def _claim_probe(self, state: _ProviderState, now: float) -> bool:
+        """Let one request per ``probe_interval_seconds`` retry a provider in cooldown.
+
+        冷卻是為了跳過壞掉的那家、改用下一家；全部都在冷卻（只剩 Gemma 一家時一失敗就是）
+        還整段跳過，等於服務停擺。實測 GPU 被別的程式佔滿、OOM 一次後，GPU 早已放掉，
+        仍拒絕所有請求到 60 秒冷卻結束。改成每秒放一個請求去試，成功就解除；其餘請求
+        照樣快速回錯，模型真的壞掉時也不會每個請求都去重載。
+        """
+        if now - max(state.last_failure_time, state.last_probe_time) < self.probe_interval_seconds:
+            return False
+        state.last_probe_time = now
+        return True
 
     def _record_success(self, state: _ProviderState) -> None:
         state.failure_count = 0
@@ -192,12 +212,13 @@ class ProviderRegistry:
             logger.warning(msg)
             raise RuntimeError(msg)
 
+        retry_all = self._all_in_cooldown(candidate_names, now)
         for name in candidate_names:
             state = self._providers[name]
             provider = state.instance
             spec = provider.spec(input_semantics=input_type)
 
-            if self._is_in_cooldown(state, now):
+            if self._is_in_cooldown(state, now) and not (retry_all and self._claim_probe(state, now)):
                 attempts.append({
                     "provider": name,
                     "model": spec.model,
