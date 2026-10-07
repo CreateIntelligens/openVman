@@ -118,6 +118,12 @@ _PROMPT_LINE = (
     "search_knowledge；回答列出的產品以 filter_products 的 matches 為準，search_knowledge 的片段常不完整，"
     "不能只憑片段列款式或說其他款沒有資料。"
 )
+# 規格表常常只收了一部分產品（鶴記只有 EDW、EUB-M），沒講範圍時模型把 matches 當成全部，
+# 跨系列的選型題只列規格表裡的款式，還說「共 N 款」。
+_SCOPE_LINE = (
+    "規格表只收錄「{title}」，不是全部產品：問題不限這些產品時，規格表以外的款式依 search_knowledge "
+    "片段補列，並說明完整比較只涵蓋規格表收錄的範圍。"
+)
 
 
 def product_prompt_line(project_id: str) -> str:
@@ -126,7 +132,9 @@ def product_prompt_line(project_id: str) -> str:
         catalog = load_product_catalog(project_id)
     except ValueError:
         return _PROMPT_LINE
-    return _PROMPT_LINE if catalog is not None else ""
+    if catalog is None:
+        return ""
+    return _PROMPT_LINE + _SCOPE_LINE.format(title=catalog.title)
 
 
 def _scalar(spec: CatalogField, raw: Any) -> Any:

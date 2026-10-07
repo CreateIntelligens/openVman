@@ -223,6 +223,8 @@ def test_tool_reports_a_non_numeric_value_with_the_unit(workspace):
 def test_prompt_line_only_for_projects_with_a_catalog(workspace, monkeypatch):
     from tools.builtin import product_tools
 
-    assert "第一輪必須同時呼叫 filter_products" in product_tools.product_prompt_line("p")
+    line = product_tools.product_prompt_line("p")
+    assert "第一輪必須同時呼叫 filter_products" in line
+    assert "規格表只收錄「測試泵浦」，不是全部產品" in line
     monkeypatch.setattr(product_tools, "load_product_catalog", lambda _project: None)
     assert product_tools.product_prompt_line("p") == ""

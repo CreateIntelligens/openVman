@@ -173,7 +173,7 @@ workspace 不存在時，啟動或首次使用會建立 scaffold 與預設模板
 - `unknown`：用到的欄位是 null，不能視為不符合。
 - `excluded_count`：確定不符合的數量。
 
-工具說明會帶入該專案的欄位與單位；有規格表的專案，系統提示另有一條規則，要求選型、比較、極值類問題在第一輪同時呼叫 `filter_products` 與 `search_knowledge`，並以 `matches` 為準列產品，所以 `fast` 模式（不准追加工具）也用得到。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
+工具說明會帶入該專案的欄位與單位；有規格表的專案，系統提示另有一條規則，要求選型、比較、極值類問題在第一輪同時呼叫 `filter_products` 與 `search_knowledge`，並以 `matches` 為準列產品，所以 `fast` 模式（不准追加工具）也用得到。規則同時寫明規格表只收錄 `title` 所列的範圍，問題不限這些產品時，範圍外的款式依檢索片段補列；規格表沒收齊全部產品時，`title` 要寫清楚涵蓋哪些系列。範例規格表見 [`scripts/experiments/product-notes/catalog/_catalog.yaml`](../scripts/experiments/product-notes/catalog/_catalog.yaml)，設計見 [docs/plans/product-spec-filter.md](../docs/plans/product-spec-filter.md)。
 
 ### 網路工具（2md）
 
